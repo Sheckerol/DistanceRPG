@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="../GameEngine/GameEngine.Core/GameEngine.Core.csproj" />
+  <Project Path="GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj" />
+  <Project Path="GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj" />
+</Solution>
