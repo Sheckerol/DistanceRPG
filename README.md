@@ -30,7 +30,7 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 | Input | Action |
 | --- | --- |
 | WASD / arrows | Move the active character |
-| 1–4 / Tab / click | Switch party member |
+| 1–4 / Tab / click | Switch party member (click their box or the party list) |
 | Left-click enemy | Attack with the equipped weapon |
 | Space / Enter | End turn (banks half your unspent movement) |
 | I / B | Inventory (2/3 swaps a bag slot with the equipped slot) |

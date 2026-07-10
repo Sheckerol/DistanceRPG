@@ -123,15 +123,44 @@ public sealed class DungeonHud
         DrawCentered(w, 42f, weaponLabel, 1.5f, Yellow);
     }
 
+    // Party selector layout, shared between drawing and click hit-testing.
+    private const float SelectorX = 14f;
+    private const float SelectorTop = 130f;
+    private const float SelectorRowPitch = 30f;
+    private const float SelectorRowBand = 26f; // clickable height within each row's pitch
+    private const float SelectorWidth = 150f;
+
+    /// <summary>
+    /// Hit-test the party selector rows against a mouse position in window
+    /// pixels. The rows double as click-to-select buttons.
+    /// </summary>
+    public static bool HitPartySelector(Vector2 mouse, int partyCount, out int index)
+    {
+        index = -1;
+        if (mouse.X < SelectorX - 4f || mouse.X > SelectorX + SelectorWidth) return false;
+        float rel = mouse.Y - (SelectorTop - 5f);
+        if (rel < 0f) return false;
+        int row = (int)(rel / SelectorRowPitch);
+        if (row >= partyCount || rel - row * SelectorRowPitch > SelectorRowBand) return false;
+        index = row;
+        return true;
+    }
+
     private void DrawPartySelector(DungeonScene scene)
     {
+        int hovered = -1;
+        bool hasHover = !scene.AnyMenuOpen
+            && HitPartySelector(scene.MousePos, scene.Party.Count, out hovered);
+
         for (int i = 0; i < scene.Party.Count; i++)
         {
             var state = scene.Party[i].State;
             bool isActive = i == scene.ActiveIndex;
             var color = !state.Alive ? DarkGrey : scene.PartyColor(i);
+            if (hasHover && hovered == i && state.Alive)
+                color = Vector4.Lerp(color, White, 0.5f);
             string marker = isActive ? ">" : " ";
-            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}", 14f, 130f + i * 30f, 2f, color);
+            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}", SelectorX, SelectorTop + i * SelectorRowPitch, 2f, color);
         }
     }
 

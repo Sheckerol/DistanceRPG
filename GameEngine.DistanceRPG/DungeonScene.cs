@@ -107,6 +107,7 @@ public class DungeonScene : Scene
     public bool EnemyVisible => _enemyVisible;
     public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+    public Vector2 MousePos => _mousePos;
     public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
@@ -385,6 +386,10 @@ public class DungeonScene : Scene
         input.SubscribeToKeyPressed(_ => _right = true, Keys.D, Keys.Right);
         input.SubscribeToKeyReleased(_ => _right = false, Keys.D, Keys.Right);
 
+        // KeyPressed fires once per physical press (the engine routes OS
+        // auto-repeat to KeyRepeated), so one-shot actions like Tab-cycling
+        // never machine-gun while held.
+        //
         // Number keys select party members, equip inventory slots while the
         // bag is open (2/3 swap that slot with the equipped slot), or pick a
         // pause-menu option (1 close, 2 exit).
@@ -648,6 +653,14 @@ public class DungeonScene : Scene
     private void HandleClick()
     {
         if (AnyMenuOpen) return;
+
+        // The HUD party list doubles as buttons and wins over world picking.
+        if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))
+        {
+            SetActiveCharacter(hudIdx); // ignores dead members
+            return;
+        }
+
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
         if (w <= 0 || h <= 0) return;

@@ -14,7 +14,8 @@ public class DistanceRpgGame : Game
 
     public DistanceRpgGame()
     {
-        // Esc quits only if the scene doesn't consume it (e.g. to close the inventory).
+        // Esc quits only if the scene doesn't consume it (menus). KeyPressed
+        // is edge-only, so holding Esc doesn't flicker the pause menu.
         _inputEventManager.SubscribeToKeyPressed(_ =>
         {
             if (_dungeon?.HandleEscape() != true) Close();
