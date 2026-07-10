@@ -423,6 +423,14 @@ public class DungeonScene : Scene
         InventoryOpen = !InventoryOpen;
     }
 
+    /// <summary>Escape closes the inventory if open. True if the key was consumed.</summary>
+    public bool HandleEscape()
+    {
+        if (!InventoryOpen) return false;
+        InventoryOpen = false;
+        return true;
+    }
+
     /// <summary>Swap an inventory slot with the equipped slot (slot 0).</summary>
     private void EquipSlot(int slot)
     {

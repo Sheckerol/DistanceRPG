@@ -35,7 +35,7 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 | Space / Enter | End turn (banks half your unspent movement) |
 | I / B | Inventory (2/3 swaps a bag slot with the equipped slot) |
 | Scroll wheel | Zoom |
-| Esc | Quit |
+| Esc | Close inventory, otherwise quit |
 
 Outside combat — while no living enemy has been sighted this turn — the rest
 of the party marches behind the active character in a single-file line, and
