@@ -157,6 +157,7 @@ public class DungeonScene : Scene
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
         UpdateMarchingFollowers(deltaTime);
+        AutoEndTurnWhenDry();
 
         // While the enemy walks its waypoints, mirror its logic position and
         // refresh visibility when it crosses tile boundaries.
@@ -585,6 +586,25 @@ public class DungeonScene : Scene
             MoveFollowerToward(member, target.Value, stopAt, deltaTime);
             prev = (member.State.X, member.State.Y);
         }
+    }
+
+    /// <summary>
+    /// Outside combat, cycle the turn automatically once the whole party is
+    /// out of movement, so exploring doesn't need Space every few tiles.
+    /// Combat turns always end by hand — held-back movement is a choice there.
+    /// </summary>
+    private void AutoEndTurnWhenDry()
+    {
+        if (!Marching || AnyMenuOpen) return; // Marching implies the player phase
+
+        // Budgets deplete through float math and may stop just shy of zero;
+        // treat anything below a hair's width as dry (a full budget is 160).
+        const float dry = 0.05f;
+        foreach (var member in _party)
+            if (member.State.Alive && member.State.DistLeft > dry)
+                return;
+
+        _turns.EndTurn();
     }
 
     private void MoveFollowerToward(CharacterObject member, (float X, float Y) target, float stopAt, float deltaTime)
