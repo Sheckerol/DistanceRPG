@@ -98,6 +98,7 @@ public class DungeonScene : Scene
     public EnemyObject Enemy => _enemy;
     public bool EnemyVisible => _enemyVisible;
     public bool InventoryOpen { get; private set; }
+    public bool MenuOpen { get; private set; }
     public float LastBankedMovement { get; private set; }
 
     /// <summary>
@@ -373,15 +374,29 @@ public class DungeonScene : Scene
         input.SubscribeToKeyPressed(_ => _right = true, Keys.D, Keys.Right);
         input.SubscribeToKeyReleased(_ => _right = false, Keys.D, Keys.Right);
 
-        // Number keys select party members, or equip inventory slots while the
-        // bag is open (2/3 swap that slot with the equipped slot).
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) SetActiveCharacter(0); }, Keys.D1);
-        input.SubscribeToKeyPressed(_ => { if (InventoryOpen) EquipSlot(1); else SetActiveCharacter(1); }, Keys.D2);
-        input.SubscribeToKeyPressed(_ => { if (InventoryOpen) EquipSlot(2); else SetActiveCharacter(2); }, Keys.D3);
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) SetActiveCharacter(3); }, Keys.D4);
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) CycleActiveCharacter(); }, Keys.Tab);
+        // Number keys select party members, equip inventory slots while the
+        // bag is open (2/3 swap that slot with the equipped slot), or pick a
+        // pause-menu option (1 close, 2 exit).
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (MenuOpen) MenuOpen = false;
+            else if (!InventoryOpen) SetActiveCharacter(0);
+        }, Keys.D1);
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (MenuOpen) _game.Close();
+            else if (InventoryOpen) EquipSlot(1);
+            else SetActiveCharacter(1);
+        }, Keys.D2);
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (MenuOpen) return;
+            if (InventoryOpen) EquipSlot(2); else SetActiveCharacter(2);
+        }, Keys.D3);
+        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) SetActiveCharacter(3); }, Keys.D4);
+        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) CycleActiveCharacter(); }, Keys.Tab);
 
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
+        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
@@ -419,15 +434,23 @@ public class DungeonScene : Scene
 
     private void ToggleInventory()
     {
-        if (_turns.Phase == TurnPhase.GameOver) return;
+        if (_turns.Phase == TurnPhase.GameOver || MenuOpen) return;
         InventoryOpen = !InventoryOpen;
     }
 
-    /// <summary>Escape closes the inventory if open. True if the key was consumed.</summary>
+    /// <summary>
+    /// Escape closes the inventory, then toggles the pause menu. Only on the
+    /// game-over screen is it left unconsumed, so the game quits directly.
+    /// </summary>
     public bool HandleEscape()
     {
-        if (!InventoryOpen) return false;
-        InventoryOpen = false;
+        if (_turns.Phase == TurnPhase.GameOver) return false;
+        if (InventoryOpen)
+        {
+            InventoryOpen = false;
+            return true;
+        }
+        MenuOpen = !MenuOpen;
         return true;
     }
 
@@ -440,7 +463,7 @@ public class DungeonScene : Scene
 
     private void UpdateActiveCharacterMovement(float deltaTime)
     {
-        if (_turns.Phase != TurnPhase.Player || InventoryOpen) return;
+        if (_turns.Phase != TurnPhase.Player || InventoryOpen || MenuOpen) return;
 
         var state = ActiveCharacter.State;
         if (!state.Alive || state.DistLeft <= 0f) return;
@@ -532,7 +555,7 @@ public class DungeonScene : Scene
         }
         _wasMarching = true;
 
-        if (InventoryOpen) return;
+        if (InventoryOpen || MenuOpen) return;
 
         var leader = ActiveCharacter.State;
         _march.SetLeader(leader.X, leader.Y);
@@ -596,7 +619,7 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (InventoryOpen) return;
+        if (InventoryOpen || MenuOpen) return;
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
         if (w <= 0 || h <= 0) return;

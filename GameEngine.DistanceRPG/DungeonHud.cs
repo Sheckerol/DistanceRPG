@@ -74,7 +74,7 @@ public sealed class DungeonHud
         // Dim layers go first so all text draws on top of them.
         if (turns.Phase == TurnPhase.GameOver)
             _fade.Draw(_game.ShaderManager, 0.7f);
-        else if (scene.InventoryOpen)
+        else if (scene.InventoryOpen || scene.MenuOpen)
             _fade.Draw(_game.ShaderManager, 0.65f);
 
         DrawTopReadouts(w, active);
@@ -91,6 +91,9 @@ public sealed class DungeonHud
 
         if (scene.InventoryOpen)
             DrawInventory(w, h, active);
+
+        if (scene.MenuOpen)
+            DrawMenu(w, h);
 
         if (turns.Phase == TurnPhase.GameOver)
         {
@@ -175,6 +178,15 @@ public sealed class DungeonHud
         }
 
         DrawCentered(w, top + 70f + 3 * 46f + 20f, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
+    }
+
+    private void DrawMenu(int w, int h)
+    {
+        float top = h / 2f - 90f;
+        DrawCentered(w, top, "PAUSED", 4f, Cyan);
+        DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
+        DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
+        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
