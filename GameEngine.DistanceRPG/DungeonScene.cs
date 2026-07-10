@@ -7,6 +7,14 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
+/// <summary>Full-screen menus; at most one is open at a time.</summary>
+public enum GameMenu
+{
+    None,
+    Inventory,
+    Pause,
+}
+
 /// <summary>
 /// The main gameplay scene: a procedurally generated dungeon explored by a
 /// four-character party in turn-based, distance-budgeted combat. The dungeon
@@ -97,8 +105,10 @@ public class DungeonScene : Scene
     public TurnSystem Turns => _turns;
     public EnemyObject Enemy => _enemy;
     public bool EnemyVisible => _enemyVisible;
-    public bool InventoryOpen { get; private set; }
-    public bool MenuOpen { get; private set; }
+    public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
+    public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+    public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
+    public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
 
     /// <summary>
@@ -304,7 +314,7 @@ public class DungeonScene : Scene
         {
             Log.Info($"[Turns] End of turn — banked {saved} movement");
             LastBankedMovement = saved;
-            if (InventoryOpen) InventoryOpen = false;
+            if (InventoryOpen) ActiveMenu = GameMenu.None;
             ResetFogVisibility();
         };
 
@@ -379,24 +389,24 @@ public class DungeonScene : Scene
         // pause-menu option (1 close, 2 exit).
         input.SubscribeToKeyPressed(_ =>
         {
-            if (MenuOpen) MenuOpen = false;
-            else if (!InventoryOpen) SetActiveCharacter(0);
+            if (PauseMenuOpen) ActiveMenu = GameMenu.None;
+            else if (!AnyMenuOpen) SetActiveCharacter(0);
         }, Keys.D1);
         input.SubscribeToKeyPressed(_ =>
         {
-            if (MenuOpen) _game.Close();
+            if (PauseMenuOpen) _game.Close();
             else if (InventoryOpen) EquipSlot(1);
             else SetActiveCharacter(1);
         }, Keys.D2);
         input.SubscribeToKeyPressed(_ =>
         {
-            if (MenuOpen) return;
-            if (InventoryOpen) EquipSlot(2); else SetActiveCharacter(2);
+            if (InventoryOpen) EquipSlot(2);
+            else if (!AnyMenuOpen) SetActiveCharacter(2);
         }, Keys.D3);
-        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) SetActiveCharacter(3); }, Keys.D4);
-        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) CycleActiveCharacter(); }, Keys.Tab);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) SetActiveCharacter(3); }, Keys.D4);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) CycleActiveCharacter(); }, Keys.Tab);
 
-        input.SubscribeToKeyPressed(_ => { if (!MenuOpen && !InventoryOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
@@ -434,23 +444,18 @@ public class DungeonScene : Scene
 
     private void ToggleInventory()
     {
-        if (_turns.Phase == TurnPhase.GameOver || MenuOpen) return;
-        InventoryOpen = !InventoryOpen;
+        if (_turns.Phase == TurnPhase.GameOver || PauseMenuOpen) return;
+        ActiveMenu = InventoryOpen ? GameMenu.None : GameMenu.Inventory;
     }
 
     /// <summary>
-    /// Escape closes the inventory, then toggles the pause menu. Only on the
-    /// game-over screen is it left unconsumed, so the game quits directly.
+    /// Escape closes whatever menu is open, or opens the pause menu. Only on
+    /// the game-over screen is it left unconsumed, so the game quits directly.
     /// </summary>
     public bool HandleEscape()
     {
         if (_turns.Phase == TurnPhase.GameOver) return false;
-        if (InventoryOpen)
-        {
-            InventoryOpen = false;
-            return true;
-        }
-        MenuOpen = !MenuOpen;
+        ActiveMenu = AnyMenuOpen ? GameMenu.None : GameMenu.Pause;
         return true;
     }
 
@@ -463,7 +468,7 @@ public class DungeonScene : Scene
 
     private void UpdateActiveCharacterMovement(float deltaTime)
     {
-        if (_turns.Phase != TurnPhase.Player || InventoryOpen || MenuOpen) return;
+        if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
 
         var state = ActiveCharacter.State;
         if (!state.Alive || state.DistLeft <= 0f) return;
@@ -555,7 +560,7 @@ public class DungeonScene : Scene
         }
         _wasMarching = true;
 
-        if (InventoryOpen || MenuOpen) return;
+        if (AnyMenuOpen) return;
 
         var leader = ActiveCharacter.State;
         _march.SetLeader(leader.X, leader.Y);
@@ -619,7 +624,7 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (InventoryOpen || MenuOpen) return;
+        if (AnyMenuOpen) return;
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
         if (w <= 0 || h <= 0) return;

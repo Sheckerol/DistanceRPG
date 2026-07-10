@@ -74,7 +74,7 @@ public sealed class DungeonHud
         // Dim layers go first so all text draws on top of them.
         if (turns.Phase == TurnPhase.GameOver)
             _fade.Draw(_game.ShaderManager, 0.7f);
-        else if (scene.InventoryOpen || scene.MenuOpen)
+        else if (scene.AnyMenuOpen)
             _fade.Draw(_game.ShaderManager, 0.65f);
 
         DrawTopReadouts(w, active);
@@ -92,7 +92,7 @@ public sealed class DungeonHud
         if (scene.InventoryOpen)
             DrawInventory(w, h, active);
 
-        if (scene.MenuOpen)
+        if (scene.PauseMenuOpen)
             DrawMenu(w, h);
 
         if (turns.Phase == TurnPhase.GameOver)
