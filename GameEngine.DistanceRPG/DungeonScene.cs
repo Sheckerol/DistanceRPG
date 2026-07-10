@@ -1,5 +1,6 @@
 using GameEngine.Core;
 using GameEngine.Core.Diagnostics;
+using GameEngine.Core.Particles;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -43,6 +44,15 @@ public class DungeonScene : Scene
     private FogState _fog = null!;
     private FogOverlayRenderer _fogOverlay = null!;
     private TurnSystem _turns = null!;
+
+    // Fog particles: mist puffs on reveal (staggered with the ripple) and
+    // ambient wisps drifting over explored-but-out-of-view tiles.
+    private ParticleEmitter _mistEmitter = null!;
+    private ParticleEmitter _wispEmitter = null!;
+    private readonly List<(float TimeLeft, Vector3 Position)> _pendingMistBursts = new();
+    private readonly Random _fxRng = new();
+    private float _wispTimer;
+    private const float WispInterval = 0.15f;
 
     private readonly List<CharacterObject> _party = new();
     private readonly Dictionary<CharacterObject, (int R, int C)> _lastFogTile = new();
@@ -96,7 +106,8 @@ public class DungeonScene : Scene
         BuildWalls();
         SpawnParty();
         SpawnEnemy();
-        BuildFogOverlay(); // added last: its translucent pass must draw over everything
+        BuildFogOverlay();   // after all geometry: its translucent pass blends over everything
+        BuildFogParticles(); // after the fog overlay: mist blends over the shroud
         WireTurnSystem();
         WireInput();
 
@@ -117,6 +128,7 @@ public class DungeonScene : Scene
 
         _turns.Update(deltaTime);
         _hud.Update(deltaTime);
+        UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
 
         // While the enemy walks its waypoints, mirror its logic position and
@@ -225,6 +237,46 @@ public class DungeonScene : Scene
         _fogOverlay.Fog = _fog;
         _fogOverlay.Height = WallHeight + 0.05f;
         AddGameObject(fogObject);
+    }
+
+    // Added after the fog overlay so the mist blends over the shroud.
+    private void BuildFogParticles()
+    {
+        var mistObject = new TransformNodeObject();
+        _mistEmitter = mistObject.AddComponent<ParticleEmitter>();
+        var mist = _mistEmitter.Simulation;
+        mist.LifetimeMin = 0.7f;
+        mist.LifetimeMax = 1.3f;
+        mist.Direction = Vector3.UnitY;
+        mist.SpreadDegrees = 65f;
+        mist.SpeedMin = 0.25f;
+        mist.SpeedMax = 0.7f;
+        mist.SizeMin = 0.35f;
+        mist.SizeMax = 0.6f;
+        mist.EndSizeFactor = 2.5f;
+        mist.StartColor = new Vector4(0.72f, 0.78f, 0.92f, 0.4f);
+        mist.EndColor = new Vector4(0.72f, 0.78f, 0.92f, 0f);
+        mist.Drag = 1.2f;
+        mist.Gravity = new Vector3(0f, 0.2f, 0f); // gentle updraft as the fog dissipates
+        AddGameObject(mistObject);
+
+        var wispObject = new TransformNodeObject();
+        _wispEmitter = wispObject.AddComponent<ParticleEmitter>();
+        var wisp = _wispEmitter.Simulation;
+        wisp.LifetimeMin = 2.5f;
+        wisp.LifetimeMax = 4f;
+        wisp.Direction = Vector3.UnitY;
+        wisp.SpreadDegrees = 90f;
+        wisp.SpeedMin = 0.1f;
+        wisp.SpeedMax = 0.3f;
+        wisp.SizeMin = 0.5f;
+        wisp.SizeMax = 1.0f;
+        wisp.EndSizeFactor = 1.8f;
+        wisp.StartColor = new Vector4(0.6f, 0.65f, 0.8f, 0.14f);
+        wisp.EndColor = new Vector4(0.6f, 0.65f, 0.8f, 0f);
+        wisp.Drag = 0.4f;
+        wisp.Gravity = new Vector3(0f, 0.05f, 0f);
+        AddGameObject(wispObject);
     }
 
     private void WireTurnSystem()
@@ -460,29 +512,96 @@ public class DungeonScene : Scene
 
     // ── Fog & enemy visibility ───────────────────────────────────────────────
 
-    private void UpdateFogFor(CharacterObject member)
+    private void UpdateFogFor(CharacterObject member, bool animate = true)
     {
         var tile = LogicTile(member.State.X, member.State.Y);
         if (_lastFogTile.TryGetValue(member, out var last) && last == tile) return;
         _lastFogTile[member] = tile;
 
-        if (_fog.RevealAt(tile.R, tile.C, _fogBoxes.FogBoxes).Count > 0)
+        var newly = _fog.RevealAt(tile.R, tile.C, _fogBoxes.FogBoxes);
+        if (newly.Count > 0)
+        {
             _fogOverlay.MarkDirty();
+            if (animate)
+            {
+                _fogOverlay.AnimateReveal(newly, tile);
+                QueueRevealMist(newly, tile);
+            }
+        }
         UpdateEnemyVisibility();
     }
 
-    /// <summary>Start-of-enemy-turn reset: only currently-occupied boxes stay lit.</summary>
+    /// <summary>
+    /// Start-of-enemy-turn reset: only currently-occupied boxes stay lit.
+    /// Tiles that stayed in view re-reveal silently (no flash, matching the
+    /// prototype); tiles that left view grow their shroud back as a ripple
+    /// closing toward the active character.
+    /// </summary>
     private void ResetFogVisibility()
     {
+        var oldVisible = (bool[,])_fog.Visible.Clone();
+
         _fog.ResetVisibility();
         _lastFogTile.Clear();
         foreach (var member in _party)
         {
             if (member.State.Alive)
-                UpdateFogFor(member);
+                UpdateFogFor(member, animate: false);
         }
+
+        var lostTiles = new List<(int R, int C)>();
+        for (int r = 0; r < _fog.Rows; r++)
+            for (int c = 0; c < _fog.Cols; c++)
+                if (oldVisible[r, c] && !_fog.Visible[r, c] && _fog.Seen[r, c])
+                    lostTiles.Add((r, c));
+        _fogOverlay.AnimateRefog(lostTiles, LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y));
+
         _fogOverlay.MarkDirty();
         UpdateEnemyVisibility();
+    }
+
+    /// <summary>Schedule mist puffs on revealed tiles, following the reveal ripple's stagger.</summary>
+    private void QueueRevealMist(IReadOnlyList<(int R, int C, bool WasSeen)> tiles, (int R, int C) origin)
+    {
+        foreach (var (r, c, _) in tiles)
+        {
+            int dist = Math.Abs(r - origin.R) + Math.Abs(c - origin.C);
+            var pos = WorldSpace.TileCenter(r, c, _fogOverlay.Height);
+            _pendingMistBursts.Add((dist * 0.018f + 0.1f, pos));
+        }
+    }
+
+    private void UpdateFogParticles(float deltaTime)
+    {
+        // Fire scheduled reveal puffs whose ripple delay has elapsed.
+        for (int i = _pendingMistBursts.Count - 1; i >= 0; i--)
+        {
+            var (timeLeft, pos) = _pendingMistBursts[i];
+            timeLeft -= deltaTime;
+            if (timeLeft <= 0f)
+            {
+                _mistEmitter.Burst(2, pos);
+                _pendingMistBursts.RemoveAt(i);
+            }
+            else
+            {
+                _pendingMistBursts[i] = (timeLeft, pos);
+            }
+        }
+
+        // Ambient wisps over explored-but-out-of-view tiles.
+        _wispTimer -= deltaTime;
+        if (_wispTimer > 0f) return;
+        _wispTimer = WispInterval;
+
+        for (int attempt = 0; attempt < 12; attempt++)
+        {
+            int r = _fxRng.Next(_fog.Rows);
+            int c = _fxRng.Next(_fog.Cols);
+            if (!_fog.Seen[r, c] || _fog.Visible[r, c]) continue;
+            _wispEmitter.Burst(1, WorldSpace.TileCenter(r, c, _fogOverlay.Height + 0.1f));
+            break;
+        }
     }
 
     private void UpdateEnemyVisibility()

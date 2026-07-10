@@ -29,9 +29,9 @@ public sealed class FogState
     /// also marked seen. Returns the tiles that just became visible so the
     /// presentation layer can animate them.
     /// </summary>
-    public List<(int R, int C)> RevealAt(int tileR, int tileC, IReadOnlyList<MapRect> fogBoxes)
+    public List<(int R, int C, bool WasSeen)> RevealAt(int tileR, int tileC, IReadOnlyList<MapRect> fogBoxes)
     {
-        var newlyVisible = new List<(int R, int C)>();
+        var newlyVisible = new List<(int R, int C, bool WasSeen)>();
 
         foreach (var box in fogBoxes)
         {
@@ -48,8 +48,8 @@ public sealed class FogState
                 {
                     if (Visible[r, c]) continue;
                     Visible[r, c] = true;
+                    newlyVisible.Add((r, c, Seen[r, c]));
                     Seen[r, c] = true;
-                    newlyVisible.Add((r, c));
                 }
             }
         }
