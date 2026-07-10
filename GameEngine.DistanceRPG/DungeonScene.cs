@@ -589,9 +589,11 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Outside combat, cycle the turn automatically once the whole party is
-    /// out of movement, so exploring doesn't need Space every few tiles.
-    /// Combat turns always end by hand — held-back movement is a choice there.
+    /// Outside combat, cycle the turn automatically once the slowest living
+    /// member is out of movement — the group is halted at that point anyway,
+    /// since the leader paces itself to the smallest budget. Exploring never
+    /// needs Space; combat turns always end by hand, where held-back movement
+    /// is a choice.
     /// </summary>
     private void AutoEndTurnWhenDry()
     {
@@ -601,10 +603,11 @@ public class DungeonScene : Scene
         // treat anything below a hair's width as dry (a full budget is 160).
         const float dry = 0.05f;
         foreach (var member in _party)
-            if (member.State.Alive && member.State.DistLeft > dry)
+            if (member.State.Alive && member.State.DistLeft <= dry)
+            {
+                _turns.EndTurn();
                 return;
-
-        _turns.EndTurn();
+            }
     }
 
     private void MoveFollowerToward(CharacterObject member, (float X, float Y) target, float stopAt, float deltaTime)
