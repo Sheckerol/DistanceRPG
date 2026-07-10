@@ -6,24 +6,28 @@ using OpenTK.Mathematics;
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// Renders the fog of war as a horizontal quad layer above the dungeon:
+/// Renders the fog of war as floor-to-ceiling boxes filling each fogged tile:
 /// never-seen tiles are opaque black (the world simply isn't there yet),
 /// explored-but-out-of-view tiles are dimmed with a translucent shroud.
+/// Only boundary faces are emitted — no interior walls between adjacent
+/// fogged tiles — so the camera can never peek under the fog and the
+/// translucent shroud blends exactly once per boundary crossing.
 ///
 /// Reveals and re-fogs ripple like the Phaser prototype: each tile's fog
-/// shrinks away (or the shroud grows back) over 250ms, staggered 18ms per
-/// Manhattan step from the triggering character, via <see cref="AnimateReveal"/>
-/// and <see cref="AnimateRefog"/>. The static tile mesh is rebuilt only when
-/// <see cref="MarkDirty"/> is called; animating tiles are drawn from a small
-/// per-frame dynamic buffer. Attach to a GameObject added to the scene
-/// <b>last</b> so the translucent passes blend over everything already drawn.
+/// cube shrinks away (or the shroud grows back) over 250ms, staggered 18ms
+/// per Manhattan step from the triggering character, via
+/// <see cref="AnimateReveal"/> and <see cref="AnimateRefog"/>. The static
+/// tile mesh is rebuilt only when <see cref="MarkDirty"/> is called;
+/// animating tiles are drawn from a small per-frame dynamic buffer. Attach
+/// to a GameObject added to the scene <b>last</b> so the translucent passes
+/// blend over everything already drawn.
 /// </summary>
 public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareComponent
 {
     /// <summary>Fog grids to visualize. Set once after construction.</summary>
     public FogState? Fog { get; set; }
 
-    /// <summary>Height of the fog layer, just above the wall tops.</summary>
+    /// <summary>Top of the fog volume, just above the wall tops. Boxes span the floor to here.</summary>
     public float Height { get; set; } = 1.25f;
 
     private const float DimAlpha = 0.65f;        // the prototype's explored-fog opacity
@@ -225,6 +229,18 @@ public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareC
         return (vao, vbo, ebo);
     }
 
+    private enum FogCat { Clear, Dim, Unseen }
+
+    /// <summary>Fog category of a tile; out-of-bounds and grow-back-animating tiles count as clear.</summary>
+    private FogCat CategoryAt(int r, int c)
+    {
+        var fog = Fog!;
+        if (r < 0 || c < 0 || r >= fog.Rows || c >= fog.Cols) return FogCat.Clear;
+        if (!fog.Seen[r, c]) return FogCat.Unseen;
+        if (fog.Visible[r, c]) return FogCat.Clear;
+        return _fillAnimTiles.Contains((r, c)) ? FogCat.Clear : FogCat.Dim;
+    }
+
     private void RebuildStaticMesh()
     {
         var fog = Fog!;
@@ -236,12 +252,22 @@ public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareC
         {
             for (int c = 0; c < fog.Cols; c++)
             {
-                bool seen = fog.Seen[r, c];
-                bool visible = fog.Visible[r, c];
-                if (seen && visible) continue;
-                if (_fillAnimTiles.Contains((r, c))) continue; // drawn animated until grown in
+                var cat = CategoryAt(r, c);
+                if (cat == FogCat.Clear) continue;
 
-                AddTileQuad(vertices, seen ? dimIndices : unseenIndices, r, c, scale: 1f);
+                // A side face exists only at a fog boundary: opaque fog shows
+                // its flank to anything not opaque (it is visible through the
+                // dim shroud), the dim shroud only to fully clear tiles —
+                // never against opaque fog, where the coplanar face would
+                // z-fight the black wall behind it.
+                bool FaceTo(int nr, int nc) => cat == FogCat.Unseen
+                    ? CategoryAt(nr, nc) != FogCat.Unseen
+                    : CategoryAt(nr, nc) == FogCat.Clear;
+
+                AddTileBox(vertices, cat == FogCat.Dim ? dimIndices : unseenIndices, r, c,
+                    xzScale: 1f, yScale: 1f,
+                    north: FaceTo(r - 1, c), south: FaceTo(r + 1, c),
+                    west: FaceTo(r, c - 1), east: FaceTo(r, c + 1));
             }
         }
 
@@ -259,21 +285,24 @@ public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareC
         foreach (var anim in _revealAnims)
         {
             // Before the ripple reaches this tile it is still fully fogged;
-            // then the quad shrinks away over the duration (ease-out).
+            // then the cube shrinks toward the floor over the duration
+            // (ease-out) while the scene spawns smoke puffs in its volume.
             float t = Math.Clamp((anim.Age - anim.Delay) / AnimDuration, 0f, 1f);
             float eased = 1f - (1f - t) * (1f - t);
             float scale = 1f - eased;
             if (scale <= 0f) continue;
-            AddTileQuad(vertices, anim.Dim ? dimIndices : opaqueIndices, anim.R, anim.C, scale);
+            AddTileBox(vertices, anim.Dim ? dimIndices : opaqueIndices, anim.R, anim.C,
+                xzScale: scale, yScale: scale, north: true, south: true, west: true, east: true);
         }
 
         foreach (var anim in _fillAnims)
         {
-            // Grows from nothing back to a full dim quad.
+            // Grows from nothing back to a full dim cube.
             float t = Math.Clamp((anim.Age - anim.Delay) / AnimDuration, 0f, 1f);
             float eased = 1f - (1f - t) * (1f - t);
             if (eased <= 0f) continue;
-            AddTileQuad(vertices, dimIndices, anim.R, anim.C, eased);
+            AddTileBox(vertices, dimIndices, anim.R, anim.C,
+                xzScale: eased, yScale: eased, north: true, south: true, west: true, east: true);
         }
 
         _animOpaqueIndexCount = opaqueIndices.Count;
@@ -281,21 +310,52 @@ public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareC
         UploadQuadMesh(_animVao, _animVbo, _animEbo, vertices, opaqueIndices, dimIndices);
     }
 
-    private void AddTileQuad(List<float> vertices, List<uint> indices, int r, int c, float scale)
+    /// <summary>
+    /// Emit a fog box for a tile: top face plus the requested side faces
+    /// (north = toward row-1, west = toward col-1). The box stands on the
+    /// floor; scales shrink it toward its floor center for animations.
+    /// No bottom face — the camera never sees fog from below.
+    /// </summary>
+    private void AddTileBox(List<float> vertices, List<uint> indices, int r, int c,
+        float xzScale, float yScale, bool north, bool south, bool west, bool east)
     {
-        uint baseIdx = (uint)(vertices.Count / 6);
-
-        float inset = (1f - scale) * WorldSpace.UnitsPerTile / 2f;
+        float inset = (1f - xzScale) * WorldSpace.UnitsPerTile / 2f;
         float x0 = c * WorldSpace.UnitsPerTile + inset;
         float x1 = (c + 1) * WorldSpace.UnitsPerTile - inset;
         float z0 = r * WorldSpace.UnitsPerTile + inset;
         float z1 = (r + 1) * WorldSpace.UnitsPerTile - inset;
+        float y1 = Height * yScale;
 
-        // 4 corners, normal up
-        vertices.AddRange(new[] { x0, Height, z0, 0f, 1f, 0f });
-        vertices.AddRange(new[] { x1, Height, z0, 0f, 1f, 0f });
-        vertices.AddRange(new[] { x1, Height, z1, 0f, 1f, 0f });
-        vertices.AddRange(new[] { x0, Height, z1, 0f, 1f, 0f });
+        AddFace(vertices, indices,
+            new Vector3(x0, y1, z0), new Vector3(x1, y1, z0),
+            new Vector3(x1, y1, z1), new Vector3(x0, y1, z1), Vector3.UnitY);
+
+        if (north)
+            AddFace(vertices, indices,
+                new Vector3(x0, 0f, z0), new Vector3(x1, 0f, z0),
+                new Vector3(x1, y1, z0), new Vector3(x0, y1, z0), -Vector3.UnitZ);
+        if (south)
+            AddFace(vertices, indices,
+                new Vector3(x1, 0f, z1), new Vector3(x0, 0f, z1),
+                new Vector3(x0, y1, z1), new Vector3(x1, y1, z1), Vector3.UnitZ);
+        if (west)
+            AddFace(vertices, indices,
+                new Vector3(x0, 0f, z1), new Vector3(x0, 0f, z0),
+                new Vector3(x0, y1, z0), new Vector3(x0, y1, z1), -Vector3.UnitX);
+        if (east)
+            AddFace(vertices, indices,
+                new Vector3(x1, 0f, z0), new Vector3(x1, 0f, z1),
+                new Vector3(x1, y1, z1), new Vector3(x1, y1, z0), Vector3.UnitX);
+    }
+
+    /// <summary>Quad a→b→c→d wound so its front faces along <paramref name="n"/>.</summary>
+    private static void AddFace(List<float> vertices, List<uint> indices,
+        Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n)
+    {
+        uint baseIdx = (uint)(vertices.Count / 6);
+        Span<Vector3> corners = stackalloc Vector3[] { a, b, c, d };
+        foreach (var v in corners)
+            vertices.AddRange(new[] { v.X, v.Y, v.Z, n.X, n.Y, n.Z });
 
         indices.Add(baseIdx);
         indices.Add(baseIdx + 2);

@@ -245,19 +245,19 @@ public class DungeonScene : Scene
         var mistObject = new TransformNodeObject();
         _mistEmitter = mistObject.AddComponent<ParticleEmitter>();
         var mist = _mistEmitter.Simulation;
-        mist.LifetimeMin = 0.7f;
-        mist.LifetimeMax = 1.3f;
+        mist.LifetimeMin = 0.8f;
+        mist.LifetimeMax = 1.5f;
         mist.Direction = Vector3.UnitY;
-        mist.SpreadDegrees = 65f;
-        mist.SpeedMin = 0.25f;
-        mist.SpeedMax = 0.7f;
-        mist.SizeMin = 0.35f;
-        mist.SizeMax = 0.6f;
-        mist.EndSizeFactor = 2.5f;
-        mist.StartColor = new Vector4(0.72f, 0.78f, 0.92f, 0.4f);
-        mist.EndColor = new Vector4(0.72f, 0.78f, 0.92f, 0f);
+        mist.SpreadDegrees = 80f;
+        mist.SpeedMin = 0.2f;
+        mist.SpeedMax = 0.55f;
+        mist.SizeMin = 0.3f;
+        mist.SizeMax = 0.55f;
+        mist.EndSizeFactor = 2.8f;
+        mist.StartColor = new Vector4(0.13f, 0.13f, 0.17f, 0.6f); // dark smoke, near the fog's black
+        mist.EndColor = new Vector4(0.24f, 0.24f, 0.30f, 0f);     // thins toward gray as it fades
         mist.Drag = 1.2f;
-        mist.Gravity = new Vector3(0f, 0.2f, 0f); // gentle updraft as the fog dissipates
+        mist.Gravity = new Vector3(0f, 0.25f, 0f); // gentle updraft as the fog dissipates
         AddGameObject(mistObject);
 
         var wispObject = new TransformNodeObject();
@@ -272,8 +272,8 @@ public class DungeonScene : Scene
         wisp.SizeMin = 0.5f;
         wisp.SizeMax = 1.0f;
         wisp.EndSizeFactor = 1.8f;
-        wisp.StartColor = new Vector4(0.6f, 0.65f, 0.8f, 0.14f);
-        wisp.EndColor = new Vector4(0.6f, 0.65f, 0.8f, 0f);
+        wisp.StartColor = new Vector4(0.10f, 0.10f, 0.14f, 0.16f);
+        wisp.EndColor = new Vector4(0.10f, 0.10f, 0.14f, 0f);
         wisp.Drag = 0.4f;
         wisp.Gravity = new Vector3(0f, 0.05f, 0f);
         AddGameObject(wispObject);
@@ -560,14 +560,28 @@ public class DungeonScene : Scene
         UpdateEnemyVisibility();
     }
 
-    /// <summary>Schedule mist puffs on revealed tiles, following the reveal ripple's stagger.</summary>
+    /// <summary>
+    /// Schedule smoke puffs on revealed tiles, following the reveal ripple's
+    /// stagger: several puffs scattered through each tile's volume between
+    /// the floor and the wall tops, so the shrinking fog cube reads as
+    /// dissolving into smoke.
+    /// </summary>
     private void QueueRevealMist(IReadOnlyList<(int R, int C, bool WasSeen)> tiles, (int R, int C) origin)
     {
         foreach (var (r, c, _) in tiles)
         {
             int dist = Math.Abs(r - origin.R) + Math.Abs(c - origin.C);
-            var pos = WorldSpace.TileCenter(r, c, _fogOverlay.Height);
-            _pendingMistBursts.Add((dist * 0.018f + 0.1f, pos));
+            float rippleDelay = dist * 0.018f + 0.06f;
+            var center = WorldSpace.TileCenter(r, c);
+
+            for (int i = 0; i < 3; i++)
+            {
+                var pos = center + new Vector3(
+                    ((float)_fxRng.NextDouble() - 0.5f) * WorldSpace.UnitsPerTile * 0.8f,
+                    0.15f + (float)_fxRng.NextDouble() * (WallHeight - 0.3f),
+                    ((float)_fxRng.NextDouble() - 0.5f) * WorldSpace.UnitsPerTile * 0.8f);
+                _pendingMistBursts.Add((rippleDelay + (float)_fxRng.NextDouble() * 0.12f, pos));
+            }
         }
     }
 
@@ -580,7 +594,7 @@ public class DungeonScene : Scene
             timeLeft -= deltaTime;
             if (timeLeft <= 0f)
             {
-                _mistEmitter.Burst(2, pos);
+                _mistEmitter.Burst(1, pos);
                 _pendingMistBursts.RemoveAt(i);
             }
             else
@@ -599,7 +613,8 @@ public class DungeonScene : Scene
             int r = _fxRng.Next(_fog.Rows);
             int c = _fxRng.Next(_fog.Cols);
             if (!_fog.Seen[r, c] || _fog.Visible[r, c]) continue;
-            _wispEmitter.Burst(1, WorldSpace.TileCenter(r, c, _fogOverlay.Height + 0.1f));
+            float y = 0.2f + (float)_fxRng.NextDouble() * (WallHeight - 0.35f);
+            _wispEmitter.Burst(1, WorldSpace.TileCenter(r, c, y));
             break;
         }
     }
