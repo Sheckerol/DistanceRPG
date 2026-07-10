@@ -562,25 +562,30 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Schedule smoke puffs on revealed tiles, following the reveal ripple's
-    /// stagger: several puffs scattered through each tile's volume between
-    /// the floor and the wall tops, so the shrinking fog cube reads as
-    /// dissolving into smoke.
+    /// stagger: several puffs scattered through each tile's volume, each
+    /// timed to when the dropping fog surface passes its height, so the
+    /// sinking cube reads as dissolving into smoke at its surface.
     /// </summary>
     private void QueueRevealMist(IReadOnlyList<(int R, int C, bool WasSeen)> tiles, (int R, int C) origin)
     {
         foreach (var (r, c, _) in tiles)
         {
             int dist = Math.Abs(r - origin.R) + Math.Abs(c - origin.C);
-            float rippleDelay = dist * 0.018f + 0.06f;
+            float rippleDelay = dist * 0.018f;
             var center = WorldSpace.TileCenter(r, c);
 
             for (int i = 0; i < 3; i++)
             {
+                float y = 0.15f + (float)_fxRng.NextDouble() * (WallHeight - 0.3f);
                 var pos = center + new Vector3(
                     ((float)_fxRng.NextDouble() - 0.5f) * WorldSpace.UnitsPerTile * 0.8f,
-                    0.15f + (float)_fxRng.NextDouble() * (WallHeight - 0.3f),
+                    y,
                     ((float)_fxRng.NextDouble() - 0.5f) * WorldSpace.UnitsPerTile * 0.8f);
-                _pendingMistBursts.Add((rippleDelay + (float)_fxRng.NextDouble() * 0.12f, pos));
+
+                // The cube top drops as 1 - t² of its full height, so it
+                // passes this puff's y at t = √(1 − y/top) of the 250ms drop.
+                float surfaceHits = MathF.Sqrt(Math.Max(0f, 1f - y / _fogOverlay.Height)) * 0.25f;
+                _pendingMistBursts.Add((rippleDelay + surfaceHits + (float)_fxRng.NextDouble() * 0.05f, pos));
             }
         }
     }

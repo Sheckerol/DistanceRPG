@@ -14,8 +14,8 @@ namespace GameEngine.DistanceRPG;
 /// translucent shroud blends exactly once per boundary crossing.
 ///
 /// Reveals and re-fogs ripple like the Phaser prototype: each tile's fog
-/// cube shrinks away (or the shroud grows back) over 250ms, staggered 18ms
-/// per Manhattan step from the triggering character, via
+/// cube drops into the floor (or the shroud rises back out) over 250ms,
+/// staggered 18ms per Manhattan step from the triggering character, via
 /// <see cref="AnimateReveal"/> and <see cref="AnimateRefog"/>. The static
 /// tile mesh is rebuilt only when <see cref="MarkDirty"/> is called;
 /// animating tiles are drawn from a small per-frame dynamic buffer. Attach
@@ -282,27 +282,32 @@ public class FogOverlayRenderer : Component, IRenderableComponent, IShaderAwareC
         var opaqueIndices = new List<uint>();
         var dimIndices = new List<uint>();
 
+        // Full-footprint cubes, inset a hair so their walls never sit coplanar
+        // with (and z-fight) the boundary faces of still-fogged neighbors.
+        const float animFootprint = 0.985f;
+
         foreach (var anim in _revealAnims)
         {
             // Before the ripple reaches this tile it is still fully fogged;
-            // then the cube shrinks toward the floor over the duration
-            // (ease-out) while the scene spawns smoke puffs in its volume.
+            // then the cube drops into the floor — ease-in, so it starts slow
+            // and accelerates down like a collapse — while the scene spawns
+            // smoke puffs in its volume.
             float t = Math.Clamp((anim.Age - anim.Delay) / AnimDuration, 0f, 1f);
-            float eased = 1f - (1f - t) * (1f - t);
-            float scale = 1f - eased;
-            if (scale <= 0f) continue;
+            float height = 1f - t * t;
+            if (height <= 0f) continue;
             AddTileBox(vertices, anim.Dim ? dimIndices : opaqueIndices, anim.R, anim.C,
-                xzScale: scale, yScale: scale, north: true, south: true, west: true, east: true);
+                xzScale: animFootprint, yScale: height, north: true, south: true, west: true, east: true);
         }
 
         foreach (var anim in _fillAnims)
         {
-            // Grows from nothing back to a full dim cube.
+            // Rises back out of the floor to a full dim cube — ease-out, the
+            // mirror of the reveal drop.
             float t = Math.Clamp((anim.Age - anim.Delay) / AnimDuration, 0f, 1f);
-            float eased = 1f - (1f - t) * (1f - t);
-            if (eased <= 0f) continue;
+            float height = 1f - (1f - t) * (1f - t);
+            if (height <= 0f) continue;
             AddTileBox(vertices, dimIndices, anim.R, anim.C,
-                xzScale: eased, yScale: eased, north: true, south: true, west: true, east: true);
+                xzScale: animFootprint, yScale: height, north: true, south: true, west: true, east: true);
         }
 
         _animOpaqueIndexCount = opaqueIndices.Count;
