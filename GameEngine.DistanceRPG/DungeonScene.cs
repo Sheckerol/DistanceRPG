@@ -56,6 +56,13 @@ public class DungeonScene : Scene
 
     private readonly List<CharacterObject> _party = new();
     private readonly Dictionary<CharacterObject, (int R, int C)> _lastFogTile = new();
+
+    // Non-combat marching: the rest of the party follows the active character
+    // single file along their walked path.
+    private readonly MarchingLine _march = new();
+    private CharacterObject? _marchLeader;
+    private bool _wasMarching;
+    private const float MarchArriveTolerance = 2f;
     private EnemyObject _enemy = null!;
     private (int R, int C) _lastEnemyTile = (-1, -1);
     private bool _enemyVisible;
@@ -92,6 +99,14 @@ public class DungeonScene : Scene
     public bool EnemyVisible => _enemyVisible;
     public bool InventoryOpen { get; private set; }
     public float LastBankedMovement { get; private set; }
+
+    /// <summary>
+    /// True while the party marches freely: player phase and no live enemy
+    /// sighted this turn. Sighting the enemy drops everyone into combat
+    /// footing until a turn passes without seeing it again.
+    /// </summary>
+    public bool Marching => _turns.Phase == TurnPhase.Player
+        && !(_enemy.State.Alive && _turns.EnemySeenThisTurn);
     public Vector4 PartyColor(int idx) => PartyColors[idx];
 
     public override void Initialize()
@@ -130,6 +145,7 @@ public class DungeonScene : Scene
         _hud.Update(deltaTime);
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
+        UpdateMarchingFollowers(deltaTime);
 
         // While the enemy walks its waypoints, mirror its logic position and
         // refresh visibility when it crosses tile boundaries.
@@ -431,22 +447,43 @@ public class DungeonScene : Scene
             vy *= 0.707f;
         }
 
-        // Cap this frame's intended travel to the remaining budget.
+        // Cap this frame's intended travel to the remaining budget. While
+        // marching, the slowest member sets the group's pace: the leader can
+        // spend no more than the smallest budget left in the party, so nobody
+        // gets left behind.
+        float budget = state.DistLeft;
+        if (Marching)
+        {
+            foreach (var member in _party)
+                if (member.State.Alive)
+                    budget = MathF.Min(budget, member.State.DistLeft);
+            if (budget <= 0f) return;
+        }
+
         float dx = vx * deltaTime;
         float dy = vy * deltaTime;
         float frameDist = MathF.Sqrt(dx * dx + dy * dy);
-        if (frameDist > state.DistLeft)
+        if (frameDist > budget)
         {
-            float scale = state.DistLeft / frameDist;
+            float scale = budget / frameDist;
             dx *= scale;
             dy *= scale;
         }
 
-        // Walls and the enemy block; party members pass through each other
-        // (the prototype dropped inter-party colliders — they caused wall shoves).
-        var blockers = _enemy.State.Alive
-            ? new[] { new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius) }
-            : null;
+        // Walls and the enemy always block. In combat the party body-blocks
+        // too — blockers are immovable circles here, so this is safe from the
+        // two-body wall shoves that made the prototype drop inter-party
+        // colliders. While marching, followers never block the leader, or
+        // reversing through your own line would deadlock it.
+        var blockers = new List<GridCollision.Circle>();
+        if (_enemy.State.Alive)
+            blockers.Add(new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius));
+        if (!Marching)
+        {
+            foreach (var member in _party)
+                if (member != ActiveCharacter && member.State.Alive)
+                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
+        }
         var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
 
         // Budget depletes by distance actually travelled, so pushing into a
@@ -460,6 +497,91 @@ public class DungeonScene : Scene
         state.Y = ny;
         ActiveCharacter.SyncTransform();
         UpdateFogFor(ActiveCharacter);
+    }
+
+    // ── Marching formation ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Outside combat the rest of the party follows the active character in a
+    /// single-file line (party order), each targeting a point a fixed
+    /// arc-length back along the leader's walked path. Followers spend their
+    /// own movement budgets as they walk and stop when dry.
+    /// </summary>
+    private void UpdateMarchingFollowers(float deltaTime)
+    {
+        if (!Marching)
+        {
+            _wasMarching = false;
+            return;
+        }
+
+        // Entering march (or switching leader) starts a fresh trail — the old
+        // one points at wherever the previous leader wandered.
+        if (!_wasMarching || _marchLeader != ActiveCharacter)
+        {
+            _march.Reset();
+            _marchLeader = ActiveCharacter;
+        }
+        _wasMarching = true;
+
+        if (InventoryOpen) return;
+
+        var leader = ActiveCharacter.State;
+        _march.SetLeader(leader.X, leader.Y);
+
+        int rank = 0;
+        (float X, float Y) prev = (leader.X, leader.Y);
+        foreach (var member in _party)
+        {
+            if (member == ActiveCharacter || !member.State.Alive) continue;
+            rank++;
+
+            var target = _march.PointBehind(rank * MarchingLine.Spacing);
+            float stopAt = MarchArriveTolerance;
+            if (target == null)
+            {
+                // Trail is younger than this rank's depth: tuck in behind the
+                // previous marcher until the leader has walked far enough.
+                target = prev;
+                stopAt = MarchingLine.Spacing;
+            }
+
+            MoveFollowerToward(member, target.Value, stopAt, deltaTime);
+            prev = (member.State.X, member.State.Y);
+        }
+    }
+
+    private void MoveFollowerToward(CharacterObject member, (float X, float Y) target, float stopAt, float deltaTime)
+    {
+        var state = member.State;
+        if (state.DistLeft <= 0f) return;
+
+        float dx = target.X - state.X;
+        float dy = target.Y - state.Y;
+        float dist = MathF.Sqrt(dx * dx + dy * dy);
+        if (dist <= stopAt + 0.5f) return;
+
+        // A touch faster than the leader when far behind, so gaps close
+        // instead of merely holding steady.
+        float speed = dist > 2f * MarchingLine.Spacing ? GameConstants.Speed * 1.25f : GameConstants.Speed;
+        float step = MathF.Min(MathF.Min(speed * deltaTime, dist - stopAt), state.DistLeft);
+
+        var blockers = _enemy.State.Alive
+            ? new[] { new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius) }
+            : null;
+        var (nx, ny) = GridCollision.Move(
+            _map.Grid, state.X, state.Y, state.Radius, dx / dist * step, dy / dist * step, blockers);
+
+        float movedX = nx - state.X;
+        float movedY = ny - state.Y;
+        float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
+        if (moved <= 0f) return;
+
+        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.X = nx;
+        state.Y = ny;
+        member.SyncTransform();
+        UpdateFogFor(member);
     }
 
     // ── Combat input ─────────────────────────────────────────────────────────

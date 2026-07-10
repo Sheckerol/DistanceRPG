@@ -37,6 +37,12 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 | Scroll wheel | Zoom |
 | Esc | Quit |
 
+Outside combat — while no living enemy has been sighted this turn — the rest
+of the party marches behind the active character in a single-file line, and
+the group paces itself to the member with the least movement left. Sighting
+the enemy breaks formation: everyone stops following and characters body-block
+each other until a turn passes without seeing it.
+
 ## How the port was verified
 
 `GameEngine.DistanceRPG.Tests/TestData/distancerpg-golden.json` was generated
