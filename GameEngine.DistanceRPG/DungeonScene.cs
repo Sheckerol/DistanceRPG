@@ -155,15 +155,14 @@ public class DungeonScene : Scene
         base.Initialize();
 
         Log.Info($"[Map] Generating dungeon with seed {MapSeed}");
-        var rng = new Mulberry32(MapSeed); // shared stream: map first, then enemy layout
-        _map = MapGenerator.Generate(rng);
+        _map = MapGenerator.Generate(new Mulberry32(MapSeed));
         _fogBoxes = FogBoxBuilder.Build(_map); // also expands _map.Corridors in place
         _fog = new FogState(MapGenerator.Rows, MapGenerator.Cols);
 
         BuildFloor();
         BuildWalls();
         SpawnParty();
-        SpawnEnemies(rng);
+        SpawnEnemies();
         BuildFogOverlay();   // after all geometry: its translucent pass blends over everything
         BuildFogParticles(); // after the fog overlay: mist blends over the shroud
         WireTurnSystem();
@@ -286,43 +285,18 @@ public class DungeonScene : Scene
         _activeIdx = 0;
     }
 
-    private const int MaxEnemiesPerRoom = 4;
-
     /// <summary>
-    /// 0–4 dummies on random distinct tiles of every room except the party's
-    /// starting room, drawn from the same seeded RNG stream as the map so a
-    /// seed reproduces the enemy layout too. DebugRooms is the pristine room
-    /// list — FogBoxBuilder appends synthetic union rooms to Rooms, which
-    /// must not spawn anything.
+    /// First-entry enemy population: EnemyPlacer decides positions from the
+    /// map seed on its own RNG stream. When save games arrive, a loaded
+    /// entry skips this and restores saved enemy states instead.
     /// </summary>
-    private void SpawnEnemies(Mulberry32 rng)
+    private void SpawnEnemies()
     {
-        foreach (var room in _map.DebugRooms)
+        foreach (var (x, y) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            if ((room.Cy, room.Cx) == _map.PlayerStart) continue;
-
-            int count = rng.NextInt(0, MaxEnemiesPerRoom);
-            var taken = new HashSet<(int R, int C)>();
-            for (int i = 0; i < count; i++)
-            {
-                // A few tries to find a free tile; small rooms may not fit all.
-                for (int attempt = 0; attempt < 8; attempt++)
-                {
-                    int c = rng.NextInt(room.X, room.X + room.W - 1);
-                    int r = rng.NextInt(room.Y, room.Y + room.H - 1);
-                    if (!taken.Add((r, c))) continue;
-
-                    var state = new EnemyState
-                    {
-                        X = c * GameConstants.Tile + GameConstants.Tile / 2f,
-                        Y = r * GameConstants.Tile + GameConstants.Tile / 2f,
-                    };
-                    var enemy = new EnemyObject(state, EnemyColor);
-                    _enemies.Add(enemy);
-                    AddGameObject(enemy);
-                    break;
-                }
-            }
+            var enemy = new EnemyObject(new EnemyState { X = x, Y = y }, EnemyColor);
+            _enemies.Add(enemy);
+            AddGameObject(enemy);
         }
         Log.Info($"[Map] Spawned {_enemies.Count} enemies across {_map.DebugRooms.Count} rooms");
     }
