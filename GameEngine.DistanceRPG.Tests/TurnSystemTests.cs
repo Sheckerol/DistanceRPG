@@ -260,6 +260,30 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void TwoEnemies_ApproachingTheSameTarget_DoNotStack()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 2 * Tile + 16, 5 * Tile + 16);
+        // Same column, far beyond sword reach: both walk their full budget
+        // toward A along the same row and would land on the same spot.
+        var e1 = new EnemyState { X = 20 * Tile + 16, Y = 5 * Tile + 16 };
+        var e2 = new EnemyState { X = 25 * Tile + 16, Y = 5 * Tile + 16 };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);
+
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+        turns.EndTurn();
+        Advance(turns, 15f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        float dx = e1.X - e2.X;
+        float dy = e1.Y - e2.Y;
+        float dist = MathF.Sqrt(dx * dx + dy * dy);
+        Assert.True(dist >= e1.Radius + e2.Radius,
+            $"enemies ended {dist:0.0} apart, overlapping (radii sum {e1.Radius + e2.Radius})");
+    }
+
+    [Fact]
     public void PassiveEnemies_SkipInstantly_WithoutStallingTheTurn()
     {
         var grid = new int[20, 60];

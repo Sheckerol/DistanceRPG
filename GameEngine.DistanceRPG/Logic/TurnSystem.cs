@@ -231,7 +231,18 @@ public sealed class TurnSystem
         _moveTargetWeapon = target.EquippedWeapon;
         _wasInRangeBeforeMove = EnemyAi.CharCanHit(target, enemy, _moveTargetWeapon, _grid);
 
-        var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget);
+        // Everyone else on the board blocks this enemy's path — enemies act
+        // sequentially, so each planner sees the ones already in position and
+        // queues behind them instead of piling onto the same tile.
+        var blocked = new HashSet<(int R, int C)>();
+        foreach (var other in _enemies)
+            if (other != enemy && other.Alive)
+                blocked.Add(TileOf(other.X, other.Y));
+        foreach (var member in _party)
+            if (member.Alive)
+                blocked.Add(TileOf(member.X, member.Y));
+
+        var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget, blocked);
         _enemyBudget = remaining;
 
         if (waypoints.Count == 0)
@@ -247,6 +258,9 @@ public sealed class TurnSystem
 
     private bool AnyHittableBy(EnemyState enemy)
         => _party.Any(c => c.Alive && EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid));
+
+    private static (int R, int C) TileOf(float x, float y)
+        => ((int)MathF.Floor(y / GameConstants.Tile), (int)MathF.Floor(x / GameConstants.Tile));
 
     private void UpdateEnemyMovement(float deltaTime)
     {

@@ -114,4 +114,42 @@ public class EnemyAiTests
         Assert.Empty(waypoints);
         Assert.Equal(GameConstants.EnemyMove, remaining);
     }
+
+    [Fact]
+    public void PlanMove_RoutesAroundBlockedTiles()
+    {
+        var grid = new int[10, 20]; // open field
+        var enemy = Enemy(2 * Tile + 16, 5 * Tile + 16);
+        var target = Char("A", 9 * Tile + 16, 5 * Tile + 16);
+
+        // Another actor parked directly on the straight-line path.
+        var blocked = new[] { (5, 4) };
+
+        var (waypoints, _) = EnemyAi.PlanMove(
+            enemy, target, grid, budget: 1000f, blocked);
+
+        Assert.NotEmpty(waypoints);
+        Assert.All(waypoints, w => Assert.NotEqual(
+            (5, 4), ((int)(w.Y / Tile), (int)(w.X / Tile))));
+    }
+
+    [Fact]
+    public void PlanMove_FullyBoxedInByActors_StaysPut()
+    {
+        var grid = new int[10, 10];
+        var enemy = Enemy(5 * Tile + 16, 5 * Tile + 16);
+        var target = Char("A", 8 * Tile + 16, 8 * Tile + 16);
+
+        var blocked = new List<(int, int)>();
+        for (int dr = -1; dr <= 1; dr++)
+            for (int dc = -1; dc <= 1; dc++)
+                if ((dr, dc) != (0, 0))
+                    blocked.Add((5 + dr, 5 + dc));
+
+        var (waypoints, remaining) = EnemyAi.PlanMove(
+            enemy, target, grid, GameConstants.EnemyMove, blocked);
+
+        Assert.Empty(waypoints);
+        Assert.Equal(GameConstants.EnemyMove, remaining);
+    }
 }
