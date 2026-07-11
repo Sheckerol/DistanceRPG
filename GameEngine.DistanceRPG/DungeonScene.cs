@@ -70,6 +70,7 @@ public class DungeonScene : Scene
     private readonly MarchingLine _march = new();
     private CharacterObject? _marchLeader;
     private bool _wasMarching;
+    private bool _marchingThisTurn; // decided once at each turn start
     private const float MarchArriveTolerance = 2f;
     private EnemyObject _enemy = null!;
     private (int R, int C) _lastEnemyTile = (-1, -1);
@@ -113,12 +114,38 @@ public class DungeonScene : Scene
     public float LastBankedMovement { get; private set; }
 
     /// <summary>
-    /// True while the party marches freely: player phase and no live enemy
-    /// sighted this turn. Sighting the enemy drops everyone into combat
-    /// footing until a turn passes without seeing it again.
+    /// True while the party marches freely. Marching is granted only at the
+    /// start of a turn — no live enemy visible and the party regrouped within
+    /// each member's max movement of the leader — and once revoked (a live
+    /// enemy sighted) stays off for the rest of the turn. This keeps a split
+    /// party from charging back into formation the moment line of sight to
+    /// the enemy breaks mid-fight.
     /// </summary>
     public bool Marching => _turns.Phase == TurnPhase.Player
+        && _marchingThisTurn
         && !(_enemy.State.Alive && _turns.EnemySeenThisTurn);
+
+    /// <summary>
+    /// The turn-start marching decision: needs the enemy dead or out of view
+    /// and every living member within their own max movement of the leader.
+    /// </summary>
+    private void EvaluateMarchingForTurn()
+    {
+        _marchingThisTurn = false;
+        if (_enemy.State.Alive && _enemyVisible) return;
+
+        var leader = ActiveCharacter.State;
+        foreach (var member in _party)
+        {
+            var state = member.State;
+            if (!state.Alive) continue;
+            float dx = state.X - leader.X;
+            float dy = state.Y - leader.Y;
+            if (dx * dx + dy * dy > state.EffectiveMax * state.EffectiveMax) return;
+        }
+
+        _marchingThisTurn = true;
+    }
     public Vector4 PartyColor(int idx) => PartyColors[idx];
 
     public override void Initialize()
@@ -142,6 +169,7 @@ public class DungeonScene : Scene
         foreach (var member in _party)
             UpdateFogFor(member);
         UpdateEnemyVisibility();
+        EvaluateMarchingForTurn(); // the first turn starts without a PlayerTurnStarted event
 
         _cameraTarget = ActiveCharacter.Position;
         _camera.Yaw = -90f;   // face -Z (up the map)
@@ -325,6 +353,7 @@ public class DungeonScene : Scene
             Log.Info($"[Turns] Player turn {_turns.TurnCount} begins");
             if (!ActiveCharacter.State.Alive)
                 SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
+            EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
         };
 
         _turns.EnemyHit += res =>
