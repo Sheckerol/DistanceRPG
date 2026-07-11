@@ -399,13 +399,17 @@ public class DungeonScene : Scene
             Log.Info("[Combat] Enemy defeated!");
             var obj = EnemyObjectFor(enemy);
             SetColor(obj, DeadColor);
+            obj.SetDefeatedVisual(true); // eases down to a walkable floor remnant
             _hud.AddFloatingText(obj.Position, "DEFEATED!", new Vector4(1f, 1f, 1f, 1f), -54f);
         };
 
         _turns.EnemyResurrected += enemy =>
         {
             Log.Info("[Combat] Enemy resurrected!");
-            SetColor(EnemyObjectFor(enemy), EnemyColor);
+            var obj = EnemyObjectFor(enemy);
+            SetColor(obj, EnemyColor);
+            obj.SetDefeatedVisual(false);
+            obj.SyncTransform(); // resurrection may have relocated it off an occupied tile
             UpdateEnemyVisibility();
         };
 

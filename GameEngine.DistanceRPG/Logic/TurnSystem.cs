@@ -262,6 +262,43 @@ public sealed class TurnSystem
     private static (int R, int C) TileOf(float x, float y)
         => ((int)MathF.Floor(y / GameConstants.Tile), (int)MathF.Floor(x / GameConstants.Tile));
 
+    /// <summary>
+    /// Nearest floor tile not occupied by a living actor, breadth-first from
+    /// the enemy's own tile (so its own tile wins when it's free). Expansion
+    /// only crosses floor, keeping the result in the same room or corridor.
+    /// Falls back to staying put if everything reachable is somehow taken.
+    /// </summary>
+    private (int R, int C) FindNearestFreeTile(EnemyState self)
+    {
+        var start = TileOf(self.X, self.Y);
+        int rows = _grid.GetLength(0), cols = _grid.GetLength(1);
+        var visited = new HashSet<(int R, int C)> { start };
+        var queue = new Queue<(int R, int C)>();
+        queue.Enqueue(start);
+
+        while (queue.Count > 0)
+        {
+            var (r, c) = queue.Dequeue();
+            if (IsFreeTile(r, c, self)) return (r, c);
+
+            foreach (var (nr, nc) in new[] { (r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1) })
+            {
+                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+                if (_grid[nr, nc] != 0 || !visited.Add((nr, nc))) continue;
+                queue.Enqueue((nr, nc));
+            }
+        }
+
+        return start;
+    }
+
+    private bool IsFreeTile(int r, int c, EnemyState self)
+    {
+        if (_grid[r, c] != 0) return false;
+        if (_party.Any(m => m.Alive && TileOf(m.X, m.Y) == (r, c))) return false;
+        return !_enemies.Any(e => e != self && e.Alive && TileOf(e.X, e.Y) == (r, c));
+    }
+
     private void UpdateEnemyMovement(float deltaTime)
     {
         var enemy = ActingEnemy;
@@ -403,6 +440,13 @@ public sealed class TurnSystem
                 enemy.Hp = enemy.MaxHp;
                 enemy.Alive = true;
                 enemy.TurnsSinceSeen = 2;
+
+                // Someone may be standing on the remnant: wake up on the
+                // nearest free tile instead of inside them.
+                var (r, c) = FindNearestFreeTile(enemy);
+                enemy.X = c * GameConstants.Tile + GameConstants.Tile / 2f;
+                enemy.Y = r * GameConstants.Tile + GameConstants.Tile / 2f;
+
                 EnemyResurrected?.Invoke(enemy);
             }
         }

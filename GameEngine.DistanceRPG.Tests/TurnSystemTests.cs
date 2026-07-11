@@ -260,6 +260,36 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void Resurrection_WakesOnAFreeTile_WhenSomeoneStandsOnTheRemnant()
+    {
+        var grid = new int[20, 20];
+        var a = Char("A", 5 * Tile, 5 * Tile);
+        var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile, Hp = 10 };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.False(enemy.Alive);
+
+        // Park the character exactly on the remnant, then wait out the timer.
+        a.X = enemy.X;
+        a.Y = enemy.Y;
+        for (int i = 0; i < GameConstants.DummyResurrectTurns; i++)
+        {
+            turns.EndTurn();
+            Advance(turns, 3f);
+        }
+
+        Assert.True(enemy.Alive);
+        var enemyTile = ((int)(enemy.Y / Tile), (int)(enemy.X / Tile));
+        var charTile = ((int)(a.Y / Tile), (int)(a.X / Tile));
+        Assert.NotEqual(charTile, enemyTile);
+
+        // Nearest free tile: at most one step from where it fell.
+        Assert.True(Math.Abs(enemyTile.Item1 - charTile.Item1)
+            + Math.Abs(enemyTile.Item2 - charTile.Item2) <= 1);
+    }
+
+    [Fact]
     public void TwoEnemies_ApproachingTheSameTarget_DoNotStack()
     {
         var grid = new int[20, 30];
