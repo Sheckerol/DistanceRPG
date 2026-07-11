@@ -166,13 +166,16 @@ public sealed class DungeonHud
 
     private void DrawEnemyLabel(Camera camera, DungeonScene scene, int w, int h)
     {
-        if (!scene.EnemyVisible || !scene.Enemy.State.Alive) return;
-        var anchor = scene.Enemy.Position + Vector3.UnitY * 0.9f;
-        if (!WorldToScreen(camera, anchor, w, h, out var px)) return;
+        foreach (var obj in scene.Enemies)
+        {
+            if (!obj.IsActive || !obj.State.Alive) continue; // fogged or dead
+            var anchor = obj.Position + Vector3.UnitY * 0.9f;
+            if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
-        var enemy = scene.Enemy.State;
-        DrawCenteredAt(px.X, px.Y - 18f, $"DUMMY [{enemy.Weapon.Name}]", 1.5f, Orange);
-        DrawCenteredAt(px.X, px.Y, $"{enemy.Hp}/{enemy.MaxHp}", 1.5f, White);
+            var enemy = obj.State;
+            DrawCenteredAt(px.X, px.Y - 18f, $"DUMMY [{enemy.Weapon.Name}]", 1.5f, Orange);
+            DrawCenteredAt(px.X, px.Y, $"{enemy.Hp}/{enemy.MaxHp}", 1.5f, White);
+        }
     }
 
     private void DrawFloatingTexts(Camera camera, int w, int h)

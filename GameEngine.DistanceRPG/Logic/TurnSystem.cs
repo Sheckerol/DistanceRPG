@@ -21,9 +21,12 @@ public enum TurnPhase
 
 /// <summary>
 /// The turn state machine ported from the prototype, engine-free and driven by
-/// <see cref="Update"/>. Owns all combat/turn state transitions; presentation
-/// (floating text, banners, greying out corpses) subscribes to the events.
-/// Timing constants match the original's tween/delayedCall pacing.
+/// <see cref="Update"/>, extended to any number of enemies: on the enemy turn
+/// they act one at a time (plan → walk → attack beats), and passive enemies
+/// (unseen for 2+ turns with nobody in reach) skip instantly so a populated
+/// maze doesn't stall the turn. Presentation (floating text, banners, greying
+/// out corpses) subscribes to the events. Timing constants match the
+/// original's tween/delayedCall pacing.
 /// </summary>
 public sealed class TurnSystem
 {
@@ -34,7 +37,7 @@ public sealed class TurnSystem
 
     private readonly int[,] _grid;
     private readonly IReadOnlyList<PartyMemberState> _party;
-    private readonly EnemyState _enemy;
+    private readonly IReadOnlyList<EnemyState> _enemies;
     private readonly Func<int> _rollD20;
 
     public TurnPhase Phase { get; private set; } = TurnPhase.Player;
@@ -42,21 +45,25 @@ public sealed class TurnSystem
     /// <summary>Completed turn count; increments when a new player turn starts.</summary>
     public int TurnCount { get; private set; }
 
-    /// <summary>True once any party member has seen the enemy this player turn.</summary>
-    public bool EnemySeenThisTurn { get; private set; }
+    /// <summary>Enemies a party member has laid eyes on this turn (cleared each player turn).</summary>
+    private readonly HashSet<EnemyState> _seenThisTurn = new();
+
+    /// <summary>True once any still-living enemy has been seen this turn — the combat-footing signal.</summary>
+    public bool AnyLiveEnemySeenThisTurn => _seenThisTurn.Any(e => e.Alive);
 
     // ── Events for the presentation layer ────────────────────────────────────
     public event Action<float>? TurnEnded;                                 // total movement banked
     public event Action? PlayerTurnStarted;
     public event Action<PartyMemberState, AttackResolution>? CharacterHit;
     public event Action<PartyMemberState>? CharacterDied;
-    public event Action<AttackResolution>? EnemyHit;
-    public event Action? EnemyDefeated;
-    public event Action? EnemyResurrected;
+    public event Action<EnemyState, AttackResolution>? EnemyHit;
+    public event Action<EnemyState>? EnemyDefeated;
+    public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
+    private int _enemyIdx;            // index of the enemy currently acting
     private float _timer;
     private float _enemyBudget;
     private List<(float X, float Y)> _waypoints = new();
@@ -66,45 +73,47 @@ public sealed class TurnSystem
     private bool _wasInRangeBeforeMove;
     private bool _braceUsedThisTurn;
     private bool _enemyTurnPending;   // banner is up; enemy turn starts when it ends
-    private bool _playerTurnPending;  // pause before control returns to the party
+    private bool _nextEnemyPending;   // pause before the next enemy acts (or control returns)
 
-    public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party, EnemyState enemy, Func<int>? rollD20 = null)
+    private EnemyState ActingEnemy => _enemies[_enemyIdx];
+
+    public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
+        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null)
     {
         _grid = grid;
         _party = party;
-        _enemy = enemy;
+        _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
     }
 
-    /// <summary>Scene calls this whenever the enemy's tile visibility changes.</summary>
-    public void NotifyEnemyVisible(bool visible)
+    /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
+    public void NotifyEnemyVisible(EnemyState enemy, bool visible)
     {
-        if (visible && Phase == TurnPhase.Player)
-            EnemySeenThisTurn = true;
-        // Seeing the enemy during its own movement also counts (the prototype
-        // updates visibility while the enemy walks).
-        if (visible && (Phase == TurnPhase.EnemyMoving || Phase == TurnPhase.EnemyAttacking))
-            EnemySeenThisTurn = true;
+        if (!visible) return;
+        // Seeing an enemy during the enemy turn also counts (the prototype
+        // updates visibility while enemies walk).
+        if (Phase is TurnPhase.Player or TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
+            _seenThisTurn.Add(enemy);
     }
 
     // ── Player actions ───────────────────────────────────────────────────────
 
-    public bool CanAttack(PartyMemberState c)
+    public bool CanAttack(PartyMemberState c, EnemyState enemy)
     {
-        if (Phase != TurnPhase.Player || !_enemy.Alive || !c.Alive) return false;
+        if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
         if (w == null || c.DistLeft < w.Cost) return false;
-        return EnemyAi.CharCanHit(c, _enemy, w, _grid);
+        return EnemyAi.CharCanHit(c, enemy, w, _grid);
     }
 
-    /// <summary>Attack the enemy with the given member. Returns false if not allowed.</summary>
-    public bool TryAttack(PartyMemberState c)
+    /// <summary>Attack an enemy with the given member. Returns false if not allowed.</summary>
+    public bool TryAttack(PartyMemberState c, EnemyState enemy)
     {
-        if (!CanAttack(c)) return false;
+        if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
         c.DistLeft = MathF.Max(0f, c.DistLeft - w.Cost);
-        ResolveAttackOnEnemy(w);
+        ResolveAttackOnEnemy(w, enemy);
         return true;
     }
 
@@ -146,10 +155,10 @@ public sealed class TurnSystem
                 _timer -= deltaTime;
                 if (_timer <= 0f)
                 {
-                    if (_playerTurnPending)
+                    if (_nextEnemyPending)
                     {
-                        _playerTurnPending = false;
-                        StartPlayerTurn();
+                        _nextEnemyPending = false;
+                        AdvanceToNextEnemy();
                     }
                     else
                     {
@@ -164,28 +173,54 @@ public sealed class TurnSystem
 
     private void StartEnemyTurn()
     {
-        if (!_enemy.Alive)
+        // Seen bookkeeping happens once for everyone, before anyone acts.
+        foreach (var enemy in _enemies)
         {
-            StartPlayerTurn();
+            if (!enemy.Alive) continue;
+            if (_seenThisTurn.Contains(enemy))
+                enemy.TurnsSinceSeen = 0;
+            else
+                enemy.TurnsSinceSeen++;
+        }
+
+        _enemyIdx = -1;
+        AdvanceToNextEnemy();
+    }
+
+    /// <summary>
+    /// Hand the enemy turn to the next enemy that will actually do something;
+    /// when none remain, the player turn starts. Dead enemies and passive
+    /// ones — unseen for 2+ turns with nobody in reach — skip instantly, so a
+    /// maze full of idle dummies costs no wall-clock time.
+    /// </summary>
+    private void AdvanceToNextEnemy()
+    {
+        while (++_enemyIdx < _enemies.Count)
+        {
+            var enemy = _enemies[_enemyIdx];
+            if (!enemy.Alive) continue;
+            if (enemy.TurnsSinceSeen >= 2 && !AnyHittableBy(enemy)) continue;
+
+            StartEnemyAction(enemy);
             return;
         }
 
-        if (EnemySeenThisTurn)
-            _enemy.TurnsSinceSeen = 0;
-        else
-            _enemy.TurnsSinceSeen++;
+        StartPlayerTurn();
+    }
 
+    private void StartEnemyAction(EnemyState enemy)
+    {
         _enemyBudget = GameConstants.EnemyMove;
 
-        // Unseen for 2+ turns: the dummy stays put (it may still attack if
-        // someone parked next to it).
-        if (_enemy.TurnsSinceSeen >= 2)
+        // Unseen for 2+ turns: the dummy stays put (it may still attack —
+        // AdvanceToNextEnemy only let it through because someone is in reach).
+        if (enemy.TurnsSinceSeen >= 2)
         {
             BeginAttackPhase();
             return;
         }
 
-        var target = EnemyAi.SelectTarget(_enemy, _party, _grid);
+        var target = EnemyAi.SelectTarget(enemy, _party, _grid);
         if (target == null)
         {
             BeginAttackPhase();
@@ -194,9 +229,9 @@ public sealed class TurnSystem
 
         _moveTarget = target;
         _moveTargetWeapon = target.EquippedWeapon;
-        _wasInRangeBeforeMove = EnemyAi.CharCanHit(target, _enemy, _moveTargetWeapon, _grid);
+        _wasInRangeBeforeMove = EnemyAi.CharCanHit(target, enemy, _moveTargetWeapon, _grid);
 
-        var (waypoints, remaining) = EnemyAi.PlanMove(_enemy, target, _grid, _enemyBudget);
+        var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget);
         _enemyBudget = remaining;
 
         if (waypoints.Count == 0)
@@ -210,28 +245,32 @@ public sealed class TurnSystem
         Phase = TurnPhase.EnemyMoving;
     }
 
+    private bool AnyHittableBy(EnemyState enemy)
+        => _party.Any(c => c.Alive && EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid));
+
     private void UpdateEnemyMovement(float deltaTime)
     {
+        var enemy = ActingEnemy;
         float step = GameConstants.EnemySpeed * deltaTime;
 
         while (step > 0f && _waypointIdx < _waypoints.Count)
         {
             var (wx, wy) = _waypoints[_waypointIdx];
-            float dx = wx - _enemy.X;
-            float dy = wy - _enemy.Y;
+            float dx = wx - enemy.X;
+            float dy = wy - enemy.Y;
             float dist = MathF.Sqrt(dx * dx + dy * dy);
 
             if (dist <= step)
             {
-                _enemy.X = wx;
-                _enemy.Y = wy;
+                enemy.X = wx;
+                enemy.Y = wy;
                 step -= dist;
                 _waypointIdx++;
             }
             else
             {
-                _enemy.X += dx / dist * step;
-                _enemy.Y += dy / dist * step;
+                enemy.X += dx / dist * step;
+                enemy.Y += dy / dist * step;
                 step = 0f;
             }
         }
@@ -242,32 +281,34 @@ public sealed class TurnSystem
 
     private void AfterEnemyMove()
     {
-        // Brace: a free retaliation when the enemy walks into the braced
+        var enemy = ActingEnemy;
+
+        // Brace: a free retaliation when an enemy walks into the braced
         // character's reach — once per turn, only if they weren't already
-        // in range and are still the enemy's chosen target.
+        // in range and are still that enemy's chosen target.
         var target = _moveTarget;
         var weapon = _moveTargetWeapon;
         if (target != null && weapon?.GetAbility(AbilityType.Brace) != null
             && !_braceUsedThisTurn && !_wasInRangeBeforeMove)
         {
-            var t2 = EnemyAi.SelectTarget(_enemy, _party, _grid);
-            if (t2 == target && EnemyAi.CharCanHit(target, _enemy, weapon, _grid))
+            var t2 = EnemyAi.SelectTarget(enemy, _party, _grid);
+            if (t2 == target && EnemyAi.CharCanHit(target, enemy, weapon, _grid))
             {
                 _braceUsedThisTurn = true;
                 BraceTriggered?.Invoke(target);
-                ResolveAttackOnEnemy(weapon);
+                ResolveAttackOnEnemy(weapon, enemy);
             }
         }
 
-        if (_enemy.Alive)
+        if (enemy.Alive)
         {
             BeginAttackPhase();
         }
         else
         {
-            // Brace killed the dummy mid-turn: short pause, then hand back control.
+            // Brace killed this one mid-walk: short pause, then the next enemy acts.
             Phase = TurnPhase.EnemyAttacking;
-            _playerTurnPending = true;
+            _nextEnemyPending = true;
             _timer = BraceDeathPauseSeconds;
         }
     }
@@ -280,30 +321,32 @@ public sealed class TurnSystem
 
     private void TryEnemyAttackBeat()
     {
+        var enemy = ActingEnemy;
+
         // Attack cost scales the same way the prototype scaled it: the enemy's
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * _enemy.Weapon.Cost;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.Cost;
 
-        if (!_enemy.Alive || _enemyBudget < scaledCost)
+        if (!enemy.Alive || _enemyBudget < scaledCost)
         {
-            _playerTurnPending = true;
+            _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
             return;
         }
 
-        var hittable = _party.Where(c => c.Alive && EnemyAi.CanHit(_enemy, c, _enemy.Weapon, _grid)).ToList();
+        var hittable = _party.Where(c => c.Alive && EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid)).ToList();
         if (hittable.Count == 0)
         {
-            _playerTurnPending = true;
+            _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
             return;
         }
 
         var target = hittable[0];
-        float bestDist = Dist2(target);
+        float bestDist = Dist2(enemy, target);
         for (int i = 1; i < hittable.Count; i++)
         {
-            float d = Dist2(hittable[i]);
+            float d = Dist2(enemy, hittable[i]);
             if (d < bestDist)
             {
                 target = hittable[i];
@@ -312,7 +355,7 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        var resolution = CombatRules.ResolveAttack(_enemy.Weapon, target.EquippedWeapon, _rollD20);
+        var resolution = CombatRules.ResolveAttack(enemy.Weapon, target.EquippedWeapon, _rollD20);
         target.Hp = Math.Max(0, target.Hp - resolution.Damage);
         CharacterHit?.Invoke(target, resolution);
 
@@ -336,15 +379,18 @@ public sealed class TurnSystem
 
     private void StartPlayerTurn()
     {
-        EnemySeenThisTurn = false;
+        _seenThisTurn.Clear();
         TurnCount++;
 
-        if (!_enemy.Alive && TurnCount - _enemy.DefeatedAtTurn >= GameConstants.DummyResurrectTurns)
+        foreach (var enemy in _enemies)
         {
-            _enemy.Hp = _enemy.MaxHp;
-            _enemy.Alive = true;
-            _enemy.TurnsSinceSeen = 2;
-            EnemyResurrected?.Invoke();
+            if (!enemy.Alive && TurnCount - enemy.DefeatedAtTurn >= GameConstants.DummyResurrectTurns)
+            {
+                enemy.Hp = enemy.MaxHp;
+                enemy.Alive = true;
+                enemy.TurnsSinceSeen = 2;
+                EnemyResurrected?.Invoke(enemy);
+            }
         }
 
         _braceUsedThisTurn = false;
@@ -359,24 +405,24 @@ public sealed class TurnSystem
 
     // ── Shared attack plumbing ───────────────────────────────────────────────
 
-    private void ResolveAttackOnEnemy(Weapon attackerWeapon)
+    private void ResolveAttackOnEnemy(Weapon attackerWeapon, EnemyState enemy)
     {
-        var resolution = CombatRules.ResolveAttack(attackerWeapon, _enemy.Weapon, _rollD20);
-        _enemy.Hp = Math.Max(0, _enemy.Hp - resolution.Damage);
-        EnemyHit?.Invoke(resolution);
+        var resolution = CombatRules.ResolveAttack(attackerWeapon, enemy.Weapon, _rollD20);
+        enemy.Hp = Math.Max(0, enemy.Hp - resolution.Damage);
+        EnemyHit?.Invoke(enemy, resolution);
 
-        if (_enemy.Hp <= 0)
+        if (enemy.Hp <= 0)
         {
-            _enemy.Alive = false;
-            _enemy.DefeatedAtTurn = TurnCount;
-            EnemyDefeated?.Invoke();
+            enemy.Alive = false;
+            enemy.DefeatedAtTurn = TurnCount;
+            EnemyDefeated?.Invoke(enemy);
         }
     }
 
-    private float Dist2(PartyMemberState c)
+    private static float Dist2(EnemyState enemy, PartyMemberState c)
     {
-        float dx = _enemy.X - c.X;
-        float dy = _enemy.Y - c.Y;
+        float dx = enemy.X - c.X;
+        float dy = enemy.Y - c.Y;
         return dx * dx + dy * dy;
     }
 }

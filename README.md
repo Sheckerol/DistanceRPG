@@ -6,6 +6,11 @@ original [Phaser prototype](https://github.com/Sheckerol/Game) onto the
 custom [GameEngine](https://github.com/Sheckerol/GameEngine), reinterpreted as
 a 3D dungeon with an angled top-down camera.
 
+Each run generates a fresh dungeon (the seed is logged at startup so a map can
+be reproduced). Every room but the party's starting one holds a training dummy;
+defeated dummies resurrect after 10 turns. Dummies stay passive until spotted
+and doze back off two turns after losing sight of the party.
+
 ## Layout requirement
 
 The engine is consumed as a **sibling checkout** — clone both repos next to
