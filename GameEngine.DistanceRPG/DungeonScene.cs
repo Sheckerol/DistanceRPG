@@ -7,6 +7,14 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
+/// <summary>Full-screen menus; at most one is open at a time.</summary>
+public enum GameMenu
+{
+    None,
+    Inventory,
+    Pause,
+}
+
 /// <summary>
 /// The main gameplay scene: a procedurally generated dungeon explored by a
 /// four-character party in turn-based, distance-budgeted combat. The dungeon
@@ -56,6 +64,14 @@ public class DungeonScene : Scene
 
     private readonly List<CharacterObject> _party = new();
     private readonly Dictionary<CharacterObject, (int R, int C)> _lastFogTile = new();
+
+    // Non-combat marching: the rest of the party follows the active character
+    // single file along their walked path.
+    private readonly MarchingLine _march = new();
+    private CharacterObject? _marchLeader;
+    private bool _wasMarching;
+    private bool _marchingThisTurn; // decided once at each turn start
+    private const float MarchArriveTolerance = 2f;
     private EnemyObject _enemy = null!;
     private (int R, int C) _lastEnemyTile = (-1, -1);
     private bool _enemyVisible;
@@ -90,8 +106,46 @@ public class DungeonScene : Scene
     public TurnSystem Turns => _turns;
     public EnemyObject Enemy => _enemy;
     public bool EnemyVisible => _enemyVisible;
-    public bool InventoryOpen { get; private set; }
+    public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
+    public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+    public Vector2 MousePos => _mousePos;
+    public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
+    public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
+
+    /// <summary>
+    /// True while the party marches freely. Marching is granted only at the
+    /// start of a turn — no live enemy visible and the party regrouped within
+    /// each member's max movement of the leader — and once revoked (a live
+    /// enemy sighted) stays off for the rest of the turn. This keeps a split
+    /// party from charging back into formation the moment line of sight to
+    /// the enemy breaks mid-fight.
+    /// </summary>
+    public bool Marching => _turns.Phase == TurnPhase.Player
+        && _marchingThisTurn
+        && !(_enemy.State.Alive && _turns.EnemySeenThisTurn);
+
+    /// <summary>
+    /// The turn-start marching decision: needs the enemy dead or out of view
+    /// and every living member within their own max movement of the leader.
+    /// </summary>
+    private void EvaluateMarchingForTurn()
+    {
+        _marchingThisTurn = false;
+        if (_enemy.State.Alive && _enemyVisible) return;
+
+        var leader = ActiveCharacter.State;
+        foreach (var member in _party)
+        {
+            var state = member.State;
+            if (!state.Alive) continue;
+            float dx = state.X - leader.X;
+            float dy = state.Y - leader.Y;
+            if (dx * dx + dy * dy > state.EffectiveMax * state.EffectiveMax) return;
+        }
+
+        _marchingThisTurn = true;
+    }
     public Vector4 PartyColor(int idx) => PartyColors[idx];
 
     public override void Initialize()
@@ -115,6 +169,7 @@ public class DungeonScene : Scene
         foreach (var member in _party)
             UpdateFogFor(member);
         UpdateEnemyVisibility();
+        EvaluateMarchingForTurn(); // the first turn starts without a PlayerTurnStarted event
 
         _cameraTarget = ActiveCharacter.Position;
         _camera.Yaw = -90f;   // face -Z (up the map)
@@ -130,6 +185,8 @@ public class DungeonScene : Scene
         _hud.Update(deltaTime);
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
+        UpdateMarchingFollowers(deltaTime);
+        AutoEndTurnWhenDry();
 
         // While the enemy walks its waypoints, mirror its logic position and
         // refresh visibility when it crosses tile boundaries.
@@ -287,7 +344,7 @@ public class DungeonScene : Scene
         {
             Log.Info($"[Turns] End of turn — banked {saved} movement");
             LastBankedMovement = saved;
-            if (InventoryOpen) InventoryOpen = false;
+            if (InventoryOpen) ActiveMenu = GameMenu.None;
             ResetFogVisibility();
         };
 
@@ -296,6 +353,7 @@ public class DungeonScene : Scene
             Log.Info($"[Turns] Player turn {_turns.TurnCount} begins");
             if (!ActiveCharacter.State.Alive)
                 SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
+            EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
         };
 
         _turns.EnemyHit += res =>
@@ -357,15 +415,33 @@ public class DungeonScene : Scene
         input.SubscribeToKeyPressed(_ => _right = true, Keys.D, Keys.Right);
         input.SubscribeToKeyReleased(_ => _right = false, Keys.D, Keys.Right);
 
-        // Number keys select party members, or equip inventory slots while the
-        // bag is open (2/3 swap that slot with the equipped slot).
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) SetActiveCharacter(0); }, Keys.D1);
-        input.SubscribeToKeyPressed(_ => { if (InventoryOpen) EquipSlot(1); else SetActiveCharacter(1); }, Keys.D2);
-        input.SubscribeToKeyPressed(_ => { if (InventoryOpen) EquipSlot(2); else SetActiveCharacter(2); }, Keys.D3);
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) SetActiveCharacter(3); }, Keys.D4);
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) CycleActiveCharacter(); }, Keys.Tab);
+        // KeyPressed fires once per physical press (the engine routes OS
+        // auto-repeat to KeyRepeated), so one-shot actions like Tab-cycling
+        // never machine-gun while held.
+        //
+        // Number keys select party members, equip inventory slots while the
+        // bag is open (2/3 swap that slot with the equipped slot), or pick a
+        // pause-menu option (1 close, 2 exit).
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (PauseMenuOpen) ActiveMenu = GameMenu.None;
+            else if (!AnyMenuOpen) SetActiveCharacter(0);
+        }, Keys.D1);
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (PauseMenuOpen) _game.Close();
+            else if (InventoryOpen) EquipSlot(1);
+            else SetActiveCharacter(1);
+        }, Keys.D2);
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (InventoryOpen) EquipSlot(2);
+            else if (!AnyMenuOpen) SetActiveCharacter(2);
+        }, Keys.D3);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) SetActiveCharacter(3); }, Keys.D4);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) CycleActiveCharacter(); }, Keys.Tab);
 
-        input.SubscribeToKeyPressed(_ => { if (!InventoryOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
@@ -403,8 +479,19 @@ public class DungeonScene : Scene
 
     private void ToggleInventory()
     {
-        if (_turns.Phase == TurnPhase.GameOver) return;
-        InventoryOpen = !InventoryOpen;
+        if (_turns.Phase == TurnPhase.GameOver || PauseMenuOpen) return;
+        ActiveMenu = InventoryOpen ? GameMenu.None : GameMenu.Inventory;
+    }
+
+    /// <summary>
+    /// Escape closes whatever menu is open, or opens the pause menu. Only on
+    /// the game-over screen is it left unconsumed, so the game quits directly.
+    /// </summary>
+    public bool HandleEscape()
+    {
+        if (_turns.Phase == TurnPhase.GameOver) return false;
+        ActiveMenu = AnyMenuOpen ? GameMenu.None : GameMenu.Pause;
+        return true;
     }
 
     /// <summary>Swap an inventory slot with the equipped slot (slot 0).</summary>
@@ -416,7 +503,7 @@ public class DungeonScene : Scene
 
     private void UpdateActiveCharacterMovement(float deltaTime)
     {
-        if (_turns.Phase != TurnPhase.Player || InventoryOpen) return;
+        if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
 
         var state = ActiveCharacter.State;
         if (!state.Alive || state.DistLeft <= 0f) return;
@@ -431,22 +518,43 @@ public class DungeonScene : Scene
             vy *= 0.707f;
         }
 
-        // Cap this frame's intended travel to the remaining budget.
+        // Cap this frame's intended travel to the remaining budget. While
+        // marching, the slowest member sets the group's pace: the leader can
+        // spend no more than the smallest budget left in the party, so nobody
+        // gets left behind.
+        float budget = state.DistLeft;
+        if (Marching)
+        {
+            foreach (var member in _party)
+                if (member.State.Alive)
+                    budget = MathF.Min(budget, member.State.DistLeft);
+            if (budget <= 0f) return;
+        }
+
         float dx = vx * deltaTime;
         float dy = vy * deltaTime;
         float frameDist = MathF.Sqrt(dx * dx + dy * dy);
-        if (frameDist > state.DistLeft)
+        if (frameDist > budget)
         {
-            float scale = state.DistLeft / frameDist;
+            float scale = budget / frameDist;
             dx *= scale;
             dy *= scale;
         }
 
-        // Walls and the enemy block; party members pass through each other
-        // (the prototype dropped inter-party colliders — they caused wall shoves).
-        var blockers = _enemy.State.Alive
-            ? new[] { new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius) }
-            : null;
+        // Walls and the enemy always block. In combat the party body-blocks
+        // too — blockers are immovable circles here, so this is safe from the
+        // two-body wall shoves that made the prototype drop inter-party
+        // colliders. While marching, followers never block the leader, or
+        // reversing through your own line would deadlock it.
+        var blockers = new List<GridCollision.Circle>();
+        if (_enemy.State.Alive)
+            blockers.Add(new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius));
+        if (!Marching)
+        {
+            foreach (var member in _party)
+                if (member != ActiveCharacter && member.State.Alive)
+                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
+        }
         var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
 
         // Budget depletes by distance actually travelled, so pushing into a
@@ -462,11 +570,126 @@ public class DungeonScene : Scene
         UpdateFogFor(ActiveCharacter);
     }
 
+    // ── Marching formation ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Outside combat the rest of the party follows the active character in a
+    /// single-file line (party order), each targeting a point a fixed
+    /// arc-length back along the leader's walked path. Followers spend their
+    /// own movement budgets as they walk and stop when dry.
+    /// </summary>
+    private void UpdateMarchingFollowers(float deltaTime)
+    {
+        if (!Marching)
+        {
+            _wasMarching = false;
+            return;
+        }
+
+        // Entering march (or switching leader) starts a fresh trail — the old
+        // one points at wherever the previous leader wandered.
+        if (!_wasMarching || _marchLeader != ActiveCharacter)
+        {
+            _march.Reset();
+            _marchLeader = ActiveCharacter;
+        }
+        _wasMarching = true;
+
+        if (AnyMenuOpen) return;
+
+        var leader = ActiveCharacter.State;
+        _march.SetLeader(leader.X, leader.Y);
+
+        int rank = 0;
+        (float X, float Y) prev = (leader.X, leader.Y);
+        foreach (var member in _party)
+        {
+            if (member == ActiveCharacter || !member.State.Alive) continue;
+            rank++;
+
+            var target = _march.PointBehind(rank * MarchingLine.Spacing);
+            float stopAt = MarchArriveTolerance;
+            if (target == null)
+            {
+                // Trail is younger than this rank's depth: tuck in behind the
+                // previous marcher until the leader has walked far enough.
+                target = prev;
+                stopAt = MarchingLine.Spacing;
+            }
+
+            MoveFollowerToward(member, target.Value, stopAt, deltaTime);
+            prev = (member.State.X, member.State.Y);
+        }
+    }
+
+    /// <summary>
+    /// Outside combat, cycle the turn automatically once the slowest living
+    /// member is out of movement — the group is halted at that point anyway,
+    /// since the leader paces itself to the smallest budget. Exploring never
+    /// needs Space; combat turns always end by hand, where held-back movement
+    /// is a choice.
+    /// </summary>
+    private void AutoEndTurnWhenDry()
+    {
+        if (!Marching || AnyMenuOpen) return; // Marching implies the player phase
+
+        // Budgets deplete through float math and may stop just shy of zero;
+        // treat anything below a hair's width as dry (a full budget is 160).
+        const float dry = 0.05f;
+        foreach (var member in _party)
+            if (member.State.Alive && member.State.DistLeft <= dry)
+            {
+                _turns.EndTurn();
+                return;
+            }
+    }
+
+    private void MoveFollowerToward(CharacterObject member, (float X, float Y) target, float stopAt, float deltaTime)
+    {
+        var state = member.State;
+        if (state.DistLeft <= 0f) return;
+
+        float dx = target.X - state.X;
+        float dy = target.Y - state.Y;
+        float dist = MathF.Sqrt(dx * dx + dy * dy);
+        if (dist <= stopAt + 0.5f) return;
+
+        // A touch faster than the leader when far behind, so gaps close
+        // instead of merely holding steady.
+        float speed = dist > 2f * MarchingLine.Spacing ? GameConstants.Speed * 1.25f : GameConstants.Speed;
+        float step = MathF.Min(MathF.Min(speed * deltaTime, dist - stopAt), state.DistLeft);
+
+        var blockers = _enemy.State.Alive
+            ? new[] { new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius) }
+            : null;
+        var (nx, ny) = GridCollision.Move(
+            _map.Grid, state.X, state.Y, state.Radius, dx / dist * step, dy / dist * step, blockers);
+
+        float movedX = nx - state.X;
+        float movedY = ny - state.Y;
+        float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
+        if (moved <= 0f) return;
+
+        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.X = nx;
+        state.Y = ny;
+        member.SyncTransform();
+        UpdateFogFor(member);
+    }
+
     // ── Combat input ─────────────────────────────────────────────────────────
 
     private void HandleClick()
     {
-        if (InventoryOpen) return;
+        if (AnyMenuOpen) return;
+
+        // The HUD party list doubles as buttons and wins over world picking.
+        if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))
+        {
+            SetActiveCharacter(hudIdx); // ignores dead members
+            return;
+        }
+
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
         if (w <= 0 || h <= 0) return;

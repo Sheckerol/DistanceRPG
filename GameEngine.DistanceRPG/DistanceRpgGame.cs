@@ -10,9 +10,16 @@ namespace GameEngine.DistanceRPG;
 /// </summary>
 public class DistanceRpgGame : Game
 {
+    private DungeonScene? _dungeon;
+
     public DistanceRpgGame()
     {
-        _inputEventManager.SubscribeToKeyPressed(_ => Close(), Keys.Escape);
+        // Esc quits only if the scene doesn't consume it (menus). KeyPressed
+        // is edge-only, so holding Esc doesn't flicker the pause menu.
+        _inputEventManager.SubscribeToKeyPressed(_ =>
+        {
+            if (_dungeon?.HandleEscape() != true) Close();
+        }, Keys.Escape);
     }
 
     protected override void OnLoad()
@@ -22,8 +29,8 @@ public class DistanceRpgGame : Game
         // Black background so the void beyond the map reads as unexplored fog.
         GL.ClearColor(0f, 0f, 0f, 1f);
 
-        SceneManager.Instance.RegisterScene("DungeonScene",
-            new DungeonScene(_camera!, this));
+        _dungeon = new DungeonScene(_camera!, this);
+        SceneManager.Instance.RegisterScene("DungeonScene", _dungeon);
         SceneManager.Instance.TransitionToScene("DungeonScene");
     }
 }
