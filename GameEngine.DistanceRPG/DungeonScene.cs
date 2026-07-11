@@ -292,9 +292,10 @@ public class DungeonScene : Scene
     /// </summary>
     private void SpawnEnemies()
     {
-        foreach (var (x, y) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
+        foreach (var (x, y, weaponIdx) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            var enemy = new EnemyObject(new EnemyState { X = x, Y = y }, EnemyColor);
+            var state = new EnemyState { X = x, Y = y, Weapon = GameConstants.Weapons[weaponIdx] };
+            var enemy = new EnemyObject(state, EnemyColor);
             _enemies.Add(enemy);
             AddGameObject(enemy);
         }

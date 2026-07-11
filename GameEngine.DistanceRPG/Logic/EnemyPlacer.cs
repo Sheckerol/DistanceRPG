@@ -16,11 +16,15 @@ public static class EnemyPlacer
     /// <summary>Stream splitter so enemy placement never aliases the map stream.</summary>
     private const long SeedSalt = 0x9E3779B9;
 
-    /// <summary>Deterministic spawn positions (logic-space centres) for a map seed.</summary>
-    public static List<(float X, float Y)> PlaceEnemies(MapData map, long mapSeed)
+    /// <summary>
+    /// Deterministic spawns for a map seed: logic-space centre positions plus
+    /// a uniformly random weapon (index into <see cref="GameConstants.Weapons"/>)
+    /// per dummy.
+    /// </summary>
+    public static List<(float X, float Y, int WeaponIdx)> PlaceEnemies(MapData map, long mapSeed)
     {
         var rng = new Mulberry32(mapSeed ^ SeedSalt);
-        var positions = new List<(float X, float Y)>();
+        var spawns = new List<(float X, float Y, int WeaponIdx)>();
 
         // DebugRooms is the pristine room list — FogBoxBuilder appends
         // synthetic union rooms to Rooms, which must not spawn anything.
@@ -39,14 +43,15 @@ public static class EnemyPlacer
                     int r = rng.NextInt(room.Y, room.Y + room.H - 1);
                     if (!taken.Add((r, c))) continue;
 
-                    positions.Add((
+                    spawns.Add((
                         c * GameConstants.Tile + GameConstants.Tile / 2f,
-                        r * GameConstants.Tile + GameConstants.Tile / 2f));
+                        r * GameConstants.Tile + GameConstants.Tile / 2f,
+                        rng.NextInt(0, GameConstants.Weapons.Count - 1)));
                     break;
                 }
             }
         }
 
-        return positions;
+        return spawns;
     }
 }

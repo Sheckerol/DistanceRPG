@@ -45,7 +45,7 @@ public class EnemyPlacerTests
         var positions = EnemyPlacer.PlaceEnemies(map, Seed);
         Assert.NotEmpty(positions);
 
-        foreach (var (x, y) in positions)
+        foreach (var (x, y, _) in positions)
         {
             int c = (int)(x / GameConstants.Tile);
             int r = (int)(y / GameConstants.Tile);
@@ -80,5 +80,19 @@ public class EnemyPlacerTests
                 t.Item1 >= room.Y && t.Item1 < room.Y + room.H);
             Assert.InRange(inRoom, 0, EnemyPlacer.MaxEnemiesPerRoom);
         }
+    }
+
+    [Fact]
+    public void PlaceEnemies_AssignsValidWeaponIndices()
+    {
+        var spawns = EnemyPlacer.PlaceEnemies(Map(), Seed);
+
+        Assert.All(spawns, s => Assert.InRange(s.WeaponIdx, 0, GameConstants.Weapons.Count - 1));
+
+        // Over a whole map the loadout should be mixed, not one weapon
+        // (uniform draw across ~dozens of spawns — a single value would mean
+        // the weapon roll is broken, not unlucky).
+        if (spawns.Count >= 10)
+            Assert.True(spawns.Select(s => s.WeaponIdx).Distinct().Count() > 1);
     }
 }
