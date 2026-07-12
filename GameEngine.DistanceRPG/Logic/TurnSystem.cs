@@ -73,12 +73,12 @@ public sealed class TurnSystem
 
     // Brace bookkeeping: spear-wielders threaten a zone. Members NOT already
     // holding the acting enemy in reach are snapshotted before it walks; any
-    // of them whose reach it enters retaliates for free, once per character
-    // per turn. (The prototype only braced the enemy's own chosen target —
-    // with formations and many enemies, the nearest member is always the
-    // target and back-row spears would never fire.)
+    // of them whose reach it enters retaliates for free, up to the weapon's
+    // Brace value uses per turn. (The prototype only braced the enemy's own
+    // chosen target — with formations and many enemies, the nearest member
+    // is always the target and back-row spears would never fire.)
     private readonly List<PartyMemberState> _braceCandidates = new();
-    private readonly HashSet<PartyMemberState> _bracedThisTurn = new();
+    private readonly Dictionary<PartyMemberState, int> _braceUsesThisTurn = new();
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
@@ -347,17 +347,24 @@ public sealed class TurnSystem
         var enemy = ActingEnemy;
 
         // Brace: free retaliation from every spear-wielder whose reach the
-        // enemy just walked into (once per character per turn). Its death
-        // mid-volley stops the rest.
+        // enemy just walked into — the weapon's Brace value is its uses per
+        // turn. The enemy dying mid-volley stops the rest.
         foreach (var member in _braceCandidates)
         {
             if (!enemy.Alive) break;
-            if (!member.Alive || _bracedThisTurn.Contains(member)) continue;
-            if (!EnemyAi.CharCanHit(member, enemy, member.EquippedWeapon, _grid)) continue;
+            if (!member.Alive) continue;
 
-            _bracedThisTurn.Add(member);
+            var weapon = member.EquippedWeapon;
+            var brace = weapon?.GetAbility(AbilityType.Brace);
+            if (brace == null) continue;
+
+            _braceUsesThisTurn.TryGetValue(member, out int used);
+            if (used >= brace.Value) continue;
+            if (!EnemyAi.CharCanHit(member, enemy, weapon, _grid)) continue;
+
+            _braceUsesThisTurn[member] = used + 1;
             BraceTriggered?.Invoke(member);
-            ResolveAttackOnEnemy(member.EquippedWeapon!, enemy);
+            ResolveAttackOnEnemy(weapon!, enemy);
         }
 
         if (enemy.Alive)
@@ -460,7 +467,7 @@ public sealed class TurnSystem
             }
         }
 
-        _bracedThisTurn.Clear();
+        _braceUsesThisTurn.Clear();
         foreach (var c in _party)
         {
             if (c.Alive) c.StartTurn();

@@ -248,6 +248,34 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void Brace_UsesPerTurn_MatchTheWeaponsBraceValue()
+    {
+        var grid = new int[20, 40];
+        // One char with a Brace-2 pike, one with the standard Brace-1 spear,
+        // side by side; two enemies walk in from the same direction in one
+        // turn. The pike retaliates against both, the spear only the first.
+        var pikeWeapon = new Weapon("Pike", Range: 130, Damage: 7, Cost: 40,
+            new[] { new WeaponAbility(AbilityType.Brace, 2) });
+        var p = Char("P", 5 * Tile + 16, 5 * Tile + 16);
+        p.Inventory[0] = pikeWeapon;
+        var s = Char("S", 5 * Tile + 16, 6 * Tile + 16, weaponIdx: 2); // spear
+
+        var e1 = new EnemyState { X = p.X + 250f, Y = p.Y };
+        var e2 = new EnemyState { X = p.X + 250f, Y = s.Y };
+        var turns = new TurnSystem(grid, new[] { p, s }, new[] { e1, e2 }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+        turns.EndTurn();
+        Advance(turns, 15f);
+
+        Assert.Equal(2, braced.Count(ch => ch == p)); // pike: both walkers
+        Assert.Equal(1, braced.Count(ch => ch == s)); // spear: first only
+    }
+
+    [Fact]
     public void GameOver_WhenLastCharacterDies()
     {
         var grid = new int[20, 20];
