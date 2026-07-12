@@ -183,8 +183,13 @@ public sealed class DungeonHud
             if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
             var enemy = obj.State;
-            DrawCenteredAt(px.X, px.Y - 18f, $"DUMMY [{enemy.Weapon.Name}]", 1.5f, Orange);
-            DrawCenteredAt(px.X, px.Y, $"{enemy.Hp}/{enemy.MaxHp}", 1.5f, White);
+            string name = enemy.IsHealer ? "HEALER" : "DUMMY";
+            DrawCenteredAt(px.X, px.Y - 18f, $"{name} [{enemy.Weapon.Name}]", 1.5f,
+                enemy.IsHealer ? Cyan : Orange);
+
+            int regen = enemy.StatusLevel(StatusEffectType.Regeneration);
+            string hp = regen > 0 ? $"{enemy.Hp}/{enemy.MaxHp} +{regen}" : $"{enemy.Hp}/{enemy.MaxHp}";
+            DrawCenteredAt(px.X, px.Y, hp, 1.5f, White);
         }
     }
 

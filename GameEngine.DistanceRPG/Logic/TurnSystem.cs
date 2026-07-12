@@ -63,6 +63,9 @@ public sealed class TurnSystem
     public event Action<EnemyState>? EnemyBraceTriggered;
     public event Action<PartyMemberState, StatusEffect>? CharacterBuffed;   // staff cast landed
     public event Action<PartyMemberState, int>? CharacterHealed;            // end-of-turn regen tick (HP restored)
+    public event Action<EnemyState, StatusEffect>? EnemyBuffed;             // enemy healer's cast landed on an ally
+    public event Action<EnemyState, int>? EnemyHealed;                      // end-of-enemy-turn regen tick
+    public event Action<EnemyState>? EnemyFleeing;                          // lone healer turning tail
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -294,7 +297,7 @@ public sealed class TurnSystem
         {
             var enemy = _enemies[_enemyIdx];
             if (!enemy.Alive) continue;
-            if (enemy.TurnsSinceSeen >= 2 && !AnyHittableBy(enemy)) continue;
+            if (enemy.TurnsSinceSeen >= 2 && !HasPassiveAction(enemy)) continue;
 
             StartEnemyAction(enemy);
             return;
@@ -306,6 +309,12 @@ public sealed class TurnSystem
     private void StartEnemyAction(EnemyState enemy)
     {
         _enemyBudget = GameConstants.EnemyMove;
+
+        if (enemy.IsHealer)
+        {
+            StartHealerAction(enemy);
+            return;
+        }
 
         // Unseen for 2+ turns: the dummy stays put (it may still attack —
         // AdvanceToNextEnemy only let it through because someone is in reach).
@@ -322,27 +331,8 @@ public sealed class TurnSystem
             return;
         }
 
-        // Snapshot who could NOT reach this enemy yet — walking into their
-        // reach is what triggers a brace.
-        _braceCandidates.Clear();
-        foreach (var member in _party)
-        {
-            var w = member.EquippedWeapon;
-            if (member.Alive && w?.GetAbility(AbilityType.Brace) != null
-                && !EnemyAi.CharCanHit(member, enemy, w, _grid))
-                _braceCandidates.Add(member);
-        }
-
-        // Everyone else on the board blocks this enemy's path — enemies act
-        // sequentially, so each planner sees the ones already in position and
-        // queues behind them instead of piling onto the same tile.
-        var blocked = new HashSet<(int R, int C)>();
-        foreach (var other in _enemies)
-            if (other != enemy && other.Alive)
-                blocked.Add(TileOf(other.X, other.Y));
-        foreach (var member in _party)
-            if (member.Alive)
-                blocked.Add(TileOf(member.X, member.Y));
+        SnapshotBraceCandidates(enemy);
+        var blocked = OccupiedTilesExcept(enemy);
 
         var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget, blocked);
         _enemyBudget = remaining;
@@ -354,6 +344,76 @@ public sealed class TurnSystem
             return;
         }
 
+        BeginWalk(waypoints);
+    }
+
+    /// <summary>
+    /// A staff healer's turn: while it has a living ally it moves to mend the
+    /// most-wounded one (then casts in the attack phase); alone, it flees the
+    /// party. Unseen healers stay put but still cast on any ally already in reach.
+    /// </summary>
+    private void StartHealerAction(EnemyState healer)
+    {
+        SnapshotBraceCandidates(healer);
+        var blocked = OccupiedTilesExcept(healer);
+
+        if (!EnemyAi.HasLivingAlly(healer, _enemies))
+        {
+            EnemyFleeing?.Invoke(healer);
+            var (flee, fleeLeft) = EnemyAi.PlanFlee(healer, _party, _grid, _enemyBudget, blocked);
+            _enemyBudget = fleeLeft;
+            if (flee.Count == 0) { BeginAttackPhase(); return; } // cornered — beats will no-op
+            BeginWalk(flee);
+            return;
+        }
+
+        var ally = EnemyAi.SelectHealTarget(healer, _enemies);
+        // No wounded ally, or one already in reach, or standing pat while unseen:
+        // skip straight to the cast phase (which no-ops if nothing's castable).
+        if (ally == null || healer.TurnsSinceSeen >= 2 || EnemyAi.CanHealFrom(healer, ally, _grid))
+        {
+            BeginAttackPhase();
+            return;
+        }
+
+        var (waypoints, remaining) = EnemyAi.PlanApproach(
+            healer, ally.X, ally.Y, ally.Radius, healer.Weapon.Range, _grid, _enemyBudget, blocked);
+        _enemyBudget = remaining;
+        if (waypoints.Count == 0) { BeginAttackPhase(); return; }
+        BeginWalk(waypoints);
+    }
+
+    // Snapshot who could NOT reach this enemy yet — walking into their reach is
+    // what triggers a brace.
+    private void SnapshotBraceCandidates(EnemyState enemy)
+    {
+        _braceCandidates.Clear();
+        foreach (var member in _party)
+        {
+            var w = member.EquippedWeapon;
+            if (member.Alive && w?.GetAbility(AbilityType.Brace) != null
+                && !EnemyAi.CharCanHit(member, enemy, w, _grid))
+                _braceCandidates.Add(member);
+        }
+    }
+
+    // Every other living actor blocks this enemy's path — enemies act
+    // sequentially, so each planner queues behind the ones already in position
+    // instead of piling onto the same tile.
+    private HashSet<(int R, int C)> OccupiedTilesExcept(EnemyState enemy)
+    {
+        var blocked = new HashSet<(int R, int C)>();
+        foreach (var other in _enemies)
+            if (other != enemy && other.Alive)
+                blocked.Add(TileOf(other.X, other.Y));
+        foreach (var member in _party)
+            if (member.Alive)
+                blocked.Add(TileOf(member.X, member.Y));
+        return blocked;
+    }
+
+    private void BeginWalk(List<(float X, float Y)> waypoints)
+    {
         _waypoints = waypoints;
         _waypointIdx = 0;
         Phase = TurnPhase.EnemyMoving;
@@ -361,6 +421,18 @@ public sealed class TurnSystem
 
     private bool AnyHittableBy(EnemyState enemy)
         => _party.Any(c => c.Alive && EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid));
+
+    /// <summary>
+    /// Does this enemy have a reason to act while passive (unseen 2+ turns)? An
+    /// attacker needs someone in reach; a healer needs a wounded ally to mend.
+    /// A lone healer only flees once it's actually seen — there's no point
+    /// running through the fog from a party that can't see it — so while unseen
+    /// it stays put like any other idle dummy.
+    /// </summary>
+    private bool HasPassiveAction(EnemyState enemy)
+        => enemy.IsHealer
+            ? EnemyAi.HasLivingAlly(enemy, _enemies) && EnemyAi.SelectHealTarget(enemy, _enemies) != null
+            : AnyHittableBy(enemy);
 
     private static (int R, int C) TileOf(float x, float y)
         => ((int)MathF.Floor(y / GameConstants.Tile), (int)MathF.Floor(x / GameConstants.Tile));
@@ -484,6 +556,12 @@ public sealed class TurnSystem
     {
         var enemy = ActingEnemy;
 
+        if (enemy.IsHealer)
+        {
+            TryEnemyHealBeat(enemy);
+            return;
+        }
+
         // Attack cost scales the same way the prototype scaled it: the enemy's
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
         float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.Cost;
@@ -522,10 +600,41 @@ public sealed class TurnSystem
         _timer = AttackBeatSeconds;
     }
 
+    /// <summary>
+    /// A healer's attack-phase beat: cast Regeneration on the most-wounded ally
+    /// in reach, spending scaled budget, one cast per beat until dry or nobody
+    /// needs mending. A fleeing/idle healer simply finds no target and passes.
+    /// </summary>
+    private void TryEnemyHealBeat(EnemyState healer)
+    {
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * healer.Weapon.Cost;
+        var ally = EnemyAi.SelectHealTarget(healer, _enemies);
+
+        if (!healer.Alive || _enemyBudget < scaledCost
+            || ally == null || !EnemyAi.CanHealFrom(healer, ally, _grid))
+        {
+            _nextEnemyPending = true;
+            _timer = AttackBeatSeconds;
+            return;
+        }
+
+        _enemyBudget -= scaledCost;
+        var heal = healer.Weapon.GetAbility(AbilityType.HealCast)!;
+        var effect = ally.ApplyStatusEffect(StatusEffectType.Regeneration, heal.Value);
+        EnemyBuffed?.Invoke(ally, effect);
+
+        _timer = AttackBeatSeconds;
+    }
+
     private void StartPlayerTurn()
     {
         _seenThisTurn.Clear();
         TurnCount++;
+
+        // End of the enemy turn: regen ticks on the allies a healer mended,
+        // before resurrections (which restore full HP) are considered.
+        foreach (var enemy in _enemies)
+            TickEnemyStatusEffects(enemy);
 
         foreach (var enemy in _enemies)
         {
@@ -596,6 +705,33 @@ public sealed class TurnSystem
 
             if (--effect.Level <= 0)
                 c.StatusEffects.RemoveAt(i);
+        }
+    }
+
+    /// <summary>Enemy mirror of <see cref="TickStatusEffects"/>, run at end of the enemy turn.</summary>
+    private void TickEnemyStatusEffects(EnemyState e)
+    {
+        if (!e.Alive)
+        {
+            e.StatusEffects.Clear();
+            return;
+        }
+
+        for (int i = e.StatusEffects.Count - 1; i >= 0; i--)
+        {
+            var effect = e.StatusEffects[i];
+            if (effect.Type == StatusEffectType.Regeneration)
+            {
+                int healed = Math.Min(effect.Level, e.MaxHp - e.Hp);
+                if (healed > 0)
+                {
+                    e.Hp += healed;
+                    EnemyHealed?.Invoke(e, healed);
+                }
+            }
+
+            if (--effect.Level <= 0)
+                e.StatusEffects.RemoveAt(i);
         }
     }
 
