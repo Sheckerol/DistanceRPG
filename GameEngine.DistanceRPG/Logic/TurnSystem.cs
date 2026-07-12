@@ -305,7 +305,8 @@ public sealed class TurnSystem
 
         if (waypoints.Count == 0)
         {
-            AfterEnemyMove();
+            // No movement means no reach was crossed — straight to attacks.
+            BeginAttackPhase();
             return;
         }
 
@@ -384,20 +385,34 @@ public sealed class TurnSystem
             }
         }
 
+        // Braces resolve mid-walk: every spear-wielder stabs the moment the
+        // enemy crosses into their reach — zones merely passed through count,
+        // not just wherever the walk ends. A kill stops the walk on the spot.
+        TryBracesAgainst(enemy);
+        if (!enemy.Alive)
+        {
+            Phase = TurnPhase.EnemyAttacking;
+            _nextEnemyPending = true;
+            _timer = BraceDeathPauseSeconds;
+            return;
+        }
+
         if (_waypointIdx >= _waypoints.Count)
-            AfterEnemyMove();
+            BeginAttackPhase();
     }
 
-    private void AfterEnemyMove()
+    /// <summary>
+    /// Fire a free retaliation from each brace candidate whose reach contains
+    /// the enemy right now. A member stabs a given walk at most once (they
+    /// leave the candidate list), and the weapon's Brace value caps their
+    /// uses per turn across all walks.
+    /// </summary>
+    private void TryBracesAgainst(EnemyState enemy)
     {
-        var enemy = ActingEnemy;
-
-        // Brace: free retaliation from every spear-wielder whose reach the
-        // enemy just walked into — the weapon's Brace value is its uses per
-        // turn. The enemy dying mid-volley stops the rest.
-        foreach (var member in _braceCandidates)
+        for (int i = _braceCandidates.Count - 1; i >= 0; i--)
         {
-            if (!enemy.Alive) break;
+            if (!enemy.Alive) return;
+            var member = _braceCandidates[i];
             if (!member.Alive) continue;
 
             var weapon = member.EquippedWeapon;
@@ -408,21 +423,10 @@ public sealed class TurnSystem
             if (used >= brace.Value) continue;
             if (!EnemyAi.CharCanHit(member, enemy, weapon, _grid)) continue;
 
+            _braceCandidates.RemoveAt(i);
             _braceUsesThisTurn[member] = used + 1;
             BraceTriggered?.Invoke(member);
             ResolveAttackOnEnemy(weapon!, enemy);
-        }
-
-        if (enemy.Alive)
-        {
-            BeginAttackPhase();
-        }
-        else
-        {
-            // Brace killed this one mid-walk: short pause, then the next enemy acts.
-            Phase = TurnPhase.EnemyAttacking;
-            _nextEnemyPending = true;
-            _timer = BraceDeathPauseSeconds;
         }
     }
 

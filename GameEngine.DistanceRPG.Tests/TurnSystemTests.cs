@@ -276,6 +276,32 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void Brace_FiresFromEveryZoneCrossed_NotJustWhereTheWalkEnds()
+    {
+        var grid = new int[20, 30];
+        // Dagger leader draws the enemy along row 5. S sits perpendicular to
+        // the walk's midpoint: inside spear reach only mid-walk (out of reach
+        // both where the enemy starts and where it stops). C covers the end
+        // of the walk. Both must stab during the single approach.
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var s = Char("S", 376f, 5 * Tile + 16 + 154f, weaponIdx: 2);
+        var c = Char("C", 296f, 5 * Tile + 16 + 96f, weaponIdx: 2);
+        var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
+        var turns = new TurnSystem(grid, new[] { a, s, c }, new[] { enemy }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 10f);
+
+        Assert.Contains(s, braced); // crossed mid-walk, endpoint out of reach
+        Assert.Contains(c, braced); // in reach at the end of the walk
+        Assert.Equal(2, braced.Count);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+    }
+
+    [Fact]
     public void EnemyBrace_PokesACharacterWalkingIntoASeenSpearDummysReach()
     {
         var grid = new int[20, 30];
