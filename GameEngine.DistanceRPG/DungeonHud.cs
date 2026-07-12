@@ -103,7 +103,7 @@ public sealed class DungeonHud
         else
         {
             DrawCentered(w, h - 24f,
-                "WASD MOVE - CLICK ENEMY ATTACK - SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM",
+                "WASD MOVE - CLICK ENEMY ATTACK - STAFF: CLICK ALLY HEAL - SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM",
                 1.2f, Grey);
         }
 
@@ -114,14 +114,22 @@ public sealed class DungeonHud
 
     private void DrawTopReadouts(int w, PartyMemberState active)
     {
-        DrawCentered(w, 14f, $"[{active.Id}] MOVE: {MathF.Ceiling(active.DistLeft)} / {active.EffectiveMax:0}", 2f, White);
+        DrawCentered(w, 14f,
+            $"[{active.Id}] MOVE: {MathF.Ceiling(active.DistLeft)} / {active.EffectiveMax:0}    MANA: {active.Mana} / {active.MaxMana}",
+            2f, White);
 
         var weapon = active.EquippedWeapon;
         string weaponLabel = weapon == null
             ? $"[{active.Id}] (NO WEAPON)"
-            : $"[{active.Id}] {weapon.Name}  DMG:{weapon.Damage}  RNG:{weapon.Range}  COST:{weapon.Cost}{AbilitySuffix(weapon)}";
+            : $"[{active.Id}] {weapon.Name}  {WeaponStats(weapon)}{AbilitySuffix(weapon)}";
         DrawCentered(w, 42f, weaponLabel, 1.5f, Yellow);
     }
+
+    /// <summary>Core stat block for a weapon label — a staff drops damage for mana.</summary>
+    private static string WeaponStats(Weapon weapon)
+        => weapon.IsCaster
+            ? $"RNG:{weapon.Range}  MOVE:{weapon.Cost}  MANA:{weapon.ManaCost}"
+            : $"DMG:{weapon.Damage}  RNG:{weapon.Range}  COST:{weapon.Cost}";
 
     // Party selector layout, shared between drawing and click hit-testing.
     private const float SelectorX = 14f;
@@ -160,7 +168,9 @@ public sealed class DungeonHud
             if (hasHover && hovered == i && state.Alive)
                 color = Vector4.Lerp(color, White, 0.5f);
             string marker = isActive ? ">" : " ";
-            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}", SelectorX, SelectorTop + i * SelectorRowPitch, 2f, color);
+            int regen = state.StatusLevel(StatusEffectType.Regeneration);
+            string buff = regen > 0 ? $" +{regen}" : "";
+            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}{buff}", SelectorX, SelectorTop + i * SelectorRowPitch, 2f, color);
         }
     }
 
@@ -205,7 +215,7 @@ public sealed class DungeonHud
             var color = slot == 0 ? Yellow : White;
             string label = weapon == null
                 ? $"{slot + 1}  - EMPTY -"
-                : $"{slot + 1}  {weapon.Name}  DMG:{weapon.Damage} RNG:{weapon.Range} COST:{weapon.Cost}{AbilitySuffix(weapon)}";
+                : $"{slot + 1}  {weapon.Name}  {WeaponStats(weapon)}{AbilitySuffix(weapon)}";
             _text.DrawText(label, cx - 190f, y, 2f, weapon == null ? DarkGrey : color);
         }
 
@@ -230,6 +240,7 @@ public sealed class DungeonHud
             AbilityType.Block => $"BLOCK {a.Value}",
             AbilityType.CritRange => $"CRIT +{a.Value}",
             AbilityType.Brace => "BRACE",
+            AbilityType.HealCast => $"HEAL {a.Value}",
             _ => a.Type.ToString().ToUpperInvariant(),
         }).ToList();
         return parts.Count > 0 ? "  * " + string.Join("  ", parts) : "";

@@ -87,8 +87,19 @@ public class CombatRulesTests
     [Fact]
     public void StartingWeapons_MatchPrototype()
     {
-        Assert.Equal(3, GameConstants.Weapons.Count);
-        Assert.Equal(new[] { "Dagger", "Sword", "Spear" }, GameConstants.Weapons.Select(w => w.Name));
+        // The three prototype weapons keep indices 0-2 (parity); the Staff is an
+        // engine-side addition appended after them.
+        Assert.Equal(new[] { "Dagger", "Sword", "Spear" }, GameConstants.Weapons.Take(3).Select(w => w.Name));
         Assert.Equal(new[] { 0, 1, 2, 2 }, GameConstants.CharStartingWeaponIdx);
+    }
+
+    [Fact]
+    public void Staff_IsACasterWithManaCost()
+    {
+        var staff = GameConstants.Weapons[GameConstants.StaffWeaponIdx];
+        Assert.Equal("Staff", staff.Name);
+        Assert.True(staff.IsCaster);
+        Assert.True(staff.ManaCost > 0);
+        Assert.NotNull(staff.GetAbility(AbilityType.HealCast));
     }
 }

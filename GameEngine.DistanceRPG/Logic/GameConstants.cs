@@ -22,6 +22,16 @@ public static class GameConstants
     public const int PlayerHp = 100;
     public const int DummyHp = 50;
 
+    /// <summary>Mana pool per party member, for casting staves.</summary>
+    public const int MaxMana = 100;
+
+    /// <summary>
+    /// Turns of fully-idle movement needed to refill mana from empty: each end
+    /// of turn converts the unused fraction of the base budget into
+    /// <c>MaxMana / ManaRegenTurns</c> mana.
+    /// </summary>
+    public const int ManaRegenTurns = 10;
+
     /// <summary>Enemy movement budget per turn, in logic units.</summary>
     public const float EnemyMove = 100f;
 
@@ -39,7 +49,12 @@ public static class GameConstants
             new[] { new WeaponAbility(AbilityType.Block, 3) }),
         new Weapon("Spear", Range: 130, Damage: 7, Cost: 40,
             new[] { new WeaponAbility(AbilityType.Brace, 1) }),
+        new Weapon("Staff", Range: 100, Damage: 0, Cost: 40,
+            new[] { new WeaponAbility(AbilityType.HealCast, 1) }, ManaCost: 15),
     };
+
+    /// <summary>Index of the Staff in <see cref="Weapons"/>.</summary>
+    public const int StaffWeaponIdx = 3;
 
     /// <summary>Starting weapon index (into <see cref="Weapons"/>) per party member A–D.</summary>
     public static readonly IReadOnlyList<int> CharStartingWeaponIdx = new[] { 0, 1, 2, 2 };

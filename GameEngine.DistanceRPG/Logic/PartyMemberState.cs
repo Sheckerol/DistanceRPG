@@ -16,6 +16,13 @@ public sealed class PartyMemberState
     public int MaxHp { get; } = GameConstants.PlayerHp;
     public bool Alive { get; set; } = true;
 
+    /// <summary>Mana pool for casting staves; persists across turns.</summary>
+    public int Mana { get; set; } = GameConstants.MaxMana;
+    public int MaxMana => GameConstants.MaxMana;
+
+    /// <summary>Active heal-over-time and other ongoing effects.</summary>
+    public List<StatusEffect> StatusEffects { get; } = new();
+
     /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
     public Weapon?[] Inventory { get; } = new Weapon?[3];
 
@@ -58,4 +65,42 @@ public sealed class PartyMemberState
         SavedMovement = save;
         return save;
     }
+
+    /// <summary>
+    /// Convert the movement left unspent this turn into mana: a fully idle turn
+    /// (nothing moved) restores <c>MaxMana / <see cref="GameConstants.ManaRegenTurns"/></c>,
+    /// scaling linearly with the unused fraction of the base budget. Casting a
+    /// staff spends movement, so it eats into this the same way walking does.
+    /// Returns the mana actually regained.
+    /// </summary>
+    public int RegenManaFromUnusedMovement()
+    {
+        if (!Alive || Mana >= MaxMana) return 0;
+        float frac = Math.Clamp(DistLeft / GameConstants.MaxDistance, 0f, 1f);
+        int regen = (int)MathF.Round(frac * MaxMana / GameConstants.ManaRegenTurns);
+        int before = Mana;
+        Mana = Math.Min(MaxMana, Mana + regen);
+        return Mana - before;
+    }
+
+    /// <summary>
+    /// Add a status effect, stacking its level onto any existing effect of the
+    /// same type. Returns the (possibly merged) effect now on the member.
+    /// </summary>
+    public StatusEffect ApplyStatusEffect(StatusEffectType type, int level)
+    {
+        var existing = StatusEffects.FirstOrDefault(e => e.Type == type);
+        if (existing != null)
+        {
+            existing.Level += level;
+            return existing;
+        }
+        var added = new StatusEffect { Type = type, Level = level };
+        StatusEffects.Add(added);
+        return added;
+    }
+
+    /// <summary>Level of the given effect currently on the member, 0 if absent.</summary>
+    public int StatusLevel(StatusEffectType type)
+        => StatusEffects.FirstOrDefault(e => e.Type == type)?.Level ?? 0;
 }
