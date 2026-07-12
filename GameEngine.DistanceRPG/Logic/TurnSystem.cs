@@ -61,6 +61,8 @@ public sealed class TurnSystem
     public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action<EnemyState>? EnemyBraceTriggered;
+    public event Action<PartyMemberState, StatusEffect>? CharacterBuffed;   // staff cast landed
+    public event Action<PartyMemberState, int>? CharacterHealed;            // end-of-turn regen tick (HP restored)
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -153,7 +155,7 @@ public sealed class TurnSystem
     {
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
-        if (w == null || c.DistLeft < w.Cost) return false;
+        if (w == null || w.IsCaster || c.DistLeft < w.Cost) return false; // a staff heals allies, it can't strike
         return EnemyAi.CharCanHit(c, enemy, w, _grid);
     }
 
@@ -168,6 +170,44 @@ public sealed class TurnSystem
         return true;
     }
 
+    /// <summary>
+    /// Can the caster cast their equipped staff on <paramref name="ally"/>
+    /// (self allowed)? Needs a caster weapon, enough movement and mana, and the
+    /// ally within range and line of sight.
+    /// </summary>
+    public bool CanCast(PartyMemberState caster, PartyMemberState ally)
+    {
+        if (Phase != TurnPhase.Player || !caster.Alive || !ally.Alive) return false;
+        var w = caster.EquippedWeapon;
+        if (w == null || !w.IsCaster) return false;
+        if (caster.DistLeft < w.Cost || caster.Mana < w.ManaCost) return false;
+        return CanCastOn(caster, ally, w);
+    }
+
+    /// <summary>
+    /// Cast the equipped staff on an ally: spend movement and mana, then stack
+    /// its heal-over-time buff. Returns false if the cast is not allowed.
+    /// </summary>
+    public bool TryCast(PartyMemberState caster, PartyMemberState ally)
+    {
+        if (!CanCast(caster, ally)) return false;
+        var w = caster.EquippedWeapon!;
+        var heal = w.GetAbility(AbilityType.HealCast)!;
+
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.Cost);
+        caster.Mana -= w.ManaCost;
+        var effect = ally.ApplyStatusEffect(StatusEffectType.Regeneration, heal.Value);
+        CharacterBuffed?.Invoke(ally, effect);
+        return true;
+    }
+
+    private bool CanCastOn(PartyMemberState caster, PartyMemberState ally, Weapon w)
+    {
+        if (!CombatRules.InAttackRange(caster.X, caster.Y, caster.Radius, ally.X, ally.Y, ally.Radius, w))
+            return false;
+        return LineOfSight.HasLineOfSight(_grid, caster.X, caster.Y, ally.X, ally.Y);
+    }
+
     /// <summary>End the player turn: bank leftover movement, then run the enemy.</summary>
     public void EndTurn()
     {
@@ -175,7 +215,11 @@ public sealed class TurnSystem
 
         float totalSaved = 0f;
         foreach (var c in _party)
+        {
             totalSaved += c.EndTurnSaveMovement();
+            c.RegenManaFromUnusedMovement();
+            TickStatusEffects(c);
+        }
 
         Phase = TurnPhase.TurnEnding;
         _timer = BannerSeconds;
@@ -522,6 +566,37 @@ public sealed class TurnSystem
 
         Phase = TurnPhase.Player;
         PlayerTurnStarted?.Invoke();
+    }
+
+    /// <summary>
+    /// End-of-turn status tick: each Regeneration effect heals HP equal to its
+    /// level (capped at missing HP), then loses a level and is dropped at zero.
+    /// A dead member simply sheds every effect — regen can't resurrect.
+    /// </summary>
+    private void TickStatusEffects(PartyMemberState c)
+    {
+        if (!c.Alive)
+        {
+            c.StatusEffects.Clear();
+            return;
+        }
+
+        for (int i = c.StatusEffects.Count - 1; i >= 0; i--)
+        {
+            var effect = c.StatusEffects[i];
+            if (effect.Type == StatusEffectType.Regeneration)
+            {
+                int healed = Math.Min(effect.Level, c.MaxHp - c.Hp);
+                if (healed > 0)
+                {
+                    c.Hp += healed;
+                    CharacterHealed?.Invoke(c, healed);
+                }
+            }
+
+            if (--effect.Level <= 0)
+                c.StatusEffects.RemoveAt(i);
+        }
     }
 
     // ── Shared attack plumbing ───────────────────────────────────────────────

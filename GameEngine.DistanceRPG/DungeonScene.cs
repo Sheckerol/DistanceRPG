@@ -38,6 +38,7 @@ public class DungeonScene : Scene
     private static readonly Vector4 FloorColor = Rgb(0x0f3460);
     private static readonly Vector4 EnemyColor = Rgb(0xf5a623);
     private static readonly Vector4 DeadColor = Rgb(0x555555);
+    private static readonly Vector4 HealColor = Rgb(0x44dd77);
 
     private static readonly Vector4[] PartyColors =
     {
@@ -276,6 +277,7 @@ public class DungeonScene : Scene
                 Y = tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f,
             };
             state.Inventory[0] = GameConstants.Weapons[GameConstants.CharStartingWeaponIdx[i]];
+            state.Inventory[1] = GameConstants.Weapons[GameConstants.StaffWeaponIdx]; // healer option for anyone
 
             var character = new CharacterObject(state, PartyColors[i]);
             _party.Add(character);
@@ -424,6 +426,20 @@ public class DungeonScene : Scene
         {
             Log.Info("[Combat] Enemy braces!");
             _hud.AddFloatingText(EnemyObjectFor(enemy).Position, "BRACE!", new Vector4(1f, 0.6f, 0.4f, 1f), -52f);
+        };
+
+        _turns.CharacterBuffed += (c, effect) =>
+        {
+            Log.Info($"[Combat] {c.Id} gains {effect.Type} Lv{effect.Level}");
+            var obj = _party.First(p => p.State == c);
+            _hud.AddFloatingText(obj.Position, $"REGEN Lv{effect.Level}", HealColor, -52f);
+        };
+
+        _turns.CharacterHealed += (c, amount) =>
+        {
+            Log.Info($"[Combat] {c.Id} regenerates {amount} — HP {c.Hp}");
+            var obj = _party.First(p => p.State == c);
+            _hud.AddFloatingText(obj.Position, $"+{amount}", HealColor, 8f);
         };
 
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
@@ -742,7 +758,16 @@ public class DungeonScene : Scene
             {
                 bestT = tChar;
                 int idx = i;
-                action = () => SetActiveCharacter(idx);
+                var target = member.State;
+                // A staff-wielder's ally-click is always a heal — identical
+                // rules in and out of combat, spending the caster's movement.
+                // It never falls back to a leader-switch, which would reset the
+                // march formation mid-explore. Without a staff, the click
+                // selects the ally as the new leader instead.
+                bool casting = ActiveCharacter.State.EquippedWeapon?.IsCaster == true;
+                action = casting
+                    ? () => _turns.TryCast(ActiveCharacter.State, target)
+                    : () => SetActiveCharacter(idx);
             }
         }
 
