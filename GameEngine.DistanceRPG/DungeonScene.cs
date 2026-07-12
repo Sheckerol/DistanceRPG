@@ -23,8 +23,12 @@ public enum GameMenu
 /// </summary>
 public class DungeonScene : Scene
 {
-    /// <summary>The map seed the Phaser prototype ships with.</summary>
-    public const long MapSeed = 2762136374;
+    /// <summary>
+    /// This run's dungeon seed, rolled fresh per scene and logged at startup
+    /// so any map can be reproduced. (Golden tests still pin the prototype's
+    /// shipped seed to guarantee generator parity.)
+    /// </summary>
+    public long MapSeed { get; } = (uint)Random.Shared.NextInt64();
 
     private const float WallHeight = 1.2f;
     private const float FloorThickness = 0.2f;
@@ -72,9 +76,8 @@ public class DungeonScene : Scene
     private bool _wasMarching;
     private bool _marchingThisTurn; // decided once at each turn start
     private const float MarchArriveTolerance = 2f;
-    private EnemyObject _enemy = null!;
-    private (int R, int C) _lastEnemyTile = (-1, -1);
-    private bool _enemyVisible;
+    private readonly List<EnemyObject> _enemies = new();
+    private readonly Dictionary<EnemyObject, (int R, int C)> _lastEnemyTile = new();
     private int _activeIdx;
 
     // Held movement keys (arrows and WASD both drive the active character).
@@ -104,8 +107,7 @@ public class DungeonScene : Scene
     public IReadOnlyList<CharacterObject> Party => _party;
     public int ActiveIndex => _activeIdx;
     public TurnSystem Turns => _turns;
-    public EnemyObject Enemy => _enemy;
-    public bool EnemyVisible => _enemyVisible;
+    public IReadOnlyList<EnemyObject> Enemies => _enemies;
     public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
     public Vector2 MousePos => _mousePos;
@@ -123,7 +125,7 @@ public class DungeonScene : Scene
     /// </summary>
     public bool Marching => _turns.Phase == TurnPhase.Player
         && _marchingThisTurn
-        && !(_enemy.State.Alive && _turns.EnemySeenThisTurn);
+        && !_turns.AnyLiveEnemySeenThisTurn;
 
     /// <summary>
     /// The turn-start marching decision: needs the enemy dead or out of view
@@ -132,7 +134,7 @@ public class DungeonScene : Scene
     private void EvaluateMarchingForTurn()
     {
         _marchingThisTurn = false;
-        if (_enemy.State.Alive && _enemyVisible) return;
+        if (_enemies.Any(e => e.State.Alive && e.IsActive)) return;
 
         var leader = ActiveCharacter.State;
         foreach (var member in _party)
@@ -152,6 +154,7 @@ public class DungeonScene : Scene
     {
         base.Initialize();
 
+        Log.Info($"[Map] Generating dungeon with seed {MapSeed}");
         _map = MapGenerator.Generate(new Mulberry32(MapSeed));
         _fogBoxes = FogBoxBuilder.Build(_map); // also expands _map.Corridors in place
         _fog = new FogState(MapGenerator.Rows, MapGenerator.Cols);
@@ -159,7 +162,7 @@ public class DungeonScene : Scene
         BuildFloor();
         BuildWalls();
         SpawnParty();
-        SpawnEnemy();
+        SpawnEnemies();
         BuildFogOverlay();   // after all geometry: its translucent pass blends over everything
         BuildFogParticles(); // after the fog overlay: mist blends over the shroud
         WireTurnSystem();
@@ -188,17 +191,23 @@ public class DungeonScene : Scene
         UpdateMarchingFollowers(deltaTime);
         AutoEndTurnWhenDry();
 
-        // While the enemy walks its waypoints, mirror its logic position and
-        // refresh visibility when it crosses tile boundaries.
-        if (_turns.Phase == TurnPhase.EnemyMoving)
+        // While the enemy turn runs, mirror logic positions and refresh
+        // visibility when someone crosses a tile boundary. Syncing through
+        // the attack phase too catches the final sub-step of a walk, which
+        // lands in the same frame the phase flips to EnemyAttacking.
+        if (_turns.Phase is TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
         {
-            _enemy.SyncTransform();
-            var tile = LogicTile(_enemy.State.X, _enemy.State.Y);
-            if (tile != _lastEnemyTile)
+            bool crossedTile = false;
+            foreach (var enemy in _enemies)
             {
-                _lastEnemyTile = tile;
-                UpdateEnemyVisibility();
+                enemy.SyncTransform();
+                var tile = LogicTile(enemy.State.X, enemy.State.Y);
+                if (_lastEnemyTile.TryGetValue(enemy, out var last) && last == tile) continue;
+                _lastEnemyTile[enemy] = tile;
+                crossedTile = true;
             }
+            if (crossedTile)
+                UpdateEnemyVisibility();
         }
     }
 
@@ -276,15 +285,21 @@ public class DungeonScene : Scene
         _activeIdx = 0;
     }
 
-    private void SpawnEnemy()
+    /// <summary>
+    /// First-entry enemy population: EnemyPlacer decides positions from the
+    /// map seed on its own RNG stream. When save games arrive, a loaded
+    /// entry skips this and restores saved enemy states instead.
+    /// </summary>
+    private void SpawnEnemies()
     {
-        var state = new EnemyState
+        foreach (var (x, y, weaponIdx) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            X = _map.EnemyStart.Col * GameConstants.Tile + GameConstants.Tile / 2f,
-            Y = _map.EnemyStart.Row * GameConstants.Tile + GameConstants.Tile / 2f,
-        };
-        _enemy = new EnemyObject(state, EnemyColor);
-        AddGameObject(_enemy);
+            var state = new EnemyState { X = x, Y = y, Weapon = GameConstants.Weapons[weaponIdx] };
+            var enemy = new EnemyObject(state, EnemyColor);
+            _enemies.Add(enemy);
+            AddGameObject(enemy);
+        }
+        Log.Info($"[Map] Spawned {_enemies.Count} enemies across {_map.DebugRooms.Count} rooms");
     }
 
     private void BuildFogOverlay()
@@ -338,7 +353,8 @@ public class DungeonScene : Scene
 
     private void WireTurnSystem()
     {
-        _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(), _enemy.State);
+        _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(),
+            _enemies.Select(e => e.State).ToList());
 
         _turns.TurnEnded += saved =>
         {
@@ -356,10 +372,10 @@ public class DungeonScene : Scene
             EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
         };
 
-        _turns.EnemyHit += res =>
+        _turns.EnemyHit += (enemy, res) =>
         {
-            Log.Info($"[Combat] Enemy hit: roll {res.Roll.Roll} ({res.Roll.Outcome}) for {res.Damage} (blocked {res.Blocked}) — enemy HP {_enemy.State.Hp}");
-            SpawnAttackTexts(_enemy.Position, res);
+            Log.Info($"[Combat] Enemy hit: roll {res.Roll.Roll} ({res.Roll.Outcome}) for {res.Damage} (blocked {res.Blocked}) — enemy HP {enemy.Hp}");
+            SpawnAttackTexts(EnemyObjectFor(enemy).Position, res);
         };
 
         _turns.CharacterHit += (c, res) =>
@@ -378,17 +394,22 @@ public class DungeonScene : Scene
                 SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
         };
 
-        _turns.EnemyDefeated += () =>
+        _turns.EnemyDefeated += enemy =>
         {
             Log.Info("[Combat] Enemy defeated!");
-            SetColor(_enemy, DeadColor);
-            _hud.AddFloatingText(_enemy.Position, "DEFEATED!", new Vector4(1f, 1f, 1f, 1f), -54f);
+            var obj = EnemyObjectFor(enemy);
+            SetColor(obj, DeadColor);
+            obj.SetDefeatedVisual(true); // eases down to a walkable floor remnant
+            _hud.AddFloatingText(obj.Position, "DEFEATED!", new Vector4(1f, 1f, 1f, 1f), -54f);
         };
 
-        _turns.EnemyResurrected += () =>
+        _turns.EnemyResurrected += enemy =>
         {
             Log.Info("[Combat] Enemy resurrected!");
-            SetColor(_enemy, EnemyColor);
+            var obj = EnemyObjectFor(enemy);
+            SetColor(obj, EnemyColor);
+            obj.SetDefeatedVisual(false);
+            obj.SyncTransform(); // resurrection may have relocated it off an occupied tile
             UpdateEnemyVisibility();
         };
 
@@ -397,6 +418,12 @@ public class DungeonScene : Scene
             Log.Info($"[Combat] {c.Id} braces!");
             var obj = _party.First(p => p.State == c);
             _hud.AddFloatingText(obj.Position, "BRACE!", new Vector4(0.53f, 1f, 1f, 1f), -52f);
+        };
+
+        _turns.EnemyBraceTriggered += enemy =>
+        {
+            Log.Info("[Combat] Enemy braces!");
+            _hud.AddFloatingText(EnemyObjectFor(enemy).Position, "BRACE!", new Vector4(1f, 0.6f, 0.4f, 1f), -52f);
         };
 
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
@@ -541,14 +568,12 @@ public class DungeonScene : Scene
             dy *= scale;
         }
 
-        // Walls and the enemy always block. In combat the party body-blocks
+        // Walls and live enemies always block. In combat the party body-blocks
         // too — blockers are immovable circles here, so this is safe from the
         // two-body wall shoves that made the prototype drop inter-party
         // colliders. While marching, followers never block the leader, or
         // reversing through your own line would deadlock it.
-        var blockers = new List<GridCollision.Circle>();
-        if (_enemy.State.Alive)
-            blockers.Add(new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius));
+        var blockers = LiveEnemyBlockers();
         if (!Marching)
         {
             foreach (var member in _party)
@@ -568,6 +593,7 @@ public class DungeonScene : Scene
         state.Y = ny;
         ActiveCharacter.SyncTransform();
         UpdateFogFor(ActiveCharacter);
+        _turns.NotifyCharacterMoved(state); // spear enemies brace against walk-ins
     }
 
     // ── Marching formation ───────────────────────────────────────────────────
@@ -659,11 +685,8 @@ public class DungeonScene : Scene
         float speed = dist > 2f * MarchingLine.Spacing ? GameConstants.Speed * 1.25f : GameConstants.Speed;
         float step = MathF.Min(MathF.Min(speed * deltaTime, dist - stopAt), state.DistLeft);
 
-        var blockers = _enemy.State.Alive
-            ? new[] { new GridCollision.Circle(_enemy.State.X, _enemy.State.Y, _enemy.State.Radius) }
-            : null;
         var (nx, ny) = GridCollision.Move(
-            _map.Grid, state.X, state.Y, state.Radius, dx / dist * step, dy / dist * step, blockers);
+            _map.Grid, state.X, state.Y, state.Radius, dx / dist * step, dy / dist * step, LiveEnemyBlockers());
 
         float movedX = nx - state.X;
         float movedY = ny - state.Y;
@@ -675,6 +698,7 @@ public class DungeonScene : Scene
         state.Y = ny;
         member.SyncTransform();
         UpdateFogFor(member);
+        _turns.NotifyCharacterMoved(state);
     }
 
     // ── Combat input ─────────────────────────────────────────────────────────
@@ -699,11 +723,15 @@ public class DungeonScene : Scene
         float bestT = float.MaxValue;
         Action? action = null;
 
-        if (_enemy.State.Alive && _enemyVisible
-            && RayHitsSphere(origin, dir, _enemy.Position, 0.65f, out float tEnemy) && tEnemy < bestT)
+        foreach (var enemy in _enemies)
         {
-            bestT = tEnemy;
-            action = () => _turns.TryAttack(ActiveCharacter.State);
+            if (!enemy.State.Alive || !enemy.IsActive) continue;
+            if (RayHitsSphere(origin, dir, enemy.Position, 0.65f, out float tEnemy) && tEnemy < bestT)
+            {
+                bestT = tEnemy;
+                var target = enemy.State;
+                action = () => _turns.TryAttack(ActiveCharacter.State, target);
+            }
         }
 
         for (int i = 0; i < _party.Count; i++)
@@ -849,11 +877,25 @@ public class DungeonScene : Scene
 
     private void UpdateEnemyVisibility()
     {
-        var (r, c) = LogicTile(_enemy.State.X, _enemy.State.Y);
-        bool visible = _fog.Visible[r, c];
-        _enemyVisible = visible;
-        _enemy.IsActive = visible;
-        _turns.NotifyEnemyVisible(visible);
+        foreach (var enemy in _enemies)
+        {
+            var (r, c) = LogicTile(enemy.State.X, enemy.State.Y);
+            bool visible = _fog.Visible[r, c];
+            enemy.IsActive = visible;
+            _turns.NotifyEnemyVisible(enemy.State, visible);
+        }
+    }
+
+    private EnemyObject EnemyObjectFor(EnemyState state) => _enemies.First(e => e.State == state);
+
+    /// <summary>Live enemies as collision blockers; corpses are walkable.</summary>
+    private List<GridCollision.Circle> LiveEnemyBlockers()
+    {
+        var blockers = new List<GridCollision.Circle>();
+        foreach (var enemy in _enemies)
+            if (enemy.State.Alive)
+                blockers.Add(new GridCollision.Circle(enemy.State.X, enemy.State.Y, enemy.State.Radius));
+        return blockers;
     }
 
     private void SpawnAttackTexts(Vector3 worldPos, AttackResolution res)

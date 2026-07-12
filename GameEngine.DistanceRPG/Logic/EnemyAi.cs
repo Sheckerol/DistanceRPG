@@ -59,9 +59,13 @@ public static class EnemyAi
     /// then walk the path until the movement budget runs out (with a partial
     /// final waypoint if more than 1 unit of budget remains).
     /// Returns the waypoints and the budget left after moving.
+    /// <paramref name="blockedTiles"/> are treated as walls (tiles occupied
+    /// by other actors), so enemies queue and fan out instead of piling onto
+    /// the same spot; a fully boxed-in enemy simply stays put.
     /// </summary>
     public static (List<(float X, float Y)> Waypoints, float RemainingBudget) PlanMove(
-        EnemyState enemy, PartyMemberState target, int[,] grid, float budget)
+        EnemyState enemy, PartyMemberState target, int[,] grid, float budget,
+        IReadOnlyCollection<(int R, int C)>? blockedTiles = null)
     {
         var waypoints = new List<(float X, float Y)>();
 
@@ -74,6 +78,17 @@ public static class EnemyAi
         int enemyC = (int)MathF.Floor(enemy.X / tile);
         int targetR = (int)MathF.Floor(target.Y / tile);
         int targetC = (int)MathF.Floor(target.X / tile);
+
+        // Mask occupied tiles as walls on a copy — the Pathfinder itself must
+        // stay JS-identical (golden tests), so it never learns about actors.
+        if (blockedTiles is { Count: > 0 })
+        {
+            grid = (int[,])grid.Clone();
+            int rows = grid.GetLength(0), cols = grid.GetLength(1);
+            foreach (var (r, c) in blockedTiles)
+                if (r >= 0 && r < rows && c >= 0 && c < cols && (r, c) != (enemyR, enemyC))
+                    grid[r, c] = 1;
+        }
 
         int weaponRangeTiles = Math.Max(1, (int)MathF.Floor(enemy.Weapon.Range / tile));
         var path = Pathfinder.FindPath(grid, enemyR, enemyC, targetR, targetC, weaponRangeTiles);

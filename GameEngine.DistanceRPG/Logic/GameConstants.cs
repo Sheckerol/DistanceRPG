@@ -28,8 +28,8 @@ public static class GameConstants
     /// <summary>Enemy movement animation speed, logic units per second.</summary>
     public const float EnemySpeed = 150f;
 
-    /// <summary>Turns after defeat before the dummy resurrects.</summary>
-    public const int DummyResurrectTurns = 3;
+    /// <summary>Turns after defeat before a dummy resurrects.</summary>
+    public const int DummyResurrectTurns = 10;
 
     public static readonly IReadOnlyList<Weapon> Weapons = new[]
     {

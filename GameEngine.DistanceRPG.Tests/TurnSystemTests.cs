@@ -26,7 +26,7 @@ public class TurnSystemTests
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile);
         var enemy = new EnemyState { X = 15 * Tile, Y = 15 * Tile };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         a.DistLeft = 100f; // 60 spent
         float banked = -1f;
@@ -51,7 +51,7 @@ public class TurnSystemTests
         var a = Char("A", 5 * Tile, 5 * Tile);
         a.DistLeft = 300f; // from a previous bonus turn
         var enemy = new EnemyState { X = 15 * Tile, Y = 15 * Tile };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         float banked = -1f;
         turns.TurnEnded += saved => banked = saved;
@@ -66,12 +66,12 @@ public class TurnSystemTests
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger: dmg 15, cost 30, range 40
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile }; // 50px away, surface 22 â‰¤ 40
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         AttackResolution? res = null;
-        turns.EnemyHit += r => res = r;
+        turns.EnemyHit += (_, r) => res = r;
 
-        Assert.True(turns.TryAttack(a));
+        Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(GameConstants.MaxDistance - 30f, a.DistLeft);
         Assert.NotNull(res);
         // Dagger 15 into sword block 3 â†’ 12
@@ -85,44 +85,44 @@ public class TurnSystemTests
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile);
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         a.DistLeft = 29f; // dagger costs 30
-        Assert.False(turns.TryAttack(a));
+        Assert.False(turns.TryAttack(a, enemy));
 
         a.DistLeft = 160f;
         enemy.X = 15 * Tile; // out of range
-        Assert.False(turns.TryAttack(a));
+        Assert.False(turns.TryAttack(a, enemy));
 
         // In range (spear) but a wall tile sits between attacker and enemy.
         a.Inventory[0] = GameConstants.Weapons[2]; // spear, range 130
         enemy.X = 7 * Tile + 16f;                  // ~110px away, within reach
         grid[5, 6] = 1;                            // wall in the middle column
-        Assert.False(turns.TryAttack(a));
+        Assert.False(turns.TryAttack(a, enemy));
 
         grid[5, 6] = 0; // clear it: same shot now lands
-        Assert.True(turns.TryAttack(a));
+        Assert.True(turns.TryAttack(a, enemy));
     }
 
     [Fact]
-    public void KillingEnemy_MarksDefeat_AndResurrectsAfterThreeTurns()
+    public void KillingEnemy_MarksDefeat_AndResurrectsAfterConfiguredTurns()
     {
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile);
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile, Hp = 10 };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         bool defeated = false, resurrected = false;
-        turns.EnemyDefeated += () => defeated = true;
-        turns.EnemyResurrected += () => resurrected = true;
+        turns.EnemyDefeated += _ => defeated = true;
+        turns.EnemyResurrected += _ => resurrected = true;
 
-        Assert.True(turns.TryAttack(a)); // 12 â‰¥ 10 HP
+        Assert.True(turns.TryAttack(a, enemy)); // 12 â‰¥ 10 HP
         Assert.True(defeated);
         Assert.False(enemy.Alive);
         Assert.Equal(0, enemy.DefeatedAtTurn);
 
-        // Three end-turn cycles later the dummy comes back.
-        for (int i = 0; i < 3; i++)
+        // The configured number of end-turn cycles later, the dummy comes back.
+        for (int i = 0; i < GameConstants.DummyResurrectTurns; i++)
         {
             Assert.False(resurrected);
             turns.EndTurn();
@@ -140,11 +140,11 @@ public class TurnSystemTests
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger defender: no block
         var enemy = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         int hits = 0;
         turns.CharacterHit += (_, _) => hits++;
-        turns.NotifyEnemyVisible(true);
+        turns.NotifyEnemyVisible(enemy, true);
 
         turns.EndTurn();
         Advance(turns, 6f);
@@ -161,7 +161,7 @@ public class TurnSystemTests
         var grid = new int[20, 30];
         var a = Char("A", 2 * Tile, 5 * Tile);
         var enemy = new EnemyState { X = 25 * Tile, Y = 5 * Tile };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         float startX = enemy.X;
         turns.EndTurn(); // never seen: TurnsSinceSeen 2 â†’ 3
@@ -177,10 +177,10 @@ public class TurnSystemTests
         var grid = new int[20, 30];
         var a = Char("A", 2 * Tile + 16, 5 * Tile + 16);
         var enemy = new EnemyState { X = 25 * Tile + 16, Y = 5 * Tile + 16 };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         float startX = enemy.X;
-        turns.NotifyEnemyVisible(true);
+        turns.NotifyEnemyVisible(enemy, true);
         turns.EndTurn();
         Advance(turns, 10f);
 
@@ -197,14 +197,14 @@ public class TurnSystemTests
         // after its 100px approach it lands at 150px â†’ inside reach.
         var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
         var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         PartyMemberState? braced = null;
         int enemyHits = 0;
         turns.BraceTriggered += c => braced = c;
-        turns.EnemyHit += _ => enemyHits++;
+        turns.EnemyHit += (_, _) => enemyHits++;
 
-        turns.NotifyEnemyVisible(true);
+        turns.NotifyEnemyVisible(enemy, true);
         turns.EndTurn();
         Advance(turns, 10f);
 
@@ -214,19 +214,181 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void Brace_FiresFromBackRowSpears_WhenEnemyChasesTheLeader()
+    {
+        var grid = new int[20, 30];
+        // Marching-line party, dagger leader nearest to the enemy: the enemy
+        // targets the leader, but walking in crosses the back row's spear
+        // reach. (The prototype only braced the enemy's own target, which a
+        // formation's leader always eats — brace is a threat zone now.)
+        var a = Char("A", 8 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var b = Char("B", 7 * Tile + 16, 5 * Tile + 16, weaponIdx: 1);
+        var c = Char("C", 6 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var d = Char("D", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
+        var turns = new TurnSystem(grid, new[] { a, b, c, d }, new[] { enemy }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+
+        // Two approach turns: the 100-unit budget leaves the enemy 150px from
+        // the leader after the first; the second walks it into sword range of
+        // A — crossing into C's spear reach on the way. D sits one tile
+        // farther and stays out of reach.
+        for (int i = 0; i < 2; i++)
+        {
+            turns.NotifyEnemyVisible(enemy, true);
+            turns.EndTurn();
+            Advance(turns, 10f);
+        }
+
+        Assert.Contains(c, braced);
+        Assert.DoesNotContain(d, braced);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+    }
+
+    [Fact]
+    public void Brace_UsesPerTurn_MatchTheWeaponsBraceValue()
+    {
+        var grid = new int[20, 40];
+        // One char with a Brace-2 pike, one with the standard Brace-1 spear,
+        // side by side; two enemies walk in from the same direction in one
+        // turn. The pike retaliates against both, the spear only the first.
+        var pikeWeapon = new Weapon("Pike", Range: 130, Damage: 7, Cost: 40,
+            new[] { new WeaponAbility(AbilityType.Brace, 2) });
+        var p = Char("P", 5 * Tile + 16, 5 * Tile + 16);
+        p.Inventory[0] = pikeWeapon;
+        var s = Char("S", 5 * Tile + 16, 6 * Tile + 16, weaponIdx: 2); // spear
+
+        var e1 = new EnemyState { X = p.X + 250f, Y = p.Y };
+        var e2 = new EnemyState { X = p.X + 250f, Y = s.Y };
+        var turns = new TurnSystem(grid, new[] { p, s }, new[] { e1, e2 }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+        turns.EndTurn();
+        Advance(turns, 15f);
+
+        Assert.Equal(2, braced.Count(ch => ch == p)); // pike: both walkers
+        Assert.Equal(1, braced.Count(ch => ch == s)); // spear: first only
+    }
+
+    [Fact]
+    public void Brace_FiresFromEveryZoneCrossed_NotJustWhereTheWalkEnds()
+    {
+        var grid = new int[20, 30];
+        // Dagger leader draws the enemy along row 5. S sits perpendicular to
+        // the walk's midpoint: inside spear reach only mid-walk (out of reach
+        // both where the enemy starts and where it stops). C covers the end
+        // of the walk. Both must stab during the single approach.
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var s = Char("S", 376f, 5 * Tile + 16 + 154f, weaponIdx: 2);
+        var c = Char("C", 296f, 5 * Tile + 16 + 96f, weaponIdx: 2);
+        var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
+        var turns = new TurnSystem(grid, new[] { a, s, c }, new[] { enemy }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 10f);
+
+        Assert.Contains(s, braced); // crossed mid-walk, endpoint out of reach
+        Assert.Contains(c, braced); // in reach at the end of the walk
+        Assert.Equal(2, braced.Count);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+    }
+
+    [Fact]
+    public void EnemyBrace_PokesACharacterWalkingIntoASeenSpearDummysReach()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0); // dagger: no block
+        var enemy = new EnemyState
+        {
+            X = a.X + 200f, Y = a.Y,
+            Weapon = GameConstants.Weapons[2], // spear, Brace 1
+        };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        int enemyBraces = 0;
+        turns.EnemyBraceTriggered += _ => enemyBraces++;
+        turns.NotifyEnemyVisible(enemy, true);
+
+        // Outside spear reach (172 surface > 130): stepping around is safe.
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+        Assert.Equal(GameConstants.PlayerHp, a.Hp);
+
+        // Walk into reach: one free spear poke (7, no block from a dagger).
+        a.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+        Assert.Equal(GameConstants.PlayerHp - 7, a.Hp);
+
+        // Deeper movement inside reach: no second trigger.
+        a.X += 20f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+
+        // Out and back in: pair re-arms, but Brace 1 is spent this turn.
+        a.X = enemy.X - 250f;
+        turns.NotifyCharacterMoved(a);
+        a.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+    }
+
+    [Fact]
+    public void EnemyBrace_DoesNotTrigger_FromUnseenEnemies_OrWhenAlreadyInReach()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var enemy = new EnemyState
+        {
+            X = a.X + 150f, Y = a.Y, // already inside spear reach
+            Weapon = GameConstants.Weapons[2],
+        };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        int enemyBraces = 0;
+        turns.EnemyBraceTriggered += _ => enemyBraces++;
+
+        // Unseen enemy: walking around inside its reach costs nothing.
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+
+        // Cycle a turn with A parked in reach, now seen: the turn-start
+        // snapshot marks the pair as already-in-reach — still no trigger.
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 6f);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+
+        turns.NotifyEnemyVisible(enemy, true);
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+    }
+
+    [Fact]
     public void GameOver_WhenLastCharacterDies()
     {
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile);
         a.Hp = 5; // one sword hit kills
         var enemy = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile };
-        var turns = new TurnSystem(grid, new[] { a }, enemy, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         bool over = false, died = false;
         turns.GameOver += () => over = true;
         turns.CharacterDied += _ => died = true;
 
-        turns.NotifyEnemyVisible(true);
+        turns.NotifyEnemyVisible(enemy, true);
         turns.EndTurn();
         Advance(turns, 6f);
 
@@ -234,5 +396,100 @@ public class TurnSystemTests
         Assert.True(over);
         Assert.Equal(TurnPhase.GameOver, turns.Phase);
         Assert.False(a.Alive);
+    }
+
+    [Fact]
+    public void TwoAdjacentEnemies_BothActInSequence()
+    {
+        var grid = new int[20, 20];
+        var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger defender: no block
+        var e1 = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
+        var e2 = new EnemyState { X = 5 * Tile - 60f, Y = 5 * Tile };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);
+
+        int hits = 0;
+        turns.CharacterHit += (_, _) => hits++;
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+
+        turns.EndTurn();
+        Advance(turns, 12f);
+
+        // Each enemy lands its 3 scaled sword attacks (budget 100, cost 31.25).
+        Assert.Equal(6, hits);
+        Assert.Equal(GameConstants.PlayerHp - 60, a.Hp);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+    }
+
+    [Fact]
+    public void Resurrection_WakesOnAFreeTile_WhenSomeoneStandsOnTheRemnant()
+    {
+        var grid = new int[20, 20];
+        var a = Char("A", 5 * Tile, 5 * Tile);
+        var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile, Hp = 10 };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.False(enemy.Alive);
+
+        // Park the character exactly on the remnant, then wait out the timer.
+        a.X = enemy.X;
+        a.Y = enemy.Y;
+        for (int i = 0; i < GameConstants.DummyResurrectTurns; i++)
+        {
+            turns.EndTurn();
+            Advance(turns, 3f);
+        }
+
+        Assert.True(enemy.Alive);
+        var enemyTile = ((int)(enemy.Y / Tile), (int)(enemy.X / Tile));
+        var charTile = ((int)(a.Y / Tile), (int)(a.X / Tile));
+        Assert.NotEqual(charTile, enemyTile);
+
+        // Nearest free tile: at most one step from where it fell.
+        Assert.True(Math.Abs(enemyTile.Item1 - charTile.Item1)
+            + Math.Abs(enemyTile.Item2 - charTile.Item2) <= 1);
+    }
+
+    [Fact]
+    public void TwoEnemies_ApproachingTheSameTarget_DoNotStack()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 2 * Tile + 16, 5 * Tile + 16);
+        // Same column, far beyond sword reach: both walk their full budget
+        // toward A along the same row and would land on the same spot.
+        var e1 = new EnemyState { X = 20 * Tile + 16, Y = 5 * Tile + 16 };
+        var e2 = new EnemyState { X = 25 * Tile + 16, Y = 5 * Tile + 16 };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);
+
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+        turns.EndTurn();
+        Advance(turns, 15f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        float dx = e1.X - e2.X;
+        float dy = e1.Y - e2.Y;
+        float dist = MathF.Sqrt(dx * dx + dy * dy);
+        Assert.True(dist >= e1.Radius + e2.Radius,
+            $"enemies ended {dist:0.0} apart, overlapping (radii sum {e1.Radius + e2.Radius})");
+    }
+
+    [Fact]
+    public void PassiveEnemies_SkipInstantly_WithoutStallingTheTurn()
+    {
+        var grid = new int[20, 60];
+        var a = Char("A", 2 * Tile, 5 * Tile);
+        // Ten never-seen enemies scattered far away: none should cost a beat.
+        var enemies = Enumerable.Range(0, 10)
+            .Select(i => new EnemyState { X = (20 + 3 * i) * Tile, Y = 5 * Tile })
+            .ToList();
+        var turns = new TurnSystem(grid, new[] { a }, enemies, () => 10);
+
+        turns.EndTurn();
+        Advance(turns, 1.0f); // banner is 0.8s; idle enemies must add ~nothing
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        Assert.All(enemies, e => Assert.Equal((20 + 3 * enemies.IndexOf(e)) * Tile, e.X));
     }
 }
