@@ -214,6 +214,40 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void Brace_FiresFromBackRowSpears_WhenEnemyChasesTheLeader()
+    {
+        var grid = new int[20, 30];
+        // Marching-line party, dagger leader nearest to the enemy: the enemy
+        // targets the leader, but walking in crosses the back row's spear
+        // reach. (The prototype only braced the enemy's own target, which a
+        // formation's leader always eats — brace is a threat zone now.)
+        var a = Char("A", 8 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var b = Char("B", 7 * Tile + 16, 5 * Tile + 16, weaponIdx: 1);
+        var c = Char("C", 6 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var d = Char("D", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
+        var turns = new TurnSystem(grid, new[] { a, b, c, d }, new[] { enemy }, () => 10);
+
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += ch => braced.Add(ch);
+
+        // Two approach turns: the 100-unit budget leaves the enemy 150px from
+        // the leader after the first; the second walks it into sword range of
+        // A — crossing into C's spear reach on the way. D sits one tile
+        // farther and stays out of reach.
+        for (int i = 0; i < 2; i++)
+        {
+            turns.NotifyEnemyVisible(enemy, true);
+            turns.EndTurn();
+            Advance(turns, 10f);
+        }
+
+        Assert.Contains(c, braced);
+        Assert.DoesNotContain(d, braced);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+    }
+
+    [Fact]
     public void GameOver_WhenLastCharacterDies()
     {
         var grid = new int[20, 20];

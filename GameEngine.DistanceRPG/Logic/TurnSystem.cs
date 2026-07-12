@@ -68,12 +68,17 @@ public sealed class TurnSystem
     private float _enemyBudget;
     private List<(float X, float Y)> _waypoints = new();
     private int _waypointIdx;
-    private PartyMemberState? _moveTarget;
-    private Weapon? _moveTargetWeapon;
-    private bool _wasInRangeBeforeMove;
-    private bool _braceUsedThisTurn;
     private bool _enemyTurnPending;   // banner is up; enemy turn starts when it ends
     private bool _nextEnemyPending;   // pause before the next enemy acts (or control returns)
+
+    // Brace bookkeeping: spear-wielders threaten a zone. Members NOT already
+    // holding the acting enemy in reach are snapshotted before it walks; any
+    // of them whose reach it enters retaliates for free, once per character
+    // per turn. (The prototype only braced the enemy's own chosen target —
+    // with formations and many enemies, the nearest member is always the
+    // target and back-row spears would never fire.)
+    private readonly List<PartyMemberState> _braceCandidates = new();
+    private readonly HashSet<PartyMemberState> _bracedThisTurn = new();
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
@@ -227,9 +232,16 @@ public sealed class TurnSystem
             return;
         }
 
-        _moveTarget = target;
-        _moveTargetWeapon = target.EquippedWeapon;
-        _wasInRangeBeforeMove = EnemyAi.CharCanHit(target, enemy, _moveTargetWeapon, _grid);
+        // Snapshot who could NOT reach this enemy yet — walking into their
+        // reach is what triggers a brace.
+        _braceCandidates.Clear();
+        foreach (var member in _party)
+        {
+            var w = member.EquippedWeapon;
+            if (member.Alive && w?.GetAbility(AbilityType.Brace) != null
+                && !EnemyAi.CharCanHit(member, enemy, w, _grid))
+                _braceCandidates.Add(member);
+        }
 
         // Everyone else on the board blocks this enemy's path — enemies act
         // sequentially, so each planner sees the ones already in position and
@@ -334,21 +346,18 @@ public sealed class TurnSystem
     {
         var enemy = ActingEnemy;
 
-        // Brace: a free retaliation when an enemy walks into the braced
-        // character's reach — once per turn, only if they weren't already
-        // in range and are still that enemy's chosen target.
-        var target = _moveTarget;
-        var weapon = _moveTargetWeapon;
-        if (target != null && weapon?.GetAbility(AbilityType.Brace) != null
-            && !_braceUsedThisTurn && !_wasInRangeBeforeMove)
+        // Brace: free retaliation from every spear-wielder whose reach the
+        // enemy just walked into (once per character per turn). Its death
+        // mid-volley stops the rest.
+        foreach (var member in _braceCandidates)
         {
-            var t2 = EnemyAi.SelectTarget(enemy, _party, _grid);
-            if (t2 == target && EnemyAi.CharCanHit(target, enemy, weapon, _grid))
-            {
-                _braceUsedThisTurn = true;
-                BraceTriggered?.Invoke(target);
-                ResolveAttackOnEnemy(weapon, enemy);
-            }
+            if (!enemy.Alive) break;
+            if (!member.Alive || _bracedThisTurn.Contains(member)) continue;
+            if (!EnemyAi.CharCanHit(member, enemy, member.EquippedWeapon, _grid)) continue;
+
+            _bracedThisTurn.Add(member);
+            BraceTriggered?.Invoke(member);
+            ResolveAttackOnEnemy(member.EquippedWeapon!, enemy);
         }
 
         if (enemy.Alive)
@@ -451,7 +460,7 @@ public sealed class TurnSystem
             }
         }
 
-        _braceUsedThisTurn = false;
+        _bracedThisTurn.Clear();
         foreach (var c in _party)
         {
             if (c.Alive) c.StartTurn();
