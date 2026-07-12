@@ -442,6 +442,30 @@ public class DungeonScene : Scene
             _hud.AddFloatingText(obj.Position, $"+{amount}", HealColor, 8f);
         };
 
+        _turns.EnemyBuffed += (enemy, effect) =>
+        {
+            Log.Info($"[Combat] Enemy healer casts {effect.Type} Lv{effect.Level}");
+            var obj = EnemyObjectFor(enemy);
+            if (obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"REGEN Lv{effect.Level}", HealColor, -52f);
+        };
+
+        _turns.EnemyHealed += (enemy, amount) =>
+        {
+            Log.Info($"[Combat] Enemy regenerates {amount} — HP {enemy.Hp}");
+            var obj = EnemyObjectFor(enemy);
+            if (obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"+{amount}", HealColor, 8f);
+        };
+
+        _turns.EnemyFleeing += enemy =>
+        {
+            Log.Info("[Combat] Enemy healer flees!");
+            var obj = EnemyObjectFor(enemy);
+            if (obj.IsActive)
+                _hud.AddFloatingText(obj.Position, "FLEE!", new Vector4(1f, 0.8f, 0.3f, 1f), -52f);
+        };
+
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
     }
 
