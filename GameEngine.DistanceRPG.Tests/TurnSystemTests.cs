@@ -276,6 +276,80 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void EnemyBrace_PokesACharacterWalkingIntoASeenSpearDummysReach()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0); // dagger: no block
+        var enemy = new EnemyState
+        {
+            X = a.X + 200f, Y = a.Y,
+            Weapon = GameConstants.Weapons[2], // spear, Brace 1
+        };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        int enemyBraces = 0;
+        turns.EnemyBraceTriggered += _ => enemyBraces++;
+        turns.NotifyEnemyVisible(enemy, true);
+
+        // Outside spear reach (172 surface > 130): stepping around is safe.
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+        Assert.Equal(GameConstants.PlayerHp, a.Hp);
+
+        // Walk into reach: one free spear poke (7, no block from a dagger).
+        a.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+        Assert.Equal(GameConstants.PlayerHp - 7, a.Hp);
+
+        // Deeper movement inside reach: no second trigger.
+        a.X += 20f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+
+        // Out and back in: pair re-arms, but Brace 1 is spent this turn.
+        a.X = enemy.X - 250f;
+        turns.NotifyCharacterMoved(a);
+        a.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, enemyBraces);
+    }
+
+    [Fact]
+    public void EnemyBrace_DoesNotTrigger_FromUnseenEnemies_OrWhenAlreadyInReach()
+    {
+        var grid = new int[20, 30];
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var enemy = new EnemyState
+        {
+            X = a.X + 150f, Y = a.Y, // already inside spear reach
+            Weapon = GameConstants.Weapons[2],
+        };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        int enemyBraces = 0;
+        turns.EnemyBraceTriggered += _ => enemyBraces++;
+
+        // Unseen enemy: walking around inside its reach costs nothing.
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+
+        // Cycle a turn with A parked in reach, now seen: the turn-start
+        // snapshot marks the pair as already-in-reach — still no trigger.
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 6f);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+
+        turns.NotifyEnemyVisible(enemy, true);
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, enemyBraces);
+    }
+
+    [Fact]
     public void GameOver_WhenLastCharacterDies()
     {
         var grid = new int[20, 20];

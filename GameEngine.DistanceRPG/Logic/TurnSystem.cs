@@ -60,6 +60,7 @@ public sealed class TurnSystem
     public event Action<EnemyState>? EnemyDefeated;
     public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
+    public event Action<EnemyState>? EnemyBraceTriggered;
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -80,6 +81,13 @@ public sealed class TurnSystem
     private readonly List<PartyMemberState> _braceCandidates = new();
     private readonly Dictionary<PartyMemberState, int> _braceUsesThisTurn = new();
 
+    // Enemy-side brace mirror: spear dummies threaten a zone too. Pairs
+    // already in reach at the start of the player turn never trigger; a
+    // character whose movement carries them into a seen spear enemy's reach
+    // eats a free poke, up to the enemy weapon's Brace value per turn.
+    private readonly HashSet<(EnemyState Enemy, PartyMemberState Member)> _inEnemyReach = new();
+    private readonly Dictionary<EnemyState, int> _enemyBraceUsesThisTurn = new();
+
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -89,6 +97,44 @@ public sealed class TurnSystem
         _party = party;
         _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
+    }
+
+    /// <summary>
+    /// Scene calls this after a character's position changes during the
+    /// player phase. Walking into a seen, live, spear-wielding enemy's reach
+    /// triggers its brace: a free retaliation, up to the weapon's Brace value
+    /// per turn. Leaving reach re-arms the pair (further entries still cost
+    /// the enemy a use). Pairs already in reach when the turn began never
+    /// trigger — standing ground is safe, walking in is not.
+    /// </summary>
+    public void NotifyCharacterMoved(PartyMemberState mover)
+    {
+        if (Phase != TurnPhase.Player || !mover.Alive) return;
+
+        foreach (var enemy in _enemies)
+        {
+            if (!enemy.Alive) continue;
+
+            bool inReach = EnemyAi.CanHit(enemy, mover, enemy.Weapon, _grid);
+            if (!inReach)
+            {
+                _inEnemyReach.Remove((enemy, mover));
+                continue;
+            }
+            if (!_inEnemyReach.Add((enemy, mover))) continue; // was already in reach
+
+            var brace = enemy.Weapon.GetAbility(AbilityType.Brace);
+            if (brace == null) continue;
+            if (!_seenThisTurn.Contains(enemy)) continue; // no ambushes from the fog
+
+            _enemyBraceUsesThisTurn.TryGetValue(enemy, out int used);
+            if (used >= brace.Value) continue;
+
+            _enemyBraceUsesThisTurn[enemy] = used + 1;
+            EnemyBraceTriggered?.Invoke(enemy);
+            ResolveAttackOnCharacter(enemy, mover);
+            if (Phase == TurnPhase.GameOver) return;
+        }
     }
 
     /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
@@ -422,24 +468,8 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        var resolution = CombatRules.ResolveAttack(enemy.Weapon, target.EquippedWeapon, _rollD20);
-        target.Hp = Math.Max(0, target.Hp - resolution.Damage);
-        CharacterHit?.Invoke(target, resolution);
-
-        if (target.Hp <= 0)
-        {
-            target.Alive = false;
-            target.SavedMovement = 0;
-            CharacterDied?.Invoke(target);
-
-            if (_party.All(c => !c.Alive))
-            {
-                Phase = TurnPhase.GameOver;
-                _timer = GameOverPauseSeconds;
-                GameOver?.Invoke();
-                return;
-            }
-        }
+        ResolveAttackOnCharacter(enemy, target);
+        if (Phase == TurnPhase.GameOver) return;
 
         _timer = AttackBeatSeconds;
     }
@@ -468,6 +498,19 @@ public sealed class TurnSystem
         }
 
         _braceUsesThisTurn.Clear();
+        _enemyBraceUsesThisTurn.Clear();
+
+        // Snapshot who already stands inside each live enemy's reach (after
+        // resurrections placed everyone): those pairs never brace this turn.
+        _inEnemyReach.Clear();
+        foreach (var enemy in _enemies)
+        {
+            if (!enemy.Alive) continue;
+            foreach (var member in _party)
+                if (member.Alive && EnemyAi.CanHit(enemy, member, enemy.Weapon, _grid))
+                    _inEnemyReach.Add((enemy, member));
+        }
+
         foreach (var c in _party)
         {
             if (c.Alive) c.StartTurn();
@@ -478,6 +521,27 @@ public sealed class TurnSystem
     }
 
     // ── Shared attack plumbing ───────────────────────────────────────────────
+
+    private void ResolveAttackOnCharacter(EnemyState enemy, PartyMemberState target)
+    {
+        var resolution = CombatRules.ResolveAttack(enemy.Weapon, target.EquippedWeapon, _rollD20);
+        target.Hp = Math.Max(0, target.Hp - resolution.Damage);
+        CharacterHit?.Invoke(target, resolution);
+
+        if (target.Hp <= 0)
+        {
+            target.Alive = false;
+            target.SavedMovement = 0;
+            CharacterDied?.Invoke(target);
+
+            if (_party.All(c => !c.Alive))
+            {
+                Phase = TurnPhase.GameOver;
+                _timer = GameOverPauseSeconds;
+                GameOver?.Invoke();
+            }
+        }
+    }
 
     private void ResolveAttackOnEnemy(Weapon attackerWeapon, EnemyState enemy)
     {

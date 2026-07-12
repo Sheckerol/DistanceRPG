@@ -420,6 +420,12 @@ public class DungeonScene : Scene
             _hud.AddFloatingText(obj.Position, "BRACE!", new Vector4(0.53f, 1f, 1f, 1f), -52f);
         };
 
+        _turns.EnemyBraceTriggered += enemy =>
+        {
+            Log.Info("[Combat] Enemy braces!");
+            _hud.AddFloatingText(EnemyObjectFor(enemy).Position, "BRACE!", new Vector4(1f, 0.6f, 0.4f, 1f), -52f);
+        };
+
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
     }
 
@@ -587,6 +593,7 @@ public class DungeonScene : Scene
         state.Y = ny;
         ActiveCharacter.SyncTransform();
         UpdateFogFor(ActiveCharacter);
+        _turns.NotifyCharacterMoved(state); // spear enemies brace against walk-ins
     }
 
     // ── Marching formation ───────────────────────────────────────────────────
@@ -691,6 +698,7 @@ public class DungeonScene : Scene
         state.Y = ny;
         member.SyncTransform();
         UpdateFogFor(member);
+        _turns.NotifyCharacterMoved(state);
     }
 
     // ── Combat input ─────────────────────────────────────────────────────────
