@@ -120,12 +120,16 @@ already does.
 Each modifier declares what one stack is worth and where it caps. This is the
 only place a modifier's maths exists:
 
-**Stacks are hard-capped at 5, for every modifier.** The cap is on the *stack
-count*, not the resolved value, and it is a single constant enforced in one
-place — `ModifierSet.With` clamps. Nothing anywhere can hold a sixth stack, so
-no combination of variant, unique and enchantment can produce a dagger that
-crits on 10+. Every stack you can hold does something, and the ceiling is
-uniform and obvious.
+**Each modifier is hard-capped at 5 stacks of itself.** The cap is per
+*modifier type* and the types are independent — there is no shared budget
+across a weapon. `CritWindow ×5, CritMultiplier ×5` is legal; `CritWindow ×6`
+is not.
+
+The cap is on the *stack count*, not the resolved value, and it is a single
+constant enforced in one place — `ModifierSet.With` clamps per type. No
+combination of variant, unique and enchantment can push one modifier past its
+fifth stack, every stack you can hold does something, and the ceiling is
+uniform across modifiers.
 
 Because the cap is uniform, **per-stack value is the only balance dial** — it
 has to be chosen as `intended ceiling ÷ 5`.
@@ -427,7 +431,7 @@ sealed class ModifierSet                 // ModifierType → stack count
 
 static class ModifierRules               // the §1.1 table, one place only
 {
-    const int MaxStacks = 5;             // uniform, every modifier
+    const int MaxStacks = 5;             // per modifier type, independently
     static int PerStack(ModifierType t);
     static int Resolve(ModifierType t, int stacks)
         => PerStack(t) * Math.Min(MaxStacks, stacks);
@@ -440,11 +444,16 @@ out of `ModifierRules`. `With` being additive *and clamping* is what makes
 variants, uniques and enchantments the same operation: an enchantment landing
 on an already-maxed modifier is a no-op rather than a special case.
 
-**Migration must preserve the shipped values** — the prototype dagger crits on
-16+, the sword blocks 3, the spear braces once. Sword, spear and staff map to
-`×1` directly. The dagger does not: at `+1` per stack a 16+ window is
-`CritWindow ×4`, which spends four of its five stacks on its own class
-identity. Resolving that is an open question below, not a migration detail.
+**Migration must preserve the shipped values.** Today's dagger carries
+`CritRange 4`, and `CombatRules` resolves the crit threshold as `20 - value`
+(`CombatRules.cs:35`), so it crits on **16+** — 25% of swings, pinned by
+`CombatRulesTests.cs:28`. The sword blocks 3, the spear braces once.
+
+Sword, spear and staff map to `×1` directly. The dagger needs `CritWindow ×4`
+to keep its 16+ window under the new `+1` per stack. That is legal and leaves
+Keen's `CritMultiplier` and `OnCrit` budgets untouched, since caps are per
+type — but whether a base weapon should sit that close to its own cap is a
+tuning question, listed below.
 
 ### Everything else
 
@@ -720,16 +729,15 @@ produces an identical world state.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
-- **The dagger's stack budget.** With `CritWindow` at +1 per stack and a hard
-  cap of 5, the prototype dagger's 16+ window is `CritWindow ×4` — leaving it
-  one stack of headroom, so Greater is ×5 and Keen has nowhere to go. Either
-  the dagger's base window narrows (breaking parity with the prototype), or
-  the dagger's class modifier is something other than `CritWindow`. The class
-  tables in §1.2 still show the old `×1` counts and need restating once this
-  is settled.
-- **`Momentum` per stack.** At +25% it refunds 125% at ×5 — more movement back
-  than the swing cost, i.e. free attacks forever. Its per-stack value needs to
-  be picked so ×5 lands exactly on the mechanic's natural ceiling.
+- **Does the dagger keep its 16+ window?** The ported dagger crits on 16+
+  (25%), which is `CritWindow ×4` at +1 per stack — one stack short of its own
+  cap, so Greater takes it to ×5 (15+, 30%) and there it stops. That works,
+  but it means the dagger's whole `CritWindow` range across every variant and
+  unique is 16+ to 15+. Narrowing the base window would open that range back
+  up at the cost of parity with the prototype. The class tables in §1.2 still
+  show `×1` counts and need restating once this is settled.
+- **`Momentum` needs tuning.** At +25% it refunds 125% at ×5 — more movement
+  back than the swing cost, i.e. free attacks forever.
 - **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
   and only halves damage. The symmetric move is a fumble applying **Weakened**
   to *yourself* — but crits and fumbles both firing riders may be too much
@@ -747,6 +755,7 @@ produces an identical world state.
 - Modifiers are **stacks, not values**. Greater is a second stack of the class
   modifier; uniques are arbitrary stacks; enchantments are stacks with a mana
   lock. One mechanism.
-- **Max 5 stacks of any modifier**, hardcoded and uniform — the cap is on the
-  stack count, not the resolved value, so per-stack value is the only dial.
+- **Max 5 stacks per modifier type**, hardcoded, with types independent — no
+  shared budget across a weapon. The cap is on the stack count, not the
+  resolved value, so per-stack value is the only dial.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
