@@ -98,7 +98,7 @@ CON governs no weapon — it is the health stat alone.
 | --- | --- |
 | **Swift** | Base stats, reduced movement cost |
 | **Greater** | Base stats, class feature value increased |
-| **Keen** | Base stats, crit-specced |
+| **Keen** | Base stats, crit-specced: wider window *and* a stronger crit rider (§1.4) |
 | **Wildcard** | A distinct twist unique to the class |
 
 ### Dagger — *CritRange* (DEX)
@@ -240,12 +240,83 @@ gives spacing a cost, which is the right kind of tension for this game — but
 it is the single most reversible decision in Phase 1, so it ships behind a
 constant.
 
-## 1.4 Code impact
+## 1.4 Crit riders — a crit leaves a mark
+
+A crit today just doubles damage. That makes the Keen variant the weakest of
+the four: Swift saves movement (the actual currency) and Greater doubles the
+class feature, while Keen only makes a number occasionally bigger. Crits should
+*land an effect*, not just spike damage.
+
+Two new status effects carry it, both using the existing decaying model —
+level N, ticks down one per turn, removed at zero, so they always self-clear:
+
+| Effect | Per level | Notes |
+| --- | --- | --- |
+| **Sundered** | Target takes **+2 damage** from every source | Getting crit opens you up |
+| **Weakened** | Target deals **2 less damage**, floored at 1 | Getting crit rattles your swing |
+
+Both cap at level 4 (`+8` / `−8`). The floor mirrors Block's existing "never
+below 1 taken" rule (`CombatRules.cs:58`), so nothing can be reduced to
+harmlessness.
+
+### Riders express the class
+
+Every weapon in a class carries `OnCrit → <rider> 1`. The **Keen** variant
+carries `OnCrit → <rider> 2` on top of its wider crit window — that is what
+makes it genuinely crit-specced rather than mildly luckier.
+
+| Class | Crit rider | Why |
+| --- | --- | --- |
+| Dagger | **Sundered** | Precision finds the gap; the party cashes it in |
+| Ranged | **Sundered** | A marked target, softened at range |
+| Sword & Shield | **Weakened** | A shield-bash rattles the attacker |
+| Axe | **Weakened** | A crushing blow, spread across everything cleaved |
+| Spear | **Mire** | Caught at reach and staggered — costs them movement |
+| Throwing | **Mire** | Same, and it sets up the harpoon's Drag |
+
+Sundered on the dagger is the deliberate combo: A crits to open a target, then
+C's axe cashes it in for double value across the whole cleave. That is the
+first real reason for the party to focus one enemy.
+
+### Casts crit too
+
+Staves and wands roll d20 like attacks. A crit **doubles the effect level
+applied** — a critical Staff of Mire strips twice the movement, a critical
+Renewal stacks twice the regeneration. That restores the crit axis to the
+caster classes, which lost it when staff variants became four distinct effects.
+
+### Both sides, and why that is survivable
+
+Status effects are universal (Phase 0), so enemy crits apply riders to the
+party — a dagger dummy with CritRange 4 crits on 25% of swings. Three things
+keep that from spiralling:
+
+- Riders decay one level per turn on their own.
+- They cap at level 4.
+- Sundered is flat `+2`, not a multiplier, so it cannot compound with the crit
+  doubling into a one-shot.
+
+### Damage pipeline
+
+`CombatRules.ResolveAttack` gains two steps, ordered so Block stays last and
+its minimum-1 guarantee holds:
+
+```
+1. roll d20   → base damage    (× CritMultiplier, or halved on a natural 1)
+2. attacker's Weakened          → subtract
+3. defender's Sundered          → add
+4. defender's Block             → absorb, never below 1 taken
+5. on a crit, apply the weapon's OnCrit rider to the defender
+```
+
+## 1.5 Code impact
 
 New `AbilityType` members: `Cleave`, `CritMultiplier`, `Riposte`, `Push`,
-`Drag`, `Momentum`, `Longshot`, `Charges`, `Overwatch`, `Cast`, `AreaCast`.
+`Drag`, `Momentum`, `Longshot`, `Charges`, `Overwatch`, `Cast`, `AreaCast`,
+`OnCrit`.
 
-New `StatusEffectType` members: `Ward`, `Poison`, `Mire`.
+New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
+`Weakened`.
 
 `Weapon` gains `WeaponClass` (the eight above) and `AreaShape?`. Phase 3's drop
 tables key off `WeaponClass`.
@@ -256,9 +327,15 @@ damage becomes a function of distance for Longshot.
 
 `TurnSystem` gains: cleave and area target selection, a riposte hook, push/drag
 displacement, per-turn charge tracking, an overwatch reaction during the enemy
-phase, and `Ward`/`Poison`/`Mire` in the now-universal `TickStatusEffects`.
-Mire reduces `EffectiveMax` in `PartyMemberState.StartTurn` and the enemy
-budget in `StartEnemyAction`.
+phase, and the five new effects in the now-universal `TickStatusEffects`. Mire
+reduces `EffectiveMax` in `PartyMemberState.StartTurn` and the enemy budget in
+`StartEnemyAction`. Sundered and Weakened are read by `CombatRules`, so
+`ResolveAttack` needs the attacker passed in — today it only takes the two
+weapons (`CombatRules.cs:49`).
+
+**HUD.** The regen badge is party-only today. Riders land on enemies too, so
+enemy nameplates need effect badges, and floating combat text needs a
+`SUNDERED!` / `WEAKENED!` beat distinct from the damage number.
 
 **Enemy AI needs a pass.** `EnemyAi.PlanMove` closes to weapon range. Ranged
 and wand enemies want the opposite — hold distance and kite. That is real work,
@@ -391,6 +468,7 @@ Starting set:
 | Weightless | 25 | 5 | Attacks cost 10 less movement |
 | Warding | 30 | 40 | A killing blow leaves you at 1 HP instead |
 | Echoing | 20 | 15 | The weapon's class feature triggers one extra time per turn |
+| Shattering | 25 | 10 | Crit riders (§1.4) apply at +1 level |
 
 Because Vampiric heals and every trigger spends mana, an enchanted loadout
 feeds both the HP and mana pools from Phase 2. Stacking locks is the real cost:
@@ -492,6 +570,10 @@ produces an identical world state.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
+- **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
+  and only halves damage. The symmetric move is a fumble applying **Weakened**
+  to *yourself* — but crits and fumbles both firing riders may be too much
+  status churn per turn. Deliberately not specced.
 
 # Settled
 
@@ -500,3 +582,5 @@ produces an identical world state.
 - Innate stats are **fixed at creation** and never rise.
 - Enchantment mana locks apply **while equipped** only.
 - Floors persist **within a dungeon visit** and reset on leaving.
+- Crits apply a **class-flavoured rider** on top of the damage spike, both
+  ways; casts crit for double effect level.
