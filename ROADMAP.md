@@ -736,8 +736,12 @@ produces an identical world state.
   unique is 16+ to 15+. Narrowing the base window would open that range back
   up at the cost of parity with the prototype. The class tables in §1.2 still
   show `×1` counts and need restating once this is settled.
-- **`Momentum` needs tuning.** At +25% it refunds 125% at ×5 — more movement
-  back than the swing cost, i.e. free attacks forever.
+- **`Momentum` needs tuning, and it compounds with `Cleave`.** At +25% per
+  stack it refunds 125% at ×5, which is already free attacks forever. But the
+  real problem is that it lives on an axe: refunds are *per kill* and a cleave
+  can kill several per swing, so `Momentum ×2` plus two kills refunds the
+  whole cost at only the second stack. Either the refund is capped per swing
+  rather than per kill, or the per-stack value has to assume multi-kills.
 - **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
   and only halves damage. The symmetric move is a fumble applying **Weakened**
   to *yourself* — but crits and fumbles both firing riders may be too much
