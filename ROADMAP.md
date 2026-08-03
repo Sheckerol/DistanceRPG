@@ -146,7 +146,7 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Light` | −15 movement cost | −75 | Cost floors at 10 |
 | `Riposte` | +1 counter per turn | 5 | |
 | `Push` / `Drag` | +1 tile displaced | 5 | |
-| `Momentum` | +25% cost refunded per kill | **125%** ⚠ | Over 100% refunds more than the swing cost |
+| `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
 | `Overwatch` | +1 held shot | 5 | |
 | `OnCrit` | +1 rider level | 5 | §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
@@ -154,10 +154,26 @@ has to be chosen as `intended ceiling ÷ 5`.
 Flat costs, not percentages, for `Light`: in a game where you count exact
 movement units, `−15` is legible in a way that `−25%` is not.
 
-The per-stack numbers above are first-pass targets, not tuned values. Two are
-flagged rather than solved (see Open questions): `Momentum` exceeds a full
-refund at ×5, and `CritWindow` at +1 per stack changes what the base weapons
-need to declare.
+The per-stack numbers above are first-pass targets, not tuned values.
+
+### If it needs a cap, it is an enchantment
+
+**A weapon modifier must be safe at ×5 by construction.** Anything that would
+need a bespoke ceiling to stay sane does not belong in this table at all — it
+belongs in the enchantment layer (Phase 3), where the mana lock and per-trigger
+cost bound it organically instead.
+
+That is a real dividing line, not a style preference. Every modifier above is
+bounded by *something structural*: a per-turn count, a triggering condition, or
+a ceiling that another modifier already imposes (`Splitting` tops out exactly
+where `Block` does). None of them feed their own resource back into themselves.
+
+A refund does. `Momentum` — movement returned per enemy killed — pays back into
+the budget that bought the swing, so more kills buy more swings. No per-stack
+value fixes that shape; capping it per swing would just be the bespoke ceiling
+this rule exists to avoid. As an enchantment it self-limits: each trigger costs
+mana, mana regenerates only from *unspent* movement, so a refund loop starves
+itself. See Phase 3.
 
 ## 1.2 The martial variant shape
 
@@ -224,10 +240,12 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 | Swift | Hatchet | 60 | 18 | 45 | `Cleave ×1, Light ×1` |
 | Greater | Great Axe | 60 | 18 | 60 | `Cleave ×2` |
 | Keen | Executioner's Axe | 60 | 18 | 60 | `Cleave ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Reaver | 60 | 14 | 60 | `Cleave ×1, Momentum ×1` |
+| Wildcard | Reaver | 60 | 14 | 60 | `Cleave ×1, Splitting ×1` |
 
-**Momentum**: every enemy killed by the swing refunds a share of the movement
-cost. Rewards wading into a crowd at exactly the right moment.
+**Splitting**: ignores 3 of the target's Block per stack. Axes split shields —
+and at ×5 it ignores 15, exactly the `Block` cap, so the modifier's ceiling is
+set by the thing it counters rather than by an arbitrary number. Gives the axe
+a clean answer to shield-wall enemies without needing one.
 
 ### Ranged — class modifier `Longshot` (DEX)
 
@@ -419,8 +437,8 @@ the value **derived**, so the pair becomes:
 
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
-                    Longshot, Light, Riposte, Push, Drag, Momentum, Overwatch,
-                    OnCrit, OnHitPoison, Cast }
+                    Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
+                    OnCrit, OnHitPoison, Cast, Momentum }   // Momentum: enchantment-only
 
 sealed class ModifierSet                 // ModifierType → stack count
 {
@@ -619,10 +637,20 @@ Starting set:
 | Warding | 30 | 40 | A killing blow leaves you at 1 HP instead |
 | Echoing | 20 | 15 | The weapon's class feature triggers one extra time per turn |
 | Shattering | 25 | 10 | `OnCrit ×1` — crit riders (§1.6) land one level deeper |
+| Momentum | 30 | 10 | Each enemy killed by the swing refunds part of its movement cost |
 
 Because Vampiric heals and every trigger spends mana, an enchanted loadout
 feeds both the HP and mana pools from Phase 2. Stacking locks is the real cost:
 three enchantments can leave a caster with almost no castable mana.
+
+**Momentum is the case this layer exists for** (§1.1). As a weapon modifier a
+movement refund loops — refunded movement buys the next swing, which refunds
+again. As an enchantment it cannot: each refund costs 10 mana, and mana
+regenerates only from movement left *unspent* at end of turn
+(`PartyMemberState.RegenManaFromUnusedMovement`). Spending the refund to keep
+swinging is exactly what stops the mana coming back, so the loop starves itself
+without a single bespoke cap. Anything else that scales dangerously should
+arrive here for the same reason.
 
 ## 3.4 Code impact
 
@@ -736,12 +764,6 @@ produces an identical world state.
   unique is 16+ to 15+. Narrowing the base window would open that range back
   up at the cost of parity with the prototype. The class tables in §1.2 still
   show `×1` counts and need restating once this is settled.
-- **`Momentum` needs tuning, and it compounds with `Cleave`.** At +25% per
-  stack it refunds 125% at ×5, which is already free attacks forever. But the
-  real problem is that it lives on an axe: refunds are *per kill* and a cleave
-  can kill several per swing, so `Momentum ×2` plus two kills refunds the
-  whole cost at only the second stack. Either the refund is capped per swing
-  rather than per kill, or the per-stack value has to assume multi-kills.
 - **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
   and only halves damage. The symmetric move is a fumble applying **Weakened**
   to *yourself* — but crits and fumbles both firing riders may be too much
@@ -763,3 +785,7 @@ produces an identical world state.
   shared budget across a weapon. The cap is on the stack count, not the
   resolved value, so per-stack value is the only dial.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
+- **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
+  at ×5 by construction; anything needing a bespoke ceiling goes to the
+  enchantment layer, where the mana lock and trigger cost bound it organically.
+  `Momentum` moved there for exactly this reason.
