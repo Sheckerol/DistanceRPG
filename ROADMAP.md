@@ -120,31 +120,40 @@ already does.
 Each modifier declares what one stack is worth and where it caps. This is the
 only place a modifier's maths exists:
 
-| Modifier | Per stack | Cap | Notes |
-| --- | --- | --- | --- |
-| `Brace` | +1 retaliation | 4 | |
-| `Block` | +3 absorbed | 12 | Never reduces below 1 taken |
-| `CritWindow` | +4 to the window | **10** | Capped hard — see below |
-| `CritMultiplier` | +1 to the multiplier | ×5 | Base is ×2 with no stacks |
-| `Cleave` | +1 extra target | 4 | |
-| `Charges` | +2 throws per turn | 8 | |
-| `Longshot` | +1 damage per tile | 4 | Beyond 3 tiles |
-| `Light` | −15 movement cost | −45 | Cost floors at 10 |
-| `Riposte` | +1 counter per turn | 3 | |
-| `Push` / `Drag` | +1 tile displaced | 3 | |
-| `Momentum` | +25% cost refunded per kill | 100% | |
-| `Overwatch` | +1 held shot | 2 | |
-| `OnCrit` | +1 rider level | 4 | §1.6 |
-| `Cast` | +1 effect level applied | 4 | Staves and wands |
+**Stacks are hard-capped at 5, for every modifier.** The cap is on the *stack
+count*, not the resolved value, and it is a single constant enforced in one
+place — `ModifierSet.With` clamps. Nothing anywhere can hold a sixth stack, so
+no combination of variant, unique and enchantment can produce a dagger that
+crits on 10+. Every stack you can hold does something, and the ceiling is
+uniform and obvious.
 
-**`CritWindow` is the one that must cap.** Linear stacking would reach
-"crit on any roll" at ×5, which deletes the d20 entirely. Capping the *value*
-at 10 (crit on 10+, 55%) means extra stacks are wasted rather than degenerate
-— and the cap is on the resolved value, not the stack count, so a unique can
-carry `CritWindow ×4` harmlessly.
+Because the cap is uniform, **per-stack value is the only balance dial** — it
+has to be chosen as `intended ceiling ÷ 5`.
+
+| Modifier | Per stack | At ×5 | Notes |
+| --- | --- | --- | --- |
+| `Brace` | +1 retaliation | 5 | |
+| `Block` | +3 absorbed | 15 | Never reduces below 1 taken |
+| `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20, ×3 = 17–20 … |
+| `CritMultiplier` | +1 to the multiplier | ×7 | Base is ×2 with no stacks |
+| `Cleave` | +1 extra target | 5 | |
+| `Charges` | +2 throws per turn | 10 | |
+| `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
+| `Light` | −15 movement cost | −75 | Cost floors at 10 |
+| `Riposte` | +1 counter per turn | 5 | |
+| `Push` / `Drag` | +1 tile displaced | 5 | |
+| `Momentum` | +25% cost refunded per kill | **125%** ⚠ | Over 100% refunds more than the swing cost |
+| `Overwatch` | +1 held shot | 5 | |
+| `OnCrit` | +1 rider level | 5 | §1.6 |
+| `Cast` | +1 effect level applied | 5 | Staves and wands |
 
 Flat costs, not percentages, for `Light`: in a game where you count exact
 movement units, `−15` is legible in a way that `−25%` is not.
+
+The per-stack numbers above are first-pass targets, not tuned values. Two are
+flagged rather than solved (see Open questions): `Momentum` exceeds a full
+refund at ×5, and `CritWindow` at +1 per stack changes what the base weapons
+need to declare.
 
 ## 1.2 The martial variant shape
 
@@ -418,22 +427,24 @@ sealed class ModifierSet                 // ModifierType → stack count
 
 static class ModifierRules               // the §1.1 table, one place only
 {
+    const int MaxStacks = 5;             // uniform, every modifier
     static int PerStack(ModifierType t);
-    static int MaxValue(ModifierType t);
     static int Resolve(ModifierType t, int stacks)
-        => Math.Min(MaxValue(t), PerStack(t) * stacks);
+        => PerStack(t) * Math.Min(MaxStacks, stacks);
 }
 ```
 
 Every call site that reads `GetAbility(x)?.Value ?? 0` becomes
-`weapon.Modifiers.Value(x)` — the caps and per-stack maths never leak out of
-`ModifierRules`. `With` being additive is what makes variants, uniques, and
-enchantments the same operation.
+`weapon.Modifiers.Value(x)` — the 5-stack cap and per-stack maths never leak
+out of `ModifierRules`. `With` being additive *and clamping* is what makes
+variants, uniques and enchantments the same operation: an enchantment landing
+on an already-maxed modifier is a no-op rather than a special case.
 
-**Migration is mechanical.** The four shipped weapons become `CritWindow ×1`,
-`Block ×1`, `Brace ×1`, `Cast ×1`, and `PerStack` is set so their resolved
-values are 4 / 3 / 1 / 1 — identical to today, so
-`CombatRulesTests.StartingWeapons_MatchPrototype` keeps passing unchanged.
+**Migration must preserve the shipped values** — the prototype dagger crits on
+16+, the sword blocks 3, the spear braces once. Sword, spear and staff map to
+`×1` directly. The dagger does not: at `+1` per stack a 16+ window is
+`CritWindow ×4`, which spends four of its five stacks on its own class
+identity. Resolving that is an open question below, not a migration detail.
 
 ### Everything else
 
@@ -709,6 +720,16 @@ produces an identical world state.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
+- **The dagger's stack budget.** With `CritWindow` at +1 per stack and a hard
+  cap of 5, the prototype dagger's 16+ window is `CritWindow ×4` — leaving it
+  one stack of headroom, so Greater is ×5 and Keen has nowhere to go. Either
+  the dagger's base window narrows (breaking parity with the prototype), or
+  the dagger's class modifier is something other than `CritWindow`. The class
+  tables in §1.2 still show the old `×1` counts and need restating once this
+  is settled.
+- **`Momentum` per stack.** At +25% it refunds 125% at ×5 — more movement back
+  than the swing cost, i.e. free attacks forever. Its per-stack value needs to
+  be picked so ×5 lands exactly on the mechanic's natural ceiling.
 - **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
   and only halves damage. The symmetric move is a fumble applying **Weakened**
   to *yourself* — but crits and fumbles both firing riders may be too much
@@ -725,4 +746,7 @@ produces an identical world state.
   ways; casts crit for double effect level.
 - Modifiers are **stacks, not values**. Greater is a second stack of the class
   modifier; uniques are arbitrary stacks; enchantments are stacks with a mana
-  lock. One mechanism, capped per modifier in one table.
+  lock. One mechanism.
+- **Max 5 stacks of any modifier**, hardcoded and uniform — the cap is on the
+  stack count, not the resolved value, so per-stack value is the only dial.
+- `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
