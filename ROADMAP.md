@@ -81,7 +81,7 @@ do the same thing at different prices, which is not interesting.
 
 | Class | Stat | Class feature | Variant axis |
 | --- | --- | --- | --- |
-| Dagger | DEX | CritRange | Martial |
+| Dagger | DEX | CritWindow | Martial |
 | Sword & Shield | **max(STR, DEX)** | Block | Martial |
 | Spear | STR | Brace | Martial |
 | Axe | STR | Cleave | Martial |
@@ -92,110 +92,167 @@ do the same thing at different prices, which is not interesting.
 
 CON governs no weapon — it is the health stat alone.
 
-## 1.1 The martial variant shape
+## 1.1 Modifiers are stacks, not values
 
-| Variant | Rule |
+**This is the load-bearing decision of Phase 1.** A weapon is a base statline
+plus a **multiset of modifiers**. There is no `Brace 3` — there is `Brace ×3`,
+the same modifier applied three times. Stack count is the only dial.
+
+That makes every variant, every unique, and every enchantment the same
+operation — *add stacks* — so nothing below needs a bespoke mechanism:
+
+| Concept | Expressed as |
 | --- | --- |
-| **Swift** | Base stats, reduced movement cost |
-| **Greater** | Base stats, class feature value increased |
-| **Keen** | Base stats, crit-specced: wider window *and* a stronger crit rider (§1.4) |
-| **Wildcard** | A distinct twist unique to the class |
+| Base weapon | Class modifier ×1 |
+| Swift | `+ Light ×1` |
+| Greater | `+` one more stack of the class modifier (→ ×2) |
+| Keen | `+ CritWindow ×1` and `+ OnCrit ×1` |
+| Wildcard | `+` one stack of a modifier the class does not normally get |
+| **Unique** | Arbitrary stacks — class modifier ×3, or two features at ×2 |
+| Enchantment (Phase 3) | A stack that also carries a mana lock |
 
-### Dagger — *CritRange* (DEX)
+A unique is therefore *not a new kind of thing*. "A halberd that braces three
+times" is `Brace ×3, Push ×1` and needs no code beyond what the base system
+already does.
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+### Stacking rules live in one table
+
+Each modifier declares what one stack is worth and where it caps. This is the
+only place a modifier's maths exists:
+
+| Modifier | Per stack | Cap | Notes |
+| --- | --- | --- | --- |
+| `Brace` | +1 retaliation | 4 | |
+| `Block` | +3 absorbed | 12 | Never reduces below 1 taken |
+| `CritWindow` | +4 to the window | **10** | Capped hard — see below |
+| `CritMultiplier` | +1 to the multiplier | ×5 | Base is ×2 with no stacks |
+| `Cleave` | +1 extra target | 4 | |
+| `Charges` | +2 throws per turn | 8 | |
+| `Longshot` | +1 damage per tile | 4 | Beyond 3 tiles |
+| `Light` | −15 movement cost | −45 | Cost floors at 10 |
+| `Riposte` | +1 counter per turn | 3 | |
+| `Push` / `Drag` | +1 tile displaced | 3 | |
+| `Momentum` | +25% cost refunded per kill | 100% | |
+| `Overwatch` | +1 held shot | 2 | |
+| `OnCrit` | +1 rider level | 4 | §1.6 |
+| `Cast` | +1 effect level applied | 4 | Staves and wands |
+
+**`CritWindow` is the one that must cap.** Linear stacking would reach
+"crit on any roll" at ×5, which deletes the d20 entirely. Capping the *value*
+at 10 (crit on 10+, 55%) means extra stacks are wasted rather than degenerate
+— and the cap is on the resolved value, not the stack count, so a unique can
+carry `CritWindow ×4` harmlessly.
+
+Flat costs, not percentages, for `Light`: in a game where you count exact
+movement units, `−15` is legible in a way that `−25%` is not.
+
+## 1.2 The martial variant shape
+
+Written as stack operations on the base weapon. Every class follows the same
+four rules; only the wildcard differs.
+
+| Variant | Operation |
+| --- | --- |
+| **Swift** | `+ Light ×1` |
+| **Greater** | `+` one stack of the class modifier |
+| **Keen** | `+ CritWindow ×1`, `+ OnCrit ×1` |
+| **Wildcard** | `+` one stack of an off-class modifier |
+
+### Dagger — class modifier `CritWindow` (DEX)
+
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Dagger | 40 | 15 | 30 | CritRange 4 |
-| Swift | Flensing Knife | 40 | 15 | **20** | CritRange 4 |
-| Greater | Assassin's Fang | 40 | 15 | 30 | **CritRange 8** |
-| Keen | Vorpal Kris | 40 | 15 | 30 | CritRange 4, **CritMultiplier 3** |
-| Wildcard | Venom Kiss | 40 | **10** | 30 | CritRange 4, **OnHit → Poison 2** |
+| base | Dagger | 40 | 15 | 30 | `CritWindow ×1` |
+| Swift | Flensing Knife | 40 | 15 | 15 | `CritWindow ×1, Light ×1` |
+| Greater | Assassin's Fang | 40 | 15 | 30 | `CritWindow ×2` |
+| Keen | Vorpal Kris | 40 | 15 | 30 | `CritWindow ×1, CritMultiplier ×1, OnCrit ×1` |
+| Wildcard | Venom Kiss | 40 | 10 | 30 | `CritWindow ×1, OnHitPoison ×1` |
 
-Dagger is the one martial class where Greater and Keen would collide — crit
-*is* its feature. Greater widens the crit **window**; Keen raises the crit
-**multiplier** (×3 instead of ×2).
+Dagger is the class where Greater and Keen would collide — crit *is* its
+modifier. Under stacking they separate cleanly: Greater adds another
+`CritWindow` stack, Keen adds `CritMultiplier` and `OnCrit` instead.
 
-### Sword & Shield — *Block* (max STR/DEX)
+### Sword & Shield — class modifier `Block` (max STR/DEX)
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Sword | 80 | 10 | 50 | Block 3 |
-| Swift | Arming Sword | 80 | 10 | **35** | Block 3 |
-| Greater | Tower Guard | 80 | 10 | 50 | **Block 7** |
-| Keen | Estoc | 80 | 10 | 50 | Block 3, **CritRange 3** |
-| Wildcard | Riposte Blade | 80 | 10 | 50 | Block 3, **Riposte 1** |
+| base | Sword | 80 | 10 | 50 | `Block ×1` |
+| Swift | Arming Sword | 80 | 10 | 35 | `Block ×1, Light ×1` |
+| Greater | Tower Guard | 80 | 10 | 50 | `Block ×2` |
+| Keen | Estoc | 80 | 10 | 50 | `Block ×1, CritWindow ×1, OnCrit ×1` |
+| Wildcard | Riposte Blade | 80 | 10 | 50 | `Block ×1, Riposte ×1` |
 
-**Riposte**: blocking an attack grants a free counter-swing at the attacker,
-once per turn. Turns the shield from pure mitigation into a threat.
+**Riposte**: blocking an attack grants a free counter-swing at the attacker.
+Turns the shield from pure mitigation into a threat.
 
-### Spear — *Brace* (STR)
+### Spear — class modifier `Brace` (STR)
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Spear | 130 | 7 | 40 | Brace 1 |
-| Swift | Skirmisher's Pike | 130 | 7 | **25** | Brace 1 |
-| Greater | Phalanx Spear | 130 | 7 | 40 | **Brace 3** |
-| Keen | Impaler | 130 | 7 | 40 | Brace 1, **CritRange 3** |
-| Wildcard | Halberd | 130 | 7 | 40 | Brace 1, **Push 1** |
+| base | Spear | 130 | 7 | 40 | `Brace ×1` |
+| Swift | Skirmisher's Pike | 130 | 7 | 25 | `Brace ×1, Light ×1` |
+| Greater | Phalanx Spear | 130 | 7 | 40 | `Brace ×2` |
+| Keen | Impaler | 130 | 7 | 40 | `Brace ×1, CritWindow ×1, OnCrit ×1` |
+| Wildcard | Halberd | 130 | 7 | 40 | `Brace ×1, Push ×1` |
 
 **Push**: a brace hit shoves the target back out of its own reach. In a game
 where movement is the resource, denying an enemy its approach is the purest
 possible spear ability — and `TryBracesAgainst` already resolves braces
 mid-walk, so the hook exists.
 
-### Axe — *Cleave* (STR)
+### Axe — class modifier `Cleave` (STR)
 
 One swing hits every valid target in range, paying the movement cost once.
 Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Axe | 60 | 18 | 60 | Cleave 1 |
-| Swift | Hatchet | 60 | 18 | **40** | Cleave 1 |
-| Greater | Great Axe | 60 | 18 | 60 | **Cleave 3** |
-| Keen | Executioner's Axe | 60 | 18 | 60 | Cleave 1, **CritRange 4** |
-| Wildcard | Reaver | 60 | **14** | 60 | Cleave 1, **Momentum 1** |
+| base | Axe | 60 | 18 | 60 | `Cleave ×1` |
+| Swift | Hatchet | 60 | 18 | 45 | `Cleave ×1, Light ×1` |
+| Greater | Great Axe | 60 | 18 | 60 | `Cleave ×2` |
+| Keen | Executioner's Axe | 60 | 18 | 60 | `Cleave ×1, CritWindow ×1, OnCrit ×1` |
+| Wildcard | Reaver | 60 | 14 | 60 | `Cleave ×1, Momentum ×1` |
 
 **Momentum**: every enemy killed by the swing refunds a share of the movement
 cost. Rewards wading into a crowd at exactly the right moment.
 
-### Ranged — *Longshot* (DEX)
+### Ranged — class modifier `Longshot` (DEX)
 
-**Longshot**: damage rises with the distance to the target — `+value` damage
-per tile beyond 3 tiles. A bow in the front rank is nearly useless; the same
-bow across a room is devastating. This is the most on-theme ability in the
-game and it makes the marching formation a genuine trade-off.
+**Longshot**: damage rises with distance to the target — `+1` per tile beyond
+3 tiles, per stack. A bow in the front rank is nearly useless; the same bow
+across a room is devastating. Most on-theme ability in the game, and it makes
+the marching formation a genuine trade-off.
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Shortbow | 320 | 5 | 45 | Longshot 1 |
-| Swift | Hunting Bow | 320 | 5 | **30** | Longshot 1 |
-| Greater | Longbow | 320 | 5 | 45 | **Longshot 2** |
-| Keen | Recurve | 320 | 5 | 45 | Longshot 1, **CritRange 3** |
-| Wildcard | Crossbow | 320 | 8 | 45 | Longshot 1, **Overwatch 1** |
+| base | Shortbow | 320 | 5 | 45 | `Longshot ×1` |
+| Swift | Hunting Bow | 320 | 5 | 30 | `Longshot ×1, Light ×1` |
+| Greater | Longbow | 320 | 5 | 45 | `Longshot ×2` |
+| Keen | Recurve | 320 | 5 | 45 | `Longshot ×1, CritWindow ×1, OnCrit ×1` |
+| Wildcard | Crossbow | 320 | 8 | 45 | `Longshot ×1, Overwatch ×1` |
 
 **Overwatch**: bank the shot instead of firing. If an enemy enters line of
-sight during the enemy turn, it fires for free. A ranged mirror of Brace —
-and it reuses the same threat-zone machinery Phase 0 unified.
+sight during the enemy turn, it fires for free. A ranged mirror of Brace — and
+it reuses the same threat-zone machinery Phase 0 unified.
 
-### Throwing — *Charges* (STR)
+### Throwing — class modifier `Charges` (STR)
 
-**Charges**: N throws per turn, replenished at turn start, each cheaper than a
+**Charges**: throws per turn, replenished at turn start, each cheaper than a
 melee swing. Cleave is many targets in one swing; Charges is many swings in one
 turn.
 
-| Variant | Name | Range | Dmg | Cost | Abilities |
+| Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
-| base | Javelins | 190 | 9 | 35 | Charges 2 |
-| Swift | Darts | 190 | 6 | **20** | Charges 2 |
-| Greater | Bandolier | 190 | 9 | 35 | **Charges 4** |
-| Keen | Balanced Knives | 190 | 9 | 35 | Charges 2, **CritRange 3** |
-| Wildcard | Harpoon | 190 | 9 | 35 | Charges 2, **Drag 1** |
+| base | Javelins | 190 | 9 | 35 | `Charges ×1` |
+| Swift | Darts | 190 | 6 | 20 | `Charges ×1, Light ×1` |
+| Greater | Bandolier | 190 | 9 | 35 | `Charges ×2` |
+| Keen | Balanced Knives | 190 | 9 | 35 | `Charges ×1, CritWindow ×1, OnCrit ×1` |
+| Wildcard | Harpoon | 190 | 9 | 35 | `Charges ×1, Drag ×1` |
 
 **Drag**: a hit pulls the target *toward* the thrower — the exact inverse of
 the halberd's Push, and it sets up your own axe and sword line.
 
-## 1.2 Staff — four effects, half buffs and half debuffs (INT)
+## 1.3 Staff — four effects, half buffs and half debuffs (INT)
 
 Each staff casts a *different* effect. All share Range 100 and Cost 40; they
 differ in what they apply and what it costs in mana.
@@ -210,6 +267,11 @@ differ in what they apply and what it costs in mana.
 Staff of Renewal is today's shipped Staff with its numbers unchanged, so
 parity holds.
 
+Each carries `Cast ×1`, so the stacking model applies here too: a Greater
+staff is `Cast ×2` and applies its effect at double level. **Which** effect a
+staff casts is a field on the weapon, not a modifier — the modifier only says
+how hard it lands.
+
 **Mire is the signature debuff** for this game specifically: in a system where
 movement is the only real currency, taxing an enemy's budget is a more
 meaningful attack than damage. It also gives INT characters something to do
@@ -219,7 +281,7 @@ Debuff staves need `TryCast` to accept an **enemy** target — today `CanCast`
 and `TryCast` only take `PartyMemberState ally` (`TurnSystem.cs:178,191`).
 Phase 0's `ActorState` makes that a signature change rather than a rewrite.
 
-## 1.3 Wand — four area shapes (INT)
+## 1.4 Wand — four area shapes (INT)
 
 Wands deal damage in an area. All share Damage 8, Cost 45, Mana 20; they differ
 only in geometry. Shapes are in logic units.
@@ -240,7 +302,29 @@ gives spacing a cost, which is the right kind of tension for this game — but
 it is the single most reversible decision in Phase 1, so it ships behind a
 constant.
 
-## 1.4 Crit riders — a crit leaves a mark
+Wands carry `Cast ×1` like staves; the shape is a field, the stack is the
+damage multiplier.
+
+## 1.5 Uniques
+
+A unique is a named weapon with a stack spread the four standard variants
+cannot produce. It needs **no new mechanism** — only a name, a base statline,
+and a modifier multiset:
+
+| Unique | Class | Modifiers | Reads as |
+| --- | --- | --- | --- |
+| The Bulwark | Sword | `Block ×4` | Absorbs 12; nothing else |
+| Widowmaker | Dagger | `CritWindow ×2, CritMultiplier ×2, OnCrit ×2` | Crits on 12+, for ×4, sundering deep |
+| Hoplite's Wall | Spear | `Brace ×3, Push ×2` | Three retaliations, each shoving 2 tiles |
+| Stormcrow | Ranged | `Longshot ×3, Overwatch ×2` | Two held shots, brutal at full range |
+| Feathered Death | Throwing | `Charges ×3, Light ×2` | Six cheap throws a turn |
+
+Uniques drop from the deepest repeat-kill tiers (Phase 3). Because they are
+just stacks, a unique that turns out overtuned is a data edit, not a code
+change — and the per-modifier caps in §1.1 mean no unique can escape the
+balance envelope by construction.
+
+## 1.6 Crit riders — a crit leaves a mark
 
 A crit today just doubles damage. That makes the Keen variant the weakest of
 the four: Swift saves movement (the actual currency) and Greater doubles the
@@ -261,9 +345,11 @@ harmlessness.
 
 ### Riders express the class
 
-Every weapon in a class carries `OnCrit → <rider> 1`. The **Keen** variant
-carries `OnCrit → <rider> 2` on top of its wider crit window — that is what
-makes it genuinely crit-specced rather than mildly luckier.
+**Which** rider a weapon applies is a field on the class; **how deep** it lands
+is `OnCrit` stacks. Every weapon carries `OnCrit ×1`; the Keen variant adds a
+second stack on top of its wider window, which is what makes it genuinely
+crit-specced rather than mildly luckier. Rider level = `OnCrit` stacks, so
+Shattering (Phase 3) and a unique's `OnCrit ×3` feed the same number.
 
 | Class | Crit rider | Why |
 | --- | --- | --- |
@@ -288,7 +374,7 @@ caster classes, which lost it when staff variants became four distinct effects.
 ### Both sides, and why that is survivable
 
 Status effects are universal (Phase 0), so enemy crits apply riders to the
-party — a dagger dummy with CritRange 4 crits on 25% of swings. Three things
+party — a dagger dummy with `CritWindow ×1` crits on 25% of swings. Three things
 keep that from spiralling:
 
 - Riders decay one level per turn on their own.
@@ -309,21 +395,59 @@ its minimum-1 guarantee holds:
 5. on a crit, apply the weapon's OnCrit rider to the defender
 ```
 
-## 1.5 Code impact
+## 1.7 Code impact
 
-New `AbilityType` members: `Cleave`, `CritMultiplier`, `Riposte`, `Push`,
-`Drag`, `Momentum`, `Longshot`, `Charges`, `Overwatch`, `Cast`, `AreaCast`,
-`OnCrit`.
+### The modifier model replaces `WeaponAbility`
+
+Today a weapon holds `IReadOnlyList<WeaponAbility>` where
+`WeaponAbility(AbilityType, int Value)` carries the value inline, and lookup is
+`GetAbility(type)` returning at most one (`Weapons.cs:21,33`). Stacking makes
+the value **derived**, so the pair becomes:
+
+```csharp
+enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
+                    Longshot, Light, Riposte, Push, Drag, Momentum, Overwatch,
+                    OnCrit, OnHitPoison, Cast }
+
+sealed class ModifierSet                 // ModifierType → stack count
+{
+    int Stacks(ModifierType t);          // 0 when absent
+    int Value(ModifierType t);           // ModifierRules.Resolve(t, Stacks(t))
+    ModifierSet With(ModifierType t, int n = 1);   // additive merge
+}
+
+static class ModifierRules               // the §1.1 table, one place only
+{
+    static int PerStack(ModifierType t);
+    static int MaxValue(ModifierType t);
+    static int Resolve(ModifierType t, int stacks)
+        => Math.Min(MaxValue(t), PerStack(t) * stacks);
+}
+```
+
+Every call site that reads `GetAbility(x)?.Value ?? 0` becomes
+`weapon.Modifiers.Value(x)` — the caps and per-stack maths never leak out of
+`ModifierRules`. `With` being additive is what makes variants, uniques, and
+enchantments the same operation.
+
+**Migration is mechanical.** The four shipped weapons become `CritWindow ×1`,
+`Block ×1`, `Brace ×1`, `Cast ×1`, and `PerStack` is set so their resolved
+values are 4 / 3 / 1 / 1 — identical to today, so
+`CombatRulesTests.StartingWeapons_MatchPrototype` keeps passing unchanged.
+
+### Everything else
 
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
 `Weakened`.
 
-`Weapon` gains `WeaponClass` (the eight above) and `AreaShape?`. Phase 3's drop
-tables key off `WeaponClass`.
+`Weapon` gains `WeaponClass` (the eight above), `AreaShape?`, and
+`StatusEffectType? CastEffect` — which effect a staff or wand applies is a
+*field*, not a modifier; the modifier only says how hard it lands. Phase 3's
+drop tables key off `WeaponClass`.
 
 `CombatRules.RollAttack` hardcodes `weapon.Damage * 2` on a crit
-(`CombatRules.cs:39`) — that becomes `Damage * (CritMultiplier ?? 2)`, and
-damage becomes a function of distance for Longshot.
+(`CombatRules.cs:39`) — that becomes `Damage * (2 + Modifiers.Value(CritMultiplier))`,
+and damage becomes a function of distance for Longshot.
 
 `TurnSystem` gains: cleave and area target selection, a riposte hook, push/drag
 displacement, per-turn charge tracking, an overwatch reaction during the enemy
@@ -448,6 +572,12 @@ This makes the resurrection timer a deliberate farming rhythm rather than
 flavour — camp a dummy to deepen its drops, at the cost of the turns you spend
 waiting.
 
+**Uniques sit at the deep end.** Past a threshold (5 defeats, tuning target)
+the roll can return a unique of that class (§1.5) instead of a variant. Since
+uniques and enchantments are both just stacks, the whole ladder — base →
+variant → enchanted → unique — is one number going up, and the §1.1 caps hold
+at every rung.
+
 ## 3.3 Enchantments cost max mana while equipped
 
 Every enchantment carries a **mana lock** and a **trigger cost**:
@@ -468,7 +598,7 @@ Starting set:
 | Weightless | 25 | 5 | Attacks cost 10 less movement |
 | Warding | 30 | 40 | A killing blow leaves you at 1 HP instead |
 | Echoing | 20 | 15 | The weapon's class feature triggers one extra time per turn |
-| Shattering | 25 | 10 | Crit riders (§1.4) apply at +1 level |
+| Shattering | 25 | 10 | `OnCrit ×1` — crit riders (§1.6) land one level deeper |
 
 Because Vampiric heals and every trigger spends mana, an enchanted loadout
 feeds both the HP and mana pools from Phase 2. Stacking locks is the real cost:
@@ -477,9 +607,18 @@ three enchantments can leave a caster with almost no castable mana.
 ## 3.4 Code impact
 
 New `Logic/Enchantment.cs` and `Logic/LootTable.cs` (own RNG stream:
-`mapSeed ^ LootSalt`). `Weapon` gains an enchantment list — note `Weapon` is a
-`record` shared by reference from `GameConstants.Weapons` today, so dropped
-instances must be **copies**, never mutations of the shared table.
+`mapSeed ^ LootSalt`).
+
+An enchantment is **a modifier stack that carries a mana lock and a trigger
+cost** — nothing more. Enchanting is `Modifiers.With(type)` plus an entry in
+the weapon's enchantment list, so enchantments, variants and uniques all move
+the same numbers and the §1.1 caps bound them too. That is why a fully
+enchanted weapon cannot outrun the balance envelope: the cap is on the resolved
+value, wherever the stacks came from.
+
+Note `Weapon` is a `record` shared by reference from `GameConstants.Weapons`
+today, so dropped instances must be **copies**, never mutations of the shared
+table — `ModifierSet` should be immutable with `With` returning a new set.
 
 `PartyMemberState.MaxMana` subtracts the equipped item's total lock.
 
@@ -584,3 +723,6 @@ produces an identical world state.
 - Floors persist **within a dungeon visit** and reset on leaving.
 - Crits apply a **class-flavoured rider** on top of the damage spike, both
   ways; casts crit for double effect level.
+- Modifiers are **stacks, not values**. Greater is a second stack of the class
+  modifier; uniques are arbitrary stacks; enchantments are stacks with a mana
+  lock. One mechanism, capped per modifier in one table.
