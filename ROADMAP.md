@@ -104,13 +104,13 @@ operation — *add stacks* — so nothing below needs a bespoke mechanism:
 
 | Concept | Expressed as |
 | --- | --- |
-| Base weapon | Class modifier ×1 |
-| Swift | `+ Light ×1` |
-| Greater | `+` one more stack of the class modifier (→ ×2) |
-| Keen | `+ CritWindow ×1` and `+ OnCrit ×1` |
-| Wildcard | `+` one stack of a modifier the class does not normally get |
-| **Unique** | Arbitrary stacks — class modifier ×3, or two features at ×2 |
-| Enchantment (Phase 3) | A stack that also carries a mana lock |
+| Class baseline | The one or two modifiers every weapon of that class carries |
+| Efficiency weapon | `+ Light ×1` |
+| Purity weapon | `+` one more stack of the class's signature (→ ×2) |
+| Control weapon | `+` one stack of something that degrades the enemy |
+| Support weapon | `+` one stack of something that helps the party |
+| **Unique** | Arbitrary stacks — signature ×3, or two modifiers at ×2 |
+| Enchantment (Phase 3) | Its own system entirely — §3.3 |
 
 A unique is therefore *not a new kind of thing*. "A halberd that braces three
 times" is `Brace ×3, Push ×1` and needs no code beyond what the base system
@@ -149,7 +149,8 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Push` / `Drag` | +1 tile displaced | 5 | |
 | `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
 | `Overwatch` | +1 held shot | 5 | |
-| `OnCrit` | +1 rider level | 5 | §1.6 |
+| `CritWeaken` | +1 `Weakened` level on a crit | 5 | §1.6 |
+| `CritSunder` | +1 `Sundered` level on a crit | 5 | §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
 
 ### `Light` has to be proportional, not flat
@@ -201,34 +202,46 @@ itself. See Phase 3.
 Written as stack operations on the base weapon. Every class follows the same
 four rules; only the wildcard differs.
 
-| Variant | Operation |
-| --- | --- |
-| **Swift** | `+ Light ×1` |
-| **Greater** | `+` one stack of the class modifier |
-| **Keen** | `+ CritWindow ×1`, `+ OnCrit ×1` |
-| **Wildcard** | `+` one stack of an off-class modifier |
+A class has a **baseline** — the modifiers every weapon of that class carries —
+and each of its four weapons adds **exactly one more**, drawn from four fixed
+roles:
 
-**Cost columns below are base costs.** A Swift weapon shows the same cost as
-its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is what
-the weapon is; modifiers are what happens to it.
+| Role | Adds | Reads as |
+| --- | --- | --- |
+| **Efficiency** | `Light ×1` | Standard, but quick |
+| **Purity** | Another stack of the class's signature | More of what the class *is* |
+| **Control** | Something that degrades the enemy | The defensive-ish option |
+| **Support** | Something that helps the rest of the party | The interesting one |
 
-### Dagger — class modifier `CritWindow` (DEX)
+Two things this fixes over a rigid "crit-specced" slot. A class whose identity
+*is* crit has nothing to gain from one — that belongs in its baseline instead.
+And every class gets a **support** weapon, so each one has a reason to exist in
+a party that already has damage covered.
 
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+**Cost columns below are base costs.** An Efficiency weapon shows the same cost
+as its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is
+what the weapon is; modifiers are what happens to it.
+
+### Dagger (DEX) — baseline `CritWindow ×1, CritMultiplier ×1`
+
+Crit is the class, so both of its dimensions live in the baseline: 19–20 to
+crit, and ×3 when it lands.
+
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Dagger | 40 | 15 | 30 | `CritWindow ×1` |
-| Swift | Flensing Knife | 40 | 15 | 30 | `CritWindow ×1, Light ×1` |
-| Greater | Assassin's Fang | 40 | 15 | 30 | `CritWindow ×2` |
-| Keen | Vorpal Kris | 40 | 15 | 30 | `CritWindow ×1, CritMultiplier ×1, OnCrit ×1` |
-| Wildcard | Venom Kiss | 40 | 10 | 30 | `CritWindow ×1, OnHitPoison ×1` |
+| Efficiency | Flensing Knife | 40 | 15 | 30 | `Light ×1` |
+| Purity | Assassin's Fang | 40 | 15 | 30 | `CritWindow ×1` → 18–20 |
+| Control | Disarming Kris | 40 | 15 | 30 | `CritWeaken ×1` |
+| Support | Weakspot Stiletto | 40 | 15 | 30 | `CritSunder ×1` |
 
-**The dagger's baseline is `×1` — crit on 19–20**, and its crit specialist
-(Assassin's Fang) sits at `×2`, 18–20. This is a deliberate break from the
-prototype, whose dagger crits on 16+ (`CombatRulesTests.cs:28`).
+- **Disarming Kris** — crits apply `Weakened`, cutting what the target deals.
+  Defensive: you crit to stop being hit back.
+- **Weakspot Stiletto** — crits apply `Sundered`, so *everyone* hits that
+  target harder. The dagger stops being a damage weapon and becomes a setup
+  weapon; A crits to open a target and C's axe cashes it in across the cleave.
 
-Dagger is the class where Greater and Keen would collide — crit *is* its
-modifier. Under stacking they separate cleanly: Greater adds another
-`CritWindow` stack, Keen adds `CritMultiplier` and `OnCrit` instead.
+**The baseline is `CritWindow ×1` — crit on 19–20**, a deliberate break from
+the prototype's 16+ (`CombatRulesTests.cs:28`).
 
 ### Crit frequency is deliberately narrow; crit *power* is the build
 
@@ -243,6 +256,11 @@ line, with Assassin's Fang buying frequency and Vorpal Kris buying magnitude.
 
 Starting at `×1` rather than the prototype's `×4` also leaves the dagger four
 stacks of headroom for uniques and enchantments to work with, instead of one.
+
+> **The five classes below have not had this pass yet.** Their tables still
+> show the older Swift / Greater / Keen / Wildcard frame and need restating as
+> baseline-plus-four-roles. Proposals for each are being worked through; the
+> dagger above is the only settled one.
 
 ### Sword & Shield — class modifier `Block` (max STR/DEX)
 
@@ -456,7 +474,7 @@ and a modifier multiset:
 | Unique | Class | Modifiers | Reads as |
 | --- | --- | --- | --- |
 | The Bulwark | Sword | `Block ×4` | Absorbs 12; nothing else |
-| Widowmaker | Dagger | `CritWindow ×2, CritMultiplier ×2, OnCrit ×2` | Crits on 12+, for ×4, sundering deep |
+| Widowmaker | Dagger | `CritWindow ×3, CritMultiplier ×3, CritSunder ×2` | Crits on 17+, for ×5, sundering deep |
 | Hoplite's Wall | Spear | `Brace ×3, Push ×2` | Three retaliations, each shoving 2 tiles |
 | Stormcrow | Ranged | `Longshot ×3, Overwatch ×2` | Two held shots, brutal at full range |
 | Feathered Death | Throwing | `Charges ×3, Light ×2` | Six cheap throws a turn |
@@ -485,26 +503,29 @@ Both cap at level 4 (`+8` / `−8`). The floor mirrors Block's existing "never
 below 1 taken" rule (`CombatRules.cs:58`), so nothing can be reduced to
 harmlessness.
 
-### Riders express the class
+### Riders are per weapon, not per class
 
-**Which** rider a weapon applies is a field on the class; **how deep** it lands
-is `OnCrit` stacks. Every weapon carries `OnCrit ×1`; the Keen variant adds a
-second stack on top of its wider window, which is what makes it genuinely
-crit-specced rather than mildly luckier. Rider level = `OnCrit` stacks, so
-Shattering (Phase 3) and a unique's `OnCrit ×3` feed the same number.
+Each rider is **its own modifier**, so a weapon that has one carries it as
+stacks like anything else:
 
-| Class | Crit rider | Why |
-| --- | --- | --- |
-| Dagger | **Sundered** | Precision finds the gap; the party cashes it in |
-| Ranged | **Sundered** | A marked target, softened at range |
-| Sword & Shield | **Weakened** | A shield-bash rattles the attacker |
-| Axe | **Weakened** | A crushing blow, spread across everything cleaved |
-| Spear | **Mire** | Caught at reach and staggered — costs them movement |
-| Throwing | **Mire** | Same, and it sets up the harpoon's Drag |
+| Modifier | On a crit, applies |
+| --- | --- |
+| `CritWeaken` | `Weakened` at the stack count — the target deals less |
+| `CritSunder` | `Sundered` at the stack count — the target takes more |
 
-Sundered on the dagger is the deliberate combo: A crits to open a target, then
-C's axe cashes it in for double value across the whole cleave. That is the
-first real reason for the party to focus one enemy.
+Making them separate modifier types rather than one `OnCrit` with a payload
+keeps the §1.1 rule intact: **a stack is a count, never a value carrying
+something else.** It also lets one weapon carry both.
+
+Riders are the natural fill for the **Control** and **Support** roles (§1.2) —
+`CritWeaken` degrades the enemy, `CritSunder` helps everyone else — which is
+exactly how the dagger uses them. Not every class needs to fill those roles
+with riders, but crit-flavoured classes will.
+
+`CritSunder` is the deliberate combo: A crits to open a target, then C's axe
+cashes it in for double value across the whole cleave. That is the first real
+reason for the party to focus one enemy, and the Weakspot Stiletto exists to
+make it a build rather than an accident.
 
 ### Casts crit too
 
@@ -534,7 +555,7 @@ its minimum-1 guarantee holds:
 2. attacker's Weakened          → subtract
 3. defender's Sundered          → add
 4. defender's Block             → absorb, never below 1 taken
-5. on a crit, apply the weapon's OnCrit rider to the defender
+5. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
 ```
 
 ## 1.7 Code impact
@@ -549,7 +570,8 @@ the value **derived**, so the pair becomes:
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
-                    OnCrit, OnHitPoison, Cast, Momentum }   // Momentum: enchantment-only
+                    CritWeaken, CritSunder, OnHitPoison, Cast,
+                    Momentum }                             // Momentum: enchantment-only
 
 sealed class ModifierSet                 // ModifierType → stack count
 {
@@ -1430,6 +1452,15 @@ new events on the floor-transit path from Phase 4.
   over another.
 - **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
   for a boss.
+- **A class has a baseline plus four role weapons** — Efficiency (`Light`),
+  Purity (more of the signature), Control (degrade the enemy), Support (help
+  the party). The old universal "crit-specced" slot is gone; a crit class puts
+  crit in its baseline instead.
+- **Crit riders are per-weapon modifiers**, `CritWeaken` and `CritSunder`, not
+  a per-class field — so a stack stays a count rather than a payload.
+- **The dagger's baseline is `CritWindow ×1, CritMultiplier ×1`**, with its
+  four weapons adding `Light`, another `CritWindow`, `CritWeaken`, and
+  `CritSunder`.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
   taught by enemy spear dummies instead of a party spear.
