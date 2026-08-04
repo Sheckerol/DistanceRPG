@@ -647,6 +647,10 @@ This makes the resurrection timer a deliberate farming rhythm rather than
 flavour — camp a dummy to deepen its drops, at the cost of the turns you spend
 waiting.
 
+**Nothing is handed over at the time.** `DefeatCount` is the quality of the
+drop that dummy is *carrying*; you collect it only by killing it permanently on
+the way out, after the boss has stopped resurrection (§4.4).
+
 **Uniques sit at the deep end.** Past a threshold (5 defeats, tuning target)
 the roll can return a unique of that class (§1.5) instead of a variant.
 
@@ -831,9 +835,43 @@ Killing the boss is what makes a run *successful* (§6.3), and it is also what
 ends your farming. Deciding when you have farmed enough is the run's real
 decision, and it is entirely the player's to make.
 
-The boss does not end the run — the party still has to leave.
+## 4.4 Fighting your way out
 
-## 4.4 Code impact
+**The boss does not end the run.** Killing it turns the party around: you climb
+back out through every floor you descended, killing the monsters one last
+time — and that final kill is when you collect their drops.
+
+### `DefeatCount` sets the quality; the last kill collects it
+
+This resolves when loot actually materialises. Repeat-killing a dummy during
+the descent does not hand you anything — it raises that dummy's `DefeatCount`,
+which is the *quality* of the drop it is carrying. Because the boss stopped
+resurrection, killing it on the way out is permanent, and permanent death is
+what yields the goods.
+
+Farm a dummy five times on the way down and it is holding a tier-5 drop. You
+bank the quality going in and harvest it coming out.
+
+### The risk curve inverts
+
+You are strongest descending and weakest climbing out — resources spent, HP
+gone, movement banked away — and that is precisely when the entire payout sits
+on the board. Every extra farming cycle makes the drop better *and* the
+extraction harder, with the same currency paying for both.
+
+The gauntlet does thin as you climb, since nothing revives any more. The
+ascent is a diminishing fight, not an escalating one.
+
+Navigation is not the challenge: floors persist within a visit (§4.1), so the
+map and the fog are already known. The way out is a combat problem.
+
+### Wear charges on the way out
+
+Wear accrues from swinging (§6.1), so the extraction is also what charges your
+weapons for the enchanter — including the improvement roll, which scales with
+wear brought in (§6.4). The fight out pays twice.
+
+## 4.5 Code impact
 
 New `Logic/DungeonState.cs` holding `Floor[]`, each with its map, actor list,
 and `FogState`, plus `BossFloor` and a `BossDefeated` flag. `DungeonScene`
@@ -842,7 +880,13 @@ fog directly — that becomes a swap of the active floor, tearing down and
 rebuilding geometry on transit.
 
 The resurrection block in `TurnSystem.StartPlayerTurn` (`TurnSystem.cs:530`)
-gets gated on `!BossDefeated`.
+gets gated on `!BossDefeated`, which is the same flag that turns `EnemyDefeated`
+into a drop rather than just a `DefeatCount` increment.
+
+**The HUD must show `DefeatCount` on the enemy nameplate.** Farming with no
+visible reward until the extraction would read as broken otherwise — the player
+needs to see the quality building on each dummy to make the stop-farming call
+deliberately.
 
 `Logic/FogState.cs` becomes per-floor rather than per-scene.
 
@@ -951,14 +995,21 @@ correctly at a glance, where a silently stalled queue reads as a bug.
 **Entering the dungeon ticks nothing.** Otherwise the optimal play is a stack
 of twenty-second entries to burn the service clock without ever fighting.
 
-**A run is successful when you kill the boss** (§4.3) and leave. Nothing else
-counts as a win.
+**A run is successful when you kill the boss** (§4.3) and fight your way back
+out (§4.4). Nothing else counts as a win.
 
-| Outcome | Service tick |
-| --- | --- |
-| Entered, left above floor 2 | **None** |
-| Reached floor 2, left without the boss | **1 (mercy)** |
-| Killed the boss | **1** |
+The tick and the spoils come apart, and they should:
+
+| Outcome | Service tick | Drops |
+| --- | --- | --- |
+| Entered, left above floor 2 | **None** | — |
+| Reached floor 2, left without the boss | **1 (mercy)** | — |
+| Killed the boss, died on the way out | **1** | **None** |
+| Killed the boss and extracted | **1** | **Everything you killed climbing out** |
+
+The tick rewards the achievement; the drops require the extraction. Beating the
+boss and then dying in the stairwell still moves your weapons along at the
+enchanter — you just walk away with nothing to put on them.
 
 The mercy tick exists for exactly one purpose: **a losing streak must not
 freeze the workshop.** Several failed runs in a row would otherwise stall every
@@ -1060,6 +1111,15 @@ new events on the floor-transit path from Phase 4.
   (§4.1), which re-rolls the boss floor and revives everything. So a cleared
   dungeon cannot be returned to — clearing it is worth doing only for what you
   can carry out in that visit.
+- **Is there a carry limit on the way out?** Inventory is three slots per
+  member today (`PartyMemberState.cs:27`). A deep farm can bank far more drops
+  than twelve, so either the extraction forces choices about what to leave
+  behind — which would sharpen the whole loop — or a separate haul bag exists.
+  This is the single biggest unanswered question in the run design.
+- **Can you skip floors on the way out?** If the ascent can be run past rather
+  than fought through, the extraction risk collapses and so does the reason to
+  stop farming. Whether stairs can be reached without clearing a floor decides
+  how much of §4.4 actually bites.
 - **Does wear cap?** If it accumulates without limit, a long-serving weapon
   eventually has enough for any enchantment forever and wear stops being a
   gate. A ceiling — or wear being fully consumed per attachment — needs
@@ -1101,6 +1161,11 @@ new events on the floor-transit path from Phase 4.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
   farm into a finite clear — so winning ends your farming, and choosing when to
   stop farming is the run's central decision.
+- **You fight your way out.** The boss turns the party around; you climb back
+  through every floor killing everything a final time.
+- **`DefeatCount` is the drop's quality, the last kill collects it.** Farming
+  banks value into a dummy; you harvest it on the way out. Die in the
+  stairwell and you keep the service tick but none of the spoils.
 - **Service has a low chance of adding a modifier stack**, scaled by wear
   brought in and bounded by the §1.1 caps — this is how a weapon improves
   across runs rather than merely accumulating attachments.
