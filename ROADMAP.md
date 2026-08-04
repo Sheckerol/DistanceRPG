@@ -178,29 +178,51 @@ one place — `ModifierSet.With` clamps per type against the weapon's forged set
 
 **Per-stack value is still the only balance dial**, but it is now chosen as
 `intended ceiling ÷ deepest reachable stack count` rather than `÷ 5`. The
-deepest forged spread in the game is a unique's `×3`, so for most modifiers the
-number to divide by is 8.
+deepest forged spread in the game is The Bulwark's `Block ×4`, so the number to
+divide by is **9** — `×3` and a ceiling of 8 is the more typical unique.
 
-### Three modifiers hold at a flat five
+### Bounding a modifier: three tools, in order of preference
 
-Most modifiers are bounded only by their own count — more `Brace` is simply
-more retaliations, and the eighth is no stranger than the third. Three are
-bounded by something *outside* themselves, and lifting their ceiling either
-breaks a band the design fixes deliberately or does nothing at all:
+A few modifiers would misbehave at `×9`. There are three ways to handle that,
+and **the flat cap is the last resort, not the first** — a capped modifier has
+dead stacks in it, and a dead stack is a service roll or a farm cycle that
+bought the player nothing.
 
-| Modifier | Bounded by | At ×6 and beyond |
-| --- | --- | --- |
-| `CritWindow` | The d20 — it resolves to a **probability** | 35% and climbing, past the 10–30% band §1.2 sets on purpose |
-| `Light` | The weapon's own cost | −60% and heading toward free attacks |
-| `Charges` | The 160 movement budget | `×5` is already 10 throws × 15 = 150; a sixth stack is dead |
+**1. Re-price the stack.** Choose a per-stack value such that the deepest
+reachable spread still lands inside whatever bounds it. Nothing is capped,
+nothing is dead, and the modifier scales like everything else. Always try this
+first.
 
-Those three keep the flat cap. `Charges` landing exactly on its crossover is a
-coincidence of the current numbers rather than a designed one — if the budget
-or the throw cost moves, that cap has to move with it.
+`Charges` is the case. At `+2` throws per stack it overshoots — Feathered
+Death's forged `×3` ceilings at `×8`, and 16 throws × 15 is 240 against a 160
+budget. Re-priced to **one throw plus one per stack** it lands at 9 throws for
+135, just inside the budget at the deepest spread in the game, with the shipped
+baseline of 2 throws at `×1` unchanged. `CritMultiplier` already carries an
+offset like this (base ×2, +1 per stack), so the shape has precedent.
 
-This is the same shape as `Block`'s existing exemption from the proportional
-rule below: a named exception with a stated reason, not a general escape hatch.
-Anything else that wants one belongs in the enchantment layer instead.
+**2. Limit what can be forged.** Leave the `+5` acquired headroom alone and cap
+the *forged* contribution instead. The ceiling comes down without any stack
+becoming dead, and the modifier stays reachable through play.
+
+`Light` is the case. **No weapon may be forged with more than `Light ×1`** — the
+Efficiency role grants exactly one and no unique may exceed it. That puts the
+ceiling at `×6`, a 60% discount, which is generous but not degenerate: a dagger
+at 12, an axe at 24. Getting there takes five acquired stacks landing on the one
+modifier, which is a build rather than a windfall, and a weapon *not* forged
+Light tops out at `×5` for −50%.
+
+**3. Cap it flat.** Only when the modifier resolves to a quantity where more is
+not simply stronger.
+
+`CritWindow` is the only case, and it is the only flat cap in the game. It
+resolves to a **probability**: at `×8` a Widowmaker crits on 45% of swings,
+which is a different game rather than a better weapon, and it would break the
+10–30% band §1.2 sets deliberately. No re-pricing helps, because `+1` to the
+window is already the smallest step a d20 has.
+
+`Block` was the fourth candidate and does **not** need any of the three — see
+§1.6, where crits bypass it entirely. That is a better answer than a cap,
+because it leaves the shield strong and hands every class a way through.
 
 Values below are shown at `×5`, which is the reference point rather than the
 ceiling — a forged spread reaches further.
@@ -208,13 +230,13 @@ ceiling — a forged spread reaches further.
 | Modifier | Per stack | At ×5 | Notes |
 | --- | --- | --- | --- |
 | `Brace` | +1 retaliation | 5 | |
-| `Block` | +3 absorbed | 15 | Never reduces below 1 taken |
-| `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20, ×3 = 17–20 … |
+| `Block` | +3 absorbed | 15 | Never reduces below 1 taken; **crits ignore it entirely** — §1.6 |
+| `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20 … **flat-capped at ×5** |
 | `CritMultiplier` | +1 to the multiplier | ×7 | Base is ×2 with no stacks |
 | `Cleave` | +1 extra target | 5 | |
-| `Charges` | +2 throws per turn | 10 | A **cap**, not a grant — see §1.2 |
+| `Charges` | +1 throw per turn, on top of 1 | 6 | A **cap**, not a grant — see §1.2 |
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
-| `Light` | **−10% of the weapon's cost** | −50% | Additive across stacks, not compounding |
+| `Light` | **−10% of the weapon's cost** | −50% | Additive, not compounding; **max forged ×1**, so it ceilings at ×6 |
 | `Riposte` | +1 counter per turn | 5 | |
 | `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | |
 | `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
@@ -254,18 +276,18 @@ The per-stack numbers above are first-pass targets, not tuned values.
 ### If it needs a cap, it is an enchantment
 
 **A weapon modifier must be safe at its cap by construction** — and since the
-cap is now `forged + 5`, that means safe at `×8`, the deepest a unique reaches.
-Anything that would need a bespoke ceiling to stay sane does not belong in this
-table at all; it belongs in the enchantment system (§3.3), which is a separate
-mechanism with its own dials, bounded by a mana budget rather than by stack
-counts.
+cap is `forged + 5`, that means safe at `×9`, the deepest anything in the game
+reaches. Anything that would need a bespoke ceiling to stay sane does not belong
+in this table at all; it belongs in the enchantment system (§3.3), which is a
+separate mechanism with its own dials, bounded by a mana budget rather than by
+stack counts.
 
 That is a real dividing line, not a style preference. Every modifier above is
 bounded by *something structural*: a per-turn count, a triggering condition, or
 another modifier it is measured against (`Splitting` against `Block`). None of
-them feed their own resource back into themselves. The three flat-capped
-modifiers are the near-miss cases — bounded, but by a quantity that runs out
-before the eighth stack does, so they stop at five rather than moving out.
+them feed their own resource back into themselves. The three tools above are for
+modifiers that are bounded, but by a quantity that runs out before the ninth
+stack does — re-price, limit the forge, and only then cap.
 
 A refund does. `Momentum` — movement returned per enemy killed — pays back into
 the budget that bought the swing, so more kills buy more swings. No per-stack
@@ -353,8 +375,8 @@ in the game is 19–20 to 15–20 — **10% to 30%**. That is intentional. Frequ
 stays bounded so the d20 keeps mattering, and the investment axis is
 `CritMultiplier` instead, which runs ×2 upward.
 
-This band is the reason `CritWindow` is one of the three modifiers held at a
-flat 5 rather than scaling to `forged + 5` (§1.1). It resolves to a
+This band is the reason `CritWindow` is the **only** modifier in the game held
+at a flat 5 rather than scaling to `forged + 5` (§1.1). It resolves to a
 *probability*, and a probability is the one quantity in the game where more is
 not simply stronger — a Widowmaker at `CritWindow ×8` would crit on 45% of
 swings, which is a different game rather than a better weapon. `CritMultiplier`
@@ -395,6 +417,11 @@ self-defence. Same effect, opposite role, decided by who carries it.
 
 It is also the one weapon whose added modifier depends on the class baseline:
 `BlockWeaken` cannot fire without a `Block` to succeed at.
+
+**Both have the same blind spot.** Crits bypass Block entirely (§1.6), so a crit
+is not a successful block and neither `Riposte` nor `BlockWeaken` triggers on
+one. A crit-heavy attacker beats the whole class rather than just its
+mitigation, which is the price the sword pays for scaling to `Block ×9`.
 
 ### Spear (STR) — baseline `Brace ×1`
 
@@ -516,8 +543,8 @@ swinging. See §3.4.
 
 **Charges is a cap, and the cap is the point.** A throw costs only 15, so the
 movement budget alone would allow ten a turn — absurd. Charges is what bounds
-that: `×1` permits 2 throws, and each stack adds 2 more. Raising it is
-genuinely the class feature, because the cap rather than the budget is what
+that: it grants **one throw, plus one per stack**, so `×1` permits 2. Raising it
+is genuinely the class feature, because the cap rather than the budget is what
 binds.
 
 Getting this backwards is easy and worth stating plainly: at a *normal* attack
@@ -528,8 +555,21 @@ the cap the interesting number.
 | Charges | Throws | Movement spent | Damage | Movement left |
 | --- | --- | --- | --- | --- |
 | ×1 | 2 | 30 | 18 | 130 |
-| ×2 | 4 | 60 | 36 | 100 |
-| ×5 | 10 | 150 | 90 | 10 |
+| ×2 | 3 | 45 | 27 | 115 |
+| ×5 | 6 | 90 | 54 | 70 |
+| ×7 — a Bandolier at its ceiling | 8 | 120 | 72 | 40 |
+| ×8 — Feathered Death at its ceiling, the deepest `Charges` in the game | 9 | 135 | 81 | 25 |
+
+**The per-stack value is chosen so the cap stays inside the budget at every
+reachable stack count** (§1.1). At the old `+2` per stack, the deepest spread
+would have permitted 16 throws for 240 movement against a budget of 160 — five
+of them unthrowable, which would have made the last three stacks of the class's
+own signature worthless. `+1` keeps the shipped baseline of 2 throws and lands
+the deepest weapon in the game at 9 throws for 135, just inside.
+
+That is deliberate rather than lucky: `Charges` is the one modifier measured
+directly against the movement budget, so if the budget or the throw cost ever
+moves, this number moves with them.
 
 The class identity is **attack and still have movement left** — the only weapon
 that does not force a choice between fighting and repositioning. That gives
@@ -550,7 +590,7 @@ stacking the signature changes what the weapon is *for*.
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
 | Efficiency | Darts | 190 | 9 | 15 | `Light ×1` |
-| Purity | Bandolier | 190 | 9 | 15 | `Charges ×1` → 4 throws |
+| Purity | Bandolier | 190 | 9 | 15 | `Charges ×1` → 3 throws |
 | Control | Harpoon | 190 | 9 | 15 | `Drag ×1` |
 | Support | Softening Javelins | 190 | 9 | 15 | `Softening ×1` |
 
@@ -697,11 +737,15 @@ and a modifier multiset:
 
 | Unique | Class | Modifiers | Reads as |
 | --- | --- | --- | --- |
-| The Bulwark | Sword | `Block ×4` | Absorbs 12; nothing else |
+| The Bulwark | Sword | `Block ×4` | Absorbs 12; nothing else. The deepest forge in the game — ceiling `×9`, 27 absorbed |
 | Widowmaker | Dagger | `CritWindow ×3, CritMultiplier ×3, CritSunder ×2` | Crits on 17+, for ×5, sundering deep |
 | Hoplite's Wall | Spear | `Brace ×3, Pin ×2` | Three retaliations, each pinning hard |
 | Stormcrow | Ranged | `Longshot ×3, Overwatch ×2` | Two held shots, brutal at full range |
-| Feathered Death | Throwing | `Charges ×3, Light ×2` | Six cheap throws a turn |
+| Feathered Death | Throwing | `Charges ×3, Light ×1` | Four cheap throws now, nine at its ceiling |
+
+`Light ×1` on Feathered Death is not a trim for balance — **no weapon may be
+forged with more than one stack of `Light`** (§1.1), uniques included. It is the
+one modifier the forge is limited on, and the limit binds everywhere.
 
 A unique's whole spread is **forged** (§1.1), which makes uniques the deepest
 ceilings in the game: Widowmaker's `CritWindow ×3` caps at 8, with a full
@@ -780,6 +824,42 @@ keep that from spiralling:
 - Sundered is flat `+2`, not a multiplier, so it cannot compound with the crit
   doubling into a one-shot.
 
+### A crit is not blocked
+
+**Block is skipped entirely on a crit.** Not reduced, not halved — skipped.
+
+This is what lets `Block` scale with the forged spread like everything else
+instead of being flat-capped (§1.1). The Bulwark ceilings at `Block ×9`, 27
+absorbed, against weapons that deal 5 to 18: without an exception, a maxed
+shield would simply stop taking damage, and the minimum-1 rule would turn every
+fight against one into a hundred-turn arithmetic exercise.
+
+Capping `Block` would have fixed that by making the shield worse. Letting crits
+through fixes it by making armour *answerable*, which is the more interesting
+version — the shield stays genuinely excellent, and there is always a way in:
+
+| Answer to heavy armour | Who has it | How reliable |
+| --- | --- | --- |
+| Crit through it | Dagger, at `CritWindow ×1–5` | 10–30% of swings |
+| Crit through it | Everyone else, on a natural 20 | 5% |
+| `Splitting` | Axe | Every swing, 3 Block per stack |
+| `Softening` | Throwing | Every hit, for everyone, one turn |
+
+So the dagger becomes the **burst** answer to armour and the axe the **grind**
+answer, which is a better division than both of them wanting the same modifier.
+It also puts a floor under every other class: nobody is ever fully locked out,
+they just need the 20.
+
+Two consequences worth stating:
+
+- **`Riposte` and `BlockWeaken` do not fire on a crit**, since both trigger on a
+  *successful block* and a bypassed one never happens. A crit-heavy attacker is
+  therefore the counter to the sword's whole Control/Support half, not just to
+  its mitigation.
+- **It runs both ways.** Enemy crits go straight through party shields too, so
+  a shield-bearer is not a solution to dagger dummies — which is the same
+  symmetry the riders already have.
+
 ### Damage pipeline
 
 `CombatRules.ResolveAttack` gains two steps, ordered so Block stays last and
@@ -790,6 +870,7 @@ its minimum-1 guarantee holds:
 2. attacker's Weakened          → subtract
 3. defender's Sundered          → add
 4. defender's Block             → absorb, never below 1 taken
+                                  SKIPPED ENTIRELY on a crit
 5. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
 ```
 
@@ -820,13 +901,23 @@ static class ModifierRules               // the §1.1 table, one place only
 {
     const int AcquiredHeadroom = 5;      // per modifier type, independently
     static int PerStack(ModifierType t);
-    static bool FlatCapped(ModifierType t);      // CritWindow, Light, Charges
+    static int Offset(ModifierType t);   // CritMultiplier 2, Charges 1, else 0
+    static int FlatCap(ModifierType t);  // CritWindow 5, else no limit
+    static int MaxForged(ModifierType t);// Light 1, else no limit
+
     static int Cap(ModifierType t, int forgedStacks)
-        => FlatCapped(t) ? AcquiredHeadroom
-                         : forgedStacks + AcquiredHeadroom;
-    static int Resolve(ModifierType t, int stacks) => PerStack(t) * stacks;
+        => Math.Min(FlatCap(t), forgedStacks + AcquiredHeadroom);
+    static int Resolve(ModifierType t, int stacks)
+        => Offset(t) + PerStack(t) * stacks;
 }
 ```
+
+Three dials, three jobs (§1.1). `Offset` is what re-prices a modifier that has a
+grant before its first stack — `CritMultiplier`'s base ×2 and `Charges`'s first
+throw. `MaxForged` is checked when a weapon is **built** — variant tables,
+unique tables, boss theming, all of which are data — rather than in `With`,
+since it constrains the forge and not acquisition. `FlatCap` is the last resort
+and applies to `CritWindow` alone.
 
 **A weapon carries two sets, not one.** `Weapon.Forged` is the identity spread —
 class baseline, variant role, unique spread, dungeon theme — fixed at drop and
@@ -895,8 +986,15 @@ modifiers never raise any weapon's cap; a boss's theme only does so on the
 weapons it **drops**, because those drop forged with it (§4.3).
 
 `CombatRules.RollAttack` hardcodes `weapon.Damage * 2` on a crit
-(`CombatRules.cs:39`) — that becomes `Damage * (2 + Modifiers.Value(CritMultiplier))`,
-and damage becomes a function of distance for Longshot.
+(`CombatRules.cs:39`) — that becomes `Damage * Modifiers.Value(CritMultiplier)`,
+the `×2` base now living in that modifier's `Offset`, and damage becomes a
+function of distance for Longshot.
+
+`ResolveAttack` must also **skip the Block step entirely when the roll crit**
+(§1.6), and skip it before the minimum-1 clamp rather than after — a crit that
+absorbed down to 1 and was then let through is a different number. The same
+branch is what suppresses the `Riposte` and `BlockWeaken` hooks, so all three
+should read off one `blocked` flag rather than re-testing the crit separately.
 
 `TurnSystem` gains: cleave and area target selection, a riposte hook, push/drag
 displacement, per-turn charge tracking, an overwatch reaction during the enemy
@@ -1393,14 +1491,19 @@ makes true. Block absorbs a *flat* amount and never reduces a hit below 1
 terrible against it and few large ones are fine.
 
 The starting party spans that range deliberately — **axe 18, dagger 15, sword
-10**, plus a healer. Give the golem `Block ×3` innately and the maths does the
-teaching by itself: the sword's 10 lands for 1, the axe's 18 for 9, and a
-dagger crit for 21. The player discovers that by swinging, not by reading a
-tooltip.
+10**, plus a healer. Give the golem `Block ×3` innately — 9 absorbed — and the
+maths does the teaching by itself: the sword's 10 lands for 1, the dagger's 15
+for 6, the axe's 18 for 9. The player discovers that by swinging, not by
+reading a tooltip.
 
-That is the lesson the tutorial should land: **damage per swing beats swings
-per turn against armour**, and picking the right party member for the target is
-the whole game.
+Then the dagger crits and lands **45**, because crits ignore Block entirely
+(§1.6). One roll in ten, out of nowhere, the armour stops existing.
+
+Two lessons for the price of one fight, and the second is the more valuable:
+**damage per swing beats swings per turn against armour**, and **there is always
+a way through** — you may just have to wait for it. Picking the right party
+member for the target is the whole game, and the golem teaches both halves of
+what "right" means.
 
 The pairing runs deeper than the tutorial. The axe's wildcard modifier is
 `Splitting`, which ignores Block outright (§1.2) — so the tutorial dungeon is
@@ -1772,7 +1875,10 @@ new events on the floor-transit path from Phase 4.
   how many `Block` stacks it carries innately. A slow, heavily armoured
   construct is the obvious shape, but slow enemies are trivially kited once
   ranged weapons exist (§1.2) — worth checking the tutorial boss does not
-  become a joke in Phase 1.
+  become a joke in Phase 1. `Block ×3` also now means a tutorial dagger crit
+  lands for 45 where its normal swing lands for 6; that is the lesson working,
+  but a first-time player needs the floating combat text to *say* the armour was
+  ignored, or it reads as a bug.
 - **What does the hub look like?** Dungeon selection now definitely exists
   (§4.3): a list of themed dungeons, the tutorial present until beaten. Nothing
   else about the hub is specified — how dungeons are discovered, whether the
@@ -1790,15 +1896,14 @@ new events on the floor-transit path from Phase 4.
   eventually has enough for any enchantment forever and wear stops being a
   gate. A ceiling — or wear being fully consumed per attachment — needs
   deciding.
-- **`Splitting` no longer tops out exactly where `Block` does.** That coupling
-  was one of the neater things in §1.1 — the axe's anti-armour modifier ceilinged
-  by the armour it counters — and `forged + 5` breaks it: a Tower Guard reaches
-  `Block ×7` (21 absorbed) and a Reaver only `Splitting ×6` (18 ignored), so the
-  axe can no longer fully split the best shield. Either `Splitting` gets a
-  per-stack bump to +4, or the coupling is restated as "stack for stack, not
-  ceiling for ceiling" and the shield is allowed to win at the extreme. The
-  second is probably right — a maxed shield *should* beat a maxed axe by a
-  little — but it wants saying rather than happening by accident.
+- **`Splitting` no longer tops out where `Block` does, and that is now fine.**
+  A Bulwark reaches `Block ×9` (27 absorbed) and a Reaver only `Splitting ×6`
+  (18 ignored), so the axe can no longer fully split the best shield. Crits
+  bypassing Block (§1.6) is what makes that acceptable rather than a hole — the
+  grind answer is allowed to fall short when the burst answer never does. What
+  is still open is whether `Splitting` should get a per-stack bump to `+4` so
+  the axe *nearly* keeps up, or stay at `+3` and let the shield decisively win
+  the attrition matchup. Needs play.
 - **How rare is a graft, and can a weapon collect them without limit?** §6.4
   makes grafts safe in *depth* (capped at 5) but says nothing about *breadth*.
   A weapon serviced twenty times could plausibly end up carrying eight modifiers
@@ -1806,16 +1911,26 @@ new events on the floor-transit path from Phase 4.
   by accumulation rather than by depth. A cap on distinct modifier types per
   weapon — or simply a low enough graft rate — needs deciding before Phase 6
   codes it.
-- **`CritMultiplier` at ×10 wants a look.** It scales with the forged spread, so
-  Widowmaker's `×3` ceilings at a ×10 multiplier — 150 from a 15-damage dagger,
-  on 30% of swings, roughly five swings a turn. That is a deliberately
-  rare-and-catastrophic build reaching its end state, and it sits behind a
-  hand-authored unique plus many services, but it is the single biggest number
-  the cap change creates and it has never been played.
-- **Is `Charges` flat-capped or just coincidentally capped?** It holds at 5
-  because 10 throws × 15 lands on 150 against a 160 budget. That crossover is a
-  property of the current numbers, not a design decision, so if either number
-  moves the cap has to be recomputed rather than left at 5.
+- **`CritMultiplier` at ×10 wants a look, and crit-bypasses-Block makes it
+  louder.** It scales with the forged spread, so Widowmaker's `×3` ceilings at a
+  ×10 multiplier — 150 from a 15-damage dagger, on 30% of swings, roughly five
+  swings a turn, *and it ignores armour entirely*. That is a deliberately
+  rare-and-catastrophic build reaching its end state behind a hand-authored
+  unique plus many services, but it is the biggest number in the game and it has
+  never been played. If anything gets trimmed, this is the candidate — most
+  likely `CritMultiplier` joining `Light` as forged-limited, since the two dials
+  compounding is what produces the number rather than either alone.
+- **`Charges` is priced against three numbers that could all move.** `+1` throw
+  per stack works because 9 throws × 15 lands on 135 against a 160 budget. The
+  throw cost, the budget, and the deepest forged `Charges` spread are all
+  tuning targets, and this per-stack value has to be re-derived if any of them
+  changes rather than left at `+1`. Worth a test that asserts the deepest
+  reachable spread still fits the budget, so the invariant fails loudly.
+- **Does `Light ×6` interact badly with `Charges`?** A thrower forged Light and
+  worked to `×6` throws at cost 6, so 9 throws costs 54 of 160. That is the
+  intended shape — `Charges` is the binding cap, exactly as §1.2 argues — but it
+  is also the cheapest damage in the game by some margin, and the combination
+  has never been priced together.
 - **Two enchanter slots, or a strict last-in-only queue?** Phase 6 specs the
   two-newest rule as the legible middle ground, but a hard slot count is
   simpler and a pure last-in rule is harsher.
@@ -1938,17 +2053,25 @@ new events on the floor-transit path from Phase 4.
 - **Forged means chosen identity, not "what it dropped with."** Repeat-kill
   stacks arrive on the body and still count as acquired; the boss's theme
   arrives on the body and counts as forged, because you chose the dungeon.
-- **`CritWindow`, `Light` and `Charges` hold at a flat 5.** Each is bounded by
-  something outside itself — a probability, the weapon's cost, the movement
-  budget — so extra stacks either break a deliberate band or do nothing.
-  Everything else scales with its forged spread.
+- **A modifier that misbehaves deep gets re-priced, then forge-limited, and only
+  then capped.** A flat cap leaves dead stacks, and a dead stack is a farm cycle
+  or a service roll that bought nothing. `Charges` is re-priced (1 throw plus 1
+  per stack, so the deepest spread still fits the movement budget); `Light` is
+  forge-limited (**never more than `×1` forged**, uniques included, ceiling
+  `×6`); `CritWindow` is the only flat cap in the game, because it resolves to a
+  probability and `+1` to a d20 window is already the smallest step there is.
+- **Crits are not blocked at all.** That is what lets `Block` scale to `×9` like
+  everything else instead of being capped — the shield stays excellent and
+  armour stays answerable. The dagger is the burst answer, the axe's `Splitting`
+  the grind answer, and a natural 20 is everyone's. `Riposte` and `BlockWeaken`
+  do not fire on a crit, since no block succeeded.
 - **Uniques have the deepest ceilings in the game**, since their whole spread is
   forged. The balance envelope is held by the unique tables being hand-authored
   rather than by a uniform cap.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
 - **The dagger's baseline is `CritWindow ×1` and its crit specialist `×2`** —
   a deliberate break from the prototype's 16+. Crit *frequency* stays inside
-  10–30% game-wide so the d20 keeps mattering; `CritMultiplier` (×2 to ×7) is
+  10–30% game-wide so the d20 keeps mattering; `CritMultiplier` (×2 up to ×10) is
   the investment axis, so crit builds are rare-and-catastrophic rather than
   constant.
 - **Wand friendly fire is on, at half damage, on both sides.** Half is what
@@ -1960,7 +2083,7 @@ new events on the floor-transit path from Phase 4.
   baiting a caster into its own line takes real positioning instead of just
   standing nearby.
 - **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
-  at its ceiling by construction — ×8, the deepest a unique reaches, now that
+  at its ceiling by construction — ×9, the deepest anything reaches now that
   caps scale; anything needing a bespoke ceiling goes to the
   enchantment layer, where the mana lock and trigger cost bound it organically.
   `Momentum` moved there for exactly this reason.
