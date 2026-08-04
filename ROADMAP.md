@@ -182,8 +182,8 @@ as the dagger's stack counts.
 
 **A weapon modifier must be safe at ×5 by construction.** Anything that would
 need a bespoke ceiling to stay sane does not belong in this table at all — it
-belongs in the enchantment layer (Phase 3), where the mana lock and per-trigger
-cost bound it organically instead.
+belongs in the enchantment system (§3.3), which is a separate mechanism with
+its own dials, bounded by a mana budget rather than by stack counts.
 
 That is a real dividing line, not a style preference. Every modifier above is
 bounded by *something structural*: a per-turn count, a triggering condition, or
@@ -481,8 +481,9 @@ static class ModifierRules               // the §1.1 table, one place only
 Every call site that reads `GetAbility(x)?.Value ?? 0` becomes
 `weapon.Modifiers.Value(x)` — the 5-stack cap and per-stack maths never leak
 out of `ModifierRules`. `With` being additive *and clamping* is what makes
-variants, uniques and enchantments the same operation: an enchantment landing
-on an already-maxed modifier is a no-op rather than a special case.
+variants and uniques the same operation: a stack landing on an already-maxed
+modifier is a no-op rather than a special case. (Enchantments are a separate
+system with their own dials — §3.3.)
 
 `Resolve` returns a raw number; whether that number is *absolute or
 proportional* is the modifier's own business. `Light` resolves to a percentage
@@ -640,62 +641,118 @@ flavour — camp a dummy to deepen its drops, at the cost of the turns you spend
 waiting.
 
 **Uniques sit at the deep end.** Past a threshold (5 defeats, tuning target)
-the roll can return a unique of that class (§1.5) instead of a variant. Since
-uniques and enchantments are both just stacks, the whole ladder — base →
-variant → enchanted → unique — is one number going up, and the §1.1 caps hold
-at every rung.
+the roll can return a unique of that class (§1.5) instead of a variant.
 
-## 3.3 Enchantments cost max mana while equipped
+Depth therefore buys two different things, on two independent ladders: a better
+**weapon** (variant → unique, bounded by the §1.1 stack caps) and more
+**enchantments** on it (bounded by your mana budget, §3.3). A fighter farms the
+first ladder; a wizard farms the second. The same dummy serves both.
 
-Every enchantment carries a **mana lock** and a **trigger cost**:
+## 3.3 Enchantments are their own system
 
-- The lock is subtracted from usable max mana **while the item is equipped**.
-  Unequipping restores it in full. The inventory becomes a live loadout
-  decision every fight.
-- The trigger cost is spent from the remaining pool each time the enchantment
-  fires. **Insufficient mana simply means it does not fire** — no failure
-  state, no penalty, just a resource gate.
+**Enchantments are not modifier stacks.** They are a parallel system with their
+own dials, their own scaling stat, and their own budget. Folding them into
+`ModifierSet` would make them a weapon upgrade; keeping them separate makes
+them a **build axis**.
 
-Starting set:
+### The build this exists for
 
-| Enchantment | Lock | Trigger | Effect |
-| --- | --- | --- | --- |
-| Vampiric | 20 | 10 | On crit, heal the wielder for damage dealt |
-| Flaring | 15 | 5 | On hit, apply Poison 2 |
-| Weightless | 25 | 5 | `Light ×1` — attacks cost 10% less movement |
-| Warding | 30 | 40 | A killing blow leaves you at 1 HP instead |
-| Echoing | 20 | 15 | The weapon's class feature triggers one extra time per turn |
-| Shattering | 25 | 10 | `OnCrit ×1` — crit riders (§1.6) land one level deeper |
-| Momentum | 30 | 10 | Each enemy killed by the swing refunds part of its movement cost |
+A high-INT character can stay a ranged caster — or stack enchantments on a
+dagger and become close-range damage. That works only if enchantment power is
+divorced from weapon proficiency:
 
-Because Vampiric heals and every trigger spends mana, an enchanted loadout
-feeds both the HP and mana pools from Phase 2. Stacking locks is the real cost:
-three enchantments can leave a caster with almost no castable mana.
+- The wizard's dagger proficiency is *terrible*. Dagger XP scales with DEX
+  (§2.2), and a wizard has DEX 4. The weapon's own numbers stay low all run.
+- But enchantment potency scales with **INT**, and how many they can carry
+  scales with **max mana** — the pool INT grows fastest.
 
-**Momentum is the case this layer exists for** (§1.1). As a weapon modifier a
-movement refund loops — refunded movement buys the next swing, which refunds
-again. As an enchantment it cannot: each refund costs 10 mana, and mana
-regenerates only from movement left *unspent* at end of turn
-(`PartyMemberState.RegenManaFromUnusedMovement`). Spending the refund to keep
-swinging is exactly what stops the mana coming back, so the loop starves itself
-without a single bespoke cap. Anything else that scales dangerously should
-arrive here for the same reason.
+So the same dagger is a weak weapon in a fighter's hand and a delivery system
+in a wizard's. The fighter cannot copy the build: with INT 3 and a small mana
+pool, they can afford one light enchantment, not five.
+
+### Four dials, plus a tier
+
+| Dial | Meaning |
+| --- | --- |
+| **Lock** | Max mana reserved while equipped; returned in full on unequip |
+| **Trigger cost** | Mana spent each time it fires |
+| **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
+| **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
+| **Tier** | 1–3 from the repeat-kill depth that dropped it; raises lock *and* potency together |
+
+Insufficient mana means it simply **does not fire** — no failure state, no
+penalty, just a resource gate.
+
+### Max mana is the enchantment budget
+
+The sum of equipped locks may not exceed max mana. That single rule does the
+balancing:
+
+- **Max mana is capacity.** Grown by spending mana, scaled by INT (§2.2), so
+  the wizard's carrying capacity compounds over a run and the fighter's does
+  not.
+- **Locking competes with firing.** Lock your whole pool and you have nothing
+  left to trigger with. The optimum is somewhere below full, and where exactly
+  depends on how often your conditions fire — an on-hit build wants a large
+  spendable remainder, an on-kill build can afford to lock deeper.
+
+No cap is needed anywhere in this system because the budget *is* the cap.
+
+### Class-agnostic by design
+
+Any enchantment goes on any weapon. That is the whole point — the wizard's
+dagger, the fighter's warstaff. Nothing keys off `WeaponClass`.
+
+### Starting set
+
+Potency values are before INT scaling.
+
+| Enchantment | Lock | Trigger | Fires on | Effect |
+| --- | --- | --- | --- | --- |
+| Arcane Edge | 30 | 8 | Hit | Bonus damage — **the wizard-DPS core** |
+| Vampiric | 20 | 10 | Crit | Heal the wielder for damage dealt |
+| Flaring | 15 | 5 | Hit | Apply Poison |
+| Siphon | 20 | 0 | Kill | Restore mana — the engine that sustains the rest |
+| Weightless | 25 | 5 | Attack | Attacks cost less movement |
+| Warding | 30 | 40 | Lethal damage | Survive at 1 HP instead |
+| Echoing | 20 | 15 | Attack | The weapon's class feature triggers once more |
+| Shattering | 25 | 10 | Crit | Crit riders (§1.6) land one level deeper |
+| Momentum | 30 | 10 | Kill | Refund part of the swing's movement cost |
+
+Arcane Edge and Siphon together are the close-range wizard: hit for INT-scaled
+damage, kill to refund the mana that paid for it. Neither needs a bespoke
+ceiling — Siphon only pays out on kills, and Arcane Edge drains a pool that
+refills only from *unspent* movement.
+
+**Momentum is the case §1.1 sends here.** As a weapon modifier a movement
+refund loops: refunded movement buys the next swing, which refunds again. As an
+enchantment it cannot, because mana regenerates only from movement left unspent
+at end of turn (`PartyMemberState.RegenManaFromUnusedMovement`) — spending the
+refund to keep swinging is exactly what stops the mana coming back.
 
 ## 3.4 Code impact
 
 New `Logic/Enchantment.cs` and `Logic/LootTable.cs` (own RNG stream:
 `mapSeed ^ LootSalt`).
 
-An enchantment is **a modifier stack that carries a mana lock and a trigger
-cost** — nothing more. Enchanting is `Modifiers.With(type)` plus an entry in
-the weapon's enchantment list, so enchantments, variants and uniques all move
-the same numbers and the §1.1 caps bound them too. That is why a fully
-enchanted weapon cannot outrun the balance envelope: the cap is on the resolved
-value, wherever the stacks came from.
+`Enchantment` is its **own type**, not a `ModifierType` — lock, trigger cost,
+condition, base potency, tier. `Weapon` holds
+`IReadOnlyList<Enchantment> Enchantments` alongside its `ModifierSet`; the two
+never mix. A handful of enchantments happen to grant a modifier stack as their
+*effect* (Weightless, Shattering), but that is an effect they apply, not what
+they are.
+
+`PartyMemberState` gains `UsableMaxMana = MaxMana − Σ equipped locks`, and
+equipping must reject a weapon whose locks would exceed max mana.
+
+`TurnSystem` needs a **trigger dispatch point** per condition — on hit, on
+crit, on kill, on being hit, on cast. Phase 0's unified attack resolver is
+where hit/crit/kill all pass through, so this is one call site rather than the
+several it would have been before.
 
 Note `Weapon` is a `record` shared by reference from `GameConstants.Weapons`
 today, so dropped instances must be **copies**, never mutations of the shared
-table — `ModifierSet` should be immutable with `With` returning a new set.
+table — both `ModifierSet` and the enchantment list should be immutable.
 
 `PartyMemberState.MaxMana` subtracts the equipped item's total lock.
 
@@ -808,8 +865,11 @@ produces an identical world state.
 - Crits apply a **class-flavoured rider** on top of the damage spike, both
   ways; casts crit for double effect level.
 - Modifiers are **stacks, not values**. Greater is a second stack of the class
-  modifier; uniques are arbitrary stacks; enchantments are stacks with a mana
-  lock. One mechanism.
+  modifier; uniques are arbitrary stacks. One mechanism.
+- **Enchantments are a separate system**, not modifier stacks — own dials
+  (lock, trigger cost, condition, potency, tier), potency scaling with INT, and
+  max mana as the budget. That is what lets a wizard enchant a dagger into
+  close-range damage without touching their dagger proficiency.
 - **Max 5 stacks per modifier type**, hardcoded, with types independent — no
   shared budget across a weapon. The cap is on the stack count, not the
   resolved value, so per-stack value is the only dial.
