@@ -24,6 +24,14 @@
   workshop.
 - **A run is successful when you kill the boss.** One boss per dungeon, on a
   floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
+- **A boss never rolls a unique, but its graft can produce one.** There is no
+  unique roll on a boss kill — the repeat-kill ladder is the only place uniques
+  are rolled. When the drop happens to roll the **Purity** variant of the theme
+  modifier's own class, though, the theme graft takes it from `×2` to `×3` and
+  the result *is* that class's unique: Tower Guard + the golem's Block = The
+  Bulwark. Nothing special-cased it; §1.5's derivation rule and §4.3's graft met.
+  So each themed dungeon can drop exactly one named unique, and themes are drawn
+  from class signatures for that reason.
 - **Each dungeon is themed on one modifier.** Its boss carries that modifier
   innately whatever it wields, and every weapon it drops is *forged* with it.
   That is a guaranteed graft rather than a mechanism of its own, and the reason

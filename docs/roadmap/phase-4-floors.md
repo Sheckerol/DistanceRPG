@@ -110,6 +110,45 @@ and all three should exist:
 You run the Block dungeon because you want Block on something that has no
 business having it, and you want it deep enough to matter.
 
+### A boss never rolls a unique — but its graft can produce one
+
+**There is no unique roll on a boss kill.** The repeat-kill ladder (§3.2) is the
+only place uniques are *rolled*, and the two sources stay separate.
+
+But the theme graft can *arithmetically* produce one, and this needs no rule
+either. A boss drop is the rolled variant plus one stack of the theme. A unique
+is a variant with one modifier at `×3` (§1.5). So when the roll lands on the
+variant already forged `×2` in the theme's own modifier — the **Purity** variant
+of the theme modifier's class — the graft takes it to `×3` and the result *is*
+that class's unique:
+
+```
+Tower Guard  (Block ×2)  +  golem's Block graft  →  Block ×3  =  The Bulwark
+```
+
+Nothing special-cased it. The two rules met.
+
+That is the whole exception, and it is a narrow one. Any other roll produces an
+ordinary themed drop: a Riposte Blade becomes `Block ×2, Riposte ×1`, which is
+excellent and is not a unique. A spear becomes `Brace ×1, Block ×1`, an
+off-class hybrid and still not a unique.
+
+Three consequences worth stating plainly:
+
+- **Each themed dungeon can drop exactly one unique**, and everyone knows which.
+  The golem yields The Bulwark or nothing. That is a far sharper reason to pick
+  a dungeon than "Block on stuff" — you run it to hunt one named weapon.
+- **It is rare without being rare by decree.** The drop has to roll the right
+  class *and* the right variant within it. Nothing was tuned to make that
+  unlikely; it just is.
+- **Themes are drawn from class signatures.** `Block`, `Brace`, `Cleave`,
+  `Longshot`, `Charges`, `CritWindow`, `CritMultiplier`, `Cast` — the modifiers
+  a Purity variant doubles. A theme on a Control or Support modifier like `Pin`
+  could never reach `×3`, since no variant is forged `×2` in one, so such a
+  dungeon would be the only one with no unique to hunt. `Light` is excluded for
+  the same reason from the other direction: it is forge-limited to `×1` (§1.1),
+  so a Light theme could not graft at all.
+
 ### The tutorial dungeon: the stone golem
 
 The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its

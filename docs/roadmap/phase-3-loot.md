@@ -37,6 +37,9 @@ the way out, after the boss has stopped resurrection (§4.4).
 | **5** | A roll on that class's **unique** table (§1.5) |
 | 6+ | Nothing further |
 
+Tier 5 is the only place a unique is **rolled**. A boss can also hand you one,
+but only as arithmetic rather than a roll — see §4.3.
+
 Tuning targets, but the *shape* is the decision, and three things fix it.
 
 **Depth, not breadth.** The stacks land on the class signature, never on a
