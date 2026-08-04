@@ -378,6 +378,31 @@ the marching formation a genuine trade-off.
   reusing the threat-zone machinery Phase 0 unified, and it covers the party's
   approach rather than your own.
 
+**Damage 5 is meant to look low.** A bow held at knife range should be bad —
+that is what `Longshot` *is*. The answer to an enemy in your face is not a
+stronger bow, it is a different weapon, so the baseline stays weak and the
+range curve does the work.
+
+### Every stat owns a close option and a ranged one
+
+That answer only holds because swapping never costs you progression. Weapon XP
+is per class per character but scales off the class's governing stat (§2.2), so
+a character swapping inside their own stat levels both weapons at the same
+rate:
+
+| Stat | Close | Mid | Far |
+| --- | --- | --- | --- |
+| DEX | Dagger 40 | *(Sword 80)* | Ranged 320 |
+| STR | Axe 60 | Spear 130 | Throwing 190 |
+| INT | — | Staff 100, Wand ~160 | — |
+
+A DEX character carries a bow and a dagger and is equally good at both; a STR
+character has three rungs to move between. Only INT lacks the spread, which is
+correct — casters are meant to sit behind the line rather than solve range
+themselves.
+
+The 6-slot inventory (§4.4) exists partly for this: a loadout, not a weapon.
+
 ### Throwing (STR) — baseline `Charges ×1`
 
 **Charges is a cap, and the cap is the point.** A throw costs only 15, so the
@@ -1466,6 +1491,13 @@ new events on the floor-transit path from Phase 4.
   roll only the six close-range classes, and the friendly-fire constant stays
   off. Half-damage friendly fire is what lets the first version of that scorer
   be merely adequate rather than finished.
+- **Does swapping weapons cost anything?** Today it is free and instant — keys
+  2/3 swap a bag slot with the equipped one. That makes "the bow is bad up
+  close, so swap" frictionless to the point of being automatic, and it softens
+  every weapon's downside along with it: no loadout choice ever has to be
+  lived with. A movement cost to swap (or swapping only at turn start) would
+  give range bands teeth. This decides how much §1.2's whole close/far design
+  actually bites.
 - **Is half the right fraction?** Half damage is the forgiveness knob that
   makes a simple scorer shippable; once the scorer is good, full friendly fire
   may be the better game. Worth revisiting rather than treating as final. Note
@@ -1569,6 +1601,10 @@ new events on the floor-transit path from Phase 4.
 - **Attack cost tracks weight**: throwing 15, dagger and bow 30, sword 50,
   spear 55, axe 60. The spear was cheaper than the bow, which had a polearm
   swinging faster than an archer looses.
+- **The bow is deliberately weak up close.** Damage 5 stays; the answer to an
+  enemy in your face is swapping weapons, not a stronger baseline. Every stat
+  owns both a close and a ranged class, so swapping never costs progression
+  rate.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
   taught by enemy spear dummies instead of a party spear.
