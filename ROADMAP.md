@@ -893,6 +893,28 @@ The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its
 boss is a stone golem: innate Block whatever it happens to be holding, and
 every weapon it drops comes away with Block on it.
 
+### Two floors deep
+
+The tutorial ignores the 5–10 roll: its boss sits on **floor 2**, fixed. It is
+the one dungeon in the game with a hardcoded depth, and the special case earns
+itself twice over.
+
+It teaches the complete loop in miniature — descend once, fight the boss,
+extract back through a single floor — so every dungeon mechanic is demonstrated
+in the shortest run that can contain them all. And since the dungeon is
+consumed by beating it, a short one means a fast turnaround into the hub rather
+than a long commitment a first-time player cannot yet evaluate.
+
+Two floors is also enough to seed the **first stable**. Phase 6's rotation
+needs several weapons to work at all, and a couple of floors of dummies farmed
+lightly is where they come from.
+
+The pacing lines up on its own: one successful tutorial run ticks the enchanter
+once (§6.3), and attaching the first enchantment costs exactly one run (§6.2).
+Finishing the tutorial buys your first enchantment, immediately. Wear from two
+floors of fighting should be tuned to cover it — the tutorial ought to end with
+the player able to use the enchanter, not merely able to look at it.
+
 ### The tutorial is consumed by beating it
 
 Unlike every other dungeon, the tutorial is **available exactly once**. Kill
@@ -1178,6 +1200,10 @@ Note the mercy tick and the success tick are currently worth the same. Since a
 boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
 see the open questions.
 
+In the **tutorial** the two nearly coincide, since its boss is on floor 2
+(§4.3) — reaching the mercy bar means standing in front of the golem. That is
+intentional: a first run should not be able to come away with nothing.
+
 ## 6.4 Service can improve the weapon
 
 Working a weapon has a **low chance of adding a modifier stack** — sometimes
@@ -1257,9 +1283,6 @@ new events on the floor-transit path from Phase 4.
   construct is the obvious shape, but slow enemies are trivially kited once
   ranged weapons exist (§1.2) — worth checking the tutorial boss does not
   become a joke in Phase 1.
-- **Should the tutorial be 5–10 floors like everything else?** Now that it is
-  one-time, the case for a fixed shorter depth is stronger — 5–10 floors is a
-  long first experience, and a player only gets the one. Worth a special case.
 - **What does the hub look like?** Dungeon selection now definitely exists
   (§4.3): a list of themed dungeons, the tutorial present until beaten. Nothing
   else about the hub is specified — how dungeons are discovered, whether the
@@ -1323,6 +1346,9 @@ new events on the floor-transit path from Phase 4.
 - **The tutorial is consumed by beating it**; every other dungeon is picked
   from the hub and repeatable. Rushing its boss permanently forfeits its themed
   drops, which is the game's central decision delivered once in miniature.
+- **The tutorial is two floors deep**, boss on floor 2 — the only hardcoded
+  depth in the game. Shortest run that demonstrates every dungeon mechanic, and
+  a fast turnaround into the hub since it cannot be replayed.
 - **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
   its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
