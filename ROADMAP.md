@@ -385,23 +385,49 @@ range curve does the work.
 
 ### Every stat owns a close option and a ranged one
 
-That answer only holds because swapping never costs you progression. Weapon XP
-is per class per character but scales off the class's governing stat (§2.2), so
-a character swapping inside their own stat levels both weapons at the same
+That answer only holds because swapping never costs you *progression*. Weapon
+XP is per class per character but scales off the class's governing stat (§2.2),
+so a character swapping inside their own stat levels both weapons at the same
 rate:
 
 | Stat | Close | Mid | Far |
 | --- | --- | --- | --- |
 | DEX | Dagger 40 | *(Sword 80)* | Ranged 320 |
 | STR | Axe 60 | Spear 130 | Throwing 190 |
-| INT | — | Staff 100, Wand ~160 | — |
+| INT | Enchanted dagger | Staff 100, Wand ~160 | Enchanted bow |
 
-A DEX character carries a bow and a dagger and is equally good at both; a STR
-character has three rungs to move between. Only INT lacks the spread, which is
-correct — casters are meant to sit behind the line rather than solve range
-themselves.
+**INT solves range by borrowing, not by owning.** Enchantments are
+class-agnostic and their potency scales with INT rather than with weapon
+proficiency (§3.3) — so a high-INT character picks up a dagger or a bow, hangs
+an elemental enchantment on it, and plinks away at a level their dagger
+proficiency could never justify. The weapon is a delivery system; the damage is
+theirs.
+
+That is why INT has no martial classes of its own and does not need any. It is
+the same mechanism as the close-range wizard build, pointed at the range
+problem instead of the damage one.
 
 The 6-slot inventory (§4.4) exists partly for this: a loadout, not a weapon.
+
+### Swapping costs movement once you are in a fight
+
+Free swapping would make every weapon's downside optional — not just the bow's
+range curve, but the spear's 55 cost and the axe's 60 reach. Nothing you chose
+would ever have to be lived with.
+
+So a swap costs **20 movement**, more than a throw and less than a dagger
+swing, once combat has begun. Out of combat it is **free**: the game already
+tracks `AnyLiveEnemySeenThisTurn` (`TurnSystem.cs:52`), the same signal that
+grants marching, so loadout management between fights stays frictionless while
+mid-fight swapping is a real decision.
+
+The cost compounds properly. A bow user caught at knife range pays 20 to swap
+and 30 to swing — 50 for the first hit — which is exactly the punishment for
+having been caught.
+
+**Consumables cost movement too**, on the same principle: anything that changes
+your situation mid-turn should be paid for out of the same budget as moving and
+swinging. See §3.4.
 
 ### Throwing (STR) — baseline `Charges ×1`
 
@@ -999,7 +1025,25 @@ enchantment it cannot, because mana regenerates only from movement left unspent
 at end of turn (`PartyMemberState.RegenManaFromUnusedMovement`) — spending the
 refund to keep swinging is exactly what stops the mana coming back.
 
-## 3.4 Code impact
+## 3.4 Consumables
+
+A third item category alongside weapons and enchantments, and the only one that
+is spent.
+
+**Using a consumable costs movement**, on the same principle as swapping
+(§1.2): anything that changes your situation mid-turn comes out of the same
+budget as moving and swinging. A free heal in a game about movement economy
+would be a hole straight through the middle of it.
+
+**They occupy inventory slots**, which is where they get interesting. The 24
+party-wide slots (§4.4) are already contested between weapons and the haul —
+consumables make it a three-way trade. Every potion you carry down is a weapon
+you did not bring *and* a drop you cannot carry out, and the extraction is when
+you feel both.
+
+Nothing about their contents is specified yet — see open questions.
+
+## 3.5 Code impact
 
 New `Logic/Enchantment.cs` and `Logic/LootTable.cs` (own RNG stream:
 `mapSeed ^ LootSalt`).
@@ -1491,13 +1535,15 @@ new events on the floor-transit path from Phase 4.
   roll only the six close-range classes, and the friendly-fire constant stays
   off. Half-damage friendly fire is what lets the first version of that scorer
   be merely adequate rather than finished.
-- **Does swapping weapons cost anything?** Today it is free and instant — keys
-  2/3 swap a bag slot with the equipped one. That makes "the bow is bad up
-  close, so swap" frictionless to the point of being automatic, and it softens
-  every weapon's downside along with it: no loadout choice ever has to be
-  lived with. A movement cost to swap (or swapping only at turn start) would
-  give range bands teeth. This decides how much §1.2's whole close/far design
-  actually bites.
+- **STR has four classes to DEX's three.** STR covers axe, spear, throwing and
+  sword; DEX covers dagger, bow and sword. Both have close and far answers, so
+  nothing is *broken*, but STR simply has more room to move. Fixing it means
+  either a ninth class on DEX, or moving throwing to DEX (thrown knives are
+  plausibly dexterous, though it costs the STR-throws-heavy-things read), or
+  accepting that STR is the martial-breadth stat and DEX the precision one.
+- **What are consumables, actually?** §3.4 fixes that they cost movement and
+  occupy slots; their contents, where they come from (dungeon drops or the
+  hub), and whether they are craftable at the enchanter are all open.
 - **Is half the right fraction?** Half damage is the forgiveness knob that
   makes a simple scorer shippable; once the scorer is good, full friendly fire
   may be the better game. Worth revisiting rather than treating as final. Note
@@ -1603,8 +1649,16 @@ new events on the floor-transit path from Phase 4.
   swinging faster than an archer looses.
 - **The bow is deliberately weak up close.** Damage 5 stays; the answer to an
   enemy in your face is swapping weapons, not a stronger baseline. Every stat
-  owns both a close and a ranged class, so swapping never costs progression
+  owns both a close and a ranged answer, so swapping never costs progression
   rate.
+- **INT solves range by borrowing.** No martial classes of its own — a high-INT
+  character enchants a dagger or a bow and delivers INT-scaled damage through
+  it, since enchantment potency ignores weapon proficiency.
+- **Swapping costs 20 movement in combat, free out of it**, gated on the
+  existing `AnyLiveEnemySeenThisTurn` signal. Free swapping would make every
+  weapon's downside optional rather than only the bow's.
+- **Consumables cost movement and occupy inventory slots**, making the 24-slot
+  budget a three-way trade between weapons, potions and haul.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
   taught by enemy spear dummies instead of a party spear.
