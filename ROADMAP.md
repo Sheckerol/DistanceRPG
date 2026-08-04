@@ -387,12 +387,41 @@ Smaller than it sounds, and mostly code the player's targeting needs anyway:
 
 1. Enumerate candidate placements — target points for Blast, directions for
    Cone and Beam, fixed at self for Nova.
-2. Score each as `enemies hit − (allies hit × ½)`.
+2. Score each as `enemies hit − (allies hit × 1.5)`.
 3. Cast only if the best score is positive; otherwise fall back to moving.
 
 Structurally this is `EnemyAi.SelectTarget` one level up: the same
 score-and-pick over a small candidate set, with the shape geometry shared with
-the player's own casting.
+the player's own casting. It scores **enemy** casts only — the player decides
+their own placements.
+
+### The scoring weight is a policy, not the damage fraction
+
+Allies take **half** damage but are scored at **1.5×**. The two numbers are
+deliberately different and must not be reconciled.
+
+Half is the mechanical reality. Scoring at half would make the AI an expected-
+value calculator, and an EV calculator fires on a 1:1 trade — full damage to one
+of yours against half to one of mine is, strictly, a marginal gain. It is also
+what makes baiting worthless: if even trades are acceptable, you can force a
+self-clip just by standing near their group, and the play stops being a play.
+
+At 1.5× the policy reads "hit at least twice as many of them as of us":
+
+| Hits | Score | Casts? |
+| --- | --- | --- |
+| 1 enemy, 1 ally | −0.5 | No |
+| 2 enemies, 1 ally | +0.5 | Yes |
+| 3 enemies, 2 allies | 0 | No — ties lose |
+| 3 enemies, 1 ally | +1.5 | Yes |
+
+So the AI's *default* behaviour is to refuse anything short of clearly
+favourable, and forcing a bad cast takes genuine positioning — which is exactly
+what makes it feel like the player's doing rather than the AI's failure.
+
+Half-damage friendly fire then backstops the cases the scorer gets *wrong* —
+mispredicted movement, an ally stepping into a shape after it was scored —
+rather than licensing sloppiness.
 
 **Sequencing.** Wands ship in Phase 1 with the friendly-fire constant **off**.
 It flips on once the scorer exists, alongside the kiting AI that ranged and
@@ -1301,7 +1330,12 @@ new events on the floor-transit path from Phase 4.
   be merely adequate rather than finished.
 - **Is half the right fraction?** Half damage is the forgiveness knob that
   makes a simple scorer shippable; once the scorer is good, full friendly fire
-  may be the better game. Worth revisiting rather than treating as final.
+  may be the better game. Worth revisiting rather than treating as final. Note
+  the 1.5× scoring weight is a separate dial and does not have to move with it.
+- **Should the ally weight vary per target?** A flat 1.5× ignores that clipping
+  a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
+  Weighting by remaining HP or by role would be more accurate — and more
+  expensive, and harder to predict when baiting. Flat first.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
@@ -1417,6 +1451,10 @@ new events on the floor-transit path from Phase 4.
   makes a simple placement scorer shippable — a mediocre wand enemy is
   inefficient rather than suicidal. Ships behind a constant, flipped on when
   the scorer lands.
+- **The scorer weights allies at 1.5×, not at the half they actually take.**
+  The weight is a policy, not an EV calculation: it refuses even trades, so
+  baiting a caster into its own line takes real positioning instead of just
+  standing nearby.
 - **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
   at ×5 by construction; anything needing a bespoke ceiling goes to the
   enchantment layer, where the mana lock and trigger cost bound it organically.
