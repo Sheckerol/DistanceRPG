@@ -14,6 +14,7 @@ workflow rule in `CLAUDE.md`.
 | 3 | Loot drops and enchantments | 1, 2 |
 | 4 | Multiple floors | — (but lands after 3) |
 | 5 | Save / load | 0–4 |
+| 6 | Between runs: wear, the enchanter, the hub | 1–5 |
 
 ## Standing constraints
 
@@ -634,7 +635,13 @@ loot stream.
 
 Dummies resurrect after 10 turns (`GameConstants.DummyResurrectTurns`) and
 already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
-defeat of the same dummy drops a weapon carrying *n − 1* enchantments.
+defeat of the same dummy drops a **deeper weapon** — more modifier stacks, and
+past a threshold a unique.
+
+Repeat kills do **not** drop enchantments. Enchantments are applied at the
+enchanter between runs (Phase 6), not found in the dungeon — they are the
+chosen half of itemisation, and finding them at random is what would make them
+feel farmed rather than built.
 
 This makes the resurrection timer a deliberate farming rhythm rather than
 flavour — camp a dummy to deepen its drops, at the cost of the turns you spend
@@ -643,10 +650,9 @@ waiting.
 **Uniques sit at the deep end.** Past a threshold (5 defeats, tuning target)
 the roll can return a unique of that class (§1.5) instead of a variant.
 
-Depth therefore buys two different things, on two independent ladders: a better
-**weapon** (variant → unique, bounded by the §1.1 stack caps) and more
-**enchantments** on it (bounded by your mana budget, §3.3). A fighter farms the
-first ladder; a wizard farms the second. The same dummy serves both.
+So the dungeon supplies **bodies** and the enchanter supplies **souls**. Depth
+buys you a better weapon to invest in; runs survived buy you the investment
+itself (Phase 6). Neither ladder can be climbed by grinding the other.
 
 ## 3.3 Enchantments are their own system
 
@@ -678,7 +684,7 @@ pool, they can afford one light enchantment, not five.
 | **Trigger cost** | Mana spent each time it fires |
 | **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
 | **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
-| **Tier** | 1–3 from the repeat-kill depth that dropped it; raises lock *and* potency together |
+| **Tier** | 1–3; raised by re-servicing the same enchantment (Phase 6), lifting lock *and* potency together |
 
 Insufficient mana means it simply **does not fire** — no failure state, no
 penalty, just a resource gate.
@@ -769,7 +775,10 @@ floor fresh.
 
 That keeps the in-run tactics (retreat upstairs, come back for a half-cleared
 room) without the save file growing without bound, and it caps repeat-kill
-enchantment farming at one dungeon visit.
+weapon farming at one dungeon visit.
+
+The reset is also what Phase 6 is built on: the dungeon is the renewable half
+of the game and your gear is the permanent half.
 
 ## 4.2 Stairs must not perturb the golden seed
 
@@ -826,6 +835,145 @@ produces an identical world state.
 
 ---
 
+# Phase 6 — Between runs: wear, the enchanter, the hub
+
+The dungeon resets every time you leave (§4.1). Your party and your gear do
+not. Phase 6 is the layer that turns that asymmetry into progression: the
+dungeon is the renewable resource, and a weapon is the thread running through
+a whole campaign.
+
+```
+descend → fight (weapons accrue wear), gather, survive
+        → leave; the dungeon resets
+        → hub: deposit a worn weapon with the enchanter, re-equip from the stable
+        → descend again; the deposited weapon works off its time
+```
+
+## 6.1 Wear is earned, not suffered
+
+**Nothing breaks.** Wear is not damage to repair — it is proof of use, and it
+is the enchanter's raw material. Swinging a weapon accrues wear; the enchanter
+consumes it to attach an enchantment.
+
+That matches the philosophy the rest of the game already runs on: health levels
+from being healed, mana from being spent, proficiency from damage dealt. A
+weapon becomes enchantable by being *used*, not by being found.
+
+Consequence worth stating plainly: **you cannot enchant a weapon you have not
+fought with.** A fresh unique straight off the floor is inert until it has done
+some work.
+
+## 6.2 The enchanter takes time, measured in runs
+
+Depositing a weapon starts a service clock. Service time is
+**current enchantment count + 1**, so each enchantment costs more downtime than
+the last:
+
+| Adding enchantment # | Runs in service | Cumulative |
+| --- | --- | --- |
+| 1st | 1 | 1 |
+| 2nd | 2 | 3 |
+| 3rd | 3 | 6 |
+| 4th | 4 | 10 |
+| 5th | 5 | 15 |
+
+Fifteen runs to a fully enchanted weapon makes it a long-term project, and
+makes a 5-enchantment weapon rare **by construction** rather than by drop rate.
+
+This is the second, independent cost on enchantment power. Max mana says *how
+much you can carry at once* (§3.3); service time says *and it is in the shop
+while you carry it*. Your best weapon is routinely unavailable.
+
+### It forces a stable
+
+You cannot run one weapon. Every drop you would have vendored becomes rotation
+depth, which is what finally justifies the loot volume.
+
+Proficiency makes the rotation cheap in the right way: it is per **class** per
+character (§2.2), not per weapon, so a same-class backup swings at your full
+skill. The rotation costs you the *item*, never your progress — and it creates
+a real stable-building decision between hoarding same-class backups for
+continuity and diversifying at the price of swinging at low proficiency.
+
+### Only the newest work gets worked on
+
+The enchanter progresses the **two most recently deposited** weapons. Depositing
+a third stalls the oldest.
+
+That is a soft cap that enforces itself: dumping the whole stable achieves
+nothing, so you choose what matters. It stays legible in a way a pure
+last-in-only rule would not — "the smith is working on these two" reads
+correctly at a glance, where a silently stalled queue reads as a bug.
+
+## 6.3 What counts as a run
+
+**Entering the dungeon ticks nothing.** Otherwise the optimal play is a stack
+of twenty-second entries to burn the service clock without ever fighting.
+
+| Outcome | Service tick |
+| --- | --- |
+| Entered, left shallow | **None** |
+| Reached floor 2, then wiped or fled | **1 (mercy)** |
+| Successful run | **1** |
+
+The mercy tick exists for exactly one purpose: **a losing streak must not
+freeze the workshop.** Several failed runs in a row would otherwise stall every
+weapon in service at the moment you most need them back.
+
+It is deliberately not a consolation prize — a mercy tick advances the service
+clock and nothing else. You still lose the run's spoils. Succeeding is strictly
+better; failing merely is not compounding.
+
+Reaching floor 2 is the bar because it cannot be cleared by walking in and
+turning around, but it also does not demand a good run.
+
+## 6.4 Service can improve the weapon
+
+Working a weapon has a **low chance of adding a modifier stack** — sometimes
+you make a thing better while working on it.
+
+This is the mechanism that most directly delivers cross-run weapon progression.
+Enchantments are attachments; a modifier is the weapon itself getting better.
+An heirloom that has been through twenty services can genuinely out-roll a
+fresh drop, which is the payoff for loyalty and the answer to the upgrade
+treadmill — your investment is not stranded when a better base drops.
+
+Rules that keep it coherent:
+
+- **The chance scales with wear brought in.** The weapon you actually fought
+  with improves; the one you carried does not. Same principle as everywhere
+  else in the game.
+- **It adds a stack to a modifier the weapon already carries**, biased toward
+  the class modifier. A spear gets more spear-like; it does not sprout
+  `Charges`. Weapon identity survives.
+- **The §1.1 caps still bind.** A maxed modifier cannot be improved, and if
+  every modifier is at ×5 the roll simply does not happen.
+
+## 6.5 Transferring an enchantment
+
+Enchantments can be moved to a new weapon at the enchanter, costing the same
+service time as attaching one and dropping the enchantment a tier. Without
+this, a lucky late drop would strand everything you invested — with it, the
+body is replaceable and the soul is the thing you built.
+
+## 6.6 Code impact
+
+New `Logic/Wear.cs`, `Logic/Enchanter.cs`, and a `CampaignState` that lives
+*outside* `DungeonState` (§4.3) — party, stable, enchanter queue, run counter.
+The existing distinction does the work for us: `DungeonState` is discarded on
+leaving, `CampaignState` is not.
+
+`Weapon` gains `Wear`; the unified attack resolver from Phase 0 is the single
+place it accrues.
+
+Phase 5's save format grows a campaign section, and it becomes the *outer*
+document — a save with no dungeon in progress is now a valid state, which it
+is not today.
+
+`TurnSystem` needs a run-outcome signal. `GameOver` already fires on a party
+wipe (`TurnSystem.cs:620`); leaving the dungeon and reaching a new floor are
+new events on the floor-transit path from Phase 4.
+
 # Open questions
 
 - **Wand friendly fire.** Specced as on — a shape hits every actor inside it
@@ -850,6 +998,17 @@ produces an identical world state.
   unique is 16+ to 15+. Narrowing the base window would open that range back
   up at the cost of parity with the prototype. The class tables in §1.2 still
   show `×1` counts and need restating once this is settled.
+- **What is a "successful" run, exactly?** Phase 6 ticks service on success and
+  on a floor-2 mercy, but success itself is undefined. Returning to the hub
+  alive is the obvious bar; whether it also requires descending at least one
+  floor, or clearing something, is open.
+- **Does wear cap?** If it accumulates without limit, a long-serving weapon
+  eventually has enough for any enchantment forever and wear stops being a
+  gate. A ceiling — or wear being fully consumed per attachment — needs
+  deciding.
+- **Two enchanter slots, or a strict last-in-only queue?** Phase 6 specs the
+  two-newest rule as the legible middle ground, but a hard slot count is
+  simpler and a pure last-in rule is harsher.
 - **Should a natural 1 have a rider too?** `RollOutcome.Weak` already exists
   and only halves damage. The symmetric move is a fumble applying **Weakened**
   to *yourself* — but crits and fumbles both firing riders may be too much
@@ -870,6 +1029,18 @@ produces an identical world state.
   (lock, trigger cost, condition, potency, tier), potency scaling with INT, and
   max mana as the budget. That is what lets a wizard enchant a dagger into
   close-range damage without touching their dagger proficiency.
+- **Modifiers are rolled at drop; enchantments are applied at the enchanter.**
+  The dungeon supplies bodies, the hub supplies souls.
+- **Wear is a resource, not damage.** Nothing breaks; using a weapon is what
+  makes it enchantable.
+- **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so
+  power and availability trade off directly.
+- **Entering does not tick service.** A successful run ticks; reaching floor 2
+  and then failing ticks once as mercy, so a losing streak cannot freeze the
+  workshop.
+- **Service has a low chance of adding a modifier stack**, scaled by wear
+  brought in and bounded by the §1.1 caps — this is how a weapon improves
+  across runs rather than merely accumulating attachments.
 - **Max 5 stacks per modifier type**, hardcoded, with types independent — no
   shared budget across a weapon. The cap is on the stack count, not the
   resolved value, so per-stack value is the only dial.
