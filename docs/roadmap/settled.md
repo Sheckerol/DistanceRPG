@@ -1,0 +1,165 @@
+# Settled
+
+- Weapon XP is **per class, per character**, not per item.
+- Status effects are **universal** — every actor can carry them (Phase 0).
+- Innate stats are **fixed at creation** and never rise.
+- Enchantment mana locks apply **while equipped** only.
+- Floors persist **within a dungeon visit** and reset on leaving.
+- Crits apply a **class-flavoured rider** on top of the damage spike, both
+  ways; casts crit for double effect level.
+- Modifiers are **stacks, not values**. A Purity weapon is a second stack of
+  the class signature; uniques are arbitrary stacks. One mechanism.
+- **Enchantments are a separate system**, not modifier stacks — own dials
+  (lock, trigger cost, condition, potency, tier), potency scaling with INT, and
+  max mana as the budget. That is what lets a wizard enchant a dagger into
+  close-range damage without touching their dagger proficiency.
+- **Modifiers are rolled at drop; enchantments are applied at the enchanter.**
+  The dungeon supplies bodies, the hub supplies souls.
+- **Wear is a resource, not damage.** Nothing breaks; using a weapon is what
+  makes it enchantable.
+- **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so
+  power and availability trade off directly.
+- **Entering does not tick service.** A successful run ticks; reaching floor 2
+  and then failing ticks once as mercy, so a losing streak cannot freeze the
+  workshop.
+- **A run is successful when you kill the boss.** One boss per dungeon, on a
+  floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
+- **Each dungeon is themed on one modifier.** Its boss carries that modifier
+  innately whatever it wields, and every weapon it drops is *forged* with it.
+  That is a guaranteed graft rather than a mechanism of its own, and the reason
+  to choose one dungeon over another is that it is the only **chosen** off-class
+  modifier — and the only one that runs a stack deeper than a rolled graft.
+- **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
+  for a boss.
+- **A class has a baseline plus four role weapons** — Efficiency (`Light`),
+  Purity (more of the signature), Control (degrade the enemy), Support (help
+  the party). The old universal "crit-specced" slot is gone; a crit class puts
+  crit in its baseline instead.
+- **Crit riders are per-weapon modifiers**, `CritWeaken` and `CritSunder`, not
+  a per-class field — so a stack stays a count rather than a payload.
+- **The dagger's baseline is `CritWindow ×1, CritMultiplier ×1`**, with its
+  four weapons adding `Light`, another `CritWindow`, `CritWeaken`, and
+  `CritSunder`.
+- **All six martial classes are specced** — sword (`Riposte`/`BlockWeaken`), spear
+  (`Push`/`Pin`), axe (`Splitting`/`Rout`), ranged (`Pin`/`Overwatch`),
+  throwing (`Drag`/`Softening`). Caster classes keep their own frame: baseline
+  `Cast ×1` plus four effects or four shapes, since role decomposition means
+  nothing when the signature *is* which effect you cast.
+- **`Pin` appears on both spear and ranged**, delivered by a brace and by a hit
+  respectively — the two halves of a kiting pair.
+- **Throws are cheap (15) and hard-capped by `Charges`**, not free. The cap is
+  the binding constraint rather than the budget, so the class fights *and*
+  keeps movement — which banks and regenerates mana, making low-Charges an
+  economy weapon and high-Charges a damage one.
+- **Attack cost tracks weight**: throwing 15, dagger and bow 30, sword 50,
+  spear 55, axe 60. The spear was cheaper than the bow, which had a polearm
+  swinging faster than an archer looses.
+- **The bow is deliberately weak up close.** Damage 5 stays; the answer to an
+  enemy in your face is swapping weapons, not a stronger baseline. Every stat
+  owns both a close and a ranged answer, so swapping never costs progression
+  rate.
+- **INT solves range by borrowing.** No martial classes of its own — a high-INT
+  character enchants a dagger or a bow and delivers INT-scaled damage through
+  it, since enchantment potency ignores weapon proficiency.
+- **Swapping costs 20 movement in combat, free out of it**, gated on the
+  existing `AnyLiveEnemySeenThisTurn` signal. Free swapping would make every
+  weapon's downside optional rather than only the bow's.
+- **Consumables cost movement and occupy inventory slots**, making the 24-slot
+  budget a three-way trade between weapons, potions and haul.
+- **The starting party is dagger, sword, axe, staff** — both spears go, one to
+  an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
+  taught by enemy spear dummies instead of a party spear.
+- **The tutorial is consumed by beating it**; every other dungeon is picked
+  from the hub and repeatable. Rushing its boss permanently forfeits its themed
+  drops, which is the game's central decision delivered once in miniature.
+- **The tutorial is two floors deep**, boss on floor 2 — the only hardcoded
+  depth in the game. Shortest run that demonstrates every dungeon mechanic, and
+  a fast turnaround into the hub since it cannot be replayed.
+- **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
+  its own `ModifierSet`; resolution reads weapon plus innate.
+- **Killing the boss stops resurrection**, turning the dungeon from an infinite
+  farm into a finite clear — so winning ends your farming, and choosing when to
+  stop farming is the run's central decision.
+- **You fight your way out.** The boss turns the party around; you climb back
+  through every floor killing everything a final time.
+- **`DefeatCount` is the drop's quality, the last kill collects it.** Farming
+  banks value into a dummy; you harvest it on the way out. Die in the
+  stairwell and you keep the service tick but none of the spoils.
+- **Carry limit is unified with the loadout** — 6 slots per character, 24
+  party-wide, no separate haul bag. Loot competes with weapons, so hauling
+  deep makes you weaker for the fight you are hauling through.
+- **Floors can be skipped on the way out.** No gate is needed: brace taxes
+  running through, skipping forfeits that floor's drops, and wear gating means
+  a rushed run earns service time it cannot spend.
+- **Service has a low chance of adding a modifier stack**, scaled by wear
+  brought in and bounded by the §1.1 caps — this is how a weapon improves
+  across runs rather than merely accumulating attachments. It can **deepen**
+  what the weapon carries or, rarely, **graft** something it never had; the
+  graft is safe because `forged = 0` caps it at 5, so it is permanently the
+  shallowest thing on the weapon.
+- **The repeat-kill ladder is short, deep and topped.** `DefeatCount` 1–2 and
+  3–4 add one and two acquired stacks to the class signature; 5 rolls a unique;
+  6+ does nothing. Depth only, never breadth — breadth is the enchanter's
+  product. Farming spends the same acquired budget the enchanter would, so a
+  deep farm buys power now at the cost of the weapon's long-term room, and
+  reaching 5 inverts that by handing you a forged spread with the budget intact.
+- **A modifier caps at `forged + 5`**, per type, with types independent — no
+  shared budget across a weapon. Forged is the weapon's identity spread (class
+  baseline, variant, unique, dungeon theme); the five is one acquired budget
+  that farming and the enchanter both draw on. A flat cap was rejected because
+  it erases the Purity role, whose only distinguishing feature is the stack a
+  shared ceiling absorbs first.
+- **Forged means chosen identity, not "what it dropped with."** Repeat-kill
+  stacks arrive on the body and still count as acquired; the boss's theme
+  arrives on the body and counts as forged, because you chose the dungeon.
+- **Nothing is capped at the ceiling. The game caps what it *gives* you, never
+  what you can build toward.** A capped modifier contains dead stacks, and a
+  dead stack is a farm cycle or a service roll that bought nothing. Two tools
+  handle a modifier that would misbehave deep, and both act on the forge:
+  **re-price the stack** (`Charges` grants 1 throw plus 1 per stack, so the
+  deepest spread still fits the movement budget) or **limit the forge**.
+- **A unique is a variant with exactly one modifier raised to `×3`** — derived,
+  never freely authored. That bounds the forge without a second rule (`×8`
+  becomes the universal ceiling every per-stack value is priced against), keeps
+  a unique legible as "a weapon you know, more so", and stops "more special"
+  turning into "more modifiers". Each class therefore has four possible uniques,
+  one per variant, and the Control and Support derivations are the richest since
+  they keep a second modifier.
+- **The other forge limit is `Light ×1`**, uniques included, so `Light` ceilings
+  at `×6` for −60%. It also means an Efficiency-derived unique cannot raise its
+  own added modifier and is forced onto the class signature — coming out
+  `signature ×3, Light ×1`, the only shape in the game that is both deep and
+  cheap to swing.
+- **Crits are not blocked at all.** That is what lets `Block` scale to `×8` like
+  everything else instead of being capped — the shield stays excellent and
+  armour stays answerable. The dagger is the burst answer, the axe's `Splitting`
+  the grind answer, and a natural 20 is everyone's. `Riposte` and `BlockWeaken`
+  do not fire on a crit, since no block succeeded.
+- **Uniques have the deepest ceilings in the game**, since their whole spread is
+  forged. The balance envelope is held by the unique tables being hand-authored
+  and by the `×3` forge limit, not by a cap on what play can reach.
+- `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
+- **Crit frequency is narrow in practice rather than by rule.** The dagger's
+  baseline is `CritWindow ×1` and its crit specialist `×2`, a deliberate break
+  from the prototype's 16+, so a crit is a 10–20% event for essentially the
+  whole game. A fully worked Widowmaker reaches 45% on 12+ for a ×8 multiplier,
+  and that is allowed to exist: getting there is five separate low-chance
+  services landing on the same modifier, so it is an artefact of a campaign
+  rather than a build anyone picks. `CritMultiplier` remains the investment
+  axis, so crit builds stay rare-and-catastrophic rather than constant.
+- **Wand friendly fire is on, at half damage, on both sides.** Half is what
+  makes a simple placement scorer shippable — a mediocre wand enemy is
+  inefficient rather than suicidal. Ships behind a constant, flipped on when
+  the scorer lands.
+- **The scorer weights allies at 1.5×, not at the half they actually take.**
+  The weight is a policy, not an EV calculation: it refuses even trades, so
+  baiting a caster into its own line takes real positioning instead of just
+  standing nearby.
+- **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
+  at its ceiling by construction — ×8, the deepest anything reaches now that
+  caps scale; anything needing a bespoke ceiling goes to the
+  enchantment layer, where the mana lock and trigger cost bound it organically.
+  `Momentum` moved there for exactly this reason.
+- **A modifier on a value that varies across classes is proportional.** `Light`
+  is −10% of the weapon's cost per stack, not a flat subtraction — attack costs
+  span 20–60, and flat would zero out a dagger while barely touching an axe.

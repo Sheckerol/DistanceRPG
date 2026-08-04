@@ -1,0 +1,300 @@
+# Phase 4 — Multiple floors
+
+## 4.1 Persistent while you are in the dungeon; reset when you leave
+
+Floors are revisitable via stairs, and every visited floor keeps its enemy
+state and explored fog for as long as the party remains in the dungeon.
+**Leaving the dungeon discards all of it** — re-entering regenerates every
+floor fresh.
+
+That keeps the in-run tactics (retreat upstairs, come back for a half-cleared
+room) without the save file growing without bound, and it caps repeat-kill
+weapon farming at one dungeon visit.
+
+The reset is also what Phase 6 is built on: the dungeon is the renewable half
+of the game and your gear is the permanent half.
+
+## 4.2 Stairs must not perturb the golden seed
+
+`MapGenerator` cannot gain stair placement inline — that would reorder its RNG
+calls and break `MapGeneratorTests`. Stairs get placed by a **post-pass on its
+own stream**, the same pattern `EnemyPlacer` established:
+
+```
+Logic/StairPlacer.cs      seed = mapSeed ^ StairSalt ^ floorIndex
+```
+
+Down-stairs go in the room furthest from `PlayerStart` (by A* cost, using the
+existing `Pathfinder`); up-stairs at the arrival tile.
+
+Per-floor seed: `floorSeed(n) = mapSeed ^ (FloorSalt * n)`, with `n = 0`
+resolving to exactly today's seed so floor 0 stays golden.
+
+## 4.3 The boss floor
+
+Every dungeon has exactly one boss, on a floor rolled **between 5 and 10 on
+entry**. The boss floor is the dungeon's bottom, so dungeon depth varies per
+visit — a short, sharp descent or a long grind, decided before you take the
+first step.
+
+Own RNG stream, same pattern as everything else:
+
+```
+bossFloor = 5 + new Mulberry32(mapSeed ^ BossSalt).NextInt(0, 5)
+```
+
+**The roll is not disclosed.** It is fixed at entry but unknown to the player,
+who learns the depth only by reaching it. That matters — see the open question
+about re-entry scumming below.
+
+### Killing the boss stops resurrection
+
+Dummies revive after 10 turns today (`TurnSystem.cs:532`). Once the boss is
+down, they stop: the dungeon becomes **finite and clearable** for the rest of
+the visit.
+
+That is the reward, and it also creates the run's central tension. The
+repeat-kill ladder runs *on* resurrection — `DefeatCount` only advances because
+dummies come back (§3.2). So:
+
+- **Before the boss**, the dungeon is an infinite farm. Deeper weapon drops,
+  uniques, as long as you have the turns and the health to keep cycling.
+- **After the boss**, it is a finite clear. Whatever is left, you take once.
+
+Killing the boss is what makes a run *successful* (§6.3), and it is also what
+ends your farming. Deciding when you have farmed enough is the run's real
+decision, and it is entirely the player's to make.
+
+### A boss is a dungeon's theme, and the theme is a modifier
+
+Each dungeon is themed, its boss embodies that theme, and the theme is
+**one guaranteed modifier**:
+
+- The boss carries that modifier **innately**, regardless of what it wields.
+- **Every weapon it drops is forged with it**, on top of whatever the weapon's
+  own class modifier is.
+
+**This needs no mechanism of its own.** Grafting an off-class modifier onto a
+weapon is exactly what the enchanter does (§6.4); the boss simply *guarantees
+which one you get*. Same operation, different source — and the theme is not a
+special case so much as the one place in the game where a graft is chosen
+rather than rolled.
+
+The ceiling rule (§1.1) then does the rest for free, because the boss's graft
+arrives **forged** and the enchanter's arrives acquired:
+
+| Source | The off-class modifier | Ceiling |
+| --- | --- | --- |
+| Boss drop — chosen, guaranteed, on everything it drops | Forged | 6 |
+| Enchanter graft — rolled, rare, one weapon at a time | Acquired | 5 |
+
+So a golem-dropped spear is `Brace ×1, Block ×1` and can be worked up to
+`Block ×6`; a spear that happens to roll Block in service tops out at `×5`. The
+themed drop is strictly the better article, and nothing had to be special-cased
+to make it so.
+
+That is also the honest version of what dungeon selection is *for*. The point
+was never that off-class modifiers are unobtainable elsewhere — it is that the
+boss is the only way to get the one you **chose**, at full depth, on everything
+it drops. Choice and depth, not scarcity.
+
+It settles boss drops versus repeat-kill uniques too. They are different axes,
+and all three should exist:
+
+| Source | Gives you |
+| --- | --- |
+| Repeat-kill depth (§3.2) | Depth in the weapon's **own** class signature, spent out of its acquired budget |
+| Boss drop | A **chosen** off-class modifier, forged, so it runs a stack deeper |
+| Enchanter graft (§6.4) | An off-class modifier you did not pick, shallow by construction |
+
+You run the Block dungeon because you want Block on something that has no
+business having it, and you want it deep enough to matter.
+
+### The tutorial dungeon: the stone golem
+
+The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its
+boss is a stone golem: innate Block whatever it happens to be holding, and
+every weapon it drops comes away with Block on it.
+
+### Two floors deep
+
+The tutorial ignores the 5–10 roll: its boss sits on **floor 2**, fixed. It is
+the one dungeon in the game with a hardcoded depth, and the special case earns
+itself twice over.
+
+It teaches the complete loop in miniature — descend once, fight the boss,
+extract back through a single floor — so every dungeon mechanic is demonstrated
+in the shortest run that can contain them all. And since the dungeon is
+consumed by beating it, a short one means a fast turnaround into the hub rather
+than a long commitment a first-time player cannot yet evaluate.
+
+Two floors is also enough to seed the **first stable**. Phase 6's rotation
+needs several weapons to work at all, and a couple of floors of dummies farmed
+lightly is where they come from.
+
+The pacing lines up on its own: one successful tutorial run ticks the enchanter
+once (§6.3), and attaching the first enchantment costs exactly one run (§6.2).
+Finishing the tutorial buys your first enchantment, immediately. Wear from two
+floors of fighting should be tuned to cover it — the tutorial ought to end with
+the player able to use the enchanter, not merely able to look at it.
+
+### The tutorial is consumed by beating it
+
+Unlike every other dungeon, the tutorial is **available exactly once**. Kill
+the golem and it is gone from the hub for good; fail, and it is still there.
+Every other dungeon is picked from the hub and can be run indefinitely.
+
+That makes it the one place where **rushing the boss permanently costs you
+something**. Farm the tutorial and you leave with Block-themed weapons no other
+run in the game will hand you cheaply; dive straight to the golem and that
+opportunity closes behind you.
+
+Which is exactly the decision the whole game is built on (§4.4), delivered once
+in miniature where it is cheap to learn. The tutorial should **say so plainly**
+— this is the one dungeon the game is allowed to warn you about, and a
+first-time player who loses the theme without knowing the rule has been cheated
+rather than taught.
+
+Block must therefore remain obtainable elsewhere. A rushed tutorial should cost
+a good head start, never a permanently closed build.
+
+The golem is a good first boss because it teaches the one thing flat Block
+makes true. Block absorbs a *flat* amount and never reduces a hit below 1
+(§1.1, a deliberate exception to the proportional rule), so many small hits are
+terrible against it and few large ones are fine.
+
+The starting party spans that range deliberately — **axe 18, dagger 15, sword
+10**, plus a healer. Give the golem `Block ×3` innately — 9 absorbed — and the
+maths does the teaching by itself: the sword's 10 lands for 1, the dagger's 15
+for 6, the axe's 18 for 9. The player discovers that by swinging, not by
+reading a tooltip.
+
+Then the dagger crits and lands **45**, because crits ignore Block entirely
+(§1.6). One roll in ten, out of nowhere, the armour stops existing.
+
+Two lessons for the price of one fight, and the second is the more valuable:
+**damage per swing beats swings per turn against armour**, and **there is always
+a way through** — you may just have to wait for it. Picking the right party
+member for the target is the whole game, and the golem teaches both halves of
+what "right" means.
+
+The pairing runs deeper than the tutorial. The axe's wildcard modifier is
+`Splitting`, which ignores Block outright (§1.2) — so the tutorial dungeon is
+themed on the exact defence the axe class exists to break. A player who takes
+that lesson and hunts a Reaver has understood the game.
+
+### Innate modifiers
+
+"Block regardless of its weapon" means modifiers must be able to live on an
+**actor**, not only on a weapon. `ActorState` (Phase 0) gains its own
+`ModifierSet`, and resolution reads weapon *plus* innate.
+
+That is generally useful rather than a boss special case — it is also how
+armour, monster traits, and any future innate would work, on either side of the
+fight. `CombatRules.ResolveAttack` currently reads Block off the defender's
+weapon alone (`CombatRules.cs:55`); it needs the defender's actor too, which
+Phase 1 already changes the signature for (Sundered/Weakened).
+
+**Innate is not forged.** The golem's own `Block ×3` lives on the actor and is
+added at resolution time; it raises no weapon's ceiling, including the golem's
+own. What the theme forges into the weapons it **drops** is a separate
+application of the same modifier, and only that one counts toward those weapons'
+caps (§1.1). Two ideas, two fields, deliberately different words.
+
+## 4.4 Fighting your way out
+
+**The boss does not end the run.** Killing it turns the party around: you climb
+back out through every floor you descended, killing the monsters one last
+time — and that final kill is when you collect their drops.
+
+### `DefeatCount` sets the quality; the last kill collects it
+
+This resolves when loot actually materialises. Repeat-killing a dummy during
+the descent does not hand you anything — it raises that dummy's `DefeatCount`,
+which is the *quality* of the drop it is carrying. Because the boss stopped
+resurrection, killing it on the way out is permanent, and permanent death is
+what yields the goods.
+
+Farm a dummy five times on the way down and it is holding a tier-5 drop. You
+bank the quality going in and harvest it coming out.
+
+### The risk curve inverts
+
+You are strongest descending and weakest climbing out — resources spent, HP
+gone, movement banked away — and that is precisely when the entire payout sits
+on the board. Every extra farming cycle makes the drop better *and* the
+extraction harder, with the same currency paying for both.
+
+The gauntlet does thin as you climb, since nothing revives any more. The
+ascent is a diminishing fight, not an escalating one.
+
+Navigation is not the challenge: floors persist within a visit (§4.1), so the
+map and the fog are already known. The way out is a combat problem.
+
+### You cannot carry it all
+
+Inventory becomes **6 slots per character, 24 party-wide** — replacing today's
+3, which was a testing remnant rather than a design (`PartyMemberState.cs:27`).
+Exact number is a tuning target; the structure is the decision.
+
+Crucially there is **no separate haul bag**. Loot goes in the same slots as
+your weapons, so every drop you pick up climbing out costs you a weapon you
+could have been swinging. A greedy hauler is a worse fighter, which puts the
+carry limit exactly where the tension belongs — on the extraction itself,
+scaling with how much you are trying to leave with.
+
+A deep farm banks far more than 24 drops, so the ascent is **targeted, not
+exhaustive**. You do not clear the dungeon on the way out; you revisit the
+dummies you invested in and leave the rest standing. Since `DefeatCount` is
+visible on the nameplate (§4.5), that choice is informed.
+
+### Skipping floors is allowed
+
+You can run a floor rather than fight it. This needs no gate — three systems
+already price it:
+
+- **Moving through a threat is not free.** Brace fires from every zone crossed
+  (`TurnSystem.NotifyCharacterMoved`), and you are running it at low HP with a
+  spent movement budget.
+- **Skipping forfeits the drops.** Abandoning a floor abandons everything you
+  banked there, so the decision regulates itself: fight through what you
+  farmed, run past what you did not.
+- **Wear guards against rushing.** A party could dive a floor-5 boss and skip
+  straight out for a free service tick — but they would surface with almost no
+  wear, and wear is what the enchanter consumes (§6.1). Ticks bought without
+  fighting buy nothing.
+
+A percentage-of-enemies gate was considered and rejected: it would force you to
+kill dummies whose drops you do not want, which is busywork, and it overrides
+the self-regulation above rather than adding to it.
+
+### Wear charges on the way out
+
+Wear accrues from swinging (§6.1), so the extraction is also what charges your
+weapons for the enchanter — including the improvement roll, which scales with
+wear brought in (§6.4). The fight out pays twice.
+
+## 4.5 Code impact
+
+New `Logic/DungeonState.cs` holding `Floor[]`, each with its map, actor list,
+and `FogState`, plus `BossFloor` and a `BossDefeated` flag. `DungeonScene`
+currently builds one map in its constructor and holds the party, enemies and
+fog directly — that becomes a swap of the active floor, tearing down and
+rebuilding geometry on transit.
+
+The resurrection block in `TurnSystem.StartPlayerTurn` (`TurnSystem.cs:530`)
+gets gated on `!BossDefeated`, which is the same flag that turns `EnemyDefeated`
+into a drop rather than just a `DefeatCount` increment.
+
+**The HUD must show `DefeatCount` on the enemy nameplate.** Farming with no
+visible reward until the extraction would read as broken otherwise — the player
+needs to see the quality building on each dummy to make the stop-farming call
+deliberately, and to pick targets on the way out.
+
+`PartyMemberState.Inventory` goes from 3 slots to 6 (`PartyMemberState.cs:27`),
+and `DungeonHud`'s inventory panel has to grow with it. Slot 0 stays the
+equipped weapon; the swap keys currently hardcode slots 2 and 3, so the input
+handling generalises.
+
+`Logic/FogState.cs` becomes per-floor rather than per-scene.
+
