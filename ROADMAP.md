@@ -143,7 +143,7 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Cleave` | +1 extra target | 5 | |
 | `Charges` | +2 throws per turn | 10 | |
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
-| `Light` | −15 movement cost | −75 | Cost floors at 10 |
+| `Light` | **−10% of the weapon's cost** | −50% | Additive across stacks, not compounding |
 | `Riposte` | +1 counter per turn | 5 | |
 | `Push` / `Drag` | +1 tile displaced | 5 | |
 | `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
@@ -151,10 +151,32 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `OnCrit` | +1 rider level | 5 | §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
 
-Flat costs, not percentages, for `Light`: in a game where you count exact
-movement units, `−15` is legible in a way that `−25%` is not.
+### `Light` has to be proportional, not flat
 
-The per-stack numbers above are first-pass targets, not tuned values.
+Attack costs span 20–60 across the classes, so a flat discount does not mean
+the same thing twice. At a flat −15 per stack, a 30-cost dagger reaches zero at
+×2 — three of its five stacks would do nothing, and a floored 10-cost dagger
+against a 160 budget is sixteen swings a turn. Flat also converges every class
+on the same floor, so a maxed dagger and a maxed axe would cost the same to
+swing, erasing the cost structure that tells them apart.
+
+At −10% per stack the discount scales with what it is discounting. A maxed
+`Light ×5` halves any weapon: dagger 30 → 15, sword 50 → 25, axe 60 → 30. The
+classes keep their relative footing at every stack count.
+
+Percentages are harder to count with mid-turn, which is a real cost in this
+game — so the **resolved** cost is computed once and displayed on the weapon.
+The player reads `Cost 15`, never `30 −50%`.
+
+**The general rule: a modifier acting on a value that varies across classes has
+to be proportional.** `Light` is the only one that does — every class has a
+cost. `Block` is flat by deliberate exception: absorbing 3 is meant to blunt
+many small hits more than one large one, and the minimum-1 rule already stops
+it running away.
+
+The per-stack numbers above are first-pass targets, not tuned values. The
+explicit Swift costs in §1.2 predate this rule and need the same restating pass
+as the dagger's stack counts.
 
 ### If it needs a cap, it is an enchantment
 
@@ -462,6 +484,13 @@ out of `ModifierRules`. `With` being additive *and clamping* is what makes
 variants, uniques and enchantments the same operation: an enchantment landing
 on an already-maxed modifier is a no-op rather than a special case.
 
+`Resolve` returns a raw number; whether that number is *absolute or
+proportional* is the modifier's own business. `Light` resolves to a percentage
+applied to the weapon's cost, so `Weapon.ResolvedCost` is
+`Cost * (100 - Modifiers.Value(Light)) / 100`, computed once and cached rather
+than recomputed per swing — the HUD and the movement gate must agree on one
+number.
+
 **Migration must preserve the shipped values.** Today's dagger carries
 `CritRange 4`, and `CombatRules` resolves the crit threshold as `20 - value`
 (`CombatRules.cs:35`), so it crits on **16+** — 25% of swings, pinned by
@@ -633,7 +662,7 @@ Starting set:
 | --- | --- | --- | --- |
 | Vampiric | 20 | 10 | On crit, heal the wielder for damage dealt |
 | Flaring | 15 | 5 | On hit, apply Poison 2 |
-| Weightless | 25 | 5 | Attacks cost 10 less movement |
+| Weightless | 25 | 5 | `Light ×1` — attacks cost 10% less movement |
 | Warding | 30 | 40 | A killing blow leaves you at 1 HP instead |
 | Echoing | 20 | 15 | The weapon's class feature triggers one extra time per turn |
 | Shattering | 25 | 10 | `OnCrit ×1` — crit riders (§1.6) land one level deeper |
@@ -789,3 +818,6 @@ produces an identical world state.
   at ×5 by construction; anything needing a bespoke ceiling goes to the
   enchantment layer, where the mana lock and trigger cost bound it organically.
   `Momentum` moved there for exactly this reason.
+- **A modifier on a value that varies across classes is proportional.** `Light`
+  is −10% of the weapon's cost per stack, not a flat subtraction — attack costs
+  span 20–60, and flat would zero out a dagger while barely touching an axe.
