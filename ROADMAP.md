@@ -498,6 +498,12 @@ number.
 (`CombatRules.cs:35`), so it crits on **16+** — 25% of swings, pinned by
 `CombatRulesTests.cs:28`. The sword blocks 3, the spear braces once.
 
+One parity break is deliberate: `CharStartingWeaponIdx` is `{0,1,2,2}` and
+becomes dagger/sword/axe/spear (§2.1), so
+`CombatRulesTests.StartingWeapons_MatchPrototype` needs its second assertion
+updated. The first — Dagger, Sword, Spear at indices 0–2 — still holds, since
+new classes append after them.
+
 Sword, spear and staff map to `×1` directly. The dagger needs `CritWindow ×4`
 to keep its 16+ window under the new `+1` per stack. That is legal and leaves
 Keen's `CritMultiplier` and `OnCrit` budgets untouched, since caps are per
@@ -553,12 +559,18 @@ staff.
 
 Starting spreads (20 points each, tuning targets):
 
-| Member | STR | DEX | CON | INT | Leans |
-| --- | --- | --- | --- | --- | --- |
-| A | 4 | 8 | 4 | 4 | Dagger / bow |
-| B | 7 | 5 | 5 | 3 | Sword & shield line-holder |
-| C | 7 | 4 | 6 | 3 | Spear / axe / throwing bruiser |
-| D | 3 | 4 | 5 | 8 | Staff / wand caster |
+| Member | STR | DEX | CON | INT | Starts with | Leans |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | 4 | 8 | 4 | 4 | Dagger | Dagger / bow |
+| B | 7 | 5 | 5 | 3 | Sword & shield | Line-holder |
+| C | 7 | 4 | 6 | 3 | **Axe** | Axe / spear / throwing bruiser |
+| D | 3 | 4 | 5 | 8 | Spear | Staff / wand caster |
+
+The axe goes to C, the only member whose STR 7 suits it. D keeps the spear
+rather than the second axe: at STR 3 they will never level a martial weapon
+well, so what they want is the spear's 130 reach and 40 cost to hold the back
+line and brace — until staves and wands arrive and they stop swinging
+altogether.
 
 Rate curve, applied to every XP gain below:
 
@@ -874,13 +886,21 @@ every weapon it drops comes away with Block on it.
 The golem is a good first boss because it teaches the one thing flat Block
 makes true. Block absorbs a *flat* amount and never reduces a hit below 1
 (§1.1, a deliberate exception to the proportional rule), so many small hits are
-terrible against it and few large ones are fine. The starting party is dagger,
-sword, spear, spear — the dagger's 15 damage and wide crit window cut the golem
-down while the spears' 7 chip at it almost pointlessly.
+terrible against it and few large ones are fine.
+
+The starting party spans that range deliberately — **dagger 15, sword 10, axe
+18, spear 7**. Against a heavy blocker the axe is the answer and the spear is
+nearly useless, and the player discovers that by swinging rather than by
+reading a tooltip.
 
 That is the lesson the tutorial should land: **damage per swing beats swings
 per turn against armour**, and picking the right party member for the target is
 the whole game.
+
+The pairing runs deeper than the tutorial. The axe's wildcard modifier is
+`Splitting`, which ignores Block outright (§1.2) — so the tutorial dungeon is
+themed on the exact defence the axe class exists to break. A player who takes
+that lesson and hunts a Reaver has understood the game.
 
 ### Innate modifiers
 
@@ -1184,10 +1204,10 @@ new events on the floor-transit path from Phase 4.
   Enemies with those classes need kiting behaviour — hold range, back off when
   approached — which is genuine AI work. Until it exists, `EnemyPlacer` should
   roll only the six martial-and-melee classes.
-- **Does the party's starting loadout change?** `CharStartingWeaponIdx` is
-  `{0,1,2,2}` — dagger, sword, spear, spear. With eight classes and D built as
-  the caster, dagger / sword / axe / staff matches the stat spreads better, but
-  it moves the party off the ported starting state.
+- **Does D eventually start with a staff?** The loadout is now dagger, sword,
+  axe, spear (§2.1), but D is built as a caster and only carries the spear
+  because staves are a swap away in inventory slot 1. Whether they should start
+  *equipped* with one depends on how early the tutorial wants to teach casting.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
@@ -1266,6 +1286,9 @@ new events on the floor-transit path from Phase 4.
   over another.
 - **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
   for a boss.
+- **The starting party is dagger, sword, axe, spear** — one of the two spears
+  becomes an axe, on C. The 7-to-18 damage spread across the party is what
+  teaches the golem's lesson.
 - **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
   its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
