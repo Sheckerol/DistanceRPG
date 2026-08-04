@@ -514,6 +514,11 @@ New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
 *field*, not a modifier; the modifier only says how hard it lands. Phase 3's
 drop tables key off `WeaponClass`.
 
+`ActorState` gains its own `ModifierSet` for **innate** modifiers (§4.3), and
+every resolution site reads weapon **plus** innate rather than weapon alone.
+Doing this in Phase 1 rather than retrofitting it in Phase 4 is much cheaper —
+the same call sites are already being rewritten for stacking.
+
 `CombatRules.RollAttack` hardcodes `weapon.Damage * 2` on a crit
 (`CombatRules.cs:39`) — that becomes `Damage * (2 + Modifiers.Value(CritMultiplier))`,
 and damage becomes a function of distance for Longshot.
@@ -835,6 +840,60 @@ Killing the boss is what makes a run *successful* (§6.3), and it is also what
 ends your farming. Deciding when you have farmed enough is the run's real
 decision, and it is entirely the player's to make.
 
+### A boss is a dungeon's theme, and the theme is a modifier
+
+Each dungeon is themed, its boss embodies that theme, and the theme is
+**one guaranteed modifier**:
+
+- The boss carries that modifier **innately**, regardless of what it wields.
+- **Every weapon it drops carries it too**, on top of whatever the weapon's own
+  class modifier is.
+
+That makes boss drops structurally unlike anything else in the game. A spear
+dropped by a Block-themed boss is `Brace ×n, Block ×n` — an off-class hybrid
+you cannot roll, cannot farm, and cannot craft. Ordinary drops respect the
+class convention (§1.2); boss drops are the one thing that breaks it.
+
+It also settles boss drops versus repeat-kill uniques — they are different
+axes, and both should exist:
+
+| Source | Gives you |
+| --- | --- |
+| Repeat-kill depth (§3.2) | Extreme stacks of the weapon's **own** class modifier |
+| Boss drop | A guaranteed **off-class** modifier from the dungeon's theme |
+
+And it gives dungeon selection a point. You run the Block dungeon because you
+want Block on something that has no business having it.
+
+### The tutorial dungeon: the stone golem
+
+The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its
+boss is a stone golem: innate Block whatever it happens to be holding, and
+every weapon it drops comes away with Block on it.
+
+The golem is a good first boss because it teaches the one thing flat Block
+makes true. Block absorbs a *flat* amount and never reduces a hit below 1
+(§1.1, a deliberate exception to the proportional rule), so many small hits are
+terrible against it and few large ones are fine. The starting party is dagger,
+sword, spear, spear — the dagger's 15 damage and wide crit window cut the golem
+down while the spears' 7 chip at it almost pointlessly.
+
+That is the lesson the tutorial should land: **damage per swing beats swings
+per turn against armour**, and picking the right party member for the target is
+the whole game.
+
+### Innate modifiers
+
+"Block regardless of its weapon" means modifiers must be able to live on an
+**actor**, not only on a weapon. `ActorState` (Phase 0) gains its own
+`ModifierSet`, and resolution reads weapon *plus* innate.
+
+That is generally useful rather than a boss special case — it is also how
+armour, monster traits, and any future innate would work, on either side of the
+fight. `CombatRules.ResolveAttack` currently reads Block off the defender's
+weapon alone (`CombatRules.cs:55`); it needs the defender's actor too, which
+Phase 1 already changes the signature for (Sundered/Weakened).
+
 ## 4.4 Fighting your way out
 
 **The boss does not end the run.** Killing it turns the party around: you climb
@@ -1145,10 +1204,17 @@ new events on the floor-transit path from Phase 4.
   roll stops players re-entering to scum for a shallow dungeon — you cannot
   tell without descending — but if a hint ever surfaces the depth, ticks should
   scale with boss depth instead.
-- **What does the boss drop, and what is it?** Nothing is specified: statline,
-  whether it uses the weapon-class system, whether it has a unique drop. A boss
-  drop would be a cleaner source for uniques than the 5-defeat repeat-kill
-  threshold (§3.2), and the two may not both need to exist.
+- **The golem's statline.** Themed drops are settled (§4.3) but the fight is
+  not: HP, movement budget, whether it rolls a weapon like a dummy does, and
+  how many `Block` stacks it carries innately. A slow, heavily armoured
+  construct is the obvious shape, but slow enemies are trivially kited once
+  ranged weapons exist (§1.2) — worth checking the tutorial boss does not
+  become a joke in Phase 1.
+- **Should the tutorial be 5–10 floors like everything else?** That is a long
+  first dungeon. A fixed, shorter tutorial depth may serve better than the
+  general roll, at the cost of a special case.
+- **How is a dungeon chosen?** Themed dungeons imply several entrances and a
+  reason to pick one, which is hub scope (Phase 6) that does not exist yet.
 - **Can you re-enter after killing the boss?** Leaving resets the dungeon
   (§4.1), which re-rolls the boss floor and revives everything. So a cleared
   dungeon cannot be returned to — clearing it is worth doing only for what you
@@ -1194,6 +1260,14 @@ new events on the floor-transit path from Phase 4.
   workshop.
 - **A run is successful when you kill the boss.** One boss per dungeon, on a
   floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
+- **Each dungeon is themed on one modifier.** Its boss carries that modifier
+  innately whatever it wields, and every weapon it drops carries it too — the
+  only off-class modifiers in the game, and the reason to choose one dungeon
+  over another.
+- **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
+  for a boss.
+- **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
+  its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
   farm into a finite clear — so winning ends your farming, and choosing when to
   stop farming is the run's central decision.
