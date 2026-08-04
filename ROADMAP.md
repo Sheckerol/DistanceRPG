@@ -796,12 +796,53 @@ existing `Pathfinder`); up-stairs at the arrival tile.
 Per-floor seed: `floorSeed(n) = mapSeed ^ (FloorSalt * n)`, with `n = 0`
 resolving to exactly today's seed so floor 0 stays golden.
 
-## 4.3 Code impact
+## 4.3 The boss floor
+
+Every dungeon has exactly one boss, on a floor rolled **between 5 and 10 on
+entry**. The boss floor is the dungeon's bottom, so dungeon depth varies per
+visit — a short, sharp descent or a long grind, decided before you take the
+first step.
+
+Own RNG stream, same pattern as everything else:
+
+```
+bossFloor = 5 + new Mulberry32(mapSeed ^ BossSalt).NextInt(0, 5)
+```
+
+**The roll is not disclosed.** It is fixed at entry but unknown to the player,
+who learns the depth only by reaching it. That matters — see the open question
+about re-entry scumming below.
+
+### Killing the boss stops resurrection
+
+Dummies revive after 10 turns today (`TurnSystem.cs:532`). Once the boss is
+down, they stop: the dungeon becomes **finite and clearable** for the rest of
+the visit.
+
+That is the reward, and it also creates the run's central tension. The
+repeat-kill ladder runs *on* resurrection — `DefeatCount` only advances because
+dummies come back (§3.2). So:
+
+- **Before the boss**, the dungeon is an infinite farm. Deeper weapon drops,
+  uniques, as long as you have the turns and the health to keep cycling.
+- **After the boss**, it is a finite clear. Whatever is left, you take once.
+
+Killing the boss is what makes a run *successful* (§6.3), and it is also what
+ends your farming. Deciding when you have farmed enough is the run's real
+decision, and it is entirely the player's to make.
+
+The boss does not end the run — the party still has to leave.
+
+## 4.4 Code impact
 
 New `Logic/DungeonState.cs` holding `Floor[]`, each with its map, actor list,
-and `FogState`. `DungeonScene` currently builds one map in its constructor and
-holds the party, enemies and fog directly — that becomes a swap of the active
-floor, tearing down and rebuilding geometry on transit.
+and `FogState`, plus `BossFloor` and a `BossDefeated` flag. `DungeonScene`
+currently builds one map in its constructor and holds the party, enemies and
+fog directly — that becomes a swap of the active floor, tearing down and
+rebuilding geometry on transit.
+
+The resurrection block in `TurnSystem.StartPlayerTurn` (`TurnSystem.cs:530`)
+gets gated on `!BossDefeated`.
 
 `Logic/FogState.cs` becomes per-floor rather than per-scene.
 
@@ -910,11 +951,14 @@ correctly at a glance, where a silently stalled queue reads as a bug.
 **Entering the dungeon ticks nothing.** Otherwise the optimal play is a stack
 of twenty-second entries to burn the service clock without ever fighting.
 
+**A run is successful when you kill the boss** (§4.3) and leave. Nothing else
+counts as a win.
+
 | Outcome | Service tick |
 | --- | --- |
-| Entered, left shallow | **None** |
-| Reached floor 2, then wiped or fled | **1 (mercy)** |
-| Successful run | **1** |
+| Entered, left above floor 2 | **None** |
+| Reached floor 2, left without the boss | **1 (mercy)** |
+| Killed the boss | **1** |
 
 The mercy tick exists for exactly one purpose: **a losing streak must not
 freeze the workshop.** Several failed runs in a row would otherwise stall every
@@ -926,6 +970,10 @@ better; failing merely is not compounding.
 
 Reaching floor 2 is the bar because it cannot be cleared by walking in and
 turning around, but it also does not demand a good run.
+
+Note the mercy tick and the success tick are currently worth the same. Since a
+boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
+see the open questions.
 
 ## 6.4 Service can improve the weapon
 
@@ -998,10 +1046,20 @@ new events on the floor-transit path from Phase 4.
   unique is 16+ to 15+. Narrowing the base window would open that range back
   up at the cost of parity with the prototype. The class tables in §1.2 still
   show `×1` counts and need restating once this is settled.
-- **What is a "successful" run, exactly?** Phase 6 ticks service on success and
-  on a floor-2 mercy, but success itself is undefined. Returning to the hub
-  alive is the obvious bar; whether it also requires descending at least one
-  floor, or clearing something, is open.
+- **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
+  on entry and a win ticks service once either way, so a floor-5 dungeon is
+  strictly cheaper than a floor-10 one for the same reward. Not disclosing the
+  roll stops players re-entering to scum for a shallow dungeon — you cannot
+  tell without descending — but if a hint ever surfaces the depth, ticks should
+  scale with boss depth instead.
+- **What does the boss drop, and what is it?** Nothing is specified: statline,
+  whether it uses the weapon-class system, whether it has a unique drop. A boss
+  drop would be a cleaner source for uniques than the 5-defeat repeat-kill
+  threshold (§3.2), and the two may not both need to exist.
+- **Can you re-enter after killing the boss?** Leaving resets the dungeon
+  (§4.1), which re-rolls the boss floor and revives everything. So a cleared
+  dungeon cannot be returned to — clearing it is worth doing only for what you
+  can carry out in that visit.
 - **Does wear cap?** If it accumulates without limit, a long-serving weapon
   eventually has enough for any enchantment forever and wear stops being a
   gate. A ceiling — or wear being fully consumed per attachment — needs
@@ -1038,6 +1096,11 @@ new events on the floor-transit path from Phase 4.
 - **Entering does not tick service.** A successful run ticks; reaching floor 2
   and then failing ticks once as mercy, so a losing streak cannot freeze the
   workshop.
+- **A run is successful when you kill the boss.** One boss per dungeon, on a
+  floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
+- **Killing the boss stops resurrection**, turning the dungeon from an infinite
+  farm into a finite clear — so winning ends your farming, and choosing when to
+  stop farming is the run's central decision.
 - **Service has a low chance of adding a modifier stack**, scaled by wear
   brought in and bounded by the §1.1 caps — this is how a weapon improves
   across runs rather than merely accumulating attachments.
