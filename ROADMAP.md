@@ -175,9 +175,7 @@ cost. `Block` is flat by deliberate exception: absorbing 3 is meant to blunt
 many small hits more than one large one, and the minimum-1 rule already stops
 it running away.
 
-The per-stack numbers above are first-pass targets, not tuned values. The
-explicit Swift costs in §1.2 predate this rule and need the same restating pass
-as the dagger's stack counts.
+The per-stack numbers above are first-pass targets, not tuned values.
 
 ### If it needs a cap, it is an enchantment
 
@@ -210,26 +208,48 @@ four rules; only the wildcard differs.
 | **Keen** | `+ CritWindow ×1`, `+ OnCrit ×1` |
 | **Wildcard** | `+` one stack of an off-class modifier |
 
+**Cost columns below are base costs.** A Swift weapon shows the same cost as
+its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is what
+the weapon is; modifiers are what happens to it.
+
 ### Dagger — class modifier `CritWindow` (DEX)
 
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Dagger | 40 | 15 | 30 | `CritWindow ×1` |
-| Swift | Flensing Knife | 40 | 15 | 15 | `CritWindow ×1, Light ×1` |
+| Swift | Flensing Knife | 40 | 15 | 30 | `CritWindow ×1, Light ×1` |
 | Greater | Assassin's Fang | 40 | 15 | 30 | `CritWindow ×2` |
 | Keen | Vorpal Kris | 40 | 15 | 30 | `CritWindow ×1, CritMultiplier ×1, OnCrit ×1` |
 | Wildcard | Venom Kiss | 40 | 10 | 30 | `CritWindow ×1, OnHitPoison ×1` |
 
+**The dagger's baseline is `×1` — crit on 19–20**, and its crit specialist
+(Assassin's Fang) sits at `×2`, 18–20. This is a deliberate break from the
+prototype, whose dagger crits on 16+ (`CombatRulesTests.cs:28`).
+
 Dagger is the class where Greater and Keen would collide — crit *is* its
 modifier. Under stacking they separate cleanly: Greater adds another
 `CritWindow` stack, Keen adds `CritMultiplier` and `OnCrit` instead.
+
+### Crit frequency is deliberately narrow; crit *power* is the build
+
+With `CritWindow` at +1 per stack and a 5-stack cap, the entire crit-rate range
+in the game is 19–20 to 15–20 — **10% to 30%**. That is intentional. Frequency
+stays bounded so the d20 keeps mattering, and the investment axis is
+`CritMultiplier` instead, which runs ×2 up to ×7.
+
+So a crit build is not "crit constantly" but **"crit rarely and
+catastrophically"** — and the two dagger specialists split exactly along that
+line, with Assassin's Fang buying frequency and Vorpal Kris buying magnitude.
+
+Starting at `×1` rather than the prototype's `×4` also leaves the dagger four
+stacks of headroom for uniques and enchantments to work with, instead of one.
 
 ### Sword & Shield — class modifier `Block` (max STR/DEX)
 
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Sword | 80 | 10 | 50 | `Block ×1` |
-| Swift | Arming Sword | 80 | 10 | 35 | `Block ×1, Light ×1` |
+| Swift | Arming Sword | 80 | 10 | 50 | `Block ×1, Light ×1` |
 | Greater | Tower Guard | 80 | 10 | 50 | `Block ×2` |
 | Keen | Estoc | 80 | 10 | 50 | `Block ×1, CritWindow ×1, OnCrit ×1` |
 | Wildcard | Riposte Blade | 80 | 10 | 50 | `Block ×1, Riposte ×1` |
@@ -242,7 +262,7 @@ Turns the shield from pure mitigation into a threat.
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Spear | 130 | 7 | 40 | `Brace ×1` |
-| Swift | Skirmisher's Pike | 130 | 7 | 25 | `Brace ×1, Light ×1` |
+| Swift | Skirmisher's Pike | 130 | 7 | 40 | `Brace ×1, Light ×1` |
 | Greater | Phalanx Spear | 130 | 7 | 40 | `Brace ×2` |
 | Keen | Impaler | 130 | 7 | 40 | `Brace ×1, CritWindow ×1, OnCrit ×1` |
 | Wildcard | Halberd | 130 | 7 | 40 | `Brace ×1, Push ×1` |
@@ -260,7 +280,7 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Axe | 60 | 18 | 60 | `Cleave ×1` |
-| Swift | Hatchet | 60 | 18 | 45 | `Cleave ×1, Light ×1` |
+| Swift | Hatchet | 60 | 18 | 60 | `Cleave ×1, Light ×1` |
 | Greater | Great Axe | 60 | 18 | 60 | `Cleave ×2` |
 | Keen | Executioner's Axe | 60 | 18 | 60 | `Cleave ×1, CritWindow ×1, OnCrit ×1` |
 | Wildcard | Reaver | 60 | 14 | 60 | `Cleave ×1, Splitting ×1` |
@@ -280,7 +300,7 @@ the marching formation a genuine trade-off.
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Shortbow | 320 | 5 | 45 | `Longshot ×1` |
-| Swift | Hunting Bow | 320 | 5 | 30 | `Longshot ×1, Light ×1` |
+| Swift | Hunting Bow | 320 | 5 | 45 | `Longshot ×1, Light ×1` |
 | Greater | Longbow | 320 | 5 | 45 | `Longshot ×2` |
 | Keen | Recurve | 320 | 5 | 45 | `Longshot ×1, CritWindow ×1, OnCrit ×1` |
 | Wildcard | Crossbow | 320 | 8 | 45 | `Longshot ×1, Overwatch ×1` |
@@ -298,7 +318,7 @@ turn.
 | Variant | Name | Range | Dmg | Cost | Modifiers |
 | --- | --- | --- | --- | --- | --- |
 | base | Javelins | 190 | 9 | 35 | `Charges ×1` |
-| Swift | Darts | 190 | 6 | 20 | `Charges ×1, Light ×1` |
+| Swift | Darts | 190 | 6 | 35 | `Charges ×1, Light ×1` |
 | Greater | Bandolier | 190 | 9 | 35 | `Charges ×2` |
 | Keen | Balanced Knives | 190 | 9 | 35 | `Charges ×1, CritWindow ×1, OnCrit ×1` |
 | Wildcard | Harpoon | 190 | 9 | 35 | `Charges ×1, Drag ×1` |
@@ -572,11 +592,13 @@ becomes dagger/sword/axe/staff (§2.1), so
 updated. The first — Dagger, Sword, Spear at indices 0–2 — still holds, since
 new classes append after them.
 
-Sword, spear and staff map to `×1` directly. The dagger needs `CritWindow ×4`
-to keep its 16+ window under the new `+1` per stack. That is legal and leaves
-Keen's `CritMultiplier` and `OnCrit` budgets untouched, since caps are per
-type — but whether a base weapon should sit that close to its own cap is a
-tuning question, listed below.
+Sword, spear and staff map to `×1` directly, preserving their shipped values.
+
+**The dagger is a deliberate exception.** It becomes `CritWindow ×1` — crit on
+19–20, not the prototype's 16+ (§1.2). Two assertions in
+`CombatRulesTests.cs:28` change with it. Narrowing the baseline is what keeps
+crit frequency inside a 10–30% band across the whole game and leaves the dagger
+four stacks of headroom instead of one.
 
 ### Everything else
 
@@ -1339,13 +1361,6 @@ new events on the floor-transit path from Phase 4.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
-- **Does the dagger keep its 16+ window?** The ported dagger crits on 16+
-  (25%), which is `CritWindow ×4` at +1 per stack — one stack short of its own
-  cap, so Greater takes it to ×5 (15+, 30%) and there it stops. That works,
-  but it means the dagger's whole `CritWindow` range across every variant and
-  unique is 16+ to 15+. Narrowing the base window would open that range back
-  up at the cost of parity with the prototype. The class tables in §1.2 still
-  show `×1` counts and need restating once this is settled.
 - **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
   on entry and a win ticks service once either way, so a floor-5 dungeon is
   strictly cheaper than a floor-10 one for the same reward. Not disclosing the
@@ -1447,6 +1462,11 @@ new events on the floor-transit path from Phase 4.
   shared budget across a weapon. The cap is on the stack count, not the
   resolved value, so per-stack value is the only dial.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
+- **The dagger's baseline is `CritWindow ×1` and its crit specialist `×2`** —
+  a deliberate break from the prototype's 16+. Crit *frequency* stays inside
+  10–30% game-wide so the d20 keeps mattering; `CritMultiplier` (×2 to ×7) is
+  the investment axis, so crit builds are rare-and-catastrophic rather than
+  constant.
 - **Wand friendly fire is on, at half damage, on both sides.** Half is what
   makes a simple placement scorer shippable — a mediocre wand enemy is
   inefficient rather than suicidal. Ships behind a constant, flipped on when
