@@ -142,7 +142,7 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20, ×3 = 17–20 … |
 | `CritMultiplier` | +1 to the multiplier | ×7 | Base is ×2 with no stacks |
 | `Cleave` | +1 extra target | 5 | |
-| `Charges` | +2 throws per turn | 10 | |
+| `Charges` | +2 throws per turn | 10 | A **cap**, not a grant — see §1.2 |
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive across stacks, not compounding |
 | `Riposte` | +1 counter per turn | 5 | |
@@ -225,6 +225,32 @@ a party that already has damage covered.
 as its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is
 what the weapon is; modifiers are what happens to it.
 
+### Attack cost tracks weight
+
+| Class | Cost | |
+| --- | --- | --- |
+| Throwing | 15 | A flick of the wrist, and hard-capped by Charges |
+| Dagger | 30 | Light, fast |
+| Ranged | 30 | Drawing a bow is not heavy work |
+| Sword & Shield | 50 | A shield is most of that number |
+| Spear | 55 | A long polearm is slow to bring to bear |
+| Axe | 60 | Heaviest thing anyone swings |
+
+Spear at 55 against bow at 30 is a **correction**: the spear was 40 and the bow
+45, which had a heavy polearm swinging faster than an archer looses. Weight
+should read in the movement cost, since movement is what the game is about.
+
+The spear's damage is 7 and it now costs 55, so it swings twice a turn for 14 —
+which is correct rather than broken. **A spear is not a weapon you attack
+with, it is a weapon you threaten with.** Its value is `Brace` firing for free
+on the enemy turn and 130 units of reach; the swing is the fallback. High cost
+makes that identity explicit instead of leaving the spear a cheap poking stick
+that happens to brace.
+
+Throwing at 15 undercuts the bow despite a javelin outweighing an arrow — a
+throw is a quicker action than nocking, drawing and aiming, and the Charges cap
+is what keeps it honest. Uncapped, that price would be indefensible.
+
 ### Dagger (DEX) — baseline `CritWindow ×1, CritMultiplier ×1`
 
 Crit is the class, so both of its dimensions live in the baseline: 19–20 to
@@ -292,10 +318,10 @@ It is also the one weapon whose added modifier depends on the class baseline:
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| Efficiency | Skirmisher's Pike | 130 | 7 | 40 | `Light ×1` |
-| Purity | Phalanx Spear | 130 | 7 | 40 | `Brace ×1` → 2 retaliations |
-| Control | Halberd | 130 | 7 | 40 | `Push ×1` |
-| Support | Pinning Lance | 130 | 7 | 40 | `Pin ×1` |
+| Efficiency | Skirmisher's Pike | 130 | 7 | 55 | `Light ×1` |
+| Purity | Phalanx Spear | 130 | 7 | 55 | `Brace ×1` → 2 retaliations |
+| Control | Halberd | 130 | 7 | 55 | `Push ×1` |
+| Support | Pinning Lance | 130 | 7 | 55 | `Pin ×1` |
 
 The spear is the class that decides **where enemies are**, and its two
 non-baseline tools are exact opposites:
@@ -339,10 +365,10 @@ the marching formation a genuine trade-off.
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| Efficiency | Hunting Bow | 320 | 5 | 45 | `Light ×1` |
-| Purity | Longbow | 320 | 5 | 45 | `Longshot ×1` → +2 per tile |
-| Control | Pinning Bow | 320 | 5 | 45 | `Pin ×1` |
-| Support | Crossbow | 320 | 5 | 45 | `Overwatch ×1` |
+| Efficiency | Hunting Bow | 320 | 5 | 30 | `Light ×1` |
+| Purity | Longbow | 320 | 5 | 30 | `Longshot ×1` → +2 per tile |
+| Control | Pinning Bow | 320 | 5 | 30 | `Pin ×1` |
+| Support | Crossbow | 320 | 5 | 30 | `Overwatch ×1` |
 
 - **Pin** — the same `Mire` application as the spear's, delivered by a hit
   rather than a brace. A bow that stops an enemy closing is a bow that never
@@ -354,16 +380,45 @@ the marching formation a genuine trade-off.
 
 ### Throwing (STR) — baseline `Charges ×1`
 
-**Charges**: throws per turn, replenished at turn start, each cheaper than a
-melee swing. Cleave is many targets in one swing; Charges is many swings in one
-turn.
+**Charges is a cap, and the cap is the point.** A throw costs only 15, so the
+movement budget alone would allow ten a turn — absurd. Charges is what bounds
+that: `×1` permits 2 throws, and each stack adds 2 more. Raising it is
+genuinely the class feature, because the cap rather than the budget is what
+binds.
+
+Getting this backwards is easy and worth stating plainly: at a *normal* attack
+cost the budget already caps you at four or five swings, so a "throws per turn"
+limit would be a restriction rather than a feature. Cheap throws are what make
+the cap the interesting number.
+
+| Charges | Throws | Movement spent | Damage | Movement left |
+| --- | --- | --- | --- | --- |
+| ×1 | 2 | 30 | 18 | 130 |
+| ×2 | 4 | 60 | 36 | 100 |
+| ×5 | 10 | 150 | 90 | 10 |
+
+The class identity is **attack and still have movement left** — the only weapon
+that does not force a choice between fighting and repositioning. That gives
+STR characters a way to land many hits per turn the way DEX characters do, and
+it is what a full kiting party is built around.
+
+Leftover movement is not dead weight here. Half of it banks into next turn
+(`EndTurnSaveMovement`) and it regenerates mana
+(`RegenManaFromUnusedMovement`), so a low-Charges thrower **fights while
+fuelling mana** — feeding enchantment triggers (§3.3) and the mana XP pool
+(§2.2).
+
+Which makes the stack count a real build decision rather than a straight
+upgrade: low Charges is an economy weapon that keeps your enchantments firing,
+high Charges converts that economy into raw damage. It is the only class where
+stacking the signature changes what the weapon is *for*.
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| Efficiency | Darts | 190 | 9 | 35 | `Light ×1` |
-| Purity | Bandolier | 190 | 9 | 35 | `Charges ×1` → 4 throws |
-| Control | Harpoon | 190 | 9 | 35 | `Drag ×1` |
-| Support | Softening Javelins | 190 | 9 | 35 | `Softening ×1` |
+| Efficiency | Darts | 190 | 9 | 15 | `Light ×1` |
+| Purity | Bandolier | 190 | 9 | 15 | `Charges ×1` → 4 throws |
+| Control | Harpoon | 190 | 9 | 15 | `Drag ×1` |
+| Support | Softening Javelins | 190 | 9 | 15 | `Softening ×1` |
 
 - **Drag** — a hit pulls the target *toward* the thrower, the exact inverse of
   the halberd's Push, setting up your own axe and sword line.
@@ -1507,6 +1562,13 @@ new events on the floor-transit path from Phase 4.
   nothing when the signature *is* which effect you cast.
 - **`Pin` appears on both spear and ranged**, delivered by a brace and by a hit
   respectively — the two halves of a kiting pair.
+- **Throws are cheap (15) and hard-capped by `Charges`**, not free. The cap is
+  the binding constraint rather than the budget, so the class fights *and*
+  keeps movement — which banks and regenerates mana, making low-Charges an
+  economy weapon and high-Charges a damage one.
+- **Attack cost tracks weight**: throwing 15, dagger and bow 30, sword 50,
+  spear 55, axe 60. The spear was cheaper than the bow, which had a polearm
+  swinging faster than an archer looses.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
   taught by enemy spear dummies instead of a party spear.
