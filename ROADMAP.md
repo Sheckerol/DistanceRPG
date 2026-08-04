@@ -149,11 +149,11 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | |
 | `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same ceiling, but for everyone |
-| `Guard` | +1 tile of radius over which allies share your Block | 5 | |
 | `Pin` | +1 `Mire` level on the target | 5 | |
 | `Overwatch` | +1 held shot | 5 | |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | §1.6 |
+| `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
 
 ### `Light` has to be proportional, not flat
@@ -268,12 +268,25 @@ stacks of headroom for uniques and enchantments to work with, instead of one.
 | Efficiency | Arming Sword | 80 | 10 | 50 | `Light ×1` |
 | Purity | Tower Guard | 80 | 10 | 50 | `Block ×1` → absorbs 6 |
 | Control | Riposte Blade | 80 | 10 | 50 | `Riposte ×1` |
-| Support | Bulwark | 80 | 10 | 50 | `Guard ×1` |
+| Support | Warden's Shield | 80 | 10 | 50 | `BlockWeaken ×1` |
 
-- **Riposte** — a successful block grants a free counter-swing at the attacker.
-  Turns the shield from pure mitigation into a threat.
-- **Guard** — allies within `32 × stacks` units benefit from your Block. The
-  line-holder finally holds a line rather than merely surviving one.
+Both trigger off the same event — a successful block — and split cleanly on who
+collects:
+
+- **Riposte** — the block grants a free counter-swing. Turns mitigation into a
+  threat, and the payoff is yours.
+- **BlockWeaken** — the block applies `Weakened` to the attacker, so it deals
+  less to *everyone* afterwards. The same effect the dagger's `CritWeaken`
+  applies, on a different trigger.
+
+**Why that is support and the dagger's is control.** A shield-bearer already
+mitigates incoming damage with Block, so weakening their attacker barely
+improves their own position — it improves the position of whoever gets hit next
+without a shield. On a dagger, with no Block behind it, weakening is
+self-defence. Same effect, opposite role, decided by who carries it.
+
+It is also the one weapon whose added modifier depends on the class baseline:
+`BlockWeaken` cannot fire without a `Block` to succeed at.
 
 ### Spear (STR) — baseline `Brace ×1`
 
@@ -530,14 +543,17 @@ harmlessness.
 Each rider is **its own modifier**, so a weapon that has one carries it as
 stacks like anything else:
 
-| Modifier | On a crit, applies |
-| --- | --- |
-| `CritWeaken` | `Weakened` at the stack count — the target deals less |
-| `CritSunder` | `Sundered` at the stack count — the target takes more |
+| Modifier | Trigger | Applies |
+| --- | --- | --- |
+| `CritWeaken` | Crit | `Weakened` at the stack count — the target deals less |
+| `CritSunder` | Crit | `Sundered` at the stack count — the target takes more |
+| `BlockWeaken` | Successful block | `Weakened` at the stack count |
 
 Making them separate modifier types rather than one `OnCrit` with a payload
 keeps the §1.1 rule intact: **a stack is a count, never a value carrying
-something else.** It also lets one weapon carry both.
+something else.** It also lets one weapon carry several, and lets the same
+effect arrive on different triggers — `Weakened` from a dagger's crit or a
+shield's block, resolved identically once applied.
 
 Riders are the natural fill for the **Control** and **Support** roles (§1.2) —
 `CritWeaken` degrades the enemy, `CritSunder` helps everyone else — which is
@@ -592,7 +608,7 @@ the value **derived**, so the pair becomes:
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
-                    Rout, Guard, Pin, Softening, CritWeaken, CritSunder,
+                    Rout, Pin, Softening, CritWeaken, CritSunder, BlockWeaken,
                     OnHitPoison, Cast,
                     Momentum }                             // Momentum: enchantment-only
 
@@ -1484,7 +1500,7 @@ new events on the floor-transit path from Phase 4.
 - **The dagger's baseline is `CritWindow ×1, CritMultiplier ×1`**, with its
   four weapons adding `Light`, another `CritWindow`, `CritWeaken`, and
   `CritSunder`.
-- **All six martial classes are specced** — sword (`Riposte`/`Guard`), spear
+- **All six martial classes are specced** — sword (`Riposte`/`BlockWeaken`), spear
   (`Push`/`Pin`), axe (`Splitting`/`Rout`), ranged (`Pin`/`Overwatch`),
   throwing (`Drag`/`Softening`). Caster classes keep their own frame: baseline
   `Cast ×1` plus four effects or four shapes, since role decomposition means
