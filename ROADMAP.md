@@ -146,8 +146,11 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive across stacks, not compounding |
 | `Riposte` | +1 counter per turn | 5 | |
-| `Push` / `Drag` | +1 tile displaced | 5 | |
+| `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | |
 | `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
+| `Softening` | +3 of the target's Block stripped for a turn | 15 | Same ceiling, but for everyone |
+| `Guard` | +1 tile of radius over which allies share your Block | 5 | |
+| `Pin` | +1 `Mire` level on the target | 5 | |
 | `Overwatch` | +1 held shot | 5 | |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | §1.6 |
@@ -197,7 +200,7 @@ this rule exists to avoid. As an enchantment it self-limits: each trigger costs
 mana, mana regenerates only from *unspent* movement, so a refund loop starves
 itself. See Phase 3.
 
-## 1.2 The martial variant shape
+## 1.2 The martial classes
 
 Written as stack operations on the base weapon. Every class follows the same
 four rules; only the wildcard differs.
@@ -252,97 +255,117 @@ stays bounded so the d20 keeps mattering, and the investment axis is
 
 So a crit build is not "crit constantly" but **"crit rarely and
 catastrophically"** — and the two dagger specialists split exactly along that
-line, with Assassin's Fang buying frequency and Vorpal Kris buying magnitude.
+line — Assassin's Fang buys frequency, the baseline `CritMultiplier` carries
+magnitude.
 
 Starting at `×1` rather than the prototype's `×4` also leaves the dagger four
 stacks of headroom for uniques and enchantments to work with, instead of one.
 
-> **The five classes below have not had this pass yet.** Their tables still
-> show the older Swift / Greater / Keen / Wildcard frame and need restating as
-> baseline-plus-four-roles. Proposals for each are being worked through; the
-> dagger above is the only settled one.
+### Sword & Shield (max STR/DEX) — baseline `Block ×1`
 
-### Sword & Shield — class modifier `Block` (max STR/DEX)
-
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Sword | 80 | 10 | 50 | `Block ×1` |
-| Swift | Arming Sword | 80 | 10 | 50 | `Block ×1, Light ×1` |
-| Greater | Tower Guard | 80 | 10 | 50 | `Block ×2` |
-| Keen | Estoc | 80 | 10 | 50 | `Block ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Riposte Blade | 80 | 10 | 50 | `Block ×1, Riposte ×1` |
+| Efficiency | Arming Sword | 80 | 10 | 50 | `Light ×1` |
+| Purity | Tower Guard | 80 | 10 | 50 | `Block ×1` → absorbs 6 |
+| Control | Riposte Blade | 80 | 10 | 50 | `Riposte ×1` |
+| Support | Bulwark | 80 | 10 | 50 | `Guard ×1` |
 
-**Riposte**: blocking an attack grants a free counter-swing at the attacker.
-Turns the shield from pure mitigation into a threat.
+- **Riposte** — a successful block grants a free counter-swing at the attacker.
+  Turns the shield from pure mitigation into a threat.
+- **Guard** — allies within `32 × stacks` units benefit from your Block. The
+  line-holder finally holds a line rather than merely surviving one.
 
-### Spear — class modifier `Brace` (STR)
+### Spear (STR) — baseline `Brace ×1`
 
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Spear | 130 | 7 | 40 | `Brace ×1` |
-| Swift | Skirmisher's Pike | 130 | 7 | 40 | `Brace ×1, Light ×1` |
-| Greater | Phalanx Spear | 130 | 7 | 40 | `Brace ×2` |
-| Keen | Impaler | 130 | 7 | 40 | `Brace ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Halberd | 130 | 7 | 40 | `Brace ×1, Push ×1` |
+| Efficiency | Skirmisher's Pike | 130 | 7 | 40 | `Light ×1` |
+| Purity | Phalanx Spear | 130 | 7 | 40 | `Brace ×1` → 2 retaliations |
+| Control | Halberd | 130 | 7 | 40 | `Push ×1` |
+| Support | Pinning Lance | 130 | 7 | 40 | `Pin ×1` |
 
-**Push**: a brace hit shoves the target back out of its own reach. In a game
-where movement is the resource, denying an enemy its approach is the purest
-possible spear ability — and `TryBracesAgainst` already resolves braces
-mid-walk, so the hook exists.
+The spear is the class that decides **where enemies are**, and its two
+non-baseline tools are exact opposites:
 
-### Axe — class modifier `Cleave` (STR)
+- **Push** — a braced hit shoves the target back out of its own reach. Breaks
+  contact. `TryBracesAgainst` already resolves braces mid-walk, so the hook
+  exists.
+- **Pin** — a braced hit applies `Mire`, draining the target's movement budget.
+  Refuses to let contact break. Catching an enemy on the point and leaving it
+  stuck there is what lets the rest of the party disengage and kite, which is
+  why this is the spear's *support* weapon even though it reads as control.
+
+Pin applies the existing `Mire` effect (§1.3) rather than inventing its own, so
+it reuses machinery already being built.
+
+### Axe (STR) — baseline `Cleave ×1`
 
 One swing hits every valid target in range, paying the movement cost once.
 Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Axe | 60 | 18 | 60 | `Cleave ×1` |
-| Swift | Hatchet | 60 | 18 | 60 | `Cleave ×1, Light ×1` |
-| Greater | Great Axe | 60 | 18 | 60 | `Cleave ×2` |
-| Keen | Executioner's Axe | 60 | 18 | 60 | `Cleave ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Reaver | 60 | 14 | 60 | `Cleave ×1, Splitting ×1` |
+| Efficiency | Hatchet | 60 | 18 | 60 | `Light ×1` |
+| Purity | Great Axe | 60 | 18 | 60 | `Cleave ×1` → 2 extra targets |
+| Control | Reaver | 60 | 18 | 60 | `Splitting ×1` |
+| Support | Routing Axe | 60 | 18 | 60 | `Rout ×1` |
 
-**Splitting**: ignores 3 of the target's Block per stack. Axes split shields —
-and at ×5 it ignores 15, exactly the `Block` cap, so the modifier's ceiling is
-set by the thing it counters rather than by an arbitrary number. Gives the axe
-a clean answer to shield-wall enemies without needing one.
+- **Splitting** — ignores 3 of the target's Block per stack. Axes split
+  shields, and at ×5 it ignores 15, exactly the `Block` cap, so its ceiling is
+  set by the thing it counters rather than an arbitrary number. This is the
+  weapon the tutorial dungeon exists to teach you to want (§4.3).
+- **Rout** — everything caught by the cleave is pushed back a tile per stack.
+  One swing that resets a whole crowd's position buys the entire party room.
 
-### Ranged — class modifier `Longshot` (DEX)
+### Ranged (DEX) — baseline `Longshot ×1`
 
 **Longshot**: damage rises with distance to the target — `+1` per tile beyond
 3 tiles, per stack. A bow in the front rank is nearly useless; the same bow
 across a room is devastating. Most on-theme ability in the game, and it makes
 the marching formation a genuine trade-off.
 
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Shortbow | 320 | 5 | 45 | `Longshot ×1` |
-| Swift | Hunting Bow | 320 | 5 | 45 | `Longshot ×1, Light ×1` |
-| Greater | Longbow | 320 | 5 | 45 | `Longshot ×2` |
-| Keen | Recurve | 320 | 5 | 45 | `Longshot ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Crossbow | 320 | 8 | 45 | `Longshot ×1, Overwatch ×1` |
+| Efficiency | Hunting Bow | 320 | 5 | 45 | `Light ×1` |
+| Purity | Longbow | 320 | 5 | 45 | `Longshot ×1` → +2 per tile |
+| Control | Pinning Bow | 320 | 5 | 45 | `Pin ×1` |
+| Support | Crossbow | 320 | 5 | 45 | `Overwatch ×1` |
 
-**Overwatch**: bank the shot instead of firing. If an enemy enters line of
-sight during the enemy turn, it fires for free. A ranged mirror of Brace — and
-it reuses the same threat-zone machinery Phase 0 unified.
+- **Pin** — the same `Mire` application as the spear's, delivered by a hit
+  rather than a brace. A bow that stops an enemy closing is a bow that never
+  has to stop shooting, and it is the other half of the kiting pair.
+- **Overwatch** — bank the shot instead of firing; if an enemy enters line of
+  sight during the enemy turn, it fires for free. A ranged mirror of Brace,
+  reusing the threat-zone machinery Phase 0 unified, and it covers the party's
+  approach rather than your own.
 
-### Throwing — class modifier `Charges` (STR)
+### Throwing (STR) — baseline `Charges ×1`
 
 **Charges**: throws per turn, replenished at turn start, each cheaper than a
 melee swing. Cleave is many targets in one swing; Charges is many swings in one
 turn.
 
-| Variant | Name | Range | Dmg | Cost | Modifiers |
+| Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| base | Javelins | 190 | 9 | 35 | `Charges ×1` |
-| Swift | Darts | 190 | 6 | 35 | `Charges ×1, Light ×1` |
-| Greater | Bandolier | 190 | 9 | 35 | `Charges ×2` |
-| Keen | Balanced Knives | 190 | 9 | 35 | `Charges ×1, CritWindow ×1, OnCrit ×1` |
-| Wildcard | Harpoon | 190 | 9 | 35 | `Charges ×1, Drag ×1` |
+| Efficiency | Darts | 190 | 9 | 35 | `Light ×1` |
+| Purity | Bandolier | 190 | 9 | 35 | `Charges ×1` → 4 throws |
+| Control | Harpoon | 190 | 9 | 35 | `Drag ×1` |
+| Support | Softening Javelins | 190 | 9 | 35 | `Softening ×1` |
 
-**Drag**: a hit pulls the target *toward* the thrower — the exact inverse of
-the halberd's Push, and it sets up your own axe and sword line.
+- **Drag** — a hit pulls the target *toward* the thrower, the exact inverse of
+  the halberd's Push, setting up your own axe and sword line.
+- **Softening** — a hit strips 3 of the target's Block per stack for a turn.
+  Deliberately distinct from the axe's `Splitting`: Splitting lets *your*
+  weapon through, Softening opens the target up for **everyone**. Same
+  ceiling, opposite beneficiary — the Control/Support line exactly.
+
+### Caster classes do not take this frame
+
+Staff and wand both carry baseline `Cast ×1`, but their four weapons differ by
+**effect** and **shape** rather than by role (§1.3, §1.4). Forcing them into
+Efficiency / Purity / Control / Support would be redundant — a debuff staff is
+already control and a buff staff already support, and "more of the signature"
+means nothing when the signature *is* which effect you cast.
 
 ## 1.3 Staff — four effects, half buffs and half debuffs (INT)
 
@@ -359,10 +382,9 @@ differ in what they apply and what it costs in mana.
 Staff of Renewal is today's shipped Staff with its numbers unchanged, so
 parity holds.
 
-Each carries `Cast ×1`, so the stacking model applies here too: a Greater
-staff is `Cast ×2` and applies its effect at double level. **Which** effect a
-staff casts is a field on the weapon, not a modifier — the modifier only says
-how hard it lands.
+Each carries `Cast ×1`, so the stacking model applies here too: `Cast ×2`
+applies the effect at double level. **Which** effect a staff casts is a field
+on the weapon, not a modifier — the modifier only says how hard it lands.
 
 **Mire is the signature debuff** for this game specifically: in a system where
 movement is the only real currency, taxing an enemy's budget is a more
@@ -475,7 +497,7 @@ and a modifier multiset:
 | --- | --- | --- | --- |
 | The Bulwark | Sword | `Block ×4` | Absorbs 12; nothing else |
 | Widowmaker | Dagger | `CritWindow ×3, CritMultiplier ×3, CritSunder ×2` | Crits on 17+, for ×5, sundering deep |
-| Hoplite's Wall | Spear | `Brace ×3, Push ×2` | Three retaliations, each shoving 2 tiles |
+| Hoplite's Wall | Spear | `Brace ×3, Pin ×2` | Three retaliations, each pinning hard |
 | Stormcrow | Ranged | `Longshot ×3, Overwatch ×2` | Two held shots, brutal at full range |
 | Feathered Death | Throwing | `Charges ×3, Light ×2` | Six cheap throws a turn |
 
@@ -486,10 +508,10 @@ balance envelope by construction.
 
 ## 1.6 Crit riders — a crit leaves a mark
 
-A crit today just doubles damage. That makes the Keen variant the weakest of
-the four: Swift saves movement (the actual currency) and Greater doubles the
-class feature, while Keen only makes a number occasionally bigger. Crits should
-*land an effect*, not just spike damage.
+A crit today just doubles damage — a number occasionally getting bigger, with
+nothing left behind. Crits should *land an effect*, which is what lets them
+fill the Control and Support roles (§1.2) rather than being pure damage
+variance.
 
 Two new status effects carry it, both using the existing decaying model —
 level N, ticks down one per turn, removed at zero, so they always self-clear:
@@ -570,7 +592,8 @@ the value **derived**, so the pair becomes:
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
-                    CritWeaken, CritSunder, OnHitPoison, Cast,
+                    Rout, Guard, Pin, Softening, CritWeaken, CritSunder,
+                    OnHitPoison, Cast,
                     Momentum }                             // Momentum: enchantment-only
 
 sealed class ModifierSet                 // ModifierType → stack count
@@ -1429,8 +1452,8 @@ new events on the floor-transit path from Phase 4.
 - Floors persist **within a dungeon visit** and reset on leaving.
 - Crits apply a **class-flavoured rider** on top of the damage spike, both
   ways; casts crit for double effect level.
-- Modifiers are **stacks, not values**. Greater is a second stack of the class
-  modifier; uniques are arbitrary stacks. One mechanism.
+- Modifiers are **stacks, not values**. A Purity weapon is a second stack of
+  the class signature; uniques are arbitrary stacks. One mechanism.
 - **Enchantments are a separate system**, not modifier stacks — own dials
   (lock, trigger cost, condition, potency, tier), potency scaling with INT, and
   max mana as the budget. That is what lets a wizard enchant a dagger into
@@ -1461,6 +1484,13 @@ new events on the floor-transit path from Phase 4.
 - **The dagger's baseline is `CritWindow ×1, CritMultiplier ×1`**, with its
   four weapons adding `Light`, another `CritWindow`, `CritWeaken`, and
   `CritSunder`.
+- **All six martial classes are specced** — sword (`Riposte`/`Guard`), spear
+  (`Push`/`Pin`), axe (`Splitting`/`Rout`), ranged (`Pin`/`Overwatch`),
+  throwing (`Drag`/`Softening`). Caster classes keep their own frame: baseline
+  `Cast ×1` plus four effects or four shapes, since role decomposition means
+  nothing when the signature *is* which effect you cast.
+- **`Pin` appears on both spear and ranged**, delivered by a brace and by a hit
+  respectively — the two halves of a kiting pair.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
   taught by enemy spear dummies instead of a party spear.
