@@ -350,14 +350,53 @@ only in geometry. Shapes are in logic units.
 All shapes stop at walls — `LineOfSight` already does segment-vs-wall tests and
 extends naturally to per-target checks inside a shape.
 
-**Friendly fire is on** (see open questions): a shape hits every actor inside
-it except the caster. That makes the marching line an actual liability and
-gives spacing a cost, which is the right kind of tension for this game — but
-it is the single most reversible decision in Phase 1, so it ships behind a
-constant.
-
 Wands carry `Cast ×1` like staves; the shape is a field, the stack is the
 damage multiplier.
+
+### Friendly fire is on, at half damage, both sides
+
+A shape hits **every actor inside it except the caster** — allies included, on
+either side of the fight. Allies take **half** damage.
+
+Full-strength friendly fire is the sharper mechanic, but it demands a
+placement-scoring AI be *good immediately*, or wand enemies spend the game
+detonating their own side and the fight reads as broken. Half damage makes the
+AI's job forgiving: a mediocre scorer that clips one ally is merely
+inefficient, not suicidal. It buys the right to ship a simple version and
+refine it, instead of needing the finished thing on day one.
+
+Why keep it at all:
+
+- **It prices positioning in movement**, which is the game's actual currency.
+  Spreading to dodge a cone costs movement; regrouping afterwards costs more.
+  That is the central resource doing what it already does everywhere else,
+  not a tax bolted on beside it.
+- **It is most fun when the enemy suffers it** — baiting a wand caster into
+  its own line is a real play. That only reads as skill if avoiding it is the
+  AI's normal behaviour and being baited is the exception, which is exactly
+  what the scorer below provides.
+- **The marching rules already cover the worst case.** A single-file marching
+  line is what a Nova would delete, but marching is revoked the moment a live
+  enemy is sighted, so the formation dissolves on contact. What remains is that
+  a party can still arrive *clustered*, and the opening blast punishes that —
+  a good lesson rather than a cheap shot.
+
+### The placement scorer
+
+Smaller than it sounds, and mostly code the player's targeting needs anyway:
+
+1. Enumerate candidate placements — target points for Blast, directions for
+   Cone and Beam, fixed at self for Nova.
+2. Score each as `enemies hit − (allies hit × ½)`.
+3. Cast only if the best score is positive; otherwise fall back to moving.
+
+Structurally this is `EnemyAi.SelectTarget` one level up: the same
+score-and-pick over a small candidate set, with the shape geometry shared with
+the player's own casting.
+
+**Sequencing.** Wands ship in Phase 1 with the friendly-fire constant **off**.
+It flips on once the scorer exists, alongside the kiting AI that ranged and
+wand enemies need regardless.
 
 ## 1.5 Uniques
 
@@ -542,8 +581,9 @@ enemy nameplates need effect badges, and floating combat text needs a
 `SUNDERED!` / `WEAKENED!` beat distinct from the damage number.
 
 **Enemy AI needs a pass.** `EnemyAi.PlanMove` closes to weapon range. Ranged
-and wand enemies want the opposite — hold distance and kite. That is real work,
-not a parameter, and it is why ranged/wand enemies are an open question below.
+and wand enemies want the opposite — hold distance and kite — and wands
+additionally need the placement scorer from §1.4. That is real work, not a
+parameter, and it is why ranged/wand enemies are an open question below.
 
 ---
 
@@ -1253,14 +1293,15 @@ new events on the floor-transit path from Phase 4.
 
 # Open questions
 
-- **Wand friendly fire.** Specced as on — a shape hits every actor inside it
-  except the caster. It makes spacing cost movement, which is the right
-  tension, but it may be miserable with the marching formation as it stands.
-  Ships behind a constant so it can be flipped after play.
 - **Ranged and wand enemies.** `EnemyAi.PlanMove` only knows how to close.
-  Enemies with those classes need kiting behaviour — hold range, back off when
-  approached — which is genuine AI work. Until it exists, `EnemyPlacer` should
-  roll only the six martial-and-melee classes.
+  Those classes need kiting — hold range, back off when approached — plus the
+  placement scorer for wands (§1.4). Until both exist, `EnemyPlacer` should
+  roll only the six close-range classes, and the friendly-fire constant stays
+  off. Half-damage friendly fire is what lets the first version of that scorer
+  be merely adequate rather than finished.
+- **Is half the right fraction?** Half damage is the forgiveness knob that
+  makes a simple scorer shippable; once the scorer is good, full friendly fire
+  may be the better game. Worth revisiting rather than treating as final.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
@@ -1372,6 +1413,10 @@ new events on the floor-transit path from Phase 4.
   shared budget across a weapon. The cap is on the stack count, not the
   resolved value, so per-stack value is the only dial.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
+- **Wand friendly fire is on, at half damage, on both sides.** Half is what
+  makes a simple placement scorer shippable — a mediocre wand enemy is
+  inefficient rather than suicidal. Ships behind a constant, flipped on when
+  the scorer lands.
 - **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
   at ×5 by construction; anything needing a bespoke ceiling goes to the
   enchantment layer, where the mana lock and trigger cost bound it organically.
