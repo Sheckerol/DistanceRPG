@@ -499,7 +499,7 @@ number.
 `CombatRulesTests.cs:28`. The sword blocks 3, the spear braces once.
 
 One parity break is deliberate: `CharStartingWeaponIdx` is `{0,1,2,2}` and
-becomes dagger/sword/axe/spear (§2.1), so
+becomes dagger/sword/axe/staff (§2.1), so
 `CombatRulesTests.StartingWeapons_MatchPrototype` needs its second assertion
 updated. The first — Dagger, Sword, Spear at indices 0–2 — still holds, since
 new classes append after them.
@@ -559,18 +559,28 @@ staff.
 
 Starting spreads (20 points each, tuning targets):
 
-| Member | STR | DEX | CON | INT | Starts with | Leans |
+| Member | STR | DEX | CON | INT | Starts with | Teaches |
 | --- | --- | --- | --- | --- | --- | --- |
-| A | 4 | 8 | 4 | 4 | Dagger | Dagger / bow |
-| B | 7 | 5 | 5 | 3 | Sword & shield | Line-holder |
-| C | 7 | 4 | 6 | 3 | **Axe** | Axe / spear / throwing bruiser |
-| D | 3 | 4 | 5 | 8 | Spear | Staff / wand caster |
+| A | 4 | 8 | 4 | 4 | Dagger | Crit windows |
+| B | 7 | 5 | 5 | 3 | Sword & shield | Block |
+| C | 7 | 4 | 6 | 3 | **Axe** | Cleave, and beating armour |
+| D | 3 | 4 | 5 | 8 | **Staff of Renewal** | Buffs, mana |
 
-The axe goes to C, the only member whose STR 7 suits it. D keeps the spear
-rather than the second axe: at STR 3 they will never level a martial weapon
-well, so what they want is the spear's 130 reach and 40 cost to hold the back
-line and brace — until staves and wands arrive and they stop swinging
-altogether.
+The axe goes to C, the only member whose STR 7 suits it. D gives up the second
+spear for a staff — at STR 3 they would never level a martial weapon well
+anyway, and a party with no caster never discovers half the game.
+
+**D carries a debuff staff in the bag.** Renewal equipped, Blight or Mire in an
+inventory slot, so the player meets both halves of casting and learns the swap
+mechanic getting to the second one.
+
+### Brace is taught from the receiving end
+
+Dropping the spear costs the party its `Brace` demonstration — but spear dummies
+already brace against the party (`TurnSystem.NotifyCharacterMoved`), so walking
+into one's reach still costs a free poke. Learning a threat zone by being
+punished by it, then finding a spear and turning it around, is a better first
+lesson than owning one from the start. Spears remain an early, common drop.
 
 Rate curve, applied to every XP gain below:
 
@@ -883,15 +893,36 @@ The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its
 boss is a stone golem: innate Block whatever it happens to be holding, and
 every weapon it drops comes away with Block on it.
 
+### The tutorial is consumed by beating it
+
+Unlike every other dungeon, the tutorial is **available exactly once**. Kill
+the golem and it is gone from the hub for good; fail, and it is still there.
+Every other dungeon is picked from the hub and can be run indefinitely.
+
+That makes it the one place where **rushing the boss permanently costs you
+something**. Farm the tutorial and you leave with Block-themed weapons no other
+run in the game will hand you cheaply; dive straight to the golem and that
+opportunity closes behind you.
+
+Which is exactly the decision the whole game is built on (§4.4), delivered once
+in miniature where it is cheap to learn. The tutorial should **say so plainly**
+— this is the one dungeon the game is allowed to warn you about, and a
+first-time player who loses the theme without knowing the rule has been cheated
+rather than taught.
+
+Block must therefore remain obtainable elsewhere. A rushed tutorial should cost
+a good head start, never a permanently closed build.
+
 The golem is a good first boss because it teaches the one thing flat Block
 makes true. Block absorbs a *flat* amount and never reduces a hit below 1
 (§1.1, a deliberate exception to the proportional rule), so many small hits are
 terrible against it and few large ones are fine.
 
-The starting party spans that range deliberately — **dagger 15, sword 10, axe
-18, spear 7**. Against a heavy blocker the axe is the answer and the spear is
-nearly useless, and the player discovers that by swinging rather than by
-reading a tooltip.
+The starting party spans that range deliberately — **axe 18, dagger 15, sword
+10**, plus a healer. Give the golem `Block ×3` innately and the maths does the
+teaching by itself: the sword's 10 lands for 1, the axe's 18 for 9, and a
+dagger crit for 21. The player discovers that by swinging, not by reading a
+tooltip.
 
 That is the lesson the tutorial should land: **damage per swing beats swings
 per turn against armour**, and picking the right party member for the target is
@@ -1204,10 +1235,6 @@ new events on the floor-transit path from Phase 4.
   Enemies with those classes need kiting behaviour — hold range, back off when
   approached — which is genuine AI work. Until it exists, `EnemyPlacer` should
   roll only the six martial-and-melee classes.
-- **Does D eventually start with a staff?** The loadout is now dagger, sword,
-  axe, spear (§2.1), but D is built as a caster and only carries the spear
-  because staves are a swap away in inventory slot 1. Whether they should start
-  *equipped* with one depends on how early the tutorial wants to teach casting.
 - **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
   phase, as braces already do. Whether a character can hold *both* an overwatch
   shot and a brace in the same turn needs a ruling before Phase 1 codes it.
@@ -1230,11 +1257,15 @@ new events on the floor-transit path from Phase 4.
   construct is the obvious shape, but slow enemies are trivially kited once
   ranged weapons exist (§1.2) — worth checking the tutorial boss does not
   become a joke in Phase 1.
-- **Should the tutorial be 5–10 floors like everything else?** That is a long
-  first dungeon. A fixed, shorter tutorial depth may serve better than the
-  general roll, at the cost of a special case.
-- **How is a dungeon chosen?** Themed dungeons imply several entrances and a
-  reason to pick one, which is hub scope (Phase 6) that does not exist yet.
+- **Should the tutorial be 5–10 floors like everything else?** Now that it is
+  one-time, the case for a fixed shorter depth is stronger — 5–10 floors is a
+  long first experience, and a player only gets the one. Worth a special case.
+- **What does the hub look like?** Dungeon selection now definitely exists
+  (§4.3): a list of themed dungeons, the tutorial present until beaten. Nothing
+  else about the hub is specified — how dungeons are discovered, whether the
+  list grows, whether themes repeat. Phase 6 scope.
+- **Which debuff staff does D carry?** Blight (Poison) is the more legible
+  demonstration; Mire (movement tax) is the more on-theme one for this game.
 - **Can you re-enter after killing the boss?** Leaving resets the dungeon
   (§4.1), which re-rolls the boss floor and revives everything. So a cleared
   dungeon cannot be returned to — clearing it is worth doing only for what you
@@ -1286,9 +1317,12 @@ new events on the floor-transit path from Phase 4.
   over another.
 - **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
   for a boss.
-- **The starting party is dagger, sword, axe, spear** — one of the two spears
-  becomes an axe, on C. The 7-to-18 damage spread across the party is what
-  teaches the golem's lesson.
+- **The starting party is dagger, sword, axe, staff** — both spears go, one to
+  an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
+  taught by enemy spear dummies instead of a party spear.
+- **The tutorial is consumed by beating it**; every other dungeon is picked
+  from the hub and repeatable. Rushing its boss permanently forfeits its themed
+  drops, which is the game's central decision delivered once in miniature.
 - **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
   its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
