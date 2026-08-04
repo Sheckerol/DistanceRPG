@@ -99,8 +99,9 @@ CON governs no weapon — it is the health stat alone.
 plus a **multiset of modifiers**. There is no `Brace 3` — there is `Brace ×3`,
 the same modifier applied three times. Stack count is the only dial.
 
-That makes every variant, every unique, and every enchantment the same
-operation — *add stacks* — so nothing below needs a bespoke mechanism:
+That makes every variant, every unique, every dungeon theme, every farmed tier
+and every service result the same operation — *add stacks* — so nothing below
+needs a bespoke mechanism:
 
 | Concept | Expressed as |
 | --- | --- |
@@ -110,30 +111,99 @@ operation — *add stacks* — so nothing below needs a bespoke mechanism:
 | Control weapon | `+` one stack of something that degrades the enemy |
 | Support weapon | `+` one stack of something that helps the party |
 | **Unique** | Arbitrary stacks — signature ×3, or two modifiers at ×2 |
+| Dungeon theme (Phase 4) | `+` one stack of the boss's modifier, on everything it drops — §4.3 |
+| Repeat-kill depth (Phase 3) | `+1` or `+2` stacks of the class signature — §3.2 |
+| Enchanter service (Phase 6) | `+1` stack, deepening or grafting — §6.4 |
 | Enchantment (Phase 3) | Its own system entirely — §3.3 |
 
 A unique is therefore *not a new kind of thing*. "A halberd that braces three
 times" is `Brace ×3, Push ×1` and needs no code beyond what the base system
 already does.
 
-### Stacking rules live in one table
+### Forged and acquired: where a modifier caps
 
 Each modifier declares what one stack is worth and where it caps. This is the
-only place a modifier's maths exists:
+only place a modifier's maths exists.
 
-**Each modifier is hard-capped at 5 stacks of itself.** The cap is per
-*modifier type* and the types are independent — there is no shared budget
-across a weapon. `CritWindow ×5, CritMultiplier ×5` is legal; `CritWindow ×6`
-is not.
+A weapon's stacks come from two places, and the split is what sets its ceiling:
 
-The cap is on the *stack count*, not the resolved value, and it is a single
-constant enforced in one place — `ModifierSet.With` clamps per type. No
-combination of variant, unique and enchantment can push one modifier past its
-fifth stack, every stack you can hold does something, and the ceiling is
-uniform across modifiers.
+| | Means | Sources |
+| --- | --- | --- |
+| **Forged** | What the weapon's identity entitles it to | Class baseline, variant role, unique spread, and the theme of the dungeon it dropped in (§4.3) |
+| **Acquired** | Everything piled on afterwards | Repeat-kill depth (§3.2), enchanter grafts and improvements (§6.4) |
 
-Because the cap is uniform, **per-stack value is the only balance dial** — it
-has to be chosen as `intended ceiling ÷ 5`.
+**A modifier caps at its forged stacks plus five.**
+
+```
+cap(t) = forged(t) + 5
+```
+
+The five is **one shared budget per modifier type**, and every acquired source
+draws on it. Farming spends it up front; the enchanter spends it slowly across
+many runs. Every ceiling in the game falls out of that one line.
+
+Forged is *not* "what the weapon dropped with." A repeat-killed dummy hands you
+a weapon already carrying acquired stacks, and those count against the budget
+exactly as an enchanter's would. The line is **chosen identity versus
+accumulation**: the dungeon you chose to run and the weapon you chose to keep
+decide how deep it can ever go — grinding and servicing decide how much of that
+depth you have actually filled.
+
+### Why the cap is not a flat five
+
+A flat cap erases the **Purity** role. Its entire distinguishing feature is a
+second stack of the class signature, which is the first thing a shared ceiling
+absorbs. At `×5` an Assassin's Fang is `CritWindow ×5, CritMultiplier ×5` and a
+Flensing Knife is that *plus* `Light ×5` — the purity weapon ends up strictly
+worse than every sibling, because its variant stack was the only one that never
+bought it a new modifier type.
+
+The other roles survive a flat cap, because §6.4 deepens modifiers a weapon
+already carries: a Kris grows `CritWeaken`, a Hatchet grows `Light`, and they
+stay distinct by *which* modifiers rather than by how many. Purity is the one
+role with nothing of its own to grow into.
+
+`forged + 5` fixes that at the root, and pays out twice more:
+
+- **Uniques and boss drops become better projects, not merely better starts.**
+  Widowmaker's `CritWindow ×3` is a ceiling of 8 with five stacks of headroom
+  above it — the deepest spread in the game *and* the most room left in it.
+- **It makes grafting safe.** A modifier the weapon was never forged with has
+  `forged = 0` and so caps at 5, which means a grafted `Block` on a dagger is
+  always shallower than that dagger's own crit line. Breadth can be handed out
+  freely (§6.4) without any weapon losing its shape.
+
+The cap is on the *stack count*, not the resolved value, and it is enforced in
+one place — `ModifierSet.With` clamps per type against the weapon's forged set.
+
+**Per-stack value is still the only balance dial**, but it is now chosen as
+`intended ceiling ÷ deepest reachable stack count` rather than `÷ 5`. The
+deepest forged spread in the game is a unique's `×3`, so for most modifiers the
+number to divide by is 8.
+
+### Three modifiers hold at a flat five
+
+Most modifiers are bounded only by their own count — more `Brace` is simply
+more retaliations, and the eighth is no stranger than the third. Three are
+bounded by something *outside* themselves, and lifting their ceiling either
+breaks a band the design fixes deliberately or does nothing at all:
+
+| Modifier | Bounded by | At ×6 and beyond |
+| --- | --- | --- |
+| `CritWindow` | The d20 — it resolves to a **probability** | 35% and climbing, past the 10–30% band §1.2 sets on purpose |
+| `Light` | The weapon's own cost | −60% and heading toward free attacks |
+| `Charges` | The 160 movement budget | `×5` is already 10 throws × 15 = 150; a sixth stack is dead |
+
+Those three keep the flat cap. `Charges` landing exactly on its crossover is a
+coincidence of the current numbers rather than a designed one — if the budget
+or the throw cost moves, that cap has to move with it.
+
+This is the same shape as `Block`'s existing exemption from the proportional
+rule below: a named exception with a stated reason, not a general escape hatch.
+Anything else that wants one belongs in the enchantment layer instead.
+
+Values below are shown at `×5`, which is the reference point rather than the
+ceiling — a forged spread reaches further.
 
 | Modifier | Per stack | At ×5 | Notes |
 | --- | --- | --- | --- |
@@ -147,8 +217,8 @@ has to be chosen as `intended ceiling ÷ 5`.
 | `Light` | **−10% of the weapon's cost** | −50% | Additive across stacks, not compounding |
 | `Riposte` | +1 counter per turn | 5 | |
 | `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | |
-| `Splitting` | +3 of the target's Block ignored | 15 | Exactly the `Block` ceiling |
-| `Softening` | +3 of the target's Block stripped for a turn | 15 | Same ceiling, but for everyone |
+| `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
+| `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |
 | `Overwatch` | +1 held shot | 5 | |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | §1.6 |
@@ -183,15 +253,19 @@ The per-stack numbers above are first-pass targets, not tuned values.
 
 ### If it needs a cap, it is an enchantment
 
-**A weapon modifier must be safe at ×5 by construction.** Anything that would
-need a bespoke ceiling to stay sane does not belong in this table at all — it
-belongs in the enchantment system (§3.3), which is a separate mechanism with
-its own dials, bounded by a mana budget rather than by stack counts.
+**A weapon modifier must be safe at its cap by construction** — and since the
+cap is now `forged + 5`, that means safe at `×8`, the deepest a unique reaches.
+Anything that would need a bespoke ceiling to stay sane does not belong in this
+table at all; it belongs in the enchantment system (§3.3), which is a separate
+mechanism with its own dials, bounded by a mana budget rather than by stack
+counts.
 
 That is a real dividing line, not a style preference. Every modifier above is
 bounded by *something structural*: a per-turn count, a triggering condition, or
-a ceiling that another modifier already imposes (`Splitting` tops out exactly
-where `Block` does). None of them feed their own resource back into themselves.
+another modifier it is measured against (`Splitting` against `Block`). None of
+them feed their own resource back into themselves. The three flat-capped
+modifiers are the near-miss cases — bounded, but by a quantity that runs out
+before the eighth stack does, so they stop at five rather than moving out.
 
 A refund does. `Momentum` — movement returned per enemy killed — pays back into
 the budget that bought the swing, so more kills buy more swings. No per-stack
@@ -277,7 +351,15 @@ the prototype's 16+ (`CombatRulesTests.cs:28`).
 With `CritWindow` at +1 per stack and a 5-stack cap, the entire crit-rate range
 in the game is 19–20 to 15–20 — **10% to 30%**. That is intentional. Frequency
 stays bounded so the d20 keeps mattering, and the investment axis is
-`CritMultiplier` instead, which runs ×2 up to ×7.
+`CritMultiplier` instead, which runs ×2 upward.
+
+This band is the reason `CritWindow` is one of the three modifiers held at a
+flat 5 rather than scaling to `forged + 5` (§1.1). It resolves to a
+*probability*, and a probability is the one quantity in the game where more is
+not simply stronger — a Widowmaker at `CritWindow ×8` would crit on 45% of
+swings, which is a different game rather than a better weapon. `CritMultiplier`
+carries no such problem, so it scales normally: a dagger's forged `×1` ceilings
+at ×8 damage, and Widowmaker's forged `×3` at ×10.
 
 So a crit build is not "crit constantly" but **"crit rarely and
 catastrophically"** — and the two dagger specialists split exactly along that
@@ -350,9 +432,10 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 | Support | Routing Axe | 60 | 18 | 60 | `Rout ×1` |
 
 - **Splitting** — ignores 3 of the target's Block per stack. Axes split
-  shields, and at ×5 it ignores 15, exactly the `Block` cap, so its ceiling is
-  set by the thing it counters rather than an arbitrary number. This is the
-  weapon the tutorial dungeon exists to teach you to want (§4.3).
+  shields, and it is measured stack for stack against the thing it counters
+  rather than against an arbitrary number — though the two no longer share a
+  ceiling now that caps scale with the forged spread (see open questions). This
+  is the weapon the tutorial dungeon exists to teach you to want (§4.3).
 - **Rout** — everything caught by the cleave is pushed back a tile per stack.
   One swing that resets a whole crowd's position buys the entire party room.
 
@@ -620,10 +703,18 @@ and a modifier multiset:
 | Stormcrow | Ranged | `Longshot ×3, Overwatch ×2` | Two held shots, brutal at full range |
 | Feathered Death | Throwing | `Charges ×3, Light ×2` | Six cheap throws a turn |
 
-Uniques drop from the deepest repeat-kill tiers (Phase 3). Because they are
-just stacks, a unique that turns out overtuned is a data edit, not a code
-change — and the per-modifier caps in §1.1 mean no unique can escape the
-balance envelope by construction.
+A unique's whole spread is **forged** (§1.1), which makes uniques the deepest
+ceilings in the game: Widowmaker's `CritWindow ×3` caps at 8, with a full
+five-stack acquired budget still unspent above it. A unique is therefore not
+just the best weapon you can find — it is the best weapon you can *keep
+building*, which is what earns it the deep end of the repeat-kill ladder
+(§3.2).
+
+Because they are just stacks, a unique that turns out overtuned is a data edit,
+not a code change. And since ceilings now scale with the forged spread rather
+than sitting at a flat 5, the balance envelope is enforced by the unique tables
+being **hand-authored** — no roll, graft or service can reach a spread nobody
+wrote down.
 
 ## 1.6 Crit riders — a crit leaves a mark
 
@@ -722,24 +813,38 @@ sealed class ModifierSet                 // ModifierType → stack count
 {
     int Stacks(ModifierType t);          // 0 when absent
     int Value(ModifierType t);           // ModifierRules.Resolve(t, Stacks(t))
-    ModifierSet With(ModifierType t, int n = 1);   // additive merge
+    ModifierSet With(ModifierType t, int n, ModifierSet forged);   // clamped merge
 }
 
 static class ModifierRules               // the §1.1 table, one place only
 {
-    const int MaxStacks = 5;             // per modifier type, independently
+    const int AcquiredHeadroom = 5;      // per modifier type, independently
     static int PerStack(ModifierType t);
-    static int Resolve(ModifierType t, int stacks)
-        => PerStack(t) * Math.Min(MaxStacks, stacks);
+    static bool FlatCapped(ModifierType t);      // CritWindow, Light, Charges
+    static int Cap(ModifierType t, int forgedStacks)
+        => FlatCapped(t) ? AcquiredHeadroom
+                         : forgedStacks + AcquiredHeadroom;
+    static int Resolve(ModifierType t, int stacks) => PerStack(t) * stacks;
 }
 ```
 
+**A weapon carries two sets, not one.** `Weapon.Forged` is the identity spread —
+class baseline, variant role, unique spread, dungeon theme — fixed at drop and
+never written again. `Weapon.Modifiers` is the live total, forged plus acquired,
+and is what every resolution site reads. `Forged` exists purely to compute the
+ceiling, so it must be immutable and must travel with the weapon through drops,
+saves (§5.1) and enchanter services alike.
+
+`Resolve` no longer clamps: clamping moves to `With`, which is the only path by
+which a stack is ever added, so a set cannot be constructed out of bounds in the
+first place. That keeps the invariant at the door rather than at every read.
+
 Every call site that reads `GetAbility(x)?.Value ?? 0` becomes
-`weapon.Modifiers.Value(x)` — the 5-stack cap and per-stack maths never leak
-out of `ModifierRules`. `With` being additive *and clamping* is what makes
-variants and uniques the same operation: a stack landing on an already-maxed
-modifier is a no-op rather than a special case. (Enchantments are a separate
-system with their own dials — §3.3.)
+`weapon.Modifiers.Value(x)` — the cap and the per-stack maths never leak out of
+`ModifierRules`. `With` being additive *and clamping* is what makes variants,
+uniques, farm depth and grafts the same operation: a stack landing on an
+already-capped modifier is a no-op rather than a special case. (Enchantments
+are a separate system with their own dials — §3.3.)
 
 `Resolve` returns a raw number; whether that number is *absolute or
 proportional* is the modifier's own business. `Light` resolves to a percentage
@@ -772,8 +877,8 @@ four stacks of headroom instead of one.
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
 `Weakened`.
 
-`Weapon` gains `WeaponClass` (the eight above), `AreaShape?`, and
-`StatusEffectType? CastEffect` — which effect a staff or wand applies is a
+`Weapon` gains `WeaponClass` (the eight above), `Forged` (§1.1), `AreaShape?`,
+and `StatusEffectType? CastEffect` — which effect a staff or wand applies is a
 *field*, not a modifier; the modifier only says how hard it lands. Phase 3's
 drop tables key off `WeaponClass`.
 
@@ -781,6 +886,13 @@ drop tables key off `WeaponClass`.
 every resolution site reads weapon **plus** innate rather than weapon alone.
 Doing this in Phase 1 rather than retrofitting it in Phase 4 is much cheaper —
 the same call sites are already being rewritten for stacking.
+
+**`Innate` and `Forged` are different things and must not be conflated.**
+`ActorState.Innate` belongs to the *actor* — the golem's Block whatever it is
+holding — and is added at resolution time. `Weapon.Forged` belongs to the
+*weapon* and exists only to compute that weapon's ceiling. An actor's innate
+modifiers never raise any weapon's cap; a boss's theme only does so on the
+weapons it **drops**, because those drop forged with it (§4.3).
 
 `CombatRules.RollAttack` hardcodes `weapon.Damage * 2` on a crit
 (`CombatRules.cs:39`) — that becomes `Damage * (2 + Modifiers.Value(CritMultiplier))`,
@@ -916,12 +1028,11 @@ seeded stream (`EnemyPlacer.cs:49`); the drop reads that class back. Placement
 rolls over the eight **classes**, with the variant rolled at drop time on the
 loot stream.
 
-## 3.2 Repeat kills add enchantments
+## 3.2 Repeat kills deepen the drop
 
 Dummies resurrect after 10 turns (`GameConstants.DummyResurrectTurns`) and
 already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
-defeat of the same dummy drops a **deeper weapon** — more modifier stacks, and
-past a threshold a unique.
+defeat of the same dummy deepens the weapon it is carrying.
 
 Repeat kills do **not** drop enchantments. Enchantments are applied at the
 enchanter between runs (Phase 6), not found in the dungeon — they are the
@@ -929,15 +1040,60 @@ chosen half of itemisation, and finding them at random is what would make them
 feel farmed rather than built.
 
 This makes the resurrection timer a deliberate farming rhythm rather than
-flavour — camp a dummy to deepen its drops, at the cost of the turns you spend
+flavour — camp a dummy to deepen its drop, at the cost of the turns you spend
 waiting.
 
 **Nothing is handed over at the time.** `DefeatCount` is the quality of the
 drop that dummy is *carrying*; you collect it only by killing it permanently on
 the way out, after the boss has stopped resurrection (§4.4).
 
-**Uniques sit at the deep end.** Past a threshold (5 defeats, tuning target)
-the roll can return a unique of that class (§1.5) instead of a variant.
+### The ladder is short and it has a top
+
+| `DefeatCount` | The drop becomes |
+| --- | --- |
+| 0 | The class variant, rolled |
+| 1–2 | Variant `+1` acquired stack on the class signature |
+| 3–4 | Variant `+2` |
+| **5** | A roll on that class's **unique** table (§1.5) |
+| 6+ | Nothing further |
+
+Tuning targets, but the *shape* is the decision, and three things fix it.
+
+**Depth, not breadth.** The stacks land on the class signature, never on a
+modifier the weapon has no claim to. Breadth is the enchanter's product (§6.4);
+if farming produced it too, the two ladders would collapse back into one. Kept
+apart, each gives you something the other cannot: **farming buys depth in what
+the weapon already is, the enchanter buys breadth and the slow climb.**
+
+Because the stacks land on the signature, they inherit the *forged* ceiling —
+6 or 7 rather than the bare 5 an off-class graft would hit (§1.1).
+
+**Farming spends the weapon's future.** Those stacks are **acquired**, so they
+come out of the same five-stack budget the enchanter would otherwise fill. A
+`DefeatCount 3` dagger arrives at `CritWindow` forged 1 + acquired 2, ceiling 6,
+with three of its five acquired slots already gone. Farming a weapon deep
+partly consumes its long-term potential — which is the cost the repeat-kill
+ladder was otherwise missing, since turns are the cheapest thing a patient
+player has.
+
+**It stops at five, and stopping is the point.** §4.3 rests on "deciding when
+you have farmed enough is the run's real decision, and it is entirely the
+player's to make" — and that is only a decision if farming demonstrably stops
+paying. Unbounded, even on a diminishing curve, it becomes a grind-tolerance
+test instead. A visible top also has to fit on a nameplate, which §4.5 requires:
+`3/5` reads at a glance, an asymptote does not.
+
+### Hitting five inverts the ladder
+
+Tiers 1–4 trade future depth for power now. Tier 5 does the opposite: a unique's
+spread is **forged**, so you land on a deeper base *with the acquired budget
+untouched* — Widowmaker at `CritWindow ×3`, ceiling 8, five stacks still to
+spend.
+
+So pushing to five is not more of the same, it is the thing that resets the
+ladder in your favour, and the last two cycles are where the farm stops being
+incremental. A max-farmed dummy hands you the best **project** in the game
+rather than the most finished weapon.
 
 So the dungeon supplies **bodies** and the enchanter supplies **souls**. Depth
 buys you a better weapon to invest in; runs survived buy you the investment
@@ -1144,24 +1300,44 @@ Each dungeon is themed, its boss embodies that theme, and the theme is
 **one guaranteed modifier**:
 
 - The boss carries that modifier **innately**, regardless of what it wields.
-- **Every weapon it drops carries it too**, on top of whatever the weapon's own
-  class modifier is.
+- **Every weapon it drops is forged with it**, on top of whatever the weapon's
+  own class modifier is.
 
-That makes boss drops structurally unlike anything else in the game. A spear
-dropped by a Block-themed boss is `Brace ×n, Block ×n` — an off-class hybrid
-you cannot roll, cannot farm, and cannot craft. Ordinary drops respect the
-class convention (§1.2); boss drops are the one thing that breaks it.
+**This needs no mechanism of its own.** Grafting an off-class modifier onto a
+weapon is exactly what the enchanter does (§6.4); the boss simply *guarantees
+which one you get*. Same operation, different source — and the theme is not a
+special case so much as the one place in the game where a graft is chosen
+rather than rolled.
 
-It also settles boss drops versus repeat-kill uniques — they are different
-axes, and both should exist:
+The ceiling rule (§1.1) then does the rest for free, because the boss's graft
+arrives **forged** and the enchanter's arrives acquired:
+
+| Source | The off-class modifier | Ceiling |
+| --- | --- | --- |
+| Boss drop — chosen, guaranteed, on everything it drops | Forged | 6 |
+| Enchanter graft — rolled, rare, one weapon at a time | Acquired | 5 |
+
+So a golem-dropped spear is `Brace ×1, Block ×1` and can be worked up to
+`Block ×6`; a spear that happens to roll Block in service tops out at `×5`. The
+themed drop is strictly the better article, and nothing had to be special-cased
+to make it so.
+
+That is also the honest version of what dungeon selection is *for*. The point
+was never that off-class modifiers are unobtainable elsewhere — it is that the
+boss is the only way to get the one you **chose**, at full depth, on everything
+it drops. Choice and depth, not scarcity.
+
+It settles boss drops versus repeat-kill uniques too. They are different axes,
+and all three should exist:
 
 | Source | Gives you |
 | --- | --- |
-| Repeat-kill depth (§3.2) | Extreme stacks of the weapon's **own** class modifier |
-| Boss drop | A guaranteed **off-class** modifier from the dungeon's theme |
+| Repeat-kill depth (§3.2) | Depth in the weapon's **own** class signature, spent out of its acquired budget |
+| Boss drop | A **chosen** off-class modifier, forged, so it runs a stack deeper |
+| Enchanter graft (§6.4) | An off-class modifier you did not pick, shallow by construction |
 
-And it gives dungeon selection a point. You run the Block dungeon because you
-want Block on something that has no business having it.
+You run the Block dungeon because you want Block on something that has no
+business having it, and you want it deep enough to matter.
 
 ### The tutorial dungeon: the stone golem
 
@@ -1242,6 +1418,12 @@ armour, monster traits, and any future innate would work, on either side of the
 fight. `CombatRules.ResolveAttack` currently reads Block off the defender's
 weapon alone (`CombatRules.cs:55`); it needs the defender's actor too, which
 Phase 1 already changes the signature for (Sundered/Weakened).
+
+**Innate is not forged.** The golem's own `Block ×3` lives on the actor and is
+added at resolution time; it raises no weapon's ceiling, including the golem's
+own. What the theme forges into the weapons it **drops** is a separate
+application of the same modifier, and only that one counts toward those weapons'
+caps (§1.1). Two ideas, two fields, deliberately different words.
 
 ## 4.4 Fighting your way out
 
@@ -1351,7 +1533,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (with enchantments), active status effects |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments and wear), active status effects |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -1491,16 +1673,40 @@ An heirloom that has been through twenty services can genuinely out-roll a
 fresh drop, which is the payoff for loyalty and the answer to the upgrade
 treadmill — your investment is not stranded when a better base drops.
 
+### Two outcomes: deepen, or graft
+
+| Outcome | What happens | Weighting |
+| --- | --- | --- |
+| **Deepen** | `+1` stack on a modifier the weapon already carries | Common, biased toward the class signature |
+| **Graft** | `+1` stack of a modifier it has never carried | Rare |
+
+Grafting is the surprise in an itemisation system that is otherwise entirely
+determined — drops are class-locked and variant-rolled, enchantments are
+chosen, boss themes are announced. A Disarming Kris that comes back from service
+carrying `Block` is a story, and it is the only place the game tells you one you
+did not ask for.
+
+**Identity survives by ceiling, not by restriction.** The obvious guard would be
+to forbid grafts outright — a spear should not sprout `Charges` — but §1.1
+already handles it more gracefully. A grafted modifier has `forged = 0` and so
+caps at 5, while everything the weapon was forged with caps at 6 to 8. The graft
+is always the shallowest thing on the weapon, permanently. So a spear *can*
+sprout `Charges`, and it will never be a throwing weapon.
+
 Rules that keep it coherent:
 
 - **The chance scales with wear brought in.** The weapon you actually fought
   with improves; the one you carried does not. Same principle as everywhere
   else in the game.
-- **It adds a stack to a modifier the weapon already carries**, biased toward
-  the class modifier. A spear gets more spear-like; it does not sprout
-  `Charges`. Weapon identity survives.
-- **The §1.1 caps still bind.** A maxed modifier cannot be improved, and if
-  every modifier is at ×5 the roll simply does not happen.
+- **The §1.1 caps still bind.** A modifier at its ceiling cannot be deepened,
+  and a weapon with every modifier capped rolls nothing at all.
+- **It competes with farming.** Deepening spends the same acquired budget
+  repeat-kills spend (§3.2), so a heavily farmed weapon has less room left to
+  work with. The forge and the farm are alternatives, not a stack: buy the
+  depth now, or climb to it over twenty runs.
+- **A finished weapon is not inert.** Even with its signature capped, a weapon
+  can still gain *breadth* through grafts at 5 apiece — which is what keeps a
+  max-farmed drop worth depositing at all.
 
 ## 6.5 Transferring an enchantment
 
@@ -1584,6 +1790,32 @@ new events on the floor-transit path from Phase 4.
   eventually has enough for any enchantment forever and wear stops being a
   gate. A ceiling — or wear being fully consumed per attachment — needs
   deciding.
+- **`Splitting` no longer tops out exactly where `Block` does.** That coupling
+  was one of the neater things in §1.1 — the axe's anti-armour modifier ceilinged
+  by the armour it counters — and `forged + 5` breaks it: a Tower Guard reaches
+  `Block ×7` (21 absorbed) and a Reaver only `Splitting ×6` (18 ignored), so the
+  axe can no longer fully split the best shield. Either `Splitting` gets a
+  per-stack bump to +4, or the coupling is restated as "stack for stack, not
+  ceiling for ceiling" and the shield is allowed to win at the extreme. The
+  second is probably right — a maxed shield *should* beat a maxed axe by a
+  little — but it wants saying rather than happening by accident.
+- **How rare is a graft, and can a weapon collect them without limit?** §6.4
+  makes grafts safe in *depth* (capped at 5) but says nothing about *breadth*.
+  A weapon serviced twenty times could plausibly end up carrying eight modifiers
+  at ×5, which is not overpowered but is unreadable, and it would blur classes
+  by accumulation rather than by depth. A cap on distinct modifier types per
+  weapon — or simply a low enough graft rate — needs deciding before Phase 6
+  codes it.
+- **`CritMultiplier` at ×10 wants a look.** It scales with the forged spread, so
+  Widowmaker's `×3` ceilings at a ×10 multiplier — 150 from a 15-damage dagger,
+  on 30% of swings, roughly five swings a turn. That is a deliberately
+  rare-and-catastrophic build reaching its end state, and it sits behind a
+  hand-authored unique plus many services, but it is the single biggest number
+  the cap change creates and it has never been played.
+- **Is `Charges` flat-capped or just coincidentally capped?** It holds at 5
+  because 10 throws × 15 lands on 150 against a 160 budget. That crossover is a
+  property of the current numbers, not a design decision, so if either number
+  moves the cap has to be recomputed rather than left at 5.
 - **Two enchanter slots, or a strict last-in-only queue?** Phase 6 specs the
   two-newest rule as the legible middle ground, but a hard slot count is
   simpler and a pure last-in rule is harsher.
@@ -1619,9 +1851,10 @@ new events on the floor-transit path from Phase 4.
 - **A run is successful when you kill the boss.** One boss per dungeon, on a
   floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
 - **Each dungeon is themed on one modifier.** Its boss carries that modifier
-  innately whatever it wields, and every weapon it drops carries it too — the
-  only off-class modifiers in the game, and the reason to choose one dungeon
-  over another.
+  innately whatever it wields, and every weapon it drops is *forged* with it.
+  That is a guaranteed graft rather than a mechanism of its own, and the reason
+  to choose one dungeon over another is that it is the only **chosen** off-class
+  modifier — and the only one that runs a stack deeper than a rolled graft.
 - **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
   for a boss.
 - **A class has a baseline plus four role weapons** — Efficiency (`Light`),
@@ -1686,10 +1919,32 @@ new events on the floor-transit path from Phase 4.
   a rushed run earns service time it cannot spend.
 - **Service has a low chance of adding a modifier stack**, scaled by wear
   brought in and bounded by the §1.1 caps — this is how a weapon improves
-  across runs rather than merely accumulating attachments.
-- **Max 5 stacks per modifier type**, hardcoded, with types independent — no
-  shared budget across a weapon. The cap is on the stack count, not the
-  resolved value, so per-stack value is the only dial.
+  across runs rather than merely accumulating attachments. It can **deepen**
+  what the weapon carries or, rarely, **graft** something it never had; the
+  graft is safe because `forged = 0` caps it at 5, so it is permanently the
+  shallowest thing on the weapon.
+- **The repeat-kill ladder is short, deep and topped.** `DefeatCount` 1–2 and
+  3–4 add one and two acquired stacks to the class signature; 5 rolls a unique;
+  6+ does nothing. Depth only, never breadth — breadth is the enchanter's
+  product. Farming spends the same acquired budget the enchanter would, so a
+  deep farm buys power now at the cost of the weapon's long-term room, and
+  reaching 5 inverts that by handing you a forged spread with the budget intact.
+- **A modifier caps at `forged + 5`**, per type, with types independent — no
+  shared budget across a weapon. Forged is the weapon's identity spread (class
+  baseline, variant, unique, dungeon theme); the five is one acquired budget
+  that farming and the enchanter both draw on. A flat cap was rejected because
+  it erases the Purity role, whose only distinguishing feature is the stack a
+  shared ceiling absorbs first.
+- **Forged means chosen identity, not "what it dropped with."** Repeat-kill
+  stacks arrive on the body and still count as acquired; the boss's theme
+  arrives on the body and counts as forged, because you chose the dungeon.
+- **`CritWindow`, `Light` and `Charges` hold at a flat 5.** Each is bounded by
+  something outside itself — a probability, the weapon's cost, the movement
+  budget — so extra stacks either break a deliberate band or do nothing.
+  Everything else scales with its forged spread.
+- **Uniques have the deepest ceilings in the game**, since their whole spread is
+  forged. The balance envelope is held by the unique tables being hand-authored
+  rather than by a uniform cap.
 - `CritWindow` is **+1 per stack**: ×1 crits on 19–20, ×2 on 18–20, and so on.
 - **The dagger's baseline is `CritWindow ×1` and its crit specialist `×2`** —
   a deliberate break from the prototype's 16+. Crit *frequency* stays inside
@@ -1705,7 +1960,8 @@ new events on the floor-transit path from Phase 4.
   baiting a caster into its own line takes real positioning instead of just
   standing nearby.
 - **If it needs a cap, it is an enchantment.** A weapon modifier has to be safe
-  at ×5 by construction; anything needing a bespoke ceiling goes to the
+  at its ceiling by construction — ×8, the deepest a unique reaches, now that
+  caps scale; anything needing a bespoke ceiling goes to the
   enchantment layer, where the mana lock and trigger cost bound it organically.
   `Momentum` moved there for exactly this reason.
 - **A modifier on a value that varies across classes is proportional.** `Light`
