@@ -865,6 +865,43 @@ ascent is a diminishing fight, not an escalating one.
 Navigation is not the challenge: floors persist within a visit (§4.1), so the
 map and the fog are already known. The way out is a combat problem.
 
+### You cannot carry it all
+
+Inventory becomes **6 slots per character, 24 party-wide** — replacing today's
+3, which was a testing remnant rather than a design (`PartyMemberState.cs:27`).
+Exact number is a tuning target; the structure is the decision.
+
+Crucially there is **no separate haul bag**. Loot goes in the same slots as
+your weapons, so every drop you pick up climbing out costs you a weapon you
+could have been swinging. A greedy hauler is a worse fighter, which puts the
+carry limit exactly where the tension belongs — on the extraction itself,
+scaling with how much you are trying to leave with.
+
+A deep farm banks far more than 24 drops, so the ascent is **targeted, not
+exhaustive**. You do not clear the dungeon on the way out; you revisit the
+dummies you invested in and leave the rest standing. Since `DefeatCount` is
+visible on the nameplate (§4.5), that choice is informed.
+
+### Skipping floors is allowed
+
+You can run a floor rather than fight it. This needs no gate — three systems
+already price it:
+
+- **Moving through a threat is not free.** Brace fires from every zone crossed
+  (`TurnSystem.NotifyCharacterMoved`), and you are running it at low HP with a
+  spent movement budget.
+- **Skipping forfeits the drops.** Abandoning a floor abandons everything you
+  banked there, so the decision regulates itself: fight through what you
+  farmed, run past what you did not.
+- **Wear guards against rushing.** A party could dive a floor-5 boss and skip
+  straight out for a free service tick — but they would surface with almost no
+  wear, and wear is what the enchanter consumes (§6.1). Ticks bought without
+  fighting buy nothing.
+
+A percentage-of-enemies gate was considered and rejected: it would force you to
+kill dummies whose drops you do not want, which is busywork, and it overrides
+the self-regulation above rather than adding to it.
+
 ### Wear charges on the way out
 
 Wear accrues from swinging (§6.1), so the extraction is also what charges your
@@ -886,7 +923,12 @@ into a drop rather than just a `DefeatCount` increment.
 **The HUD must show `DefeatCount` on the enemy nameplate.** Farming with no
 visible reward until the extraction would read as broken otherwise — the player
 needs to see the quality building on each dummy to make the stop-farming call
-deliberately.
+deliberately, and to pick targets on the way out.
+
+`PartyMemberState.Inventory` goes from 3 slots to 6 (`PartyMemberState.cs:27`),
+and `DungeonHud`'s inventory panel has to grow with it. Slot 0 stays the
+equipped weapon; the swap keys currently hardcode slots 2 and 3, so the input
+handling generalises.
 
 `Logic/FogState.cs` becomes per-floor rather than per-scene.
 
@@ -1111,15 +1153,9 @@ new events on the floor-transit path from Phase 4.
   (§4.1), which re-rolls the boss floor and revives everything. So a cleared
   dungeon cannot be returned to — clearing it is worth doing only for what you
   can carry out in that visit.
-- **Is there a carry limit on the way out?** Inventory is three slots per
-  member today (`PartyMemberState.cs:27`). A deep farm can bank far more drops
-  than twelve, so either the extraction forces choices about what to leave
-  behind — which would sharpen the whole loop — or a separate haul bag exists.
-  This is the single biggest unanswered question in the run design.
-- **Can you skip floors on the way out?** If the ascent can be run past rather
-  than fought through, the extraction risk collapses and so does the reason to
-  stop farming. Whether stairs can be reached without clearing a floor decides
-  how much of §4.4 actually bites.
+- **Is 24 the right carry limit?** The structure is settled — unified with the
+  loadout, no haul bag — but the number is a guess. Too high and the extraction
+  stops forcing choices; too low and a deep farm is mostly wasted. Needs play.
 - **Does wear cap?** If it accumulates without limit, a long-serving weapon
   eventually has enough for any enchantment forever and wear stops being a
   gate. A ceiling — or wear being fully consumed per attachment — needs
@@ -1166,6 +1202,12 @@ new events on the floor-transit path from Phase 4.
 - **`DefeatCount` is the drop's quality, the last kill collects it.** Farming
   banks value into a dummy; you harvest it on the way out. Die in the
   stairwell and you keep the service tick but none of the spoils.
+- **Carry limit is unified with the loadout** — 6 slots per character, 24
+  party-wide, no separate haul bag. Loot competes with weapons, so hauling
+  deep makes you weaker for the fight you are hauling through.
+- **Floors can be skipped on the way out.** No gate is needed: brace taxes
+  running through, skipping forfeits that floor's drops, and wear gating means
+  a rushed run earns service time it cannot spend.
 - **Service has a low chance of adding a modifier stack**, scaled by wear
   brought in and bounded by the §1.1 caps — this is how a weapon improves
   across runs rather than merely accumulating attachments.
