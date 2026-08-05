@@ -43,16 +43,22 @@
 - **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
   Multiplying an applied effect on a natural 20 is a rounding event on 5% of
   casts. Caster uniques follow, arriving at tier 3.
-- **`Cast` is efficiency, not magnitude** — −10% per stack off *every* point of
+- **`Resonant` is efficiency, not magnitude** — −10% per stack off *every* point of
   mana the weapon spends, cast costs and enchantment triggers alike. Tier sets
-  how hard an effect lands; `Cast` sets what it costs. Forged on casters only,
+  how hard an effect lands; `Resonant` sets what it costs. Forged on casters only,
   graftable onto anything carrying an enchantment.
-- **`Light` and `Cast` exclude each other.** Mana regenerates from movement left
-  unspent, so cheap movement is already cheap mana by the long route — a weapon
-  with both compounds one discount with itself. One currency per weapon, so a
-  mana-efficient dagger and a light dagger are different weapons.
+- **`Light` and `Resonant` exclude each other** — the **currency** group. Mana
+  regenerates from movement left unspent, so cheap movement is already cheap
+  mana by the long route; a weapon with both compounds one discount with itself.
+  One currency per weapon, so a mana-efficient dagger and a light dagger are
+  different weapons.
+- **The modifier is named `Resonant`, not `Cast`.** It no longer has anything to
+  do with casting — it discounts mana on any weapon that spends it — and an
+  adjective matches its opposite number `Light`. `Attunement` was unavailable
+  (damage types took it) and `Efficiency` would have collided with the variant
+  role whose modifier is `Light ×1`.
 - **An efficient caster is harder to level.** Mana moved is enchantment XP, so
-  once `Cast` stacks make a caster movement-bound rather than mana-bound, every
+  once `Resonant` stacks make a caster movement-bound rather than mana-bound, every
   further stack moves less mana for the same casts. More bang per point spent,
   and a slower climb — the first modifier in the design with a real downside
   written into it rather than an opportunity cost.
@@ -101,7 +107,7 @@
 - **All six martial classes are specced** — sword (`Riposte`/`BlockWeaken`), spear
   (`Push`/`Pin`), axe (`Splitting`/`Rout`), ranged (`Pin`/`Overwatch`),
   throwing (`Drag`/`Softening`). Caster classes keep their own frame: baseline
-  `Cast ×1` plus four effects or four shapes, since role decomposition means
+  `Resonant ×1` plus four effects or four shapes, since role decomposition means
   nothing when the signature *is* which effect you cast.
 - **`Pin` appears on both spear and ranged**, delivered by a brace and by a hit
   respectively — the two halves of a kiting pair.
@@ -195,7 +201,7 @@
     makes grafting **order-dependent** — a dagger cannot be offered `Riposte`
     until it has grafted `Block` — and since nothing is ever removed, a
     satisfied prerequisite stays satisfied.
-  - Kind: `Brace`/`Opportunist` melee, `Overwatch` ranged, `Cast` casters.
+  - Kind: `Brace`/`Opportunist` melee, `Overwatch` ranged, `Resonant` casters.
 - **`Riposte` is outside the threat-zone group on purpose.** It fires on the
   enemy turn like the other three, but it answers *being hit* rather than *being
   approached* — no zone, no movement, nothing the enemy could have walked

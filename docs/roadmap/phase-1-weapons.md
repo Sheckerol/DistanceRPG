@@ -55,7 +55,7 @@ signature alone does not:
 | Axe | `Cleave ×1, Opportunist ×1` | **Nobody walks away from an axe** |
 | Ranged | `Longshot ×1, CritWindow ×1` | An aimed shot finds the gap |
 | Throwing | `Charges ×1, CritMultiplier ×1` | Throw enough and one lands perfectly |
-| Staff / Wand | `Cast ×1` + **one rolled enchantment** | The caster's second axis is not a stack at all |
+| Staff / Wand | `Resonant ×1` + **one rolled enchantment** | The caster's second axis is not a stack at all |
 
 Four of these change what the class *does*, not just its numbers:
 
@@ -85,7 +85,7 @@ lands. The axe does not need it: `Splitting` is already its answer to armour
 
 Staves and wands satisfy the two-axis rule without a second modifier: **every
 caster weapon drops carrying an enchantment** (§3.1), and farming can put its
-ten points into `Cast` stacks or into that enchantment's levelling (§3.2). The
+ten points into `Resonant` stacks or into that enchantment's levelling (§3.2). The
 allowance has somewhere to go, which is all the rule ever asked for.
 
 The two classes hold it differently, and the difference is each class's
@@ -621,7 +621,7 @@ stacking the signature changes what the weapon is *for*.
 
 ### Caster classes do not take this frame
 
-Staff and wand both carry baseline `Cast ×1` plus a rolled enchantment (§1.2),
+Staff and wand both carry baseline `Resonant ×1` plus a rolled enchantment (§1.2),
 but their four weapons differ by **effect** and **shape** rather than by role
 (§1.3, §1.4). Forcing them into
 Efficiency / Purity / Control / Support would be redundant — a debuff staff is
@@ -643,15 +643,15 @@ differ in what they apply and what it costs in mana.
 Staff of Renewal is today's shipped Staff with its numbers unchanged, so
 parity holds.
 
-### `Cast` is efficiency, not magnitude
+### `Resonant` is efficiency, not magnitude
 
-**`Cast ×n` discounts every point of mana the weapon spends by 10% a stack** —
+**`Resonant ×n` discounts every point of mana the weapon spends by 10% a stack** —
 its own cast cost *and* its enchantments' trigger costs — proportional exactly
 as `Light` is on movement (§1.1). It is not an effect multiplier and never was a
-good one: with tier now carrying the effect's power (§3.3), having `Cast` do
+good one: with tier now carrying the effect's power (§3.3), having `Resonant` do
 magnitude too would be two dials on one number.
 
-Because it covers triggers, `Cast` is **not caster-only**. A dagger carrying
+Because it covers triggers, `Resonant` is **not caster-only**. A dagger carrying
 Arcane Edge spends mana every hit, and a stack that makes those hits cheaper is
 exactly as meaningful there as on a staff — so the wizard's dagger (§3.3) can be
 grafted toward mana efficiency, at a graft's shallow `×5`. It stays *forged* on
@@ -667,9 +667,9 @@ The division is clean, and the two halves come from different places:
 | | Sets | Earned by |
 | --- | --- | --- |
 | **Enchantment tier** | How hard the effect lands | Casting — mana moved (§3.3) |
-| **`Cast` stacks** | What the cast costs | Forged, farmed, grafted (§1.1) |
+| **`Resonant` stacks** | What the cast costs | Forged, farmed, grafted (§1.1) |
 
-A Staff of Mire at `Cast ×5` costs 12 mana instead of 25. Same Mire.
+A Staff of Mire at `Resonant ×5` costs 12 mana instead of 25. Same Mire.
 
 ### An efficient staff is harder to level, and that is the point
 
@@ -679,10 +679,10 @@ The two dials pull against each other, and the loop is worth following:
 2. An unmodified caster is **mana-bound**: four casts a turn is 160 movement,
    the whole budget, and 80 mana, which no starting pool sustains. You stop
    because you are dry.
-3. `Cast` stacks move you to **movement-bound**. At `×5` those same four casts
+3. `Resonant` stacks move you to **movement-bound**. At `×5` those same four casts
    cost 48 mana, and at `×8` only 32 — the pool is no longer what stops you.
 4. But **mana moved is the enchantment's XP** (§3.3). Once movement-bound, every
-   further stack of `Cast` is strictly less mana moved for the same number of
+   further stack of `Resonant` is strictly less mana moved for the same number of
    casts, so the effect you are casting levels more slowly.
 
 **An efficient casting tool is genuinely harder to level up, and gives you more
@@ -716,8 +716,8 @@ That is worth more than it first looks:
   it (§3.3), and casting a staff is exactly that. Every cast makes the effect it
   applies land harder, without touching the staff's stats or its proficiency. A
   staff you use is a staff that grows.
-- **`Cast` and tier are two different dials on the same number, and they come
-  from different places.** `Cast` stacks are forged, farmed and grafted — the
+- **`Resonant` and tier are two different dials on the same number, and they come
+  from different places.** `Resonant` stacks are forged, farmed and grafted — the
   weapon getting better. Tier is cast for — the *effect* getting better. Which
   is why the pairing is not redundant: one is what you found, the other is what
   you did with it.
@@ -775,7 +775,7 @@ only in geometry. Shapes are in logic units.
 All shapes stop at walls — `LineOfSight` already does segment-vs-wall tests and
 extends naturally to per-target checks inside a shape.
 
-Wands carry `Cast ×1` like staves, and it means the same thing — **20% off the
+Wands carry `Resonant ×1` like staves, and it means the same thing — **20% off the
 20 mana a cast costs**, not more damage (§1.3). The shape is a field; wand
 damage comes from weapon level (§2.2) and from the damage type's tier below.
 
@@ -981,17 +981,17 @@ Bulwark but would be dull four times over.
 
 ### Caster uniques raise the enchantment instead
 
-A caster's two forged axes are `Cast ×1` and a rolled enchantment (§1.2), so the
+A caster's two forged axes are `Resonant ×1` and a rolled enchantment (§1.2), so the
 derivation rule has two ways to land — and only one of them is interesting.
-`Cast ×3` is a staff that costs less mana, which is a fine modifier and a
+`Resonant ×3` is a staff that costs less mana, which is a fine modifier and a
 terrible legend. So:
 
 **A caster unique is a caster variant whose enchantment arrives at tier 3.**
 
 | Unique | Class | Built from | Carries | Reads as |
 | --- | --- | --- | --- | --- |
-| Rotwood | Staff | Staff of Blight | `Cast ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
-| The Long Candle | Wand | Wand of the Beam | `Cast ×1`, **Flame tier 3** | A beam that is *always* fire, and hot |
+| Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
+| The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Flame tier 3** | A beam that is *always* fire, and hot |
 
 The two classes get there differently, which follows from §1.3 and §1.4. A
 staff's enchantment is already fixed by variant, so its unique simply starts
@@ -1008,7 +1008,7 @@ is the deepest project in the game for exactly the same reason The Bulwark is:
 it starts high on the axis that keeps going.
 
 Note what a caster unique is **not**: it is not a bigger number on the weapon.
-`Cast ×1` is unchanged, the statline is unchanged, and every point of its
+`Resonant ×1` is unchanged, the statline is unchanged, and every point of its
 advantage sits in a thing that can be transferred off it (§6.5). A caster unique
 is a *soul that arrives grown*, and the body it came in is ordinary.
 

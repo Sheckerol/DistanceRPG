@@ -174,7 +174,7 @@ Three consequences worth stating plainly:
   class *and* the right variant within it. Nothing was tuned to make that
   unlikely; it just is.
 - **Themes are drawn from class signatures.** `Block`, `Brace`, `Cleave`,
-  `Longshot`, `Charges`, `CritWindow`, `CritMultiplier`, `Cast` — the modifiers
+  `Longshot`, `Charges`, `CritWindow`, `CritMultiplier`, `Resonant` — the modifiers
   a Purity variant doubles. A theme on a Control or Support modifier like `Pin`
   could never reach `×3`, since no variant is forged `×2` in one, so such a
   dungeon would be the only one with no unique to hunt. `Light` is excluded for

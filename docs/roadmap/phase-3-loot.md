@@ -125,7 +125,7 @@ decides where a farm can go:
 | Tower Guard | `Block ×2`, `Push ×1` | `Block ×7`, `Push ×6` — **both maxed** |
 | Assassin's Fang | `CritWindow ×2`, `CritMultiplier ×1` | `CritWindow ×7`, `CritMultiplier ×6` — both maxed |
 | Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10 spread across three, **none maxed** |
-| Staff of Blight | `Cast ×1`, innate enchantment | `Cast ×6` and **five tiers** — the only farm that buys potency |
+| Staff of Blight | `Resonant ×1`, innate enchantment | `Resonant ×6` and **five tiers** — the only farm that buys potency |
 
 **A two-modifier weapon can be finished; a three-modifier weapon cannot.** Ten
 stacks fill two ceilings exactly and leave nothing over, so a Purity variant

@@ -232,28 +232,22 @@
   differ and the answer is a decision, not a derivation. Crits already bypass
   `Block` entirely (§1.6), so the interesting case is a resisted crit.
 - **Where exactly does the mana-bound / movement-bound crossover sit?** The
-  whole `Cast` trade (§1.3) depends on there being a crossover at all — if a
-  caster is movement-bound from `Cast ×1`, efficiency is pure downside on the
+  whole `Resonant` trade (§1.3) depends on there being a crossover at all — if a
+  caster is movement-bound from `Resonant ×1`, efficiency is pure downside on the
   levelling axis, and if they never stop being mana-bound even at `×8`, it is
   pure upside. The interesting shape needs the crossover somewhere in the middle
   of the stack range, which is a joint constraint on cast cost (40), mana cost
   (15–25), the movement budget (160) and the regen rate. None of those four were
   chosen with this in mind, so at least one probably has to move.
-- **Does `Cast` on a wand mean something different in practice?** Wand
+- **Does `Resonant` on a wand mean something different in practice?** Wand
   proficiency XP is total damage across the shape (§2.2), so a cheap wand levels
   the *weapon* fast while levelling its *element* slowly. A staff has no such
   second ladder — its proficiency comes from effect level applied, which tier
   drives, so efficiency slows both of a staff's ladders and only one of a wand's.
-  That may make `Cast` straightforwardly better on wands than on staves.
-- **Should `Cast` be renamed?** It now discounts enchantment trigger costs on
-  any weapon, so a mana-efficient dagger carries a modifier called `Cast` and
-  never casts anything. `Focus`, `Channeling` or `Attunement` all read better on
-  a knife. Kept as `Cast` for now because it is an enum member threaded through
-  §1.7 and every weapon table, and renaming is cheap only if it happens before
-  Phase 1 codes it — so this wants deciding early rather than well.
-- **The `Light`/`Cast` exclusion makes an Efficiency variant a fork in the road.**
+  That may make `Resonant` straightforwardly better on wands than on staves.
+- **The `Light`/`Resonant` exclusion makes an Efficiency variant a fork in the road.**
   A martial Efficiency variant is forged `Light ×1` and can therefore *never*
-  take `Cast`, which permanently closes the mana-efficient route on the exact
+  take `Resonant`, which permanently closes the mana-efficient route on the exact
   weapons an enchantment-heavy build would otherwise want. That is the trade
   working as intended, but it means the wizard's dagger has to be a non-
   Efficiency variant, and it is worth checking that does not quietly make one of

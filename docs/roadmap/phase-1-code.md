@@ -15,7 +15,7 @@ the value **derived**, so the pair becomes:
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
                     Opportunist, Rout, Pin, Softening, CritWeaken, CritSunder,
-                    BlockWeaken, OnHitPoison, Cast,
+                    BlockWeaken, OnHitPoison, Resonant,
                     Momentum }                             // Momentum: enchantment-only
 
 sealed class ModifierSet                 // ModifierType → stack count
@@ -44,7 +44,7 @@ static class ModifierRules               // the §1.1 table, one place only
             [Push]  = [Drag, Rout],               // one displacement direction
             [Drag]  = [Rout],
             [Riposte] = [BlockWeaken],            // one payoff per block
-            [Light] = [Cast],                     // one currency per weapon
+            [Light] = [Resonant],                     // one currency per weapon
         });
 
     // Cannot exist WITHOUT these. Not symmetric — a dependency, not a pair.
@@ -62,7 +62,7 @@ static class ModifierRules               // the §1.1 table, one place only
         {
             [Brace] = Melee, [Opportunist] = Melee,
             [Overwatch] = Ranged,
-            // Cast is NOT caster-only: it discounts enchantment triggers too
+            // Resonant is NOT caster-only: it discounts enchantment triggers too
         };
 
     static int Cap(ModifierType t, int forgedStacks)
@@ -228,10 +228,10 @@ New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
 `Weapon` gains `WeaponClass` (the eight above), `Forged` (§1.1) and
 `AreaShape?`. There is **no `CastEffect` field** — a staff's effect is its innate
 enchantment (§1.3), so it lives in the enchantment list with everything else and
-`Cast` discounts the mana cost rather than scaling it. Phase 3's drop tables key
+`Resonant` discounts the mana cost rather than scaling it. Phase 3's drop tables key
 off `WeaponClass`.
 
-`Cast` therefore resolves like `Light`, against `Weapon.ManaCost` instead of
+`Resonant` therefore resolves like `Light`, against `Weapon.ManaCost` instead of
 `Weapon.Cost`, and both want the same treatment: resolve once, display the
 resolved number, never show the player a percentage mid-turn.
 

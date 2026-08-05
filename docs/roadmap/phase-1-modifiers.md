@@ -7,10 +7,11 @@ classes vary by stat profile; caster classes vary by what the cast actually
 does. Forcing casters into the martial shape would produce four staves that all
 do the same thing at different prices, which is not interesting.
 
-Every class baseline is its signature **plus a class-specific second modifier**
-(§1.2), so no weapon in the game is forged with fewer than two modifiers:
-`Push` on the sword, `Longshot` on the spear, `Opportunist` on the axe,
-`CritWindow` on the bow, `CritMultiplier` on throwing and the casters.
+Every class baseline is its signature **plus a class-specific second axis**
+(§1.2), so no weapon in the game is forged with fewer than two: `Push` on the
+sword, `Longshot` on the spear, `Opportunist` on the axe, `CritWindow` on the
+bow, `CritMultiplier` on the dagger and throwing — and on the casters an innate
+**enchantment** rather than a second modifier at all (§3.1).
 
 | Class | Stat | Class feature | Variant axis |
 | --- | --- | --- | --- |
@@ -172,7 +173,7 @@ graft, and a boss theme alike — and all are tables rather than special cases.
 | **Threat zone** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one zone it watches |
 | **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
 | **Block response** | `Riposte`, `BlockWeaken` | One block, one payoff |
-| **Efficiency** | `Light`, `Cast` | One currency per weapon |
+| **Currency** | `Light`, `Resonant` | One currency per weapon |
 
 A group exists for one of two reasons, and it is worth being able to tell which:
 
@@ -185,13 +186,13 @@ A group exists for one of two reasons, and it is worth being able to tell which:
   gets two payoffs from one defensive event and the Control/Support fork stops
   meaning anything.
 
-The efficiency group is a **third** reason, and the most subtle: holding both
+The currency group is a **third** reason, and the most subtle: holding both
 would be *double-dipping on one axis while looking like two*.
 
-**`Light` and `Cast` are the same discount reached two ways.** Mana regenerates
+**`Light` and `Resonant` are the same discount reached two ways.** Mana regenerates
 only from movement left unspent at end of turn
 (`PartyMemberState.RegenManaFromUnusedMovement`), so cheaper *movement* is
-already cheaper *mana* — it just arrives by the long route. `Cast` takes the
+already cheaper *mana* — it just arrives by the long route. `Resonant` takes the
 short one. A weapon carrying both compounds a discount with itself: it spends
 less mana per action, and the movement it saves comes back as more mana to
 spend.
@@ -201,14 +202,14 @@ So the group forces a real choice rather than forbidding a silly one:
 | | Buys you | The route |
 | --- | --- | --- |
 | **`Light`** | More actions per turn | Movement saved becomes mana at end of turn |
-| **`Cast`** | More mana per action | The mana simply costs less |
+| **`Resonant`** | More mana per action | The mana simply costs less |
 
 **A mana-efficient dagger and a light dagger are now different weapons**, and
-the enchanted-dagger build (§3.3) has to pick one. `Cast` is the better answer
+the enchanted-dagger build (§3.3) has to pick one. `Resonant` is the better answer
 for a wizard leaning on expensive triggers; `Light` is better for one who wants
 to swing four times and let the regen carry them. Neither is available on an
 Efficiency variant carrying the other, and neither can be grafted onto a caster,
-since every caster is forged `Cast ×1`.
+since every caster is forged `Resonant ×1`.
 
 There is a levelling consequence too, and it points the same way. Both modifiers
 reduce **mana moved**, which is enchantment XP (§3.3), so a weapon carrying both
@@ -259,7 +260,7 @@ hand it.
 | `Brace`, `Opportunist` | **Melee only** — dagger, sword, spear, axe | A threat zone is a weapon's physical reach; you cannot menace a tile with a bow |
 | `Overwatch` | **Ranged only** — bow, throwing | Holding a shot is what a nocked arrow does; a spear cannot wait for a target to appear |
 
-`Cast` is deliberately **not** on that list. It was caster-only while it scaled
+`Resonant` is deliberately **not** on that list. It was caster-only while it scaled
 an effect level, because a weapon with no effect had nothing to scale. Now that
 it discounts *every* point of mana a weapon spends — its own cast cost and its
 enchantments' trigger costs alike — any weapon carrying an enchantment has
@@ -329,7 +330,7 @@ ceiling — a forged spread reaches further.
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Requires `Block`; block-response group. Levels **accumulate**, uncapped — §1.6 |
-| `Cast` | **−10% of all mana the weapon spends** per stack, proportional | 5 | Cast costs *and* enchantment triggers. Efficiency, not magnitude — §1.3. **Excludes `Light`** |
+| `Resonant` | **−10% of all mana the weapon spends** per stack, proportional | 5 | Cast costs *and* enchantment triggers. Efficiency, not magnitude — §1.3. **Excludes `Light`** |
 
 ### `Light` has to be proportional, not flat
 
@@ -349,8 +350,8 @@ game — so the **resolved** cost is computed once and displayed on the weapon.
 The player reads `Cost 15`, never `30 −50%`.
 
 **The general rule: a modifier acting on a value that varies across classes has
-to be proportional.** `Light` and `Cast` are the two that do — `Light` on the
-movement cost every class has, `Cast` on the mana cost only casters have (15–25
+to be proportional.** `Light` and `Resonant` are the two that do — `Light` on the
+movement cost every class has, `Resonant` on the mana cost only casters have (15–25
 across the variants, so the same argument applies in miniature). The two are the
 same modifier pointed at the game's two currencies, which is why they take the
 same shape and the same −10%.
