@@ -23,13 +23,15 @@
   a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
   Weighting by remaining HP or by role would be more accurate — and more
   expensive, and harder to predict when baiting. Flat first.
-- **Does `Riposte` belong in the reaction group?** §1.1 makes `Brace`,
-  `Opportunist` and `Overwatch` mutually exclusive, so a weapon holds exactly
-  one movement-triggered reaction. `Riposte` is also a free swing on the enemy
-  turn, but it triggers off a successful *block* rather than off movement, so it
-  is currently outside the group — meaning a Riposte Blade that grafted `Brace`
-  could fire both in one enemy phase. Either the group is about "reactions" and
-  `Riposte` joins it, or it is about "threat zones" and the name should say so.
+- **`Charges` may be actively harmful in the wrong place, not merely useless.**
+  It is a *cap* on attacks per turn (§1.2), and a weapon without it has no cap
+  at all beyond the movement budget. So a `Charges ×1` grafted onto a bow would
+  hold it to 2 shots where 30-cost attacks already allowed 5 — a stack that
+  makes the weapon worse. Every other modifier is at worst inert. Either
+  `Charges` needs a throwing-only restriction (which `WeaponKind` cannot express,
+  since throwing and ranged are both `Ranged`), or it needs redefining so it
+  only ever raises a cap that already exists. Worth checking the whole table for
+  others of this shape before Phase 1 codes grafting.
 - **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
   on entry and a win ticks service once either way, so a floor-5 dungeon is
   strictly cheaper than a floor-10 one for the same reward. Not disclosing the

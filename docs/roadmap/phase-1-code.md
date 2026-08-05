@@ -45,6 +45,15 @@ static class ModifierRules               // the §1.1 table, one place only
             [Drag]  = [Rout],
         });
 
+    // Cannot exist WITHOUT these. Not symmetric — a dependency, not a pair.
+    static readonly IReadOnlyDictionary<ModifierType, ModifierType[]> Requires =
+        new()
+        {
+            [Riposte]     = [Block],    // nothing to counter off
+            [BlockWeaken] = [Block],    // nothing to succeed at
+            [Rout]        = [Cleave],   // without a cleave it is just a worse Push
+        };
+
     // Absent → WeaponKind.Any
     static readonly IReadOnlyDictionary<ModifierType, WeaponKind> RequiresKind =
         new()
@@ -61,7 +70,8 @@ static class ModifierRules               // the §1.1 table, one place only
 
     static bool Allowed(ModifierType t, WeaponKind kind, ModifierSet present)
         => RequiresKind.GetValueOrDefault(t, Any).HasFlag(kind)
-        && !Excludes.GetValueOrDefault(t, []).Any(x => present.Stacks(x) > 0);
+        && !Excludes.GetValueOrDefault(t, []).Any(x => present.Stacks(x) > 0)
+        &&  Requires.GetValueOrDefault(t, []).All(x => present.Stacks(x) > 0);
 }
 ```
 
@@ -90,7 +100,27 @@ order-dependent and horrible. So the table is declared **one direction only** an
 single entry that cannot be got wrong, which is the reason to prefer the
 dictionary in the first place rather than a reason to be careful with it.
 
-`Allowed` folds both rules into one predicate, so there is exactly one
+**`Requires` is the third relation and is deliberately *not* symmetric.**
+`Excludes` says two modifiers cannot coexist; `Requires` says one cannot exist
+alone. A `Riposte` with no `Block` has nothing to counter off, a `BlockWeaken`
+has nothing to succeed at, and a `Rout` without a `Cleave` is a strictly worse
+`Push` that also occupies the displacement slot. All three would be dead stacks,
+which §1.1 forbids — so they are illegal rather than merely bad.
+
+Two consequences worth having on purpose:
+
+- **Grafts become order-dependent, which is a feature.** A dagger can never be
+  offered `Riposte` — but a dagger that has already grafted `Block` can, later.
+  Over enough services a weapon can reach spreads no single roll could hand it,
+  and the game tells a small story getting there. Nothing is ever removed from a
+  weapon, so a satisfied prerequisite stays satisfied.
+- **A themed boss can unlock a prerequisite wholesale.** The golem forges `Block`
+  onto everything it drops (§4.3), so every one of those weapons becomes
+  eligible for `Riposte` and `BlockWeaken` at the enchanter. A Block-themed
+  spear that later learns to riposte is a weapon the drop tables cannot produce
+  and nobody designed — which is the best thing grafting does.
+
+`Allowed` folds all three rules into one predicate, so there is exactly one
 definition of "this weapon cannot hold that" and every caller asks the same
 question. It gates *offers* rather than rejecting after the fact:
 

@@ -316,8 +316,10 @@ section below; the short version is that `Brace` is about dangerous ground and
 
 No weapon holds both, and none holds an `Overwatch` alongside either: the three
 are one exclusion group, and `Brace`/`Opportunist` are melee-only while
-`Overwatch` is ranged-only (§1.1). **One weapon, one reaction** — which is what
-stops a front line turning the enemy phase into a second player phase.
+`Overwatch` is ranged-only (§1.1). **One weapon, one threat zone** — which is
+what stops a front line turning the enemy phase into a second player phase.
+`Riposte` sits outside that group deliberately, since it answers being hit
+rather than being approached.
 
 That third row is what keeps `Push` coherent. The Halberd's whole purpose is
 shoving a target *out* of its own reach to break contact (§1.2), and if leaving

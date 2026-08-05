@@ -132,14 +132,26 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
-- **Exclusion groups: one reaction and one displacement direction per weapon.**
-  `Brace`, `Opportunist` and `Overwatch` are mutually exclusive, and so are
-  `Push`, `Drag` and `Rout`. `Brace`/`Opportunist` are **melee only**,
-  `Overwatch` **ranged only**, `Cast` **casters only**. So every weapon holds
-  exactly one reaction and melee and ranged hold different ones, which is what
-  stops a front line turning the enemy phase into a second player phase —
-  bounded at the weapon, where the player can see it, rather than by a new
-  per-character resource.
+- **Three relations govern what a weapon may hold**, all tables rather than
+  special cases: **Excludes** (cannot coexist), **Requires** (cannot exist
+  without), and **Kind** (melee / ranged / caster only).
+  - Excludes: `Brace`/`Opportunist`/`Overwatch` are one **threat-zone** group,
+    and `Push`/`Drag`/`Rout` one **displacement** group. So every weapon holds
+    exactly one threat zone and one displacement direction — which stops a front
+    line turning the enemy phase into a second player phase, bounded at the
+    weapon where the player can see it rather than by a new per-character
+    resource.
+  - Requires: `Riposte` and `BlockWeaken` need `Block`, `Rout` needs `Cleave`.
+    Each would otherwise be a dead stack, so it is illegal rather than bad. This
+    makes grafting **order-dependent** — a dagger cannot be offered `Riposte`
+    until it has grafted `Block` — and since nothing is ever removed, a
+    satisfied prerequisite stays satisfied.
+  - Kind: `Brace`/`Opportunist` melee, `Overwatch` ranged, `Cast` casters.
+- **`Riposte` is outside the threat-zone group on purpose.** It fires on the
+  enemy turn like the other three, but it answers *being hit* rather than *being
+  approached* — no zone, no movement, nothing the enemy could have walked
+  around. Grouping it there would be grouping by when it resolves rather than by
+  what it responds to.
 - **A themed boss cannot drop a class that will not take its theme.** The drop
   table bends to the guarantee rather than the other way round: a `Brace`-themed
   boss drops daggers, swords and spears and nothing else, because axes hold

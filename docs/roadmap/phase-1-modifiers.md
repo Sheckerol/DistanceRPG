@@ -153,18 +153,49 @@ Two forge limits exist, and they are the only hard numbers in the system:
 | **A unique is a variant with one modifier raised to `×3`** | Every unique (§1.5) | Nothing is forged past `×3`, so `×8` is the universal ceiling |
 | **No weapon may be forged past `Light ×1`** | Everything, uniques included | `Light` ceilings at `×6`, a 60% discount — dagger at 12, axe at 24 |
 
-### Exclusion groups and class restrictions
+### What a weapon may hold: three relations
 
-Two constraints act on *which* modifiers can share a weapon at all, rather than
-on how deep they go. Both bind every source — the forge, a farm roll, a graft,
-and a boss theme alike.
+Three constraints act on *which* modifiers can share a weapon at all, rather
+than on how deep they go. All bind every source — the forge, a farm roll, a
+graft, and a boss theme alike — and all are tables rather than special cases.
 
-**A weapon may carry at most one modifier from each exclusion group:**
+| Relation | Says | Example |
+| --- | --- | --- |
+| **Excludes** | These two cannot coexist | `Brace` and `Opportunist` |
+| **Requires** | This cannot exist without that | `Riposte` needs `Block` |
+| **Kind** | Only on this sort of weapon | `Overwatch` is ranged only |
+
+**Excludes — a weapon may carry at most one modifier from each group:**
 
 | Group | Members | Why they exclude |
 | --- | --- | --- |
-| **Reaction** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one held response |
+| **Threat zone** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one zone it watches |
 | **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
+
+**`Riposte` is deliberately outside the threat-zone group.** It fires on the
+enemy turn like the other three, but it answers *being hit* rather than *being
+approached* — there is no zone, no movement, and nothing the enemy could have
+walked around. Grouping it with them would be grouping by when it resolves
+rather than by what it responds to, and the sword would lose its counter-attack
+to a rule that exists for a different reason.
+
+**Requires — some modifiers depend on another being present:**
+
+| Modifier | Needs | Without it |
+| --- | --- | --- |
+| `Riposte` | `Block` | Nothing to counter off |
+| `BlockWeaken` | `Block` | Nothing to succeed at |
+| `Rout` | `Cleave` | A strictly worse `Push` that also takes the displacement slot |
+
+Each of those would otherwise be a **dead stack**, which §1.1 forbids — so they
+are illegal rather than merely bad. Unlike `Excludes`, this relation is one-way:
+`Block` needs nothing.
+
+It also makes grafting **order-dependent**, which is worth having. A dagger can
+never be offered `Riposte` — but a dagger that already grafted `Block` can, and
+nothing is ever removed from a weapon, so a satisfied prerequisite stays
+satisfied. Over enough services a weapon reaches spreads no single roll could
+hand it.
 
 **And two modifiers are restricted by weapon type:**
 
@@ -214,7 +245,7 @@ ceiling — a forged spread reaches further.
 
 | Modifier | Per stack | At ×5 | Notes |
 | --- | --- | --- | --- |
-| `Brace` | +1 retaliation | 5 | **Melee only**; reaction group |
+| `Brace` | +1 retaliation | 5 | **Melee only**; threat-zone group |
 | `Block` | +3 absorbed | 15 | Never reduces below 1 taken; **crits ignore it entirely** — §1.6 |
 | `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20 … ×8 = 12+ |
 | `CritMultiplier` | +1 to the multiplier | ×7 | Base is ×2 with no stacks |
@@ -222,13 +253,13 @@ ceiling — a forged spread reaches further.
 | `Charges` | +1 throw per turn, on top of 1 | 6 | A **cap**, not a grant — see §1.2 |
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive, not compounding; **max forged ×1**, so it ceilings at ×6 |
-| `Riposte` | +1 counter per turn | 5 | |
+| `Riposte` | +1 counter per turn | 5 | Requires `Block`; outside the threat-zone group |
 | `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | Displacement group — one direction per weapon. Fires on any hit, however delivered |
 | `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |
-| `Overwatch` | +1 held shot | 5 | **Ranged only**; reaction group |
-| `Opportunist` | +1 free attack when a target **leaves** your reach | 5 | **Melee only**; reaction group. Voluntary movement only — the mirror of `Brace`, §1.2 |
+| `Overwatch` | +1 held shot | 5 | **Ranged only**; threat-zone group |
+| `Opportunist` | +1 free attack when a target **leaves** your reach | 5 | **Melee only**; threat-zone group. Voluntary movement only — the mirror of `Brace`, §1.2 |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Levels **accumulate**, uncapped — §1.6 |
