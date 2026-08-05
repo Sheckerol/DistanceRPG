@@ -23,6 +23,17 @@
   a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
   Weighting by remaining HP or by role would be more accurate — and more
   expensive, and harder to predict when baiting. Flat first.
+- **Should `CritWeaken` and `CritSunder` be an exclusion group?** §1.1 currently
+  says no, on the grounds that they neither contradict nor cost enemy-turn
+  economy. But they are the dagger's Control and Support variants, which makes
+  them structurally identical to the sword's `Riposte`/`BlockWeaken` — one
+  trigger forked by who collects — and that pair *did* get a group. Either the
+  fork argument applies to both or to neither, and the current answer picks
+  differently for two things of the same shape. The counter-argument is that a
+  crit is a rare event a player built toward, where a block is routine, so
+  doubling up on a crit is a payoff rather than an economy exploit. Needs
+  deciding before Phase 1 codes grafting, since it changes what a deep dagger
+  can become.
 - **`Charges` may be actively harmful in the wrong place, not merely useless.**
   It is a *cap* on attacks per turn (§1.2), and a weapon without it has no cap
   at all beyond the movement budget. So a `Charges ×1` grafted onto a bow would

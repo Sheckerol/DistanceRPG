@@ -191,12 +191,17 @@ the two block modifiers make clear. All four fire on the enemy turn, but `Brace`
 all five together; grouping by what it responds to gives the two groups above,
 and that is the useful cut.
 
-**Crit riders are deliberately *not* a group.** `CritWeaken` and `CritSunder`
-share a trigger too, so the pattern above would suggest excluding them — but
-they fail both tests. They do not contradict (a crit can rattle a swing *and*
-open a target up), and they cost no enemy-turn economy, since they ride an
-attack you already paid for on your own turn. A dagger that grafts its way to
-both is a fine weapon, not a rules hole.
+**Crit riders are *not* a group — provisionally.** `CritWeaken` and `CritSunder`
+share a trigger too, so the pattern above would suggest excluding them, and they
+appear to fail both tests: they do not contradict (a crit can rattle a swing
+*and* open a target up), and they cost no enemy-turn economy, since they ride an
+attack already paid for on your own turn.
+
+The reason to be unsure anyway is that the dagger's Control and Support variants
+are exactly `CritWeaken` and `CritSunder`, so this is the *same* shape as the
+sword's block responses — one trigger forked by who collects — and that shape got
+a group. The tests above say leave it; the symmetry with the sword says group it.
+Left open rather than resolved; see open questions.
 
 **Requires — some modifiers depend on another being present:**
 

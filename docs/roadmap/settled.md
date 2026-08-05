@@ -145,9 +145,9 @@
     front line turning the enemy phase into a second player phase, bounded at
     the weapon where the player can see it rather than by a new per-character
     resource.
-  - **Crit riders are deliberately not a group.** `CritWeaken` and `CritSunder`
-    share a trigger but fail both tests: they do not contradict, and they cost
-    no enemy-turn economy since they ride an attack already paid for.
+  - Crit riders are **not** a group, on the reasoning that they neither
+    contradict nor cost enemy-turn economy — but that one is provisional rather
+    than settled; see open questions.
   - Requires: `Riposte` and `BlockWeaken` need `Block`, `Rout` needs `Cleave`.
     Each would otherwise be a dead stack, so it is illegal rather than bad. This
     makes grafting **order-dependent** — a dagger cannot be offered `Riposte`
