@@ -25,19 +25,43 @@ sealed class ModifierSet                 // ModifierType → stack count
     ModifierSet With(ModifierType t, int n, ModifierSet forged);   // clamped merge
 }
 
+[Flags] enum WeaponKind { Melee = 1, Ranged = 2, Caster = 4, Any = 7 }
+
 static class ModifierRules               // the §1.1 table, one place only
 {
     const int AcquiredHeadroom = 5;      // per modifier type, independently
     static int PerStack(ModifierType t);
     static int Offset(ModifierType t);   // CritMultiplier 2, Charges 1, else 0
     static int MaxForged(ModifierType t);// Light 1, else 3  — §1.1
-    static int  Group(ModifierType t);   // reaction / displacement / none
-    static bool Allowed(ModifierType t, WeaponClass c);   // melee / ranged / caster
+
+    // Declared one direction only; the symmetric closure is built at static
+    // init, so a pair is one line and can never be half-declared.
+    static readonly IReadOnlyDictionary<ModifierType, ModifierType[]> Excludes =
+        Symmetric(new()
+        {
+            [Brace] = [Opportunist, Overwatch],   // one reaction per weapon
+            [Opportunist] = [Overwatch],
+            [Push]  = [Drag, Rout],               // one displacement direction
+            [Drag]  = [Rout],
+        });
+
+    // Absent → WeaponKind.Any
+    static readonly IReadOnlyDictionary<ModifierType, WeaponKind> RequiresKind =
+        new()
+        {
+            [Brace] = Melee, [Opportunist] = Melee,
+            [Overwatch] = Ranged,
+            [Cast] = Caster,
+        };
 
     static int Cap(ModifierType t, int forgedStacks)
         => forgedStacks + AcquiredHeadroom;    // no clamp: nothing is capped
     static int Resolve(ModifierType t, int stacks)
         => Offset(t) + PerStack(t) * stacks;
+
+    static bool Allowed(ModifierType t, WeaponKind kind, ModifierSet present)
+        => RequiresKind.GetValueOrDefault(t, Any).HasFlag(kind)
+        && !Excludes.GetValueOrDefault(t, []).Any(x => present.Stacks(x) > 0);
 }
 ```
 
@@ -52,18 +76,46 @@ tables, boss theming, all of which are data — rather than in `With`, since it
 constrains the forge and never acquisition. Two values: `Light` at 1, everything
 else at 3.
 
-`Group` and `Allowed` are the §1.1 exclusion rules, and they gate *offers*
-rather than rejecting after the fact: the graft roll (§6.4) filters the
-candidate list, and a themed boss filters its **drop table by class** (§4.3)
-rather than skipping the graft. Both should read the same two predicates, so
-there is one definition of "this weapon cannot hold that."
+**`Excludes` is a table rather than a group enum**, and that is deliberate. A
+`Group(t)` returning `reaction | displacement | none` forces every exclusion to
+be transitive and to earn a name, which is fine for the two that exist and wrong
+the first time a pair needs to exclude without a third joining them. A
+`ModifierType → ModifierType[]` map expresses any relation, adds a rule in one
+line, and keeps the whole thing readable as data.
+
+The cost is that a hand-written map can be **half-declared** — `Brace` excluding
+`Opportunist` while `Opportunist` forgets `Brace` — and the bug that produces is
+order-dependent and horrible. So the table is declared **one direction only** and
+`Symmetric()` builds the closure at static init. Adding an exclusion is then a
+single entry that cannot be got wrong, which is the reason to prefer the
+dictionary in the first place rather than a reason to be careful with it.
+
+`Allowed` folds both rules into one predicate, so there is exactly one
+definition of "this weapon cannot hold that" and every caller asks the same
+question. It gates *offers* rather than rejecting after the fact:
+
+| Caller | Uses it to |
+| --- | --- |
+| Weapon data validation | Assert no forged spread is illegal (§1.2) |
+| Enchanter graft roll (§6.4) | Filter the candidate list before rolling |
+| Themed boss drop table (§4.3) | Drop whole **classes** that cannot take the theme |
+
+The third is the odd one, because it is a *class*-level question — "could any
+weapon of this class hold `Brace`?" — rather than a weapon-level one. It works
+today because every conflict comes from a class **baseline**, which all four
+variants share, so checking the baseline answers for the class. That stops being
+true if a theme is ever drawn from something other than a class signature: a
+`Rout`-themed boss would conflict with the Routing Axe alone and would need to
+exclude a *variant* rather than a class. Worth knowing before broadening themes.
 
 A test should assert `MaxForged` over the whole unique table, since that limit
 is what every per-stack value in §1.1 is priced against and it is enforced by
 convention in data rather than by the type system. The same test should walk all
-32 weapons plus the uniques and assert no forged spread violates `Group` or
-`Allowed` — cheap, and it catches the case where a future class baseline quietly
-gives someone two reactions.
+32 weapons plus the uniques and assert no forged spread violates `Allowed` —
+cheap, and it catches the case where a future class baseline quietly gives
+someone two reactions. A third assertion is nearly free and worth having:
+`Excludes` is symmetric after construction, which is the invariant
+`Symmetric()` exists to guarantee.
 
 The same test should check the **derivation rule** (§1.5): every unique must
 match some variant's spread with exactly one modifier raised to `×3` and nothing
