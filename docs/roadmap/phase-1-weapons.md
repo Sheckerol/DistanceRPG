@@ -643,8 +643,54 @@ differ in what they apply and what it costs in mana.
 Staff of Renewal is today's shipped Staff with its numbers unchanged, so
 parity holds.
 
-Each carries `Cast ×1`, so the stacking model applies here too: `Cast ×2`
-applies the effect at double level.
+### `Cast` is efficiency, not magnitude
+
+**`Cast ×n` discounts the weapon's mana cost by 10% a stack**, proportional
+exactly as `Light` is on movement (§1.1). It is not an effect multiplier and
+never was a good one — with tier now carrying the effect's power (§3.3), having
+`Cast` do magnitude too would be two dials on one number.
+
+The division is clean, and the two halves come from different places:
+
+| | Sets | Earned by |
+| --- | --- | --- |
+| **Enchantment tier** | How hard the effect lands | Casting — mana moved (§3.3) |
+| **`Cast` stacks** | What the cast costs | Forged, farmed, grafted (§1.1) |
+
+A Staff of Mire at `Cast ×5` costs 12 mana instead of 25. Same Mire.
+
+### An efficient staff is harder to level, and that is the point
+
+The two dials pull against each other, and the loop is worth following:
+
+1. Casts cost **movement and mana both** — 40 and 20 for a staff.
+2. An unmodified caster is **mana-bound**: four casts a turn is 160 movement,
+   the whole budget, and 80 mana, which no starting pool sustains. You stop
+   because you are dry.
+3. `Cast` stacks move you to **movement-bound**. At `×5` those same four casts
+   cost 48 mana, and at `×8` only 32 — the pool is no longer what stops you.
+4. But **mana moved is the enchantment's XP** (§3.3). Once movement-bound, every
+   further stack of `Cast` is strictly less mana moved for the same number of
+   casts, so the effect you are casting levels more slowly.
+
+**An efficient casting tool is genuinely harder to level up, and gives you more
+for every point you spend.** That is a real trade rather than a strictly-better
+modifier, and it is the first place in the design where a modifier has a
+downside written into it rather than merely an opportunity cost.
+
+It also splits the caster into two coherent builds:
+
+- **The cheap staff** casts constantly, holds the fight together, and grows a
+  large *pool* — its mana XP still feeds max mana (§2.2), which is the ladder
+  efficiency does help. Its effect stays shallow for a long time.
+- **The expensive staff** casts less and each cast is an event, but every one of
+  them banks the full 25 toward tier. Its effect gets deep fast, and it spends
+  half its turns unable to act.
+
+Neither is the upgrade. And the wrinkle that keeps it from being a simple pick
+is that the pool you grow is also the pool your locks eat (§3.3) — so the cheap
+staff builds the capacity to *carry* deep enchantments at the same rate it fails
+to level them.
 
 ### The effect *is* the staff's enchantment
 
@@ -717,8 +763,14 @@ only in geometry. Shapes are in logic units.
 All shapes stop at walls — `LineOfSight` already does segment-vs-wall tests and
 extends naturally to per-target checks inside a shape.
 
-Wands carry `Cast ×1` like staves; the shape is a field, the stack is the
-damage multiplier.
+Wands carry `Cast ×1` like staves, and it means the same thing — **20% off the
+20 mana a cast costs**, not more damage (§1.3). The shape is a field; wand
+damage comes from weapon level (§2.2) and from the damage type's tier below.
+
+The efficiency trade lands harder on wands than on staves, because a wand's
+proficiency XP is *total damage across every target in the shape* (§2.2). A
+cheap wand fires more often into more bodies and levels the weapon fast, while
+levelling its element slowly. An expensive one is the reverse.
 
 ### The damage type is the wand's enchantment, and it is rolled
 

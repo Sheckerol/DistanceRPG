@@ -227,7 +227,7 @@ hand it.
 | --- | --- | --- |
 | `Brace`, `Opportunist` | **Melee only** — dagger, sword, spear, axe | A threat zone is a weapon's physical reach; you cannot menace a tile with a bow |
 | `Overwatch` | **Ranged only** — bow, throwing | Holding a shot is what a nocked arrow does; a spear cannot wait for a target to appear |
-| `Cast` | **Casters only** — staff, wand | It scales an effect level, and a weapon with no `CastEffect` has nothing to scale |
+| `Cast` | **Casters only** — staff, wand | It discounts a mana cost, and a weapon that spends no mana has nothing to discount |
 
 Together these give a rule worth stating on its own:
 
@@ -287,7 +287,7 @@ ceiling — a forged spread reaches further.
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Requires `Block`; block-response group. Levels **accumulate**, uncapped — §1.6 |
-| `Cast` | +1 effect level applied | 5 | Staves and wands |
+| `Cast` | **−10% mana cost** per stack, proportional | 5 | Staves and wands. Efficiency, not magnitude — §1.3 |
 
 ### `Light` has to be proportional, not flat
 
@@ -307,8 +307,13 @@ game — so the **resolved** cost is computed once and displayed on the weapon.
 The player reads `Cost 15`, never `30 −50%`.
 
 **The general rule: a modifier acting on a value that varies across classes has
-to be proportional.** `Light` is the only one that does — every class has a
-cost. `Block` is flat by deliberate exception: absorbing 3 is meant to blunt
+to be proportional.** `Light` and `Cast` are the two that do — `Light` on the
+movement cost every class has, `Cast` on the mana cost only casters have (15–25
+across the variants, so the same argument applies in miniature). The two are the
+same modifier pointed at the game's two currencies, which is why they take the
+same shape and the same −10%.
+
+`Block` is flat by deliberate exception: absorbing 3 is meant to blunt
 many small hits more than one large one, and the minimum-1 rule already stops
 it running away.
 

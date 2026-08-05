@@ -43,6 +43,14 @@
 - **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
   Multiplying an applied effect on a natural 20 is a rounding event on 5% of
   casts. Caster uniques follow, arriving at tier 3.
+- **`Cast` is efficiency, not magnitude** — −10% mana cost per stack,
+  proportional, the same modifier as `Light` pointed at the other currency.
+  Tier sets how hard an effect lands; `Cast` sets what it costs.
+- **An efficient caster is harder to level.** Mana moved is enchantment XP, so
+  once `Cast` stacks make a caster movement-bound rather than mana-bound, every
+  further stack moves less mana for the same casts. More bang per point spent,
+  and a slower climb — the first modifier in the design with a real downside
+  written into it rather than an opportunity cost.
 - **A staff's effect and a wand's damage type *are* their enchantments.** The
   staff's is fixed by variant, because a staff is its effect; the wand's is
   rolled, because a wand is its shape. So a staff levels the effect it casts by

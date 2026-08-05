@@ -224,10 +224,15 @@ seven stacks of headroom instead of one.
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
 `Weakened`.
 
-`Weapon` gains `WeaponClass` (the eight above), `Forged` (§1.1), `AreaShape?`,
-and `StatusEffectType? CastEffect` — which effect a staff or wand applies is a
-*field*, not a modifier; the modifier only says how hard it lands. Phase 3's
-drop tables key off `WeaponClass`.
+`Weapon` gains `WeaponClass` (the eight above), `Forged` (§1.1) and
+`AreaShape?`. There is **no `CastEffect` field** — a staff's effect is its innate
+enchantment (§1.3), so it lives in the enchantment list with everything else and
+`Cast` discounts the mana cost rather than scaling it. Phase 3's drop tables key
+off `WeaponClass`.
+
+`Cast` therefore resolves like `Light`, against `Weapon.ManaCost` instead of
+`Weapon.Cost`, and both want the same treatment: resolve once, display the
+resolved number, never show the player a percentage mid-turn.
 
 `ActorState` gains its own `ModifierSet` for **innate** modifiers (§4.3), and
 every resolution site reads weapon **plus** innate rather than weapon alone.

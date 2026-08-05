@@ -231,3 +231,23 @@
 - **Does `Block` or the type chart apply first?** §3.5 flags it; the numbers
   differ and the answer is a decision, not a derivation. Crits already bypass
   `Block` entirely (§1.6), so the interesting case is a resisted crit.
+- **Where exactly does the mana-bound / movement-bound crossover sit?** The
+  whole `Cast` trade (§1.3) depends on there being a crossover at all — if a
+  caster is movement-bound from `Cast ×1`, efficiency is pure downside on the
+  levelling axis, and if they never stop being mana-bound even at `×8`, it is
+  pure upside. The interesting shape needs the crossover somewhere in the middle
+  of the stack range, which is a joint constraint on cast cost (40), mana cost
+  (15–25), the movement budget (160) and the regen rate. None of those four were
+  chosen with this in mind, so at least one probably has to move.
+- **Does `Cast` on a wand mean something different in practice?** Wand
+  proficiency XP is total damage across the shape (§2.2), so a cheap wand levels
+  the *weapon* fast while levelling its *element* slowly. A staff has no such
+  second ladder — its proficiency comes from effect level applied, which tier
+  drives, so efficiency slows both of a staff's ladders and only one of a wand's.
+  That may make `Cast` straightforwardly better on wands than on staves.
+- **Is there anything left for a caster Efficiency variant?** `Light` discounts
+  movement and `Cast` now discounts mana, so a caster already has an efficiency
+  signature. §1.2 exempts casters from the four-role frame, which sidesteps it —
+  but `Cast ×2` as a Purity variant and `Light ×1` as Efficiency are now two
+  discounts on one weapon, and it is worth checking they do not stack into a
+  caster that acts nearly for free.
