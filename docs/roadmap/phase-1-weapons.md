@@ -23,18 +23,18 @@ Two things this fixes over a rigid "crit-specced" slot. A class whose identity
 And every class gets a **support** weapon, so each one has a reason to exist in
 a party that already has damage covered.
 
-### Every baseline carries `CritMultiplier ×1`
+### Every class has a second baseline modifier
 
 **No weapon in the game is forged with fewer than two modifiers.** Every class
-baseline is its signature *plus* `CritMultiplier ×1`, so the four roles resolve
-to one of exactly two shapes:
+baseline is its signature *plus* a second, so the four roles resolve to one of
+exactly two shapes:
 
 | Role | Forged spread | Shape |
 | --- | --- | --- |
-| Efficiency | `signature ×1, CritMultiplier ×1, Light ×1` | three at `×1` |
-| **Purity** | `signature ×2, CritMultiplier ×1` | one `×2`, one `×1` |
-| Control | `signature ×1, CritMultiplier ×1, control ×1` | three at `×1` |
-| Support | `signature ×1, CritMultiplier ×1, support ×1` | three at `×1` |
+| Efficiency | `signature ×1, second ×1, Light ×1` | three at `×1` |
+| **Purity** | `signature ×2, second ×1` | one `×2`, one `×1` |
+| Control | `signature ×1, second ×1, control ×1` | three at `×1` |
+| Support | `signature ×1, second ×1, support ×1` | three at `×1` |
 
 Three forged stacks either way, never on fewer than two modifiers.
 
@@ -44,22 +44,44 @@ could only ever absorb half of what farming offers. A Purity variant would have
 been the one weapon in the game you could not fully invest in — precisely
 backwards, since it is the one that most wants depth.
 
-**The design reason is that crits are everyone's answer to armour.** §1.6 makes
-crits bypass `Block` entirely, and notes that a natural 20 is the universal way
-through a shield. At the old `×2` base that answer was real but weak. At `×3` it
-lands: a sword's 10 becomes 30 through any amount of armour, once in twenty
-swings.
+The second modifier is **class-specific**, and each one says something the
+signature alone does not:
 
-This costs the dagger nothing — its baseline was already
-`CritWindow ×1, CritMultiplier ×1`, and it stays the crit class because it owns
-the *frequency* dial. Everyone else now hits hard on the rare crit; only the
-dagger crits often.
+| Class | Baseline | The second says |
+| --- | --- | --- |
+| Dagger | `CritWindow ×1, CritMultiplier ×1` | Crit is two dials, and the dagger owns both |
+| Sword & Shield | `Block ×1, Push ×1` | **A shield bash.** You stop them, then you move them |
+| Spear | `Brace ×1, Longshot ×1` | Full extension is where a polearm wants to be |
+| Axe | `Cleave ×1, CritMultiplier ×1` | Heavy things land catastrophically |
+| Ranged | `Longshot ×1, CritWindow ×1` | An aimed shot finds the gap |
+| Throwing | `Charges ×1, CritMultiplier ×1` | Throw enough and one lands perfectly |
+| Staff / Wand | `Cast ×1, CritMultiplier ×1` | A crit multiplies whatever that cast does |
 
-**Casters take the same rule** with the caveat §1.2 already carries. Staff and
-wand baselines become `Cast ×1, CritMultiplier ×1`, where the multiplier scales
-whatever that weapon's crit does — damage for a wand, applied effect level for a
-staff (§1.6). Their four variants differ by effect and shape rather than by
-adding a stack, so a caster carries two forged stacks rather than three.
+Three of these change what the class *does*, not just its numbers:
+
+- **`Push` gives the sword a positioning tool it completely lacked.** Every
+  other martial class could move an enemy or refuse to be moved; the shield
+  could only absorb. A hit that shoves means a sword-bearer can open a lane, peel
+  something off a caster, or shove a target back into a spear's threat zone. It
+  is also the exact fantasy — a shield is a thing you hit people with.
+- **`Longshot` makes the spear want to fight at exactly its reach**, which is
+  where its `Brace` threat zone already lives. The two reinforce: stand at full
+  extension, threaten everything that closes, and hit hardest doing it. A spear
+  that steps in loses both at once.
+- **`CritWindow` gives the bow crit *frequency*** where the dagger has it too,
+  which is what makes DEX read as the precision stat rather than merely the fast
+  one. It is the one place another class shares the dagger's dial.
+
+`CritMultiplier` is the fallback where no better answer exists — axe, throwing
+and the casters — and it is not a filler pick. §1.6 makes crits bypass `Block`
+entirely, so a natural 20 is every class's way through armour, and at `×3`
+rather than `×2` that answer actually lands.
+
+**Casters take the rule with the caveat §1.2 already carries.** Their four
+variants differ by effect and shape rather than by adding a stack, so a caster
+carries two forged stacks rather than three. `CritMultiplier` scales whatever
+that weapon's crit does — damage for a wand, applied effect level for a staff
+(§1.6).
 
 **Cost columns below are base costs.** An Efficiency weapon shows the same cost
 as its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is
@@ -83,9 +105,14 @@ should read in the movement cost, since movement is what the game is about.
 The spear's damage is 7 and it now costs 55, so it swings twice a turn for 14 —
 which is correct rather than broken. **A spear is not a weapon you attack
 with, it is a weapon you threaten with.** Its value is `Brace` firing for free
-on the enemy turn and 130 units of reach; the swing is the fallback. High cost
-makes that identity explicit instead of leaving the spear a cheap poking stick
-that happens to brace.
+on the enemy turn and 128 units — **exactly four tiles** — of reach; the swing
+is the fallback. High cost makes that identity explicit instead of leaving the
+spear a cheap poking stick that happens to brace.
+
+The reach is pinned at 128 rather than the prototype's 130 so that "four tiles"
+is exact rather than approximate. `Longshot` keys off tile counts (§1.1) and the
+spear's baseline now carries it, so the difference between 4.0 and 4.06 tiles is
+the difference between a rule and a rounding artefact.
 
 Throwing at 15 undercuts the bow despite a javelin outweighing an arrow — a
 throw is a quicker action than nocking, drawing and aiming, and the Charges cap
@@ -119,12 +146,17 @@ range it can reach:
 
 | Weapon | Forged | Crits on | Rate |
 | --- | --- | --- | --- |
-| Any non-dagger | — | 20 | 5% |
-| Dagger baseline | `×1` | 19–20 | 10% |
-| Assassin's Fang | `×2` | 18–20 | 15% |
-| Widowmaker | `×3` | 17–20 | 20% |
+| Sword, spear, axe, throwing, casters | — | 20 | 5% |
+| Dagger or bow baseline | `×1` | 19–20 | 10% |
+| Assassin's Fang, Longbow | `×2` | 18–20 | 15% |
+| Widowmaker, Stormcrow | `×3` | 17–20 | 20% |
 | Assassin's Fang, fully worked | `×6` | 14+ | 35% |
 | **Widowmaker, fully worked** | `×8` | 12+ | **45%** |
+
+`CritWindow` is forged on **daggers and bows only** — the two DEX classes — so
+crit frequency is what DEX buys. Everything else crits on a natural 20 and no
+amount of farming or service changes that, since the roll only deepens modifiers
+a weapon already carries (§3.2) and a graft caps at `×5` (§6.4).
 
 **The band that matters is the top half of that table, and almost nobody sees
 it.** Every stack past the forged spread has to be won one at a time from the
@@ -144,10 +176,11 @@ multiplier; only a unique that raised `CritMultiplier` instead of its own
 signature reaches ×10. **Frequency and magnitude are therefore separate
 uniques**, and no single weapon is forged deep in both.
 
-Note the asymmetry that creates. `CritMultiplier` is universal, so *any* class
-can be taken deep on crit damage — but `CritWindow` is forged on daggers alone,
-so only a dagger can be taken deep on crit *frequency*. An axe worked to a ×8
-multiplier still only crits on a 20; it just removes a room when it does.
+Note the asymmetry that creates. `CritMultiplier` is on four of the eight
+baselines and reachable by graft on the rest, so most classes can be taken deep
+on crit *damage* — but `CritWindow` is forged on daggers and bows alone, so only
+DEX can be taken deep on crit *frequency*. An axe worked to a ×8 multiplier
+still only crits on a 20; it just removes a room when it does.
 
 So a crit build is not "crit constantly" but **"crit rarely and
 catastrophically"** — and the two dagger specialists split exactly along that
@@ -157,7 +190,7 @@ magnitude.
 Starting at `×1` rather than the prototype's `×4` also leaves the dagger seven
 stacks of headroom for depth, grafts and services to work with, instead of one.
 
-### Sword & Shield (max STR/DEX) — baseline `Block ×1, CritMultiplier ×1`
+### Sword & Shield (max STR/DEX) — baseline `Block ×1, Push ×1`
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
@@ -189,14 +222,30 @@ is not a successful block and neither `Riposte` nor `BlockWeaken` triggers on
 one. A crit-heavy attacker beats the whole class rather than just its
 mitigation, which is the price the sword pays for scaling to `Block ×8`.
 
-### Spear (STR) — baseline `Brace ×1, CritMultiplier ×1`
+### The shield bash is the class's second half
+
+Baseline `Push ×1`: **a sword hit shoves the target back a tile per stack.**
+
+Before this the shield could only ever say no. Every other martial class had a
+way to change where an enemy stood — the spear pushes and pins, the axe routs, a
+thrower drags — and the one class built to stand in front of things could not
+move them at all. `Push` makes the sword an active line rather than a wall:
+shove a target off a caster, open a lane through a doorway, or drive something
+back into a spear's threat zone so the brace fires on the way in.
+
+It also pairs with `Block` in the obvious way. You absorb the hit, then you
+answer it — and unlike `Riposte` and `BlockWeaken`, `Push` does not need the
+block to have *succeeded*, so it is the one part of the sword's kit that still
+works against a crit-heavy attacker.
+
+### Spear (STR) — baseline `Brace ×1, Longshot ×1`
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
-| Efficiency | Skirmisher's Pike | 130 | 7 | 55 | `Light ×1` |
-| Purity | Phalanx Spear | 130 | 7 | 55 | `Brace ×1` → 2 retaliations |
-| Control | Halberd | 130 | 7 | 55 | `Push ×1` |
-| Support | Pinning Lance | 130 | 7 | 55 | `Pin ×1` |
+| Efficiency | Skirmisher's Pike | 128 | 7 | 55 | `Light ×1` |
+| Purity | Phalanx Spear | 128 | 7 | 55 | `Brace ×1` → 2 retaliations |
+| Control | Halberd | 128 | 7 | 55 | `Push ×1` |
+| Support | Pinning Lance | 128 | 7 | 55 | `Pin ×1` |
 
 The spear is the class that decides **where enemies are**, and its two
 non-baseline tools are exact opposites:
@@ -211,6 +260,30 @@ non-baseline tools are exact opposites:
 
 Pin applies the existing `Mire` effect (§1.3) rather than inventing its own, so
 it reuses machinery already being built.
+
+### `Longshot` on a four-tile weapon is a positioning rule, not a curve
+
+Baseline `Longshot ×1`, and the spear's reach is exactly four tiles. `Longshot`
+pays `+1` per stack per tile beyond three, so on a spear **only the final tile
+qualifies**: fight at full extension and every stack pays, step in and none of
+them do.
+
+That is a feature rather than a degenerate case. On a bow `Longshot` is a curve
+you optimise across a whole room; on a spear it collapses into a single binary
+question — *am I at reach?* — which is exactly the question the class already
+asks. `Brace` threatens the tile an enemy must cross; `Longshot` pays you for
+standing where that threat lives. **A spear that closes loses both at once**,
+and a spear that holds its distance is doing the two things it is for
+simultaneously.
+
+The numbers stay modest at first — `+1` on a 7-damage poke — but the farm
+compounds it hard. A spear worked to `Longshot ×6` deals 13 at reach and 7 in
+melee, which turns a rounding error into the whole reason to play the class
+carefully.
+
+Note this makes the spear the only weapon whose two baseline modifiers want the
+*same* position. Most classes trade between their dials; the spear's reinforce,
+which is what makes it the least flexible and most decisive martial class.
 
 ### Axe (STR) — baseline `Cleave ×1, CritMultiplier ×1`
 
@@ -232,7 +305,7 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 - **Rout** — everything caught by the cleave is pushed back a tile per stack.
   One swing that resets a whole crowd's position buys the entire party room.
 
-### Ranged (DEX) — baseline `Longshot ×1, CritMultiplier ×1`
+### Ranged (DEX) — baseline `Longshot ×1, CritWindow ×1`
 
 **Longshot**: damage rises with distance to the target — `+1` per tile beyond
 3 tiles, per stack. A bow in the front rank is nearly useless; the same bow
@@ -259,6 +332,24 @@ that is what `Longshot` *is*. The answer to an enemy in your face is not a
 stronger bow, it is a different weapon, so the baseline stays weak and the
 range curve does the work.
 
+### Baseline `CritWindow ×1` — the aimed shot
+
+The bow is the only class besides the dagger forged with crit *frequency*, and
+that is what makes DEX the precision stat rather than merely the fast one. A
+drawn bow is aimed in a way a swung axe is not.
+
+Mechanically it compounds with `Longshot` rather than sitting beside it. Crit
+damage multiplies the *resolved* number (§1.6), and the resolved number is
+whatever distance has already made it — so a 19–20 at the far end of a room is
+the biggest single hit an ordinary weapon produces. A Longbow at ten tiles deals
+`5 + 14 = 19`, and a crit takes it to 38 with `Block` ignored entirely.
+
+That is the ranged class's whole answer to armour, and it is a positional one:
+the archer who backed up is also the archer who crits for meaningful damage. It
+is worth watching in play — see the open questions, since `Longshot` and
+`CritWindow` deepening together is the sharpest compounding pair in the game
+outside the dagger's two crit dials.
+
 ### Every stat owns a close option and a ranged one
 
 That answer only holds because swapping never costs you *progression*. Weapon
@@ -269,7 +360,7 @@ rate:
 | Stat | Close | Mid | Far |
 | --- | --- | --- | --- |
 | DEX | Dagger 40 | *(Sword 80)* | Ranged 320 |
-| STR | Axe 60 | Spear 130 | Throwing 190 |
+| STR | Axe 60 | Spear 128 | Throwing 190 |
 | INT | Enchanted dagger | Staff 100, Wand ~160 | Enchanted bow |
 
 **INT solves range by borrowing, not by owning.** Enchantments are
@@ -506,10 +597,10 @@ unchanged.
 
 | Unique | Class | Built from | Modifiers | Reads as |
 | --- | --- | --- | --- | --- |
-| The Bulwark | Sword | Tower Guard | `Block ×3, CritMultiplier ×1` | Absorbs 9, and little else |
+| The Bulwark | Sword | Tower Guard | `Block ×3, Push ×1` | Absorbs 9 and shoves what it stops |
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | Finds the gap on 17+ |
-| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, CritMultiplier ×1` | Three retaliations a turn |
-| Stormcrow | Ranged | Longbow | `Longshot ×3, CritMultiplier ×1` | +3 damage a tile; lethal across a room |
+| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | Three retaliations, all at full reach |
+| Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | +3 a tile; lethal across a room |
 | Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | Four throws, and the movement to reposition after |
 | Shieldbreaker | Axe | Reaver | `Cleave ×1, CritMultiplier ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
 

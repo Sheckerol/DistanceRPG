@@ -98,13 +98,24 @@ new classes append after them.
 Sword, spear and staff map to `×1` directly, preserving their shipped
 *signature* values.
 
-**A second parity break comes with the universal baseline.** Every class now
-carries `CritMultiplier ×1` (§1.2), so a crit multiplies by ×3 rather than the
-shipped ×2 for every weapon in the game, not just daggers. Any test asserting
-crit damage on a sword or spear moves with it. This is deliberate — it is what
-makes the natural-20 answer to `Block` worth having (§1.6) — but it is a
-game-wide damage change and should land in one commit with its own test sweep
-rather than riding along with the stacking migration.
+**More parity breaks come with the second baseline modifier** (§1.2). Every
+class gains one, and three of them change behaviour rather than numbers:
+
+| Class | Gains | Breaks |
+| --- | --- | --- |
+| Sword | `Push ×1` | Sword hits now displace — new behaviour, not a number |
+| Spear | `Longshot ×1` | Spear reach moves 130 → **128**, so four tiles is exact |
+| Ranged | `CritWindow ×1` | Bows crit on 19–20 rather than 20 |
+| Axe, throwing, casters | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
+
+The spear's range change is the one to watch: 130 is a shipped value and may be
+asserted directly. It is not golden-test data — `TestData/distancerpg-golden.json`
+pins map generation, fog and pathing, not weapon statlines — but any
+`Weapons.cs` parity assertion moves with it.
+
+These should land in their own commit with a test sweep rather than riding along
+with the stacking migration, since together they change what several classes
+*do* and not merely what they roll.
 
 **The dagger is a deliberate exception.** It becomes `CritWindow ×1` — crit on
 19–20, not the prototype's 16+ (§1.2). Two assertions in

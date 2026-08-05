@@ -45,9 +45,9 @@ forces those across **at least two modifiers**. There is no new rule doing that
 investment has nowhere to go but sideways.
 
 The allowance is never wasted, because **no weapon is forged with fewer than two
-modifiers** (§1.2). That is the whole reason `CritMultiplier ×1` sits in every
-class baseline: without it a Purity variant would carry one modifier, absorb
-five stacks, and be the one weapon in the game you could not fully invest in.
+modifiers** (§1.2). That is the whole reason every class baseline carries a
+second: without it a Purity variant would hold one modifier, absorb five stacks,
+and be the one weapon in the game you could not fully invest in.
 
 A fully farmed Assassin's Fang therefore comes out `CritWindow ×2+5`,
 `CritMultiplier ×1+5` — both dials of the crit build maxed, from one weapon that

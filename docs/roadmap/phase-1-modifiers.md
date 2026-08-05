@@ -7,8 +7,10 @@ classes vary by stat profile; caster classes vary by what the cast actually
 does. Forcing casters into the martial shape would produce four staves that all
 do the same thing at different prices, which is not interesting.
 
-Every class baseline is its signature **plus `CritMultiplier ×1`** (§1.2), so no
-weapon in the game is forged with fewer than two modifiers.
+Every class baseline is its signature **plus a class-specific second modifier**
+(§1.2), so no weapon in the game is forged with fewer than two modifiers:
+`Push` on the sword, `Longshot` on the spear, `CritWindow` on the bow,
+`CritMultiplier` elsewhere.
 
 | Class | Stat | Class feature | Variant axis |
 | --- | --- | --- | --- |
@@ -173,7 +175,7 @@ ceiling — a forged spread reaches further.
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive, not compounding; **max forged ×1**, so it ceilings at ×6 |
 | `Riposte` | +1 counter per turn | 5 | |
-| `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | |
+| `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | Fires on any hit, however delivered — a swing, a throw, or a brace |
 | `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |

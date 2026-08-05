@@ -132,13 +132,16 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
-- **Every class baseline carries `CritMultiplier ×1`**, so no weapon is forged
-  with fewer than two modifiers and every forged spread is either three at `×1`
-  or one `×2` and one `×1`. Mechanically this stops a Purity variant being the
-  one weapon that could not absorb a full farm; by design it makes the natural
-  20 a real answer to `Block`, since crits bypass it (§1.6) and `×3` lands where
-  `×2` did not. The dagger keeps its identity because it owns crit *frequency* —
-  `CritMultiplier` is universal, `CritWindow` is forged on daggers alone.
+- **Every class baseline carries a class-specific second modifier**, so no
+  weapon is forged with fewer than two and every forged spread is either three
+  at `×1` or one `×2` and one `×1`. Mechanically this stops a Purity variant
+  being the one weapon that could not absorb a full farm (§3.2). The picks:
+  `Push` on sword & shield — a shield bash, and the positioning tool the class
+  completely lacked; `Longshot` on spear, whose reach is pinned to exactly four
+  tiles so it pays only at full extension, reinforcing the `Brace` threat zone;
+  `CritWindow` on ranged, making DEX the precision stat and the bow the second
+  crit-frequency class; `CritMultiplier` elsewhere, which is not filler — crits
+  bypass `Block` (§1.6), so a natural 20 at `×3` is a real answer to armour.
 - **Unique chance accelerates toward an asymptote, never to certainty.** A
   logistic on `DefeatCount`: ~1% at 5, 11% at 15, 25% at 20, flattening toward a
   50% ceiling. A flat per-cycle rate made deep farming a novelty; the S-curve

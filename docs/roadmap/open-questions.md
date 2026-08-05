@@ -106,12 +106,26 @@
   is that it leaves a three-modifier weapon something for the enchanter to do;
   the argument against is that it is exactly the kind of bespoke ceiling §1.1
   spent a section rejecting.
-- **Does a universal `CritMultiplier ×1` make crits too swingy game-wide?**
-  Every weapon now crits for `×3` instead of `×2`, and crits ignore `Block`
-  entirely (§1.6) — so an axe's natural 20 goes from 36 to 54 through any
-  armour, and enemy crits do the same to the party. The change is what makes the
-  universal answer to armour real, but it raises the variance of every fight in
-  the game by 50% on the tail, which no other decision here has done so bluntly.
+- **Does `CritMultiplier ×1` on four baselines make crits too swingy?** Axe,
+  throwing and the casters now crit for `×3` instead of `×2`, and crits ignore
+  `Block` entirely (§1.6) — an axe's natural 20 goes from 36 to 54 through any
+  armour, and enemy crits do the same to the party. It is what makes the
+  natural-20 answer to armour real, but it raises tail variance by 50% for those
+  classes, which no other decision here has done so bluntly.
+- **`Longshot` and `CritWindow` on the same weapon is the sharpest compounding
+  pair outside the dagger.** A bow's crit multiplies the *distance-inflated*
+  damage, so a Longbow at ten tiles deals 19 and crits for 38 with `Block`
+  ignored — and a farm can deepen both dials at once, since the roll picks among
+  what the weapon carries (§3.2). Stormcrow worked to `Longshot ×8,
+  CritWindow ×6` is a 35% chance of something very large from across a room.
+  Whether that is the archer fantasy paying off or a hole depends on how easily
+  enemies close the distance, which needs the kiting AI to exist first.
+- **Does the sword's `Push` fight its own class?** A shield-bearer is the party's
+  front line, and shoving a target back can pull it *out* of the axe's cleave or
+  a spear's threat zone as easily as into one. `Push` on a Halberd is chosen —
+  you swing it when you want displacement — but on the sword it fires on every
+  hit, whether or not the party wanted the target moved. Worth checking whether
+  it needs to be opt-in, which no other modifier is.
 - **Should the 50% stack roll be flat?** A flat rate makes early farming feel
   reliable and the allowance land around `DefeatCount 20`, matching the unique
   curve's midpoint. A decaying rate would stretch the stack curve to match the
