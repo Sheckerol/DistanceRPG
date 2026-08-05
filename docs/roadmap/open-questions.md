@@ -84,6 +84,19 @@
   more**, and that is most of the answer to "is this too strong." What remains
   is whether ~120 on 45% is fine at the end of a campaign. Probably yes, given
   the grind, but it wants watching rather than assuming.
+- **Is `+5` per revival the right step, and is the three-way roll the right
+  shape?** §3.2 gives a revived dummy `+5` damage, `+5` max HP, or both, at a
+  third each. Against a starting party dealing 10–18 a swing, `+5` HP is small
+  and `+5` damage is large — a dummy at `DefeatCount 5` could plausibly be
+  out-damaging the party while barely being tougher. Splitting the step (say
+  `+3` damage / `+8` HP) or weighting the roll toward health would even that
+  out, but both need play first. Note the enemy's own weapon damage varies by
+  class, so a flat `+5` means much more on a dagger dummy than an axe one.
+- **Does anything scale a boss the same way?** The boss cannot revive, so it
+  never accumulates — which is right, but it means a heavily farmed floor can
+  contain dummies more dangerous than the boss guarding it. Either the boss
+  scales with the deepest `DefeatCount` on its floor, or that inversion is
+  accepted as the price of farming.
 - **How deep does an accumulated `Sundered` actually get in play?** The level
   cap is gone (§1.6) and re-application adds levels, bounded only by one-per-turn
   decay and by the target dying. Against a dummy that is self-limiting; against

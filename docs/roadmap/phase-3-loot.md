@@ -66,6 +66,47 @@ paying. Unbounded, even on a diminishing curve, it becomes a grind-tolerance
 test instead. A visible top also has to fit on a nameplate, which §4.5 requires:
 `3/5` reads at a glance, an asymptote does not.
 
+### What comes back is stronger than what died
+
+**Every revival makes the dummy more dangerous.** On each resurrection it rolls
+one of three outcomes:
+
+| Roll | Gains |
+| --- | --- |
+| Damage | **+5 damage** |
+| Health | **+5 max HP**, restored full |
+| Both | **+5 damage and +5 max HP** |
+
+One third each, as a tuning target. Over five cycles that is roughly `+17`
+damage and `+17` HP in expectation — a dummy that opened the run as scenery
+finishes it as a genuine threat.
+
+**This is the cost the ladder was missing.** §3.2 above prices farming in the
+weapon's long-term potential, which is real but abstract. This prices it in the
+fight itself, immediately and visibly: the tenth cycle is not the first cycle
+nine more times, it is a harder fight for a better drop. Turns stop being the
+only currency, and turns were the cheapest thing a patient player had.
+
+**`DefeatCount` now means two things at once**, and they are deliberately the
+same number. It is the quality of the drop the dummy is carrying *and* how
+dangerous it has become. You cannot bank value into a dummy without arming it.
+The nameplate (§4.5) has to read as a threat level and a reward tier
+simultaneously — which is honest, because that is exactly what it is.
+
+**The bonuses land on the actor, not on the weapon.** A dummy hitting for `+15`
+does not drop a weapon with `+15` on it; drop quality comes from the ladder
+above and nothing else. Otherwise farming would pay twice for one investment,
+and the flat bonus would leak into a modifier system that has no place to put
+it. Store the accumulated values on `EnemyState` alongside `DefeatCount` so
+saves round-trip without replaying rolls (§5.1), and roll on the loot stream's
+sibling — `mapSeed ^ ReviveSalt` — never a continuation of an existing one.
+
+**The scaling does not stop at five.** The drop ladder tops out; the danger does
+not. That is what turns "6+ gives nothing" into "6+ costs you something", and it
+is the sharpest possible version of §4.3's claim that deciding when to stop
+farming is the run's real decision — past five there is a wrong answer, and the
+nameplate tells you where the line is.
+
 ### Hitting five inverts the ladder
 
 Tiers 1–4 trade future depth for power now. Tier 5 does the opposite: a unique's

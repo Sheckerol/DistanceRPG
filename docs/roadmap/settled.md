@@ -113,6 +113,14 @@
   what the weapon carries or, rarely, **graft** something it never had; the
   graft is safe because `forged = 0` caps it at 5, so it is permanently the
   shallowest thing on the weapon.
+- **What comes back is stronger than what died.** Every revival rolls `+5`
+  damage, `+5` max HP, or both — one third each — accumulating on the actor and
+  never on the weapon it drops. `DefeatCount` therefore means two things at
+  once, deliberately: the quality of the drop and how dangerous the dummy has
+  become. You cannot bank value into a dummy without arming it, and the
+  extraction goes back for exactly the ones you armed. The scaling does **not**
+  stop at five even though the drop ladder does, which turns "6+ gives nothing"
+  into "6+ costs you something".
 - **The repeat-kill ladder is short, deep and topped.** `DefeatCount` 1–2 and
   3–4 add one and two acquired stacks to the class signature; 5 rolls a unique;
   6+ does nothing. Depth only, never breadth — breadth is the enchanter's
