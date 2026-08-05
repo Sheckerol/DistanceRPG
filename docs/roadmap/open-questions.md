@@ -188,3 +188,28 @@
   to *yourself* — but crits and fumbles both firing riders may be too much
   status churn per turn. Deliberately not specced.
 
+- **Does a caster still want to crit at all?** Losing `CritMultiplier ×1`
+  leaves staves and wands crit-indifferent — a natural 20 doubles a wand's
+  damage and does very little for a staff's applied effect (§1.6). That may be
+  correct for the classes whose whole pitch is a resource loop rather than a
+  damage roll, or it may leave the d20 feeling inert on two of eight classes.
+  The cheap fix if it does is a caster-specific crit meaning — a free cast, a
+  refunded mana cost — rather than putting the multiplier back.
+- **Is one enchantment on every caster drop too generous?** It is a guaranteed
+  effect on a guaranteed drop, where every other class rolls rarely for the same
+  thing. The arguments that it is fine are that it is capped at tier 1, that it
+  costs an extra run of service time forever after (§6.2), and that a low-INT
+  character cannot afford its lock at all (§3.1). The argument that it is not is
+  that a wizard's first staff is strictly better than a fighter's first sword in
+  a way no other class comparison is.
+- **Does the uncapped tier want a soft brake as well as a quadratic cost?**
+  Service time makes tier 10 a 54-run project, which is almost certainly enough.
+  But the cost is paid in *downtime*, and a player with a deep stable feels
+  downtime much less than a player running two weapons — so the brake is
+  weakest for exactly the player closest to the deep end. If that bites, the
+  answer is probably to make lock scaling superlinear rather than to add a cap.
+- **What raises an enchantment's tier at the enchanter — choice or roll?**
+  §6.4's modifier improvements are a rare roll; tier is specced as bought
+  outright with service time. Those are different economies sitting in the same
+  building, which is either a good contrast (the weapon surprises you, the
+  enchantment obeys you) or an inconsistency.

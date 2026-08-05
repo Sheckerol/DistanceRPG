@@ -21,12 +21,25 @@
   (lock, trigger cost, condition, potency, tier), potency scaling with INT, and
   max mana as the budget. That is what lets a wizard enchant a dagger into
   close-range damage without touching their dagger proficiency.
-- **Modifiers are rolled at drop; enchantments are applied at the enchanter.**
-  The dungeon supplies bodies, the hub supplies souls.
+- **The dungeon supplies bodies and one seed soul; the hub supplies the rest.**
+  A drop rolls an enchantment — always on staves and wands, rarely on everything
+  else — but only ever one, and only ever tier 1. Breadth and depth past that
+  are the enchanter's alone.
+- **Enchantment tier is uncapped.** Lock and potency both scale with it, so max
+  mana already bounds it continuously; a numeric ceiling would be a second limit
+  on the game's most constrained system. Farming may add five tiers, the
+  enchanter may add them forever, and service time is quadratic.
+- **A lock you cannot afford leaves the enchantment dormant**, never the weapon
+  unequippable. Same non-event as a trigger you cannot pay for.
+- **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
+  Multiplying an applied effect on a natural 20 is a rounding event on 5% of
+  casts; a rolled enchantment is an identity, and it gives the farm allowance
+  somewhere to land. Caster uniques follow by fixing the enchantment at tier 3.
 - **Wear is a resource, not damage.** Nothing breaks; using a weapon is what
   makes it enchantable.
-- **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so
-  power and availability trade off directly.
+- **Service costs runs, not gold** — always *the number the work arrives at*:
+  the *n*-th enchantment costs *n* runs, and tier *t* costs *t*. Power and
+  availability trade off directly, and depth and breadth cost the same.
 - **Entering does not tick service.** A successful run ticks; reaching floor 2
   and then failing ticks once as mercy, so a losing streak cannot freeze the
   workshop.

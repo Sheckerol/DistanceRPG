@@ -43,6 +43,32 @@ the last:
 Fifteen runs to a fully enchanted weapon makes it a long-term project, and
 makes a 5-enchantment weapon rare **by construction** rather than by drop rate.
 
+**An innate enchantment counts.** A weapon that dropped already enchanted
+(§3.1) starts the table on its second row, so a caster's first service costs two
+runs and the full climb costs fourteen more. Casters are handed the first
+enchantment and pay for it in downtime, which keeps a free head start from being
+a free fifteen-run shortcut.
+
+**Raising a tier is priced by the same rule.** Service time is always **the
+number the work arrives at** — attaching the 3rd enchantment costs 3 runs, and
+lifting an enchantment to tier 3 also costs 3. `count + 1` was only ever that
+rule stated for the breadth case.
+
+| Work | Runs |
+| --- | --- |
+| Attach enchantment #*n* | *n* |
+| Raise an enchantment to tier *t* | *t* |
+
+That is what lets tier be uncapped (§3.3) without the deep end being cheap. The
+climb to tier 6 costs 2+3+4+5+6 = **20 runs**, more than a fully enchanted
+weapon, and tier 10 costs 54. There is no ceiling and there does not need to be
+one: the curve is quadratic and the currency is the only thing in the game you
+cannot farm.
+
+It also puts depth and breadth in direct competition on identical terms. Four
+runs buys your 4th enchantment or your 4th tier on one you already have, and
+the mana pool (§3.3) is what decides which was correct.
+
 This is the second, independent cost on enchantment power. Max mana says *how
 much you can carry at once* (§3.3); service time says *and it is in the shop
 while you carry it*. Your best weapon is routinely unavailable.
@@ -169,10 +195,22 @@ Rules that keep it coherent:
 
 ## 6.5 Transferring an enchantment
 
-Enchantments can be moved to a new weapon at the enchanter, costing the same
-service time as attaching one and dropping the enchantment a tier. Without
-this, a lucky late drop would strand everything you invested — with it, the
-body is replaceable and the soul is the thing you built.
+Enchantments can be moved to a new weapon at the enchanter, **dropping a tier**
+and costing the service time of the tier it lands on (§6.2). Without this, a
+lucky late drop would strand everything you invested — with it, the body is
+replaceable and the soul is the thing you built. **Tier 1 is the floor**: a
+tier-1 enchantment moves intact for one run, because there is nothing left to
+take.
+
+The tier loss is what stops transfer being free re-rolling, and it gets sharper
+the deeper the enchantment is: moving a tier-6 enchantment costs 5 runs and
+throws away the 6 runs that bought the sixth tier. A shallow soul travels
+cheaply; a deep one is most of the reason you keep the body.
+
+**This is also the answer to a bad innate roll.** A staff that drops with
+Warding when you wanted Arcane Edge is not a dead weapon — it is a body with the
+wrong soul in it, and the enchanter moves souls. The roll sets what you start
+with, never what you end with.
 
 ## 6.6 Code impact
 
