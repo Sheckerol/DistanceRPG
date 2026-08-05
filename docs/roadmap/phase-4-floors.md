@@ -254,8 +254,10 @@ which is the *quality* of the drop it is carrying. Because the boss stopped
 resurrection, killing it on the way out is permanent, and permanent death is
 what yields the goods.
 
-Farm a dummy five times on the way down and it is holding a tier-5 drop. You
-bank the quality going in and harvest it coming out.
+Farm a dummy ten times on the way down and it is holding a fully deepened drop
+with a few points of unique chance on it (§3.2). You bank the quality going in
+and harvest it coming out — and the unique roll itself resolves on that final
+kill, so the extraction is where you learn what the farm was worth.
 
 ### The risk curve inverts
 
@@ -265,9 +267,9 @@ on the board. Every extra farming cycle makes the drop better *and* the
 extraction harder, with the same currency paying for both.
 
 **And the enemies you farmed are the strongest things left.** Each revival adds
-damage or health (§3.2), so the dummy carrying your tier-5 drop is also the
-dummy that has come back five times and hits accordingly. The weapon you most
-want to collect is guarded by the version of itself you made.
+damage or health (§3.2), so the dummy carrying your deepest drop is also the one
+that has come back the most times and hits accordingly. The weapon you most want
+to collect is guarded by the version of itself you made.
 
 The gauntlet does thin in *number* as you climb, since nothing revives any more
 — but it does not thin in quality. Ordinary enemies are a diminishing fight;
@@ -338,10 +340,15 @@ needs to see the quality building on each dummy to make the stop-farming call
 deliberately, and to pick targets on the way out.
 
 It has to read as a **threat** as well, since the same counter drives the
-dummy's accumulated damage and health (§3.2). A bare `3/5` communicates the
-reward half and hides the half that kills you; the nameplate wants the earned
-statline visible next to it, and a beat when a revival rolls its bonus so the
-player connects the two.
+dummy's accumulated damage and health (§3.2). A bare `7` communicates the reward
+half and hides the half that kills you; the nameplate wants the earned statline
+visible next to it, and a beat when a revival rolls its bonus so the player
+connects the two.
+
+The count is **unbounded**, so it cannot render as `n/5` or any other fraction.
+That is the honest presentation — there is no target to reach, only a curve to
+judge — but it does mean the HUD has to make "further is worse" legible without
+a denominator to lean on.
 
 `PartyMemberState.Inventory` goes from 3 slots to 6 (`PartyMemberState.cs:27`),
 and `DungeonHud`'s inventory panel has to grow with it. Slot 0 stays the

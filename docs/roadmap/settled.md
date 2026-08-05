@@ -118,15 +118,22 @@
   never on the weapon it drops. `DefeatCount` therefore means two things at
   once, deliberately: the quality of the drop and how dangerous the dummy has
   become. You cannot bank value into a dummy without arming it, and the
-  extraction goes back for exactly the ones you armed. The scaling does **not**
-  stop at five even though the drop ladder does, which turns "6+ gives nothing"
-  into "6+ costs you something".
-- **The repeat-kill ladder is short, deep and topped.** `DefeatCount` 1–2 and
-  3–4 add one and two acquired stacks to the class signature; 5 rolls a unique;
-  6+ does nothing. Depth only, never breadth — breadth is the enchanter's
-  product. Farming spends the same acquired budget the enchanter would, so a
-  deep farm buys power now at the cost of the weapon's long-term room, and
-  reaching 5 inverts that by handing you a forged spread with the budget intact.
+  extraction goes back for exactly the ones you armed. The scaling never stops,
+  and `+5` is a placeholder for the step rather than a settled number.
+- **The repeat-kill ladder has no top; the danger curve is the top.** An earlier
+  draft capped it at `DefeatCount 5` because farming's only cost was turns, and
+  turns are cheap. Revival scaling makes that obsolete — every cycle is a harder
+  fight — so the ladder runs forever and prices itself. Stacks accrue on the
+  class signature to `+5`, the acquired budget, by `DefeatCount 10`; from `5`
+  onward alternating cycles buy unique chance instead, ~1% at a time, rolled
+  once on the permanent kill. Depth only, never breadth — breadth is the
+  enchanter's product.
+- **The unique roll is the only thing that undoes farming's cost.** Ordinary
+  tiers spend the acquired budget the enchanter would have filled, so a
+  fully farmed drop can never be improved on its signature again. A unique's
+  spread is forged, so winning the roll lands a deeper base with the budget
+  untouched. Lose it and you carry out the most finished weapon in the game; win
+  it and you carry out the best project in the game.
 - **A modifier caps at `forged + 5`**, per type, with types independent — no
   shared budget across a weapon. Forged is the weapon's identity spread (class
   baseline, variant, unique, dungeon theme); the five is one acquired budget

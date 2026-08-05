@@ -27,18 +27,29 @@ waiting.
 drop that dummy is *carrying*; you collect it only by killing it permanently on
 the way out, after the boss has stopped resurrection (§4.4).
 
-### The ladder is short and it has a top
+### The ladder has no top; the danger curve is the top
 
-| `DefeatCount` | The drop becomes |
-| --- | --- |
-| 0 | The class variant, rolled |
-| 1–2 | Variant `+1` acquired stack on the class signature |
-| 3–4 | Variant `+2` |
-| **5** | A roll on that class's **unique** table (§1.5) |
-| 6+ | Nothing further |
+| `DefeatCount` | Signature stacks | Unique chance |
+| --- | --- | --- |
+| 0 | — | — |
+| 1–2 | `+1` | — |
+| 3–4 | `+2` | — |
+| **5** | `+2` | **1%** |
+| 6 | `+3` | 1% |
+| 7 | `+3` | 2% |
+| 8 | `+4` | 2% |
+| 9 | `+4` | 3% |
+| 10 | **`+5`** — the acquired budget, spent | 3% |
+| 11 | `+5` | 4% |
+| 12+ | `+5` | `+1%` per further defeat |
 
-Tier 5 is the only place a unique is **rolled**. A boss can also hand you one,
-but only as arithmetic rather than a roll — see §4.3.
+**Past five the ladder alternates**: one cycle buys a stack, the next buys a
+point of unique chance, until the stacks run out against the five-stack acquired
+budget (§1.1) at `DefeatCount 10`. After that every cycle buys chance alone.
+
+The unique chance is rolled **once, on the permanent kill** (§4.4), not per
+defeat — `DefeatCount` sets the odds the drop is carrying, and the extraction is
+where you find out.
 
 Tuning targets, but the *shape* is the decision, and three things fix it.
 
@@ -59,12 +70,23 @@ partly consumes its long-term potential — which is the cost the repeat-kill
 ladder was otherwise missing, since turns are the cheapest thing a patient
 player has.
 
-**It stops at five, and stopping is the point.** §4.3 rests on "deciding when
-you have farmed enough is the run's real decision, and it is entirely the
-player's to make" — and that is only a decision if farming demonstrably stops
-paying. Unbounded, even on a diminishing curve, it becomes a grind-tolerance
-test instead. A visible top also has to fit on a nameplate, which §4.5 requires:
-`3/5` reads at a glance, an asymptote does not.
+**Nothing stops it, and that is now safe.** §4.3 rests on "deciding when you
+have farmed enough is the run's real decision, and it is entirely the player's
+to make" — and an earlier draft put a hard top at five to guarantee that
+decision existed, on the reasoning that farming's only cost was turns and turns
+are the cheapest thing a patient player has.
+
+**Revival scaling makes that reasoning obsolete.** Every cycle now hands the
+dummy damage or health, so the tenth kill is a materially harder fight than the
+first, and the eighteenth is harder still. Farming is self-limiting through
+*risk* rather than through a number in a table, and a limit the player feels is
+worth more than one they read.
+
+That also turns the deep end into the right shape. Past ten the drop cannot
+improve at all — only the odds can — so a player pushing to fifteen is buying
+lottery tickets with escalating danger, in a run they still have to climb out
+of. Knowing when to walk away from that is a genuine judgement rather than a
+lookup.
 
 ### What comes back is stronger than what died
 
@@ -77,9 +99,15 @@ one of three outcomes:
 | Health | **+5 max HP**, restored full |
 | Both | **+5 damage and +5 max HP** |
 
-One third each, as a tuning target. Over five cycles that is roughly `+17`
-damage and `+17` HP in expectation — a dummy that opened the run as scenery
-finishes it as a genuine threat.
+One third each. **`+5` is a placeholder** — the step is unlikely to survive
+contact, since against a party dealing 10–18 a swing `+5` HP is small and `+5`
+damage is large, and a flat number means far more on a dagger dummy than an axe
+one. What matters here is the *shape*: a fixed step, rolled between two axes,
+compounding every cycle without limit.
+
+At that placeholder, five cycles is roughly `+17` damage and `+17` HP in
+expectation — a dummy that opened the run as scenery finishes it as a genuine
+threat, and at fifteen cycles it is something else entirely.
 
 **This is the cost the ladder was missing.** §3.2 above prices farming in the
 weapon's long-term potential, which is real but abstract. This prices it in the
@@ -101,23 +129,32 @@ it. Store the accumulated values on `EnemyState` alongside `DefeatCount` so
 saves round-trip without replaying rolls (§5.1), and roll on the loot stream's
 sibling — `mapSeed ^ ReviveSalt` — never a continuation of an existing one.
 
-**The scaling does not stop at five.** The drop ladder tops out; the danger does
-not. That is what turns "6+ gives nothing" into "6+ costs you something", and it
-is the sharpest possible version of §4.3's claim that deciding when to stop
-farming is the run's real decision — past five there is a wrong answer, and the
-nameplate tells you where the line is.
+**The scaling never stops, and that is what lets the drop ladder run forever
+too.** Neither side has a ceiling: the reward curve flattens into pure
+probability past `DefeatCount 10` while the danger curve keeps climbing at the
+same rate it always did. Farming therefore prices itself — every further cycle
+is strictly more dangerous for strictly less, and the player is the only one who
+decides where that stops being worth it. No table needs to tell them.
 
-### Hitting five inverts the ladder
+### The unique is the only thing that undoes the cost
 
-Tiers 1–4 trade future depth for power now. Tier 5 does the opposite: a unique's
-spread is **forged**, so you land on a deeper base *with the acquired budget
-untouched* — Widowmaker at `CritWindow ×3`, ceiling 8, five stacks still to
-spend.
+Every ordinary tier trades the weapon's future for power now — acquired stacks
+out of the budget the enchanter would have filled. At `DefeatCount 10` that
+budget is gone entirely: the drop is `signature +5`, as deep as farming can make
+it, and **the enchanter can never improve its signature again**. You bought a
+finished weapon by spending everything it could have become.
 
-So pushing to five is not more of the same, it is the thing that resets the
-ladder in your favour, and the last two cycles are where the farm stops being
-incremental. A max-farmed dummy hands you the best **project** in the game
-rather than the most finished weapon.
+The unique roll is the one outcome that undoes that. A unique's spread is
+**forged** (§1.5), so winning the roll lands you on a deeper base *with the
+acquired budget untouched* — Widowmaker at `CritWindow ×3`, ceiling 8, five
+stacks still to spend. Not a better version of the same weapon: the opposite
+kind of object.
+
+So the deep farm is a genuine gamble rather than a grind. Every cycle past five
+makes the fight harder, spends more of the weapon's future, and buys another
+point of chance at the thing that would have made all of it irrelevant. Lose the
+roll and you carry out the most finished weapon in the game; win it and you
+carry out the best **project** in the game.
 
 So the dungeon supplies **bodies** and the enchanter supplies **souls**. Depth
 buys you a better weapon to invest in; runs survived buy you the investment
