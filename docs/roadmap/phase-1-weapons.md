@@ -285,6 +285,57 @@ Note this makes the spear the only weapon whose two baseline modifiers want the
 *same* position. Most classes trade between their dials; the spear's reinforce,
 which is what makes it the least flexible and most decisive martial class.
 
+### Displacement triggers threat zones
+
+**Yes — shoving an enemy into a spear's reach gives the spear a free attack.**
+
+A threat zone does not care *why* a body entered it. `Brace` and `Overwatch`
+fire on a target entering a threatened tile, and forced movement from `Push`,
+`Drag` or `Rout` is movement. Mechanically it routes through the same
+`NotifyCharacterMoved` path a voluntary walk does, tile by tile, so every zone
+crossed fires exactly as §4.4 already describes for enemies running past a
+spear line.
+
+The precise rule, since the edges matter:
+
+| Situation | Fires? |
+| --- | --- |
+| Displaced **into** a threat zone it was outside | **Yes** |
+| Displaced **through** two zones on a multi-tile shove | Yes, both |
+| Displaced **further away** while already inside a zone | No — it is leaving, not entering |
+| Displaced by an **ally** of the bracer | No — threat zones only face the other side |
+
+That third row is what keeps `Push` coherent. The Halberd's whole purpose is
+shoving a target *out* of its own reach to break contact (§1.2), and if leaving
+a zone fired braces, the spear's own control weapon would punish the spear for
+using it.
+
+**This is the best party-composition combo in the game**, and it falls out of
+rules that already existed rather than needing new ones:
+
+- **Sword shoves, spear pokes.** A sword-bearer hits something on open ground
+  and drives it four tiles back into the party's spear line. The spear gets a
+  free attack it did not spend movement on, and it happens on *your* turn rather
+  than waiting for the enemy to walk in.
+- **Drag is the inverse and better for it.** A thrower's `Drag` pulls a target
+  *toward* the party — which is toward your spears. A ranged class setting up a
+  melee class's free attacks is exactly the kind of reason a party wants both.
+- **Rout is the crowd version.** A Routing Axe displaces everything its cleave
+  caught, so one swing beside a spear line can fire several braces at once.
+
+It runs both ways, of course. An enemy sword-dummy can shove a character into an
+enemy spear-dummy's reach, which is the same lesson §2.1 wants the tutorial to
+teach from the receiving end.
+
+**Nothing here can loop**, because the existing per-turn brace budget bounds it:
+each character's `Brace` value is uses per turn (§1.2), spent whether the
+trigger was a walk or a shove. A brace that itself displaces — a Halberd
+retaliating — can chain into another zone, but every link consumes a use from a
+finite pool, so the chain terminates on its own. That is worth stating rather
+than discovering: it is the only place in the design where one action can cause
+an unbounded-looking cascade, and the thing that stops it is a budget that was
+put there for another reason entirely.
+
 ### Axe (STR) — baseline `Cleave ×1, CritMultiplier ×1`
 
 One swing hits every valid target in range, paying the movement cost once.

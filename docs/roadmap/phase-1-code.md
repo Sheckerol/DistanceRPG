@@ -164,6 +164,20 @@ reduces `EffectiveMax` in `PartyMemberState.StartTurn` and the enemy budget in
 `ResolveAttack` needs the attacker passed in — today it only takes the two
 weapons (`CombatRules.cs:49`).
 
+**Displacement must not teleport.** `Push`, `Drag` and `Rout` move an actor
+tile by tile through `NotifyCharacterMoved`, exactly as a voluntary walk does,
+so threat zones fire on the way (§1.2). Setting the position directly would
+silently drop every brace and overwatch the shove should have triggered, and
+would do so invisibly — the combo simply would not happen and nothing would look
+broken. It also has to stop early on a wall or an occupied tile rather than
+overlapping actors, reusing the anti-stacking mask `EnemyPlacer` and the pathing
+already share.
+
+The recursion guard is the existing per-turn brace budget rather than a depth
+limit: a brace fired by a displacement spends a use like any other, so a
+displacement chain terminates when the pool empties. Worth an explicit test,
+since it is the one cascade in the design.
+
 **HUD.** The regen badge is party-only today. Riders land on enemies too, so
 enemy nameplates need effect badges, and floating combat text needs a
 `SUNDERED!` / `WEAKENED!` beat distinct from the damage number.

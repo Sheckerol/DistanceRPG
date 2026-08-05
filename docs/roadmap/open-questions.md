@@ -112,17 +112,19 @@
   armour, and enemy crits do the same to the party. It is what makes the
   natural-20 answer to armour real, but it raises tail variance by 50% for those
   classes, which no other decision here has done so bluntly.
-- **`Longshot` and `CritWindow` on the same weapon is the sharpest compounding
-  pair outside the dagger.** A bow's crit multiplies the *distance-inflated*
-  damage, so a Longbow at ten tiles deals 19 and crits for 38 with `Block`
-  ignored — and a farm can deepen both dials at once, since the roll picks among
-  what the weapon carries (§3.2). Stormcrow worked to `Longshot ×8,
-  CritWindow ×6` is a 35% chance of something very large from across a room.
-  Whether that is the archer fantasy paying off or a hole depends on how easily
-  enemies close the distance, which needs the kiting AI to exist first.
+- **`Longshot` and `CritWindow` compound, but the dungeon is the counterweight.**
+  A bow's crit multiplies the *distance-inflated* damage, so a Longbow at ten
+  tiles deals 19 and crits for 38 with `Block` ignored, and a farm can deepen
+  both dials at once (§3.2). What keeps it honest is the map: this is a dungeon
+  of rooms, corridors and blind corners, and most contact happens within a few
+  tiles where `Longshot` pays nothing at all. The archer gets the long hall and
+  the open room and is a 5-damage weapon everywhere else — which is the trade
+  §1.2 already argues for. Still worth watching once the kiting AI exists, since
+  that is what decides whether an archer can *choose* the long shot or merely
+  take the ones the map hands them.
 - **Does the sword's `Push` fight its own class?** A shield-bearer is the party's
-  front line, and shoving a target back can pull it *out* of the axe's cleave or
-  a spear's threat zone as easily as into one. `Push` on a Halberd is chosen —
+  front line, and shoving a target back can pull it *out* of the axe's cleave as
+  easily as into a spear's threat zone (§1.2). `Push` on a Halberd is chosen —
   you swing it when you want displacement — but on the sword it fires on every
   hit, whether or not the party wanted the target moved. Worth checking whether
   it needs to be opt-in, which no other modifier is.

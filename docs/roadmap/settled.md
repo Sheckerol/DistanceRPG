@@ -132,6 +132,16 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
+- **Forced movement triggers threat zones.** Shoving an enemy into a spear's
+  reach gives the spear a free attack — `Push`, `Drag` and `Rout` route through
+  the same per-tile movement path a walk does, so `Brace` and `Overwatch` fire
+  on every zone *entered*. Leaving a zone does not fire, which is what keeps the
+  Halberd's break-contact purpose coherent, and an ally's shove never triggers a
+  bracer on its own side. The existing per-turn brace budget is the recursion
+  guard, so displacement chains terminate on their own. This is the game's best
+  party-composition combo and it needed no new rules: sword shoves into the
+  spear line, a thrower's `Drag` pulls toward it, an axe's `Rout` fires several
+  at once.
 - **Every class baseline carries a class-specific second modifier**, so no
   weapon is forged with fewer than two and every forged spread is either three
   at `×1` or one `×2` and one `×1`. Mechanically this stops a Purity variant
