@@ -175,9 +175,9 @@ ceiling — a forged spread reaches further.
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |
 | `Overwatch` | +1 held shot | 5 | |
-| `CritWeaken` | +1 `Weakened` level on a crit | 5 | §1.6 |
-| `CritSunder` | +1 `Sundered` level on a crit | 5 | §1.6 |
-| `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | §1.6 |
+| `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
+| `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
+| `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
 
 ### `Light` has to be proportional, not flat

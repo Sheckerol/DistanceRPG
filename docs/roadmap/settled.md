@@ -5,6 +5,14 @@
 - Innate stats are **fixed at creation** and never rise.
 - Enchantment mana locks apply **while equipped** only.
 - Floors persist **within a dungeon visit** and reset on leaving.
+- **Crit riders accumulate and have no level cap.** Re-applying `Sundered` or
+  `Weakened` adds levels rather than refreshing a timer, so a `CritSunder ×4`
+  weapon that crits three times leaves the target taking `+12`. Investment
+  should read as a bigger number, not the same number lasting longer — and a cap
+  would have meant the last four stacks of a deepened rider weapon applying
+  nothing, the exact dead-stack failure §1.1 forbids. Per level is `+1`, now the
+  effect's only dial; one-level-per-turn decay, the fight ending, and
+  `Weakened`'s floor of 1 are what bound it instead.
 - Crits apply a **class-flavoured rider** on top of the damage spike, both
   ways; casts crit for double effect level.
 - Modifiers are **stacks, not values**. A Purity weapon is a second stack of

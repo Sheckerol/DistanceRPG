@@ -84,15 +84,12 @@
   more**, and that is most of the answer to "is this too strong." What remains
   is whether ~120 on 45% is fine at the end of a campaign. Probably yes, given
   the grind, but it wants watching rather than assuming.
-- **Crit riders cap at level 4 but reach 8 stacks — those are dead stacks.**
-  §1.6 caps `Sundered` and `Weakened` at level 4, but a Weakspot Stiletto is
-  forged `CritSunder ×1` and ceilings at `×6`, and a Stiletto-derived unique at
-  `×8` — so half those stacks buy nothing. That is exactly the failure mode §1.1
-  exists to prevent, and it is currently the only place in the design where it
-  survives. Two candidate fixes: raise the rider cap to 8 to match the reachable
-  ceiling, or re-price riders at half a level per stack. Raising the cap is
-  simpler but means a level-8 `Sundered` is `+16` taken for eight turns, which
-  wants checking against a 45% re-application rate before it is chosen.
+- **How deep does an accumulated `Sundered` actually get in play?** The level
+  cap is gone (§1.6) and re-application adds levels, bounded only by one-per-turn
+  decay and by the target dying. Against a dummy that is self-limiting; against
+  a boss with a large HP pool and a party critting every turn it could ramp a
+  long way. The per-level `+1` is the dial if it does, but the shape needs
+  playing before anyone reaches for it.
 - **`Charges` is priced against three numbers that could all move.** `+1` throw
   per stack works because 9 throws × 15 lands on 135 against a 160 budget. The
   throw cost, the budget, and the deepest forged `Charges` spread are all

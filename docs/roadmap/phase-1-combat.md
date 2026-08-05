@@ -14,12 +14,38 @@ level N, ticks down one per turn, removed at zero, so they always self-clear:
 
 | Effect | Per level | Notes |
 | --- | --- | --- |
-| **Sundered** | Target takes **+2 damage** from every source | Getting crit opens you up |
-| **Weakened** | Target deals **2 less damage**, floored at 1 | Getting crit rattles your swing |
+| **Sundered** | Target takes **+1 damage** from every source | Getting crit opens you up |
+| **Weakened** | Target deals **1 less damage**, floored at 1 | Getting crit rattles your swing |
 
-Both cap at level 4 (`+8` / `−8`). The floor mirrors Block's existing "never
-below 1 taken" rule (`CombatRules.cs:58`), so nothing can be reduced to
-harmlessness.
+The `Weakened` floor mirrors Block's existing "never below 1 taken" rule
+(`CombatRules.cs:58`), so nothing can be reduced to harmlessness.
+
+### Riders accumulate, and there is no level cap
+
+**Re-applying a rider adds levels. It does not refresh a timer.** A
+`CritSunder ×4` weapon that crits three times has applied twelve levels, and
+the target takes `+12` from everyone until it decays off.
+
+That is the point of building a rider weapon, and any ceiling on the level
+would take it away. A cap would also reintroduce the exact failure §1.1 exists
+to forbid: a Weakspot Stiletto ceilings at `CritSunder ×6` and a
+Stiletto-derived unique at `×8`, so a cap of 4 would mean the last four stacks
+of the thing you spent a campaign deepening apply nothing at all. **Investment
+should read as a bigger number, not as the same number lasting longer.**
+
+Per level is `1` rather than `2` precisely because nothing clamps it. With
+accumulation and no cap, the per-level value is the only dial the effect has,
+and the coarser one made a moderate crit streak swing the maths too hard.
+
+Three things bound it instead, none of them a cap:
+
+- **Decay.** One level per turn, always, so a rider only stays deep while you
+  keep landing crits.
+- **The fight ends.** `Sundered` makes the target die faster, which is the
+  thing that stops `Sundered` — it is a win-more that closes out its own
+  window rather than a runaway.
+- **`Weakened` floors at 1.** However deep it goes, an attacker still hits for
+  something, so no enemy is ever fully neutralised.
 
 ### Riders are per weapon, not per class
 
@@ -58,13 +84,17 @@ caster classes, which lost it when staff variants became four distinct effects.
 ### Both sides, and why that is survivable
 
 Status effects are universal (Phase 0), so enemy crits apply riders to the
-party — a dagger dummy with `CritWindow ×1` crits on 25% of swings. Three things
+party — a dagger dummy with `CritWindow ×1` crits on 10% of swings. Three things
 keep that from spiralling:
 
-- Riders decay one level per turn on their own.
-- They cap at level 4.
-- Sundered is flat `+2`, not a multiplier, so it cannot compound with the crit
-  doubling into a one-shot.
+- Riders decay one level per turn on their own, and an enemy critting on 10%
+  cannot outrun that decay for long.
+- `Sundered` is a flat `+1` per level added **after** the multiplier in the
+  pipeline below, not a multiplier itself, so it cannot compound with the crit
+  spike into a one-shot.
+- Enemy weapons are rolled, not built. Nothing on the enemy side accumulates
+  `CritSunder` stacks across runs the way a serviced party weapon does, so the
+  deep rider builds are the player's alone.
 
 ### A crit is not blocked
 
