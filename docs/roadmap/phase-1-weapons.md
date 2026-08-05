@@ -55,7 +55,7 @@ signature alone does not:
 | Axe | `Cleave ×1, Opportunist ×1` | **Nobody walks away from an axe** |
 | Ranged | `Longshot ×1, CritWindow ×1` | An aimed shot finds the gap |
 | Throwing | `Charges ×1, CritMultiplier ×1` | Throw enough and one lands perfectly |
-| Staff / Wand | `Cast ×1, CritMultiplier ×1` | A crit multiplies whatever that cast does |
+| Staff / Wand | `Cast ×1` + **one rolled enchantment** | The caster's second axis is not a stack at all |
 
 Four of these change what the class *does*, not just its numbers:
 
@@ -75,17 +75,38 @@ Four of these change what the class *does*, not just its numbers:
   surrounded, but nothing stopped an enemy simply walking out of a 60-unit reach
   that costs 60 to swing. Now leaving is what gets you hit.
 
-`CritMultiplier` is the fallback where no better answer exists — throwing and
-the casters — and it is not a filler pick. §1.6 makes crits bypass `Block`
-entirely, so a natural 20 is a way through armour, and at `×3` rather than `×2`
-that answer actually lands. The axe does not need it: `Splitting` is already its
-answer to armour (§1.2), which is why it can afford something stranger.
+`CritMultiplier` is the fallback where no better answer exists — throwing — and
+it is not a filler pick. §1.6 makes crits bypass `Block` entirely, so a natural
+20 is a way through armour, and at `×3` rather than `×2` that answer actually
+lands. The axe does not need it: `Splitting` is already its answer to armour
+(§1.2), which is why it can afford something stranger.
 
-**Casters take the rule with the caveat §1.2 already carries.** Their four
-variants differ by effect and shape rather than by adding a stack, so a caster
-carries two forged stacks rather than three. `CritMultiplier` scales whatever
-that weapon's crit does — damage for a wand, applied effect level for a staff
-(§1.6).
+### The casters' second axis is an enchantment
+
+Staves and wands satisfy the two-axis rule without a second modifier: **every
+caster weapon drops carrying one rolled enchantment** (§3.1), and farming can
+put its ten points into `Cast` stacks or into that enchantment's tier (§3.2).
+The allowance has somewhere to go, which is all the rule ever asked for.
+
+`CritMultiplier` was the previous answer here and it was the wrong one for a
+class that does not attack. A staff *applies an effect*; multiplying it on a
+natural 20 is a rounding event on 5% of casts, not an identity. The
+enchantment is the identity — it is the only slot in the game where what a
+weapon does is rolled rather than fixed by its class, which is exactly right for
+the classes whose four variants already differ by *effect* rather than by role.
+
+It also makes the caster the class the whole enchantment system was built for
+(§3.3) rather than merely its best user. A wizard's staff arrives with a soul
+already in it; every other class has to earn one at the enchanter.
+
+The trade is downtime. Service time is enchantment count + 1 (§6.2), so a
+caster's first visit costs two runs where a fighter's costs one. Casters are
+pre-loaded and pay for it in time — which is also the only cost in the game
+that scales with nothing you can farm.
+
+**The caveat §1.2 carries still applies.** Caster variants differ by effect and
+shape rather than by adding a stack, so a caster carries one forged stack and
+one forged enchantment rather than three stacks.
 
 **Cost columns below are base costs.** An Efficiency weapon shows the same cost
 as its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is
@@ -174,17 +195,19 @@ event and the d20 keeps mattering exactly as intended. Capping the window would
 have bought that guarantee at the price of telling a player who ground for forty
 runs that the thing they were grinding toward was not allowed to exist.
 
-The investment axis is still `CritMultiplier`, which scales the same way. Every
-weapon in the game is forged `CritMultiplier ×1` and so ceilings at a ×8
-multiplier; only a unique that raised `CritMultiplier` instead of its own
-signature reaches ×10. **Frequency and magnitude are therefore separate
-uniques**, and no single weapon is forged deep in both.
+The investment axis is still `CritMultiplier`, which scales the same way. A
+weapon forged `CritMultiplier ×1` ceilings at a ×8 multiplier; only a unique
+that raised `CritMultiplier` instead of its own signature reaches ×10.
+**Frequency and magnitude are therefore separate uniques**, and no single weapon
+is forged deep in both.
 
-Note the asymmetry that creates. `CritMultiplier` is on four of the eight
-baselines and reachable by graft on the rest, so most classes can be taken deep
-on crit *damage* — but `CritWindow` is forged on daggers and bows alone, so only
-DEX can be taken deep on crit *frequency*. An axe worked to a ×8 multiplier
-still only crits on a 20; it just removes a room when it does.
+Note the asymmetry that creates. `CritMultiplier` is forged on the dagger and
+throwing baselines and reachable by graft everywhere else, so any class *can* be
+taken deep on crit damage — but only at the graft's shallow `×5`, and only if
+the rare service roll lands there. `CritWindow` is narrower still, forged on
+daggers and bows alone, so only DEX can be taken deep on crit *frequency*. An
+axe worked to a ×8 multiplier still only crits on a 20; it just removes a room
+when it does.
 
 So a crit build is not "crit constantly" but **"crit rarely and
 catastrophically"** — and the two dagger specialists split exactly along that
@@ -584,8 +607,9 @@ stacking the signature changes what the weapon is *for*.
 
 ### Caster classes do not take this frame
 
-Staff and wand both carry baseline `Cast ×1, CritMultiplier ×1`, but their four weapons differ by
-**effect** and **shape** rather than by role (§1.3, §1.4). Forcing them into
+Staff and wand both carry baseline `Cast ×1` plus a rolled enchantment (§1.2),
+but their four weapons differ by **effect** and **shape** rather than by role
+(§1.3, §1.4). Forcing them into
 Efficiency / Purity / Control / Support would be redundant — a debuff staff is
 already control and a buff staff already support, and "more of the signature"
 means nothing when the signature *is* which effect you cast.
@@ -767,6 +791,31 @@ and cheap to swing.
 The Control and Support derivations are the richest, since they keep a second
 modifier. A Purity unique collapses to a single number, which is right for The
 Bulwark but would be dull four times over.
+
+### Caster uniques raise the enchantment instead
+
+A caster's two forged axes are `Cast ×1` and a rolled enchantment (§1.2), so the
+derivation rule has two ways to land — and only one of them is interesting.
+`Cast ×3` is a staff that costs less mana, which is a fine modifier and a
+terrible legend. So:
+
+**A caster unique is a caster variant whose enchantment is fixed and forged at
+tier 3.**
+
+| Unique | Class | Built from | Carries | Reads as |
+| --- | --- | --- | --- | --- |
+| Rotwood | Staff | Staff of Blight | `Cast ×1`, **Flaring tier 3** | Poisons on cast *and* on every hit |
+| The Long Candle | Wand | Wand of the Beam | `Cast ×1`, **Siphon tier 3** | A beam that pays for the next one |
+
+That is the only place in the game a weapon's enchantment is not a roll, which
+is what makes a caster unique recognisable in the same way `Block ×3` makes The
+Bulwark recognisable: you know what it is the moment it drops.
+
+It also inherits the right ceiling by accident. Tier is uncapped (§3.3), so a
+unique's tier-3 enchantment is not near any limit — it is three tiers of head
+start on a climb with no top, on the axis where the pool is the only cost. A
+caster unique is the deepest *project* in the game for exactly the same reason
+The Bulwark is: it starts high on the axis that keeps going.
 
 ### Uniques are the deepest ceilings in the game
 

@@ -109,7 +109,7 @@ decides where a farm can go:
 
 | Weapon | Modifiers | Where 10 stacks land |
 | --- | --- | --- |
-| Tower Guard | `Block ×2`, `CritMultiplier ×1` | `Block ×7`, `CritMultiplier ×6` — **both maxed** |
+| Tower Guard | `Block ×2`, `Push ×1` | `Block ×7`, `Push ×6` — **both maxed** |
 | Assassin's Fang | `CritWindow ×2`, `CritMultiplier ×1` | `CritWindow ×7`, `CritMultiplier ×6` — both maxed |
 | Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10 spread across three, **none maxed** |
 | Staff of Blight | `Cast ×1`, innate enchantment | `Cast ×6` and **five tiers** — the only farm that buys potency |

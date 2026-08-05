@@ -123,12 +123,13 @@
   is that it leaves a three-modifier weapon something for the enchanter to do;
   the argument against is that it is exactly the kind of bespoke ceiling §1.1
   spent a section rejecting.
-- **Does `CritMultiplier ×1` on four baselines make crits too swingy?** Axe,
-  throwing and the casters now crit for `×3` instead of `×2`, and crits ignore
-  `Block` entirely (§1.6) — an axe's natural 20 goes from 36 to 54 through any
-  armour, and enemy crits do the same to the party. It is what makes the
-  natural-20 answer to armour real, but it raises tail variance by 50% for those
-  classes, which no other decision here has done so bluntly.
+- **Does `CritMultiplier ×1` on the remaining baselines make crits too swingy?**
+  Dagger and throwing crit for `×3` instead of `×2`, and crits ignore
+  `Block` entirely (§1.6), and enemy crits do the same to the party. It is what
+  makes the natural-20 answer to armour real, but it raises tail variance by 50%
+  for those classes, which no other decision here has done so bluntly. Narrowing
+  the baseline from four classes to two has taken some heat out of this, at the
+  price of leaving the other six reliant on a `×2` crit for the same job.
 - **`Longshot` and `CritWindow` compound, but the dungeon is the counterweight.**
   A bow's crit multiplies the *distance-inflated* damage, so a Longbow at ten
   tiles deals 19 and crits for 38 with `Block` ignored, and a farm can deepen

@@ -201,7 +201,8 @@ class gains one, and three of them change behaviour rather than numbers:
 | Spear | `Longshot ×1` | Spear reach moves 130 → **128**, so four tiles is exact |
 | Axe | `Opportunist ×1` | A whole new reaction on the exit side of a threat zone |
 | Ranged | `CritWindow ×1` | Bows crit on 19–20 rather than 20 |
-| Throwing, casters | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
+| Throwing | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
+| Staff, wand | **A rolled enchantment**, not a stack | Casters gain no second `ModifierType` at all; their second axis lives in the enchantment list (§3.1) |
 
 The spear's range change is the one to watch: 130 is a shipped value and may be
 asserted directly. It is not golden-test data — `TestData/distancerpg-golden.json`
