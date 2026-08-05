@@ -65,7 +65,13 @@ Each defeat rolls **50% to add one stack**. On a success it rolls again for
 *which* modifier receives it, uniformly among the modifiers the weapon is
 already forged with, skipping any that have reached their `forged + 5` ceiling
 (§1.1). An **innate enchantment is one of the entries in that roll** — landing
-on it raises its tier by one instead of a modifier by one stack.
+on it banks a tier's worth of enchantment XP (§3.3) instead of a modifier stack.
+
+XP rather than a tier outright, because tier is something a weapon *earns* and
+the farm has an obvious story for how: the dummy carrying it has been casting
+with it, over and over, for as many cycles as you have made it come back. The
+drop arrives with the levelling already done, which is the same thing farming
+does for everything else.
 
 **A farm grants at most 10 stacks**, and §1.1's per-modifier cap of 5 is what
 forces those across **at least two modifiers**. There is no new rule doing that
@@ -74,10 +80,9 @@ investment has nowhere to go but sideways.
 
 Enchantment tiers are **not** capped (§3.3), so they take the same allowance of
 five as a rule of the farm rather than a property of the enchantment: farming
-can add five tiers and no more. The asymmetry is deliberate and priced in time
-— farming spends turns, which a patient player has in unlimited supply, while
-the enchanter spends *runs of downtime*, which is the scarcest thing in the
-game. So the uncapped climb stays where the real cost is.
+can bank five tiers' worth and no more. Beyond that the enchantment levels the
+way every other one does — by being cast with, by you. Farming buys a head
+start, never the climb.
 
 The allowance is never wasted, because **no weapon is forged with fewer than two
 axes** (§1.2). Every class baseline carries a second modifier for exactly this
@@ -306,19 +311,53 @@ pool, they can afford one light enchantment, not five.
 | **Trigger cost** | Mana spent each time it fires |
 | **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
 | **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
-| **Tier** | Uncapped; raised by re-servicing (§6.4) or by farming an innate one (§3.2), lifting lock *and* potency together |
+| **Tier** | Uncapped; **earned by use** — mana moved through it is its XP — lifting lock *and* potency together |
 
 Insufficient mana means it simply **does not fire** — no failure state, no
 penalty, just a resource gate. The same is true one level up: a lock you cannot
 afford leaves the enchantment **dormant** rather than making the weapon
 unequippable (§3.1).
 
+### Tier is earned by use, not bought
+
+```
+enchantXp[enchantment] += manaMoved * rate(INT)
+```
+
+**Mana is an enchantment's experience.** Every trigger it pays for, and every
+point it restores, feeds its own pool — the same `manaSpent` credit that already
+grows max mana (§2.2), counted a second time against the thing that spent it.
+An enchantment you fire constantly gets better at what it does, and one you
+carry does not.
+
+That is the pattern the whole game already runs on: health levels from being
+healed, mana from being spent, weapon proficiency from damage dealt, wear from
+swinging. An enchantment levelling from mana moved is the same rule reaching the
+last system that lacked one.
+
+**Mana *moved*, not spent**, so a zero-cost enchantment still levels. Siphon
+restores 20 on a kill and banks 20 XP for doing it, which keeps the engine that
+sustains every other enchantment from being the only one that cannot grow.
+
 ### Tier is uncapped, because the pool is the cap
 
 Lock and potency both scale linearly with tier — `lock × tier`,
 `potency × tier` — so a tier-3 Arcane Edge locks 90 and a tier-6 locks 180. The
 enchantment never stops improving and never needs a ceiling, because every tier
-you buy is a tier's worth of pool you can no longer spend on anything else.
+it earns is a tier's worth of pool you can no longer spend on anything else.
+
+**The brake is built into the fuel.** Levelling an enchantment means spending
+mana; the tier that spending buys locks more of the pool that mana comes from.
+So the deeper an enchantment gets, the smaller the remainder available to feed
+it, and the climb slows on its own with no curve authored anywhere. A tier-6
+Arcane Edge on a 200-pool wizard has 20 mana left to fire with, which is two
+more triggers and then nothing — the enchantment has very nearly eaten the
+character that grew it.
+
+And the mana itself only comes back from **movement left unspent at end of
+turn** (`PartyMemberState.RegenManaFromUnusedMovement`). So the deep enchantment
+is ultimately paid for in the game's real currency, by a caster standing still
+to afford the thing that makes standing still worthwhile.
 
 This is the same principle §1.1 states for modifiers, arriving at a different
 place because the constraint is different. Modifiers cap at `forged + 5` because

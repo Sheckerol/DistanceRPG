@@ -49,25 +49,47 @@ runs and the full climb costs fourteen more. Casters are handed the first
 enchantment and pay for it in downtime, which keeps a free head start from being
 a free fifteen-run shortcut.
 
-**Raising a tier is priced by the same rule.** Service time is always **the
-number the work arrives at** — attaching the 3rd enchantment costs 3 runs, and
-lifting an enchantment to tier 3 also costs 3. `count + 1` was only ever that
-rule stated for the breadth case.
+**The enchanter does not sell tiers.** Tier is earned by casting (§3.3), so
+service time prices **breadth only** — how many enchantments a weapon carries,
+never how deep any of them runs.
 
-| Work | Runs |
-| --- | --- |
-| Attach enchantment #*n* | *n* |
-| Raise an enchantment to tier *t* | *t* |
+That split is what keeps both halves honest, and it lines up with every other
+pair of ladders in the game:
 
-That is what lets tier be uncapped (§3.3) without the deep end being cheap. The
-climb to tier 6 costs 2+3+4+5+6 = **20 runs**, more than a fully enchanted
-weapon, and tier 10 costs 54. There is no ceiling and there does not need to be
-one: the curve is quadratic and the currency is the only thing in the game you
-cannot farm.
+| | Bought with | Costs |
+| --- | --- | --- |
+| **Breadth** — another enchantment | Service time | Runs of downtime |
+| **Depth** — another tier | Use | Mana, and the pool the next tier locks |
 
-It also puts depth and breadth in direct competition on identical terms. Four
-runs buys your 4th enchantment or your 4th tier on one you already have, and
-the mana pool (§3.3) is what decides which was correct.
+You cannot grind your way to breadth and you cannot pay your way to depth. A
+player who wants a deep enchantment has to *cast with it*, which means carrying
+it down rather than leaving it in the shop — and the shop is where breadth
+comes from, so the two ambitions want the weapon in different places. That is
+the same tension §6.2 already builds the stable around, now running inside a
+single weapon.
+
+### You choose what gets attached
+
+The enchanter is not a gamble. **You pick the enchantment**, from everything
+your campaign has seen — anything currently on a weapon in the stable, and
+anything that has ever passed through your hands.
+
+This is the one place in itemisation that is deliberately not a roll, and it is
+what makes every other roll bearable. Drops are class-locked and variant-rolled,
+grafts are a rare surprise (§6.4), innate enchantments come up random (§3.1) —
+so the system needs exactly one lever the player operates directly, or a build
+is something that happens to you. Enchantments are that lever, which is why they
+are the half of itemisation the design calls *chosen*.
+
+**Random drops are how the catalogue grows.** A wand that dropped with a damage
+type you did not want is not waste — it is that type, permanently added to what
+the enchanter can give you, on any weapon, forever after. So the rolls feed the
+choice rather than competing with it, and a scrapped drop still moves the
+campaign somewhere.
+
+The trade against a free innate is clean: **free but random, or chosen but
+costly.** A caster's staff arrives enchanted at no cost and no say; anything you
+actually want costs runs of downtime.
 
 This is the second, independent cost on enchantment power. Max mana says *how
 much you can carry at once* (§3.3); service time says *and it is in the shop
@@ -196,16 +218,16 @@ Rules that keep it coherent:
 ## 6.5 Transferring an enchantment
 
 Enchantments can be moved to a new weapon at the enchanter, **dropping a tier**
-and costing the service time of the tier it lands on (§6.2). Without this, a
-lucky late drop would strand everything you invested — with it, the body is
-replaceable and the soul is the thing you built. **Tier 1 is the floor**: a
-tier-1 enchantment moves intact for one run, because there is nothing left to
-take.
+and costing one attachment's service time. Without this, a lucky late drop would
+strand everything you invested — with it, the body is replaceable and the soul
+is the thing you built. **Tier 1 is the floor**: a tier-1 enchantment moves
+intact, because there is nothing left to take.
 
-The tier loss is what stops transfer being free re-rolling, and it gets sharper
-the deeper the enchantment is: moving a tier-6 enchantment costs 5 runs and
-throws away the 6 runs that bought the sixth tier. A shallow soul travels
-cheaply; a deep one is most of the reason you keep the body.
+The tier loss is what stops transfer being free re-rolling, and it is now the
+only place a tier can go *backwards*. It also bites hardest exactly where it
+should: a tier-6 enchantment represents hundreds of points of mana moved through
+it, and a move throws away the last and most expensive of those tiers. A shallow
+soul travels cheaply; a deep one is most of the reason you keep the body.
 
 **This is also the answer to a bad innate roll.** A staff that drops with
 Warding when you wanted Arcane Edge is not a dead weapon — it is a body with the
