@@ -98,6 +98,38 @@ was never that off-class modifiers are unobtainable elsewhere — it is that the
 boss is the only way to get the one you **chose**, at full depth, on everything
 it drops. Choice and depth, not scarcity.
 
+### A themed boss cannot drop a class that will not take its theme
+
+"On everything it drops" is a guarantee, so the drop table bends to it rather
+than the other way round. Some modifiers are exclusive with others or restricted
+by weapon type (§1.1), and where a class cannot legally carry the theme, **the
+boss simply does not drop that class.**
+
+A `Brace`-themed boss is the worked example. `Brace` is melee-only and sits in
+the reaction group with `Opportunist`, so:
+
+| Class | Can it take `Brace`? | |
+| --- | --- | --- |
+| Dagger, Sword & Shield | Yes | No reaction forged, and melee |
+| Spear | Yes | It is the theme's own class — the graft deepens it |
+| **Axe** | **No** | Forged `Opportunist`; same reaction group |
+| **Ranged, Throwing** | **No** | `Brace` is melee-only |
+| **Staff, Wand** | **No** | Also not melee |
+
+So that dungeon drops daggers, swords and spears, and nothing else.
+
+The alternative — dropping ungrafted axes — was rejected because it puts a
+footnote on the one thing the theme promises. A player who runs the Brace
+dungeon and comes out with a plain Reaver has been handed the exception rather
+than the rule, and no amount of tooltip explains that well.
+
+**Theme breadth therefore varies by theme, and that is a feature.** `Block` and
+`Cleave` graft onto anything, so the golem's table is all eight classes.
+`Brace` reaches three. A narrow dungeon is a *specialised* dungeon — you run the
+Brace dungeon to kit a melee line, and you go elsewhere for a bow. The unique
+each one gates is unaffected, since a theme's unique always comes from its own
+class (§1.5), which can always carry it by definition.
+
 It settles boss drops versus repeat-kill uniques too. They are different axes,
 and all three should exist:
 

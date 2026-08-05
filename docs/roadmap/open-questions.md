@@ -23,9 +23,13 @@
   a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
   Weighting by remaining HP or by role would be more accurate — and more
   expensive, and harder to predict when baiting. Flat first.
-- **Overwatch and enemy-turn reactions.** Overwatch fires during the enemy
-  phase, as braces already do. Whether a character can hold *both* an overwatch
-  shot and a brace in the same turn needs a ruling before Phase 1 codes it.
+- **Does `Riposte` belong in the reaction group?** §1.1 makes `Brace`,
+  `Opportunist` and `Overwatch` mutually exclusive, so a weapon holds exactly
+  one movement-triggered reaction. `Riposte` is also a free swing on the enemy
+  turn, but it triggers off a successful *block* rather than off movement, so it
+  is currently outside the group — meaning a Riposte Blade that grafted `Brace`
+  could fire both in one enemy phase. Either the group is about "reactions" and
+  `Riposte` joins it, or it is about "threat zones" and the name should say so.
 - **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
   on entry and a win ticks service once either way, so a floor-5 dungeon is
   strictly cheaper than a floor-10 one for the same reward. Not disclosing the
@@ -122,12 +126,13 @@
   §1.2 already argues for. Still worth watching once the kiting AI exists, since
   that is what decides whether an archer can *choose* the long shot or merely
   take the ones the map hands them.
-- **Can a character hold an `Opportunistic` reaction, a `Brace` and an
-  `Overwatch` in the same turn?** The existing open question about overwatch and
-  braces now has a third member, and `Opportunistic` makes it pressing: a
-  sword-and-axe front line could otherwise stack reactions until the enemy turn
-  is mostly the party attacking. Separate per-modifier pools is the simple
-  answer; a shared per-character reaction budget is the conservative one.
+- **Does a two-weapon loadout dodge the one-reaction rule?** §1.1 bounds
+  reactions at the *weapon*, which is clean while a character is holding one.
+  But the inventory holds six slots and swapping costs 20 movement in combat
+  (§1.2), so nothing currently stops a character ending their turn on a spear
+  after spending it on an axe. Whether a held reaction survives a swap — or
+  whether only the equipped weapon's reaction is ever live — needs a ruling
+  before Phase 1 codes the enemy phase.
 - **Does the sword's `Push` fight its own class?** A shield-bearer is the party's
   front line, and shoving a target back can pull it *out* of the axe's cleave as
   easily as into a spear's threat zone (§1.2). `Push` on a Halberd is chosen —

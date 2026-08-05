@@ -132,7 +132,22 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
-- **`Opportunistic` is the axe's second baseline** — a free attack when a target
+- **Exclusion groups: one reaction and one displacement direction per weapon.**
+  `Brace`, `Opportunist` and `Overwatch` are mutually exclusive, and so are
+  `Push`, `Drag` and `Rout`. `Brace`/`Opportunist` are **melee only**,
+  `Overwatch` **ranged only**, `Cast` **casters only**. So every weapon holds
+  exactly one reaction and melee and ranged hold different ones, which is what
+  stops a front line turning the enemy phase into a second player phase —
+  bounded at the weapon, where the player can see it, rather than by a new
+  per-character resource.
+- **A themed boss cannot drop a class that will not take its theme.** The drop
+  table bends to the guarantee rather than the other way round: a `Brace`-themed
+  boss drops daggers, swords and spears and nothing else, because axes hold
+  `Opportunist` and the rest are not melee. Dropping *ungrafted* axes was
+  rejected — it puts a footnote on the one thing the theme promises. Theme
+  breadth therefore varies (`Block` reaches all eight classes, `Brace` three),
+  which makes narrow themes specialised dungeons rather than broken ones.
+- **`Opportunist` is the axe's second baseline** — a free attack when a target
   *leaves* your reach, the exact mirror of `Brace`. It answers the hole in the
   class: reach under two tiles, the game's highest attack cost, no way to chase,
   and `Cleave` rewarding a crowd that could simply walk off. Spear and axe now

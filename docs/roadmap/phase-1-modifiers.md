@@ -9,7 +9,7 @@ do the same thing at different prices, which is not interesting.
 
 Every class baseline is its signature **plus a class-specific second modifier**
 (§1.2), so no weapon in the game is forged with fewer than two modifiers:
-`Push` on the sword, `Longshot` on the spear, `Opportunistic` on the axe,
+`Push` on the sword, `Longshot` on the spear, `Opportunist` on the axe,
 `CritWindow` on the bow, `CritMultiplier` on throwing and the casters.
 
 | Class | Stat | Class feature | Variant axis |
@@ -153,6 +153,54 @@ Two forge limits exist, and they are the only hard numbers in the system:
 | **A unique is a variant with one modifier raised to `×3`** | Every unique (§1.5) | Nothing is forged past `×3`, so `×8` is the universal ceiling |
 | **No weapon may be forged past `Light ×1`** | Everything, uniques included | `Light` ceilings at `×6`, a 60% discount — dagger at 12, axe at 24 |
 
+### Exclusion groups and class restrictions
+
+Two constraints act on *which* modifiers can share a weapon at all, rather than
+on how deep they go. Both bind every source — the forge, a farm roll, a graft,
+and a boss theme alike.
+
+**A weapon may carry at most one modifier from each exclusion group:**
+
+| Group | Members | Why they exclude |
+| --- | --- | --- |
+| **Reaction** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one held response |
+| **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
+
+**And two modifiers are restricted by weapon type:**
+
+| Modifier | Allowed on | Because |
+| --- | --- | --- |
+| `Brace`, `Opportunist` | **Melee only** — dagger, sword, spear, axe | A threat zone is a weapon's physical reach; you cannot menace a tile with a bow |
+| `Overwatch` | **Ranged only** — bow, throwing | Holding a shot is what a nocked arrow does; a spear cannot wait for a target to appear |
+| `Cast` | **Casters only** — staff, wand | It scales an effect level, and a weapon with no `CastEffect` has nothing to scale |
+
+Together these give a rule worth stating on its own:
+
+> **Every weapon holds exactly one reaction, and melee and ranged hold different
+> ones.** A spear braces, an axe punishes leaving, a bow watches — and no weapon
+> in the game does two of those.
+
+That is what keeps the enemy turn readable. Reactions all resolve during the
+opposing side's movement, so a front line able to stack three of them would turn
+the enemy phase into a second player phase. Bounding it at the *weapon* rather
+than with a per-character reaction budget means the limit is visible on the item
+you chose, and needs no new resource to track.
+
+The displacement group is the same idea pointed at coherence rather than budget:
+`Rout` is `Push` applied to everything a cleave caught, so a weapon carrying
+both is asking one hit to move a target two directions at once.
+
+**A graft that would conflict is never offered.** For the enchanter (§6.4) that
+means the graft roll picks only among modifiers the weapon can legally hold — a
+spear is never offered `Opportunist`, a bow is never offered `Brace`.
+
+For a **boss theme** it goes further, because a themed drop is a guarantee
+rather than a roll: the boss's drop table simply **excludes the classes that
+cannot carry its theme** (§4.3). A `Brace`-themed boss does not drop axes at
+all, rather than dropping ungrafted ones. Every weapon a themed boss hands you
+carries the theme, without exception — which is the promise §4.3 makes, and it
+should not have a footnote.
+
 `Light` needs its own limit because it is the one modifier measured against the
 weapon's own cost, and a cost heading toward zero is a different problem from a
 number merely getting large. A weapon *not* forged Light still reaches `×5` for
@@ -166,7 +214,7 @@ ceiling — a forged spread reaches further.
 
 | Modifier | Per stack | At ×5 | Notes |
 | --- | --- | --- | --- |
-| `Brace` | +1 retaliation | 5 | |
+| `Brace` | +1 retaliation | 5 | **Melee only**; reaction group |
 | `Block` | +3 absorbed | 15 | Never reduces below 1 taken; **crits ignore it entirely** — §1.6 |
 | `CritWindow` | **+1 to the window** | crit on 15+ | ×1 = 19–20, ×2 = 18–20 … ×8 = 12+ |
 | `CritMultiplier` | +1 to the multiplier | ×7 | Base is ×2 with no stacks |
@@ -175,12 +223,12 @@ ceiling — a forged spread reaches further.
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive, not compounding; **max forged ×1**, so it ceilings at ×6 |
 | `Riposte` | +1 counter per turn | 5 | |
-| `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | Fires on any hit, however delivered — a swing, a throw, or a brace |
+| `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | Displacement group — one direction per weapon. Fires on any hit, however delivered |
 | `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |
-| `Overwatch` | +1 held shot | 5 | |
-| `Opportunistic` | +1 free attack when a target **leaves** your reach | 5 | Voluntary movement only — the mirror of `Brace`, §1.2 |
+| `Overwatch` | +1 held shot | 5 | **Ranged only**; reaction group |
+| `Opportunist` | +1 free attack when a target **leaves** your reach | 5 | **Melee only**; reaction group. Voluntary movement only — the mirror of `Brace`, §1.2 |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Levels **accumulate**, uncapped — §1.6 |

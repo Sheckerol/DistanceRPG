@@ -52,7 +52,7 @@ signature alone does not:
 | Dagger | `CritWindow ×1, CritMultiplier ×1` | Crit is two dials, and the dagger owns both |
 | Sword & Shield | `Block ×1, Push ×1` | **A shield bash.** You stop them, then you move them |
 | Spear | `Brace ×1, Longshot ×1` | Full extension is where a polearm wants to be |
-| Axe | `Cleave ×1, Opportunistic ×1` | **Nobody walks away from an axe** |
+| Axe | `Cleave ×1, Opportunist ×1` | **Nobody walks away from an axe** |
 | Ranged | `Longshot ×1, CritWindow ×1` | An aimed shot finds the gap |
 | Throwing | `Charges ×1, CritMultiplier ×1` | Throw enough and one lands perfectly |
 | Staff / Wand | `Cast ×1, CritMultiplier ×1` | A crit multiplies whatever that cast does |
@@ -71,7 +71,7 @@ Four of these change what the class *does*, not just its numbers:
 - **`CritWindow` gives the bow crit *frequency*** where the dagger has it too,
   which is what makes DEX read as the precision stat rather than merely the fast
   one. It is the one place another class shares the dagger's dial.
-- **`Opportunistic` answers the axe's actual weakness.** `Cleave` rewards being
+- **`Opportunist` answers the axe's actual weakness.** `Cleave` rewards being
   surrounded, but nothing stopped an enemy simply walking out of a 60-unit reach
   that costs 60 to swing. Now leaving is what gets you hit.
 
@@ -309,10 +309,15 @@ The precise rule, since the edges matter:
 | Displaced **further away** while already inside a zone | No — it is leaving, not entering |
 | Displaced by an **ally** of the bracer | No — threat zones only face the other side |
 
-`Opportunistic` takes the opposite convention and fires on **exit, only when
+`Opportunist` takes the opposite convention and fires on **exit, only when
 chosen** — forced movement never provokes it. The reasoning is in the axe
 section below; the short version is that `Brace` is about dangerous ground and
-`Opportunistic` is about turning your back, and only one of those is a decision.
+`Opportunist` is about turning your back, and only one of those is a decision.
+
+No weapon holds both, and none holds an `Overwatch` alongside either: the three
+are one exclusion group, and `Brace`/`Opportunist` are melee-only while
+`Overwatch` is ranged-only (§1.1). **One weapon, one reaction** — which is what
+stops a front line turning the enemy phase into a second player phase.
 
 That third row is what keeps `Push` coherent. The Halberd's whole purpose is
 shoving a target *out* of its own reach to break contact (§1.2), and if leaving
@@ -345,7 +350,7 @@ than discovering: it is the only place in the design where one action can cause
 an unbounded-looking cascade, and the thing that stops it is a budget that was
 put there for another reason entirely.
 
-### Axe (STR) — baseline `Cleave ×1, Opportunistic ×1`
+### Axe (STR) — baseline `Cleave ×1, Opportunist ×1`
 
 One swing hits every valid target in range, paying the movement cost once.
 Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
@@ -365,9 +370,9 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 - **Rout** — everything caught by the cleave is pushed back a tile per stack.
   One swing that resets a whole crowd's position buys the entire party room.
 
-### `Opportunistic` — nobody walks away from an axe
+### `Opportunist` — nobody walks away from an axe
 
-Baseline `Opportunistic ×1`: **a free attack when a target leaves your reach**,
+Baseline `Opportunist ×1`: **a free attack when a target leaves your reach**,
 one per stack per turn. It is the exact mirror of the spear's `Brace`, which
 fires on *entry*, and it is what the axe was missing.
 
@@ -383,7 +388,7 @@ Now it does, and the pairing with the spear is the good part:
 | | Punishes | Reach |
 | --- | --- | --- |
 | Spear — `Brace` | Coming **in** | Four tiles |
-| Axe — `Opportunistic` | Going **out** | Under two tiles |
+| Axe — `Opportunist` | Going **out** | Under two tiles |
 
 A spear and an axe standing together is a **cage**: wide threat on approach,
 tight threat on escape. Getting to the axe costs you, and leaving costs you
@@ -396,7 +401,7 @@ opposite convention to `Brace`, deliberately:
 
 > `Brace` fires on **entry, however caused** — reach is dangerous ground and it
 > does not care why you crossed it.
-> `Opportunistic` fires on **exit, only if chosen** — it punishes turning your
+> `Opportunist` fires on **exit, only if chosen** — it punishes turning your
 > back, and a body that was thrown made no such decision.
 
 Three things fall out of that, all good:
@@ -714,7 +719,7 @@ unchanged.
 | Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | Three retaliations, all at full reach |
 | Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | +3 a tile; lethal across a room |
 | Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | Four throws, and the movement to reposition after |
-| Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunistic ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
+| Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunist ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
 
 ### Why derive them rather than author them freely
 

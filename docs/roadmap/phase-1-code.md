@@ -14,7 +14,7 @@ the value **derived**, so the pair becomes:
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
-                    Opportunistic, Rout, Pin, Softening, CritWeaken, CritSunder,
+                    Opportunist, Rout, Pin, Softening, CritWeaken, CritSunder,
                     BlockWeaken, OnHitPoison, Cast,
                     Momentum }                             // Momentum: enchantment-only
 
@@ -31,6 +31,8 @@ static class ModifierRules               // the §1.1 table, one place only
     static int PerStack(ModifierType t);
     static int Offset(ModifierType t);   // CritMultiplier 2, Charges 1, else 0
     static int MaxForged(ModifierType t);// Light 1, else 3  — §1.1
+    static int  Group(ModifierType t);   // reaction / displacement / none
+    static bool Allowed(ModifierType t, WeaponClass c);   // melee / ranged / caster
 
     static int Cap(ModifierType t, int forgedStacks)
         => forgedStacks + AcquiredHeadroom;    // no clamp: nothing is capped
@@ -50,9 +52,18 @@ tables, boss theming, all of which are data — rather than in `With`, since it
 constrains the forge and never acquisition. Two values: `Light` at 1, everything
 else at 3.
 
+`Group` and `Allowed` are the §1.1 exclusion rules, and they gate *offers*
+rather than rejecting after the fact: the graft roll (§6.4) filters the
+candidate list, and a themed boss filters its **drop table by class** (§4.3)
+rather than skipping the graft. Both should read the same two predicates, so
+there is one definition of "this weapon cannot hold that."
+
 A test should assert `MaxForged` over the whole unique table, since that limit
 is what every per-stack value in §1.1 is priced against and it is enforced by
-convention in data rather than by the type system.
+convention in data rather than by the type system. The same test should walk all
+32 weapons plus the uniques and assert no forged spread violates `Group` or
+`Allowed` — cheap, and it catches the case where a future class baseline quietly
+gives someone two reactions.
 
 The same test should check the **derivation rule** (§1.5): every unique must
 match some variant's spread with exactly one modifier raised to `×3` and nothing
@@ -105,7 +116,7 @@ class gains one, and three of them change behaviour rather than numbers:
 | --- | --- | --- |
 | Sword | `Push ×1` | Sword hits now displace — new behaviour, not a number |
 | Spear | `Longshot ×1` | Spear reach moves 130 → **128**, so four tiles is exact |
-| Axe | `Opportunistic ×1` | A whole new reaction on the exit side of a threat zone |
+| Axe | `Opportunist ×1` | A whole new reaction on the exit side of a threat zone |
 | Ranged | `CritWindow ×1` | Bows crit on 19–20 rather than 20 |
 | Throwing, casters | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
 
@@ -175,13 +186,13 @@ overlapping actors, reusing the anti-stacking mask `EnemyPlacer` and the pathing
 already share.
 
 **That path therefore needs to know whether the move was chosen.** `Brace` fires
-on entry regardless, but `Opportunistic` fires on exit *only* for voluntary
+on entry regardless, but `Opportunist` fires on exit *only* for voluntary
 movement (§1.2), so `NotifyCharacterMoved` gains a flag distinguishing a walk
 from a shove. It is one parameter, and getting it wrong is invisible in exactly
 the same way — a Routing Axe would quietly grant itself an opportunity attack
 per target and read as a damage bug rather than a rules bug.
 
-`Opportunistic` is otherwise a straight mirror of the brace machinery: the same
+`Opportunist` is otherwise a straight mirror of the brace machinery: the same
 per-turn use pool, the same threat-zone lookup, the same resolver. The only new
 concept is watching the *exit* edge of a zone rather than the entry edge, so
 `TryBracesAgainst` generalises into one function taking which edge it cares
