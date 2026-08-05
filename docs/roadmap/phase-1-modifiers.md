@@ -9,8 +9,8 @@ do the same thing at different prices, which is not interesting.
 
 Every class baseline is its signature **plus a class-specific second modifier**
 (§1.2), so no weapon in the game is forged with fewer than two modifiers:
-`Push` on the sword, `Longshot` on the spear, `CritWindow` on the bow,
-`CritMultiplier` elsewhere.
+`Push` on the sword, `Longshot` on the spear, `Opportunistic` on the axe,
+`CritWindow` on the bow, `CritMultiplier` on throwing and the casters.
 
 | Class | Stat | Class feature | Variant axis |
 | --- | --- | --- | --- |
@@ -180,6 +180,7 @@ ceiling — a forged spread reaches further.
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
 | `Pin` | +1 `Mire` level on the target | 5 | |
 | `Overwatch` | +1 held shot | 5 | |
+| `Opportunistic` | +1 free attack when a target **leaves** your reach | 5 | Voluntary movement only — the mirror of `Brace`, §1.2 |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Levels **accumulate**, uncapped — §1.6 |

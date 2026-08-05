@@ -122,6 +122,12 @@
   §1.2 already argues for. Still worth watching once the kiting AI exists, since
   that is what decides whether an archer can *choose* the long shot or merely
   take the ones the map hands them.
+- **Can a character hold an `Opportunistic` reaction, a `Brace` and an
+  `Overwatch` in the same turn?** The existing open question about overwatch and
+  braces now has a third member, and `Opportunistic` makes it pressing: a
+  sword-and-axe front line could otherwise stack reactions until the enemy turn
+  is mostly the party attacking. Separate per-modifier pools is the simple
+  answer; a shared per-character reaction budget is the conservative one.
 - **Does the sword's `Push` fight its own class?** A shield-bearer is the party's
   front line, and shoving a target back can pull it *out* of the axe's cleave as
   easily as into a spear's threat zone (§1.2). `Push` on a Halberd is chosen —

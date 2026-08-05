@@ -52,12 +52,12 @@ signature alone does not:
 | Dagger | `CritWindow ×1, CritMultiplier ×1` | Crit is two dials, and the dagger owns both |
 | Sword & Shield | `Block ×1, Push ×1` | **A shield bash.** You stop them, then you move them |
 | Spear | `Brace ×1, Longshot ×1` | Full extension is where a polearm wants to be |
-| Axe | `Cleave ×1, CritMultiplier ×1` | Heavy things land catastrophically |
+| Axe | `Cleave ×1, Opportunistic ×1` | **Nobody walks away from an axe** |
 | Ranged | `Longshot ×1, CritWindow ×1` | An aimed shot finds the gap |
 | Throwing | `Charges ×1, CritMultiplier ×1` | Throw enough and one lands perfectly |
 | Staff / Wand | `Cast ×1, CritMultiplier ×1` | A crit multiplies whatever that cast does |
 
-Three of these change what the class *does*, not just its numbers:
+Four of these change what the class *does*, not just its numbers:
 
 - **`Push` gives the sword a positioning tool it completely lacked.** Every
   other martial class could move an enemy or refuse to be moved; the shield
@@ -71,11 +71,15 @@ Three of these change what the class *does*, not just its numbers:
 - **`CritWindow` gives the bow crit *frequency*** where the dagger has it too,
   which is what makes DEX read as the precision stat rather than merely the fast
   one. It is the one place another class shares the dagger's dial.
+- **`Opportunistic` answers the axe's actual weakness.** `Cleave` rewards being
+  surrounded, but nothing stopped an enemy simply walking out of a 60-unit reach
+  that costs 60 to swing. Now leaving is what gets you hit.
 
-`CritMultiplier` is the fallback where no better answer exists — axe, throwing
-and the casters — and it is not a filler pick. §1.6 makes crits bypass `Block`
-entirely, so a natural 20 is every class's way through armour, and at `×3`
-rather than `×2` that answer actually lands.
+`CritMultiplier` is the fallback where no better answer exists — throwing and
+the casters — and it is not a filler pick. §1.6 makes crits bypass `Block`
+entirely, so a natural 20 is a way through armour, and at `×3` rather than `×2`
+that answer actually lands. The axe does not need it: `Splitting` is already its
+answer to armour (§1.2), which is why it can afford something stranger.
 
 **Casters take the rule with the caveat §1.2 already carries.** Their four
 variants differ by effect and shape rather than by adding a stack, so a caster
@@ -298,12 +302,17 @@ spear line.
 
 The precise rule, since the edges matter:
 
-| Situation | Fires? |
+| Situation | `Brace` fires? |
 | --- | --- |
 | Displaced **into** a threat zone it was outside | **Yes** |
 | Displaced **through** two zones on a multi-tile shove | Yes, both |
 | Displaced **further away** while already inside a zone | No — it is leaving, not entering |
 | Displaced by an **ally** of the bracer | No — threat zones only face the other side |
+
+`Opportunistic` takes the opposite convention and fires on **exit, only when
+chosen** — forced movement never provokes it. The reasoning is in the axe
+section below; the short version is that `Brace` is about dangerous ground and
+`Opportunistic` is about turning your back, and only one of those is a decision.
 
 That third row is what keeps `Push` coherent. The Halberd's whole purpose is
 shoving a target *out* of its own reach to break contact (§1.2), and if leaving
@@ -336,7 +345,7 @@ than discovering: it is the only place in the design where one action can cause
 an unbounded-looking cascade, and the thing that stops it is a budget that was
 put there for another reason entirely.
 
-### Axe (STR) — baseline `Cleave ×1, CritMultiplier ×1`
+### Axe (STR) — baseline `Cleave ×1, Opportunistic ×1`
 
 One swing hits every valid target in range, paying the movement cost once.
 Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
@@ -355,6 +364,58 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
   is the weapon the tutorial dungeon exists to teach you to want (§4.3).
 - **Rout** — everything caught by the cleave is pushed back a tile per stack.
   One swing that resets a whole crowd's position buys the entire party room.
+
+### `Opportunistic` — nobody walks away from an axe
+
+Baseline `Opportunistic ×1`: **a free attack when a target leaves your reach**,
+one per stack per turn. It is the exact mirror of the spear's `Brace`, which
+fires on *entry*, and it is what the axe was missing.
+
+Read the axe's statline back and the hole is obvious. Reach 60 — under two
+tiles, the shortest of any martial weapon. Cost 60, the highest in the game, so
+two swings is a whole turn and there is nothing left to chase with. `Cleave`
+rewards being surrounded, but an enemy who simply *walked away* paid nothing at
+all, and the axe could not follow. The class that most wants a crowd had no way
+to keep one.
+
+Now it does, and the pairing with the spear is the good part:
+
+| | Punishes | Reach |
+| --- | --- | --- |
+| Spear — `Brace` | Coming **in** | Four tiles |
+| Axe — `Opportunistic` | Going **out** | Under two tiles |
+
+A spear and an axe standing together is a **cage**: wide threat on approach,
+tight threat on escape. Getting to the axe costs you, and leaving costs you
+again. Neither class had to be redesigned for that — it is just the two halves
+of one idea handed to the two classes that wanted them.
+
+**It fires on voluntary movement only.** An enemy shoved out of reach by a
+`Push`, `Drag` or `Rout` has not disengaged; it has been moved. That is the
+opposite convention to `Brace`, deliberately:
+
+> `Brace` fires on **entry, however caused** — reach is dangerous ground and it
+> does not care why you crossed it.
+> `Opportunistic` fires on **exit, only if chosen** — it punishes turning your
+> back, and a body that was thrown made no such decision.
+
+Three things fall out of that, all good:
+
+- **The Routing Axe does not detonate itself.** `Rout` shoves the whole cleave
+  out of reach, and if forced movement provoked, one swing would trigger the
+  wielder's own opportunity attacks on everything it just displaced. Instead the
+  two pull against each other honestly: a Routing Axe wants space, a baseline
+  axe wants them stuck, and you pick.
+- **Displacement becomes the safe way to break contact.** Walking away from an
+  axe costs you a hit; being pushed away does not. So the spear's Halberd and
+  the thrower's Harpoon are now *answers* to sticky melee, which is a use for
+  displacement nobody designed in on purpose.
+- **It is a convention players already know** from tabletop, so the asymmetry
+  reads as familiar rather than fiddly.
+
+And it runs both ways. An axe dummy makes disengaging expensive, which is the
+first real cost the party has ever paid for kiting — currently free (§1.2). A
+party that wants out of an axe's reach has to spend a `Push` or take the hit.
 
 ### Ranged (DEX) — baseline `Longshot ×1, CritWindow ×1`
 
@@ -653,7 +714,7 @@ unchanged.
 | Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | Three retaliations, all at full reach |
 | Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | +3 a tile; lethal across a room |
 | Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | Four throws, and the movement to reposition after |
-| Shieldbreaker | Axe | Reaver | `Cleave ×1, CritMultiplier ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
+| Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunistic ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
 
 ### Why derive them rather than author them freely
 

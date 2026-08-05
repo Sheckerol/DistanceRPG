@@ -132,6 +132,14 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
+- **`Opportunistic` is the axe's second baseline** — a free attack when a target
+  *leaves* your reach, the exact mirror of `Brace`. It answers the hole in the
+  class: reach under two tiles, the game's highest attack cost, no way to chase,
+  and `Cleave` rewarding a crowd that could simply walk off. Spear and axe now
+  form a cage — wide threat coming in, tight threat going out. It fires on
+  **voluntary movement only**, unlike `Brace`, so a `Rout` cannot detonate the
+  wielder's own opportunity attacks and displacement becomes the safe way to
+  break contact.
 - **Forced movement triggers threat zones.** Shoving an enemy into a spear's
   reach gives the spear a free attack — `Push`, `Drag` and `Rout` route through
   the same per-tile movement path a walk does, so `Brace` and `Overwatch` fire

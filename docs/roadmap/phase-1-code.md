@@ -14,8 +14,8 @@ the value **derived**, so the pair becomes:
 ```csharp
 enum ModifierType { Brace, Block, CritWindow, CritMultiplier, Cleave, Charges,
                     Longshot, Light, Riposte, Push, Drag, Splitting, Overwatch,
-                    Rout, Pin, Softening, CritWeaken, CritSunder, BlockWeaken,
-                    OnHitPoison, Cast,
+                    Opportunistic, Rout, Pin, Softening, CritWeaken, CritSunder,
+                    BlockWeaken, OnHitPoison, Cast,
                     Momentum }                             // Momentum: enchantment-only
 
 sealed class ModifierSet                 // ModifierType → stack count
@@ -105,8 +105,9 @@ class gains one, and three of them change behaviour rather than numbers:
 | --- | --- | --- |
 | Sword | `Push ×1` | Sword hits now displace — new behaviour, not a number |
 | Spear | `Longshot ×1` | Spear reach moves 130 → **128**, so four tiles is exact |
+| Axe | `Opportunistic ×1` | A whole new reaction on the exit side of a threat zone |
 | Ranged | `CritWindow ×1` | Bows crit on 19–20 rather than 20 |
-| Axe, throwing, casters | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
+| Throwing, casters | `CritMultiplier ×1` | Crits multiply ×3 rather than ×2 |
 
 The spear's range change is the one to watch: 130 is a shipped value and may be
 asserted directly. It is not golden-test data — `TestData/distancerpg-golden.json`
@@ -172,6 +173,19 @@ would do so invisibly — the combo simply would not happen and nothing would lo
 broken. It also has to stop early on a wall or an occupied tile rather than
 overlapping actors, reusing the anti-stacking mask `EnemyPlacer` and the pathing
 already share.
+
+**That path therefore needs to know whether the move was chosen.** `Brace` fires
+on entry regardless, but `Opportunistic` fires on exit *only* for voluntary
+movement (§1.2), so `NotifyCharacterMoved` gains a flag distinguishing a walk
+from a shove. It is one parameter, and getting it wrong is invisible in exactly
+the same way — a Routing Axe would quietly grant itself an opportunity attack
+per target and read as a damage bug rather than a rules bug.
+
+`Opportunistic` is otherwise a straight mirror of the brace machinery: the same
+per-turn use pool, the same threat-zone lookup, the same resolver. The only new
+concept is watching the *exit* edge of a zone rather than the entry edge, so
+`TryBracesAgainst` generalises into one function taking which edge it cares
+about rather than being copied.
 
 The recursion guard is the existing per-turn brace budget rather than a depth
 limit: a brace fired by a displacement spends a use like any other, so a
