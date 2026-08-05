@@ -165,6 +165,7 @@ graft, and a boss theme alike — and all are tables rather than special cases.
 | **Excludes** | These two cannot coexist | `Brace` and `Opportunist` |
 | **Requires** | This cannot exist without that | `Riposte` needs `Block` |
 | **Kind** | Only on this sort of weapon | `Overwatch` is ranged only |
+| **ForgedOnly** | Can be deepened, never added | `Charges` — §1.2 |
 
 **Excludes — a weapon may carry at most one modifier from each group:**
 
@@ -173,6 +174,7 @@ graft, and a boss theme alike — and all are tables rather than special cases.
 | **Threat zone** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one zone it watches |
 | **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
 | **Block response** | `Riposte`, `BlockWeaken` | One block, one payoff |
+| **Crit rider** | `CritWeaken`, `CritSunder` | One crit, one rider |
 | **Currency** | `Light`, `Resonant` | One currency per weapon |
 
 A group exists for one of two reasons, and it is worth being able to tell which:
@@ -223,17 +225,27 @@ the two block modifiers make clear. All four fire on the enemy turn, but `Brace`
 all five together; grouping by what it responds to gives the two groups above,
 and that is the useful cut.
 
-**Crit riders are *not* a group — provisionally.** `CritWeaken` and `CritSunder`
-share a trigger too, so the pattern above would suggest excluding them, and they
-appear to fail both tests: they do not contradict (a crit can rattle a swing
-*and* open a target up), and they cost no enemy-turn economy, since they ride an
-attack already paid for on your own turn.
+**Crit riders are a group**, and the argument that settles it is symmetry rather
+than either of the two tests above. `CritWeaken` and `CritSunder` pass both
+tests — they do not contradict (a crit can rattle a swing *and* open a target
+up), and they cost no enemy-turn economy, since they ride an attack already paid
+for on your own turn.
 
-The reason to be unsure anyway is that the dagger's Control and Support variants
-are exactly `CritWeaken` and `CritSunder`, so this is the *same* shape as the
-sword's block responses — one trigger forked by who collects — and that shape got
-a group. The tests above say leave it; the symmetry with the sword says group it.
-Left open rather than resolved; see open questions.
+But they are the dagger's Control and Support variants, which makes them the
+*same shape* as the sword's `Riposte`/`BlockWeaken`: one trigger forked by who
+collects the payoff — the debuff is the party's, the damage-taken is yours. That
+shape got a group on the sword, and a design that answers the same question two
+different ways on two classes has no rule, only cases.
+
+So the fork argument wins over the economy tests, and both classes read the same
+way: **one trigger, one payoff, chosen at the forge.**
+
+The counter-argument is real and worth recording, because it may bring this
+back: a crit is a rare event a player *built toward*, where a block is routine.
+Doubling up on something that fires on 5% of swings is a payoff; doubling up on
+every successful block is an exploit. If the grouped riders turn out
+underwhelming in play, that is the reasoning to reach for — the fix is to ungroup
+them, not to raise the per-level `+1`.
 
 **Requires — some modifiers depend on another being present:**
 
@@ -271,6 +283,43 @@ it is a graft: `forged = 0`, ceiling `×5`, −50% at the very deepest.
 It is inert, not harmful, on a weapon with no enchantments at all — which §1.1
 tolerates. `Charges` remains the one modifier that can actively make a weapon
 worse; see open questions.
+
+**ForgedOnly — `Charges` can be deepened but never added:**
+
+If a weapon is forged with `Charges`, every acquired source may deepen it as
+normal. If it is not, **nothing will ever give it any** — no graft, no farm roll,
+no boss theme. You have it naturally or you never have it.
+
+This is the one place §1.1's "identity survives by ceiling, not by restriction"
+does not hold, and the reason is that `Charges` is not a bonus — **it is a
+cap**. Every other modifier in the table is at worst inert on the wrong weapon:
+a grafted `Brace` on a bow would do nothing, and nothing is what it does. A
+grafted `Charges ×1` on a bow *takes something away* — it holds the bow to 2
+shots a turn where 30-cost attacks against a 160 budget already allowed 5.
+
+So the principle behind the exception is a sharpening of the one §1.1 already
+states:
+
+> No stack may be dead — and no graft may be **negative**.
+
+A ceiling cannot fix that, because the problem is not depth. `Charges ×5` on a
+bow is *better* than `Charges ×1` on a bow, which is the tell: a modifier where
+more stacks undo the harm of the first is not a shallow version of itself, it is
+a different thing. Restriction is the only tool that works.
+
+**It also sidesteps a problem `Kind` could not solve.** The natural instinct is
+"throwing only" — but `WeaponKind` cannot express that, since throwing and
+ranged are both `Ranged`, and splitting the flag to serve one modifier would
+push a data problem into the type system. ForgedOnly needs no new kind, no new
+flag, and reads off the weapon in front of you.
+
+Mechanically it is the degenerate case of `Requires` — `Charges` requires
+`Charges` — but it gets its own name, because a self-referential entry in a
+dependency table reads as a bug rather than a rule.
+
+Worth stating the consequence plainly: **a bow will never become a throwing
+weapon by accident, and a Bandolier can still become a great one.** Which is the
+whole intent, arrived at without a special case in the graft roll.
 
 Together these give a rule worth stating on its own:
 

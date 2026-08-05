@@ -175,6 +175,12 @@ crit, and ×3 when it lands.
   target harder. The dagger stops being a damage weapon and becomes a setup
   weapon; A crits to open a target and C's axe cashes it in across the cleave.
 
+**The Kris and the Stiletto are exclusive** (§1.1, crit-rider group), so neither
+can ever become the other. That is the same treatment the sword's `Riposte` and
+`BlockWeaken` get, and for the same reason: one trigger forked by who collects
+the payoff, which stops meaning anything if one weapon can hold both. A dagger
+picks whether its crits protect *it* or set up the *party*, once, at the forge.
+
 **The baseline is `CritWindow ×1` — crit on 19–20**, a deliberate break from
 the prototype's 16+ (`CombatRulesTests.cs:28`).
 

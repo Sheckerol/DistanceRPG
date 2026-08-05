@@ -180,12 +180,15 @@
   breadth stays the enchanter's product. A two-modifier weapon farmed to the end
   is *complete*, both dials capped; a three-modifier one comes out good at three
   things with room left for the enchanter.
-- **Three relations govern what a weapon may hold**, all tables rather than
+- **Four relations govern what a weapon may hold**, all tables rather than
   special cases: **Excludes** (cannot coexist), **Requires** (cannot exist
-  without), and **Kind** (melee / ranged / caster only).
-  - Excludes: three groups — **threat zone** (`Brace`/`Opportunist`/
-    `Overwatch`), **displacement** (`Push`/`Drag`/`Rout`), and **block
-    response** (`Riposte`/`BlockWeaken`). A group exists either because holding
+  without), **Kind** (melee / ranged / caster only), and **ForgedOnly** (can be
+  deepened, never added).
+  - Excludes: four groups — **threat zone** (`Brace`/`Opportunist`/
+    `Overwatch`), **displacement** (`Push`/`Drag`/`Rout`), **block
+    response** (`Riposte`/`BlockWeaken`), **crit rider**
+    (`CritWeaken`/`CritSunder`), and **currency** (`Light`/`Resonant`). A group
+    exists either because holding
     both would be incoherent (one hit cannot move a target two ways) or because
     it would collapse a distinction the design drew on purpose — §1.2 argues
     `Riposte` and `BlockWeaken` are the same trigger split by who collects, and
@@ -193,15 +196,24 @@
     front line turning the enemy phase into a second player phase, bounded at
     the weapon where the player can see it rather than by a new per-character
     resource.
-  - Crit riders are **not** a group, on the reasoning that they neither
-    contradict nor cost enemy-turn economy — but that one is provisional rather
-    than settled; see open questions.
+  - Crit riders **are** a group, decided on symmetry rather than on the two
+    tests above — they pass both, but they are the dagger's Control and Support
+    variants and so the same shape as the sword's block responses, and answering
+    the same question two ways on two classes is no rule at all. Revisit by
+    ungrouping if they play underwhelming, not by raising the per-level `+1`.
+  - ForgedOnly: `Charges` alone. It is a **cap, not a bonus**, so a graft would
+    make a bow *worse* — 2 shots where it already had 5. Every other modifier is
+    at worst inert on the wrong weapon. The rule sharpens §1.1's to *no stack
+    may be dead, and no graft may be negative*, and it sidesteps needing a
+    throwing-only `WeaponKind` that the melee/ranged/caster flags cannot express.
   - Requires: `Riposte` and `BlockWeaken` need `Block`, `Rout` needs `Cleave`.
     Each would otherwise be a dead stack, so it is illegal rather than bad. This
     makes grafting **order-dependent** — a dagger cannot be offered `Riposte`
     until it has grafted `Block` — and since nothing is ever removed, a
     satisfied prerequisite stays satisfied.
-  - Kind: `Brace`/`Opportunist` melee, `Overwatch` ranged, `Resonant` casters.
+  - Kind: `Brace`/`Opportunist` melee, `Overwatch` ranged. `Resonant` is *not*
+    kind-restricted — it discounts enchantment triggers, so any weapon carrying
+    an enchantment wants it; it is merely forged on casters alone.
 - **`Riposte` is outside the threat-zone group on purpose.** It fires on the
   enemy turn like the other three, but it answers *being hit* rather than *being
   approached* — no zone, no movement, nothing the enemy could have walked

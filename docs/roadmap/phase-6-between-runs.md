@@ -194,11 +194,19 @@ service carrying `Block` is a story, and it is the only place the game tells you
 one you did not ask for.
 
 **Identity survives by ceiling, not by restriction.** The obvious guard would be
-to forbid grafts outright — a spear should not sprout `Charges` — but §1.1
-already handles it more gracefully. A grafted modifier has `forged = 0` and so
-caps at 5, while everything the weapon was forged with caps at 6 to 8. The graft
-is always the shallowest thing on the weapon, permanently. So a spear *can*
-sprout `Charges`, and it will never be a throwing weapon.
+to forbid grafts outright — a spear should not sprout `Block` — but §1.1 handles
+it more gracefully. A grafted modifier has `forged = 0` and so caps at 5, while
+everything the weapon was forged with caps at 6 to 8. The graft is always the
+shallowest thing on the weapon, permanently. So a spear *can* sprout `Block`,
+and it will never be a shield.
+
+**`Charges` is the exception, and it proves the rule rather than bending it.**
+It is ForgedOnly (§1.1) — deepenable if the weapon has it, never grantable if it
+does not. A ceiling cannot make it safe, because `Charges` is a *cap* rather
+than a bonus: a first stack grafted onto a bow would hold it to 2 shots where it
+already had 5. Restriction is reserved for grafts that would be **negative**,
+not merely off-class, which is why it applies to exactly one modifier and the
+other twenty are handed out freely.
 
 Rules that keep it coherent:
 

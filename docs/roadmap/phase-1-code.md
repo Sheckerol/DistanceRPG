@@ -44,8 +44,15 @@ static class ModifierRules               // the §1.1 table, one place only
             [Push]  = [Drag, Rout],               // one displacement direction
             [Drag]  = [Rout],
             [Riposte] = [BlockWeaken],            // one payoff per block
-            [Light] = [Resonant],                     // one currency per weapon
+            [CritWeaken] = [CritSunder],          // one rider per crit
+            [Light] = [Resonant],                 // one currency per weapon
         });
+
+    // Deepenable if already present, never grantable from zero.
+    static readonly IReadOnlySet<ModifierType> ForgedOnly = new HashSet<ModifierType>
+    {
+        Charges,    // it is a cap, not a bonus: grafting one would make a bow worse
+    };
 
     // Cannot exist WITHOUT these. Not symmetric — a dependency, not a pair.
     static readonly IReadOnlyDictionary<ModifierType, ModifierType[]> Requires =
@@ -72,6 +79,7 @@ static class ModifierRules               // the §1.1 table, one place only
 
     static bool Allowed(ModifierType t, WeaponKind kind, ModifierSet present)
         => RequiresKind.GetValueOrDefault(t, Any).HasFlag(kind)
+        && (!ForgedOnly.Contains(t) || present.Stacks(t) > 0)
         && !Excludes.GetValueOrDefault(t, []).Any(x => present.Stacks(x) > 0)
         &&  Requires.GetValueOrDefault(t, []).All(x => present.Stacks(x) > 0);
 }

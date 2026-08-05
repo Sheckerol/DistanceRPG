@@ -23,26 +23,12 @@
   a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
   Weighting by remaining HP or by role would be more accurate — and more
   expensive, and harder to predict when baiting. Flat first.
-- **Should `CritWeaken` and `CritSunder` be an exclusion group?** §1.1 currently
-  says no, on the grounds that they neither contradict nor cost enemy-turn
-  economy. But they are the dagger's Control and Support variants, which makes
-  them structurally identical to the sword's `Riposte`/`BlockWeaken` — one
-  trigger forked by who collects — and that pair *did* get a group. Either the
-  fork argument applies to both or to neither, and the current answer picks
-  differently for two things of the same shape. The counter-argument is that a
-  crit is a rare event a player built toward, where a block is routine, so
-  doubling up on a crit is a payoff rather than an economy exploit. Needs
-  deciding before Phase 1 codes grafting, since it changes what a deep dagger
-  can become.
-- **`Charges` may be actively harmful in the wrong place, not merely useless.**
-  It is a *cap* on attacks per turn (§1.2), and a weapon without it has no cap
-  at all beyond the movement budget. So a `Charges ×1` grafted onto a bow would
-  hold it to 2 shots where 30-cost attacks already allowed 5 — a stack that
-  makes the weapon worse. Every other modifier is at worst inert. Either
-  `Charges` needs a throwing-only restriction (which `WeaponKind` cannot express,
-  since throwing and ranged are both `Ranged`), or it needs redefining so it
-  only ever raises a cap that already exists. Worth checking the whole table for
-  others of this shape before Phase 1 codes grafting.
+- **Is `Charges` the only negative graft?** ForgedOnly (§1.1) fixes the known
+  case, but the test that found it — *does a first stack of this take something
+  away?* — has not been run over the rest of the table. `Light` is the other
+  candidate worth checking, since a cost floor interacts with `Charges` in ways
+  §1.2 already flags. Worth a sweep before Phase 1 codes grafting, and worth a
+  test that asserts every modifier's `×1` is a non-decrease.
 - **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
   on entry and a win ticks service once either way, so a floor-5 dungeon is
   strictly cheaper than a floor-10 one for the same reward. Not disclosing the
