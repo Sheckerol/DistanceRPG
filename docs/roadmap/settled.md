@@ -25,21 +25,37 @@
   A drop rolls an enchantment — always on staves and wands, rarely on everything
   else — but only ever one, and only ever tier 1. Breadth and depth past that
   are the enchanter's alone.
-- **Enchantment tier is uncapped.** Lock and potency both scale with it, so max
-  mana already bounds it continuously; a numeric ceiling would be a second limit
-  on the game's most constrained system. Farming may add five tiers, the
-  enchanter may add them forever, and service time is quadratic.
+- **Enchantment tier is uncapped and earned by use** — mana *moved* through an
+  enchantment is its XP, so it levels by being cast with, never bought. The
+  brake is built into the fuel: the tier that spending buys locks more of the
+  pool the spending came from. Farming may bank five tiers' worth as a head
+  start; the rest is yours to cast for.
+- **The enchanter sells breadth, use buys depth.** Service time prices how many
+  enchantments a weapon carries and never how deep any of them runs. You cannot
+  grind to breadth or pay for depth, and the two ambitions want the weapon in
+  different places — in the shop, or in your hand.
+- **What the enchanter attaches is chosen, not rolled**, from everything the
+  campaign has seen. It is the one lever in itemisation the player operates
+  directly, which is what makes every other roll bearable — and random drops
+  feed the catalogue rather than competing with it.
 - **A lock you cannot afford leaves the enchantment dormant**, never the weapon
   unequippable. Same non-event as a trigger you cannot pay for.
 - **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
   Multiplying an applied effect on a natural 20 is a rounding event on 5% of
-  casts; a rolled enchantment is an identity, and it gives the farm allowance
-  somewhere to land. Caster uniques follow by fixing the enchantment at tier 3.
+  casts. Caster uniques follow, arriving at tier 3.
+- **A staff's effect and a wand's damage type *are* their enchantments.** The
+  staff's is fixed by variant, because a staff is its effect; the wand's is
+  rolled, because a wand is its shape. So a staff levels the effect it casts by
+  casting it, and that effect can be transferred onto a dagger.
+- **Four damage types, two opposed pairs** — Flame/Frost, Storm/Stone. Against a
+  target's attunement: same halved, opposed ×1.5, otherwise unchanged.
+  Attunement belongs to the **themed floor**, not to individual enemies, so the
+  counter is knowable before descending. Halved rather than nullified, because
+  nothing in this game has a zero.
 - **Wear is a resource, not damage.** Nothing breaks; using a weapon is what
   makes it enchantable.
-- **Service costs runs, not gold** — always *the number the work arrives at*:
-  the *n*-th enchantment costs *n* runs, and tier *t* costs *t*. Power and
-  availability trade off directly, and depth and breadth cost the same.
+- **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so
+  power and availability trade off directly.
 - **Entering does not tick service.** A successful run ticks; reaching floor 2
   and then failing ticks once as mercy, so a losing streak cannot freeze the
   workshop.

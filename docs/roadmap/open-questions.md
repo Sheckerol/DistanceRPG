@@ -202,14 +202,32 @@
   character cannot afford its lock at all (§3.1). The argument that it is not is
   that a wizard's first staff is strictly better than a fighter's first sword in
   a way no other class comparison is.
-- **Does the uncapped tier want a soft brake as well as a quadratic cost?**
-  Service time makes tier 10 a 54-run project, which is almost certainly enough.
-  But the cost is paid in *downtime*, and a player with a deep stable feels
-  downtime much less than a player running two weapons — so the brake is
-  weakest for exactly the player closest to the deep end. If that bites, the
-  answer is probably to make lock scaling superlinear rather than to add a cap.
-- **What raises an enchantment's tier at the enchanter — choice or roll?**
-  §6.4's modifier improvements are a rare roll; tier is specced as bought
-  outright with service time. Those are different economies sitting in the same
-  building, which is either a good contrast (the weapon surprises you, the
-  enchantment obeys you) or an inconsistency.
+- **Does the uncapped tier self-limit fast enough?** The brake is that a higher
+  tier locks more of the pool it levels from (§3.3), which is elegant but has
+  never been simulated. If max mana grows faster than locks do — and §2.2 grows
+  it from the *same* mana spending that feeds the tier — the loop may accelerate
+  rather than converge. The dial if it does is superlinear lock scaling, not a
+  cap.
+- **Mana spent now pays twice.** It grows max mana (§2.2) *and* levels the
+  enchantment that moved it. That is a deliberate double credit and it makes
+  casting the most rewarding thing an INT character can do, but it is the only
+  place in the game one action feeds two ladders. Worth checking it does not
+  make the caster the obvious pick for every party slot.
+- **Does choosing from what you have seen make late innate rolls inert?** By the
+  time the catalogue is full, a rolled innate is only ever a free tier-1 copy of
+  something you could already ask for. That is fine — it is still free, and it
+  is still a body — but the *discovery* half of drops has a natural end, and
+  nothing currently replaces it.
+- **Should unattuned floors exist?** Attunement sits on the themed floor (§1.4),
+  so a floor with no theme has no chart and every element is identical there. If
+  most floors are unthemed, the type chart is a boss-fight mechanic wearing a
+  system's clothes; if none are, every dungeon has a right answer and carrying
+  the wrong wand is punishment rather than a trade.
+- **Four types may be too few to make a rotation.** Two opposed pairs means any
+  wand is correct against exactly one theme and wrong against exactly one, so a
+  two-wand stable covers everything. That is either pleasingly tight or it is
+  the whole mechanic solved by owning two items — the fix is more types, which
+  costs the one-line readability the four were chosen for.
+- **Does `Block` or the type chart apply first?** §3.5 flags it; the numbers
+  differ and the answer is a decision, not a derivation. Crits already bypass
+  `Block` entirely (§1.6), so the interesting case is a resisted crit.

@@ -673,6 +673,26 @@ property of a weapon class; an enchantment is a thing you own, and can carry
 somewhere else, which turns eight staves into a **source of effects** rather
 than eight fixed loadout choices.
 
+### A cast is a hit
+
+Moving a staff's effect onto a dagger raises the obvious question — a dagger has
+no cast for an on-cast enchantment to fire on. The answer is that there is no
+on-cast condition: **the condition is `Hit`, and a staff's cast is its hit.**
+`TryCast` is a staff's attack, so it resolves through the same path everything
+else does (Phase 0's unified resolver) and triggers the same way.
+
+That collapses two lists into one. `Flaring` in §3.3's starting set — lock 15,
+trigger 5, applies Poison on hit — **is** the Staff of Blight's enchantment,
+seen from the other end. The staff is where you find it; a dagger is somewhere
+you can put it. There is one catalogue of enchantments, and a staff variant is a
+guaranteed source of one entry rather than a separate system that happens to
+look similar.
+
+It also means the wizard-with-a-dagger build (§3.3) is assembled entirely from
+parts the caster classes hand you. You do not find a Poison enchantment in the
+abstract — you find a Staff of Blight, cast with it until the rot is deep, and
+then move it onto the knife.
+
 **Mire is the signature debuff** for this game specifically: in a system where
 movement is the only real currency, taxing an enemy's budget is a more
 meaningful attack than damage. It also gives INT characters something to do

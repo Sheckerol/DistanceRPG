@@ -426,6 +426,12 @@ Potency values are before INT scaling.
 | Shattering | 25 | 10 | Crit | Crit riders (§1.6) land one level deeper |
 | Momentum | 30 | 10 | Kill | Refund part of the swing's movement cost |
 
+**This table and the staff effects are one catalogue.** `Flaring` is the Staff
+of Blight's enchantment written from the other end (§1.3), and the same holds
+for Ward, Mire and Regeneration — a staff variant is a guaranteed *source* of an
+entry here, not a parallel system. A cast is a hit, so an effect fires the same
+way wherever it ends up.
+
 Arcane Edge and Siphon together are the close-range wizard: hit for INT-scaled
 damage, kill to refund the mana that paid for it. Neither needs a bespoke
 ceiling — Siphon only pays out on kills, and Arcane Edge drains a pool that
@@ -474,9 +480,31 @@ max mana or the equipped set changes — never stored on the enchantment, which
 is shared and immutable.
 
 `Tier` is an `int` with no upper bound; `EffectiveLock` and `EffectivePotency`
-are `Base × Tier`. Nothing in the type should express a maximum, since the two
-places that raise it (§3.2, §6.4) each impose their own limits and the
-enchantment itself has none.
+are `Base × Tier`. Nothing in the type should express a maximum.
+
+**Tier is derived from XP, not stored.** An enchantment instance carries `Xp`
+and computes `Tier` from a curve in `Progression.cs`, exactly as
+`WeaponXp`/`HpXp`/`ManaXp` already work (§2.2). That keeps one levelling
+mechanism in the game rather than two, and makes the farm's contribution (§3.2)
+a plain XP grant instead of a special case.
+
+`TurnSystem` credits it wherever mana moves: `TryCast` and the trigger dispatch
+point both already exist for §2.2's `manaXp`, so this is a second credit at the
+same call sites, against the enchantment that moved the mana rather than the
+member that owns it.
+
+**Damage types are enchantments, but they resolve in `CombatRules`.** The
+opposition table (§1.4) is a static four-entry map; a `DamageType?` on the
+incoming attack and an `Attunement` on `EnemyState`, populated by the floor
+theme (§4.3), are what it reads. It applies **after** `Block` and follows the
+same rule crits do about ordering — worth pinning in a test, since a halved
+attack that is then blocked and a blocked attack that is then halved are
+different numbers.
+
+**The catalogue is campaign state.** §6.4's "choose from what you have seen"
+means `CampaignState` holds a `HashSet<EnchantmentId> Seen`, added to whenever
+a weapon carrying one enters your inventory. It is small, but it is save data
+(§5.1) and it is the one collection that only ever grows.
 
 `TurnSystem` needs a **trigger dispatch point** per condition — on hit, on
 crit, on kill, on being hit, on cast. Phase 0's unified attack resolver is
