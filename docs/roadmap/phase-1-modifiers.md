@@ -171,13 +171,32 @@ graft, and a boss theme alike — and all are tables rather than special cases.
 | --- | --- | --- |
 | **Threat zone** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one zone it watches |
 | **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
+| **Block response** | `Riposte`, `BlockWeaken` | One block, one payoff |
 
-**`Riposte` is deliberately outside the threat-zone group.** It fires on the
-enemy turn like the other three, but it answers *being hit* rather than *being
-approached* — there is no zone, no movement, and nothing the enemy could have
-walked around. Grouping it with them would be grouping by when it resolves
-rather than by what it responds to, and the sword would lose its counter-attack
-to a rule that exists for a different reason.
+A group exists for one of two reasons, and it is worth being able to tell which:
+
+- **Holding both would be incoherent.** Displacement is the case — one hit
+  cannot move a target two directions.
+- **Holding both would collapse a distinction the design deliberately drew.**
+  Threat zones and block responses are both this. §1.2 spends a section arguing
+  that `Riposte` and `BlockWeaken` are *the same trigger split by who collects* —
+  the counter-swing is yours, the debuff is the party's. A shield carrying both
+  gets two payoffs from one defensive event and the Control/Support fork stops
+  meaning anything.
+
+**`Riposte` is still outside the *threat-zone* group**, which is the distinction
+the two block modifiers make clear. All four fire on the enemy turn, but `Brace`,
+`Opportunist` and `Overwatch` answer *being approached* while `Riposte` and
+`BlockWeaken` answer *being hit*. Grouping by when something resolves would put
+all five together; grouping by what it responds to gives the two groups above,
+and that is the useful cut.
+
+**Crit riders are deliberately *not* a group.** `CritWeaken` and `CritSunder`
+share a trigger too, so the pattern above would suggest excluding them — but
+they fail both tests. They do not contradict (a crit can rattle a swing *and*
+open a target up), and they cost no enemy-turn economy, since they ride an
+attack you already paid for on your own turn. A dagger that grafts its way to
+both is a fine weapon, not a rules hole.
 
 **Requires — some modifiers depend on another being present:**
 
@@ -253,7 +272,7 @@ ceiling — a forged spread reaches further.
 | `Charges` | +1 throw per turn, on top of 1 | 6 | A **cap**, not a grant — see §1.2 |
 | `Longshot` | +1 damage per tile | 5 | Beyond 3 tiles |
 | `Light` | **−10% of the weapon's cost** | −50% | Additive, not compounding; **max forged ×1**, so it ceilings at ×6 |
-| `Riposte` | +1 counter per turn | 5 | Requires `Block`; outside the threat-zone group |
+| `Riposte` | +1 counter per turn | 5 | Requires `Block`; block-response group |
 | `Push` / `Drag` / `Rout` | +1 tile displaced | 5 | Displacement group — one direction per weapon. Fires on any hit, however delivered |
 | `Splitting` | +3 of the target's Block ignored | 15 | Matches `Block` stack for stack, but not ceiling for ceiling — open question |
 | `Softening` | +3 of the target's Block stripped for a turn | 15 | Same per-stack value, but for everyone |
@@ -262,7 +281,7 @@ ceiling — a forged spread reaches further.
 | `Opportunist` | +1 free attack when a target **leaves** your reach | 5 | **Melee only**; threat-zone group. Voluntary movement only — the mirror of `Brace`, §1.2 |
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
-| `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Levels **accumulate**, uncapped — §1.6 |
+| `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Requires `Block`; block-response group. Levels **accumulate**, uncapped — §1.6 |
 | `Cast` | +1 effect level applied | 5 | Staves and wands |
 
 ### `Light` has to be proportional, not flat

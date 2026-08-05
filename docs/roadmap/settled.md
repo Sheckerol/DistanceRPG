@@ -135,12 +135,19 @@
 - **Three relations govern what a weapon may hold**, all tables rather than
   special cases: **Excludes** (cannot coexist), **Requires** (cannot exist
   without), and **Kind** (melee / ranged / caster only).
-  - Excludes: `Brace`/`Opportunist`/`Overwatch` are one **threat-zone** group,
-    and `Push`/`Drag`/`Rout` one **displacement** group. So every weapon holds
-    exactly one threat zone and one displacement direction — which stops a front
-    line turning the enemy phase into a second player phase, bounded at the
-    weapon where the player can see it rather than by a new per-character
+  - Excludes: three groups — **threat zone** (`Brace`/`Opportunist`/
+    `Overwatch`), **displacement** (`Push`/`Drag`/`Rout`), and **block
+    response** (`Riposte`/`BlockWeaken`). A group exists either because holding
+    both would be incoherent (one hit cannot move a target two ways) or because
+    it would collapse a distinction the design drew on purpose — §1.2 argues
+    `Riposte` and `BlockWeaken` are the same trigger split by who collects, and
+    a shield holding both erases that. One threat zone per weapon also stops a
+    front line turning the enemy phase into a second player phase, bounded at
+    the weapon where the player can see it rather than by a new per-character
     resource.
+  - **Crit riders are deliberately not a group.** `CritWeaken` and `CritSunder`
+    share a trigger but fail both tests: they do not contradict, and they cost
+    no enemy-turn economy since they ride an attack already paid for.
   - Requires: `Riposte` and `BlockWeaken` need `Block`, `Rout` needs `Cleave`.
     Each would otherwise be a dead stack, so it is illegal rather than bad. This
     makes grafting **order-dependent** — a dagger cannot be offered `Riposte`

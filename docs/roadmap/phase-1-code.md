@@ -39,10 +39,11 @@ static class ModifierRules               // the §1.1 table, one place only
     static readonly IReadOnlyDictionary<ModifierType, ModifierType[]> Excludes =
         Symmetric(new()
         {
-            [Brace] = [Opportunist, Overwatch],   // one reaction per weapon
+            [Brace] = [Opportunist, Overwatch],   // one threat zone per weapon
             [Opportunist] = [Overwatch],
             [Push]  = [Drag, Rout],               // one displacement direction
             [Drag]  = [Rout],
+            [Riposte] = [BlockWeaken],            // one payoff per block
         });
 
     // Cannot exist WITHOUT these. Not symmetric — a dependency, not a pair.

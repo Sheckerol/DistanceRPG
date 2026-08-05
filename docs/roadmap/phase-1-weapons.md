@@ -219,7 +219,12 @@ without a shield. On a dagger, with no Block behind it, weakening is
 self-defence. Same effect, opposite role, decided by who carries it.
 
 It is also the one weapon whose added modifier depends on the class baseline:
-`BlockWeaken` cannot fire without a `Block` to succeed at.
+`BlockWeaken` cannot fire without a `Block` to succeed at — which §1.1 now
+enforces as a prerequisite rather than leaving to convention.
+
+**And a weapon can never hold both.** They are one exclusion group (§1.1), so a
+Riposte Blade can never be serviced into a Warden's Shield and no drop combines
+them. That is the point: the fork above is only a fork if you have to choose.
 
 **Both have the same blind spot.** Crits bypass Block entirely (§1.6), so a crit
 is not a successful block and neither `Riposte` nor `BlockWeaken` triggers on
