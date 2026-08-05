@@ -14,13 +14,21 @@ A dropped weapon rolls for an enchantment (§3.3) alongside its variant:
 
 | Class | Enchantment on drop |
 | --- | --- |
-| Staff, wand | **Always one**, rolled uniformly — it is their second forged slot (§1.2) |
-| Everything else | **Rare** — an uncommon roll on the loot stream |
+| **Staff** | **Always, and fixed** — its effect *is* its enchantment (§1.3). A Staff of Blight carries Poison, every time |
+| **Wand** | **Always, and rolled** — its damage type (§1.4), uniformly among the four |
+| Everything else | **Rare** — an uncommon roll on the loot stream, uniformly among the general set |
 
 Always **exactly one**, always **tier 1**. Breadth stays the enchanter's
 product (§6.4) and depth past the first tier stays a project; what the dungeon
 hands you is a *seed*, and the fifteen-run climb to a fully enchanted weapon
 (§6.2) is untouched.
+
+**The two casters are asymmetric on purpose.** A staff's identity is the effect
+it casts, so fixing it keeps a Staff of Mire recognisably a Staff of Mire. A
+wand's identity is its *shape*, which leaves the damage free to roll — so a wand
+is a shape you picked crossed with an element you did not, and the same four
+wands play differently every campaign. Neither class gives up its identity;
+they just keep it in different fields.
 
 The innate enchantment is **forged** in the §1.1 sense — it is part of what the
 weapon is, not something piled on afterwards. That matters in exactly two

@@ -84,9 +84,23 @@ lands. The axe does not need it: `Splitting` is already its answer to armour
 ### The casters' second axis is an enchantment
 
 Staves and wands satisfy the two-axis rule without a second modifier: **every
-caster weapon drops carrying one rolled enchantment** (§3.1), and farming can
-put its ten points into `Cast` stacks or into that enchantment's tier (§3.2).
-The allowance has somewhere to go, which is all the rule ever asked for.
+caster weapon drops carrying an enchantment** (§3.1), and farming can put its
+ten points into `Cast` stacks or into that enchantment's levelling (§3.2). The
+allowance has somewhere to go, which is all the rule ever asked for.
+
+The two classes hold it differently, and the difference is each class's
+identity kept in the field that suits it:
+
+| | The enchantment is | Rolled? |
+| --- | --- | --- |
+| **Staff** | The effect it casts — Poison, Ward, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
+| **Wand** | Its damage type — Flame, Frost, Storm, Stone (§1.4) | **Yes.** Uniform among four |
+
+A staff *is* its effect, so rolling it would make a Staff of Blight stop being
+one. A wand is its **shape**, which leaves the damage free to vary — so the four
+geometries stay stable and the element is what makes them feel new. And because
+the type chart (§1.4) makes elements situational rather than ranked, a rolled
+one is never a bad wand, only a wand for a different dungeon.
 
 `CritMultiplier` was the previous answer here and it was the wrong one for a
 class that does not attack. A staff *applies an effect*; multiplying it on a
@@ -630,8 +644,34 @@ Staff of Renewal is today's shipped Staff with its numbers unchanged, so
 parity holds.
 
 Each carries `Cast ×1`, so the stacking model applies here too: `Cast ×2`
-applies the effect at double level. **Which** effect a staff casts is a field
-on the weapon, not a modifier — the modifier only says how hard it lands.
+applies the effect at double level.
+
+### The effect *is* the staff's enchantment
+
+**Which** effect a staff casts is not a field and not a modifier — it is the
+weapon's innate enchantment (§3.1), fixed by variant rather than rolled. Staff
+of Blight always carries Poison; Staff of Renewal always carries Regeneration.
+
+That is worth more than it first looks:
+
+- **The staff levels itself.** Enchantment tier is earned by mana moved through
+  it (§3.3), and casting a staff is exactly that. Every cast makes the effect it
+  applies land harder, without touching the staff's stats or its proficiency. A
+  staff you use is a staff that grows.
+- **`Cast` and tier are two different dials on the same number, and they come
+  from different places.** `Cast` stacks are forged, farmed and grafted — the
+  weapon getting better. Tier is cast for — the *effect* getting better. Which
+  is why the pairing is not redundant: one is what you found, the other is what
+  you did with it.
+- **The effect can leave the staff.** Enchantments transfer (§6.5), so a Staff
+  of Mire's Poison — earned to tier 5 over a campaign — can be moved onto a
+  dagger, and the wizard who does it is precisely the build §3.3 exists for.
+  The staff is where the effect *comes from*, not where it has to stay.
+
+The last one is the reason to prefer this over a plain field. A field is a
+property of a weapon class; an enchantment is a thing you own, and can carry
+somewhere else, which turns eight staves into a **source of effects** rather
+than eight fixed loadout choices.
 
 **Mire is the signature debuff** for this game specifically: in a system where
 movement is the only real currency, taxing an enemy's budget is a more
@@ -659,6 +699,69 @@ extends naturally to per-target checks inside a shape.
 
 Wands carry `Cast ×1` like staves; the shape is a field, the stack is the
 damage multiplier.
+
+### The damage type is the wand's enchantment, and it is rolled
+
+Where a staff's enchantment is its effect and fixed, a **wand's is its damage
+type and it is rolled** — uniformly among four, at tier 1, on every wand that
+drops (§3.1).
+
+| Type | Opposed by |
+| --- | --- |
+| **Flame** | Frost |
+| **Frost** | Flame |
+| **Storm** | Stone |
+| **Stone** | Storm |
+
+So a wand is **a shape you chose crossed with an element you did not**. The four
+geometries stay the wand's identity and the element is what makes the same four
+weapons play differently from one campaign to the next. It also gives the class
+the one thing its variant table lacked: a reason to want a *second* wand of a
+shape you already have.
+
+### The type chart cancels
+
+Every enemy may carry an **attunement**, and damage resolves against it:
+
+| Incoming type vs the target's attunement | Damage |
+| --- | --- |
+| **Same** | **Halved** — it cancels |
+| **Opposed** | **×1.5** |
+| Unrelated, or the target is unattuned | Unchanged |
+
+Four types in two opposed pairs, not a matrix. Every relation in the table is
+readable off one line — *what is this weak to* — which is the whole reason to
+keep it at four rather than the eight a richer chart would want.
+
+**Attunement is the dungeon's, not the individual enemy's.** A themed floor
+(§4.3) attunes what it spawns, so the chart reads as *this place resists fire*
+rather than as a per-enemy stat block the player has to memorise. The theme is
+already announced, so the counter is knowable before you descend rather than
+discovered by wasting a cast.
+
+Three things this buys:
+
+- **A reason to carry a second wand.** The stable (§6.2) already exists because
+  weapons sit in service; the chart gives it a second, sharper reason — the wand
+  that clears a Flame floor is the wrong tool for the next dungeon, and rotation
+  is preparation rather than a consolation for downtime.
+- **It makes a bad roll into a trade rather than a loss.** A Frost wand in a
+  Frost dungeon is halved; the same wand is the best thing you own one dungeon
+  later. The roll decides *when* a wand is good, never *whether*.
+- **The counter is transferable.** The damage type is an enchantment, so §6.5
+  moves it — onto another wand, or onto a sword. A fighter carrying Frost into a
+  Flame dungeon is a real answer built out of parts that already existed, and
+  the only one available to a party with no caster.
+
+**Halved rather than nullified**, because a wand hits an area and a shape full
+of resistant enemies should be a poor cast rather than an illegal one — nothing
+in this game has a zero, and a resisted Nova that still softens a room keeps the
+class playable in its worst matchup.
+
+Tier scales the type's contribution along with everything else, so a tier-5
+Flame is both more damage and more of what the chart multiplies. That is the
+axis a caster who commits to one element is building, and the chart is the cost
+of committing.
 
 ### Friendly fire is on, at half damage, both sides
 
@@ -799,23 +902,31 @@ derivation rule has two ways to land — and only one of them is interesting.
 `Cast ×3` is a staff that costs less mana, which is a fine modifier and a
 terrible legend. So:
 
-**A caster unique is a caster variant whose enchantment is fixed and forged at
-tier 3.**
+**A caster unique is a caster variant whose enchantment arrives at tier 3.**
 
 | Unique | Class | Built from | Carries | Reads as |
 | --- | --- | --- | --- | --- |
-| Rotwood | Staff | Staff of Blight | `Cast ×1`, **Flaring tier 3** | Poisons on cast *and* on every hit |
-| The Long Candle | Wand | Wand of the Beam | `Cast ×1`, **Siphon tier 3** | A beam that pays for the next one |
+| Rotwood | Staff | Staff of Blight | `Cast ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
+| The Long Candle | Wand | Wand of the Beam | `Cast ×1`, **Flame tier 3** | A beam that is *always* fire, and hot |
 
-That is the only place in the game a weapon's enchantment is not a roll, which
-is what makes a caster unique recognisable in the same way `Block ×3` makes The
-Bulwark recognisable: you know what it is the moment it drops.
+The two classes get there differently, which follows from §1.3 and §1.4. A
+staff's enchantment is already fixed by variant, so its unique simply starts
+deep. A **wand's is rolled**, so its unique does both — fixes the element and
+starts it deep — which makes a wand unique the only weapon in the game whose
+damage type is not a roll. That is what makes it recognisable in the way
+`Block ×3` makes The Bulwark recognisable: you know what it is the moment it
+drops.
 
-It also inherits the right ceiling by accident. Tier is uncapped (§3.3), so a
-unique's tier-3 enchantment is not near any limit — it is three tiers of head
-start on a climb with no top, on the axis where the pool is the only cost. A
-caster unique is the deepest *project* in the game for exactly the same reason
-The Bulwark is: it starts high on the axis that keeps going.
+It also inherits the right ceiling by accident. Tier is uncapped and earned by
+casting (§3.3), so a unique's tier 3 is not near any limit — it is three tiers
+of *levelling you did not have to do*, on a climb with no top. A caster unique
+is the deepest project in the game for exactly the same reason The Bulwark is:
+it starts high on the axis that keeps going.
+
+Note what a caster unique is **not**: it is not a bigger number on the weapon.
+`Cast ×1` is unchanged, the statline is unchanged, and every point of its
+advantage sits in a thing that can be transferred off it (§6.5). A caster unique
+is a *soul that arrives grown*, and the body it came in is ordinary.
 
 ### Uniques are the deepest ceilings in the game
 
