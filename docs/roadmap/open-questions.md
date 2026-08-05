@@ -91,13 +91,21 @@
   weight the roll toward health, or scale the step proportionally to the
   dummy's own weapon rather than flat. The three-way roll shape is settled; the
   numbers are not.
-- **Is ~1% the right unique chance, and should it accelerate?** At `+1%` per
-  alternating cycle, `DefeatCount 20` is about 8% — so the farm route to a
-  unique is very cold, and the boss route (§4.3, roughly 1-in-24 on a themed
-  drop) may end up strictly better despite being the one you cannot grind.
-  Whether that is correct depends on how dangerous `DefeatCount 20` actually is,
-  which nobody knows yet. An accelerating curve would make deep farming a real
-  strategy rather than a novelty; a flat one keeps uniques mostly a boss story.
+- **Where should the logistic's hot zone sit?** §3.2 puts `Midpoint` at
+  `DefeatCount 20` with a 50% ceiling, so the odds go interesting somewhere
+  around 12–25. Whether that is reachable depends entirely on how survivable a
+  twenty-times-revived dummy is, which is unknown until revival scaling has
+  numbers. If `DefeatCount 20` turns out to be suicide, the midpoint has to come
+  down to meet it; if it turns out trivial, both the midpoint and the revival
+  step are too soft.
+- **Should the signature-stack budget be larger than 5 for farming?** The ladder
+  currently exhausts the acquired budget at `DefeatCount 10`, so two thirds of a
+  deep farm buys only unique chance. Raising §1.1's acquired headroom to 10
+  would give the stacks a runway matching the curve's — but it moves the
+  universal ceiling from `×8` to `×13` and re-opens the pricing of every
+  modifier, `Light` and `Charges` worst of all. The cheaper alternative is to
+  stretch the *schedule* rather than the budget: one stack per three defeats
+  reaches `+5` at `DefeatCount 15` instead of 10.
 - **Does anything scale a boss the same way?** The boss cannot revive, so it
   never accumulates — which is right, but it means a heavily farmed floor can
   contain dummies more dangerous than the boss guarding it. Either the boss

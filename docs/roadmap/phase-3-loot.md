@@ -29,27 +29,54 @@ the way out, after the boss has stopped resurrection (§4.4).
 
 ### The ladder has no top; the danger curve is the top
 
+Two things accrue, on different shapes. **Stacks come on a schedule and run
+out; unique chance is a curve and never does.**
+
 | `DefeatCount` | Signature stacks | Unique chance |
 | --- | --- | --- |
-| 0 | — | — |
 | 1–2 | `+1` | — |
-| 3–4 | `+2` | — |
-| **5** | `+2` | **1%** |
-| 6 | `+3` | 1% |
-| 7 | `+3` | 2% |
-| 8 | `+4` | 2% |
-| 9 | `+4` | 3% |
-| 10 | **`+5`** — the acquired budget, spent | 3% |
-| 11 | `+5` | 4% |
-| 12+ | `+5` | `+1%` per further defeat |
+| 3–5 | `+2` | 1% |
+| 6–7 | `+3` | 1–2% |
+| 8–9 | `+4` | 2–3% |
+| **10+** | **`+5`** — the acquired budget, spent | 3% and climbing |
 
-**Past five the ladder alternates**: one cycle buys a stack, the next buys a
-point of unique chance, until the stacks run out against the five-stack acquired
-budget (§1.1) at `DefeatCount 10`. After that every cycle buys chance alone.
+### The unique chance accelerates toward an asymptote
 
-The unique chance is rolled **once, on the permanent kill** (§4.4), not per
-defeat — `DefeatCount` sets the odds the drop is carrying, and the extraction is
-where you find out.
+A flat `+1%` per cycle made deep farming a novelty rather than a strategy — at
+`DefeatCount 20` it was still colder than simply killing a boss. It should
+instead start negligible, get genuinely hot in the middle, and then flatten
+without ever reaching certainty. That is a logistic:
+
+```
+uniqueChance(n) = Ceiling / (1 + e^(-K × (n − Midpoint)))
+
+Ceiling  = 0.50     never certain, however deep you go
+Midpoint = 20       the steepest point, at half the ceiling
+K        = 0.26     tuned so DefeatCount 5 lands on ~1%
+```
+
+| `DefeatCount` | 5 | 10 | 12 | 15 | 18 | **20** | 25 | 30 | 40 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Chance | 1% | 3.5% | 5.6% | 11% | 19% | **25%** | 39% | 47% | 50% |
+
+Three things this buys that a flat rate did not:
+
+- **A hot zone.** Between 12 and 25 the odds roughly quadruple, so there is a
+  stretch where each additional cycle visibly matters — and it lands exactly
+  where revival scaling has made the dummy genuinely dangerous. The interesting
+  decision and the interesting fight are the same cycles.
+- **A real reason to overcommit.** At 20 it is a coin-flip's worth of a coin
+  flip, against an enemy that has come back twenty times. That is a story.
+- **No certainty, ever.** The 50% ceiling means no amount of grinding
+  *guarantees* a unique, so the deep farm stays a gamble rather than becoming a
+  long, safe purchase. This is the asymptote doing the work a hard cap used to.
+
+All three constants are knobs. `Ceiling` sets how much grinding can ever be
+worth, `Midpoint` moves the hot zone, and `K` controls how sharply it arrives.
+
+The chance is rolled **once, on the permanent kill** (§4.4), not per defeat —
+`DefeatCount` sets the odds the drop is carrying, and the extraction is where
+you find out.
 
 Tuning targets, but the *shape* is the decision, and three things fix it.
 

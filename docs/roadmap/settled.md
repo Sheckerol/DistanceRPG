@@ -124,10 +124,14 @@
   draft capped it at `DefeatCount 5` because farming's only cost was turns, and
   turns are cheap. Revival scaling makes that obsolete — every cycle is a harder
   fight — so the ladder runs forever and prices itself. Stacks accrue on the
-  class signature to `+5`, the acquired budget, by `DefeatCount 10`; from `5`
-  onward alternating cycles buy unique chance instead, ~1% at a time, rolled
-  once on the permanent kill. Depth only, never breadth — breadth is the
-  enchanter's product.
+  class signature to `+5`, the acquired budget, by `DefeatCount 10`. Depth only,
+  never breadth — breadth is the enchanter's product.
+- **Unique chance accelerates toward an asymptote, never to certainty.** A
+  logistic on `DefeatCount`: ~1% at 5, 11% at 15, 25% at 20, flattening toward a
+  50% ceiling. A flat per-cycle rate made deep farming a novelty; the S-curve
+  gives it a hot zone that lands on exactly the cycles revival scaling has made
+  dangerous, and the ceiling keeps it a gamble rather than a long safe purchase.
+  Rolled once, on the permanent kill.
 - **The unique roll is the only thing that undoes farming's cost.** Ordinary
   tiers spend the acquired budget the enchanter would have filled, so a
   fully farmed drop can never be improved on its signature again. A unique's
