@@ -245,9 +245,16 @@
   second ladder — its proficiency comes from effect level applied, which tier
   drives, so efficiency slows both of a staff's ladders and only one of a wand's.
   That may make `Cast` straightforwardly better on wands than on staves.
-- **Is there anything left for a caster Efficiency variant?** `Light` discounts
-  movement and `Cast` now discounts mana, so a caster already has an efficiency
-  signature. §1.2 exempts casters from the four-role frame, which sidesteps it —
-  but `Cast ×2` as a Purity variant and `Light ×1` as Efficiency are now two
-  discounts on one weapon, and it is worth checking they do not stack into a
-  caster that acts nearly for free.
+- **Should `Cast` be renamed?** It now discounts enchantment trigger costs on
+  any weapon, so a mana-efficient dagger carries a modifier called `Cast` and
+  never casts anything. `Focus`, `Channeling` or `Attunement` all read better on
+  a knife. Kept as `Cast` for now because it is an enum member threaded through
+  §1.7 and every weapon table, and renaming is cheap only if it happens before
+  Phase 1 codes it — so this wants deciding early rather than well.
+- **The `Light`/`Cast` exclusion makes an Efficiency variant a fork in the road.**
+  A martial Efficiency variant is forged `Light ×1` and can therefore *never*
+  take `Cast`, which permanently closes the mana-efficient route on the exact
+  weapons an enchantment-heavy build would otherwise want. That is the trade
+  working as intended, but it means the wizard's dagger has to be a non-
+  Efficiency variant, and it is worth checking that does not quietly make one of
+  the four dagger variants the only correct choice for the build.

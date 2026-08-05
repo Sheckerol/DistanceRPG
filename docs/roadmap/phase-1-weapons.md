@@ -645,10 +645,22 @@ parity holds.
 
 ### `Cast` is efficiency, not magnitude
 
-**`Cast ×n` discounts the weapon's mana cost by 10% a stack**, proportional
-exactly as `Light` is on movement (§1.1). It is not an effect multiplier and
-never was a good one — with tier now carrying the effect's power (§3.3), having
-`Cast` do magnitude too would be two dials on one number.
+**`Cast ×n` discounts every point of mana the weapon spends by 10% a stack** —
+its own cast cost *and* its enchantments' trigger costs — proportional exactly
+as `Light` is on movement (§1.1). It is not an effect multiplier and never was a
+good one: with tier now carrying the effect's power (§3.3), having `Cast` do
+magnitude too would be two dials on one number.
+
+Because it covers triggers, `Cast` is **not caster-only**. A dagger carrying
+Arcane Edge spends mana every hit, and a stack that makes those hits cheaper is
+exactly as meaningful there as on a staff — so the wizard's dagger (§3.3) can be
+grafted toward mana efficiency, at a graft's shallow `×5`. It stays *forged* on
+casters alone.
+
+**It excludes `Light`** (§1.1). Mana comes back from movement left unspent, so
+cheap movement is already cheap mana by the long route; a weapon with both would
+compound one discount with itself. You pick which currency your weapon is cheap
+in — and a mana-efficient dagger and a light dagger are two different weapons.
 
 The division is clean, and the two halves come from different places:
 

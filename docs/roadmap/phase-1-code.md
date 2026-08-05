@@ -44,6 +44,7 @@ static class ModifierRules               // the §1.1 table, one place only
             [Push]  = [Drag, Rout],               // one displacement direction
             [Drag]  = [Rout],
             [Riposte] = [BlockWeaken],            // one payoff per block
+            [Light] = [Cast],                     // one currency per weapon
         });
 
     // Cannot exist WITHOUT these. Not symmetric — a dependency, not a pair.
@@ -61,7 +62,7 @@ static class ModifierRules               // the §1.1 table, one place only
         {
             [Brace] = Melee, [Opportunist] = Melee,
             [Overwatch] = Ranged,
-            [Cast] = Caster,
+            // Cast is NOT caster-only: it discounts enchantment triggers too
         };
 
     static int Cap(ModifierType t, int forgedStacks)

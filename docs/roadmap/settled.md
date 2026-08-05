@@ -43,9 +43,14 @@
 - **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
   Multiplying an applied effect on a natural 20 is a rounding event on 5% of
   casts. Caster uniques follow, arriving at tier 3.
-- **`Cast` is efficiency, not magnitude** — −10% mana cost per stack,
-  proportional, the same modifier as `Light` pointed at the other currency.
-  Tier sets how hard an effect lands; `Cast` sets what it costs.
+- **`Cast` is efficiency, not magnitude** — −10% per stack off *every* point of
+  mana the weapon spends, cast costs and enchantment triggers alike. Tier sets
+  how hard an effect lands; `Cast` sets what it costs. Forged on casters only,
+  graftable onto anything carrying an enchantment.
+- **`Light` and `Cast` exclude each other.** Mana regenerates from movement left
+  unspent, so cheap movement is already cheap mana by the long route — a weapon
+  with both compounds one discount with itself. One currency per weapon, so a
+  mana-efficient dagger and a light dagger are different weapons.
 - **An efficient caster is harder to level.** Mana moved is enchantment XP, so
   once `Cast` stacks make a caster movement-bound rather than mana-bound, every
   further stack moves less mana for the same casts. More bang per point spent,

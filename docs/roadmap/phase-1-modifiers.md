@@ -172,6 +172,7 @@ graft, and a boss theme alike — and all are tables rather than special cases.
 | **Threat zone** | `Brace`, `Opportunist`, `Overwatch` | One weapon, one zone it watches |
 | **Displacement** | `Push`, `Drag`, `Rout` | A weapon that both shoves and pulls has no answer to "which way?" |
 | **Block response** | `Riposte`, `BlockWeaken` | One block, one payoff |
+| **Efficiency** | `Light`, `Cast` | One currency per weapon |
 
 A group exists for one of two reasons, and it is worth being able to tell which:
 
@@ -183,6 +184,36 @@ A group exists for one of two reasons, and it is worth being able to tell which:
   the counter-swing is yours, the debuff is the party's. A shield carrying both
   gets two payoffs from one defensive event and the Control/Support fork stops
   meaning anything.
+
+The efficiency group is a **third** reason, and the most subtle: holding both
+would be *double-dipping on one axis while looking like two*.
+
+**`Light` and `Cast` are the same discount reached two ways.** Mana regenerates
+only from movement left unspent at end of turn
+(`PartyMemberState.RegenManaFromUnusedMovement`), so cheaper *movement* is
+already cheaper *mana* — it just arrives by the long route. `Cast` takes the
+short one. A weapon carrying both compounds a discount with itself: it spends
+less mana per action, and the movement it saves comes back as more mana to
+spend.
+
+So the group forces a real choice rather than forbidding a silly one:
+
+| | Buys you | The route |
+| --- | --- | --- |
+| **`Light`** | More actions per turn | Movement saved becomes mana at end of turn |
+| **`Cast`** | More mana per action | The mana simply costs less |
+
+**A mana-efficient dagger and a light dagger are now different weapons**, and
+the enchanted-dagger build (§3.3) has to pick one. `Cast` is the better answer
+for a wizard leaning on expensive triggers; `Light` is better for one who wants
+to swing four times and let the regen carry them. Neither is available on an
+Efficiency variant carrying the other, and neither can be grafted onto a caster,
+since every caster is forged `Cast ×1`.
+
+There is a levelling consequence too, and it points the same way. Both modifiers
+reduce **mana moved**, which is enchantment XP (§3.3), so a weapon carrying both
+would be the cheapest thing in the game to operate *and* the slowest to grow —
+an extreme at both ends rather than a position on the trade §1.3 describes.
 
 **`Riposte` is still outside the *threat-zone* group**, which is the distinction
 the two block modifiers make clear. All four fire on the enemy turn, but `Brace`,
@@ -221,13 +252,24 @@ nothing is ever removed from a weapon, so a satisfied prerequisite stays
 satisfied. Over enough services a weapon reaches spreads no single roll could
 hand it.
 
-**And two modifiers are restricted by weapon type:**
+**And three modifiers are restricted by weapon type:**
 
 | Modifier | Allowed on | Because |
 | --- | --- | --- |
 | `Brace`, `Opportunist` | **Melee only** — dagger, sword, spear, axe | A threat zone is a weapon's physical reach; you cannot menace a tile with a bow |
 | `Overwatch` | **Ranged only** — bow, throwing | Holding a shot is what a nocked arrow does; a spear cannot wait for a target to appear |
-| `Cast` | **Casters only** — staff, wand | It discounts a mana cost, and a weapon that spends no mana has nothing to discount |
+
+`Cast` is deliberately **not** on that list. It was caster-only while it scaled
+an effect level, because a weapon with no effect had nothing to scale. Now that
+it discounts *every* point of mana a weapon spends — its own cast cost and its
+enchantments' trigger costs alike — any weapon carrying an enchantment has
+something for it to work on, and the mana-efficient dagger is a build rather
+than a category error. It stays **forged** on casters only, so on anything else
+it is a graft: `forged = 0`, ceiling `×5`, −50% at the very deepest.
+
+It is inert, not harmful, on a weapon with no enchantments at all — which §1.1
+tolerates. `Charges` remains the one modifier that can actively make a weapon
+worse; see open questions.
 
 Together these give a rule worth stating on its own:
 
@@ -287,7 +329,7 @@ ceiling — a forged spread reaches further.
 | `CritWeaken` | +1 `Weakened` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `CritSunder` | +1 `Sundered` level on a crit | 5 | Levels **accumulate**, uncapped — §1.6 |
 | `BlockWeaken` | +1 `Weakened` level on a successful block | 5 | Requires `Block`; block-response group. Levels **accumulate**, uncapped — §1.6 |
-| `Cast` | **−10% mana cost** per stack, proportional | 5 | Staves and wands. Efficiency, not magnitude — §1.3 |
+| `Cast` | **−10% of all mana the weapon spends** per stack, proportional | 5 | Cast costs *and* enchantment triggers. Efficiency, not magnitude — §1.3. **Excludes `Light`** |
 
 ### `Light` has to be proportional, not flat
 
