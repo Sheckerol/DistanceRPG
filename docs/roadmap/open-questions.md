@@ -106,6 +106,12 @@
   is that it leaves a three-modifier weapon something for the enchanter to do;
   the argument against is that it is exactly the kind of bespoke ceiling §1.1
   spent a section rejecting.
+- **Does a universal `CritMultiplier ×1` make crits too swingy game-wide?**
+  Every weapon now crits for `×3` instead of `×2`, and crits ignore `Block`
+  entirely (§1.6) — so an axe's natural 20 goes from 36 to 54 through any
+  armour, and enemy crits do the same to the party. The change is what makes the
+  universal answer to armour real, but it raises the variance of every fight in
+  the game by 50% on the tail, which no other decision here has done so bluntly.
 - **Should the 50% stack roll be flat?** A flat rate makes early farming feel
   reliable and the allowance land around `DefeatCount 20`, matching the unique
   curve's midpoint. A decaying rate would stretch the stack curve to match the

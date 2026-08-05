@@ -7,6 +7,9 @@ classes vary by stat profile; caster classes vary by what the cast actually
 does. Forcing casters into the martial shape would produce four staves that all
 do the same thing at different prices, which is not interesting.
 
+Every class baseline is its signature **plus `CritMultiplier ×1`** (§1.2), so no
+weapon in the game is forged with fewer than two modifiers.
+
 | Class | Stat | Class feature | Variant axis |
 | --- | --- | --- | --- |
 | Dagger | DEX | CritWindow | Martial |

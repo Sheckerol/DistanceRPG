@@ -95,7 +95,16 @@ becomes dagger/sword/axe/staff (§2.1), so
 updated. The first — Dagger, Sword, Spear at indices 0–2 — still holds, since
 new classes append after them.
 
-Sword, spear and staff map to `×1` directly, preserving their shipped values.
+Sword, spear and staff map to `×1` directly, preserving their shipped
+*signature* values.
+
+**A second parity break comes with the universal baseline.** Every class now
+carries `CritMultiplier ×1` (§1.2), so a crit multiplies by ×3 rather than the
+shipped ×2 for every weapon in the game, not just daggers. Any test asserting
+crit damage on a sword or spear moves with it. This is deliberate — it is what
+makes the natural-20 answer to `Block` worth having (§1.6) — but it is a
+game-wide damage change and should land in one commit with its own test sweep
+rather than riding along with the stacking migration.
 
 **The dagger is a deliberate exception.** It becomes `CritWindow ×1` — crit on
 19–20, not the prototype's 16+ (§1.2). Two assertions in

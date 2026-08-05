@@ -44,6 +44,11 @@ forces those across **at least two modifiers**. There is no new rule doing that
 — five is simply as much as one modifier can take, so the eleventh point of
 investment has nowhere to go but sideways.
 
+The allowance is never wasted, because **no weapon is forged with fewer than two
+modifiers** (§1.2). That is the whole reason `CritMultiplier ×1` sits in every
+class baseline: without it a Purity variant would carry one modifier, absorb
+five stacks, and be the one weapon in the game you could not fully invest in.
+
 A fully farmed Assassin's Fang therefore comes out `CritWindow ×2+5`,
 `CritMultiplier ×1+5` — both dials of the crit build maxed, from one weapon that
 was carried long enough.
@@ -66,18 +71,22 @@ lottery from that point rather than a mix of two rewards.
 The roll picks among what the weapon *already carries*, so its forged spread
 decides where a farm can go:
 
-| Weapon | Modifiers | Farm can absorb |
+| Weapon | Modifiers | Where 10 stacks land |
 | --- | --- | --- |
-| The Bulwark | `Block` only | **5** — half the allowance is unspendable |
-| Tower Guard | `Block` only | 5 |
-| Assassin's Fang | `CritWindow`, `CritMultiplier` | 10 |
-| Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10, spread three ways |
+| Tower Guard | `Block ×2`, `CritMultiplier ×1` | `Block ×7`, `CritMultiplier ×6` — **both maxed** |
+| Assassin's Fang | `CritWindow ×2`, `CritMultiplier ×1` | `CritWindow ×7`, `CritMultiplier ×6` — both maxed |
+| Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10 spread across three, **none maxed** |
 
-**Pure weapons hit their ceiling at half depth.** That is a real cost to the
-Purity role and a real counterweight to it — a single-modifier weapon is the
-strongest thing you can pick up and the weakest thing you can invest in. Broad
-weapons take the whole allowance but dilute it, so a Kris ends up good at three
-things rather than excellent at two.
+**A two-modifier weapon can be finished; a three-modifier weapon cannot.** Ten
+stacks fill two ceilings exactly and leave nothing over, so a Purity variant
+farmed to the end is *complete* — every dial at its cap. A three-modifier weapon
+has fifteen stacks of room and only ten to fill it, so it comes out good at
+three things rather than perfect at two, with five slots left for the enchanter.
+
+That is a genuine trade rather than a strict ordering. Purity concentrates and
+finishes; Control and Support spread and stay open. And it reverses cleanly
+against §6.4 — the weapon farming can complete is the one the enchanter has
+nothing left to do with.
 
 Choosing the weapon to farm is therefore choosing the *shape* of what you get
 out, not just how much.

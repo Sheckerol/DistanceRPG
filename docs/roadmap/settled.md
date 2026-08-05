@@ -129,9 +129,16 @@
   stacks**, and §1.1's per-modifier cap of 5 is what forces those across at
   least two modifiers rather than needing a rule of its own. Depth only, never
   breadth — the roll can only pick a modifier the weapon already carries, and
-  breadth stays the enchanter's product. A consequence worth keeping: a
-  single-modifier weapon like The Bulwark can only absorb 5, so pure weapons are
-  the strongest to find and the weakest to invest in.
+  breadth stays the enchanter's product. A two-modifier weapon farmed to the end
+  is *complete*, both dials capped; a three-modifier one comes out good at three
+  things with room left for the enchanter.
+- **Every class baseline carries `CritMultiplier ×1`**, so no weapon is forged
+  with fewer than two modifiers and every forged spread is either three at `×1`
+  or one `×2` and one `×1`. Mechanically this stops a Purity variant being the
+  one weapon that could not absorb a full farm; by design it makes the natural
+  20 a real answer to `Block`, since crits bypass it (§1.6) and `×3` lands where
+  `×2` did not. The dagger keeps its identity because it owns crit *frequency* —
+  `CritMultiplier` is universal, `CritWindow` is forged on daggers alone.
 - **Unique chance accelerates toward an asymptote, never to certainty.** A
   logistic on `DefeatCount`: ~1% at 5, 11% at 15, 25% at 20, flattening toward a
   50% ceiling. A flat per-cycle rate made deep farming a novelty; the S-curve

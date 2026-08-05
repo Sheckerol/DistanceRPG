@@ -23,6 +23,44 @@ Two things this fixes over a rigid "crit-specced" slot. A class whose identity
 And every class gets a **support** weapon, so each one has a reason to exist in
 a party that already has damage covered.
 
+### Every baseline carries `CritMultiplier ×1`
+
+**No weapon in the game is forged with fewer than two modifiers.** Every class
+baseline is its signature *plus* `CritMultiplier ×1`, so the four roles resolve
+to one of exactly two shapes:
+
+| Role | Forged spread | Shape |
+| --- | --- | --- |
+| Efficiency | `signature ×1, CritMultiplier ×1, Light ×1` | three at `×1` |
+| **Purity** | `signature ×2, CritMultiplier ×1` | one `×2`, one `×1` |
+| Control | `signature ×1, CritMultiplier ×1, control ×1` | three at `×1` |
+| Support | `signature ×1, CritMultiplier ×1, support ×1` | three at `×1` |
+
+Three forged stacks either way, never on fewer than two modifiers.
+
+**The mechanical reason is the farm.** A repeat-kill farm grants up to 10 stacks
+and §1.1 caps each modifier at 5 acquired (§3.2), so a single-modifier weapon
+could only ever absorb half of what farming offers. A Purity variant would have
+been the one weapon in the game you could not fully invest in — precisely
+backwards, since it is the one that most wants depth.
+
+**The design reason is that crits are everyone's answer to armour.** §1.6 makes
+crits bypass `Block` entirely, and notes that a natural 20 is the universal way
+through a shield. At the old `×2` base that answer was real but weak. At `×3` it
+lands: a sword's 10 becomes 30 through any amount of armour, once in twenty
+swings.
+
+This costs the dagger nothing — its baseline was already
+`CritWindow ×1, CritMultiplier ×1`, and it stays the crit class because it owns
+the *frequency* dial. Everyone else now hits hard on the rare crit; only the
+dagger crits often.
+
+**Casters take the same rule** with the caveat §1.2 already carries. Staff and
+wand baselines become `Cast ×1, CritMultiplier ×1`, where the multiplier scales
+whatever that weapon's crit does — damage for a wand, applied effect level for a
+staff (§1.6). Their four variants differ by effect and shape rather than by
+adding a stack, so a caster carries two forged stacks rather than three.
+
 **Cost columns below are base costs.** An Efficiency weapon shows the same cost
 as its base row — `Light ×1` resolves it down by 10% (§1.1). The statline is
 what the weapon is; modifiers are what happens to it.
@@ -101,10 +139,15 @@ have bought that guarantee at the price of telling a player who ground for forty
 runs that the thing they were grinding toward was not allowed to exist.
 
 The investment axis is still `CritMultiplier`, which scales the same way. Every
-dagger is forged `CritMultiplier ×1` and so ceilings at a ×8 multiplier; only a
-unique that raised `CritMultiplier` rather than `CritWindow` — a Kris or a
-Stiletto taken to `×3` (§1.5) — reaches ×10. **Frequency and magnitude are
-therefore separate uniques**, and no single weapon is forged deep in both.
+weapon in the game is forged `CritMultiplier ×1` and so ceilings at a ×8
+multiplier; only a unique that raised `CritMultiplier` instead of its own
+signature reaches ×10. **Frequency and magnitude are therefore separate
+uniques**, and no single weapon is forged deep in both.
+
+Note the asymmetry that creates. `CritMultiplier` is universal, so *any* class
+can be taken deep on crit damage — but `CritWindow` is forged on daggers alone,
+so only a dagger can be taken deep on crit *frequency*. An axe worked to a ×8
+multiplier still only crits on a 20; it just removes a room when it does.
 
 So a crit build is not "crit constantly" but **"crit rarely and
 catastrophically"** — and the two dagger specialists split exactly along that
@@ -114,7 +157,7 @@ magnitude.
 Starting at `×1` rather than the prototype's `×4` also leaves the dagger seven
 stacks of headroom for depth, grafts and services to work with, instead of one.
 
-### Sword & Shield (max STR/DEX) — baseline `Block ×1`
+### Sword & Shield (max STR/DEX) — baseline `Block ×1, CritMultiplier ×1`
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
@@ -146,7 +189,7 @@ is not a successful block and neither `Riposte` nor `BlockWeaken` triggers on
 one. A crit-heavy attacker beats the whole class rather than just its
 mitigation, which is the price the sword pays for scaling to `Block ×8`.
 
-### Spear (STR) — baseline `Brace ×1`
+### Spear (STR) — baseline `Brace ×1, CritMultiplier ×1`
 
 | Role | Name | Range | Dmg | Cost | Adds |
 | --- | --- | --- | --- | --- | --- |
@@ -169,7 +212,7 @@ non-baseline tools are exact opposites:
 Pin applies the existing `Mire` effect (§1.3) rather than inventing its own, so
 it reuses machinery already being built.
 
-### Axe (STR) — baseline `Cleave ×1`
+### Axe (STR) — baseline `Cleave ×1, CritMultiplier ×1`
 
 One swing hits every valid target in range, paying the movement cost once.
 Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
@@ -189,7 +232,7 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 - **Rout** — everything caught by the cleave is pushed back a tile per stack.
   One swing that resets a whole crowd's position buys the entire party room.
 
-### Ranged (DEX) — baseline `Longshot ×1`
+### Ranged (DEX) — baseline `Longshot ×1, CritMultiplier ×1`
 
 **Longshot**: damage rises with distance to the target — `+1` per tile beyond
 3 tiles, per stack. A bow in the front rank is nearly useless; the same bow
@@ -262,7 +305,7 @@ having been caught.
 your situation mid-turn should be paid for out of the same budget as moving and
 swinging. See §3.4.
 
-### Throwing (STR) — baseline `Charges ×1`
+### Throwing (STR) — baseline `Charges ×1, CritMultiplier ×1`
 
 **Charges is a cap, and the cap is the point.** A throw costs only 15, so the
 movement budget alone would allow ten a turn — absurd. Charges is what bounds
@@ -326,7 +369,7 @@ stacking the signature changes what the weapon is *for*.
 
 ### Caster classes do not take this frame
 
-Staff and wand both carry baseline `Cast ×1`, but their four weapons differ by
+Staff and wand both carry baseline `Cast ×1, CritMultiplier ×1`, but their four weapons differ by
 **effect** and **shape** rather than by role (§1.3, §1.4). Forcing them into
 Efficiency / Purity / Control / Support would be redundant — a debuff staff is
 already control and a buff staff already support, and "more of the signature"
@@ -463,12 +506,12 @@ unchanged.
 
 | Unique | Class | Built from | Modifiers | Reads as |
 | --- | --- | --- | --- | --- |
-| The Bulwark | Sword | Tower Guard | `Block ×3` | Absorbs 9; nothing else |
+| The Bulwark | Sword | Tower Guard | `Block ×3, CritMultiplier ×1` | Absorbs 9, and little else |
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | Finds the gap on 17+ |
-| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3` | Three retaliations a turn |
-| Stormcrow | Ranged | Longbow | `Longshot ×3` | +3 damage a tile; lethal across a room |
-| Feathered Death | Throwing | Bandolier | `Charges ×3` | Four throws, and the movement to reposition after |
-| Shieldbreaker | Axe | Reaver | `Cleave ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
+| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, CritMultiplier ×1` | Three retaliations a turn |
+| Stormcrow | Ranged | Longbow | `Longshot ×3, CritMultiplier ×1` | +3 damage a tile; lethal across a room |
+| Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | Four throws, and the movement to reposition after |
+| Shieldbreaker | Axe | Reaver | `Cleave ×1, CritMultiplier ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
 
 ### Why derive them rather than author them freely
 
