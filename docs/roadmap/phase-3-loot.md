@@ -8,16 +8,43 @@ seeded stream (`EnemyPlacer.cs:49`); the drop reads that class back. Placement
 rolls over the eight **classes**, with the variant rolled at drop time on the
 loot stream.
 
+### A drop can arrive already enchanted
+
+A dropped weapon rolls for an enchantment (§3.3) alongside its variant:
+
+| Class | Enchantment on drop |
+| --- | --- |
+| Staff, wand | **Always one**, rolled uniformly — it is their second forged slot (§1.2) |
+| Everything else | **Rare** — an uncommon roll on the loot stream |
+
+Always **exactly one**, always **tier 1**. Breadth stays the enchanter's
+product (§6.4) and depth past the first tier stays a project; what the dungeon
+hands you is a *seed*, and the fifteen-run climb to a fully enchanted weapon
+(§6.2) is untouched.
+
+The innate enchantment is **forged** in the §1.1 sense — it is part of what the
+weapon is, not something piled on afterwards. That matters in exactly two
+places: farming can deepen it (§3.2), and it counts toward service time (§6.2),
+so a caster's first visit to the enchanter already costs two runs. Casters come
+pre-loaded and pay for it in downtime.
+
+**A weapon you cannot afford is not a weapon you cannot use.** A staff dropping
+with a 30-lock enchantment would otherwise be unequippable by a fighter with a
+small pool. Instead the lock goes unpaid and the enchantment sits **dormant** —
+the same non-event as a trigger you cannot afford (§3.3). The weapon is a
+weapon; the enchantment wakes up if your pool ever grows to cover it, or when it
+moves to someone whose pool already does (§6.5).
+
 ## 3.2 Repeat kills deepen the drop
 
 Dummies resurrect after 10 turns (`GameConstants.DummyResurrectTurns`) and
 already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
 defeat of the same dummy deepens the weapon it is carrying.
 
-Repeat kills do **not** drop enchantments. Enchantments are applied at the
-enchanter between runs (Phase 6), not found in the dungeon — they are the
-chosen half of itemisation, and finding them at random is what would make them
-feel farmed rather than built.
+Repeat kills never add a **new** enchantment. Farming buys depth in what the
+weapon already is — that rule holds for enchantments exactly as it holds for
+modifiers, so a farm can raise the tier of an innate enchantment (§3.1) and can
+never attach a second. Breadth remains the thing you only get by choosing it.
 
 This makes the resurrection timer a deliberate farming rhythm rather than
 flavour — camp a dummy to deepen its drop, at the cost of the turns you spend
@@ -37,17 +64,26 @@ chance is a curve and never does.**
 Each defeat rolls **50% to add one stack**. On a success it rolls again for
 *which* modifier receives it, uniformly among the modifiers the weapon is
 already forged with, skipping any that have reached their `forged + 5` ceiling
-(§1.1).
+(§1.1). An **innate enchantment is one of the entries in that roll** — landing
+on it raises its tier by one instead of a modifier by one stack.
 
 **A farm grants at most 10 stacks**, and §1.1's per-modifier cap of 5 is what
 forces those across **at least two modifiers**. There is no new rule doing that
 — five is simply as much as one modifier can take, so the eleventh point of
 investment has nowhere to go but sideways.
 
+Enchantment tiers are **not** capped (§3.3), so they take the same allowance of
+five as a rule of the farm rather than a property of the enchantment: farming
+can add five tiers and no more. The asymmetry is deliberate and priced in time
+— farming spends turns, which a patient player has in unlimited supply, while
+the enchanter spends *runs of downtime*, which is the scarcest thing in the
+game. So the uncapped climb stays where the real cost is.
+
 The allowance is never wasted, because **no weapon is forged with fewer than two
-modifiers** (§1.2). That is the whole reason every class baseline carries a
-second: without it a Purity variant would hold one modifier, absorb five stacks,
-and be the one weapon in the game you could not fully invest in.
+axes** (§1.2). Every class baseline carries a second modifier for exactly this
+reason; the casters carry an innate enchantment instead, and it does the same
+job. Without one, a Purity variant would hold a single modifier, absorb five
+stacks, and be the one weapon in the game you could not fully invest in.
 
 A fully farmed Assassin's Fang therefore comes out `CritWindow ×2+5`,
 `CritMultiplier ×1+5` — both dials of the crit build maxed, from one weapon that
@@ -76,6 +112,7 @@ decides where a farm can go:
 | Tower Guard | `Block ×2`, `CritMultiplier ×1` | `Block ×7`, `CritMultiplier ×6` — **both maxed** |
 | Assassin's Fang | `CritWindow ×2`, `CritMultiplier ×1` | `CritWindow ×7`, `CritMultiplier ×6` — both maxed |
 | Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10 spread across three, **none maxed** |
+| Staff of Blight | `Cast ×1`, innate enchantment | `Cast ×6` and **five tiers** — the only farm that buys potency |
 
 **A two-modifier weapon can be finished; a three-modifier weapon cannot.** Ten
 stacks fill two ceilings exactly and leave nothing over, so a Purity variant
@@ -269,10 +306,37 @@ pool, they can afford one light enchantment, not five.
 | **Trigger cost** | Mana spent each time it fires |
 | **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
 | **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
-| **Tier** | 1–3; raised by re-servicing the same enchantment (Phase 6), lifting lock *and* potency together |
+| **Tier** | Uncapped; raised by re-servicing (§6.4) or by farming an innate one (§3.2), lifting lock *and* potency together |
 
 Insufficient mana means it simply **does not fire** — no failure state, no
-penalty, just a resource gate.
+penalty, just a resource gate. The same is true one level up: a lock you cannot
+afford leaves the enchantment **dormant** rather than making the weapon
+unequippable (§3.1).
+
+### Tier is uncapped, because the pool is the cap
+
+Lock and potency both scale linearly with tier — `lock × tier`,
+`potency × tier` — so a tier-3 Arcane Edge locks 90 and a tier-6 locks 180. The
+enchantment never stops improving and never needs a ceiling, because every tier
+you buy is a tier's worth of pool you can no longer spend on anything else.
+
+This is the same principle §1.1 states for modifiers, arriving at a different
+place because the constraint is different. Modifiers cap at `forged + 5` because
+nothing else limits them; enchantments cap nowhere because **max mana already
+limits them, continuously and painfully**. A capped tier would be a second
+limit on a thing that is already the most constrained system in the game.
+
+What that buys is a genuine build fork with no right answer:
+
+- **Deep and few.** One enchantment at tier 6 on a wizard with a large pool: a
+  single overwhelming effect, most of the pool locked, very little left to fire
+  with. Wants an on-kill condition, since those fire rarely and pay out.
+- **Shallow and many.** Five tier-1 enchantments: a weapon that does something
+  on every condition in the game, and a spendable remainder large enough to
+  actually trigger them.
+
+Both cost the same pool. Neither is a strictly better use of it, and INT is what
+raises the ceiling on both.
 
 ### Max mana is the enchantment budget
 
@@ -293,6 +357,11 @@ No cap is needed anywhere in this system because the budget *is* the cap.
 
 Any enchantment goes on any weapon. That is the whole point — the wizard's
 dagger, the fighter's warstaff. Nothing keys off `WeaponClass`.
+
+The one place class enters is the **drop roll** (§3.1), and even there it only
+sets the odds of arriving with one, never which one. A staff is guaranteed an
+enchantment; it is not guaranteed a *caster's* enchantment, and Warding on a
+Staff of Mire is a perfectly ordinary drop.
 
 ### Starting set
 
@@ -351,8 +420,16 @@ never mix. A handful of enchantments happen to grant a modifier stack as their
 *effect* (Weightless, Shattering), but that is an effect they apply, not what
 they are.
 
-`PartyMemberState` gains `UsableMaxMana = MaxMana − Σ equipped locks`, and
-equipping must reject a weapon whose locks would exceed max mana.
+`PartyMemberState` gains `UsableMaxMana = MaxMana − Σ *paid* locks`. Equipping
+never rejects: locks are paid in order until the pool runs out, and the
+remainder are dormant. Dormancy is therefore derived state, recomputed whenever
+max mana or the equipped set changes — never stored on the enchantment, which
+is shared and immutable.
+
+`Tier` is an `int` with no upper bound; `EffectiveLock` and `EffectivePotency`
+are `Base × Tier`. Nothing in the type should express a maximum, since the two
+places that raise it (§3.2, §6.4) each impose their own limits and the
+enchantment itself has none.
 
 `TurnSystem` needs a **trigger dispatch point** per condition — on hit, on
 crit, on kill, on being hit, on cast. Phase 0's unified attack resolver is
