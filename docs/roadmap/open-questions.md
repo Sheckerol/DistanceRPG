@@ -98,14 +98,19 @@
   numbers. If `DefeatCount 20` turns out to be suicide, the midpoint has to come
   down to meet it; if it turns out trivial, both the midpoint and the revival
   step are too soft.
-- **Should the signature-stack budget be larger than 5 for farming?** The ladder
-  currently exhausts the acquired budget at `DefeatCount 10`, so two thirds of a
-  deep farm buys only unique chance. Raising §1.1's acquired headroom to 10
-  would give the stacks a runway matching the curve's — but it moves the
-  universal ceiling from `×8` to `×13` and re-opens the pricing of every
-  modifier, `Light` and `Charges` worst of all. The cheaper alternative is to
-  stretch the *schedule* rather than the budget: one stack per three defeats
-  reaches `+5` at `DefeatCount 15` instead of 10.
+- **Is a flat 10-stack farm allowance right, or should the per-modifier cap do
+  all the work?** §3.2 caps a farm at 10 stacks total. Removing that number
+  entirely would let §1.1's per-modifier 5 be the only bound, so a
+  three-modifier Kris could absorb 15 and a two-modifier Fang 10 — broader
+  weapons rewarded for breadth, with no extra rule. The argument for keeping 10
+  is that it leaves a three-modifier weapon something for the enchanter to do;
+  the argument against is that it is exactly the kind of bespoke ceiling §1.1
+  spent a section rejecting.
+- **Should the 50% stack roll be flat?** A flat rate makes early farming feel
+  reliable and the allowance land around `DefeatCount 20`, matching the unique
+  curve's midpoint. A decaying rate would stretch the stack curve to match the
+  logistic's shape rather than just its endpoint, at the cost of a second
+  formula in the same mechanic.
 - **Does anything scale a boss the same way?** The boss cannot revive, so it
   never accumulates — which is right, but it means a heavily farmed floor can
   contain dummies more dangerous than the boss guarding it. Either the boss

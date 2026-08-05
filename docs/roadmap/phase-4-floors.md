@@ -254,10 +254,11 @@ which is the *quality* of the drop it is carrying. Because the boss stopped
 resurrection, killing it on the way out is permanent, and permanent death is
 what yields the goods.
 
-Farm a dummy ten times on the way down and it is holding a fully deepened drop
-with a few points of unique chance on it (§3.2). You bank the quality going in
-and harvest it coming out — and the unique roll itself resolves on that final
-kill, so the extraction is where you learn what the farm was worth.
+Farm a dummy twenty times on the way down and it is holding a fully deepened
+drop with a coin-flip's worth of unique chance on it (§3.2). You bank the
+quality going in and harvest it coming out — and the unique roll itself resolves
+on that final kill, so the extraction is where you learn what the farm was
+worth.
 
 ### The risk curve inverts
 

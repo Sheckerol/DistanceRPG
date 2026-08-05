@@ -124,8 +124,14 @@
   draft capped it at `DefeatCount 5` because farming's only cost was turns, and
   turns are cheap. Revival scaling makes that obsolete — every cycle is a harder
   fight — so the ladder runs forever and prices itself. Stacks accrue on the
-  class signature to `+5`, the acquired budget, by `DefeatCount 10`. Depth only,
-  never breadth — breadth is the enchanter's product.
+  the weapon by **two rolls per defeat** — 50% for a stack at all, then
+  uniformly for which forged modifier receives it. A farm grants at most **10
+  stacks**, and §1.1's per-modifier cap of 5 is what forces those across at
+  least two modifiers rather than needing a rule of its own. Depth only, never
+  breadth — the roll can only pick a modifier the weapon already carries, and
+  breadth stays the enchanter's product. A consequence worth keeping: a
+  single-modifier weapon like The Bulwark can only absorb 5, so pure weapons are
+  the strongest to find and the weakest to invest in.
 - **Unique chance accelerates toward an asymptote, never to certainty.** A
   logistic on `DefeatCount`: ~1% at 5, 11% at 15, 25% at 20, flattening toward a
   50% ceiling. A flat per-cycle rate made deep farming a novelty; the S-curve

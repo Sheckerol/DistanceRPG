@@ -29,16 +29,58 @@ the way out, after the boss has stopped resurrection (§4.4).
 
 ### The ladder has no top; the danger curve is the top
 
-Two things accrue, on different shapes. **Stacks come on a schedule and run
-out; unique chance is a curve and never does.**
+Two things accrue, on different shapes. **Stacks are rolled and run out; unique
+chance is a curve and never does.**
 
-| `DefeatCount` | Signature stacks | Unique chance |
+### Stacks are rolled twice: whether, and onto what
+
+Each defeat rolls **50% to add one stack**. On a success it rolls again for
+*which* modifier receives it, uniformly among the modifiers the weapon is
+already forged with, skipping any that have reached their `forged + 5` ceiling
+(§1.1).
+
+**A farm grants at most 10 stacks**, and §1.1's per-modifier cap of 5 is what
+forces those across **at least two modifiers**. There is no new rule doing that
+— five is simply as much as one modifier can take, so the eleventh point of
+investment has nowhere to go but sideways.
+
+A fully farmed Assassin's Fang therefore comes out `CritWindow ×2+5`,
+`CritMultiplier ×1+5` — both dials of the crit build maxed, from one weapon that
+was carried long enough.
+
+| `DefeatCount` | Stacks, expected | Unique chance |
 | --- | --- | --- |
-| 1–2 | `+1` | — |
-| 3–5 | `+2` | 1% |
-| 6–7 | `+3` | 1–2% |
-| 8–9 | `+4` | 2–3% |
-| **10+** | **`+5`** — the acquired budget, spent | 3% and climbing |
+| 5 | ~2.5 | 1% |
+| 10 | ~5 | 3.5% |
+| 15 | ~7.5 | 11% |
+| **20** | **10 — the farm's allowance, spent** | **25%** |
+| 30+ | 10 | 47% |
+
+At 50% a defeat, the allowance runs out around `DefeatCount 20` — which is
+exactly where the unique curve below is steepest. **The weapon stops improving
+at the moment the gamble gets interesting**, so the deep farm is unambiguously a
+lottery from that point rather than a mix of two rewards.
+
+### Which weapon you farm matters more than how long
+
+The roll picks among what the weapon *already carries*, so its forged spread
+decides where a farm can go:
+
+| Weapon | Modifiers | Farm can absorb |
+| --- | --- | --- |
+| The Bulwark | `Block` only | **5** — half the allowance is unspendable |
+| Tower Guard | `Block` only | 5 |
+| Assassin's Fang | `CritWindow`, `CritMultiplier` | 10 |
+| Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10, spread three ways |
+
+**Pure weapons hit their ceiling at half depth.** That is a real cost to the
+Purity role and a real counterweight to it — a single-modifier weapon is the
+strongest thing you can pick up and the weakest thing you can invest in. Broad
+weapons take the whole allowance but dilute it, so a Kris ends up good at three
+things rather than excellent at two.
+
+Choosing the weapon to farm is therefore choosing the *shape* of what you get
+out, not just how much.
 
 ### The unique chance accelerates toward an asymptote
 
@@ -80,22 +122,23 @@ you find out.
 
 Tuning targets, but the *shape* is the decision, and three things fix it.
 
-**Depth, not breadth.** The stacks land on the class signature, never on a
-modifier the weapon has no claim to. Breadth is the enchanter's product (§6.4);
-if farming produced it too, the two ladders would collapse back into one. Kept
-apart, each gives you something the other cannot: **farming buys depth in what
-the weapon already is, the enchanter buys breadth and the slow climb.**
+**Depth, never breadth.** The roll only ever picks a modifier the weapon is
+already forged with — it deepens what is there and never adds something new.
+Breadth is the enchanter's product (§6.4); if farming produced it too, the two
+ladders would collapse back into one. Kept apart, each gives you something the
+other cannot: **farming buys depth in what the weapon already is, the enchanter
+buys breadth and the slow climb.**
 
-Because the stacks land on the signature, they inherit the *forged* ceiling —
-6 or 7 rather than the bare 5 an off-class graft would hit (§1.1).
+Because the stacks land on forged modifiers, they inherit the *forged* ceiling —
+6, 7 or 8 rather than the bare 5 an off-class graft would hit (§1.1).
 
 **Farming spends the weapon's future.** Those stacks are **acquired**, so they
-come out of the same five-stack budget the enchanter would otherwise fill. A
-`DefeatCount 3` dagger arrives at `CritWindow` forged 1 + acquired 2, ceiling 6,
-with three of its five acquired slots already gone. Farming a weapon deep
-partly consumes its long-term potential — which is the cost the repeat-kill
-ladder was otherwise missing, since turns are the cheapest thing a patient
-player has.
+come out of the same per-modifier budget the enchanter would otherwise fill. A
+`DefeatCount 10` dagger has spent five of them somewhere, and a fully farmed one
+has spent ten — which on a two-modifier weapon means the enchanter can never
+deepen it again at all. Farming consumes the weapon's long-term potential, and
+that is the cost the repeat-kill ladder was otherwise missing, since turns are
+the cheapest thing a patient player has.
 
 **Nothing stops it, and that is now safe.** §4.3 rests on "deciding when you
 have farmed enough is the run's real decision, and it is entirely the player's
@@ -157,19 +200,19 @@ saves round-trip without replaying rolls (§5.1), and roll on the loot stream's
 sibling — `mapSeed ^ ReviveSalt` — never a continuation of an existing one.
 
 **The scaling never stops, and that is what lets the drop ladder run forever
-too.** Neither side has a ceiling: the reward curve flattens into pure
-probability past `DefeatCount 10` while the danger curve keeps climbing at the
+too.** The reward curve flattens into pure probability once the stack allowance
+is spent around `DefeatCount 20`, while the danger curve keeps climbing at the
 same rate it always did. Farming therefore prices itself — every further cycle
 is strictly more dangerous for strictly less, and the player is the only one who
 decides where that stops being worth it. No table needs to tell them.
 
 ### The unique is the only thing that undoes the cost
 
-Every ordinary tier trades the weapon's future for power now — acquired stacks
-out of the budget the enchanter would have filled. At `DefeatCount 10` that
-budget is gone entirely: the drop is `signature +5`, as deep as farming can make
-it, and **the enchanter can never improve its signature again**. You bought a
-finished weapon by spending everything it could have become.
+Every stack the farm grants trades the weapon's future for power now, out of the
+budget the enchanter would have filled. By the time the allowance is spent, a
+two-modifier weapon has nothing left anywhere: both its dials sit at
+`forged + 5` and **the enchanter can never deepen it again**. You bought a
+finished weapon with everything it could have become.
 
 The unique roll is the one outcome that undoes that. A unique's spread is
 **forged** (§1.5), so winning the roll lands you on a deeper base *with the
@@ -177,11 +220,11 @@ acquired budget untouched* — Widowmaker at `CritWindow ×3`, ceiling 8, five
 stacks still to spend. Not a better version of the same weapon: the opposite
 kind of object.
 
-So the deep farm is a genuine gamble rather than a grind. Every cycle past five
-makes the fight harder, spends more of the weapon's future, and buys another
-point of chance at the thing that would have made all of it irrelevant. Lose the
-roll and you carry out the most finished weapon in the game; win it and you
-carry out the best **project** in the game.
+So the deep farm is a genuine gamble rather than a grind, and it sharpens as it
+goes. Early cycles buy stacks cheaply. Late cycles buy nothing but odds, against
+an enemy that has come back twenty times, in a run you still have to climb out
+of. Lose the roll and you carry out the most finished weapon in the game; win it
+and you carry out the best **project** in the game.
 
 So the dungeon supplies **bodies** and the enchanter supplies **souls**. Depth
 buys you a better weapon to invest in; runs survived buy you the investment
