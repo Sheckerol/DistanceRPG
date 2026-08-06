@@ -76,6 +76,20 @@
 - **A unique enchantment is transferable but never catalogued.** The enchanter
   copies what you have seen; there is nothing to copy here, only the one that
   exists.
+- **Unique enchantments never leave tier 1.** The design's first real cap, and
+  it holds because these are the first things that are not numbers: a catalogue
+  enchantment scales a *magnitude*, a unique one scales a *rule*, and there is
+  no safe multiple of "deny death". A magnitude is re-priced; a rule is limited
+  at the forge — the same reason `Light` and `Resonant` cap at `×1`. Not a dead
+  stack, since mana spent through one still feeds max mana (§2.2): you grow the
+  character instead of the item. And a unique is as good the day you find it as
+  it will ever be.
+- **A wand unique's enchantment is a DoT of its own element** — Burning, Arcing,
+  Corroding, Frostbite. One status effect carrying a damage type, so every tick
+  runs the type chart. It is the wand-shaped effect because a wand hits an
+  *area*, and it is exactly why the tier-1 cap is load-bearing rather than
+  tidy: an area DoT compounds across targets and across turns at once, the only
+  place in the design two multipliers meet.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
   non-opposing catalogue entries** (the only place a drop carries more than one).

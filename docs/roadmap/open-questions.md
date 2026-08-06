@@ -272,6 +272,16 @@
   measures casters by. The setting is worked out elsewhere; what is open is how
   much of it the game *says* versus implies through mechanics. Only the
   mechanically load-bearing parts belong in these documents.
+- **Is `Arcing` a DoT or something else?** Burning, Corroding and Frostbite are
+  all natural damage-over-time; a lingering *shock* is the one that does not
+  read as one. It may want to be the exception — arcing to an adjacent enemy
+  each turn rather than ticking in place — which is more interesting and breaks
+  the "one status effect carrying a damage type" simplification §1.5 leans on.
+- **Does an area DoT need a stacking rule?** A Nova catching the same enemy twice
+  in two turns applies the DoT twice. Crit riders accumulate levels (§1.6) and
+  `Poison` decays; whether an elemental DoT refreshes, stacks or does nothing on
+  re-application is unspecified, and with an area weapon it will come up
+  constantly rather than occasionally.
 - **`Immovable` and `Piercing` need specifying.** Six martial uniques exist and
   four unique enchantments were named, so the spear and the bow got proposals
   (§1.5) with no numbers. Both obey the trigger-cost rule; neither has a lock,

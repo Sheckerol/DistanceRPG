@@ -1088,6 +1088,41 @@ drop:
 | --- | --- | --- | --- | --- |
 | Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
 | The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Shocking + Flaming** | A beam of plasma |
+| *(unnamed)* | Wand | Wand of the Nova | `Resonant ×1`, **Burning** | A circle that keeps burning after it lands |
+
+### A wand unique's own shape: the element stays
+
+Where a martial unique's enchantment bends a rule, **a wand's makes its damage
+linger.** The unique enchantment for a wand is a **damage-over-time of its own
+element** — the shot does not stop when the shape does.
+
+| Element | Its DoT |
+| --- | --- |
+| Flaming | **Burning** |
+| Shocking | **Arcing** |
+| Acidic | **Corroding** |
+| Cold | **Frostbite** |
+
+Mechanically these are **one status effect carrying a damage type**, not four,
+so each tick runs through the type chart (§1.4) exactly as the initial hit does.
+A Burning enemy in a Cold dungeon takes `×1.5` every turn it burns. That is one
+new `StatusEffectType` alongside `Poison`, which already does the same job
+without an element.
+
+**It is the wand-shaped effect, and that is the whole argument.** A wand hits an
+*area*; a DoT applied over an area sets a room on fire and keeps it burning
+while the party repositions. No other class can produce that, because no other
+class hits more than one target and no martial unique's enchantment persists.
+The staff's uniques are effects that land on one target; the wand's is the same
+effect arriving on everything at once.
+
+It is also why the tier-1 cap on unique enchantments (§3.3) is doing real work
+here rather than being a formality. **An area DoT is precisely the thing that
+must not scale.** A Nova applying a tier-6 burn to eight enemies is not a strong
+item, it is a different game — the damage compounds across targets *and* across
+turns at the same time, which is the only place in the design where two
+multipliers meet. Held at tier 1 it is a memorable artifact; allowed to level it
+is the reason the whole run stops mattering.
 
 **The Long Candle is the third shape, and it is the neatest of the three.** A
 plasma beam is fire and lightning at once, so it carries `Shocking` and

@@ -573,6 +573,45 @@ weapon the graft roll touches.
 enchanter copies what he has seen; there is nothing to copy here, only the one
 that exists. Moving it is moving *it*.
 
+### Unique enchantments never leave tier 1
+
+**A unique enchantment does not level.** It arrives at tier 1, it stays at tier
+1, and no amount of casting, farming or servicing moves it.
+
+This is the first genuine cap in the design, and it exists because these are the
+first things that are not numbers. The distinction is exact:
+
+| | Scaling means | Can it be priced? |
+| --- | --- | --- |
+| **A catalogue enchantment** | A bigger magnitude — more damage, more healing, a deeper effect | Yes. That is what per-tier values are for |
+| **A unique enchantment** | A rule being *more true* | **No.** There is no safe multiple of "deny death" |
+
+Read the four and it is obvious there is nothing to tune. What is `Warding` at
+tier 5 — survive five lethal hits? What is `Momentum` at tier 6 — a refund
+larger than the swing, which is the exact loop §1.1 exiled it from the modifier
+table to prevent? `Siphon` deep enough returns more mana than the fight costs
+and the economy stops existing. These do not have a knob that goes up; they have
+a *statement*, and it is either true or it is not.
+
+So the two systems take the two halves of §1.1's toolkit and each takes the one
+that fits:
+
+> A magnitude is re-priced. A rule is limited at the forge.
+
+`Light ×1` and `Resonant ×1` are already limited that way (§1.1) for the same
+underlying reason — a discount running to zero is a rule change wearing a
+number's clothes. Unique enchantments are the honest version of that case.
+
+**It is not a dead stack**, which is the objection §1.1 would otherwise raise.
+Mana spent through a unique enchantment still feeds **max mana** (§2.2), so
+firing it is never wasted — it grows the pool rather than the enchantment. You
+are still building something; you are building the character instead of the
+item.
+
+And it keeps the artifact honest in a way a scaling one could not: a unique is
+**as good on the day you find it as it will ever be**. There is no version of
+The Bulwark you have to grind toward before it is the real Bulwark.
+
 **The staff effects are catalogue entries, not a parallel system.** The last
 four rows *are* the four staves (§1.3), written from the other end — a staff
 variant is a guaranteed source of an entry here. A cast is a hit, so an effect

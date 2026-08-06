@@ -235,7 +235,16 @@ seven stacks of headroom instead of one.
 ### Everything else
 
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
-`Weakened`.
+`Weakened`, and **`Searing`** — the elemental DoT (§1.5), which is one member
+carrying a `DamageType` rather than four. That is what lets each tick resolve
+through the type chart with the same call the initial hit uses; a
+`Burning`/`Arcing`/`Corroding`/`Frostbite` enum would need the chart wired in
+four places and would drift.
+
+`Enchantment` gains a `bool Unique`. It gates two things and nothing else: the
+enchanter's catalogue skips it (§6.4), and `Tier` is pinned at 1 (§3.3). Both
+are checks rather than mechanisms, which is the point — a unique enchantment is
+an ordinary enchantment with two doors closed.
 
 `Weapon` gains `WeaponClass` (the eight above), `Forged` (§1.1) and
 `AreaShape?`. There is **no `CastEffect` field** — a staff's effect is its innate
