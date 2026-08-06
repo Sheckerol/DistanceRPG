@@ -317,13 +317,6 @@
   obviously belongs to. `WardDecayPerTurn` is the one that has to be checked
   against walking distance rather than fight length — its job is to be gone by
   the next engagement.
-- **Does `Ward` want a source cap even though it does not want a ceiling?** The
-  pool self-limits against `Overheal` because decay and absorption both drain
-  it. It does not obviously self-limit against a *party* — four characters
-  stacking Ward on one front-liner between fights is a different shape of
-  stockpile, and one that decay at 1 a turn barely touches at four points a turn
-  incoming. Either that is a legitimate party play worth the four casts, or Ward
-  from allies wants to overwrite rather than accumulate.
 - **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
   now costs 5 to do it, so its net depends on a restore value nobody has set.
   Less pressing than it was, since Siphon is now unique-level and the ordinary

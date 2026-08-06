@@ -735,6 +735,39 @@ healthy target grants `Ward` slowly and the earliest points bleed off before the
 last ticks land. You get the shield you had *while* the healing was happening.
 Overhealing someone is a thing you do during a fight.
 
+### Party-stacked `Ward` accumulates, and it is allowed to be silly
+
+Four characters can pile `Ward` onto one front-liner. It **accumulates** rather
+than overwriting, and that is deliberate — an ally's temporary health is still
+temporary health, and a rule that made the second caster's contribution vanish
+would be a bespoke exception to the one thing this status does.
+
+Which means a party that spends long enough at it can walk into a boss room
+carrying an absurd pool and **gum an overlevelled boss to death** — soaking
+enormous hits one point at a time while chipping it down at whatever damage a
+party of healers manages. That is a legitimate strategy and it should stay one.
+It is also very funny, which is not nothing.
+
+**Three things bound it, and none of them is a rule written for this.**
+
+- **Mana throughput.** A cast is 20 mana and regen is a trickle from unspent
+  movement (§1.3), so a large pool costs hundreds of turns of standing still.
+  The cost is paid in the game's actual currency.
+- **The dungeon is not safe while you do it.** Resurrection runs until the boss
+  dies (§4.3), and every cycle makes the dummies stronger and quicker to return
+  (§3.2). Stockpiling in a corridor for two hundred turns means fighting
+  everything on that floor several times over, at escalating difficulty, for
+  free. **You cannot bank in peace before the boss, and after the boss there is
+  nothing left to spend it on.**
+- **Decay charges you for the walk.** One point a turn means the pool shrinks
+  every step between where you built it and where you need it.
+
+And the 1-damage floor means it is never immortality — every hit still lands for
+at least 1, so a big enough pool buys a *long* fight rather than an unlosable
+one. Which is exactly the shape "gum it to death" should have: you do not become
+invincible, you become extremely difficult to finish, and you still have to do
+the finishing.
+
 ### `Ward` is temporary health, not armour — so crits do not bypass it
 
 `Block` is skipped entirely on a crit (§1.6): that is the universal way through

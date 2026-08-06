@@ -544,3 +544,14 @@
   obvious name — and `Ward` stays free for the thing `Overheal` pours into.
   One rename instead of two, and `Sturdy` reads better on a shield that refuses
   to die than `Warding` ever did.
+- **Party-stacked `Ward` accumulates, deliberately.** An ally's temporary health
+  is still temporary health, and making a second caster's contribution vanish
+  would be a bespoke exception to the only thing the status does. So a patient
+  party can walk into a boss room with an absurd pool and gum an overlevelled
+  boss to death — a legitimate strategy, and a funny one. Three existing rules
+  bound it without anything being written for the purpose: mana throughput
+  prices it in hundreds of turns, **resurrection makes those turns dangerous**
+  (you cannot bank in peace before the boss, and after it there is nothing to
+  spend on), and decay charges you for the walk. The 1-damage floor keeps it
+  from ever being immortality — a big pool buys a *long* fight, not an unlosable
+  one.
