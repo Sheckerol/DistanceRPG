@@ -92,18 +92,25 @@
   needed anything new, and they share one `StatusEffectType` carrying a
   `DamageType`. So a wand unique is *the staff's effect delivered over an area*,
   which is the cleanest statement of what the two caster classes are for.
-- **A lingering element applies levels equal to the element's tier** — a tier-4
-  `Flaming` wand leaves 4 levels of Searing. Levels **accumulate** on
-  re-application, decay one a turn, tick `1` each, and have no cap: the exact
-  rider model §1.6 already sets, so `Poison`, `Searing`, `Sundered` and
-  `Weakened` are one family with one model. That is what makes the tier-1 cap
-  survivable — the rule ("the element lingers") is fixed while the depth rides
-  a catalogue enchantment that levels normally. It also makes the element a
-  **prerequisite**: transfer the `Flaming` off and the burn goes quiet.
-- **The lingering total is triangular** — `n` levels deal `n(n+1)/2` before
-  decaying out, so 21 at tier 6, on every target in the shape. Quadratic in
-  tier, which nothing else in the game is. Per level is the dial if it proves
-  too much, exactly as for the riders.
+- **A lingering element applies levels derived from the element's tier**, and
+  every conversion is a **named constant** rather than a baked `1`:
+  `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`. Levels
+  **accumulate** on re-application and have no cap — the rider model §1.6
+  already sets, so `Poison`, `Searing`, `Sundered` and `Weakened` are one family
+  with one model and only the constants differ. That is what makes the tier-1
+  cap survivable: the rule ("the element lingers") is fixed while the depth
+  rides a catalogue enchantment that levels normally. It also makes the element
+  a **prerequisite** — transfer the `Flaming` off and the burn goes quiet.
+- **Decay is the dial that matters most**, because it decides whether this is a
+  damage-over-time effect or a delayed burst — and duration must not outlast the
+  fight, or the deepest levels tick against a corpse and a player who bought
+  tier got nothing, which is a dead stack in everything but name.
+  Starting point `1 / 1 / 2`: 12 damage over 3 turns at tier 6.
+- **The total is quadratic in tier**, the only such term in the design, and it
+  lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
+  square, so halving it quarters the total — that is the correction if deep
+  wands are too strong while shallow ones are fine. `SearDamagePerLevel` is the
+  correction if the whole curve is too high.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
   non-opposing catalogue entries** (the only place a drop carries more than one).

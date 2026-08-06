@@ -248,10 +248,18 @@ on a target are levels, whatever happens to the wand afterwards.
 
 Which means `Poison`, `Searing`, `Sundered` and `Weakened` all want the **same
 representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
-`TickStatusEffects` path: apply damage or effect proportional to `Levels`, then
-decrement. Four effects, one code path, one HUD presentation. Worth building
-that way from the start rather than converging on it after three of them exist
-separately.
+`TickStatusEffects` path: apply an effect proportional to `Levels`, then
+decrement by that status's decay. Four effects, one code path, one HUD
+presentation. Worth building that way from the start rather than converging on
+it after three of them exist separately.
+
+**The per-status numbers belong in a table, not in the path.** Searing needs
+three (§1.5) and the others will want theirs, so `GameConstants` should carry a
+row per status — levels granted per source unit, effect per level, decay per
+turn — and `TickStatusEffects` should read it rather than branching on type.
+That is what keeps "one model, different constants" true in the code and not
+just in the document, and it is the difference between tuning a burn in a data
+file and tuning it in a `switch`.
 
 `Enchantment` gains a `bool Unique`. It gates two things and nothing else: the
 enchanter's catalogue skips it (§6.4), and `Tier` is pinned at 1 (§3.3). Both

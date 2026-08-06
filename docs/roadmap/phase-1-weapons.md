@@ -1117,27 +1117,80 @@ everything in the circle. That is the cleanest statement of what the two caster
 classes are for, and it arrives without inventing a single new effect for two of
 the four.
 
-### Levels, not a number: the element's tier is how deep it burns
+### Levels, not a number, and every conversion is a constant
 
-**Applying a lingering element grants levels equal to the element enchantment's
-tier.** A `Flaming` tier-4 wand leaves **4 levels of Searing** on everything the
-shape caught; the same wand at tier 6 leaves 6.
+**Applying a lingering element grants levels derived from the element
+enchantment's tier.** How many, what each does, and how fast they burn off are
+**three separate named constants**, because they control three different things
+and baking any of them at `1` would hide a decision:
 
-Everything else follows the rider rules §1.6 already sets, and deliberately so —
-this is the same shape as `Sundered` and `Weakened` arriving from a different
-trigger:
+```
+levelsApplied  = SearLevelsPerTier  × elementTier
+damagePerTurn  = SearDamagePerLevel × currentLevels
+levelsLost     = SearDecayPerTurn                    // each turn
+```
 
-| | |
-| --- | --- |
-| **Per level** | `1` damage a turn |
-| **Re-application** | **Accumulates.** Hitting a burning target again adds levels rather than refreshing |
-| **Decay** | One level per turn, always |
-| **Cap** | None, exactly as §1.6 argues for the riders |
+| Constant | Controls | Bounded by |
+| --- | --- | --- |
+| `SearLevelsPerTier` | How sharply the effect scales with tier — it is **inside the square** | Nothing; this is the free one |
+| `SearDamagePerLevel` | Magnitude only, linearly | Enemy HP — the totals below scale straight with it |
+| `SearDecayPerTurn` | **Duration**, and therefore the total | Fight length. See below |
 
-So `Poison`, `Searing`, `Sundered` and `Weakened` are **one family with one
-model**: a level count that accumulates, ticks, and decays a level a turn. That
-is worth more than the individual effects — a player learns the rule once, and
-the HUD needs one presentation rather than four.
+Everything else follows the rider rules §1.6 already sets, and deliberately so:
+levels **accumulate** on re-application rather than refreshing, and there is no
+cap. So `Poison`, `Searing`, `Sundered` and `Weakened` are **one family with one
+model** — a level count that accumulates, ticks, and decays. A player learns the
+rule once, the HUD needs one presentation, and only the constants differ.
+
+### Why decay is the interesting dial
+
+Levels tick and *then* decay, so the total is a triangular-ish sum and **decay
+is what bounds it**. Compare a tier-6 `Flaming` under the two obvious settings,
+with `LevelsPerTier` and `DamagePerLevel` both at `1`:
+
+| `DecayPerTurn` | Ticks | Total | Duration |
+| --- | --- | --- | --- |
+| **1** | 6, 5, 4, 3, 2, 1 | **21** | 6 turns |
+| **2** | 6, 4, 2 | **12** | 3 turns |
+| **3** | 6, 3 | **9** | 2 turns |
+
+**Decay is not merely a magnitude knob — it decides whether this is a
+damage-over-time effect or a delayed burst.** At 1 the room burns while the
+party repositions, which is the whole wand fantasy. At 3 it is a second hit
+arriving late. Somewhere around 2 is where it stays recognisably a burn while
+staying a number you can look at.
+
+There is a hard constraint on it that §1.1 supplies. **Duration must not outlast
+the fight**, or the deepest levels tick against a corpse and a player who
+invested in tier got nothing for it — a dead stack in everything but name. So
+`DecayPerTurn` has to be chosen against how long fights actually run, and it is
+the one constant here that cannot be picked from a spreadsheet.
+
+**Starting point: `LevelsPerTier 1`, `DamagePerLevel 1`, `DecayPerTurn 2`** — 12
+damage over 3 turns at tier 6. That is a real effect, it reads as burning, and
+it is roughly half what decay-1 produced. All three want play rather than
+argument, which is why they are constants rather than prose.
+
+### The totals are quadratic in tier, whatever the constants
+
+Worth seeing plainly, because it is the only quadratic term in the design. At
+the starting point above:
+
+| Element tier | 1 | 2 | 4 | 6 | 8 |
+| --- | --- | --- | --- | --- | --- |
+| Levels | 1 | 2 | 4 | 6 | 8 |
+| **Total damage** | 1 | 2 | 6 | **12** | **20** |
+
+And it lands on *every* target in the shape, so a Nova catching six enemies at
+tier 6 deals 72 over three turns. That is the number to watch, and it is the
+strongest argument for the tier-1 cap on the unique enchantment (§3.3) — if the
+enchantment scaled as well, the two would multiply.
+
+`SearLevelsPerTier` is the dial that changes the *shape* rather than the height,
+because it sits inside the square: halving it quarters the total. That makes it
+the right correction if deep wands prove too strong at the top while shallow
+ones feel fine, and `SearDamagePerLevel` the right one if the whole curve is
+simply too high.
 
 ### That resolves the tier-1 cap without breaking it
 
@@ -1156,29 +1209,6 @@ intensifies is the *statement* — the element lingers, it does not linger harde
 `Flaming` on the same weapon to say how many levels, which is `Requires` (§1.1)
 arriving in the enchantment system by necessity rather than design. Transfer the
 `Flaming` off and the burn goes quiet.
-
-### The total is triangular, and that is the number to watch
-
-Levels tick and then decay, so `n` levels applied once deal
-**`n(n+1)/2`** before burning out:
-
-| Element tier | 1 | 2 | 4 | 6 | 8 |
-| --- | --- | --- | --- | --- | --- |
-| Levels applied | 1 | 2 | 4 | 6 | 8 |
-| **Total damage** | 1 | 3 | **10** | **21** | **36** |
-
-That is **quadratic in tier**, which no other effect in the game is, and it
-arrives on every target in the shape. It is the strongest single argument for
-the tier-1 cap on the unique enchantment — if the enchantment scaled *too*, the
-two would multiply.
-
-Whether quadratic is correct here is genuinely open. The argument for is that
-tier is bought with mana the wand also needs to fire, and a deep `Flaming` has
-locked most of a pool (§3.3), so the cost curve is steep in the same direction.
-The argument against is that a Nova hitting six enemies at tier 6 is 126 damage
-from one cast, spread over six turns, and nothing else in the design produces a
-number like that. **Per level is the dial**, exactly as it is for the riders, and
-it may want to be a half rather than a `1`.
 
 **The Long Candle is the third shape, and it is the neatest of the three.** A
 plasma beam is fire and lightning at once, so it carries `Shocking` and
