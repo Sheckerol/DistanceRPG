@@ -82,14 +82,21 @@
   no safe multiple of "deny death". A magnitude is re-priced; a rule is limited
   at the forge — the same reason `Light` and `Resonant` cap at `×1`. Not a dead
   stack, since mana spent through one still feeds max mana (§2.2): you grow the
-  character instead of the item. And a unique is as good the day you find it as
-  it will ever be.
-- **A wand unique's enchantment is a DoT of its own element** — Burning, Arcing,
-  Corroding, Frostbite. One status effect carrying a damage type, so every tick
-  runs the type chart. It is the wand-shaped effect because a wand hits an
-  *area*, and it is exactly why the tier-1 cap is load-bearing rather than
-  tidy: an area DoT compounds across targets and across turns at once, the only
-  place in the design two multipliers meet.
+  character instead of the item. The *enchantment* is as good the day you find
+  it as it will ever be — the **weapon** around it is the deepest project in the
+  game, capping at `×8` with headroom unspent. The body accumulates; the
+  identity does not.
+- **A wand unique's enchantment makes its element linger** — Flaming leaves
+  **Burning**, Cold leaves **Frostbite**, Shocking leaves **Mire** (paralysis),
+  Acidic leaves **Poison**. Two reuse existing statuses; only the first two
+  needed anything new, and they share one `StatusEffectType` carrying a
+  `DamageType`. So a wand unique is *the staff's effect delivered over an area*,
+  which is the cleanest statement of what the two caster classes are for.
+- **The lingering effect ticks for the element enchantment's own damage**, not a
+  number of its own. That is what makes the tier-1 cap survivable: the rule
+  ("the element lingers") is fixed, the magnitude rides a catalogue enchantment
+  that levels normally. It also makes the element a **prerequisite** — transfer
+  the `Flaming` off and the Burning goes quiet.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
   non-opposing catalogue entries** (the only place a drop carries more than one).

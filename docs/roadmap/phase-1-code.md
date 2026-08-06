@@ -235,11 +235,18 @@ seven stacks of headroom instead of one.
 ### Everything else
 
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
-`Weakened`, and **`Searing`** — the elemental DoT (§1.5), which is one member
-carrying a `DamageType` rather than four. That is what lets each tick resolve
-through the type chart with the same call the initial hit uses; a
-`Burning`/`Arcing`/`Corroding`/`Frostbite` enum would need the chart wired in
-four places and would drift.
+`Weakened`, and **`Searing`** — the lingering element (§1.5), one member
+carrying a `DamageType` rather than a member per element. Shocking and Acidic
+need nothing new at all: they apply `Mire` and `Poison`, which the staves
+already bring.
+
+`Searing` is also the first status whose **magnitude is not stored on it**. It
+ticks for the source enchantment's damage, so the instance holds a reference to
+that enchantment rather than a number — which means levelling the element
+changes what already-applied ticks do, and means the effect has to handle its
+source having been transferred away mid-fight (§1.5). Worth deciding whether it
+snapshots on application or resolves live; live is the smaller data model and
+the stranger behaviour.
 
 `Enchantment` gains a `bool Unique`. It gates two things and nothing else: the
 enchanter's catalogue skips it (§6.4), and `Tier` is pinned at 1 (§3.3). Both

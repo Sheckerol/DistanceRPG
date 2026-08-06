@@ -1088,41 +1088,64 @@ drop:
 | --- | --- | --- | --- | --- |
 | Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
 | The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Shocking + Flaming** | A beam of plasma |
-| *(unnamed)* | Wand | Wand of the Nova | `Resonant ×1`, **Burning** | A circle that keeps burning after it lands |
+| *(unnamed)* | Wand | Wand of the Nova | `Resonant ×1`, `Flaming`, **Burning** | A circle that keeps burning after it lands |
 
-### A wand unique's own shape: the element stays
+### A wand unique's own shape: the element lingers
 
-Where a martial unique's enchantment bends a rule, **a wand's makes its damage
-linger.** The unique enchantment for a wand is a **damage-over-time of its own
-element** — the shot does not stop when the shape does.
+Where a martial unique's enchantment bends a rule, **a wand's makes its element
+persist.** The shot does not stop when the shape does — and each element
+persists as the thing that element *does*, which turns out not to be four
+damage-over-times:
 
-| Element | Its DoT |
-| --- | --- |
-| Flaming | **Burning** |
-| Shocking | **Arcing** |
-| Acidic | **Corroding** |
-| Cold | **Frostbite** |
+| Element | It leaves | Which is |
+| --- | --- | --- |
+| **Flaming** | **Burning** | Damage per turn, decaying |
+| **Cold** | **Frostbite** | Damage per turn, decaying |
+| **Shocking** | **Mire** | The movement cut — paralysis, mechanically the staff's own effect |
+| **Acidic** | **Poison** | The existing status, unchanged |
 
-Mechanically these are **one status effect carrying a damage type**, not four,
-so each tick runs through the type chart (§1.4) exactly as the initial hit does.
-A Burning enemy in a Cold dungeon takes `×1.5` every turn it burns. That is one
-new `StatusEffectType` alongside `Poison`, which already does the same job
-without an element.
+Two of these reuse statuses the game already has, which is most of the argument
+for them. A lingering *shock* never read as a damage tick — paralysis is what
+electricity actually does to a body — and acid eating away at something is
+`Poison` by another name. Only Flaming and Cold needed anything new, and they
+share one `StatusEffectType` carrying a `DamageType`, so a burn and a frostbite
+are one mechanism with two names.
 
-**It is the wand-shaped effect, and that is the whole argument.** A wand hits an
-*area*; a DoT applied over an area sets a room on fire and keeps it burning
-while the party repositions. No other class can produce that, because no other
-class hits more than one target and no martial unique's enchantment persists.
-The staff's uniques are effects that land on one target; the wand's is the same
-effect arriving on everything at once.
+**The wand unique is therefore the staff's effect delivered over an area.** A
+Staff of Mire cuts one target's movement; a Shocking Nova unique cuts
+everything in the circle. That is the cleanest statement of what the two caster
+classes are for, and it arrives without inventing a single new effect for two of
+the four.
 
-It is also why the tier-1 cap on unique enchantments (§3.3) is doing real work
-here rather than being a formality. **An area DoT is precisely the thing that
-must not scale.** A Nova applying a tier-6 burn to eight enemies is not a strong
-item, it is a different game — the damage compounds across targets *and* across
-turns at the same time, which is the only place in the design where two
-multipliers meet. Held at tier 1 it is a memorable artifact; allowed to level it
-is the reason the whole run stops mattering.
+### The DoT's magnitude comes from the element, not from itself
+
+**What it ticks for is the element enchantment's own damage** (§3.3), not a
+separate number. Burning ticks for what `Flaming` hits for; Mire cuts movement
+in proportion to what `Shocking` hits for.
+
+That resolves the tension the tier-1 cap (§3.3) would otherwise create. A unique
+enchantment cannot level — but this one does not need to, because **the rule and
+the magnitude live in different places**:
+
+| | Is | Scales? |
+| --- | --- | --- |
+| The unique enchantment | "The element lingers" — a rule | **No.** Tier 1, always |
+| Its per-turn number | The element's damage — a magnitude | **Yes**, with the element's tier |
+
+So the player still has somewhere to build: level your `Flaming`, and the
+Burning that `Flaming` feeds gets stronger with it. What never intensifies is
+the *statement* — the element lingers, it does not linger harder.
+
+**It also makes the element a prerequisite.** Burning is nothing without
+`Flaming` on the same weapon to tell it what to tick for, which is `Requires`
+(§1.1) arriving in the enchantment system by necessity rather than by design.
+Transfer the `Flaming` off and the Burning goes quiet. The artifact is only an
+artifact while it is still a fire wand.
+
+And the area-DoT worry from §3.3 stays answered. The tick tracks a catalogue
+enchantment whose depth is already paid for out of the mana pool — the same
+budget bounding everything else — rather than compounding on a second, unpriced
+axis of its own.
 
 **The Long Candle is the third shape, and it is the neatest of the three.** A
 plasma beam is fire and lightning at once, so it carries `Shocking` and

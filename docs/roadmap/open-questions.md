@@ -272,16 +272,25 @@
   measures casters by. The setting is worked out elsewhere; what is open is how
   much of it the game *says* versus implies through mechanics. Only the
   mechanically load-bearing parts belong in these documents.
-- **Is `Arcing` a DoT or something else?** Burning, Corroding and Frostbite are
-  all natural damage-over-time; a lingering *shock* is the one that does not
-  read as one. It may want to be the exception — arcing to an adjacent enemy
-  each turn rather than ticking in place — which is more interesting and breaks
-  the "one status effect carrying a damage type" simplification §1.5 leans on.
+- **Is area `Mire` too strong?** The Shocking wand unique cuts the movement of
+  everything in the shape, in a game where movement *is* the resource. A Nova
+  paralysing a whole room is either the best control effect in the design or
+  simply the winning one, and unlike the DoTs it does not scale down against
+  spread-out enemies — it lands fully on each. Worth checking against the
+  friendly-fire scorer too, since an enemy wand with it would be brutal.
 - **Does an area DoT need a stacking rule?** A Nova catching the same enemy twice
-  in two turns applies the DoT twice. Crit riders accumulate levels (§1.6) and
-  `Poison` decays; whether an elemental DoT refreshes, stacks or does nothing on
-  re-application is unspecified, and with an area weapon it will come up
-  constantly rather than occasionally.
+  in two turns applies it twice. Crit riders accumulate levels (§1.6) and
+  `Poison` decays; whether a lingering element refreshes, stacks or does nothing
+  on re-application is unspecified, and with an area weapon it comes up
+  constantly rather than occasionally. Sharper now that the tick tracks the
+  element's damage (§1.5): two stacks of a deep `Flaming` is a much larger
+  number than two stacks of a shallow one.
+- **What happens to a wand unique whose element is transferred off?** §1.5 says
+  the lingering effect goes quiet, which is correct but harsh — the artifact
+  becomes inert rather than merely worse, and nothing else in the design has
+  that failure mode. Either the enchanter should refuse the transfer, or the
+  effect should fall back to some floor value, or the inertness should be
+  surfaced loudly enough that nobody does it by accident.
 - **`Immovable` and `Piercing` need specifying.** Six martial uniques exist and
   four unique enchantments were named, so the spear and the bow got proposals
   (§1.5) with no numbers. Both obey the trigger-cost rule; neither has a lock,

@@ -608,9 +608,21 @@ firing it is never wasted — it grows the pool rather than the enchantment. You
 are still building something; you are building the character instead of the
 item.
 
-And it keeps the artifact honest in a way a scaling one could not: a unique is
-**as good on the day you find it as it will ever be**. There is no version of
-The Bulwark you have to grind toward before it is the real Bulwark.
+And it keeps the artifact honest in a way a scaling one could not: **the
+enchantment is as good on the day you find it as it will ever be.** There is no
+version of `Warding` you have to grind toward before it is the real `Warding`.
+
+**The weapon around it is the opposite**, and the distinction is worth being
+exact about. A unique's whole forged spread caps at `×8` with five stacks of
+headroom unspent (§1.5), so The Bulwark absolutely gets better — wear brings it
+back from service deeper, farming pushes `Block` toward its ceiling, and the
+Bulwark you carry for thirty runs is a substantially stronger weapon than the
+one you picked up.
+
+What does not move is the soul. So a unique is the **deepest project in the game
+wrapped around the one component that is finished on arrival**, which is a
+sharper version of the forged-and-acquired split (§1.1) than any ordinary weapon
+manages: the body accumulates, the identity does not.
 
 **The staff effects are catalogue entries, not a parallel system.** The last
 four rows *are* the four staves (§1.3), written from the other end — a staff
