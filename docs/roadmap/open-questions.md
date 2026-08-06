@@ -309,16 +309,20 @@
   deep one. That may be the right variety or it may dilute the shape that makes
   the Candle read as an artifact. Worth deciding before more uniques are
   authored, since it is the difference between a shape and a one-off.
-- **Does `Ward` need a ceiling now that `Overheal` exists?** `Ward` is the one
-  status that is a *pool* rather than a level count — it absorbs until spent and
-  does not decay, which was fine when the only source was a staff cast. With
-  `Overheal` (§3.3) converting every point of surplus healing, a Regeneration
-  tick on a healthy party generates shield every turn with nothing bleeding it
-  off. The recommendation is a ceiling at the wielder's **max HP** — you cannot
-  carry more shield than body, it scales with CON on its own, and §1.1 already
-  says the enchantment layer is where organic bounds belong. Decay is the
-  alternative and reads worse: a shield that evaporates while you walk is a
-  timer, not a buff.
+- **`OverhealPerWardLevel` and `WardAbsorbPerLevel` are unset.** 5 and a
+  Block-like 3 are the starting guesses (§3.3). They interact: the ratio decides
+  how fast Ward arrives and the absorb decides what a level is worth, so halving
+  one is not the same as doubling the other. The equilibrium worth aiming at is
+  that a mid-level Regeneration on a healthy target roughly *holds* a small
+  shield rather than growing one — accumulating means the stockpile problem is
+  back, and losing ground means `Overheal` does nothing on the staff it most
+  obviously belongs to.
+- **Does `Ward` becoming per-hit break anything that assumed a pool?** §1.3's
+  Staff of Warding is described as "absorbs damage until spent", which is now
+  "blunts the next N hits". Against many small hits it is strictly better and
+  against one enormous hit strictly worse, which is the same trade `Block` makes
+  — but the staff was specced before that change and its 20-mana cost was priced
+  against the old reading.
 - **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
   now costs 5 to do it, so its net depends on a restore value nobody has set.
   Less pressing than it was, since Siphon is now unique-level and the ordinary

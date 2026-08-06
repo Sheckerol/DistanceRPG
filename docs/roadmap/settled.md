@@ -511,13 +511,25 @@
   themed boss cannot drop a class that will not take its theme *is* `Allowed`
   run over the eight classes at load. Authoring it by hand would let the two
   disagree, and the disagreement would look exactly like a drop-rate bug.
-- **`Overheal` converts healing above full HP into `Ward`.** Unique-level by the
-  same test as the rest: `TickStatusEffects` discards overheal on purpose, and
-  §2.2 rests "constitution grows by getting hurt and then healed" on that. The
-  converted overflow grants **no HP XP** — it is `Ward`, not healing — so the
-  surplus stops being wasted for *survival* while staying wasted for
-  *progression*, and a healer cannot farm CON off a full-HP party. Its best use
-  is paired with `Vampiric` on a weapon that never heals anyone otherwise.
+- **`Overheal` converts healing above full HP into `Ward`**, lossily, at
+  `OverhealPerWardLevel` (start at **5**) — a salvage mechanism rather than a
+  second healing pool. Unique-level by the same test as the rest:
+  `TickStatusEffects` discards overheal on purpose, and §2.2 rests "constitution
+  grows by getting hurt and then healed" on that. The converted overflow grants
+  **no HP XP** — it is `Ward`, not healing — so the surplus stops being wasted
+  for *survival* while staying wasted for *progression*, and a healer cannot
+  farm CON off a full-HP party. Its best use is paired with `Vampiric` on a
+  weapon that never heals anyone otherwise.
+- **`Ward` joins the level family** rather than staying a pool: one level blunts
+  one incoming hit by `WardAbsorbPerLevel`, levels accumulate, one decays a
+  turn, and being hit spends one too. **Two drains on one counter is what makes
+  `Overheal` self-limiting** — gain sits at `healing / 5` a turn against a
+  guaranteed loss of one, so the equilibrium moves with how hard you are being
+  hit and nothing needed a ceiling. It also makes Regeneration + `Overheal` a
+  *rhythm* rather than a stockpile: the earliest levels expire before the last
+  ticks land, so you cannot bank a whole heal into a shield and walk away.
+  Per-hit rather than a damage pool because it echoes `Block`, which is flat
+  per hit for the same reason.
 - **The Bulwark's enchantment is `Sturdy`**, not `Warding`. That settles the
   one-letter collision with the staff's `Ward` by renaming the *rarer* of the
   two, so the catalogue entry and the `Ward` status it applies both keep the

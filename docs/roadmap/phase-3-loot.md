@@ -643,7 +643,7 @@ cannot be chosen at the enchanter, and cannot be copied:
 | **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
 | **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
-| **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` instead of losing it |
+| **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWardLevel` to 1 |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
@@ -689,6 +689,54 @@ Alone on a healing staff it is a straightforward upgrade. Paired with
 turns excess lifesteal into a shield, on a weapon that never heals anyone
 otherwise. That is the transfer rule (§6.5) paying off on the enchantment least
 obviously portable, and the reason `Overheal` should not be pinned to staves.
+
+**The conversion is lossy, and that is the first of its two brakes.**
+`OverhealPerWardLevel` — start at **5** — means 20 points of surplus healing
+becomes 4 levels of `Ward`. A ratio rather than 1:1 keeps it a salvage
+mechanism rather than a second healing pool: you are recovering something that
+was going to be thrown away, at a discount, which is the honest shape for it.
+
+### `Ward` joins the status family, and that is the second brake
+
+`Ward` was the one status that was a **pool** — a number that absorbed and was
+spent, with no decay. That made it the exception to the level model
+(`Poison`, `Searing`, `Sundered`, `Weakened`), and it was fine only while a
+staff cast was its single source. With `Overheal` producing it continuously, an
+undecaying pool accumulates until the fight ends.
+
+So `Ward` becomes levels like everything else:
+
+| | |
+| --- | --- |
+| **Per level** | Blunts one incoming hit by `WardAbsorbPerLevel` |
+| **Re-application** | Accumulates, exactly as the riders do (§1.6) |
+| **Decay** | One level per turn |
+| **Also spent** | One level per hit it blunts |
+
+**Two drains on one counter is what makes it self-limiting**, and it needs no
+ceiling to do it. `Overheal` adds levels at `healing / 5` a turn; time removes
+one a turn regardless; being hit removes more. The equilibrium sits wherever
+those meet, it moves with how hard you are being hit, and nothing had to be
+capped — which is the §1.1 answer rather than the bespoke max-HP ceiling this
+was heading toward.
+
+**It also makes `Overheal` and a Staff of Renewal a rhythm rather than a
+stockpile**, which is the interaction worth having. Regeneration is itself a
+decaying level count, so a long heal on a healthy target grants Ward *slowly* —
+and the earliest levels expire before the last ticks land. You cannot bank a
+whole Regeneration into a shield and walk away with it; you get the shield you
+had while the healing was happening. Overhealing someone is a thing you do
+*during* a fight, not before one.
+
+**The spend rule is a choice worth naming.** "One level per hit, blunted by
+`WardAbsorbPerLevel`" keeps `Ward` strictly in the family — the level count is
+both magnitude and timer, and the tick path stays uniform. The alternative is
+the older reading, a pool of `levels × WardAbsorbPerLevel` damage that drains
+continuously, which absorbs one big hit better and many small ones worse. The
+per-hit version is chosen because it echoes `Block` (§1.1), which is already
+flat-per-hit for exactly the reason of blunting many small hits harder — and
+because two statuses behaving the same way is worth more than the marginal
+difference in what they absorb.
 
 **This is also why they can be transferred but never catalogued** (§1.5). The
 enchanter copies what he has seen; there is nothing to copy here, only the one

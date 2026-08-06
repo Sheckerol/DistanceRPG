@@ -261,15 +261,14 @@ application and converted to levels there (§1.5). That is the simpler data mode
 *and* it sidesteps the transferred-away-mid-fight case entirely: levels already
 on a target are levels, whatever happens to the wand afterwards.
 
-**`Ward` is the exception to that family, and `Overheal` (§3.3) is why it
-matters.** It is a *pool* — a number that absorbs and is spent — rather than a
-level count that ticks and decays, so it needs its own field and its own
-accumulate-on-reapply rule. Worth knowing before the shared representation is
-written, because a pool retro-fitted into a level count is the kind of thing
-that produces a shield decaying one point a turn and nobody noticing for weeks.
+`Ward` was going to be the exception — a pool rather than a level count — and
+§3.3 folded it into the family instead, so it is one more row rather than a
+second shape. It is the only member whose levels are spent by **two** things
+(decay and absorbing a hit), which is a drain in the tick path rather than a
+different representation.
 
-Which means `Poison`, `Searing`, `Sundered` and `Weakened` all want the **same
-representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
+Which means `Poison`, `Searing`, `Sundered`, `Weakened` and `Ward` all want the
+**same representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
 `TickStatusEffects` path: apply an effect proportional to `Levels`, then
 decrement by that status's decay. Four effects, one code path, one HUD
 presentation. Worth building that way from the start rather than converging on
