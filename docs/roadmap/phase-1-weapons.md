@@ -672,29 +672,65 @@ The division is clean, and the two halves come from different places:
 
 | | Sets | Earned by |
 | --- | --- | --- |
-| **Enchantment tier** | How hard the effect lands | Casting — mana moved (§3.3) |
+| **Enchantment tier** | How hard the effect lands | Casting — mana spent (§3.3) |
 | **`Resonant` stacks** | What the cast costs | Forged, farmed, grafted (§1.1) |
 
-A Staff of Mire at `Resonant ×5` costs 12 mana instead of 25. Same Mire.
+A Staff of Mire at `Resonant ×5` costs 12 mana instead of 25. Same Mire. At its
+`×6` ceiling it costs 10 — and `×6` is the ceiling, because `Resonant` is
+forge-limited to `×1` exactly as `Light` is (§1.1), so five acquired stacks is
+all the headroom there is.
 
 ### An efficient staff is harder to level, and that is the point
 
-The two dials pull against each other, and the loop is worth following:
+The two dials pull against each other, and the reason is the **mana loop**, not
+a threshold. Mana comes back only from movement left unspent at end of turn
+(`PartyMemberState.RegenManaFromUnusedMovement`), and every enchantment trigger
+costs mana (§3.3), so over any sustained fight:
 
-1. Casts cost **movement and mana both** — 40 and 20 for a staff.
-2. An unmodified caster is **mana-bound**: four casts a turn is 160 movement,
-   the whole budget, and 80 mana, which no starting pool sustains. You stop
-   because you are dry.
-3. `Resonant` stacks move you to **movement-bound**. At `×5` those same four casts
-   cost 48 mana, and at `×8` only 32 — the pool is no longer what stops you.
-4. But **mana moved is the enchantment's XP** (§3.3). Once movement-bound, every
-   further stack of `Resonant` is strictly less mana moved for the same number of
-   casts, so the effect you are casting levels more slowly.
+```
+mana spent per turn  =  mana regained per turn  =  r × (160 − 40k)
+```
+
+where `k` is how many times you cast and `r` is the regen rate. Read that line
+carefully, because it settles the question on its own: **the more you cast, the
+less mana you can spend.** Casting consumes the movement that pays for casting.
+
+`Resonant` raises the `k` you can afford. It therefore *lowers* the right-hand
+side — and the right-hand side is the enchantment's XP (§3.3).
+
+| | `Resonant ×1` | `Resonant ×6` |
+| --- | --- | --- |
+| Mana per cast (staff, base 20) | 18 | 8 |
+| Sustainable casts a turn, `r = 1` | 2 | 3 |
+| **Mana spent a turn — the XP** | **36** | **24** |
 
 **An efficient casting tool is genuinely harder to level up, and gives you more
 for every point you spend.** That is a real trade rather than a strictly-better
 modifier, and it is the first place in the design where a modifier has a
 downside written into it rather than merely an opportunity cost.
+
+**There is no crossover to tune.** An earlier draft framed this as a caster
+switching from mana-bound to movement-bound at some stack count, which made the
+whole trade hostage to a threshold nobody had placed. The steady state above is
+**monotone**: at every stack count, more efficiency means more casts and less
+mana through the enchantment. The regen rate `r` decides *where* the sustainable
+`k` lands, never whether the trade exists.
+
+It survives the lazy case too. A player who ignores the extra capacity and casts
+the same `k` as before simply spends less mana for the same actions — less XP
+again, by the other route. There is no way to hold `Resonant` and level at the
+old rate.
+
+Two things had to be true for that to hold, and both are now rules rather than
+happy accidents:
+
+- **Every trigger costs mana** (§3.3). One free-firing enchantment would level
+  on hits rather than on mana, and this whole argument would have a hole in it
+  shaped exactly like that enchantment.
+- **`Resonant` is forge-capped at `×1`, ceiling `×6`** (§1.1). The discount tops
+  out at 60%, so the sustainable `k` climbs by about one cast rather than
+  running away — the trade stays a trade instead of becoming a wall at the deep
+  end.
 
 It also splits the caster into two coherent builds:
 
@@ -702,13 +738,21 @@ It also splits the caster into two coherent builds:
   large *pool* — its mana XP still feeds max mana (§2.2), which is the ladder
   efficiency does help. Its effect stays shallow for a long time.
 - **The expensive staff** casts less and each cast is an event, but every one of
-  them banks the full 25 toward tier. Its effect gets deep fast, and it spends
-  half its turns unable to act.
+  them banks the full 18 toward tier. Its effect gets deep fast, and it spends
+  more of its turns walking.
 
 Neither is the upgrade. And the wrinkle that keeps it from being a simple pick
 is that the pool you grow is also the pool your locks eat (§3.3) — so the cheap
 staff builds the capacity to *carry* deep enchantments at the same rate it fails
 to level them.
+
+**`r` is the one constant this rests on**, and it is now the only thing about
+casters that has to be chosen carefully. It has to be large enough that a caster
+can sustain *some* casting off regen alone — otherwise every caster is
+pool-limited, mana is a countdown rather than an economy, and the trade above
+collapses into "everyone takes `Resonant`." Around **1 mana per point of unspent
+movement** is the shape the table assumes: 40 movement banked is 40 mana, which
+is roughly two casts' worth. See open questions.
 
 ### The effect *is* the staff's enchantment
 
@@ -718,7 +762,7 @@ of Blight always carries Poison; Staff of Renewal always carries Regeneration.
 
 That is worth more than it first looks:
 
-- **The staff levels itself.** Enchantment tier is earned by mana moved through
+- **The staff levels itself.** Enchantment tier is earned by mana spent through
   it (§3.3), and casting a staff is exactly that. Every cast makes the effect it
   applies land harder, without touching the staff's stats or its proficiency. A
   staff you use is a staff that grows.
@@ -992,12 +1036,41 @@ derivation rule has two ways to land — and only one of them is interesting.
 `Resonant ×3` is a staff that costs less mana, which is a fine modifier and a
 terrible legend. So:
 
-**A caster unique is a caster variant whose enchantment arrives at tier 3.**
+**A caster unique is a caster variant whose enchantment is exceptional** — and
+the forge has no other option, because `Resonant` is limited to `×1` (§1.1), so
+the only forged thing a caster unique *can* raise is the enchantment. Exactly
+the parallel an Efficiency unique runs, which cannot raise its own `Light`
+either.
+
+There are two shapes it takes, and both read as an artifact rather than a good
+drop:
+
+| Shape | What it is | Example |
+| --- | --- | --- |
+| **A high tier** | An ordinary catalogue enchantment, arriving at tier 3 | Rotwood — a Staff of Blight whose Poison starts where an ordinary staff's ends |
+| **A unique enchantment** | One that exists nowhere else in the catalogue | The Long Candle — a Beam wand carrying an element no other weapon can hold |
 
 | Unique | Class | Built from | Carries | Reads as |
 | --- | --- | --- | --- | --- |
 | Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
-| The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Flame tier 3** | A beam that is *always* fire, and hot |
+| The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **a unique element** | A beam of something the world does not otherwise contain |
+
+**A tier-3 artifact is levelling somebody else already did.** Tier is earned by
+casting (§3.3), so a staff that drops deep has a history — it was carried by
+someone, for a long time, before it ended up down there. That is a better story
+than a bigger number and it costs nothing to tell, since the mechanism is the
+one every other enchantment uses.
+
+**A unique enchantment is the scarcer shape**, and it needs one rule to stay
+scarce: it can be **transferred but never catalogued.** §6.5 moves it, because
+the body is replaceable and the soul is the thing you built — that metaphor
+should not stop working on the best item in the game. But §6.2's "choose from
+what you have seen" cannot offer it, because the enchanter cannot make a second
+one. There is exactly one, and moving it is moving *it*.
+
+That distinction is worth being precise about, since it is the only place the
+catalogue and an actual enchantment come apart: **the catalogue is a list of
+things the enchanter can copy.** A unique enchantment is a thing that exists.
 
 The two classes get there differently, which follows from §1.3 and §1.4. A
 staff's enchantment is already fixed by variant, so its unique simply starts

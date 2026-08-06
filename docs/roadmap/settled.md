@@ -25,7 +25,7 @@
   A drop rolls an enchantment — always on staves and wands, rarely on everything
   else — but only ever one, and only ever tier 1. Breadth and depth past that
   are the enchanter's alone.
-- **Enchantment tier is uncapped and earned by use** — mana *moved* through an
+- **Enchantment tier is uncapped and earned by use** — mana *spent* by an
   enchantment is its XP, so it levels by being cast with, never bought. The
   brake is built into the fuel: the tier that spending buys locks more of the
   pool the spending came from. Farming may bank five tiers' worth as a head
@@ -47,6 +47,27 @@
   mana the weapon spends, cast costs and enchantment triggers alike. Tier sets
   how hard an effect lands; `Resonant` sets what it costs. Forged on casters only,
   graftable onto anything carrying an enchantment.
+- **Every enchantment trigger costs mana**, whatever fires it. No zero-cost
+  triggers, ever — Siphon now pays 5 to restore more. A free trigger is a
+  passive that dodges the budget balancing everything else, it could never level
+  (tier is earned from mana spent), and `Resonant` would be inert on the build it
+  exists for. It also removed the "mana *moved*" special case: XP is mana spent,
+  the same number §2.2 already credits.
+- **`Resonant` is forge-capped at `×1`, ceiling `×6`** — the same limit `Light`
+  carries, because they are one modifier pointed at two currencies. Capping one
+  alone would have made the mana half the stronger pick by a stack. It also
+  forces caster uniques onto their enchantment, exactly as an Efficiency unique
+  is forced off `Light` and onto the class signature.
+- **The `Resonant` trade has no crossover to tune.** In steady state
+  `mana spent per turn = r × (160 − 40k)`, so casting consumes the movement that
+  pays for casting: more efficiency buys more casts and therefore *less* mana
+  through the enchantment, monotonically. The regen rate `r` sets where the
+  sustainable cast count lands, never whether the trade exists.
+- **A caster unique's advantage is its enchantment** — either a catalogue one at
+  tier 3 (levelling somebody else already did) or a **unique enchantment** that
+  exists nowhere else. A unique enchantment can be **transferred but never
+  catalogued**: the enchanter copies from what you have seen, and there is no
+  second one of these to copy.
 - **`Light` and `Resonant` exclude each other** — the **currency** group. Mana
   regenerates from movement left unspent, so cheap movement is already cheap
   mana by the long route; a weapon with both compounds one discount with itself.

@@ -363,33 +363,68 @@ pool, they can afford one light enchantment, not five.
 | **Trigger cost** | Mana spent each time it fires |
 | **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
 | **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
-| **Tier** | Uncapped; **earned by use** — mana moved through it is its XP — lifting lock *and* potency together |
+| **Tier** | Uncapped; **earned by use** — mana it spends is its XP — lifting lock *and* potency together |
 
 Insufficient mana means it simply **does not fire** — no failure state, no
 penalty, just a resource gate. The same is true one level up: a lock you cannot
 afford leaves the enchantment **dormant** rather than making the weapon
 unequippable (§3.1).
 
+### Every trigger costs mana, without exception
+
+**No enchantment may have a trigger cost of zero.** Whatever fires it — a hit, a
+crit, a kill, being hit, taking lethal damage, anything invented later — firing
+costs mana. Siphon is the case that had to move: it restores mana on a kill, and
+it now pays 5 to do it. Net positive, still the engine that sustains everything
+else, but no longer free.
+
+This is a rule about the *system's* integrity rather than about any one
+enchantment, and it holds three things up at once:
+
+- **The resource gate stays real.** A free trigger is a passive, and a passive
+  does not participate in the budget that §3.3 uses to balance everything. One
+  zero-cost enchantment would be strictly better than every priced one at equal
+  effect, and the temptation to add a second is exactly how a mana system stops
+  mattering.
+- **Levelling works on the same rule everywhere.** Tier is earned from mana
+  spent, so a free trigger would be an enchantment that never levels — the
+  single dead end in a design that forbids dead stacks. Guaranteeing a cost
+  guarantees a path.
+- **`Resonant` always has something to discount.** A weapon whose enchantments
+  fired free would gain nothing from mana efficiency, so `Resonant` would be
+  inert on exactly the build it exists for.
+
+**It also simplifies the XP rule.** Tier used to be earned from mana *moved*
+rather than spent, purely so a zero-cost Siphon could still level. With no
+zero-cost triggers left, the special case goes:
+
+```
+enchantXp[enchantment] += manaSpent * rate(INT)
+```
+
+Mana **spent**, which is the same quantity §2.2 already credits to max mana. One
+number, two ladders, no second definition.
+
 ### Tier is earned by use, not bought
 
 ```
-enchantXp[enchantment] += manaMoved * rate(INT)
+enchantXp[enchantment] += manaSpent * rate(INT)
 ```
 
-**Mana is an enchantment's experience.** Every trigger it pays for, and every
-point it restores, feeds its own pool — the same `manaSpent` credit that already
+**Mana is an enchantment's experience.** Every trigger it pays for feeds its own
+pool — the same `manaSpent` credit that already
 grows max mana (§2.2), counted a second time against the thing that spent it.
 An enchantment you fire constantly gets better at what it does, and one you
 carry does not.
 
 That is the pattern the whole game already runs on: health levels from being
 healed, mana from being spent, weapon proficiency from damage dealt, wear from
-swinging. An enchantment levelling from mana moved is the same rule reaching the
-last system that lacked one.
+swinging. An enchantment levelling from the mana it spends is the same rule
+reaching the last system that lacked one.
 
-**Mana *moved*, not spent**, so a zero-cost enchantment still levels. Siphon
-restores 20 on a kill and banks 20 XP for doing it, which keeps the engine that
-sustains every other enchantment from being the only one that cannot grow.
+Every enchantment can level, because **every trigger costs something** (above).
+There is no enchantment in the game that fires for free, so there is none that
+sits at tier 1 forever.
 
 ### Tier is uncapped, because the pool is the cap
 
@@ -463,7 +498,7 @@ Potency values are before INT scaling.
 | Arcane Edge | 30 | 8 | Hit | Bonus damage — **the wizard-DPS core** |
 | Vampiric | 20 | 10 | Crit | Heal the wielder for damage dealt |
 | Flaring | 15 | 5 | Hit | Apply Poison |
-| Siphon | 20 | 0 | Kill | Restore mana — the engine that sustains the rest |
+| Siphon | 20 | 5 | Kill | Restore mana, net positive — the engine that sustains the rest |
 | Weightless | 25 | 5 | Attack | Attacks cost less movement |
 | Warding | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | Echoing | 20 | 15 | Attack | The weapon's class feature triggers once more |

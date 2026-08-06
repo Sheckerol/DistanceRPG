@@ -201,14 +201,13 @@
 - **Does `Block` or the type chart apply first?** §3.5 flags it; the numbers
   differ and the answer is a decision, not a derivation. Crits already bypass
   `Block` entirely (§1.6), so the interesting case is a resisted crit.
-- **Where exactly does the mana-bound / movement-bound crossover sit?** The
-  whole `Resonant` trade (§1.3) depends on there being a crossover at all — if a
-  caster is movement-bound from `Resonant ×1`, efficiency is pure downside on the
-  levelling axis, and if they never stop being mana-bound even at `×8`, it is
-  pure upside. The interesting shape needs the crossover somewhere in the middle
-  of the stack range, which is a joint constraint on cast cost (40), mana cost
-  (15–25), the movement budget (160) and the regen rate. None of those four were
-  chosen with this in mind, so at least one probably has to move.
+- **What is the mana regen rate `r`?** This is now the load-bearing caster
+  constant, and the only one. §1.3 assumes roughly **1 mana per point of unspent
+  movement** — 40 movement banked is 40 mana, about two casts. Too low and every
+  caster is pool-limited, mana becomes a countdown rather than an economy, and
+  the `Resonant` trade collapses into "everyone takes it". Too high and casting
+  is free. It was never chosen with any of this in mind and it interacts with
+  the movement budget (160), cast cost (40) and mana costs (15–25) at once.
 - **Does `Resonant` on a wand mean something different in practice?** Wand
   proficiency XP is total damage across the shape (§2.2), so a cheap wand levels
   the *weapon* fast while levelling its *element* slowly. A staff has no such
@@ -273,3 +272,14 @@
   measures casters by. The setting is worked out elsewhere; what is open is how
   much of it the game *says* versus implies through mechanics. Only the
   mechanically load-bearing parts belong in these documents.
+- **How many unique enchantments, and what are they?** §1.5 establishes the
+  shape — one that exists nowhere else, transferable but never catalogued — and
+  names none. A wand unique implies at least a fifth damage type outside the
+  four-type chart (§1.4), which is a real question: does it sit outside the
+  opposition table entirely, unresisted and unamplified, or does it oppose
+  something? Unresisted is the simpler artifact and the stronger one.
+- **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
+  now costs 5 to do it, so its net depends on a restore value nobody has set.
+  Too close to 5 and the enchantment that sustains every other enchantment does
+  not sustain itself; the whole close-range wizard build (§3.3) rests on this
+  one number being comfortably positive.

@@ -32,7 +32,7 @@ static class ModifierRules               // the §1.1 table, one place only
     const int AcquiredHeadroom = 5;      // per modifier type, independently
     static int PerStack(ModifierType t);
     static int Offset(ModifierType t);   // CritMultiplier 2, Charges 1, else 0
-    static int MaxForged(ModifierType t);// Light 1, else 3  — §1.1
+    static int MaxForged(ModifierType t);// Light 1, Resonant 1, else 3 — §1.1
 
     // Declared one direction only; the symmetric closure is built at static
     // init, so a pair is one line and can never be half-declared.
@@ -93,8 +93,10 @@ regression rather than a tuning change.
 `CritMultiplier`'s base ×2, `Charges`'s first throw. `MaxForged` is the *other*
 tool, and it is checked when a weapon is **built** — variant tables, unique
 tables, boss theming, all of which are data — rather than in `With`, since it
-constrains the forge and never acquisition. Two values: `Light` at 1, everything
-else at 3.
+constrains the forge and never acquisition. Two values: the currency pair
+(`Light`, `Resonant`) at 1, everything else at 3. They share the limit because
+they share a shape and exclude each other (§1.1); capping one alone would make
+the other the better pick by a stack.
 
 **`Excludes` is a table rather than a group enum**, and that is deliberate. A
 `Group(t)` returning `reaction | displacement | none` forces every exclusion to

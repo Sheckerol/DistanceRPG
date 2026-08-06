@@ -147,12 +147,32 @@ this (base ×2, +1 per stack), so the shape has precedent.
 bound the *forged* contribution instead. The ceiling comes down without any
 stack becoming dead, and the modifier stays fully reachable through play.
 
-Two forge limits exist, and they are the only hard numbers in the system:
+Three forge limits exist, and they are the only hard numbers in the system:
 
 | Limit | Applies to | Effect |
 | --- | --- | --- |
 | **A unique is a variant with one modifier raised to `×3`** | Every unique (§1.5) | Nothing is forged past `×3`, so `×8` is the universal ceiling |
 | **No weapon may be forged past `Light ×1`** | Everything, uniques included | `Light` ceilings at `×6`, a 60% discount — dagger at 12, axe at 24 |
+| **No weapon may be forged past `Resonant ×1`** | Everything, uniques included | `Resonant` ceilings at `×6`, a 60% mana discount |
+
+**The two discounts take the same limit because they are the same modifier.**
+`Light` and `Resonant` are one shape pointed at the game's two currencies
+(§1.1), they exclude each other, and a forge limit on one without the other
+would have made the mana half quietly the stronger pick — a caster forged
+`Resonant ×2` would reach `×7` where an Efficiency weapon stops at `×6`.
+
+It costs the casters nothing they wanted. A baseline `Resonant ×1` is unchanged;
+what is now impossible is a *Purity staff* — a second forged stack of the
+signature — which the casters never had anyway, since §1.2 exempts them from the
+four-role frame and their variants differ by effect and shape instead.
+
+What it does settle is **caster uniques**. §1.5 derives a unique by raising one
+forged modifier to `×3`, and `Resonant` is now structurally ineligible, so a
+caster unique is *forced* onto its enchantment. That is exactly the parallel an
+Efficiency unique already runs: it cannot raise its own `Light` either, and gets
+pushed onto the class signature instead. One rule, two classes, no special case
+— and it means nobody has to argue that "a staff that costs less mana" is a poor
+legend, because the forge cannot produce one.
 
 ### What a weapon may hold: three relations
 
@@ -214,7 +234,7 @@ Efficiency variant carrying the other, and neither can be grafted onto a caster,
 since every caster is forged `Resonant ×1`.
 
 There is a levelling consequence too, and it points the same way. Both modifiers
-reduce **mana moved**, which is enchantment XP (§3.3), so a weapon carrying both
+reduce **mana spent**, which is enchantment XP (§3.3), so a weapon carrying both
 would be the cheapest thing in the game to operate *and* the slowest to grow —
 an extreme at both ends rather than a position on the trade §1.3 describes.
 

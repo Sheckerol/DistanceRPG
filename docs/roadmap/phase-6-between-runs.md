@@ -275,7 +275,7 @@ intact, because there is nothing left to take.
 
 The tier loss is what stops transfer being free re-rolling, and it is now the
 only place a tier can go *backwards*. It also bites hardest exactly where it
-should: a tier-6 enchantment represents hundreds of points of mana moved through
+should: a tier-6 enchantment represents hundreds of points of mana spent through
 it, and a move throws away the last and most expensive of those tiers. A shallow
 soul travels cheaply; a deep one is most of the reason you keep the body.
 
