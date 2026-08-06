@@ -342,7 +342,7 @@
 - **How much of an enchantment's effect can `EffectKind` express?** §5.6 has an
   entry name a behaviour and supply parameters, which works cleanly for Arcane
   (damage), Vampiric (heal by damage dealt) and the elements. It works less
-  obviously for `Warding` (survive at 1 HP), `Momentum` (refund part of a
+  obviously for `Sturdy` (survive at 1 HP), `Momentum` (refund part of a
   swing's movement), `Overheal` (intercept surplus healing) and `Echoing`
   (trigger the weapon's class feature again) —
   each of which reaches into a different system. Either `EffectKind` becomes a

@@ -93,7 +93,7 @@ identity kept in the field that suits it:
 
 | | The enchantment is | Rolled? |
 | --- | --- | --- |
-| **Staff** | The effect it casts — Poison, Sturdy, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
+| **Staff** | The effect it casts — Poison, Ward, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
 | **Wand** | Its damage type — Flaming, Shocking, Acidic, Cold (§1.4) | **Yes.** Uniform among four |
 
 A staff *is* its effect, so rolling it would make a Staff of Blight stop being
@@ -642,7 +642,7 @@ differ in what they apply and what it costs in mana.
 | Variant | Name | Target | Mana | Applies |
 | --- | --- | --- | --- | --- |
 | Buff | Staff of Renewal | Ally | 15 | **Regeneration** — heals per turn, decaying |
-| Buff | Staff of the Aegis | Ally | 20 | **Sturdy** — applies `Ward`, which absorbs damage until spent |
+| Buff | Staff of Warding | Ally | 20 | **Ward** — absorbs damage until spent |
 | Debuff | Staff of Blight | Enemy | 20 | **Poison** — damage per turn, decaying |
 | Debuff | Staff of Mire | Enemy | 25 | **Mire** — cuts the target's movement budget |
 
@@ -1030,7 +1030,7 @@ Everything else is unchanged.
 
 | Unique | Class | Built from | Modifiers | Enchantment | Reads as |
 | --- | --- | --- | --- | --- | --- |
-| The Bulwark | Sword | Tower Guard | `Block ×3, Push ×1` | **Warding** | Absorbs 9, shoves what it stops, and refuses to let you die |
+| The Bulwark | Sword | Tower Guard | `Block ×3, Push ×1` | **Sturdy** | Absorbs 9, shoves what it stops, and refuses to let you die |
 | Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | **Weightless** | Four throws that barely cost anything to make |
 | Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunist ×1, Splitting ×3` | **Momentum** | Ignores 9 Block across the swing, and every kill pays for the next |
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | **Siphon** | Finds the gap on 17+, and every kill funds the enchantments doing it |
@@ -1038,7 +1038,7 @@ Everything else is unchanged.
 | Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | *Piercing* | +3 a tile, and the shot does not stop at the first body |
 
 **The four named enchantments each answer their weapon's own logic**, which is
-the test a pairing has to pass. `Warding` on the shield that already refuses
+the test a pairing has to pass. `Sturdy` on the shield that already refuses
 damage. `Weightless` on the class hard-capped by throws-per-turn, where cheaper
 throws are the one thing `Charges` cannot give it. `Momentum` on the axe that
 kills several things at once, so the refund fires several times. `Siphon` on the
@@ -1293,7 +1293,7 @@ both are worth keeping:
 | **Rotwood** — tier 3 | Depth | Mana, spent casting (§3.3) |
 | **The Long Candle** — two enchantments | Breadth | Runs of downtime (§6.2) |
 
-Neither bends a rule the way `Warding` or `Siphon` does. They are artifacts
+Neither bends a rule the way `Sturdy` or `Siphon` does. They are artifacts
 because of the *work already in them*, not because they do something the game
 otherwise forbids — and not every artifact should break the frame. "Somebody
 carried this for a very long time" is a legitimate thing for an item to be.

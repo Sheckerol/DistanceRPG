@@ -67,12 +67,12 @@
   uniques get that *and* one modifier at `×3`; caster uniques get only the
   enchantment, since `Resonant` cannot be forged past `×1`. So the caster case
   stopped being an exception and became the rule. `Siphon`, `Weightless`,
-  `Warding`, `Momentum` and `Overheal` are unique-level and out of the
+  `Sturdy`, `Momentum` and `Overheal` are unique-level and out of the
   catalogue.
 - **The test for unique-level is "does it break the frame", not "is it strong".**
   All four bend something the game is built on — Siphon breaks mana's dependence
   on unspent movement, Weightless and Momentum refund the game's currency,
-  Warding denies death, Overheal un-wastes surplus healing. An enchantment that
+  Sturdy denies death, Overheal un-wastes surplus healing. An enchantment that
   merely deals more damage is a
   catalogue entry however much damage it deals.
 - **A unique enchantment is transferable but never catalogued.** The enchanter
@@ -518,8 +518,9 @@
   surplus stops being wasted for *survival* while staying wasted for
   *progression*, and a healer cannot farm CON off a full-HP party. Its best use
   is paired with `Vampiric` on a weapon that never heals anyone otherwise.
-- **The `Ward` enchantment is renamed `Sturdy`**, and its staff to the **Staff
-  of the Aegis**. The status it applies is still `Ward`. This settles the
-  one-letter collision with the Bulwark's `Warding`, which does something
-  completely different (survive at 1 HP), and keeps the status name for the
-  thing `Overheal` pours into.
+- **The Bulwark's enchantment is `Sturdy`**, not `Warding`. That settles the
+  one-letter collision with the staff's `Ward` by renaming the *rarer* of the
+  two, so the catalogue entry and the `Ward` status it applies both keep the
+  obvious name — and `Ward` stays free for the thing `Overheal` pours into.
+  One rename instead of two, and `Sturdy` reads better on a shield that refuses
+  to die than `Warding` ever did.

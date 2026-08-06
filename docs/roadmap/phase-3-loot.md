@@ -577,7 +577,7 @@ dagger, the fighter's warstaff. Nothing keys off `WeaponClass`.
 
 The one place class enters is the **drop roll** (§3.1), and even there it only
 sets the odds of arriving with one, never which one. A staff is guaranteed an
-enchantment; it is not guaranteed a *caster's* enchantment, and Sturdy on a
+enchantment; it is not guaranteed a *caster's* enchantment, and Ward on a
 Staff of Mire is a perfectly ordinary drop.
 
 ### Starting set
@@ -595,7 +595,7 @@ Potency values are before INT scaling.
 | **Acidic** | 20 | 5 | Hit | Acidic damage |
 | **Cold** | 20 | 5 | Hit | Cold damage |
 | **Regeneration** | 15 | 5 | Hit | Heals per turn, decaying — Staff of Renewal's |
-| **Sturdy** | 20 | 5 | Hit | Applies `Ward`, absorbing damage until spent — the Aegis staff's |
+| **Ward** | 20 | 5 | Hit | Absorbs damage until spent — the Staff of Warding's |
 | **Poison** | 20 | 5 | Hit | Damage per turn, decaying — Staff of Blight's |
 | **Mire** | 25 | 5 | Hit | Cuts the target's movement budget — Staff of Mire's |
 
@@ -641,14 +641,14 @@ cannot be chosen at the enchanter, and cannot be copied:
 | --- | --- | --- | --- | --- |
 | **Siphon** | 20 | 5 | Kill | Restore mana, net positive |
 | **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
-| **Warding** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
+| **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
 | **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` instead of losing it |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
 movement. `Weightless` and `Momentum` refund the movement that *is* the game's
-currency. `Warding` denies death. `Overheal` un-wastes the one resource the
+currency. `Sturdy` denies death. `Overheal` un-wastes the one resource the
 design deliberately throws away. None of them is merely a larger number, and
 none of them belongs in a list the enchanter can hand out on request.
 
@@ -707,7 +707,7 @@ first things that are not numbers. The distinction is exact:
 | **A catalogue enchantment** | A bigger magnitude — more damage, more healing, a deeper effect | Yes. That is what per-tier values are for |
 | **A unique enchantment** | A rule being *more true* | **No.** There is no safe multiple of "deny death" |
 
-Read the four and it is obvious there is nothing to tune. What is `Warding` at
+Read them and it is obvious there is nothing to tune. What is `Sturdy` at
 tier 5 — survive five lethal hits? What is `Momentum` at tier 6 — a refund
 larger than the swing, which is the exact loop §1.1 exiled it from the modifier
 table to prevent? `Siphon` deep enough returns more mana than the fight costs
@@ -731,7 +731,7 @@ item.
 
 And it keeps the artifact honest in a way a scaling one could not: **the
 enchantment is as good on the day you find it as it will ever be.** There is no
-version of `Warding` you have to grind toward before it is the real `Warding`.
+version of `Sturdy` you have to grind toward before it is the real `Sturdy`.
 
 **The weapon around it is the opposite**, and the distinction is worth being
 exact about. A unique's whole forged spread caps at `×8` with five stacks of
