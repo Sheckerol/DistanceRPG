@@ -270,5 +270,6 @@
 - **How much of the enchanter's role is spoken aloud?** The premise implies he
   is a real character with a stake, not a service counter — he spends his own
   mana to train the party, and the BBEG outclasses him on the one axis the game
-  measures casters by. None of that is written, and how much of it the game says
-  versus implies through mechanics is a writing decision nobody has made.
+  measures casters by. The setting is worked out elsewhere; what is open is how
+  much of it the game *says* versus implies through mechanics. Only the
+  mechanically load-bearing parts belong in these documents.

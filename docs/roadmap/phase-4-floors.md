@@ -173,6 +173,13 @@ floor you beat it on.** A floor-5 clear locks it for 5 runs, a floor-10 clear
 for 10, counted by the same events that tick the enchanter (§6.3) so there is no
 second clock to track.
 
+**A dungeon is powered, and killing its boss unpowers it.** That is the same
+fact the tutorial rests on (below): depth is a mana budget, so a ten-floor
+dungeon represents more of the BBEG's pool than a five-floor one and takes
+proportionally longer to restore. The cooldown is not an arbitrary lockout — it
+is somebody rebuilding what you broke, and the bigger the thing you broke, the
+longer it takes.
+
 The depth that paid you is the depth that takes it away, which is what stops
 "deeper is better" from being the whole story. A deep dungeon is a bigger haul
 and a longer absence; a shallow one is a modest haul you can go back to soon.
@@ -376,9 +383,9 @@ Every other dungeon is picked from the hub and comes back after its cooldown.
 
 The lore carries the asymmetry without a rule: the enchanter powers his dungeon
 down and returns to work, so it is *retired* rather than locked. A real dungeon
-is somebody else's and merely needs re-powering, which is why it comes back at
-all — and plausibly why deeper ones take longer to (§4.3). The tutorial is the
-only one whose operator had somewhere better to be.
+is somebody else's and merely needs **re-powering**, which is why it comes back
+at all — and why deeper ones take longer to. The tutorial is the only one whose
+operator had somewhere better to be.
 
 That makes it the one place where **rushing the boss permanently costs you
 something**. Farm the tutorial and you leave with Block-themed weapons no other

@@ -3,6 +3,14 @@
 Planned features beyond the current port. Everything here is a design target,
 not shipped behaviour — see the git history for what exists today.
 
+**This is a mechanics document, not the lore.** The setting is worked out
+elsewhere and most of it never touches these systems. Lore appears here only
+where it *earns* a rule — the enchanter powering the tutorial dungeon (§4.3) is
+the case, because it settles that dungeon's depth, its retirement and the
+workshop's availability at once. Anything narrative that does not decide a
+mechanic does not belong in these files, and nothing here should be treated as
+the canonical account of the world.
+
 Six phases, in dependency order. Each is one PR off up-to-date `main`, per the
 workflow rule in `CLAUDE.md`.
 
