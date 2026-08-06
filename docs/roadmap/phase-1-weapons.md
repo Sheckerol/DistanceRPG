@@ -691,7 +691,8 @@ costs mana (§3.3), so over any sustained fight:
 mana spent per turn  =  mana regained per turn  =  r × (160 − 40k)
 ```
 
-where `k` is how many times you cast and `r` is the regen rate. Read that line
+where `k` is how many times you cast and `r` is `1 / MovementUnitsPerMana`
+(below). Read that line
 carefully, because it settles the question on its own: **the more you cast, the
 less mana you can spend.** Casting consumes the movement that pays for casting.
 
@@ -701,8 +702,8 @@ side — and the right-hand side is the enchantment's XP (§3.3).
 | | `Resonant ×1` | `Resonant ×6` |
 | --- | --- | --- |
 | Mana per cast (staff, base 20) | 18 | 8 |
-| Sustainable casts a turn, `r = 1` | 2 | 3 |
-| **Mana spent a turn — the XP** | **36** | **24** |
+| Sustainable casts a turn, at `MovementUnitsPerMana 8` | 0 | **1** |
+| **Mana banked a turn while doing it** | 20 | 15 |
 
 **An efficient casting tool is genuinely harder to level up, and gives you more
 for every point you spend.** That is a real trade rather than a strictly-better
@@ -713,7 +714,7 @@ downside written into it rather than merely an opportunity cost.
 switching from mana-bound to movement-bound at some stack count, which made the
 whole trade hostage to a threshold nobody had placed. The steady state above is
 **monotone**: at every stack count, more efficiency means more casts and less
-mana through the enchantment. The regen rate `r` decides *where* the sustainable
+mana through the enchantment. `MovementUnitsPerMana` decides *where* the sustainable
 `k` lands, never whether the trade exists.
 
 It survives the lazy case too. A player who ignores the extra capacity and casts
@@ -746,13 +747,54 @@ is that the pool you grow is also the pool your locks eat (§3.3) — so the che
 staff builds the capacity to *carry* deep enchantments at the same rate it fails
 to level them.
 
-**`r` is the one constant this rests on**, and it is now the only thing about
-casters that has to be chosen carefully. It has to be large enough that a caster
-can sustain *some* casting off regen alone — otherwise every caster is
-pool-limited, mana is a countdown rather than an economy, and the trade above
-collapses into "everyone takes `Resonant`." Around **1 mana per point of unspent
-movement** is the shape the table assumes: 40 movement banked is 40 mana, which
-is roughly two casts' worth. See open questions.
+### The regen rate is a divisor, and it is in tiles-worth, not units-worth
+
+The constant is **`MovementUnitsPerMana`** — how much banked movement buys one
+mana — expressed as an integer divisor rather than a fractional rate, so the
+file reads correctly and nothing drifts:
+
+```
+manaRegained = unspentMovement / MovementUnitsPerMana
+```
+
+An earlier draft assumed roughly *one mana per unit*, which is a units-versus-
+tiles error of the exact kind §-standing-constraints warns about: movement is in
+logic units at **32 per tile**, so "1 per point" means 32 mana a tile and a full
+160-unit budget banking 160 mana a turn. That is not a trickle, it is a second
+income.
+
+**The intended shape is about 10 mana from a fully banked turn**, which is
+`MovementUnitsPerMana 16` — a tile of unheld movement is worth 2 mana. What that
+does to the steady state is worth seeing before it is fixed, because the
+sustainable cast rate is very sensitive to it:
+
+| `MovementUnitsPerMana` | Mana from a banked turn | Sustains 1 cast a turn at | Sustains 2 |
+| --- | --- | --- | --- |
+| 4 | 40 | any `Resonant` | `Resonant ×5` |
+| **8** | 20 | **`Resonant ×3`** | never |
+| **16** | 10 | never — even `×6` misses by half a point | never |
+
+At **16**, no caster ever sustains a cast off regen; mana is a pool you spend
+down over a run and top up slowly, and the pool is the only thing that matters.
+That is a coherent design — it makes casting a burst resource and makes max mana
+the caster's real stat — but it flattens the `Resonant` trade, because a
+pool-limited caster spends the same total mana whatever it costs per cast, and
+more efficiency is then simply more casts for the same XP.
+
+At **8**, the crossover lands at `Resonant ×3`, in the middle of the reachable
+range. Below it a caster drains and has to stop; at or above it they can cast
+once a turn forever. That is the version where the §1.3 trade has teeth — the
+efficient staff really does buy sustain, and really does bank less mana doing
+it.
+
+**The direction of the trade survives either way**, and that is worth being
+clear about: casting spends the movement that pays for casting, so more casts
+always means less banked and less XP, at any divisor. What the divisor decides
+is whether there is a *sustainable rate above zero* — an equilibrium to sit at —
+or whether every caster is simply draining a tank at different speeds.
+
+Recommendation is **8**; the stated intent is **16**; it is a one-line change in
+the tuning file (§5.3) either way, which is precisely why that file exists.
 
 ### The effect *is* the staff's enchantment
 

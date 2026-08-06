@@ -40,7 +40,7 @@ use this table to find the file a section lives in.
 | [phase-2-progression](docs/roadmap/phase-2-progression.md) | §2.1–2.3 | Innate stats, the three XP pools |
 | [phase-3-loot](docs/roadmap/phase-3-loot.md) | §3.1–3.5 | Drops, the repeat-kill ladder, enchantments, consumables |
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
-| [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.2 | What is stored, and in what format |
+| [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.3 | What is stored, in what format, and `tuning.json` |
 | [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.6 | Wear, the enchanter, service and grafting, the hub |
 | [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
 | [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
@@ -63,4 +63,10 @@ These hold for every phase:
   `Random.Shared` outside an injected delegate. Presentation subscribes to
   `TurnSystem` events; it never owns rules.
 - **Distances stay in logic units** (32 per tile). Conversion happens only at
-  the `WorldSpace` boundary.
+  the `WorldSpace` boundary. A constant that converts between units and anything
+  else says so **in its name** — `MovementUnitsPerMana`, not a bare rate. §1.3
+  had this wrong once by reasoning in tiles while the code counted units, and it
+  was a factor of 32.
+- **Tunable numbers live in `tuning.json`** (§5.3), read once at startup, never
+  hot-reloaded, always with a compiled fallback. Nothing the golden tests pin
+  may ever go in it.

@@ -61,7 +61,7 @@
 - **The `Resonant` trade has no crossover to tune.** In steady state
   `mana spent per turn = r × (160 − 40k)`, so casting consumes the movement that
   pays for casting: more efficiency buys more casts and therefore *less* mana
-  through the enchantment, monotonically. The regen rate `r` sets where the
+  through the enchantment, monotonically. `MovementUnitsPerMana` sets where the
   sustainable cast count lands, never whether the trade exists.
 - **Every unique carries an enchantment that exists nowhere else.** Martial
   uniques get that *and* one modifier at `×3`; caster uniques get only the
@@ -466,3 +466,11 @@
 - **A modifier on a value that varies across classes is proportional.** `Light`
   is −10% of the weapon's cost per stack, not a flat subtraction — attack costs
   span 20–60, and flat would zero out a dagger while barely touching an axe.
+- **Tunable numbers live in `tuning.json`** (§5.3) — read once at startup,
+  never hot-reloaded, compiled fallback for every missing key, scalars only.
+  Nothing the golden tests pin may ever appear in it, enforced by a test that
+  asserts the schema is disjoint from the parity-critical names. Ratios are
+  **integer divisors with the units in the name** (`MovementUnitsPerMana: 16`),
+  because §1.3 already made the tiles-versus-units error once and it was a
+  factor of 32. Saves record a hash of the values they were played under and
+  warn on mismatch rather than refusing.

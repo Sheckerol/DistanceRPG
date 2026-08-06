@@ -201,13 +201,14 @@
 - **Does `Block` or the type chart apply first?** §3.5 flags it; the numbers
   differ and the answer is a decision, not a derivation. Crits already bypass
   `Block` entirely (§1.6), so the interesting case is a resisted crit.
-- **What is the mana regen rate `r`?** This is now the load-bearing caster
-  constant, and the only one. §1.3 assumes roughly **1 mana per point of unspent
-  movement** — 40 movement banked is 40 mana, about two casts. Too low and every
-  caster is pool-limited, mana becomes a countdown rather than an economy, and
-  the `Resonant` trade collapses into "everyone takes it". Too high and casting
-  is free. It was never chosen with any of this in mind and it interacts with
-  the movement budget (160), cast cost (40) and mana costs (15–25) at once.
+- **`MovementUnitsPerMana`: 8 or 16?** The intent is 16 (about 10 mana from a
+  fully banked turn); the recommendation is 8. At 16 no caster ever sustains a
+  cast off regen, so mana is a pool spent down over a run and max mana is the
+  caster's real stat — coherent, but it flattens the `Resonant` trade, since a
+  pool-limited caster spends the same total mana whatever a cast costs. At 8 the
+  crossover lands at `Resonant ×3`, mid-range, and the trade has teeth (§1.3).
+  The *direction* of the trade holds either way. Now a one-line change in
+  `tuning.json` (§5.3), so this is a playtest rather than a decision.
 - **Does `Resonant` on a wand mean something different in practice?** Wand
   proficiency XP is total damage across the shape (§2.2), so a cheap wand levels
   the *weapon* fast while levelling its *element* slowly. A staff has no such
@@ -331,3 +332,10 @@
   (§4.5); this wants a beat on top of that — something that connects the crit to
   the jump in the same moment, or the funniest event in the game reads as
   a glitch.
+- **Which structural data eventually leaves the code?** `tuning.json` is scalars
+  only (§5.3), deliberately — weapon tables and the §1.1 relations carry
+  invariants that a hand-edited file could violate. But weapon statlines are the
+  thing a designer most wants to iterate on, and "recompile to try a spear at
+  50" is the same friction the tuning file exists to remove. A second, validated
+  data file with `Allowed`/`MaxForged` run over it at load is the obvious answer
+  and is deliberately not specced yet.
