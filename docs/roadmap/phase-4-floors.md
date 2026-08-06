@@ -44,8 +44,9 @@ bossFloor = 5 + new Mulberry32(mapSeed ^ BossSalt).NextInt(0, 5)
 ```
 
 **The roll is not disclosed.** It is fixed at entry but unknown to the player,
-who learns the depth only by reaching it. That matters — see the open question
-about re-entry scumming below.
+who learns the depth only by reaching it. That is what keeps the depth-scaled
+payout below from being scummable: you cannot re-enter until you see a floor
+you like, because a cleared dungeon is locked and a failed one re-rolls.
 
 ### Killing the boss stops resurrection
 
@@ -97,6 +98,84 @@ That is also the honest version of what dungeon selection is *for*. The point
 was never that off-class modifiers are unobtainable elsewhere — it is that the
 boss is the only way to get the one you **chose**, at full depth, on everything
 it drops. Choice and depth, not scarcity.
+
+### A deeper boss pays more
+
+The boss floor rolls 5–10, and **the drop carries one acquired stack per floor
+past 4**:
+
+| Boss floor | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Stacks on the drop | 1 | 2 | 3 | 4 | 5 | **6** |
+
+Distributed exactly as a farm's are (§3.2) — rolled among the modifiers the
+weapon is already forged with, the theme graft included, skipping any at its
+ceiling. What is *not* like a farm is that they are **guaranteed rather than
+rolled for**. A floor-10 boss hands you six stacks; twenty defeat cycles hand
+you an expected ten and might hand you four.
+
+That is the texture difference between the two ladders, and it is worth keeping
+sharp:
+
+| | Gives | Costs |
+| --- | --- | --- |
+| **Boss** | Certainty — a chosen theme, a known count | A descent, and the dungeon afterwards (below) |
+| **Farm** | Volume, and the unique lottery | Turns, and an enemy that gets stronger every cycle (§3.2) |
+
+**Six is deliberately short of ten.** A boss can never hand you as much as a
+well-farmed weapon, because **entering a dungeon is a choice and farming is
+not** — you pick the theme, you know what the drop will be forged with, and
+every weapon on the floor carries it. Certainty is already most of the reward,
+so it does not also get to be the largest one. The farm stays the only route to
+a *finished* weapon.
+
+It also settles what depth is worth without disclosing it. The floor roll stays
+hidden, so a deep dungeon is a harder run with a better payout **discovered**
+rather than chosen — you cannot scum for a shallow one, and finding out you are
+on floor 9 is now good news rather than merely a longer walk.
+
+**Service ticks do not scale with it.** A win still ticks once at any depth
+(§6.3). The tick rewards the *achievement*, which is binary — you killed a boss
+or you did not — and the drop rewards the *depth*. Splitting them keeps a
+floor-5 clear from feeling like a failed run while still making a floor-10 one
+the better prize.
+
+### A cleared dungeon goes on cooldown
+
+**Beating a dungeon's boss locks that dungeon for a number of runs equal to the
+floor you beat it on.** A floor-5 clear locks it for 5 runs, a floor-10 clear
+for 10, counted by the same events that tick the enchanter (§6.3) so there is no
+second clock to track.
+
+The depth that paid you is the depth that takes it away, which is what stops
+"deeper is better" from being the whole story. A deep dungeon is a bigger haul
+and a longer absence; a shallow one is a modest haul you can go back to soon.
+Neither dominates, and the run you actually got is the one you plan around.
+
+Three things this fixes, none of which a flat lockout would:
+
+- **Themes stay meaningful.** Without a cooldown the correct play is to run the
+  dungeon whose theme you want until every weapon you own carries it. Themes
+  would be a menu you visit once. With it, your stable ends up carrying the
+  themes of the dungeons you have *been able* to run, which is a campaign
+  history rather than a shopping list.
+- **The named unique stays rare.** Each themed dungeon can drop exactly one
+  unique (§1.5, and the Purity coincidence in Settled). A cooldown is the only
+  thing standing between that and farming the same boss for it.
+- **The stable gets a second job.** §6.2 builds a stable because weapons sit in
+  service. Now the *dungeons* rotate too, and a party geared for one theme has
+  to fight in another — which is where a deep bench stops being insurance and
+  becomes the point.
+
+**Failing does not lock anything.** The cooldown starts on a *clear*, so a
+dungeon that beat you is available immediately and as many times as you like.
+Losing costs you the run; it must not also cost you the option.
+
+**The tutorial never locks.** It is the one dungeon a player might have no
+alternative to, and locking a new party out of the only content they have
+learned to fight in would be the single worst thing this rule could do. It is
+also the only dungeon whose boss sits on a fixed floor (2), so the depth
+formula has nothing to say about it anyway.
 
 ### A themed boss cannot drop a class that will not take its theme
 
@@ -366,6 +445,23 @@ rebuilding geometry on transit.
 The resurrection block in `TurnSystem.StartPlayerTurn` (`TurnSystem.cs:530`)
 gets gated on `!BossDefeated`, which is the same flag that turns `EnemyDefeated`
 into a drop rather than just a `DefeatCount` increment.
+
+**Cooldowns are campaign state, not dungeon state.** A cleared dungeon outlives
+the `DungeonState` that was cleared, so `CampaignState` (§6.6) holds
+`Dictionary<DungeonId, int> LockedUntilRun` against its run counter — the same
+counter §6.3 already advances for service. A dungeon is selectable when
+`runCounter >= LockedUntilRun[id]`, absent means available, and the tutorial is
+simply never written to it.
+
+The hub's dungeon list therefore needs a **locked presentation with a countdown**
+rather than hiding entries. "Available in 4 runs" is information the player
+plans around; a dungeon that silently vanishes reads as a bug and makes the
+rotation impossible to think about.
+
+`BossFloor` has to survive into the drop resolution, since it sets both the
+stack count and the cooldown length. It is already on `DungeonState`; what is
+new is that leaving has to carry two numbers out to `CampaignState` rather than
+discarding everything.
 
 **The HUD must show `DefeatCount` on the enemy nameplate.** Farming with no
 visible reward until the extraction would read as broken otherwise — the player

@@ -80,6 +80,23 @@
   workshop.
 - **A run is successful when you kill the boss.** One boss per dungeon, on a
   floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
+- **A deeper boss pays more, and costs the dungeon for longer.** The drop
+  carries `bossFloor − 4` acquired stacks — 1 at floor 5, 6 at floor 10 —
+  distributed as a farm's are but **guaranteed** rather than rolled for. Six is
+  deliberately short of the farm's ten: entering a dungeon is a choice and
+  farming is not, so certainty is already most of the reward and does not also
+  get to be the largest. Service ticks stay at one per win, because the tick
+  rewards the achievement and the drop rewards the depth.
+- **Clearing a dungeon locks it for `bossFloor` runs.** The depth that paid you
+  is the depth that takes it away, so deep and shallow runs trade rather than
+  rank. Counted by the same events that tick the enchanter, so there is no
+  second clock. **Failing locks nothing** — a dungeon that beat you is available
+  immediately. **The tutorial never locks**, since it is the one dungeon a party
+  may have no alternative to.
+- **`Charges` is the only negative graft.** The sweep is done; nothing else in
+  the table takes something away at `×1`. Still worth a test asserting every
+  modifier's first stack is a non-decrease, so a future modifier cannot
+  reintroduce the shape unnoticed.
 - **A boss never rolls a unique, but its graft can produce one.** There is no
   unique roll on a boss kill — the repeat-kill ladder is the only place uniques
   are rolled. When the drop happens to roll the **Purity** variant of the theme

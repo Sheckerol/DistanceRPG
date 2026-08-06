@@ -23,18 +23,6 @@
   a nearly-dead ally, or a healer, costs more than clipping a fresh dummy.
   Weighting by remaining HP or by role would be more accurate — and more
   expensive, and harder to predict when baiting. Flat first.
-- **Is `Charges` the only negative graft?** ForgedOnly (§1.1) fixes the known
-  case, but the test that found it — *does a first stack of this take something
-  away?* — has not been run over the rest of the table. `Light` is the other
-  candidate worth checking, since a cost floor interacts with `Charges` in ways
-  §1.2 already flags. Worth a sweep before Phase 1 codes grafting, and worth a
-  test that asserts every modifier's `×1` is a non-decrease.
-- **Does a shallow boss pay the same as a deep one?** The boss floor rolls 5–10
-  on entry and a win ticks service once either way, so a floor-5 dungeon is
-  strictly cheaper than a floor-10 one for the same reward. Not disclosing the
-  roll stops players re-entering to scum for a shallow dungeon — you cannot
-  tell without descending — but if a hint ever surfaces the depth, ticks should
-  scale with boss depth instead.
 - **The golem's statline.** Themed drops are settled (§4.3) but the fight is
   not: HP, movement budget, whether it rolls a weapon like a dummy does, and
   how many `Block` stacks it carries innately. A slow, heavily armoured
@@ -50,10 +38,6 @@
   list grows, whether themes repeat. Phase 6 scope.
 - **Which debuff staff does D carry?** Blight (Poison) is the more legible
   demonstration; Mire (movement tax) is the more on-theme one for this game.
-- **Can you re-enter after killing the boss?** Leaving resets the dungeon
-  (§4.1), which re-rolls the boss floor and revives everything. So a cleared
-  dungeon cannot be returned to — clearing it is worth doing only for what you
-  can carry out in that visit.
 - **Is 24 the right carry limit?** The structure is settled — unified with the
   loadout, no haul bag — but the number is a guess. Too high and the extraction
   stops forcing choices; too low and a deep farm is mostly wasted. Needs play.
@@ -238,3 +222,23 @@
   working as intended, but it means the wizard's dagger has to be a non-
   Efficiency variant, and it is worth checking that does not quietly make one of
   the four dagger variants the only correct choice for the build.
+- **Are the cooldown and payout constants right?** Stacks are `bossFloor − 4`
+  and the lockout is `bossFloor` runs (§4.3); both are shaped correctly and
+  neither is tuned. The lockout in particular depends on a dungeon count nobody
+  has fixed — with four dungeons a 10-run lock is most of a rotation, and with
+  ten it is barely felt. The hub's size and this number have to be chosen
+  together.
+- **Does the cooldown want to be visible before you commit?** The boss floor is
+  hidden (§4.3), so you cannot know you are about to lock a dungeon for ten runs
+  rather than five until you are standing on floor 10 deciding whether to fight.
+  That is a genuinely interesting decision — take the deep payout and lose the
+  dungeon, or leave and keep it — but it only works if the player understands
+  the rule before it happens to them, which is a tutorial problem rather than a
+  design one.
+- **Can you decline to fight a boss you have found?** Following from the above:
+  leaving a dungeon resets it (§4.1), so walking away from a floor-10 boss costs
+  the run but avoids the lockout and re-rolls the depth next time. That may be
+  the correct out, or it may be an exploit that turns the hidden roll into a
+  re-rollable one at the price of a wasted run. Depends entirely on whether a
+  wasted run is expensive enough, which service ticks (§6.3) currently say it
+  is not.
