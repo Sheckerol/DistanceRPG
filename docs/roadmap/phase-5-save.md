@@ -97,67 +97,120 @@ question that matters: *are these the same numbers?*
 
 ## 5.4 The content files, and what they share
 
-Three files hold content: **`weapons.json`**, **`enchantments.json`**,
-**`dungeons.json`**. They are a different kind of thing from `tuning.json`,
-which is scalars — these carry **invariants**, so they are validated rather than
-clamped.
+Four files hold content: **`restricted.json`**, **`weapons.json`**,
+**`enchantments.json`**, **`dungeons.json`**. They are a different kind of thing
+from `tuning.json`, which is scalars — these carry **invariants**, so they are
+validated rather than clamped.
 
 ### The reason, and it is not that numbers become editable
 
 Numbers becoming editable is a convenience. The real gain is that **adding a
-mechanic stops being a content change.** The work splits, and only one part is
-code:
+mechanic stops being a content change.** The work splits four ways, and only one
+part is code:
 
-| What | Lives in | Why there |
+| Question | Answered by | Why there |
 | --- | --- | --- |
-| A modifier's or enchantment's **behaviour** | Code | It is a rule. `Brace` fires a retaliation; that has to run |
-| Its **per-stack or per-tier value** | `tuning.json` | It is a number |
-| Its **relations** — `Excludes`, `Requires`, `RequiresKind`, `ForgedOnly`, type opposition | Code | They are the invariants the content is checked *against*; editable relations could not validate editable content |
-| **Which weapons, dungeons and drops use it** | The content files | Content |
+| **What does it do?** | Code | It is a rule. `Brace` fires a retaliation; that has to run |
+| **What number?** | `tuning.json` | It is a scalar |
+| **What may it coexist with, and can it be rolled?** | `restricted.json` | It is a relation, and relations change every time a mechanic is added |
+| **Which weapons and dungeons use it?** | The content files | It is content |
 
 So adding a modifier is: implement the behaviour, price it, declare its
-relations — and it is then usable on any weapon in any spread, forever, without
-touching code again. Every existing weapon can adopt it in the same edit. That
-is the difference between a modifier *system* and a modifier *list*, and it is
-§1.1's uniformity finally paying out in the workflow rather than only in the
-design.
+relations — **and none of that last part is a recompile.** Every existing weapon
+can adopt it in the same edit. That is the difference between a modifier
+*system* and a modifier *list*, and it is §1.1's uniformity finally paying out
+in the workflow rather than only in the design.
+
+Relations were originally going to stay in code, on the reasoning that they are
+what validates the content and so cannot themselves be content. That was wrong,
+and specifically it was wrong in the way that mattered most: **if declaring a
+relation needs a recompile, then adding a modifier needs a recompile**, and the
+additive property the whole split exists to buy is not real. The validation
+concern is genuine but it is answered by validating the relations too (§5.5),
+not by freezing them.
 
 ### The shared contract
 
-All three follow the same rules, and it is worth stating once:
+All four follow the same rules, and it is worth stating once:
 
 - **Every entry has a stable string id.** Saves, drops, enemy states and the
   enchanter's seen-catalogue all store ids, never indices or positions.
   Reordering a file is then free and appending to one costs nothing.
 - **Validated at load against the predicates that already exist** — `Allowed`,
-  `MaxForged`, the type-opposition table. No new validation logic: the loader
-  asks the same questions the graft roll and the boss drop table ask.
+  `MaxForged`, the type-opposition table. No new validation logic for content:
+  the loader asks the same questions the graft roll and the boss drop table ask.
 - **Invalid content aborts startup**, naming the entry and the rule it broke.
   Not clamped, not skipped. A bad scalar in `tuning.json` is a bad balance
   number and the game still runs; a broken invariant is something every
   downstream caller assumes holds, and limping past it turns a typo into a
   crash somewhere unrelated.
 - **Nothing here touches the golden tests.** `TestData/distancerpg-golden.json`
-  pins map generation, fog and pathing — never statlines or drop tables. Worth
-  saying plainly, because "the content is data now" sounds like a parity concern
-  and is not.
+  pins map generation, fog and pathing — never statlines, relations or drop
+  tables. Worth saying plainly, because "the content is data now" sounds like a
+  parity concern and is not.
 
 ### Load order is a real constraint
 
 The files reference each other in one direction, so they load in one order:
 
 ```
-tuning.json  →  enchantments.json  →  weapons.json  →  dungeons.json
+tuning.json → restricted.json → enchantments.json → weapons.json → dungeons.json
 ```
 
+`restricted.json` is the predicates everything after it is checked against;
 `weapons.json` names enchantment ids for caster innates and unique souls;
-`dungeons.json` names a modifier for its theme and a damage type for its
-attunement, and its **drop table is computed from the weapon list** rather than
-read. A cycle here would be a design error rather than a loader problem — if
-content ever needs to reference forward, the thing it is reaching for probably
-belongs in code.
+`dungeons.json` names a modifier for its theme, and its **drop table is computed
+from the weapon list** rather than read. A cycle here would be a design error
+rather than a loader problem — if content ever needs to reference forward, the
+thing it is reaching for probably belongs in code.
 
-## 5.5 `weapons.json`
+## 5.5 `restricted.json` — what may coexist, and what may be rolled
+
+The relations from §1.1, for modifiers and enchantments alike, in one file:
+
+| Key | Holds | Shape |
+| --- | --- | --- |
+| `excludes` | The exclusion groups — threat zone, displacement, block response, crit rider, currency, and the opposed damage-type pairs | Arrays of ids; every member excludes every other |
+| `requires` | Dependencies — `Riposte` needs `Block`, a lingering element needs its element | id → array of ids |
+| `kind` | Weapon-type restrictions — `Brace` melee, `Overwatch` ranged | id → melee / ranged / caster |
+| `forgedOnly` | Deepenable if already present, **never added from zero** — `Charges` | Array of ids |
+| `neverRolled` | Never granted by any roll at all — the unique enchantments | Array of ids |
+
+**Groups are arrays rather than pairs**, which is what makes them readable. The
+threat zone is `["Brace", "Opportunist", "Overwatch"]` and the loader expands it
+to the six directed exclusions — so a group is one line, cannot be
+half-declared, and adding a fourth member to it is adding a word. That is the
+`Symmetric()` closure §1.7 already describes, moved to load time.
+
+The last two are deliberately separate, because they say different things.
+`forgedOnly` is about a modifier that would be *harmful* granted from nothing —
+a `Charges` on a bow is a cap where there was none (§1.1). `neverRolled` is
+about something that must stay scarce — a unique enchantment the enchanter
+cannot copy (§3.3). One is a safety rule, the other is an economy rule, and
+collapsing them would lose the reason either exists.
+
+### The file that validates everything else is validated first
+
+The original objection to relations-as-data was that editable relations cannot
+validate editable content. The answer is that `restricted.json` has its own
+well-formedness rules, checked before anything reads it:
+
+| Check | Why |
+| --- | --- |
+| Every id resolves to a real modifier or enchantment | A typo in a relation is a rule that silently does not apply |
+| No id excludes itself | Unsatisfiable, and always a mistake |
+| `excludes` closes symmetrically | Half-declared exclusions produce order-dependent bugs (§1.7) |
+| `requires` is acyclic | `A` needs `B` needs `A` can never be satisfied |
+| Nothing both requires and excludes the same id | That modifier can never legally exist |
+| Every `forgedOnly` id is forged on at least one weapon | Otherwise it is unreachable — a rule for nothing |
+
+Then the ordering does the rest. **Relations load before content, so a relations
+edit that invalidates an existing weapon aborts startup naming both** — the
+weapon that is now illegal *and* the rule that made it so. That is strictly
+better than freezing either: the pair is checked together, and the error tells
+you which of the two you meant to change.
+
+## 5.6 `weapons.json`
 
 The 32 weapons, the uniques, and the class baselines leave `Weapons.cs`.
 Statline, forged spread, area shape, innate enchantment id.
@@ -184,7 +237,7 @@ fixed in code rather than on the file's length. Adding a fifth variant to a clas
 would still shift it; that is a deliberate, rare change rather than an ordinary
 edit.
 
-## 5.6 `enchantments.json`
+## 5.7 `enchantments.json`
 
 The catalogue and the unique souls: lock, trigger cost, condition, base potency,
 effect reference, `unique` flag, and a damage type where the entry is elemental.
@@ -193,10 +246,17 @@ effect reference, `unique` flag, and a damage type where the entry is elemental.
 so an entry names an `EffectKind` and supplies parameters — the same shape as a
 modifier naming a behaviour it does not implement.
 
+**The `unique` flag says one thing only: the tier is pinned at 1** (§3.3). Its
+*roll-eligibility* lives in `restricted.json` under `neverRolled`, because that
+is the same question asked of `Charges` and belongs in the same place. The
+loader cross-checks the two and aborts if they disagree, so declaring one and
+forgetting the other is a startup error rather than a unique quietly appearing
+in the enchanter's catalogue.
+
 | Check | Rule | From |
 | --- | --- | --- |
 | Trigger cost is **never zero** | No enchantment fires free, ever | §3.3 |
-| Unique entries are tier-pinned and out of the catalogue | The enchanter cannot copy them | §3.3 |
+| `unique` entries appear in `neverRolled` | One question, one answer, cross-checked | §5.5 |
 | Damage-type opposition is symmetric and total | Four types, two pairs, every type opposed by exactly one | §1.4 |
 | A lingering element names an element that exists | Searing is nothing without its `Flaming` | §1.5 |
 | Every effect reference resolves to an `EffectKind` | A typo is not a silent no-op | — |
@@ -211,7 +271,7 @@ catalogue is a `HashSet` of enchantment ids in `CampaignState` (§3.5). If ids
 shift, a player's accumulated catalogue does not merely mis-sort — it silently
 becomes a set of different enchantments, or of nothing.
 
-## 5.7 `dungeons.json`
+## 5.8 `dungeons.json`
 
 Name, theme modifier, attunement, boss definition, floor range, and the flags
 the tutorial needs.
@@ -229,6 +289,10 @@ drop a class that will not take its theme, and that is `Allowed` run over the
 eight classes at load — so the file names a theme and the loader derives which
 classes remain. Authoring it by hand would let the two disagree, and the
 disagreement would look exactly like a drop-rate bug.
+
+It is also the clearest payoff from relations being data. A `restricted.json`
+edit that makes `Brace` legal on axes changes the Brace dungeon's drop table
+**with no other edit anywhere** — because the table was never written down.
 
 | Check | Rule | From |
 | --- | --- | --- |

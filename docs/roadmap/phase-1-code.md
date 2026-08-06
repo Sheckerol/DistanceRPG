@@ -98,6 +98,21 @@ constrains the forge and never acquisition. Two values: the currency pair
 they share a shape and exclude each other (§1.1); capping one alone would make
 the other the better pick by a stack.
 
+**The four relation tables are loaded from `restricted.json` (§5.5), not
+compiled.** They are shown as initialisers above because that is the clearest
+way to read them, but a modifier's relations change every time a modifier is
+added, and baking them in would mean adding a modifier is a recompile — which
+defeats the whole point of the content split. `ModifierRules` becomes a loaded
+singleton with the same shape and the same `Allowed`.
+
+Two things stay compiled regardless:
+
+- **`Allowed` itself**, since it is the predicate rather than the data.
+- **`Symmetric()`**, which now closes the file's exclusion *groups* at load. A
+  group is declared once as an array and expands to its directed pairs, so it is
+  still impossible to half-declare one — the property §1.1 wanted, arriving from
+  a file instead of a static initialiser.
+
 **`Excludes` is a table rather than a group enum**, and that is deliberate. A
 `Group(t)` returning `reaction | displacement | none` forces every exclusion to
 be transitive and to earn a name, which is fine for the two that exist and wrong

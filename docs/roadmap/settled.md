@@ -474,13 +474,27 @@
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
   warn on mismatch rather than refusing.
-- **Content lives in three validated files** (§5.4–5.7) — `weapons.json`,
-  `enchantments.json`, `dungeons.json` — loading in that order, since weapons
-  name enchantment ids and dungeons name modifiers. All three are checked at
-  load against the `Allowed`/`MaxForged`/opposition predicates that already
-  exist, so **no new validation code exists**; invalid content **aborts
-  startup** naming the entry and the rule, rather than clamping as `tuning.json`
-  does, because a broken invariant is not a bad balance number.
+- **Content lives in four validated files** (§5.4–5.8) — `restricted.json`,
+  `enchantments.json`, `weapons.json`, `dungeons.json` — loading in that order,
+  since relations validate everything, weapons name enchantment ids, and
+  dungeons name modifiers. Invalid content **aborts startup** naming the entry
+  and the rule, rather than clamping as `tuning.json` does, because a broken
+  invariant is not a bad balance number.
+- **Relations are data, not code.** `restricted.json` holds `excludes` (as
+  *groups*, expanded to directed pairs at load), `requires`, `kind`,
+  `forgedOnly` and `neverRolled`, for modifiers and enchantments alike. The
+  earlier reasoning — that relations validate content and so cannot be content —
+  was wrong in the way that mattered: if declaring a relation needs a recompile,
+  then **adding a modifier needs a recompile**, and the additive property the
+  split exists to buy is not real. The validation concern is answered by
+  validating the relations too (ids resolve, nothing excludes itself, `requires`
+  acyclic, nothing both requires and excludes the same id) and by loading them
+  **before** content — so a relations edit that invalidates a weapon aborts
+  naming *both*, which is better than freezing either.
+- **`forgedOnly` and `neverRolled` stay separate.** One is a safety rule
+  (`Charges` granted from zero would make a bow worse), the other an economy
+  rule (a unique enchantment the enchanter cannot copy). Collapsing them would
+  lose the reason either exists.
 - **Everything is referenced by stable string id, never index.** Adding a weapon
   otherwise re-rolls every enemy in every existing save; shifting an enchantment
   id silently turns a player's earned catalogue into a set of different
