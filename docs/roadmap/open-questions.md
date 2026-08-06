@@ -324,9 +324,10 @@
   against *every* target simultaneously, where a single-target weapon banks one.
   Either that is the area weapon's reward for being an area weapon, or the bonus
   wants capping to one target a swing.
-- **Does `Splitting` or a crit make clean kills too easy?** The bar is max HP
-  after mitigation, and crits bypass `Block` entirely (§1.6) while `Splitting`
-  ignores a chunk of it. So a crit weapon clean-kills armoured things a
-  higher-damage weapon cannot, which is probably correct — but it means crit
-  frequency quietly doubles as farm rate, and `CritWindow` is already the
-  narrowest-held modifier in the game.
+- **Does the accidental clean kill need surfacing?** Settled that it is a
+  feature (§3.2), but a player who does not understand *why* the dummy suddenly
+  jumped two cycles will read it as a bug rather than as their own natural 20.
+  The nameplate already has to show `DefeatCount` as both reward and threat
+  (§4.5); this wants a beat on top of that — something that connects the crit to
+  the jump in the same moment, or the funniest event in the game reads as
+  a glitch.

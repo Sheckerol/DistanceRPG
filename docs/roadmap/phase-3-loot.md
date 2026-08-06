@@ -114,6 +114,32 @@ rate; a grind weapon does not, and catches up only because the dummy eventually
 outgrows everyone's biggest hit. Two ways to farm, differing in *where* on the
 curve they are fast.
 
+### The accidental clean kill is the best thing about it
+
+Because the bar is measured **after mitigation** and crits bypass `Block`
+entirely (§1.6), a crit can clear a threshold the same weapon's ordinary swing
+cannot. That is not a leak to be closed. It is the rule's best moment, and it is
+worth being explicit about why.
+
+**A clean kill you did not plan is a consequence you did not choose.**
+`DefeatCount` is bidirectional — it is the drop *and* the threat — so a lucky
+natural 20 on a dummy you were already struggling with does not hand you a
+reward. It hands you **two cycles of statline on the thing that was already
+beating you**, plus two steps of the revival speed-up, and it comes back
+angrier in three turns instead of eight.
+
+Nothing else in the design produces that shape. Every other reward is something
+you decided to pursue: you chose the dungeon, chose the weapon to farm, chose
+when to stop. This one arrives on a d20 and immediately makes the room worse.
+The player who rolls it laughs and then has to deal with it, which is a better
+memory than any planned outcome.
+
+**So the variance is the point, and it needs no correction.** The usual worry
+about RNG driving a progression rate — that it rewards luck over decision — does
+not apply when the thing luck advances is *also* the thing that kills you. There
+is no version of this where a player farms crits for free value; there is only a
+version where they get further, faster, into something they have to survive.
+
 ### The ladder has no top; the danger curve is the top
 
 Two things accrue, on different shapes. **Stacks are rolled and run out; unique

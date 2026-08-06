@@ -119,6 +119,14 @@
   And it puts itself out of business by the most direct route: the bar *is* max
   HP, which revival scaling raises. It also makes **burst the farming build**, a
   distinction the classes did not previously have.
+- **The accidental clean kill is a feature, not a leak.** Crits bypass `Block`
+  (§1.6), so a natural 20 can clear a bar the same weapon's ordinary swing
+  cannot — landing two cycles of statline on a dummy that was already winning,
+  returning in three turns instead of eight. The usual objection to RNG driving
+  a progression rate does not apply when the thing luck advances is also the
+  thing that kills you: there is no free-value version, only a get-further-into-
+  trouble-faster version. It is the one reward in the design nobody chose to
+  pursue, which is exactly what makes it memorable.
 - **The total is quadratic in tier**, the only such term in the design, and it
   lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
   square, so halving it quarters the total — that is the correction if deep
