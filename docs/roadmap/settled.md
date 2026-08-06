@@ -108,14 +108,17 @@
   one-shot fights and fifteen-cycle fights minutes apart. It is tuned against
   the fights a *wand* is in, which are the long ones by construction.
   Starting point `1 / 1 / 2`: 12 damage over 3 turns at tier 6.
-- **A clean kill — full HP to zero in one hit — advances `DefeatCount` by 2.**
-  Short fights were paying the same as long ones; now the trivial fight is worth
-  exactly what it looks like. It needs no counterweight because `DefeatCount` is
-  already both reward and threat, so it buys two cycles of drop quality *and*
-  hands the dummy two cycles of statline. And it puts itself out of business:
-  revival HP eventually makes the dummy un-one-shottable, so the bonus
-  front-loads a farm and then stops. It also makes **burst the farming build**,
-  a distinction the classes did not previously have.
+- **A clean kill — a killing blow dealing at least the target's *max* HP —
+  advances `DefeatCount` by 2.** The test is the swing against their
+  constitution, not against whatever is left of them, which makes it uncheesable
+  (softening a target never brings a clean kill closer) and reduces it to one
+  comparison with no tracked state. Short fights were paying the same as long
+  ones; now the trivial fight is worth exactly what it looks like. It needs no
+  counterweight because `DefeatCount` is already both reward and threat, so it
+  buys two cycles of drop quality *and* hands the dummy two cycles of statline.
+  And it puts itself out of business by the most direct route: the bar *is* max
+  HP, which revival scaling raises. It also makes **burst the farming build**, a
+  distinction the classes did not previously have.
 - **The total is quadratic in tier**, the only such term in the design, and it
   lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
   square, so halving it quarters the total — that is the correction if deep

@@ -317,15 +317,16 @@
   close-range wizard runs on `Arcane` and movement regen alone — but the
   Widowmaker that carries it should be a genuinely different character, and that
   needs the number to be comfortably positive.
-- **Does a clean kill on an area weapon want a different rule?** A wand catching
-  six unfarmed dummies in one Nova would advance six `DefeatCount`s by 2 apiece
-  (§3.2). Wands deal 8 base so it is unlikely early, but a deep one with its
-  element levelled could do it — and the rule was written imagining a single axe
-  swing, not a room. Either it is fine because the wand paid for it in mana and
-  tier, or area weapons want the bonus capped to one target.
-- **Should a clean kill mean *before it acts* rather than from full HP?** From
-  full HP is simple and unfakeable. But the thing that actually makes a fight
-  free is the enemy never taking a turn, and those come apart — a dummy that has
-  already had a turn can still be at full HP if it missed or repositioned.
-  Turn-based would reward the ambush the fog and marching rules already build
-  toward, at the cost of a rule that needs explaining.
+- **Does a clean kill on an area weapon want a different rule?** A Nova clearing
+  six unfarmed dummies advances six `DefeatCount`s by 2 apiece (§3.2), and a
+  cleaving axe does the same across everything the swing caught. Both have to
+  clear each target's full max HP, which is a real bar — but they clear it
+  against *every* target simultaneously, where a single-target weapon banks one.
+  Either that is the area weapon's reward for being an area weapon, or the bonus
+  wants capping to one target a swing.
+- **Does `Splitting` or a crit make clean kills too easy?** The bar is max HP
+  after mitigation, and crits bypass `Block` entirely (§1.6) while `Splitting`
+  ignores a chunk of it. So a crit weapon clean-kills armoured things a
+  higher-damage weapon cannot, which is probably correct — but it means crit
+  frequency quietly doubles as farm rate, and `CritWindow` is already the
+  narrowest-held modifier in the game.

@@ -65,15 +65,33 @@ the way out, after the boss has stopped resurrection (§4.4).
 
 ### A clean kill counts twice
 
-**A defeat that takes the enemy from full HP to zero in a single hit advances
+**A killing blow that deals at least the target's *max* HP advances
 `DefeatCount` by 2.** Everything else advances it by 1.
+
+The test is the swing against the enemy's constitution, not against whatever is
+left of it — *could this have killed it outright?* A dummy already down to 3 HP
+takes 2 from a dagger and dies; that is a kill, not a clean one. The same dagger
+crits for 40 into a 24-HP dummy and it is clean whether the dummy was full or
+not.
 
 The problem it solves is that fights are not all the same length, and the short
 ones were paying the same as the long ones. An axe at proficiency, swinging into
 a dummy that has not been farmed up, simply deletes it — that is a fight the
-party won before it started, and the ladder had no way to say so. Now the trivial
-fight is *worth* something, and it is worth exactly what it looks like: twice as
-much progress for half as much fight.
+party won before it started, and the ladder had no way to say so. Now the
+trivial fight is *worth* something, and it is worth exactly what it looks like:
+twice as much progress for half as much fight.
+
+**Measuring against max HP rather than current is what makes it uncheesable.**
+The bar does not move, so nothing you do to a target beforehand brings a clean
+kill closer — softening it up makes the kill easier and the *clean* kill no more
+likely. It is purely a statement about your weapon against their constitution,
+which is exactly the thing the rule is trying to reward.
+
+It is also one comparison rather than a piece of tracked state. "From full HP to
+zero in one hit" was the first draft, and it is the same rule stated worse: at
+full HP, killing in one blow *means* dealing at least max HP. The general
+version subsumes it, needs no `wasAtFullHp` flag, and stops caring whether the
+enemy had already acted.
 
 **It accelerates the reward and the risk together, which is why it needs no
 counterweight.** `DefeatCount` already means two things at once (below) — the
@@ -82,17 +100,18 @@ buys two cycles of drop quality and hands the dummy two cycles of statline,
 including two steps of the revival speed-up. You are not skipping the cost; you
 are paying it faster.
 
-**And it puts itself out of business.** Every revival adds HP, so a dummy you
-could one-shot at `DefeatCount 2` is one you cannot at 8. The bonus therefore
-front-loads a farm and then stops — the early cycles blur past while the fight
-is trivial, and the late ones arrive one at a time exactly when each is a real
-fight. That is the shape the ladder wanted anyway, and it falls out rather than
-being scheduled.
+**And it puts itself out of business**, now by the most direct route available:
+the bar *is* max HP, and revival scaling raises max HP (§3.2). Every cycle that
+rolls Health lifts the threshold your swing has to clear, so a dummy you could
+clean-kill at `DefeatCount 2` is one you cannot at 10. The bonus front-loads a
+farm and then stops — early cycles blur past while the fight is trivial, late
+ones arrive one at a time exactly when each is a real fight. That is the shape
+the ladder wanted anyway, and it falls out of a rule written for another reason.
 
 It also makes **burst the farming build**, which is a real distinction the
 classes did not have. An axe or a crit dagger clears the early cycles at double
 rate; a grind weapon does not, and catches up only because the dummy eventually
-outgrows everyone's one-shot. Two ways to farm, differing in *where* on the
+outgrows everyone's biggest hit. Two ways to farm, differing in *where* on the
 curve they are fast.
 
 ### The ladder has no top; the danger curve is the top
@@ -338,12 +357,15 @@ it. Store the accumulated values on `EnemyState` alongside `DefeatCount` so
 saves round-trip without replaying rolls (§5.1), and roll on the loot stream's
 sibling — `mapSeed ^ ReviveSalt` — never a continuation of an existing one.
 
-**The clean-kill check needs the target's HP before the hit**, which the unified
-attack resolver (Phase 0) has and the defeat handler currently does not — today
-`EnemyDefeated` fires after the fact. Passing `wasAtFullHp` through with the
-defeat is cheaper than reconstructing it, and it is the same call site the
-revival roll already hangs off. Two revival rolls fire on a clean kill, not one,
-so the statline and the timer both advance twice.
+**The clean-kill check needs the *unclamped* damage**, not the amount actually
+subtracted — a 40-damage crit into a 24-HP dummy has to read as 40. The unified
+attack resolver (Phase 0) knows both; the defeat handler currently knows
+neither, since `EnemyDefeated` fires after the fact. Pass the post-mitigation,
+pre-clamp figure through with the defeat and compare it to `MaxHp` there.
+
+Two revival rolls fire on a clean kill rather than one, so the statline and the
+timer both advance twice — and since one of those rolls may add max HP, the two
+must resolve **in order** rather than both reading the pre-kill statline.
 
 **The scaling never stops, and that is what lets the drop ladder run forever
 too.** The reward curve flattens into pure probability once the stack allowance
