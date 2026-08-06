@@ -278,13 +278,14 @@
   simply the winning one, and unlike the DoTs it does not scale down against
   spread-out enemies — it lands fully on each. Worth checking against the
   friendly-fire scorer too, since an enemy wand with it would be brutal.
-- **Does an area DoT need a stacking rule?** A Nova catching the same enemy twice
-  in two turns applies it twice. Crit riders accumulate levels (§1.6) and
-  `Poison` decays; whether a lingering element refreshes, stacks or does nothing
-  on re-application is unspecified, and with an area weapon it comes up
-  constantly rather than occasionally. Sharper now that the tick tracks the
-  element's damage (§1.5): two stacks of a deep `Flaming` is a much larger
-  number than two stacks of a shallow one.
+- **Is `1` per Searing level right, given the total is quadratic?** Levels equal
+  the element's tier and decay one a turn, so a single application deals
+  `n(n+1)/2` — 21 at tier 6, on *every* target in the shape (§1.5). A Nova
+  catching six enemies is 126 damage from one cast. Nothing else in the design
+  has a quadratic term, and the counter-argument is only that tier is bought
+  with locked mana the wand also needs to fire. Half a point per level is the
+  obvious first correction; the alternative is levels equal to *half* the tier,
+  which reintroduces the plateaus §1.1 dislikes.
 - **What happens to a wand unique whose element is transferred off?** §1.5 says
   the lingering effect goes quiet, which is correct but harsh — the artifact
   becomes inert rather than merely worse, and nothing else in the design has

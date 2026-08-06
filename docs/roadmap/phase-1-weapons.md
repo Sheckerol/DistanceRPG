@@ -1117,35 +1117,68 @@ everything in the circle. That is the cleanest statement of what the two caster
 classes are for, and it arrives without inventing a single new effect for two of
 the four.
 
-### The DoT's magnitude comes from the element, not from itself
+### Levels, not a number: the element's tier is how deep it burns
 
-**What it ticks for is the element enchantment's own damage** (§3.3), not a
-separate number. Burning ticks for what `Flaming` hits for; Mire cuts movement
-in proportion to what `Shocking` hits for.
+**Applying a lingering element grants levels equal to the element enchantment's
+tier.** A `Flaming` tier-4 wand leaves **4 levels of Searing** on everything the
+shape caught; the same wand at tier 6 leaves 6.
 
-That resolves the tension the tier-1 cap (§3.3) would otherwise create. A unique
-enchantment cannot level — but this one does not need to, because **the rule and
-the magnitude live in different places**:
+Everything else follows the rider rules §1.6 already sets, and deliberately so —
+this is the same shape as `Sundered` and `Weakened` arriving from a different
+trigger:
+
+| | |
+| --- | --- |
+| **Per level** | `1` damage a turn |
+| **Re-application** | **Accumulates.** Hitting a burning target again adds levels rather than refreshing |
+| **Decay** | One level per turn, always |
+| **Cap** | None, exactly as §1.6 argues for the riders |
+
+So `Poison`, `Searing`, `Sundered` and `Weakened` are **one family with one
+model**: a level count that accumulates, ticks, and decays a level a turn. That
+is worth more than the individual effects — a player learns the rule once, and
+the HUD needs one presentation rather than four.
+
+### That resolves the tier-1 cap without breaking it
+
+A unique enchantment cannot level (§3.3), and this is why it does not need to:
+**the rule and the magnitude live in different places.**
 
 | | Is | Scales? |
 | --- | --- | --- |
 | The unique enchantment | "The element lingers" — a rule | **No.** Tier 1, always |
-| Its per-turn number | The element's damage — a magnitude | **Yes**, with the element's tier |
+| How deep it lingers | The element's tier, in levels | **Yes**, with the element |
 
-So the player still has somewhere to build: level your `Flaming`, and the
-Burning that `Flaming` feeds gets stronger with it. What never intensifies is
-the *statement* — the element lingers, it does not linger harder.
+Level your `Flaming` and the Searing it leaves goes deeper with it. What never
+intensifies is the *statement* — the element lingers, it does not linger harder.
 
-**It also makes the element a prerequisite.** Burning is nothing without
-`Flaming` on the same weapon to tell it what to tick for, which is `Requires`
-(§1.1) arriving in the enchantment system by necessity rather than by design.
-Transfer the `Flaming` off and the Burning goes quiet. The artifact is only an
-artifact while it is still a fire wand.
+**It also makes the element a prerequisite.** Searing is nothing without
+`Flaming` on the same weapon to say how many levels, which is `Requires` (§1.1)
+arriving in the enchantment system by necessity rather than design. Transfer the
+`Flaming` off and the burn goes quiet.
 
-And the area-DoT worry from §3.3 stays answered. The tick tracks a catalogue
-enchantment whose depth is already paid for out of the mana pool — the same
-budget bounding everything else — rather than compounding on a second, unpriced
-axis of its own.
+### The total is triangular, and that is the number to watch
+
+Levels tick and then decay, so `n` levels applied once deal
+**`n(n+1)/2`** before burning out:
+
+| Element tier | 1 | 2 | 4 | 6 | 8 |
+| --- | --- | --- | --- | --- | --- |
+| Levels applied | 1 | 2 | 4 | 6 | 8 |
+| **Total damage** | 1 | 3 | **10** | **21** | **36** |
+
+That is **quadratic in tier**, which no other effect in the game is, and it
+arrives on every target in the shape. It is the strongest single argument for
+the tier-1 cap on the unique enchantment — if the enchantment scaled *too*, the
+two would multiply.
+
+Whether quadratic is correct here is genuinely open. The argument for is that
+tier is bought with mana the wand also needs to fire, and a deep `Flaming` has
+locked most of a pool (§3.3), so the cost curve is steep in the same direction.
+The argument against is that a Nova hitting six enemies at tier 6 is 126 damage
+from one cast, spread over six turns, and nothing else in the design produces a
+number like that. **Per level is the dial**, exactly as it is for the riders, and
+it may want to be a half rather than a `1`.
 
 **The Long Candle is the third shape, and it is the neatest of the three.** A
 plasma beam is fire and lightning at once, so it carries `Shocking` and

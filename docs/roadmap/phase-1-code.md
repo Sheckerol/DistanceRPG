@@ -240,13 +240,18 @@ carrying a `DamageType` rather than a member per element. Shocking and Acidic
 need nothing new at all: they apply `Mire` and `Poison`, which the staves
 already bring.
 
-`Searing` is also the first status whose **magnitude is not stored on it**. It
-ticks for the source enchantment's damage, so the instance holds a reference to
-that enchantment rather than a number — which means levelling the element
-changes what already-applied ticks do, and means the effect has to handle its
-source having been transferred away mid-fight (§1.5). Worth deciding whether it
-snapshots on application or resolves live; live is the smaller data model and
-the stranger behaviour.
+`Searing` carries a **level count**, not a magnitude, so it needs no reference
+back to the enchantment that applied it — the element's tier is read once at
+application and converted to levels there (§1.5). That is the simpler data model
+*and* it sidesteps the transferred-away-mid-fight case entirely: levels already
+on a target are levels, whatever happens to the wand afterwards.
+
+Which means `Poison`, `Searing`, `Sundered` and `Weakened` all want the **same
+representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
+`TickStatusEffects` path: apply damage or effect proportional to `Levels`, then
+decrement. Four effects, one code path, one HUD presentation. Worth building
+that way from the start rather than converging on it after three of them exist
+separately.
 
 `Enchantment` gains a `bool Unique`. It gates two things and nothing else: the
 enchanter's catalogue skips it (§6.4), and `Tier` is pinned at 1 (§3.3). Both

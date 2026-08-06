@@ -92,11 +92,18 @@
   needed anything new, and they share one `StatusEffectType` carrying a
   `DamageType`. So a wand unique is *the staff's effect delivered over an area*,
   which is the cleanest statement of what the two caster classes are for.
-- **The lingering effect ticks for the element enchantment's own damage**, not a
-  number of its own. That is what makes the tier-1 cap survivable: the rule
-  ("the element lingers") is fixed, the magnitude rides a catalogue enchantment
-  that levels normally. It also makes the element a **prerequisite** — transfer
-  the `Flaming` off and the Burning goes quiet.
+- **A lingering element applies levels equal to the element's tier** — a tier-4
+  `Flaming` wand leaves 4 levels of Searing. Levels **accumulate** on
+  re-application, decay one a turn, tick `1` each, and have no cap: the exact
+  rider model §1.6 already sets, so `Poison`, `Searing`, `Sundered` and
+  `Weakened` are one family with one model. That is what makes the tier-1 cap
+  survivable — the rule ("the element lingers") is fixed while the depth rides
+  a catalogue enchantment that levels normally. It also makes the element a
+  **prerequisite**: transfer the `Flaming` off and the burn goes quiet.
+- **The lingering total is triangular** — `n` levels deal `n(n+1)/2` before
+  decaying out, so 21 at tier 6, on every target in the shape. Quadratic in
+  tier, which nothing else in the game is. Per level is the dial if it proves
+  too much, exactly as for the riders.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
   non-opposing catalogue entries** (the only place a drop carries more than one).
