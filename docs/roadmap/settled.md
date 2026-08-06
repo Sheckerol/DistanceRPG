@@ -63,11 +63,26 @@
   pays for casting: more efficiency buys more casts and therefore *less* mana
   through the enchantment, monotonically. The regen rate `r` sets where the
   sustainable cast count lands, never whether the trade exists.
-- **A caster unique's advantage is its enchantment** — either a catalogue one at
-  tier 3 (levelling somebody else already did) or a **unique enchantment** that
-  exists nowhere else. A unique enchantment can be **transferred but never
-  catalogued**: the enchanter copies from what you have seen, and there is no
-  second one of these to copy.
+- **Every unique carries an enchantment that exists nowhere else.** Martial
+  uniques get that *and* one modifier at `×3`; caster uniques get only the
+  enchantment, since `Resonant` cannot be forged past `×1`. So the caster case
+  stopped being an exception and became the rule. `Siphon`, `Weightless`,
+  `Warding` and `Momentum` are unique-level and out of the catalogue.
+- **The test for unique-level is "does it break the frame", not "is it strong".**
+  All four bend something the game is built on — Siphon breaks mana's dependence
+  on unspent movement, Weightless and Momentum refund the game's currency,
+  Warding denies death. An enchantment that merely deals more damage is a
+  catalogue entry however much damage it deals.
+- **A unique enchantment is transferable but never catalogued.** The enchanter
+  copies what you have seen; there is nothing to copy here, only the one that
+  exists.
+- **Caster uniques take one of three shapes** — a unique enchantment, a
+  catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
+  non-opposing catalogue entries** (the only place a drop carries more than one).
+  The Long Candle is the third: a plasma beam carrying `Shocking + Flaming`. The
+  last two are the same idea on the two axes — somebody else already paid the
+  mana for depth, or the downtime for breadth — and neither bends a rule, which
+  is deliberate. Not every artifact should break the frame.
 - **`Light` and `Resonant` exclude each other** — the **currency** group. Mana
   regenerates from movement left unspent, so cheap movement is already cheap
   mana by the long route; a weapon with both compounds one discount with itself.
@@ -87,11 +102,18 @@
   staff's is fixed by variant, because a staff is its effect; the wand's is
   rolled, because a wand is its shape. So a staff levels the effect it casts by
   casting it, and that effect can be transferred onto a dagger.
-- **Four damage types, two opposed pairs** — Flame/Frost, Storm/Stone. Against a
-  target's attunement: same halved, opposed ×1.5, otherwise unchanged.
-  Attunement belongs to the **themed floor**, not to individual enemies, so the
-  counter is knowable before descending. Halved rather than nullified, because
-  nothing in this game has a zero.
+- **Four damage types, two opposed pairs** — Flaming/Cold, Shocking/Acidic. All
+  four are ordinary catalogue enchantments. Against a target's attunement: same
+  halved, opposed ×1.5, otherwise unchanged. Attunement belongs to the **themed
+  floor**, not to individual enemies, so the counter is knowable before
+  descending. Halved rather than nullified, because nothing in this game has a
+  zero.
+- **`Arcane` (was `Arcane Edge`) is elementless**, so the chart never touches it
+  — the safe damage enchantment against four situational ones. Renamed because
+  it goes on wands, which have no edge.
+- **Only opposed enchantments exclude each other.** Any non-opposing combination
+  may share a weapon; the lock budget is what actually limits breadth, so a
+  second rule would be a cap by another name.
 - **Wear is a resource, not damage.** Nothing breaks; using a weapon is what
   makes it enchantable.
 - **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so

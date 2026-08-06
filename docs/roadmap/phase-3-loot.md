@@ -429,7 +429,7 @@ sits at tier 1 forever.
 ### Tier is uncapped, because the pool is the cap
 
 Lock and potency both scale linearly with tier — `lock × tier`,
-`potency × tier` — so a tier-3 Arcane Edge locks 90 and a tier-6 locks 180. The
+`potency × tier` — so a tier-3 Arcane locks 90 and a tier-6 locks 180. The
 enchantment never stops improving and never needs a ceiling, because every tier
 it earns is a tier's worth of pool you can no longer spend on anything else.
 
@@ -437,7 +437,7 @@ it earns is a tier's worth of pool you can no longer spend on anything else.
 mana; the tier that spending buys locks more of the pool that mana comes from.
 So the deeper an enchantment gets, the smaller the remainder available to feed
 it, and the climb slows on its own with no curve authored anywhere. A tier-6
-Arcane Edge on a 200-pool wizard has 20 mana left to fire with, which is two
+Arcane on a 200-pool wizard has 20 mana left to fire with, which is two
 more triggers and then nothing — the enchantment has very nearly eaten the
 character that grew it.
 
@@ -495,26 +495,96 @@ Potency values are before INT scaling.
 
 | Enchantment | Lock | Trigger | Fires on | Effect |
 | --- | --- | --- | --- | --- |
-| Arcane Edge | 30 | 8 | Hit | Bonus damage — **the wizard-DPS core** |
-| Vampiric | 20 | 10 | Crit | Heal the wielder for damage dealt |
-| Flaring | 15 | 5 | Hit | Apply Poison |
-| Siphon | 20 | 5 | Kill | Restore mana, net positive — the engine that sustains the rest |
-| Weightless | 25 | 5 | Attack | Attacks cost less movement |
-| Warding | 30 | 40 | Lethal damage | Survive at 1 HP instead |
-| Echoing | 20 | 15 | Attack | The weapon's class feature triggers once more |
-| Shattering | 25 | 10 | Crit | Crit riders (§1.6) land one level deeper |
-| Momentum | 30 | 10 | Kill | Refund part of the swing's movement cost |
+| **Arcane** | 30 | 8 | Hit | Bonus damage — **the wizard-DPS core** |
+| **Vampiric** | 20 | 10 | Crit | Heal the wielder for damage dealt |
+| **Echoing** | 20 | 15 | Attack | The weapon's class feature triggers once more |
+| **Shattering** | 25 | 10 | Crit | Crit riders (§1.6) land one level deeper |
+| **Flaming** | 20 | 5 | Hit | Flaming damage; the type chart applies (§1.4) |
+| **Shocking** | 20 | 5 | Hit | Shocking damage |
+| **Acidic** | 20 | 5 | Hit | Acidic damage |
+| **Cold** | 20 | 5 | Hit | Cold damage |
+| **Regeneration** | 15 | 5 | Hit | Heals per turn, decaying — Staff of Renewal's |
+| **Ward** | 20 | 5 | Hit | Absorbs damage until spent — Staff of Warding's |
+| **Poison** | 20 | 5 | Hit | Damage per turn, decaying — Staff of Blight's |
+| **Mire** | 25 | 5 | Hit | Cuts the target's movement budget — Staff of Mire's |
 
-**This table and the staff effects are one catalogue.** `Flaring` is the Staff
-of Blight's enchantment written from the other end (§1.3), and the same holds
-for Ward, Mire and Regeneration — a staff variant is a guaranteed *source* of an
-entry here, not a parallel system. A cast is a hit, so an effect fires the same
-way wherever it ends up.
+**`Arcane` was `Arcane Edge`.** An edge is a thing a blade has, and the
+enchantment goes on wands — where there is no edge and the whole point is that
+it works anyway. The shorter name says what it is: raw magical damage, no
+element, and therefore nothing the type chart can resist or amplify.
 
-Arcane Edge and Siphon together are the close-range wizard: hit for INT-scaled
-damage, kill to refund the mana that paid for it. Neither needs a bespoke
-ceiling — Siphon only pays out on kills, and Arcane Edge drains a pool that
-refills only from *unspent* movement.
+That last part makes `Arcane` the **safe** damage enchantment and the four
+elements the **situational** ones. Arcane never gets halved and never gets the
+`×1.5`; an element is better in half the dungeons and worse in a quarter of
+them. Which to carry is a real question rather than a strictly-ordered one.
+
+### Only opposed enchantments exclude each other
+
+A weapon may carry **any combination of enchantments that do not oppose**. The
+only exclusion in the system is the type chart's own pairing:
+
+| | Can share a weapon? |
+| --- | --- |
+| `Flaming` + `Cold`, `Shocking` + `Acidic` | **No** — opposed |
+| `Flaming` + `Shocking` (any non-opposing elements) | Yes |
+| `Arcane` + anything | Yes — it opposes nothing |
+| Everything else | Yes |
+
+This is the same rule §1.1's displacement group runs on, arriving in the other
+system for the same reason: one hit cannot be two contradictory things. It needs
+no relation table of its own, because `opposite(t)` already exists for the chart
+and this is that function read once more.
+
+**The lock budget is what actually limits breadth**, not this rule. A weapon
+carrying four enchantments has locked most of a pool and has nothing left to
+fire them with (§3.3), so "any non-opposing combination" is permissive on
+purpose — the constraint that matters is already doing its job elsewhere, and a
+second one would just be a cap by another name.
+
+### Unique enchantments
+
+Four of these are **not in the catalogue** — they exist only on uniques (§1.5),
+cannot be chosen at the enchanter, and cannot be copied:
+
+| Enchantment | Lock | Trigger | Fires on | Effect |
+| --- | --- | --- | --- | --- |
+| **Siphon** | 20 | 5 | Kill | Restore mana, net positive |
+| **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
+| **Warding** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
+| **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
+
+Look at what they have in common: **every one of them bends a rule the rest of
+the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
+movement. `Weightless` and `Momentum` refund the movement that *is* the game's
+currency. `Warding` denies death. None of them is merely a larger number, and
+none of them belongs in a list the enchanter can hand out on request.
+
+That is the test for whether something is unique-level: **not "is it strong" but
+"does it break the frame."** An enchantment that does more damage is a catalogue
+entry however much damage it does. One that gives movement back is not.
+
+`Momentum` arrived here by a different road and confirms the rule — §1.1 sent it
+to the enchantment layer because as a weapon modifier a movement refund loops
+(refunded movement buys the next swing, which refunds again). Making it unique
+closes the last of that: it loops on *one weapon in the game* rather than on any
+weapon the graft roll touches.
+
+**This is also why they can be transferred but never catalogued** (§1.5). The
+enchanter copies what he has seen; there is nothing to copy here, only the one
+that exists. Moving it is moving *it*.
+
+**The staff effects are catalogue entries, not a parallel system.** The last
+four rows *are* the four staves (§1.3), written from the other end — a staff
+variant is a guaranteed source of an entry here. A cast is a hit, so an effect
+fires the same way wherever it ends up, and there is one list rather than two.
+
+**`Arcane` alone is the close-range wizard**, and that is deliberate. Hit for
+INT-scaled damage, drain a pool that refills only from *unspent* movement, and
+stop when it runs out — the build is regen-limited, which is exactly the economy
+§1.3 describes rather than an exception to it. `Siphon` used to be the other
+half and is now unique (below), which makes the artifact the thing that *breaks*
+the limit instead of the thing that defines the build. A wizard who finds one
+has found a genuinely different character; a wizard who does not still works.
 
 **Momentum is the case §1.1 sends here.** As a weapon modifier a movement
 refund loops: refunded movement buys the next swing, which refunds again. As an

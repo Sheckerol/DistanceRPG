@@ -279,8 +279,8 @@ should: a tier-6 enchantment represents hundreds of points of mana spent through
 it, and a move throws away the last and most expensive of those tiers. A shallow
 soul travels cheaply; a deep one is most of the reason you keep the body.
 
-**This is also the answer to a bad innate roll.** A staff that drops with
-Warding when you wanted Arcane Edge is not a dead weapon — it is a body with the
+**This is also the answer to a bad innate roll.** A wand that drops Cold when
+you wanted Flaming is not a dead weapon — it is a body with the
 wrong soul in it, and the enchanter moves souls. The roll sets what you start
 with, never what you end with.
 

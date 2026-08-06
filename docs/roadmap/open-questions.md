@@ -272,14 +272,24 @@
   measures casters by. The setting is worked out elsewhere; what is open is how
   much of it the game *says* versus implies through mechanics. Only the
   mechanically load-bearing parts belong in these documents.
-- **How many unique enchantments, and what are they?** §1.5 establishes the
-  shape — one that exists nowhere else, transferable but never catalogued — and
-  names none. A wand unique implies at least a fifth damage type outside the
-  four-type chart (§1.4), which is a real question: does it sit outside the
-  opposition table entirely, unresisted and unamplified, or does it oppose
-  something? Unresisted is the simpler artifact and the stronger one.
+- **`Immovable` and `Piercing` need specifying.** Six martial uniques exist and
+  four unique enchantments were named, so the spear and the bow got proposals
+  (§1.5) with no numbers. Both obey the trigger-cost rule; neither has a lock,
+  a trigger cost, or a settled effect. `Immovable` in particular is the first
+  enchantment that fires on the *enemy's* turn, which may want checking against
+  the reaction-economy argument §1.1 makes about threat zones.
+- **Should any unique carry two enchantments beyond The Long Candle?** The
+  two-enchantment shape (§1.5) is currently one weapon's, and it generalises
+  easily — any unique could arrive with a second catalogue entry instead of a
+  deep one. That may be the right variety or it may dilute the shape that makes
+  the Candle read as an artifact. Worth deciding before more uniques are
+  authored, since it is the difference between a shape and a one-off.
+- **`Ward` and `Warding` are one letter apart** and do different things — the
+  Staff of Warding's absorb-until-spent versus the Bulwark's survive-at-1-HP.
+  One should probably be renamed before either appears in a UI.
 - **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
   now costs 5 to do it, so its net depends on a restore value nobody has set.
-  Too close to 5 and the enchantment that sustains every other enchantment does
-  not sustain itself; the whole close-range wizard build (§3.3) rests on this
-  one number being comfortably positive.
+  Less pressing than it was, since Siphon is now unique-level and the ordinary
+  close-range wizard runs on `Arcane` and movement regen alone — but the
+  Widowmaker that carries it should be a genuinely different character, and that
+  needs the number to be comfortably positive.

@@ -94,7 +94,7 @@ identity kept in the field that suits it:
 | | The enchantment is | Rolled? |
 | --- | --- | --- |
 | **Staff** | The effect it casts — Poison, Ward, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
-| **Wand** | Its damage type — Flame, Frost, Storm, Stone (§1.4) | **Yes.** Uniform among four |
+| **Wand** | Its damage type — Flaming, Shocking, Acidic, Cold (§1.4) | **Yes.** Uniform among four |
 
 A staff *is* its effect, so rolling it would make a Staff of Blight stop being
 one. A wand is its **shape**, which leaves the damage free to vary — so the four
@@ -658,7 +658,7 @@ good one: with tier now carrying the effect's power (§3.3), having `Resonant` d
 magnitude too would be two dials on one number.
 
 Because it covers triggers, `Resonant` is **not caster-only**. A dagger carrying
-Arcane Edge spends mana every hit, and a stack that makes those hits cheaper is
+Arcane spends mana every hit, and a stack that makes those hits cheaper is
 exactly as meaningful there as on a staff — so the wizard's dagger (§3.3) can be
 grafted toward mana efficiency, at a graft's shallow `×5`. It stays *forged* on
 casters alone.
@@ -789,12 +789,12 @@ on-cast condition: **the condition is `Hit`, and a staff's cast is its hit.**
 `TryCast` is a staff's attack, so it resolves through the same path everything
 else does (Phase 0's unified resolver) and triggers the same way.
 
-That collapses two lists into one. `Flaring` in §3.3's starting set — lock 15,
-trigger 5, applies Poison on hit — **is** the Staff of Blight's enchantment,
-seen from the other end. The staff is where you find it; a dagger is somewhere
-you can put it. There is one catalogue of enchantments, and a staff variant is a
-guaranteed source of one entry rather than a separate system that happens to
-look similar.
+That collapses two lists into one. `Poison` in §3.3's catalogue — lock 20,
+trigger 5, applied on hit — **is** the Staff of Blight's enchantment, seen from
+the other end. The staff is where you find it; a dagger is somewhere you can put
+it. There is one catalogue of enchantments, and a staff variant is a guaranteed
+source of one entry rather than a separate system that happens to look
+similar.
 
 It also means the wizard-with-a-dagger build (§3.3) is assembled entirely from
 parts the caster classes hand you. You do not find a Poison enchantment in the
@@ -840,12 +840,12 @@ Where a staff's enchantment is its effect and fixed, a **wand's is its damage
 type and it is rolled** — uniformly among four, at tier 1, on every wand that
 drops (§3.1).
 
-| Type | Opposed by |
-| --- | --- |
-| **Flame** | Frost |
-| **Frost** | Flame |
-| **Storm** | Stone |
-| **Stone** | Storm |
+| Type | Opposed by | The fiction |
+| --- | --- | --- |
+| **Flaming** | Cold | Thermal shock, the intuitive pair |
+| **Cold** | Flaming | |
+| **Shocking** | Acidic | A conductive place diffuses a shock; acid eats the metal doing the conducting |
+| **Acidic** | Shocking | |
 
 So a wand is **a shape you chose crossed with an element you did not**. The four
 geometries stay the wand's identity and the element is what makes the same four
@@ -877,14 +877,14 @@ Three things this buys:
 
 - **A reason to carry a second wand.** The stable (§6.2) already exists because
   weapons sit in service; the chart gives it a second, sharper reason — the wand
-  that clears a Flame floor is the wrong tool for the next dungeon, and rotation
-  is preparation rather than a consolation for downtime.
-- **It makes a bad roll into a trade rather than a loss.** A Frost wand in a
-  Frost dungeon is halved; the same wand is the best thing you own one dungeon
+  that clears a Flaming floor is the wrong tool for the next dungeon, and
+  rotation is preparation rather than a consolation for downtime.
+- **It makes a bad roll into a trade rather than a loss.** A Cold wand in a
+  Cold dungeon is halved; the same wand is the best thing you own one dungeon
   later. The roll decides *when* a wand is good, never *whether*.
 - **The counter is transferable.** The damage type is an enchantment, so §6.5
-  moves it — onto another wand, or onto a sword. A fighter carrying Frost into a
-  Flame dungeon is a real answer built out of parts that already existed, and
+  moves it — onto another wand, or onto a sword. A fighter carrying Cold into a
+  Flaming dungeon is a real answer built out of parts that already existed, and
   the only one available to a party with no caster.
 
 **Halved rather than nullified**, because a wand hits an area and a shape full
@@ -893,9 +893,15 @@ in this game has a zero, and a resisted Nova that still softens a room keeps the
 class playable in its worst matchup.
 
 Tier scales the type's contribution along with everything else, so a tier-5
-Flame is both more damage and more of what the chart multiplies. That is the
+Flaming is both more damage and more of what the chart multiplies. That is the
 axis a caster who commits to one element is building, and the chart is the cost
 of committing.
+
+**Opposed types cannot share a weapon** (§3.3). Flaming and Cold exclude each
+other exactly as `Push` and `Drag` do, and for the same reason — one hit cannot
+be two contradictory things. Non-opposing types stack freely, so a
+Flaming-and-Shocking wand is legal and is what a player builds when they want to
+be wrong in fewer dungeons.
 
 ### Friendly fire is on, at half damage, both sides
 
@@ -973,21 +979,49 @@ wand enemies need regardless.
 
 ## 1.5 Uniques
 
-**A unique is a variant with exactly one of its modifiers raised to `×3`.**
+**A unique is a variant with one of its modifiers raised to `×3`, carrying an
+enchantment that exists nowhere else.**
 
-That is the whole rule. Not an arbitrary spread, not several deep modifiers —
-take one of the thirty-two weapons above, pick one modifier it is already
-forged with, and take it to three. Everything else about the weapon is
-unchanged.
+Take one of the thirty-two weapons above, pick one modifier it is already forged
+with, take it to three — and give it a **soul no other weapon can have** (§3.3).
+Everything else is unchanged.
 
-| Unique | Class | Built from | Modifiers | Reads as |
-| --- | --- | --- | --- | --- |
-| The Bulwark | Sword | Tower Guard | `Block ×3, Push ×1` | Absorbs 9 and shoves what it stops |
-| Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | Finds the gap on 17+ |
-| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | Three retaliations, all at full reach |
-| Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | +3 a tile; lethal across a room |
-| Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | Four throws, and the movement to reposition after |
-| Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunist ×1, Splitting ×3` | Ignores 9 Block on *everything* the swing catches |
+| Unique | Class | Built from | Modifiers | Enchantment | Reads as |
+| --- | --- | --- | --- | --- | --- |
+| The Bulwark | Sword | Tower Guard | `Block ×3, Push ×1` | **Warding** | Absorbs 9, shoves what it stops, and refuses to let you die |
+| Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | **Weightless** | Four throws that barely cost anything to make |
+| Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunist ×1, Splitting ×3` | **Momentum** | Ignores 9 Block across the swing, and every kill pays for the next |
+| Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | **Siphon** | Finds the gap on 17+, and every kill funds the enchantments doing it |
+| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | *Immovable* | Three retaliations at full reach, from a line that cannot be moved |
+| Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | *Piercing* | +3 a tile, and the shot does not stop at the first body |
+
+**The four named enchantments each answer their weapon's own logic**, which is
+the test a pairing has to pass. `Warding` on the shield that already refuses
+damage. `Weightless` on the class hard-capped by throws-per-turn, where cheaper
+throws are the one thing `Charges` cannot give it. `Momentum` on the axe that
+kills several things at once, so the refund fires several times. `Siphon` on the
+dagger, because the enchanted dagger (§3.3) is the build that runs out of mana
+and this is the weapon that does not.
+
+**`Immovable` and `Piercing` are proposals**, not settled — the spear and the
+bow need one each and the four in §3.3 were spoken for. `Immovable` fires when
+something tries to displace you and negates it, which is the phalanx fantasy and
+a real counter to `Push`/`Drag`/`Rout`. `Piercing` fires on a hit and carries
+the shot to the next target in line. Both obey the trigger-cost rule; neither
+has numbers yet.
+
+**Why a unique enchantment rather than a second `×3`.** Depth was already
+available — the derivation rule could simply have allowed two — and it would
+have made uniques *more of the same weapon* when the interesting thing is that
+they are the same weapon **plus something the game does not otherwise contain**.
+A `Block ×3` sword is a Tower Guard that stops more. A `Block ×3` sword that
+will not let you die is a story.
+
+It also unifies the two halves of §1.5 that were drifting apart. A caster unique
+cannot raise a modifier at all, since `Resonant` is forge-limited to `×1` (§1.1)
+— so its whole advantage was already the enchantment. Now that is not a caster
+exception; it is **the rule**, and martial uniques simply also get the deeper
+body.
 
 ### Why derive them rather than author them freely
 
@@ -1036,24 +1070,50 @@ derivation rule has two ways to land — and only one of them is interesting.
 `Resonant ×3` is a staff that costs less mana, which is a fine modifier and a
 terrible legend. So:
 
-**A caster unique is a caster variant whose enchantment is exceptional** — and
-the forge has no other option, because `Resonant` is limited to `×1` (§1.1), so
-the only forged thing a caster unique *can* raise is the enchantment. Exactly
-the parallel an Efficiency unique runs, which cannot raise its own `Light`
-either.
+A caster unique gets the enchantment half of the rule and **not** the `×3` half,
+because the forge has no other option: `Resonant` is limited to `×1` (§1.1), so
+there is nothing on a caster a unique could raise. Exactly the parallel an
+Efficiency unique runs, which cannot raise its own `Light` either.
 
-There are two shapes it takes, and both read as an artifact rather than a good
+That leaves three shapes, and all three read as an artifact rather than a good
 drop:
 
-| Shape | What it is | Example |
+| Shape | What it is | What no ordinary weapon can do |
 | --- | --- | --- |
-| **A high tier** | An ordinary catalogue enchantment, arriving at tier 3 | Rotwood — a Staff of Blight whose Poison starts where an ordinary staff's ends |
-| **A unique enchantment** | One that exists nowhere else in the catalogue | The Long Candle — a Beam wand carrying an element no other weapon can hold |
+| **A unique enchantment** | One that exists nowhere else — the same treatment martial uniques get | Hold it at all |
+| **A high tier** | A catalogue enchantment arriving at tier 3 | Drop above tier 1 |
+| **Two enchantments** | Two non-opposing catalogue entries, both at tier 1 | Drop with more than one |
 
 | Unique | Class | Built from | Carries | Reads as |
 | --- | --- | --- | --- | --- |
 | Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
-| The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **a unique element** | A beam of something the world does not otherwise contain |
+| The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Shocking + Flaming** | A beam of plasma |
+
+**The Long Candle is the third shape, and it is the neatest of the three.** A
+plasma beam is fire and lightning at once, so it carries `Shocking` and
+`Flaming` — legal because they do not oppose each other (§3.3; `Shocking`
+opposes `Acidic`, `Flaming` opposes `Cold`), and impossible to find any other
+way, because **a drop rolls exactly one enchantment** (§3.1). It is also the
+first weapon in the game that answers *two* attunements: halved in a Flaming
+dungeon on one element while the other still lands.
+
+The last two shapes are the same idea on the two different axes, which is why
+both are worth keeping:
+
+| | Somebody else already paid for | Which normally costs |
+| --- | --- | --- |
+| **Rotwood** — tier 3 | Depth | Mana, spent casting (§3.3) |
+| **The Long Candle** — two enchantments | Breadth | Runs of downtime (§6.2) |
+
+Neither bends a rule the way `Warding` or `Siphon` does. They are artifacts
+because of the *work already in them*, not because they do something the game
+otherwise forbids — and not every artifact should break the frame. "Somebody
+carried this for a very long time" is a legitimate thing for an item to be.
+
+There is a cost buried in the second one worth knowing about: service time is
+enchantment count + 1 (§6.2), so The Long Candle's next enchantment costs
+**three runs** where an ordinary wand's second costs two. An artifact that
+arrives ahead is also an artifact that is slower to extend.
 
 **A tier-3 artifact is levelling somebody else already did.** Tier is earned by
 casting (§3.3), so a staff that drops deep has a history — it was carried by
