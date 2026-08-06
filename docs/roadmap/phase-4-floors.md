@@ -309,11 +309,48 @@ boss is a stone golem: innate Block whatever it happens to be holding, and the
 weapon it drops comes away forged with Block. Everything else killed down there
 rolls for Block on top of its usual graft pool.
 
+### The enchanter is running it
+
+**The tutorial dungeon is the enchanter's.** He built it, he is powering the
+golems, and he is standing there operating the whole thing while the party
+learns to fight in it — training them on what they are about to face by
+building a small, safe copy of it.
+
+He is not the villain, and the difference is measured in mana. The BBEG powers
+dungeons five to ten floors deep and holds them indefinitely; the enchanter can
+sustain two floors, once, and it costs him everything he has while it runs.
+
+That premise is doing an unusual amount of work, because **three mechanics that
+were each justified separately now come from one fact**:
+
+| Mechanic | Follows because |
+| --- | --- |
+| **Fixed at two floors** (below) | It is the most his pool will hold. Depth is a mana budget, and his is the smallest in the game |
+| **Gone once beaten** (below) | He stops powering it and goes back to his workshop. Nothing is consumed — he simply has a job to return to |
+| **No service while it runs** (§6.3) | Powering golems *is* his mana. He cannot enchant and be a dungeon at once |
+
+The last one is the real gain, because it replaces a shrug with a reason.
+Previously the tutorial had no mercy tick and the defence was that a first-run
+party has nothing in service anyway — true, but incidental. Now **the enchanter
+is unavailable for the whole tutorial**, because he is busy being the dungeon,
+and there is no service clock to advance because there is no service. The
+workshop opens when the training ends.
+
+Which makes the handoff in the pacing note below exact rather than lucky: you
+beat the golem, he stops spending mana on it, and the first thing he can do is
+take your weapon. Finishing the tutorial does not merely *earn* the first
+enchantment — it is what **frees the man who performs it**.
+
+It also quietly sets the stakes. The first thing the game teaches you is a
+scaled-down imitation of the real thing, built by someone who could only afford
+two floors of it. Everything after is the version made by someone who was not
+short of mana.
+
 ### Two floors deep
 
-The tutorial ignores the 5–10 roll: its boss sits on **floor 2**, fixed. It is
-the one dungeon in the game with a hardcoded depth, and the special case earns
-itself twice over.
+The tutorial ignores the 5–10 roll: its boss sits on **floor 2**, fixed — as
+much as the enchanter's pool will hold. It is the one dungeon in the game with a
+hardcoded depth, and the special case earns itself twice over.
 
 It teaches the complete loop in miniature — descend once, fight the boss,
 extract back through a single floor — so every dungeon mechanic is demonstrated
@@ -335,7 +372,13 @@ the player able to use the enchanter, not merely able to look at it.
 
 Unlike every other dungeon, the tutorial is **available exactly once**. Kill
 the golem and it is gone from the hub for good; fail, and it is still there.
-Every other dungeon is picked from the hub and can be run indefinitely.
+Every other dungeon is picked from the hub and comes back after its cooldown.
+
+The lore carries the asymmetry without a rule: the enchanter powers his dungeon
+down and returns to work, so it is *retired* rather than locked. A real dungeon
+is somebody else's and merely needs re-powering, which is why it comes back at
+all — and plausibly why deeper ones take longer to (§4.3). The tutorial is the
+only one whose operator had somewhere better to be.
 
 That makes it the one place where **rushing the boss permanently costs you
 something**. Farm the tutorial and you leave with Block-themed weapons no other

@@ -127,6 +127,15 @@
   modifier — and the only one that runs a stack deeper than a rolled graft.
 - **The shipped dungeon is the tutorial**, themed on Block, with a stone golem
   for a boss.
+- **The enchanter runs the tutorial dungeon.** He built it and powers the golems
+  to train the party on what they are about to face; the BBEG holds dungeons of
+  5–10 floors, and the enchanter can manage two, once. That single premise
+  supplies three mechanics that were each argued separately: the fixed depth of
+  two (his pool is the smallest in the game), the permanent retirement on
+  completion (he powers it down and returns to work, rather than it being
+  consumed), and **no enchanting service for the whole tutorial** — powering
+  golems *is* his mana. The workshop opens when the training ends, which is why
+  one tutorial run lands exactly on the one-run cost of a first enchantment.
 - **A class has a baseline plus four role weapons** — Efficiency (`Light`),
   Purity (more of the signature), Control (degrade the enemy), Support (help
   the party). The old universal "crit-specced" slot is gone; a crit class puts

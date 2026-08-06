@@ -260,3 +260,15 @@
   on floor 3. Surviving the climb out is a real achievement that the table does
   not distinguish, and "escaped with the haul, no boss" may deserve to exist as
   a fourth row with partial drops.
+- **Does the enchanter being unavailable during the tutorial need surfacing?**
+  It is now a rule with a reason (§4.3) rather than an accident, but a first-time
+  player only experiences it as a workshop they cannot enter. The hub should
+  probably show him mid-ritual and unavailable rather than absent, so the moment
+  he becomes usable reads as *he finished* rather than *a menu unlocked*. That
+  is a presentation question, but it is the only place the tutorial's premise is
+  visible in play.
+- **How much of the enchanter's role is spoken aloud?** The premise implies he
+  is a real character with a stake, not a service counter — he spends his own
+  mana to train the party, and the BBEG outclasses him on the one axis the game
+  measures casters by. None of that is written, and how much of it the game says
+  versus implies through mechanics is a writing decision nobody has made.

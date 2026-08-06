@@ -180,11 +180,19 @@ boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
 see the open questions.
 
 **The tutorial has no mercy tick at all**, since its boss sits on floor 2 (§4.3)
-and the bar is three. That reads worse than it is: on a first run there is
-nothing in service for a tick to advance, so the consolation would be
-consolation for nothing. The tutorial's answer to failure is that you can walk
-straight back in — it never locks until it is beaten, and then it is gone
-(§4.3).
+and the bar is three. It needs no exception to say so: **the enchanter is not
+open during the tutorial**, because he is the one running it (§4.3). Powering
+two floors of golems is everything his mana will do, so he cannot be servicing
+weapons at the same time — there is no clock to advance, mercifully or
+otherwise.
+
+The workshop opens when the training ends. Beating the golem frees him, and the
+first thing he can do is take a weapon off you — which is why a single tutorial
+run lands exactly on the one-run cost of a first enchantment (§6.2). The pacing
+is not a coincidence to be tuned; it is the same event seen twice.
+
+The tutorial's answer to failure is that you can simply walk back in. It never
+locks until it is beaten, and then it is gone for good.
 
 It also means the mercy rule never has to be explained to a new player. They
 meet it later, in a real dungeon, at the moment it first does something — which
