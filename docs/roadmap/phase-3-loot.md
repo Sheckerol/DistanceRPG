@@ -63,6 +63,38 @@ waiting. That cost shrinks as you farm: the timer shortens with `DefeatCount`
 drop that dummy is *carrying*; you collect it only by killing it permanently on
 the way out, after the boss has stopped resurrection (§4.4).
 
+### A clean kill counts twice
+
+**A defeat that takes the enemy from full HP to zero in a single hit advances
+`DefeatCount` by 2.** Everything else advances it by 1.
+
+The problem it solves is that fights are not all the same length, and the short
+ones were paying the same as the long ones. An axe at proficiency, swinging into
+a dummy that has not been farmed up, simply deletes it — that is a fight the
+party won before it started, and the ladder had no way to say so. Now the trivial
+fight is *worth* something, and it is worth exactly what it looks like: twice as
+much progress for half as much fight.
+
+**It accelerates the reward and the risk together, which is why it needs no
+counterweight.** `DefeatCount` already means two things at once (below) — the
+quality of the drop *and* how dangerous the dummy has become. Advancing it by 2
+buys two cycles of drop quality and hands the dummy two cycles of statline,
+including two steps of the revival speed-up. You are not skipping the cost; you
+are paying it faster.
+
+**And it puts itself out of business.** Every revival adds HP, so a dummy you
+could one-shot at `DefeatCount 2` is one you cannot at 8. The bonus therefore
+front-loads a farm and then stops — the early cycles blur past while the fight
+is trivial, and the late ones arrive one at a time exactly when each is a real
+fight. That is the shape the ladder wanted anyway, and it falls out rather than
+being scheduled.
+
+It also makes **burst the farming build**, which is a real distinction the
+classes did not have. An axe or a crit dagger clears the early cycles at double
+rate; a grind weapon does not, and catches up only because the dummy eventually
+outgrows everyone's one-shot. Two ways to farm, differing in *where* on the
+curve they are fast.
+
 ### The ladder has no top; the danger curve is the top
 
 Two things accrue, on different shapes. **Stacks are rolled and run out; unique
@@ -102,6 +134,10 @@ stacks, and be the one weapon in the game you could not fully invest in.
 A fully farmed Assassin's Fang therefore comes out `CritWindow ×2+5`,
 `CritMultiplier ×1+5` — both dials of the crit build maxed, from one weapon that
 was carried long enough.
+
+A clean kill (above) advances two rows of this table at once, so the columns
+below are cycles rather than swings — a burst party reaches `DefeatCount 10` in
+five fights and a grind party in ten, and both arrive at the same drop.
 
 | `DefeatCount` | Stacks, expected | Unique chance |
 | --- | --- | --- |
@@ -301,6 +337,13 @@ and the flat bonus would leak into a modifier system that has no place to put
 it. Store the accumulated values on `EnemyState` alongside `DefeatCount` so
 saves round-trip without replaying rolls (§5.1), and roll on the loot stream's
 sibling — `mapSeed ^ ReviveSalt` — never a continuation of an existing one.
+
+**The clean-kill check needs the target's HP before the hit**, which the unified
+attack resolver (Phase 0) has and the defeat handler currently does not — today
+`EnemyDefeated` fires after the fact. Passing `wasAtFullHp` through with the
+defeat is cheaper than reconstructing it, and it is the same call site the
+revival roll already hangs off. Two revival rolls fire on a clean kill, not one,
+so the statline and the timer both advance twice.
 
 **The scaling never stops, and that is what lets the drop ladder run forever
 too.** The reward curve flattens into pure probability once the stack allowance

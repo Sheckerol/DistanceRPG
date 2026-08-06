@@ -280,11 +280,10 @@
   friendly-fire scorer too, since an enemy wand with it would be brutal.
 - **The three Searing constants need play, not argument.** `1 / 1 / 2` is a
   starting point (§1.5), not a claim: 12 damage over 3 turns at tier 6, and 72
-  across a six-target Nova. The one that cannot be picked on paper is
-  `SearDecayPerTurn`, because it has to be set against how long fights actually
-  run — too slow and the deepest levels tick against a corpse, which is a dead
-  stack §1.1 forbids in everything but name. Fight length is itself unmeasured,
-  so this waits on a playable Phase 1.
+  across a six-target Nova. `SearDecayPerTurn` is the one that cannot be picked
+  on paper, and it is tuned against the length of the fights a *deep wand* is
+  in — not against fights in general, which range from one-shot to fifteen
+  cycles in the same run (§1.5).
 - **Should the riders take the same treatment?** `Sundered` and `Weakened` are
   now the only members of the level family with their conversions written into
   prose (`1` per level, decay `1`) rather than named constants. If Searing needs
@@ -318,3 +317,15 @@
   close-range wizard runs on `Arcane` and movement regen alone — but the
   Widowmaker that carries it should be a genuinely different character, and that
   needs the number to be comfortably positive.
+- **Does a clean kill on an area weapon want a different rule?** A wand catching
+  six unfarmed dummies in one Nova would advance six `DefeatCount`s by 2 apiece
+  (§3.2). Wands deal 8 base so it is unlikely early, but a deep one with its
+  element levelled could do it — and the rule was written imagining a single axe
+  swing, not a room. Either it is fine because the wand paid for it in mana and
+  tier, or area weapons want the bonus capped to one target.
+- **Should a clean kill mean *before it acts* rather than from full HP?** From
+  full HP is simple and unfakeable. But the thing that actually makes a fight
+  free is the enemy never taking a turn, and those come apart — a dummy that has
+  already had a turn can still be at full HP if it missed or repositioned.
+  Turn-based would reward the ambush the fog and marching rules already build
+  toward, at the cost of a rule that needs explaining.

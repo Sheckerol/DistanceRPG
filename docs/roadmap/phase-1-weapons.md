@@ -1160,11 +1160,36 @@ party repositions, which is the whole wand fantasy. At 3 it is a second hit
 arriving late. Somewhere around 2 is where it stays recognisably a burn while
 staying a number you can look at.
 
-There is a hard constraint on it that §1.1 supplies. **Duration must not outlast
-the fight**, or the deepest levels tick against a corpse and a player who
-invested in tier got nothing for it — a dead stack in everything but name. So
-`DecayPerTurn` has to be chosen against how long fights actually run, and it is
-the one constant here that cannot be picked from a spreadsheet.
+The obvious constraint on it is *duration must not outlast the fight* — the
+deepest levels would tick against a corpse and a player who invested in tier got
+nothing, a dead stack in everything but name. That is right as far as it goes,
+but it is stated against a number that does not exist.
+
+**There is no such thing as "the fight length."** Two things set it and they
+move in opposite directions:
+
+| Pushes fights *shorter* | Pushes fights *longer* |
+| --- | --- |
+| Weapon proficiency — `+floor(L/2)` damage (§2.2) | Revival scaling — `+5` HP a cycle (§3.2) |
+| Weapon depth — farmed and grafted stacks | Deeper `DefeatCount` on what you chose to farm |
+
+So a party at proficiency one-shots an unfarmed dummy, and the same party
+against something it has killed fifteen times is in a long fight. Both happen in
+the same run, minutes apart. Tuning a decay constant against the average of
+those two would produce a number correct for neither.
+
+**The honest version of the constraint is narrower: duration should match the
+fights a *wand* is in.** A tier-6 `Flaming` is a late-campaign item — it has
+been levelled by hundreds of points of mana (§3.3) and its owner is fighting
+things worth that investment. It is not the weapon in the one-shot case, and a
+one-shot is not a fight it was going to matter in.
+
+Which leaves the short fight needing its own reward rather than needing the DoT
+to shrink, and §3.2 now gives it one: **a clean kill advances `DefeatCount` by
+2.** The trivial fight pays in farm progress instead of in burn damage. Two
+playstyles, two currencies, and neither constant has to compromise for the other
+— which is the actual resolution, rather than picking a decay that is wrong in
+half the situations.
 
 **Starting point: `LevelsPerTier 1`, `DamagePerLevel 1`, `DecayPerTurn 2`** — 12
 damage over 3 turns at tier 6. That is a real effect, it reads as burning, and

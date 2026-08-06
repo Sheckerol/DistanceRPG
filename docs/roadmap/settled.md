@@ -102,10 +102,20 @@
   rides a catalogue enchantment that levels normally. It also makes the element
   a **prerequisite** — transfer the `Flaming` off and the burn goes quiet.
 - **Decay is the dial that matters most**, because it decides whether this is a
-  damage-over-time effect or a delayed burst — and duration must not outlast the
-  fight, or the deepest levels tick against a corpse and a player who bought
-  tier got nothing, which is a dead stack in everything but name.
+  damage-over-time effect or a delayed burst. It is **not** tuned against "the
+  fight length", which does not exist — proficiency and weapon depth push fights
+  shorter while revival scaling pushes them longer, so the same party has
+  one-shot fights and fifteen-cycle fights minutes apart. It is tuned against
+  the fights a *wand* is in, which are the long ones by construction.
   Starting point `1 / 1 / 2`: 12 damage over 3 turns at tier 6.
+- **A clean kill — full HP to zero in one hit — advances `DefeatCount` by 2.**
+  Short fights were paying the same as long ones; now the trivial fight is worth
+  exactly what it looks like. It needs no counterweight because `DefeatCount` is
+  already both reward and threat, so it buys two cycles of drop quality *and*
+  hands the dummy two cycles of statline. And it puts itself out of business:
+  revival HP eventually makes the dummy un-one-shottable, so the bonus
+  front-loads a farm and then stops. It also makes **burst the farming build**,
+  a distinction the classes did not previously have.
 - **The total is quadratic in tier**, the only such term in the design, and it
   lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
   square, so halving it quarters the total — that is the correction if deep
