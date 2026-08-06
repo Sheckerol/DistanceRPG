@@ -332,15 +332,15 @@
   (§4.5); this wants a beat on top of that — something that connects the crit to
   the jump in the same moment, or the funniest event in the game reads as
   a glitch.
-- **Do enchantments want their own file too?** `weapons.json` (§5.4) settles
-  weapons; the enchantment catalogue is the same shape of content — lock,
-  trigger, condition, effect — with the same split between a behaviour that must
-  be code and a table that need not be. The argument for waiting is that the
-  catalogue is small and its entries are less uniform than modifiers; the
-  argument for doing it now is that it will be the same work later and one
-  loader is cheaper than two.
-- **Where do dungeon themes and boss definitions live?** §4.3 makes a theme a
-  modifier plus an attunement plus a drop table, which is data by any reasonable
-  reading — and the drop table is *derivable* from the theme via `Allowed`
-  rather than authored, so it mostly wants a loader that computes rather than
-  reads. Not urgent until there is a second dungeon.
+- **How much of an enchantment's effect can `EffectKind` express?** §5.6 has an
+  entry name a behaviour and supply parameters, which works cleanly for Arcane
+  (damage), Vampiric (heal by damage dealt) and the elements. It works less
+  obviously for `Warding` (survive at 1 HP), `Momentum` (refund part of a
+  swing's movement) and `Echoing` (trigger the weapon's class feature again) —
+  each of which reaches into a different system. Either `EffectKind` becomes a
+  wide enum of one-offs, which is honest but not really data-driven, or the
+  unique souls stay in code and only the catalogue is a file.
+- **Do party members and starting loadouts want a file?** The four-character
+  party, their innate stats and their opening weapons are content by the same
+  argument, and they are the thing a designer tweaks while tuning the tutorial.
+  Not specced; it is the obvious fifth file and nobody has asked for it yet.

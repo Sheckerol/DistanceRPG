@@ -474,17 +474,24 @@
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
   warn on mismatch rather than refusing.
-- **Weapons live in `weapons.json`** (§5.4) — statlines, forged spreads, shapes,
-  innate enchantments, uniques. Validated at load against the same
-  `Allowed`/`MaxForged` predicates the graft roll and boss drop table use, so no
-  new validation code exists; invalid data **aborts startup** naming the weapon
-  and the rule, rather than clamping as `tuning.json` does, because a broken
-  invariant is not a bad balance number. Referenced everywhere by **stable
-  string id**, never index, or adding a weapon silently re-rolls every enemy in
-  every existing save.
-- **The point of it is that modifiers become additive.** Behaviour and relations
-  stay in code, the per-stack value is `tuning.json`, and which weapons carry it
-  is `weapons.json` — so adding a modifier is: implement it, price it, declare
-  its relations, and it is then usable on any weapon in any spread without
-  touching code again. That is §1.1's uniformity finally paying out in the
-  workflow rather than only in the design.
+- **Content lives in three validated files** (§5.4–5.7) — `weapons.json`,
+  `enchantments.json`, `dungeons.json` — loading in that order, since weapons
+  name enchantment ids and dungeons name modifiers. All three are checked at
+  load against the `Allowed`/`MaxForged`/opposition predicates that already
+  exist, so **no new validation code exists**; invalid content **aborts
+  startup** naming the entry and the rule, rather than clamping as `tuning.json`
+  does, because a broken invariant is not a bad balance number.
+- **Everything is referenced by stable string id, never index.** Adding a weapon
+  otherwise re-rolls every enemy in every existing save; shifting an enchantment
+  id silently turns a player's earned catalogue into a set of different
+  enchantments.
+- **The point of it is that mechanics become additive.** Behaviour and relations
+  stay in code, values are `tuning.json`, and which weapons and dungeons *use*
+  them is content — so adding a modifier is: implement it, price it, declare its
+  relations, and it is then usable on any weapon in any spread without touching
+  code again. That is §1.1's uniformity finally paying out in the workflow
+  rather than only in the design.
+- **A dungeon's drop table is computed, not authored.** §4.3's rule that a
+  themed boss cannot drop a class that will not take its theme *is* `Allowed`
+  run over the eight classes at load. Authoring it by hand would let the two
+  disagree, and the disagreement would look exactly like a drop-rate bug.
