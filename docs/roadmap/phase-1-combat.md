@@ -143,5 +143,7 @@ its minimum-1 guarantee holds:
 3. defender's Sundered          → add
 4. defender's Block             → absorb, never below 1 taken
                                   SKIPPED ENTIRELY on a crit
-5. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
+5. defender's Ward              → spend 1 per point taken; temporary HP,
+                                  so NOT skipped on a crit — §3.3
+6. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
 ```

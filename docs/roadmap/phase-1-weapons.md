@@ -642,7 +642,7 @@ differ in what they apply and what it costs in mana.
 | Variant | Name | Target | Mana | Applies |
 | --- | --- | --- | --- | --- |
 | Buff | Staff of Renewal | Ally | 15 | **Regeneration** — heals per turn, decaying |
-| Buff | Staff of Warding | Ally | 20 | **Ward** — blunts the next few hits, a level a hit (§3.3) |
+| Buff | Staff of Warding | Ally | 20 | **Ward** — a pool absorbing 1 per point, decaying 1 a turn (§3.3) |
 | Debuff | Staff of Blight | Enemy | 20 | **Poison** — damage per turn, decaying |
 | Debuff | Staff of Mire | Enemy | 25 | **Mire** — cuts the target's movement budget |
 

@@ -72,7 +72,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Group | Keys |
 | --- | --- |
 | Economy | `MovementUnitsPerMana`, `MovementBudget` |
-| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardAbsorbPerLevel`, `OverhealPerWardLevel` |
+| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard` |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |

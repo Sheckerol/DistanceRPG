@@ -261,11 +261,11 @@ application and converted to levels there (§1.5). That is the simpler data mode
 *and* it sidesteps the transferred-away-mid-fight case entirely: levels already
 on a target are levels, whatever happens to the wand afterwards.
 
-`Ward` was going to be the exception — a pool rather than a level count — and
-§3.3 folded it into the family instead, so it is one more row rather than a
-second shape. It is the only member whose levels are spent by **two** things
-(decay and absorbing a hit), which is a drain in the tick path rather than a
-different representation.
+`Ward` is the one member that is genuinely a **pool** rather than a level count
+— points spent one per HP saved (§3.3) — but it shares the shape closely enough
+to live in the same structure: an int that accumulates and decays, differing
+only in being drained by the damage step as well as by the tick. The tick path
+handles it with one extra drain, not a second representation.
 
 Which means `Poison`, `Searing`, `Sundered`, `Weakened` and `Ward` all want the
 **same representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same

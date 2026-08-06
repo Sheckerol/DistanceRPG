@@ -643,7 +643,7 @@ cannot be chosen at the enchanter, and cannot be copied:
 | **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
 | **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
-| **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWardLevel` to 1 |
+| **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWard` to 1 |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
@@ -691,126 +691,81 @@ otherwise. That is the transfer rule (§6.5) paying off on the enchantment least
 obviously portable, and the reason `Overheal` should not be pinned to staves.
 
 **The conversion is lossy, and that is the first of its two brakes.**
-`OverhealPerWardLevel` — start at **5** — means 20 points of surplus healing
-becomes 4 levels of `Ward`. A ratio rather than 1:1 keeps it a salvage
-mechanism rather than a second healing pool: you are recovering something that
-was going to be thrown away, at a discount, which is the honest shape for it.
+`OverhealPerWard` — start at **5** — means 20 points of surplus healing becomes
+4 points of `Ward`, and 4 points of `Ward` is 4 HP it will later save you. A
+ratio rather than 1:1 keeps it a salvage mechanism rather than a second healing
+pool: you are recovering something that was going to be thrown away, at a
+discount, which is the honest shape for it.
 
-### `Ward` joins the status family, and that is the second brake
+### `Ward` is a pool that decays, and that is the second brake
 
-`Ward` was the one status that was a **pool** — a number that absorbed and was
-spent, with no decay. That made it the exception to the level model
-(`Poison`, `Searing`, `Sundered`, `Weakened`), and it was fine only while a
+`Ward` was going to be a pool that never decays, which was fine only while a
 staff cast was its single source. With `Overheal` producing it continuously, an
 undecaying pool accumulates until the fight ends.
 
-So `Ward` becomes levels like everything else:
+So `Ward` keeps being a pool — points of damage it will absorb — and gains the
+one thing every other status already has:
 
 | | |
 | --- | --- |
-| **Per level** | Blunts one incoming hit by `WardAbsorbPerLevel` |
-| **Re-application** | Accumulates, exactly as the riders do (§1.6) |
-| **Decay** | One level per turn |
-| **Also spent** | One level per hit it blunts |
+| **Absorbing** | Spends **one point per HP saved**, one for one |
+| **The floor** | Never reduces a hit below **1 taken**, exactly as `Block` does (§1.1) |
+| **Re-application** | Accumulates |
+| **Decay** | **One point per turn**, at the start of the wielder's turn |
 
-**Two drains on one counter is what makes it self-limiting**, and it needs no
-ceiling to do it. `Overheal` adds levels at `healing / 5` a turn; time removes
-one a turn regardless; being hit removes more. The equilibrium sits wherever
-those meet, it moves with how hard you are being hit, and nothing had to be
-capped — which is the §1.1 answer rather than the bespoke max-HP ceiling this
-was heading toward.
+So a 20-damage hit into 20 `Ward` leaves **1 damage through and 1 point
+remaining** — 19 absorbed, 19 spent. And that last point is gone at the start of
+your next turn.
+
+**Decay is slow against a fight and fast against a run**, which is the whole
+reason 1 a turn is the right number rather than a percentage. A shield survives
+the engagement it was raised in and bleeds away on the walk to the next one, so
+`Ward` is something you carry *through* a fight and never something you arrive
+with. Nobody stockpiles a shield in the hub and cashes it on floor 9.
+
+**Two drains on one pool is what makes `Overheal` self-limiting**, and it needs
+no ceiling to do it. Levels arrive at `healing / 5` a turn, time removes one a
+turn regardless, and being hit removes them far faster than either. The
+equilibrium moves with how hard you are being hit — which is the §1.1 answer
+rather than the bespoke max-HP cap this was heading toward.
 
 **It also makes `Overheal` and a Staff of Renewal a rhythm rather than a
-stockpile**, which is the interaction worth having. Regeneration is itself a
-decaying level count, so a long heal on a healthy target grants Ward *slowly* —
-and the earliest levels expire before the last ticks land. You cannot bank a
-whole Regeneration into a shield and walk away with it; you get the shield you
-had while the healing was happening. Overhealing someone is a thing you do
-*during* a fight, not before one.
+stockpile.** Regeneration is itself a decaying level count, so a long heal on a
+healthy target grants `Ward` slowly and the earliest points bleed off before the
+last ticks land. You get the shield you had *while* the healing was happening.
+Overhealing someone is a thing you do during a fight.
 
-**The spend rule is a choice worth naming.** "One level per hit, blunted by
-`WardAbsorbPerLevel`" keeps `Ward` strictly in the family — the level count is
-both magnitude and timer, and the tick path stays uniform. The alternative is
-the older reading, a pool of `levels × WardAbsorbPerLevel` damage that drains
-continuously, which absorbs one big hit better and many small ones worse. The
-per-hit version is chosen because it echoes `Block` (§1.1), which is already
-flat-per-hit for exactly the reason of blunting many small hits harder — and
-because two statuses behaving the same way is worth more than the marginal
-difference in what they absorb.
+### `Ward` is temporary health, not armour — so crits do not bypass it
 
-**This is also why they can be transferred but never catalogued** (§1.5). The
-enchanter copies what he has seen; there is nothing to copy here, only the one
-that exists. Moving it is moving *it*.
+`Block` is skipped entirely on a crit (§1.6): that is the universal way through
+armour and the reason a natural 20 matters. **`Ward` is not skipped**, and the
+reason is categorical rather than a balance decision.
 
-### Unique enchantments never leave tier 1
+**`Ward` is temporary hit points that decay.** It is not mitigation — it does
+not reduce a hit, it *takes* it, one point per point, and is consumed doing so.
+A crit finding the gap in armour is a coherent thing to say; a crit finding the
+gap in *being alive* is not. There is nothing for it to bypass.
 
-**A unique enchantment does not level.** It arrives at tier 1, it stays at tier
-1, and no amount of casting, farming or servicing moves it.
+That reading settles several questions at once, which is the sign it is the
+right one:
 
-This is the first genuine cap in the design, and it exists because these are the
-first things that are not numbers. The distinction is exact:
+| Question | Answer, from "it is temporary HP" |
+| --- | --- |
+| Does a crit bypass it? | No. Crits bypass armour; HP is not armour |
+| Why one point per HP saved? | Because that is what a hit point is |
+| Why the 1-damage floor? | It is `Block`'s floor, and the pipeline applies it once at the end (§1.6) |
+| Why does it decay? | Because it is *temporary* — the word is doing the work |
+| Does it stack with `Block`? | Yes, and in that order: armour reduces the hit, then the hit spends HP |
 
-| | Scaling means | Can it be priced? |
-| --- | --- | --- |
-| **A catalogue enchantment** | A bigger magnitude — more damage, more healing, a deeper effect | Yes. That is what per-tier values are for |
-| **A unique enchantment** | A rule being *more true* | **No.** There is no safe multiple of "deny death" |
+So the party does end up with a crit counter, but it was never designed as one.
+It is what happens when a pool of extra health meets an attack that ignores
+armour: the armour does nothing and the health does exactly what health does. A
+Bulwark carrying `Block ×8` still eats a natural 20 at full force; the same
+party with a staff up takes it on the temporary health and has none left
+afterwards.
 
-Read them and it is obvious there is nothing to tune. What is `Sturdy` at
-tier 5 — survive five lethal hits? What is `Momentum` at tier 6 — a refund
-larger than the swing, which is the exact loop §1.1 exiled it from the modifier
-table to prevent? `Siphon` deep enough returns more mana than the fight costs
-and the economy stops existing. These do not have a knob that goes up; they have
-a *statement*, and it is either true or it is not.
-
-So the two systems take the two halves of §1.1's toolkit and each takes the one
-that fits:
-
-> A magnitude is re-priced. A rule is limited at the forge.
-
-`Light ×1` and `Resonant ×1` are already limited that way (§1.1) for the same
-underlying reason — a discount running to zero is a rule change wearing a
-number's clothes. Unique enchantments are the honest version of that case.
-
-**It is not a dead stack**, which is the objection §1.1 would otherwise raise.
-Mana spent through a unique enchantment still feeds **max mana** (§2.2), so
-firing it is never wasted — it grows the pool rather than the enchantment. You
-are still building something; you are building the character instead of the
-item.
-
-And it keeps the artifact honest in a way a scaling one could not: **the
-enchantment is as good on the day you find it as it will ever be.** There is no
-version of `Sturdy` you have to grind toward before it is the real `Sturdy`.
-
-**The weapon around it is the opposite**, and the distinction is worth being
-exact about. A unique's whole forged spread caps at `×8` with five stacks of
-headroom unspent (§1.5), so The Bulwark absolutely gets better — wear brings it
-back from service deeper, farming pushes `Block` toward its ceiling, and the
-Bulwark you carry for thirty runs is a substantially stronger weapon than the
-one you picked up.
-
-What does not move is the soul. So a unique is the **deepest project in the game
-wrapped around the one component that is finished on arrival**, which is a
-sharper version of the forged-and-acquired split (§1.1) than any ordinary weapon
-manages: the body accumulates, the identity does not.
-
-**The staff effects are catalogue entries, not a parallel system.** The last
-four rows *are* the four staves (§1.3), written from the other end — a staff
-variant is a guaranteed source of an entry here. A cast is a hit, so an effect
-fires the same way wherever it ends up, and there is one list rather than two.
-
-**`Arcane` alone is the close-range wizard**, and that is deliberate. Hit for
-INT-scaled damage, drain a pool that refills only from *unspent* movement, and
-stop when it runs out — the build is regen-limited, which is exactly the economy
-§1.3 describes rather than an exception to it. `Siphon` used to be the other
-half and is now unique (below), which makes the artifact the thing that *breaks*
-the limit instead of the thing that defines the build. A wizard who finds one
-has found a genuinely different character; a wizard who does not still works.
-
-**Momentum is the case §1.1 sends here.** As a weapon modifier a movement
-refund loops: refunded movement buys the next swing, which refunds again. As an
-enchantment it cannot, because mana regenerates only from movement left unspent
-at end of turn (`PartyMemberState.RegenManaFromUnusedMovement`) — spending the
-refund to keep swinging is exactly what stops the mana coming back.
+That is a better shape than making armour crit-proof, which would have taken the
+natural 20 away again — and it arrived without a rule.
 
 ## 3.4 Consumables
 

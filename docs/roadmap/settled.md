@@ -520,16 +520,24 @@
   for *survival* while staying wasted for *progression*, and a healer cannot
   farm CON off a full-HP party. Its best use is paired with `Vampiric` on a
   weapon that never heals anyone otherwise.
-- **`Ward` joins the level family** rather than staying a pool: one level blunts
-  one incoming hit by `WardAbsorbPerLevel`, levels accumulate, one decays a
-  turn, and being hit spends one too. **Two drains on one counter is what makes
-  `Overheal` self-limiting** — gain sits at `healing / 5` a turn against a
-  guaranteed loss of one, so the equilibrium moves with how hard you are being
-  hit and nothing needed a ceiling. It also makes Regeneration + `Overheal` a
-  *rhythm* rather than a stockpile: the earliest levels expire before the last
-  ticks land, so you cannot bank a whole heal into a shield and walk away.
-  Per-hit rather than a damage pool because it echoes `Block`, which is flat
-  per hit for the same reason.
+- **`Ward` is a pool that decays.** It absorbs **one point per HP saved**, never
+  reduces a hit below 1 taken (the `Block` floor), accumulates on
+  re-application, and loses **one point per turn** at the start of the wielder's
+  turn. So 20 damage into 20 `Ward` leaves 1 through and 1 remaining — and that
+  last point is gone next turn.
+- **Decay of 1 a turn is slow against a fight and fast against a run**, which is
+  why it is a flat point rather than a percentage: a shield survives the
+  engagement it was raised in and bleeds away on the walk to the next. Nobody
+  stockpiles `Ward` in the hub and cashes it on floor 9. Two drains on one pool
+  — decay and absorbing — is also what makes `Overheal` self-limiting without
+  any ceiling, since the equilibrium moves with how hard you are being hit.
+- **`Ward` is temporary health, not armour**, which is why crits do not bypass
+  it. It does not reduce a hit, it takes it — so a crit finding the gap in
+  armour makes sense and a crit finding the gap in *being alive* does not. That
+  framing also answers on its own why it spends one per HP saved, why it decays,
+  and why it stacks with `Block` in that order. The party gets a crit counter it
+  was never designed to have, which beats making armour crit-proof and taking
+  the natural 20 away again.
 - **The Bulwark's enchantment is `Sturdy`**, not `Warding`. That settles the
   one-letter collision with the staff's `Ward` by renaming the *rarer* of the
   two, so the catalogue entry and the `Ward` status it applies both keep the
