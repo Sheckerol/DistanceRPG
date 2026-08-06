@@ -72,8 +72,10 @@ Each dungeon is themed, its boss embodies that theme, and the theme is
 **one guaranteed modifier**:
 
 - The boss carries that modifier **innately**, regardless of what it wields.
-- **Every weapon it drops is forged with it**, on top of whatever the weapon's
-  own class modifier is.
+- **The boss's own drop is forged with it**, on top of whatever the weapon's own
+  class modifier is.
+- **Everything else that drops in the dungeon rolls for it** — the theme joins
+  that weapon's graft pool rather than being handed to it.
 
 **This needs no mechanism of its own.** Grafting an off-class modifier onto a
 weapon is exactly what the enchanter does (§6.4); the boss simply *guarantees
@@ -86,18 +88,33 @@ arrives **forged** and the enchanter's arrives acquired:
 
 | Source | The off-class modifier | Ceiling |
 | --- | --- | --- |
-| Boss drop — chosen, guaranteed, on everything it drops | Forged | 6 |
-| Enchanter graft — rolled, rare, one weapon at a time | Acquired | 5 |
+| **Boss's own drop** — chosen, guaranteed, one weapon a run | Forged | 6 |
+| **Any other drop in that dungeon** — the theme is in its roll pool | Acquired | 5 |
+| Enchanter graft — rolled from the general pool, rare | Acquired | 5 |
 
-So a golem-dropped spear is `Brace ×1, Block ×1` and can be worked up to
-`Block ×6`; a spear that happens to roll Block in service tops out at `×5`. The
-themed drop is strictly the better article, and nothing had to be special-cased
-to make it so.
+So the golem's own spear is `Brace ×1, Block ×1` and can be worked up to
+`Block ×6`; a spear that rolls Block off a dummy in the same dungeon, or in
+service later, tops out at `×5`. The boss's article is strictly the better one,
+and nothing had to be special-cased to make it so.
+
+**The theme is one weapon a run, not a coat of paint on the floor.** Handing it
+to everything would mean a single Block run re-forging your whole stable, which
+is both too fast and too flat — every weapon you own converging on the same
+off-class modifier because you happened to like one dungeon. Guaranteeing it on
+the boss and *weighting* it everywhere else gets the good half without the bad:
+you always come home with the thing you went for, and the rest of the haul leans
+that way without all arriving identical.
+
+The middle row is the part worth stating plainly. **A dungeon does not change
+what drops; it changes what the drops are likely to grow.** An ordinary weapon
+picked up in a Block dungeon rolls its graft from the usual pool *plus* `Block`,
+so the theme shows up often without ever being certain — and when it does it
+arrives acquired, shallower than the boss's, exactly as §1.1 wants.
 
 That is also the honest version of what dungeon selection is *for*. The point
 was never that off-class modifiers are unobtainable elsewhere — it is that the
-boss is the only way to get the one you **chose**, at full depth, on everything
-it drops. Choice and depth, not scarcity.
+boss is the only way to get the one you **chose**, at full depth, guaranteed.
+Choice and depth, not scarcity.
 
 ### A deeper boss pays more
 
@@ -171,18 +188,34 @@ Three things this fixes, none of which a flat lockout would:
 dungeon that beat you is available immediately and as many times as you like.
 Losing costs you the run; it must not also cost you the option.
 
-**The tutorial never locks.** It is the one dungeon a player might have no
-alternative to, and locking a new party out of the only content they have
-learned to fight in would be the single worst thing this rule could do. It is
-also the only dungeon whose boss sits on a fixed floor (2), so the depth
-formula has nothing to say about it anyway.
+**The tutorial does not come back at all.** It is not on a cooldown — beating it
+removes it from the hub **permanently**, and the reason is lore rather than
+economy: the tutorial dungeon is a place the story closes behind you, not a
+resource you exhaust. The mechanical version of that is simply the strongest
+possible cooldown, so it needs no separate rule, only a flag.
+
+It lines up with the economy anyway, which is the tell that the lore is pulling
+in the right direction. The tutorial's boss sits on a fixed floor 2 (below), so
+the depth formula would price it at one stack and a two-run lock — the least
+rewarding dungeon in the game, kept alive forever as a cheap service-tick farm.
+Removing it is both the better story and the better rule.
+
+The obvious worry — locking a new party out of the only content they know — does
+not arise, because the tutorial is the thing that *unlocks* the hub. You cannot
+beat it before you have somewhere else to go.
 
 ### A themed boss cannot drop a class that will not take its theme
 
-"On everything it drops" is a guarantee, so the drop table bends to it rather
-than the other way round. Some modifiers are exclusive with others or restricted
-by weapon type (§1.1), and where a class cannot legally carry the theme, **the
-boss simply does not drop that class.**
+The boss's drop is a *guarantee*, so its drop table bends to it rather than the
+other way round. Some modifiers are exclusive with others or restricted by
+weapon type (§1.1), and where a class cannot legally carry the theme, **the boss
+simply does not drop that class.**
+
+This applies to the boss's own drop and nothing else. Ordinary drops need no
+such rule: the theme is only in their *roll pool*, and `Allowed` (§1.7) already
+skips a modifier a weapon cannot hold. An axe picked up in a `Brace` dungeon
+simply never rolls `Brace` and rolls something else instead — no table to bend,
+no class to exclude.
 
 A `Brace`-themed boss is the worked example. `Brace` is melee-only and sits in
 the reaction group with `Opportunist`, so:
@@ -263,8 +296,9 @@ Three consequences worth stating plainly:
 ### The tutorial dungeon: the stone golem
 
 The dungeon shipped today is the **tutorial**, and its theme is **Block**. Its
-boss is a stone golem: innate Block whatever it happens to be holding, and
-every weapon it drops comes away with Block on it.
+boss is a stone golem: innate Block whatever it happens to be holding, and the
+weapon it drops comes away forged with Block. Everything else killed down there
+rolls for Block on top of its usual graft pool.
 
 ### Two floors deep
 

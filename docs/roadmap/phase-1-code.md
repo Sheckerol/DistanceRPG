@@ -124,11 +124,13 @@ Two consequences worth having on purpose:
   Over enough services a weapon can reach spreads no single roll could hand it,
   and the game tells a small story getting there. Nothing is ever removed from a
   weapon, so a satisfied prerequisite stays satisfied.
-- **A themed boss can unlock a prerequisite wholesale.** The golem forges `Block`
-  onto everything it drops (§4.3), so every one of those weapons becomes
-  eligible for `Riposte` and `BlockWeaken` at the enchanter. A Block-themed
-  spear that later learns to riposte is a weapon the drop tables cannot produce
-  and nobody designed — which is the best thing grafting does.
+- **A themed boss can unlock a prerequisite.** The golem forges `Block` onto its
+  own drop (§4.3), so that weapon becomes eligible for `Riposte` and
+  `BlockWeaken` at the enchanter — as does any other weapon from that dungeon
+  that happened to *roll* the theme. A Block-themed spear that later learns to
+  riposte is a weapon the drop tables cannot produce and nobody designed, which
+  is the best thing grafting does. Note the ordering this implies: the theme
+  roll has to resolve before the graft roll asks what the weapon can hold.
 
 `Allowed` folds all three rules into one predicate, so there is exactly one
 definition of "this weapon cannot hold that" and every caller asks the same

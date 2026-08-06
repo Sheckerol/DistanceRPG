@@ -91,8 +91,9 @@
   is the depth that takes it away, so deep and shallow runs trade rather than
   rank. Counted by the same events that tick the enchanter, so there is no
   second clock. **Failing locks nothing** — a dungeon that beat you is available
-  immediately. **The tutorial never locks**, since it is the one dungeon a party
-  may have no alternative to.
+  immediately. **The tutorial does not come back at all** — beating it removes
+  it from the hub permanently, for lore reasons rather than economic ones. It is
+  also the thing that unlocks the hub, so no party is ever stranded by it.
 - **`Charges` is the only negative graft.** The sweep is done; nothing else in
   the table takes something away at `×1`. Still worth a test asserting every
   modifier's first stack is a non-decrease, so a future modifier cannot
@@ -104,9 +105,14 @@
   the result *is* that class's unique: Tower Guard + the golem's Block = The
   Bulwark. Nothing special-cased it; §1.5's derivation rule and §4.3's graft met.
   So each themed dungeon can drop exactly one named unique, and themes are drawn
-  from class signatures for that reason.
+  from class signatures for that reason. Only the **boss's own** drop can do
+  this: an ordinary drop that merely *rolls* the theme gains it acquired, and
+  §1.5 defines a unique by its forged spread, so a `Block ×2 + acquired` Tower
+  Guard is a good weapon rather than The Bulwark.
 - **Each dungeon is themed on one modifier.** Its boss carries that modifier
-  innately whatever it wields, and every weapon it drops is *forged* with it.
+  innately whatever it wields, and **its own drop** is *forged* with it while
+  every other drop in the dungeon merely **rolls** for it (acquired, so
+  shallower).
   That is a guaranteed graft rather than a mechanism of its own, and the reason
   to choose one dungeon over another is that it is the only **chosen** off-class
   modifier — and the only one that runs a stack deeper than a rolled graft.

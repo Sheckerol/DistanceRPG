@@ -44,7 +44,7 @@ needs a bespoke mechanism:
 | Control weapon | `+` one stack of something that degrades the enemy |
 | Support weapon | `+` one stack of something that helps the party |
 | **Unique** | Arbitrary stacks — signature ×3, or two modifiers at ×2 |
-| Dungeon theme (Phase 4) | `+` one stack of the boss's modifier, on everything it drops — §4.3 |
+| Dungeon theme (Phase 4) | `+` one stack of the boss's modifier — forged on the boss's own drop, rolled on everything else in that dungeon — §4.3 |
 | Repeat-kill depth (Phase 3) | `+1` or `+2` stacks of the class signature — §3.2 |
 | Enchanter service (Phase 6) | `+1` stack, deepening or grafting — §6.4 |
 | Enchantment (Phase 3) | Its own system entirely — §3.3 |
