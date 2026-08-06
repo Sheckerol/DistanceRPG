@@ -332,10 +332,15 @@
   (§4.5); this wants a beat on top of that — something that connects the crit to
   the jump in the same moment, or the funniest event in the game reads as
   a glitch.
-- **Which structural data eventually leaves the code?** `tuning.json` is scalars
-  only (§5.3), deliberately — weapon tables and the §1.1 relations carry
-  invariants that a hand-edited file could violate. But weapon statlines are the
-  thing a designer most wants to iterate on, and "recompile to try a spear at
-  50" is the same friction the tuning file exists to remove. A second, validated
-  data file with `Allowed`/`MaxForged` run over it at load is the obvious answer
-  and is deliberately not specced yet.
+- **Do enchantments want their own file too?** `weapons.json` (§5.4) settles
+  weapons; the enchantment catalogue is the same shape of content — lock,
+  trigger, condition, effect — with the same split between a behaviour that must
+  be code and a table that need not be. The argument for waiting is that the
+  catalogue is small and its entries are less uniform than modifiers; the
+  argument for doing it now is that it will be the same work later and one
+  loader is cheaper than two.
+- **Where do dungeon themes and boss definitions live?** §4.3 makes a theme a
+  modifier plus an attunement plus a drop table, which is data by any reasonable
+  reading — and the drop table is *derivable* from the theme via `Allowed`
+  rather than authored, so it mostly wants a loader that computes rather than
+  reads. Not urgent until there is a second dungeon.

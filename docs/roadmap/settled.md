@@ -474,3 +474,17 @@
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
   warn on mismatch rather than refusing.
+- **Weapons live in `weapons.json`** (§5.4) — statlines, forged spreads, shapes,
+  innate enchantments, uniques. Validated at load against the same
+  `Allowed`/`MaxForged` predicates the graft roll and boss drop table use, so no
+  new validation code exists; invalid data **aborts startup** naming the weapon
+  and the rule, rather than clamping as `tuning.json` does, because a broken
+  invariant is not a bad balance number. Referenced everywhere by **stable
+  string id**, never index, or adding a weapon silently re-rolls every enemy in
+  every existing save.
+- **The point of it is that modifiers become additive.** Behaviour and relations
+  stay in code, the per-stack value is `tuning.json`, and which weapons carry it
+  is `weapons.json` — so adding a modifier is: implement it, price it, declare
+  its relations, and it is then usable on any weapon in any spread without
+  touching code again. That is §1.1's uniformity finally paying out in the
+  workflow rather than only in the design.

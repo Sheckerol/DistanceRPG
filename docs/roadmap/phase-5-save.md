@@ -94,3 +94,79 @@ underneath the player is the failure to avoid.
 
 The full values are not stored. The hash costs nothing and answers the only
 question that matters: *are these the same numbers?*
+
+## 5.4 `weapons.json` — the content, validated at load
+
+The 32 weapons, the uniques, and the class baselines move out of `Weapons.cs`
+into data. Statline, forged spread, area shape, innate enchantment — all of it.
+
+### What this actually buys: modifiers become additive
+
+The reason to do it is not that weapon numbers become editable, though they do.
+It is that **adding a modifier stops being a content change.** The work splits
+three ways and only one part is code:
+
+| What | Lives in | Why there |
+| --- | --- | --- |
+| A modifier's **behaviour** | Code | It is a rule. `Brace` fires a retaliation; that has to run |
+| Its **per-stack value** | `tuning.json` | It is a number |
+| Its **relations** — `Excludes`, `Requires`, `RequiresKind`, `ForgedOnly` | Code | They are the invariants the data is checked *against*; editable relations could not validate editable weapons |
+| **Which weapons carry it** | `weapons.json` | Content |
+
+So adding `Sundering Roar` or whatever comes next is: implement the behaviour,
+add a per-stack value, add any relations it needs — and then it can go on any
+weapon, in any spread, forever, without touching the code again. Every existing
+weapon can be revised to use it in the same edit.
+
+That is the difference between a modifier system and a modifier *list*. The
+whole of §1.1 is built on modifiers being uniform — stacks, one mechanism, no
+bespoke cases — and this is that uniformity finally paying out in the workflow
+rather than only in the design.
+
+### It is validated, and that is the difference from `tuning.json`
+
+`tuning.json` is scalars that clamp and warn. **Weapon data carries invariants**,
+so it is checked at load against the predicates that already exist:
+
+| Check | Rule | From |
+| --- | --- | --- |
+| Every forged spread is legal | `Allowed(t, kind, present)` | §1.1 |
+| Nothing forged too deep | `MaxForged` — `×3`, or `×1` for `Light`/`Resonant` | §1.1 |
+| No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
+| A unique derives from a variant | Exactly one modifier raised to `×3`, plus its enchantment | §1.5 |
+| Casters carry exactly one innate enchantment | Staff fixed by variant, wand a damage type | §3.1 |
+
+§1.7 already lists "weapon data validation" as a caller of `Allowed`. This is
+that caller, and the point is that **no new validation code exists** — the
+loader asks the same questions the graft roll and the boss drop table ask.
+
+**Invalid data aborts startup**, naming the weapon and the rule it broke. Not
+clamped, not skipped. A bad scalar is a bad balance number and the game still
+runs; a bad weapon is a broken invariant that `Allowed` callers downstream
+assume holds, and limping past it turns a typo into a crash somewhere unrelated.
+
+### Weapons are referenced by stable id, never by index
+
+This is the one thing that will bite if it is got wrong later.
+
+`EnemyPlacer` assigns weapons from a seeded stream, and saves record what every
+enemy is carrying. If either refers to a weapon by its **position** in the file,
+then adding a weapon silently re-rolls every enemy in every existing save and
+breaks seed reproducibility for no visible reason.
+
+So: every weapon carries a **stable string id**, and saves, drops and enemy
+states all store that. Reordering the file is then free, and adding to it costs
+nothing.
+
+The placement roll needs the same care and §3.1 already has it right — it rolls
+over the **eight classes** with the variant rolled later, so the stream depends
+on a count fixed in code rather than on the file's length. Adding a fifth
+variant to a class would still shift things; that is a deliberate, rare change
+rather than an ordinary edit.
+
+### Not the golden tests' problem
+
+Nothing here touches `MapGenerator`, `Mulberry32` or `Pathfinder`, so
+`TestData/distancerpg-golden.json` is unaffected — it pins map generation, fog
+and pathing, never weapon statlines. Worth stating plainly, because "weapons are
+data now" sounds like it should be a parity concern and is not.
