@@ -309,9 +309,16 @@
   deep one. That may be the right variety or it may dilute the shape that makes
   the Candle read as an artifact. Worth deciding before more uniques are
   authored, since it is the difference between a shape and a one-off.
-- **`Ward` and `Warding` are one letter apart** and do different things — the
-  Staff of Warding's absorb-until-spent versus the Bulwark's survive-at-1-HP.
-  One should probably be renamed before either appears in a UI.
+- **Does `Ward` need a ceiling now that `Overheal` exists?** `Ward` is the one
+  status that is a *pool* rather than a level count — it absorbs until spent and
+  does not decay, which was fine when the only source was a staff cast. With
+  `Overheal` (§3.3) converting every point of surplus healing, a Regeneration
+  tick on a healthy party generates shield every turn with nothing bleeding it
+  off. The recommendation is a ceiling at the wielder's **max HP** — you cannot
+  carry more shield than body, it scales with CON on its own, and §1.1 already
+  says the enchantment layer is where organic bounds belong. Decay is the
+  alternative and reads worse: a shield that evaporates while you walk is a
+  timer, not a buff.
 - **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
   now costs 5 to do it, so its net depends on a restore value nobody has set.
   Less pressing than it was, since Siphon is now unique-level and the ordinary
@@ -336,7 +343,8 @@
   entry name a behaviour and supply parameters, which works cleanly for Arcane
   (damage), Vampiric (heal by damage dealt) and the elements. It works less
   obviously for `Warding` (survive at 1 HP), `Momentum` (refund part of a
-  swing's movement) and `Echoing` (trigger the weapon's class feature again) —
+  swing's movement), `Overheal` (intercept surplus healing) and `Echoing`
+  (trigger the weapon's class feature again) —
   each of which reaches into a different system. Either `EffectKind` becomes a
   wide enum of one-offs, which is honest but not really data-driven, or the
   unique souls stay in code and only the catalogue is a file.
@@ -344,3 +352,9 @@
   party, their innate stats and their opening weapons are content by the same
   argument, and they are the thing a designer tweaks while tuning the tutorial.
   Not specced; it is the obvious fifth file and nobody has asked for it yet.
+- **Which unique carries `Overheal`?** It wants a healing weapon to be obvious
+  on and a non-healing one to be interesting on, and §1.5 has no Staff of
+  Renewal unique named yet. The natural home is that staff — surplus healing is
+  what Regeneration produces most of — but the argument for putting it somewhere
+  stranger is that the `Vampiric` pairing is the better build and a staff does
+  not need help finding value in healing.

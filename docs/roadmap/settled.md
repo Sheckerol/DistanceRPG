@@ -67,11 +67,13 @@
   uniques get that *and* one modifier at `×3`; caster uniques get only the
   enchantment, since `Resonant` cannot be forged past `×1`. So the caster case
   stopped being an exception and became the rule. `Siphon`, `Weightless`,
-  `Warding` and `Momentum` are unique-level and out of the catalogue.
+  `Warding`, `Momentum` and `Overheal` are unique-level and out of the
+  catalogue.
 - **The test for unique-level is "does it break the frame", not "is it strong".**
   All four bend something the game is built on — Siphon breaks mana's dependence
   on unspent movement, Weightless and Momentum refund the game's currency,
-  Warding denies death. An enchantment that merely deals more damage is a
+  Warding denies death, Overheal un-wastes surplus healing. An enchantment that
+  merely deals more damage is a
   catalogue entry however much damage it deals.
 - **A unique enchantment is transferable but never catalogued.** The enchanter
   copies what you have seen; there is nothing to copy here, only the one that
@@ -509,3 +511,15 @@
   themed boss cannot drop a class that will not take its theme *is* `Allowed`
   run over the eight classes at load. Authoring it by hand would let the two
   disagree, and the disagreement would look exactly like a drop-rate bug.
+- **`Overheal` converts healing above full HP into `Ward`.** Unique-level by the
+  same test as the rest: `TickStatusEffects` discards overheal on purpose, and
+  §2.2 rests "constitution grows by getting hurt and then healed" on that. The
+  converted overflow grants **no HP XP** — it is `Ward`, not healing — so the
+  surplus stops being wasted for *survival* while staying wasted for
+  *progression*, and a healer cannot farm CON off a full-HP party. Its best use
+  is paired with `Vampiric` on a weapon that never heals anyone otherwise.
+- **The `Ward` enchantment is renamed `Sturdy`**, and its staff to the **Staff
+  of the Aegis**. The status it applies is still `Ward`. This settles the
+  one-letter collision with the Bulwark's `Warding`, which does something
+  completely different (survive at 1 HP), and keeps the status name for the
+  thing `Overheal` pours into.

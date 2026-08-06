@@ -577,7 +577,7 @@ dagger, the fighter's warstaff. Nothing keys off `WeaponClass`.
 
 The one place class enters is the **drop roll** (§3.1), and even there it only
 sets the odds of arriving with one, never which one. A staff is guaranteed an
-enchantment; it is not guaranteed a *caster's* enchantment, and Warding on a
+enchantment; it is not guaranteed a *caster's* enchantment, and Sturdy on a
 Staff of Mire is a perfectly ordinary drop.
 
 ### Starting set
@@ -595,7 +595,7 @@ Potency values are before INT scaling.
 | **Acidic** | 20 | 5 | Hit | Acidic damage |
 | **Cold** | 20 | 5 | Hit | Cold damage |
 | **Regeneration** | 15 | 5 | Hit | Heals per turn, decaying — Staff of Renewal's |
-| **Ward** | 20 | 5 | Hit | Absorbs damage until spent — Staff of Warding's |
+| **Sturdy** | 20 | 5 | Hit | Applies `Ward`, absorbing damage until spent — the Aegis staff's |
 | **Poison** | 20 | 5 | Hit | Damage per turn, decaying — Staff of Blight's |
 | **Mire** | 25 | 5 | Hit | Cuts the target's movement budget — Staff of Mire's |
 
@@ -643,11 +643,13 @@ cannot be chosen at the enchanter, and cannot be copied:
 | **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
 | **Warding** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
+| **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` instead of losing it |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
 movement. `Weightless` and `Momentum` refund the movement that *is* the game's
-currency. `Warding` denies death. None of them is merely a larger number, and
+currency. `Warding` denies death. `Overheal` un-wastes the one resource the
+design deliberately throws away. None of them is merely a larger number, and
 none of them belongs in a list the enchanter can hand out on request.
 
 That is the test for whether something is unique-level: **not "is it strong" but
@@ -659,6 +661,34 @@ to the enchantment layer because as a weapon modifier a movement refund loops
 (refunded movement buys the next swing, which refunds again). Making it unique
 closes the last of that: it loops on *one weapon in the game* rather than on any
 weapon the graft roll touches.
+
+### `Overheal` and the one resource the game throws away
+
+`TickStatusEffects` caps healing at missing HP (`TurnSystem.cs:589`), so healing
+a healthy target does nothing at all. That is deliberate and load-bearing —
+§2.2 rests "constitution grows by getting hurt and then healed" on it, and a
+party that never takes a scratch never gains HP.
+
+**`Overheal` converts the excess into `Ward` instead of discarding it.** Heal a
+full-HP ally for 12 and they gain 12 shield. It is the healing analogue of
+`Siphon` and `Momentum`: all three take something the design explicitly wastes
+and hand it back, which is exactly why all three are unique-level rather than
+catalogue.
+
+**It grants no HP XP, and that matters more than it looks.** The converted
+overflow is `Ward`, not healing — `hpXp` still counts only what closed an actual
+wound. Without that guard a healer parked next to a full-HP party would farm CON
+forever off a resource that costs nothing, and §2.2's emergent rule would
+collapse into a stat you grind by standing still. So the overflow stops being
+wasted for *survival* while staying wasted for *progression*, and the sentence
+"constitution grows by getting hurt and then healed" survives intact.
+
+**It is the one unique enchantment that wants a second enchantment to matter.**
+Alone on a healing staff it is a straightforward upgrade. Paired with
+`Vampiric` — heal the wielder for damage dealt — it becomes a melee build that
+turns excess lifesteal into a shield, on a weapon that never heals anyone
+otherwise. That is the transfer rule (§6.5) paying off on the enchantment least
+obviously portable, and the reason `Overheal` should not be pinned to staves.
 
 **This is also why they can be transferred but never catalogued** (§1.5). The
 enchanter copies what he has seen; there is nothing to copy here, only the one

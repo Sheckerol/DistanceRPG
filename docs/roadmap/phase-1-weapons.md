@@ -93,7 +93,7 @@ identity kept in the field that suits it:
 
 | | The enchantment is | Rolled? |
 | --- | --- | --- |
-| **Staff** | The effect it casts — Poison, Ward, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
+| **Staff** | The effect it casts — Poison, Sturdy, Mire, Regeneration (§1.3) | **No.** Fixed by variant |
 | **Wand** | Its damage type — Flaming, Shocking, Acidic, Cold (§1.4) | **Yes.** Uniform among four |
 
 A staff *is* its effect, so rolling it would make a Staff of Blight stop being
@@ -642,7 +642,7 @@ differ in what they apply and what it costs in mana.
 | Variant | Name | Target | Mana | Applies |
 | --- | --- | --- | --- | --- |
 | Buff | Staff of Renewal | Ally | 15 | **Regeneration** — heals per turn, decaying |
-| Buff | Staff of Warding | Ally | 20 | **Ward** — absorbs damage until spent |
+| Buff | Staff of the Aegis | Ally | 20 | **Sturdy** — applies `Ward`, which absorbs damage until spent |
 | Debuff | Staff of Blight | Enemy | 20 | **Poison** — damage per turn, decaying |
 | Debuff | Staff of Mire | Enemy | 25 | **Mire** — cuts the target's movement budget |
 
