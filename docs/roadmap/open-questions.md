@@ -242,3 +242,21 @@
   re-rollable one at the price of a wasted run. Depends entirely on whether a
   wasted run is expensive enough, which service ticks (§6.3) currently say it
   is not.
+- **Is `max(3, 10 − DefeatCount)` too steep at the front?** It reaches the floor
+  of 3 at `DefeatCount 7`, while the ladder runs past 20 — so more than half the
+  farm happens at the same revival speed and the acceleration is over before the
+  interesting cycles begin. That may be right, since the statline takes over
+  exactly there, or the slope may want halving (`10 − n/2`, floor at 10 cycles)
+  so the two pressures overlap instead of handing off.
+- **Does the retreat gauntlet punish the wrong player?** It lands hardest on
+  someone who farmed deep and then judged they could not take the boss — which
+  is the correct read of the situation and the most punishing outcome for making
+  it. A party that farms nothing walks out freely. Worth checking in play that
+  it reads as a consequence rather than as a trap, since the information needed
+  to make the call correctly (boss difficulty) is the one thing the run does not
+  show you until you are standing in front of it.
+- **Should a retreat be able to bank anything at all?** Currently a fighting
+  retreat from floor 8 earns a mercy tick and nothing else — the same as dying
+  on floor 3. Surviving the climb out is a real achievement that the table does
+  not distinguish, and "escaped with the haul, no boss" may deserve to exist as
+  a fourth row with partial drops.

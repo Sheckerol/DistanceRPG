@@ -75,9 +75,18 @@
   makes it enchantable.
 - **Service costs runs, not gold** — `enchantments + 1` runs per attachment, so
   power and availability trade off directly.
-- **Entering does not tick service.** A successful run ticks; reaching floor 2
-  and then failing ticks once as mercy, so a losing streak cannot freeze the
-  workshop.
+- **Entering does not tick service.** A successful run ticks; **failing at floor
+  3 or deeper** ticks once as mercy — however it ended, death or retreat — so a
+  losing streak cannot freeze the workshop. The mercy tick pays for *failing
+  deep*, never for leaving early, or a two-floor exit would be a strategy.
+- **A revival is faster as well as stronger.** `resurrectTurns = max(3, 10 −
+  DefeatCount)`. Speed front-loads and the statline back-loads, so the early
+  farm gets busy and the late farm gets dangerous. Three is a floor because a
+  two-turn revival is a treadmill rather than a fight.
+- **Farming arms the corridor behind you.** Resurrection stops only when the
+  boss dies, so retreating without one means climbing back through everything
+  you farmed, stronger and returning in three turns. The boss is not the last
+  obstacle before the exit — it is what makes an exit exist.
 - **A run is successful when you kill the boss.** One boss per dungeon, on a
   floor rolled 5–10 at entry and not disclosed; the boss floor is the bottom.
 - **A deeper boss pays more, and costs the dungeon for longer.** The drop

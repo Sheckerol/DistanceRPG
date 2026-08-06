@@ -128,8 +128,8 @@ The tick and the spoils come apart, and they should:
 
 | Outcome | Service tick | Drops |
 | --- | --- | --- |
-| Entered, left above floor 2 | **None** | — |
-| Reached floor 2, left without the boss | **1 (mercy)** | — |
+| Failed above floor 3 | **None** | — |
+| **Failed at floor 3 or deeper** — died, or retreated | **1 (mercy)** | — |
 | Killed the boss, died on the way out | **1** | **None** |
 | Killed the boss and extracted | **1** | **Everything you killed climbing out** |
 
@@ -145,16 +145,50 @@ It is deliberately not a consolation prize — a mercy tick advances the service
 clock and nothing else. You still lose the run's spoils. Succeeding is strictly
 better; failing merely is not compounding.
 
-Reaching floor 2 is the bar because it cannot be cleared by walking in and
-turning around, but it also does not demand a good run.
+### The mercy tick is for failing deep, not for leaving early
+
+The bar is **three floors down, and the run is over without a boss kill** —
+however it ended. Dying on floor 6 earns it; so does turning around on floor 4
+and getting home. What does *not* earn it is entering, seeing what is on the
+first floor, and walking back out.
+
+That framing matters more than the number. A rule that paid out for *leaving*
+would make a short exit a strategy — descend two floors, turn around, bank a
+tick, repeat. A rule that pays out for **getting deep and failing anyway** pays
+for the same thing every other system here pays for: the attempt.
+
+**Retreating is not the safe option.** Withdrawing without the boss means
+climbing back through floors where nothing stayed dead — resurrection only stops
+when the boss does (§4.3), so every dummy you killed on the way down is up again,
+stronger for having died, and coming back faster the more often you killed it
+(§3.2). The way out is *the same dungeon after you have made it worse*.
+
+So the three failure shapes are genuinely different, and none of them is free:
+
+| | What it costs |
+| --- | --- |
+| **Turn back early** | The run, and you were never deep enough for the tick |
+| **Turn back deep** | A fighting retreat through everything you farmed |
+| **Die** | The run and the haul, but the attempt still counted |
+
+Three floors is the bar because it cannot be cleared by walking in and turning
+around, and because by the third floor a retreat is already a real fight rather
+than a stroll. It still does not demand a good run.
 
 Note the mercy tick and the success tick are currently worth the same. Since a
 boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
 see the open questions.
 
-In the **tutorial** the two nearly coincide, since its boss is on floor 2
-(§4.3) — reaching the mercy bar means standing in front of the golem. That is
-intentional: a first run should not be able to come away with nothing.
+**The tutorial has no mercy tick at all**, since its boss sits on floor 2 (§4.3)
+and the bar is three. That reads worse than it is: on a first run there is
+nothing in service for a tick to advance, so the consolation would be
+consolation for nothing. The tutorial's answer to failure is that you can walk
+straight back in — it never locks until it is beaten, and then it is gone
+(§4.3).
+
+It also means the mercy rule never has to be explained to a new player. They
+meet it later, in a real dungeon, at the moment it first does something — which
+is the right time to learn any rule.
 
 ## 6.4 Service can improve the weapon
 

@@ -56,7 +56,8 @@ never attach a second. Breadth remains the thing you only get by choosing it.
 
 This makes the resurrection timer a deliberate farming rhythm rather than
 flavour — camp a dummy to deepen its drop, at the cost of the turns you spend
-waiting.
+waiting. That cost shrinks as you farm: the timer shortens with `DefeatCount`
+(below), so the waiting stops being the expensive part and the fighting starts.
 
 **Nothing is handed over at the time.** `DefeatCount` is the quality of the
 drop that dummy is *carrying*; you collect it only by killing it permanently on
@@ -249,6 +250,49 @@ same number. It is the quality of the drop the dummy is carrying *and* how
 dangerous it has become. You cannot bank value into a dummy without arming it.
 The nameplate (§4.5) has to read as a threat level and a reward tier
 simultaneously — which is honest, because that is exactly what it is.
+
+### And it comes back sooner
+
+The roll decides *what* a revival grants; the count decides **how fast it
+happens**. Resurrection is 10 turns today (`GameConstants.DummyResurrectTurns`),
+and it shortens with every defeat:
+
+```
+resurrectTurns(n) = max(3, 10 − n)
+```
+
+| `DefeatCount` | 0 | 2 | 4 | 6 | **7+** |
+| --- | --- | --- | --- | --- | --- |
+| Turns to revive | 10 | 8 | 6 | 4 | **3** |
+
+**The two pressures arrive at different stages, which is the point.** Speed
+front-loads: it bites in the first handful of cycles, turning a farm from a
+leisurely rhythm into something that keeps interrupting you, and it bottoms out
+at three before the ladder is halfway up. The statline back-loads: `+5` a cycle
+is negligible early and lethal by fifteen. So the early farm gets *busy* and the
+late farm gets *dangerous*, and neither stage feels like the other one repeated.
+
+Three is a floor rather than a curve because a two-turn revival is not a fight,
+it is a treadmill — the party would spend every turn re-killing the same thing
+and never get to decide anything. At three there is still room to reposition,
+swing at something else, or leave.
+
+**It is what makes retreat expensive.** Resurrection only stops when the boss
+dies (§4.3), so a party that turns back without one has to climb through every
+floor it farmed — and the dummies there are now stronger, and getting up in
+three turns instead of ten. Farming does not merely arm the dummy in front of
+you; **it arms the corridor behind you.** That cost lands precisely on the
+player who farmed deepest and then lost their nerve, which is the right person
+to charge for it.
+
+It also sharpens the boss kill into the thing the run is actually *for*. Before
+it, the dungeon is an infinite accelerating farm; after it, everything stays
+down and the climb out is finite (§4.4). The boss is not the last obstacle
+between you and the exit — it is what makes an exit exist.
+
+**Both numbers are knobs**, and they are coupled: shortening the floor or
+steepening the slope makes deep farming untenable long before the statline does,
+which would waste the ladder §3.2 builds.
 
 **The bonuses land on the actor, not on the weapon.** A dummy hitting for `+15`
 does not drop a weapon with `+15` on it; drop quality comes from the ladder

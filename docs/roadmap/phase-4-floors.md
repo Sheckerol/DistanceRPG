@@ -50,21 +50,30 @@ you like, because a cleared dungeon is locked and a failed one re-rolls.
 
 ### Killing the boss stops resurrection
 
-Dummies revive after 10 turns today (`TurnSystem.cs:532`). Once the boss is
-down, they stop: the dungeon becomes **finite and clearable** for the rest of
-the visit.
+Dummies revive after 10 turns today (`TurnSystem.cs:532`), and sooner the more
+often they have died — down to 3 (§3.2). Once the boss is down, they stop: the
+dungeon becomes **finite and clearable** for the rest of the visit.
 
 That is the reward, and it also creates the run's central tension. The
 repeat-kill ladder runs *on* resurrection — `DefeatCount` only advances because
 dummies come back (§3.2). So:
 
-- **Before the boss**, the dungeon is an infinite farm. Deeper weapon drops,
-  uniques, as long as you have the turns and the health to keep cycling.
+- **Before the boss**, the dungeon is an infinite farm — and an *accelerating*
+  one, since every cycle makes a dummy stronger and quicker to return (§3.2).
+  Deeper drops and better unique odds, as long as you have the turns and the
+  health to keep cycling.
 - **After the boss**, it is a finite clear. Whatever is left, you take once.
 
 Killing the boss is what makes a run *successful* (§6.3), and it is also what
 ends your farming. Deciding when you have farmed enough is the run's real
 decision, and it is entirely the player's to make.
+
+**It is also the only thing that makes leaving cheap.** Retreat without the boss
+and the climb out runs back through every floor you farmed, against dummies that
+are stronger for having died and returning in three turns rather than ten. The
+boss is not the last obstacle between the party and the exit — **it is what
+makes an exit exist.** A player who farms hard and then loses their nerve has
+built the gauntlet they now have to walk.
 
 ### A boss is a dungeon's theme, and the theme is a modifier
 
