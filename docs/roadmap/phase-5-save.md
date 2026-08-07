@@ -223,7 +223,7 @@ Statline, forged spread, area shape, innate enchantment id.
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
 | A unique derives from a variant | Exactly one modifier at `×3`, plus its unique enchantment | §1.5 |
 | Casters carry exactly one innate enchantment | Staff fixed by variant, wand a damage type | §3.1 |
-| Every unique forged with `Light` or `Resonant` names a unique enchantment | A currency cannot carry an artifact's identity | §1.5 |
+| A `Light`-forged unique carries exactly **two** enchantments, one of them unique or tier 3 | A currency cannot carry an artifact's identity, so the souls do | §1.5 |
 
 §1.7 already lists "weapon data validation" as a caller of `Allowed`. This is
 that caller, and the point is that **no new validation code exists**.

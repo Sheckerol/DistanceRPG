@@ -1073,6 +1073,7 @@ Everything else is unchanged.
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | **Siphon** | Finds the gap on 17+, and every kill funds the enchantments doing it |
 | Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | *Immovable* | Three retaliations at full reach, from a line that cannot be moved |
 | Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | *Piercing* | +3 a tile, and the shot does not stop at the first body |
+| *(unnamed)* | Dagger | Flensing Knife | `CritWindow ×3, Light ×1` | **`Vampiric` + `Overheal`** | Stabs itself a shield — the only martial weapon that runs a combo |
 
 **The four named enchantments each answer their weapon's own logic**, which is
 the test a pairing has to pass. `Sturdy` on the shield that already refuses
@@ -1130,7 +1131,7 @@ they are not interchangeable:
 | **Purity** | The class signature (already `×2`) | One deep modifier and nothing else — the purest expression the class has |
 | **Control** | Either the signature or the control modifier | Signature-deep with a rider, or shallow with a *brutal* rider |
 | **Support** | Same, on the support modifier | The party-facing version of the above |
-| **Efficiency** | The signature — **never `Light`** | Deep *and* cheap, the only shape that gets both |
+| **Efficiency** | The signature — **never `Light`** | Deep *and* cheap, and paid a **second enchantment** for the axis it spends on `Light` |
 
 Efficiency uniques cannot raise their own added modifier, because `Light` is
 forge-limited to `×1` (§1.1). An Efficiency unique is therefore forced onto the
@@ -1157,15 +1158,55 @@ unique's second axis is `Light ×1`, which is on the Flensing Knife, the Hatchet
 and the Hunting Bow too. Strip the enchantment away and it is a variant with a
 deeper signature.
 
-**So every `Light`-forged artifact carries a unique enchantment**, and the
-enchantment is where its identity lives rather than an ornament on top of it.
-The `signature ×3` is what it is made of; the soul is what it *is*.
+**So a `Light`-forged artifact's identity lives in its enchantments**, and it is
+given enough of them to hold one. Where every other martial unique is
+`signature ×3` plus a distinct second modifier plus one soul, an Efficiency
+unique spends that second axis on `Light` and is paid for it in souls:
 
-**And a `Light` artifact's soul should pay in the currency `Light` trades in.**
-`Light` buys movement back (§1.1), so an Efficiency artifact whose unique
-enchantment does something with movement is the coherent version — the cheapness
-and the soul saying the same thing rather than sharing a hilt. Which souls the
-four Efficiency uniques carry is not settled; the constraint on them is.
+| | Forged | Enchantments |
+| --- | --- | --- |
+| **Every other martial unique** | `signature ×3`, a distinct modifier `×1` | One |
+| **An Efficiency unique** | `signature ×3`, `Light ×1` | **Two — one of them unique, or at tier 3** |
+
+That is not a new shape. It is the caster menu (above) handed to a martial
+weapon: a second enchantment and an elevated one are the two things §1.5 already
+lets an artifact do that no drop can, and the Efficiency unique is the one
+martial derivation with a spare axis to pay for them.
+
+### Why `Light` specifically can afford two souls
+
+Because it is the only martial modifier that *generates mana*. Every enchantment
+trigger costs mana (§3.3) and mana comes back from movement left unspent (§1.3)
+— which is exactly what `Light` produces, and precisely why `Light` and
+`Resonant` exclude each other in the first place (§1.1). A cheap weapon banks
+the movement that pays for its own triggers.
+
+So the second soul is not compensation bolted on to make a dull shape
+interesting. **A `Light` weapon is the only martial platform that can sustain
+two triggers**, and giving it two is the design following the mana rather than
+decorating the weapon. The cheapness and the enchantments are the same fact.
+
+### Which makes the Efficiency unique the only martial weapon that runs a combo
+
+One soul on a martial weapon has to stand alone. Two can *feed each other*, and
+that is a thing no other martial artifact in the game can do:
+
+> **The Efficiency dagger** — from the Flensing Knife — carries
+> `CritWindow ×3, Light ×1`, **`Vampiric`**, and **`Overheal`**. It crits on
+> 17+, `Vampiric` heals it for the damage dealt (§3.3), and once that healing
+> runs past full `Overheal` banks the surplus as `Ward`. A dagger that stabs
+> itself a shield.
+
+Neither half works alone. `Overheal` on a weapon with no healing source is
+inert, and `Vampiric` at full health is the resource §3.3 calls the one the game
+throws away. **The gimmick requires two slots, so it can only exist on the shape
+that has two** — which is the cleanest possible answer to what an Efficiency
+unique is *for*, and it arrives without inventing an enchantment.
+
+That also settles where `Overheal` lives. It wanted a weapon that produces
+surplus healing without being a healer, and a crit-heavy lifesteal dagger is a
+better home for it than the staff it was originally proposed on — a staff does
+not need help finding value in healing.
 
 ### Caster uniques raise the enchantment instead
 

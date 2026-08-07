@@ -350,12 +350,6 @@
   party, their innate stats and their opening weapons are content by the same
   argument, and they are the thing a designer tweaks while tuning the tutorial.
   Not specced; it is the obvious fifth file and nobody has asked for it yet.
-- **Which unique carries `Overheal`?** It wants a healing weapon to be obvious
-  on and a non-healing one to be interesting on, and §1.5 has no Staff of
-  Renewal unique named yet. The natural home is that staff — surplus healing is
-  what Regeneration produces most of — but the argument for putting it somewhere
-  stranger is that the `Vampiric` pairing is the better build and a staff does
-  not need help finding value in healing.
 - **The five enchanter constants are unset, and they only mean anything
   together.** With `WearPerHit` settled at 1 they are all quoted in hits, which
   makes them checkable against play. A worked starting point that produces the
@@ -385,9 +379,16 @@
   guaranteed-nothing service that still costs runs of downtime. Silently
   allowing it is honest and consistent; showing the 0% and letting the player
   do it anyway risks reading as a bug rather than a rule.
-- **Which souls do the four Efficiency uniques carry?** §1.5 now requires every
-  `Light`-forged artifact to have a unique enchantment, and argues it should do
-  something with movement since that is what `Light` trades in. `Weightless` is
-  the obvious such soul and is already on Feathered Death, which is a Control
-  derivation — so either it moves, or the Efficiency uniques need four movement
-  souls of their own and the catalogue has none spare.
+- **What are the other three Efficiency uniques' pairs?** The dagger is settled
+  (`Vampiric` + `Overheal`, §1.5) and it sets a high bar: the two souls should
+  *need* each other, not merely coexist. `Regeneration` + `Overheal` is the
+  obvious second and is probably too obvious. The catalogue has few natural
+  pairs — most entries stand alone perfectly well — so either three more genuine
+  combos exist and want finding, or some Efficiency uniques take the tier-3
+  route instead and are simply a common soul arriving deep.
+- **Is a second soul worth more than a distinct second modifier?** That is the
+  trade §1.5 now makes every Efficiency unique take. A modifier is free passive
+  value forever; a soul costs mana every time it fires and starts at tier 1 with
+  a long climb (§3.3). The `Light` mana argument says the weapon can afford it,
+  but "can afford" and "is worth it" are different claims, and this one decides
+  whether Efficiency uniques are the best artifacts in the game or the worst.

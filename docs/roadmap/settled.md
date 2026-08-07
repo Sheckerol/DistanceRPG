@@ -623,9 +623,25 @@
 - **A currency modifier can never make a unique unique.** `Light` and `Resonant`
   are both forge-limited to `×1` (§1.1), so there is no `×3` to reach for and
   the `×1` an artifact carries is the same one its common variant had. **Every
-  `Light`-forged artifact therefore carries a unique enchantment**, and the soul
-  is where its identity lives rather than an ornament on top. This is one rule
-  covering what §1.5 previously treated as two coincidences — the Efficiency
-  unique and the caster unique hit the same wall for the same reason. A `Light`
-  artifact's soul should also do something with *movement*, since that is the
-  currency `Light` trades in.
+  `Light`-forged artifact's identity lives in its enchantments**, not its
+  forged spread. This is one rule covering what §1.5 previously treated as two
+  coincidences — the Efficiency unique and the caster unique hit the same wall
+  for the same reason.
+- **An Efficiency unique carries two enchantments, one of them unique or at
+  tier 3.** Every other martial unique is `signature ×3` plus a distinct
+  modifier plus one soul; an Efficiency unique spends that second axis on
+  `Light` and is paid in souls instead. Not a new shape — it is the caster menu
+  handed to a martial weapon.
+- **`Light` is the only martial modifier that generates mana**, which is why it
+  is the one that can afford two souls. Triggers cost mana (§3.3), mana comes
+  from movement left unspent (§1.3), and cheapness is exactly what `Light`
+  produces — which is also why it excludes `Resonant` (§1.1). The second
+  enchantment follows the mana rather than decorating the weapon.
+- **The Efficiency unique is therefore the only martial weapon that runs a
+  combo**, because two souls can feed each other where one must stand alone.
+  The dagger from the Flensing Knife carries `CritWindow ×3, Light ×1`,
+  `Vampiric` and `Overheal`: it crits on 17+, lifesteals, and banks the surplus
+  healing as `Ward`. Neither half works without the other, so the gimmick can
+  only exist on the shape with two slots. This also settles where `Overheal`
+  lives — a crit-heavy lifesteal dagger produces surplus healing without being a
+  healer, and a staff never needed help finding value in healing.

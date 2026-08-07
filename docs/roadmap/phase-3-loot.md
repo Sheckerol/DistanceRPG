@@ -688,7 +688,13 @@ Alone on a healing staff it is a straightforward upgrade. Paired with
 `Vampiric` — heal the wielder for damage dealt — it becomes a melee build that
 turns excess lifesteal into a shield, on a weapon that never heals anyone
 otherwise. That is the transfer rule (§6.5) paying off on the enchantment least
-obviously portable, and the reason `Overheal` should not be pinned to staves.
+obviously portable, and the reason `Overheal` is not pinned to staves.
+
+**Which is why it lives on the Efficiency dagger** (§1.5). Needing a partner is
+not a drawback to be worked around — it is a requirement, and exactly one
+martial shape can meet it. A `Light` artifact is the only one that carries two
+enchantments, so `Overheal` goes where its dependency can be satisfied rather
+than where its effect is easiest to explain.
 
 **The conversion is lossy, and that is the first of its two brakes.**
 `OverhealPerWard` — start at **5** — means 20 points of surplus healing becomes
