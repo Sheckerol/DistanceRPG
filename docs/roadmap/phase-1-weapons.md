@@ -702,8 +702,8 @@ side — and the right-hand side is the enchantment's XP (§3.3).
 | | `Resonant ×1` | `Resonant ×6` |
 | --- | --- | --- |
 | Mana per cast (staff, base 20) | 18 | 8 |
-| Sustainable casts a turn, at `MovementUnitsPerMana 8` | 0 | **1** |
-| **Mana banked a turn while doing it** | 20 | 15 |
+| Sustainable casts a turn, at `MovementUnitsPerMana 10` | 0 | **1** |
+| **Rounds of full 4-cast output from a 160 pool** | ~1.5 | ~3.5 |
 
 **An efficient casting tool is genuinely harder to level up, and gives you more
 for every point you spend.** That is a real trade rather than a strictly-better
@@ -747,7 +747,7 @@ is that the pool you grow is also the pool your locks eat (§3.3) — so the che
 staff builds the capacity to *carry* deep enchantments at the same rate it fails
 to level them.
 
-### The regen rate is a divisor, and it is in tiles-worth, not units-worth
+### The regen rate is a divisor, and it is derived rather than guessed
 
 The constant is **`MovementUnitsPerMana`** — how much banked movement buys one
 mana — expressed as an integer divisor rather than a fractional rate, so the
@@ -757,44 +757,81 @@ file reads correctly and nothing drifts:
 manaRegained = unspentMovement / MovementUnitsPerMana
 ```
 
-An earlier draft assumed roughly *one mana per unit*, which is a units-versus-
-tiles error of the exact kind §-standing-constraints warns about: movement is in
-logic units at **32 per tile**, so "1 per point" means 32 mana a tile and a full
-160-unit budget banking 160 mana a turn. That is not a trickle, it is a second
+An earlier draft assumed roughly *one mana per unit*, which is a
+units-versus-tiles error of the exact kind the standing constraints warn about:
+movement is in logic units at **32 per tile**, so "1 per point" means 32 mana a
+tile and a fully banked turn paying 160. That is not a trickle, it is a second
 income.
 
-**The intended shape is about 10 mana from a fully banked turn**, which is
-`MovementUnitsPerMana 16` — a tile of unheld movement is worth 2 mana. What that
-does to the steady state is worth seeing before it is fixed, because the
-sustainable cast rate is very sensitive to it:
+**The value comes from one calibration target**, which is worth stating as the
+rule rather than the answer, so it re-derives when anything it depends on moves:
 
-| `MovementUnitsPerMana` | Mana from a banked turn | Sustains 1 cast a turn at | Sustains 2 |
+> A caster at **`Resonant ×6`** carrying a **tier-1 enchantment** should sustain
+> **one cast a round indefinitely** while standing still.
+
+```
+MovementUnitsPerMana = (movementBudget − castCost) / (castMana + triggerMana, at ×6)
+                     = (160 − 40) / (8 + 3)
+                     = 120 / 11  ≈ 10.9   →   10
+```
+
+**`MovementUnitsPerMana = 10.`** A fully banked turn is 16 mana; a turn spent on
+one cast banks 120 movement and pays 12, against 11 spent. The fully-resonant
+caster runs a hair above break-even, forever, which is exactly the target.
+
+### The cliff at `×6` is the point, not an artefact
+
+Run the same sum at shallower `Resonant` and nothing else sustains:
+
+| `Resonant` | Cast + trigger | Regen while casting once | Sustains? |
 | --- | --- | --- | --- |
-| 4 | 40 | any `Resonant` | `Resonant ×5` |
-| **8** | 20 | **`Resonant ×3`** | never |
-| **16** | 10 | never — even `×6` misses by half a point | never |
+| `×1` | 18 + 7 = 25 | 12 | No |
+| `×3` | 14 + 6 = 20 | 12 | No |
+| `×5` | 10 + 4 = 14 | 12 | **Nearly** |
+| **`×6`** | **8 + 3 = 11** | **12** | **Yes** |
 
-At **16**, no caster ever sustains a cast off regen; mana is a pool you spend
-down over a run and top up slowly, and the pool is the only thing that matters.
-That is a coherent design — it makes casting a burst resource and makes max mana
-the caster's real stat — but it flattens the `Resonant` trade, because a
-pool-limited caster spends the same total mana whatever it costs per cast, and
-more efficiency is then simply more casts for the same XP.
+So **sustained casting is the reward for maxing `Resonant`**, and `×6` needs
+five acquired stacks — a campaign's worth of services (§6.4). Everything below
+it buys *sprint length* rather than sustain, which is still worth having and is
+a different thing to want.
 
-At **8**, the crossover lands at `Resonant ×3`, in the middle of the reachable
-range. Below it a caster drains and has to stop; at or above it they can cast
-once a turn forever. That is the version where the §1.3 trade has teeth — the
-efficient staff really does buy sustain, and really does bank less mana doing
-it.
+That is a sharp edge rather than a gradient, and deliberately so. "The staff
+that never stops" is a legible endgame achievement in a way "the staff that
+stops 18% later" is not.
 
-**The direction of the trade survives either way**, and that is worth being
-clear about: casting spends the movement that pays for casting, so more casts
-always means less banked and less XP, at any divisor. What the divisor decides
-is whether there is a *sustainable rate above zero* — an equilibrium to sit at —
-or whether every caster is simply draining a tank at different speeds.
+### Casters are sprinters
 
-Recommendation is **8**; the stated intent is **16**; it is a one-line change in
-the tuning file (§5.3) either way, which is precisely why that file exists.
+This is the shape the whole caster economy is built to produce, and it is worth
+naming because every constant above serves it:
+
+| | Burst | Sustained | Reload |
+| --- | --- | --- | --- |
+| **Caster** | 4 casts a round while the pool lasts | 1 a round at `×6`, none below | **~10+ turns** to refill |
+| **Martial** | Whatever the movement budget allows | The same, every round | **1 turn** — movement refreshes |
+
+A caster **unloads**, then walks. A martial class fights at one rate forever.
+Neither is stronger; they are shaped differently, and the caster's shape is the
+one that has to be *timed*.
+
+Three consequences fall out, none of which needed a rule:
+
+- **`Resonant` buys sprint length before it buys sustain.** At `×1` a 160-mana
+  pool is about 1.5 rounds of full output; at `×6` it is nearer 3.5. The
+  fully-resonant caster both sprints longer *and* never fully stops.
+- **Arriving full is the caster's preparation.** Mana banks from unspent
+  movement, so the walk to the fight *is* the reload — and marching (§4.1),
+  which the party does when no enemy is visible, is when it happens. A caster
+  dragged into a fight straight after another one is a caster with nothing.
+- **It sharpens the `Resonant` trade rather than softening it.** Efficiency
+  extends the sprint and lowers the mana moved per round, so the staff that
+  fights longest is still the staff that levels its enchantment slowest (§3.3).
+  The sprinter shape does not rescue an efficient caster from that; it just
+  makes the sprint the thing they are buying.
+
+**The pool is the other half of this and is not yet fixed.** How long a sprint
+lasts is `maxMana / spendPerRound`, so the starting pool decides whether a
+caster gets one dramatic round or four. `MovementUnitsPerMana` only sets the
+*floor* they fall back to.
 
 ### The effect *is* the staff's enchantment
 

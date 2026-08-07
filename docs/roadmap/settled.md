@@ -472,7 +472,7 @@
   never hot-reloaded, compiled fallback for every missing key, scalars only.
   Nothing the golden tests pin may ever appear in it, enforced by a test that
   asserts the schema is disjoint from the parity-critical names. Ratios are
-  **integer divisors with the units in the name** (`MovementUnitsPerMana: 16`),
+  **integer divisors with the units in the name** (`MovementUnitsPerMana: 10`),
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
   warn on mismatch rather than refusing.
@@ -555,3 +555,20 @@
   spend on), and decay charges you for the walk. The 1-damage floor keeps it
   from ever being immortality — a big pool buys a *long* fight, not an unlosable
   one.
+- **`MovementUnitsPerMana` is 10**, and it is *derived* rather than picked: a
+  caster at `Resonant ×6` with a tier-1 enchantment should sustain one cast a
+  round while standing still, which is `(160 − 40) / (8 + 3) ≈ 10.9`. Stated as
+  the rule rather than the number, so it re-derives when the movement budget or
+  cast costs move.
+- **Sustained casting is the reward for maxing `Resonant`, and it is a cliff.**
+  Nothing below `×6` sustains — `×5` misses by two mana — so shallower stacks
+  buy *sprint length* rather than sustain. That sharp edge is deliberate: "the
+  staff that never stops" is a legible endgame achievement in a way "the staff
+  that stops 18% later" is not, and `×6` costs five acquired stacks.
+- **Casters are sprinters.** Four casts a round while the pool lasts, one a
+  round sustained at `×6`, and **~10+ turns to reload** against a martial
+  class's one. Neither is stronger; the caster's shape is the one that has to be
+  *timed*. Two things follow without a rule: the walk to the fight **is** the
+  reload, so marching is when a caster refills — and `Resonant` buys sprint
+  length before it buys sustain, so an efficient staff fights longest while
+  still levelling its enchantment slowest (§3.3).

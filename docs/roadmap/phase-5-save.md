@@ -58,7 +58,7 @@ is a crash waiting on a typo. `tuning.json` holds **scalars only**.
 - **Missing keys fall back to the compiled default.** A partial file is valid,
   so the player edits the three lines they care about — and adding a constant
   later never invalidates an existing file.
-- **Ratios are integer divisors, not floats.** `MovementUnitsPerMana: 16`, not
+- **Ratios are integer divisors, not floats.** `MovementUnitsPerMana: 10`, not
   `ManaPerMovementUnit: 0.0625`. It reads correctly, it cannot drift, and it
   makes the units explicit in the name — which is the exact error §1.3 already
   made once by thinking in tiles while the code counted units.
@@ -71,7 +71,7 @@ Everything currently flagged as a knob, gathered in one place:
 
 | Group | Keys |
 | --- | --- |
-| Economy | `MovementUnitsPerMana`, `MovementBudget` |
+| Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingMaxMana` |
 | Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard` |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
