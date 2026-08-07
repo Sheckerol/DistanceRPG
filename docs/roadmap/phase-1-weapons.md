@@ -1233,14 +1233,15 @@ here consumes exactly what the previous one produces:
 | | Turns | Into |
 | --- | --- | --- |
 | **`Serrated`** | A hit | Continuous damage — `Bleeding`, ticking every turn |
-| **`Vampiric`** at tier 3 | Damage dealt | Healing |
+| **`Vampiric`** at tier 3 | Every instance of damage — a swing, a bleed tick | 3 HP of healing, flat (§3.3) |
 | **`Overheal`** | Healing past full | `Ward` |
 
 That is why the dagger gives up a third stack of `CritWindow` rather than
-keeping it. `Vampiric` on a burst weapon heals in spikes, most of which land on
-a wielder who is already full and are thrown away; `Serrated` converts the
-weapon's output from spikes into a **stream**, which is the shape lifesteal
-actually wants. The dagger is not a crit weapon with lifesteal bolted on — it
+keeping it. `Vampiric` heals a flat amount per damage *instance* (§3.3), so a
+burst weapon is the worst possible carrier for it — one enormous crit pays
+exactly as much as one pinprick. `Serrated` converts the weapon's output from
+spikes into a **stream** of instances, which is the shape lifesteal actually
+wants. The dagger is not a crit weapon with lifesteal bolted on — it
 is a weapon that makes its damage continuous *in order to* make its healing
 continuous, and then banks the healing it cannot spend.
 

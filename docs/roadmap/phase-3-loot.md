@@ -587,7 +587,7 @@ Potency values are before INT scaling.
 | Enchantment | Lock | Trigger | Fires on | Effect |
 | --- | --- | --- | --- | --- |
 | **Arcane** | 30 | 8 | Hit | Bonus damage — **the wizard-DPS core** |
-| **Vampiric** | 20 | 10 | Crit | Heal the wielder for damage dealt |
+| **Vampiric** | 20 | **2** | **Damage dealt** | Heal the wielder **1 per tier** — flat, not a share of the damage |
 | **Echoing** | 20 | 15 | Attack | The weapon's class feature triggers once more |
 | **Shattering** | 25 | 10 | Crit | Crit riders (§1.6) land one level deeper |
 | **Flaming** | 20 | 5 | Hit | Flaming damage; the type chart applies (§1.4) |
@@ -633,6 +633,38 @@ purpose — the constraint that matters is already doing its job elsewhere, and 
 second one would just be a cap by another name.
 
 ### Unique enchantments
+
+### `Vampiric` is priced on frequency, not magnitude
+
+`Vampiric` used to fire on a **crit** and heal for the **damage dealt**. Both
+halves were wrong, and they were wrong together:
+
+| | Was | Is | Why |
+| --- | --- | --- | --- |
+| Fires on | Crit | **Damage dealt** | A bleed tick is damage and was not a crit, so the dagger's chain (§1.5) could not close |
+| Heals | Damage dealt | **1 per tier** | A share of the damage makes it a percentage effect, and percentages of a number that grows all campaign do not stay balanced |
+| Trigger cost | 10 | **2** | It now fires many times a turn instead of occasionally |
+
+**The trigger cost had to fall because the trigger frequency rose**, and that is
+a general rule rather than a fix for this entry: **a trigger is priced against
+how often it fires.** Enchantment triggers always cost mana (§3.3), so an
+enchantment that fires on every damage instance at a crit-shaped price would be
+unpayable — a Bleeding room would cost more mana a turn than a caster spends
+casting. This is the enchantment-side version of what §1.1 does with stacks: if
+the behaviour is right and the numbers are wrong, re-price it.
+
+**Flat-per-instance turns `Vampiric` into a build rather than a bonus.** A
+greataxe swinging once heals `tier`; a dagger with `Serrated` running on three
+enemies heals `4 × tier` in the same turn without swinging at all. It stops
+being universally good and starts rewarding weapons that generate *instances* —
+daggers, `Charges` throwing weapons, wands whose element lingers. That is a
+real itemisation axis the design did not previously have, and it is the reason
+the Efficiency dagger drops a `CritWindow` stack for `Serrated` (§1.5): the
+weapon wants frequency, and a crit is one instance like any other.
+
+It also explains, again, why the dagger is a `Light` weapon. A trigger that
+fires constantly needs mana constantly, and `Light` is the only martial modifier
+that produces any (§1.5).
 
 These are **not in the catalogue** — they exist only on uniques (§1.5), cannot
 be chosen at the enchanter, and cannot be copied:
@@ -750,6 +782,36 @@ soul travels and the strength does not follow automatically.
 ratio rather than 1:1 keeps it a salvage mechanism rather than a second healing
 pool: you are recovering something that was going to be thrown away, at a
 discount, which is the honest shape for it.
+
+### The conversion accumulates, because otherwise small heals vanish
+
+A ratio and integer `Ward` do not survive being applied *per heal*. Once
+`Vampiric` heals 1 per tier, a tier-3 dagger produces 3 points of surplus at a
+time — and `3 / 5` rounds to nothing. Every tick would be discarded, and the
+enchantment whose entire purpose is to stop discarding things would discard
+everything.
+
+**So `Overheal` carries a remainder.** Surplus healing accumulates into a
+counter; each time it crosses `OverhealPerWard` it emits one point of `Ward` and
+subtracts the cost. Nothing is ever rounded away:
+
+```
+overhealPool += surplus
+ward         += overhealPool / OverhealPerWard
+overhealPool %= OverhealPerWard
+```
+
+One int on the character, and it is the whole fix. The obvious alternative —
+totalling surplus across a round and converting once — is worse in three ways:
+it needs a round boundary to hang off, it behaves differently for a heal that
+straddles one, and it still discards the remainder at the end. The accumulator
+has no boundary at all, so a dagger dribbling 3 at a time and a staff dumping 20
+at once convert at exactly the same rate over any span.
+
+**The remainder is bounded below the conversion rate**, so at most
+`OverhealPerWard − 1` points of shield are ever pending. It persists rather than
+clearing between fights, which is not a carry worth guarding: it is by
+construction less than one point of `Ward`.
 
 ### `Ward` is a pool that decays, and that is the second brake
 

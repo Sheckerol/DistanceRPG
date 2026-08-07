@@ -379,15 +379,15 @@
   guaranteed-nothing service that still costs runs of downtime. Silently
   allowing it is honest and consistent; showing the 0% and letting the player
   do it anyway risks reading as a bug rather than a rule.
-- **Does `Bleeding` damage feed `Vampiric`?** The dagger's whole chain (§1.5)
-  assumes it does — that is what turns a burst weapon into a stream. But
-  `Vampiric` fires on **Crit** and heals for damage dealt, and a bleed tick is
-  neither a hit nor a crit. Either the tick routes through the same damage
-  resolver and counts as the weapon's damage, or the dagger's `Vampiric` needs a
-  different trigger from the catalogue entry, or the chain is really
-  `Serrated` and `Vampiric` running in parallel off the same crits rather than
-  in series. The third reading still works and is a weaker item; the first is
-  what the design wants and is the one to check against `TurnSystem` first.
+- **Is every damage instance a `Vampiric` trigger, including ones the wielder
+  did not cause this turn?** §3.3 fires it on damage dealt, which cleanly
+  includes bleed ticks — but ticks resolve on the *enemy's* turn, from a status
+  applied several turns ago, possibly by a weapon that has since been swapped
+  out. Either the status remembers who applied it and pays their `Vampiric`, or
+  triggers only fire for damage the wielder deals on their own turn and the
+  dagger's chain is weaker than §1.5 describes. The first is what the design
+  wants; it is also a back-reference from a status to a character, which nothing
+  else in the design needs.
 - **`BleedPercent` and `BleedDecayPerTurn` are unset.** The percentage is quoted
   against `base damage + proficiency level`, so it compounds with the one term
   that grows all campaign — a flat 25% is a very different item at proficiency 2

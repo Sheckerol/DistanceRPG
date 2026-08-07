@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the `Overheal` remainder |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -245,7 +245,7 @@ edit.
 The catalogue and the unique souls: lock, trigger cost, condition, base potency,
 effect reference, `unique` flag, and a damage type where the entry is elemental.
 
-**The effect itself stays code.** "Heal the wielder for damage dealt" is a rule,
+**The effect itself stays code.** "Heal the wielder 1 per tier on damage dealt" is a rule,
 so an entry names an `EffectKind` and supplies parameters — the same shape as a
 modifier naming a behaviour it does not implement.
 

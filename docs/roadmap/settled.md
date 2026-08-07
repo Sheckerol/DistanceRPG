@@ -685,3 +685,26 @@
   to hang it off a ladder already climbing (§2.2). It also makes `Serrated`
   self-limiting on transfer: the soul moves, the proficiency term resets to the
   new class's skill, and the strength does not follow.
+- **`Vampiric` fires on *damage dealt* and heals a flat 1 per tier**, at a
+  trigger cost of 2 rather than 10. Both halves of the old entry were wrong
+  together: a bleed tick is damage and is not a crit, so the dagger's chain
+  could not close; and healing for a *share* of the damage is a percentage of a
+  number that grows all campaign.
+- **A trigger is priced against how often it fires.** The cost fell from 10 to 2
+  because the frequency rose — the enchantment-side version of §1.1's re-price-
+  the-stack rule. An every-instance trigger at a crit-shaped price would be
+  unpayable.
+- **Flat-per-instance makes `Vampiric` a build rather than a bonus.** A greataxe
+  swinging once heals `tier`; a dagger with `Serrated` running on three enemies
+  heals `4 × tier` without swinging. It rewards weapons that generate
+  *instances* — daggers, `Charges` throwers, lingering-element wands — which is
+  a new itemisation axis, and the reason the Efficiency dagger trades a
+  `CritWindow` stack for `Serrated`.
+- **`Overheal` carries a remainder rather than converting per heal.** Surplus
+  accumulates; each time it crosses `OverhealPerWard` it emits one `Ward` and
+  subtracts. Without it a tier-3 `Vampiric` dribbling 3 surplus at a time would
+  round to zero every tick and the enchantment whose purpose is to stop
+  discarding things would discard everything. One int, no round boundary to hang
+  off, and a dagger dribbling 3 converts at the same rate as a staff dumping 20.
+  The remainder is bounded below `OverhealPerWard`, so it is by construction
+  less than one point of pending shield.
