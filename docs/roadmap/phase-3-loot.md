@@ -976,10 +976,13 @@ natural 20 away again — and it arrived without a rule.
 A third item category alongside weapons and enchantments, and the only one that
 is spent.
 
-**Using a consumable costs movement**, on the same principle as swapping
-(§1.2): anything that changes your situation mid-turn comes out of the same
-budget as moving and swinging. A free heal in a game about movement economy
-would be a hole straight through the middle of it.
+**Using a consumable costs movement** — `PotionUseCost`, start at **40** — on
+the same principle as swapping (§1.2): anything that changes your situation
+mid-turn comes out of the same budget as moving and swinging. A free heal in a
+game about movement economy would be a hole straight through the middle of it.
+
+Twice a swap's 20, and a quarter of a 160 budget: enough that drinking is
+visibly a turn's worth of action, not so much that it ends the turn outright.
 
 **They occupy inventory slots**, which is where they get interesting. The 24
 party-wide slots (§4.4) are already contested between weapons and the haul —
@@ -987,7 +990,94 @@ consumables make it a three-way trade. Every potion you carry down is a weapon
 you did not bring *and* a drop you cannot carry out, and the extraction is when
 you feel both.
 
-Nothing about their contents is specified yet — see open questions.
+### Two of them, and they are emergency first aid
+
+| | Restores | Covers |
+| --- | --- | --- |
+| **Health potion** | A share of max HP | The healer being dead, absent, or out of mana |
+| **Mana potion** | A share of max mana | The caster's reload (§1.3) |
+
+That is the whole list, deliberately. Buff potions, cure potions and utility
+consumables are all things this design already has somewhere better — a staff, a
+status that decays, a modifier. What it does *not* have is a way to survive the
+minute after the healer goes down, and that is what a potion is for.
+
+**"Emergency first aid" is a claim about frequency, and the movement cost
+enforces it without a second rule.** Using a potion costs `PotionUseCost` (above)
+— and the interesting thing is what that price is worth in the two situations it
+can be paid in:
+
+| | What the turn was worth | So the potion costs |
+| --- | --- | --- |
+| **You are fine** | A full turn of attacking or repositioning | A great deal |
+| **You are about to die** | Nothing; you were losing it anyway | Almost nothing |
+
+**A cost that collapses exactly when you need it is the definition of first
+aid.** Nobody drinks routinely, because routinely it is the most expensive
+action available; everybody drinks at 4 HP, because at 4 HP the alternative was
+worthless. No cooldown, no per-fight limit, no rule about when it may be used.
+
+### They restore a *share*, not an amount
+
+`HealthPotionPercent` and `ManaPotionPercent`, not flat numbers — the same rule
+§1.5 settled for unique magnitudes, reaching the third system now: **a number
+with no ladder decays into irrelevance.** A flat 30-HP potion is a resurrection
+on floor 1 and a rounding error on floor 9, which is precisely backwards for an
+item whose entire purpose is the moment before death.
+
+A percentage rides the ladders the character is already climbing — CON for
+health (§2.2), the mana pool for mana — so the potion in your bag on the last
+floor is as much of a save as the one you found on the first.
+
+### The mana potion is a rule-break, and that is what a consumable is for
+
+The caster economy rests on one sentence: **mana comes from movement left
+unspent** (§1.3). `Siphon` is a *unique-level* enchantment for no reason other
+than that it breaks that dependence (§3.3) — and a mana potion breaks it
+outright.
+
+It is allowed to, and the distinction is the whole category:
+
+| | Breaks the rule | For how long |
+| --- | --- | --- |
+| **`Siphon`** | Yes | **Permanently** — it is why it is unique-level |
+| **A mana potion** | Yes, harder | **Once**, and then it is gone |
+
+**A consumable may break a rule a permanent item may not, because it breaks it
+once.** That is the design licence the category exists to hold, and it is why
+two potions are enough: anything that wants to bend a rule *repeatedly* should
+be an enchantment and pay an enchantment's costs.
+
+For a caster specifically, a mana potion is **the reload, skipped**. §1.3 makes
+casters sprinters — enormous burst, then ten turns of walking — so the thing
+that most changes a caster's fight is not more mana per turn but *not having to
+walk*. That makes mana potions the party's answer to a boss that arrives before
+the caster has refilled, which is exactly the emergency the shape creates.
+
+### They come from the dungeon, not the hub, and the reason is CON
+
+Health potions restore HP, and §2.2 grows constitution from `hpRestored`. So a
+potion **does** grant health XP — carving out an exception would need a reason,
+and "you were healed" is true whoever poured it.
+
+Which settles where they come from. **A purchasable heal is a purchasable
+stat**: if potions were a hub commodity, a player with gold could stand in a
+corridor drinking their constitution up. As dungeon drops on the loot stream
+they are self-limiting — you cannot grind CON off an item you can only get by
+fighting, and the fighting is what the ladder was measuring anyway.
+
+That also keeps the enchanter out of it. He is a weapon service (§6.2), his time
+is the scarce thing, and a crafting bench would be a second economy competing
+for it.
+
+### One per slot
+
+A potion occupies a whole inventory slot and does not stack. Stacking would
+quietly undo the three-way trade this section rests on — the whole point is that
+carrying four potions means carrying four fewer of everything else, and a stack
+of four in one slot means it costs nothing to be prepared.
+
+It is the harsher reading and it is the one that keeps the extraction tense.
 
 ## 3.5 Code impact
 

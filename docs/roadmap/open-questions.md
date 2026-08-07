@@ -12,9 +12,22 @@
   either a ninth class on DEX, or moving throwing to DEX (thrown knives are
   plausibly dexterous, though it costs the STR-throws-heavy-things read), or
   accepting that STR is the martial-breadth stat and DEX the precision one.
-- **What are consumables, actually?** §3.4 fixes that they cost movement and
-  occupy slots; their contents, where they come from (dungeon drops or the
-  hub), and whether they are craftable at the enchanter are all open.
+- **What drops a potion?** §3.4 settles that they are dungeon drops rather than
+  hub purchases, but not what they come *off*. Enemies already drop weapons
+  class-locked (§3.1), and hanging potions on the same kill would mean the
+  8-class table needs a non-weapon outcome. The alternatives are a separate
+  loot-stream roll independent of the kill, or floor-placed containers, which
+  the design does not otherwise have and would be a new system for one item.
+- **Does one potion per slot survive contact with a real inventory?** It is the
+  reading that keeps §3.4's three-way trade honest, and it may simply be
+  annoying — four health potions is a sixth of the party's total carry. If it
+  proves too harsh the cheapest relief is more slots rather than stacking, since
+  stacking is the thing that would make being prepared free.
+- **Do potions want to be usable on an ally?** Self-only is simpler and makes
+  the movement cost land on the person who benefits. Ally-targeted makes them a
+  substitute healer, which is closer to what "the healer is down" actually
+  needs — and is also the version that competes with the staff rather than
+  covering for it.
 - **Is half the right fraction?** Half damage is the forgiveness knob that
   makes a simple scorer shippable; once the scorer is good, full friendly fire
   may be the better game. Worth revisiting rather than treating as final. Note

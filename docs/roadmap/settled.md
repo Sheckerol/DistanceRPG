@@ -802,3 +802,33 @@
   burst, but the fallback — one trigger per cast however many it catches — is a
   one-line change with no new constant, so nothing should be built that assumes
   either answer.
+- **Two consumables: a health potion and a mana potion.** Emergency first aid,
+  and that is the whole list — buffs, cures and utility all have better homes in
+  this design as staves, statuses or modifiers. What it lacked was a way to
+  survive the minute after the healer goes down.
+- **The movement cost enforces "emergency" without a second rule.** Drinking
+  costs a turn's worth of action when you are fine and costs nothing when you
+  were about to die anyway, so nobody drinks routinely and everybody drinks at 4
+  HP. No cooldown, no per-fight limit, no usage restriction.
+- **Potions restore a *share* of max, not a flat amount** — the unique-magnitude
+  rule (§1.5) reaching a third system. A number with no ladder decays into
+  irrelevance, and a flat potion would be a resurrection on floor 1 and a
+  rounding error on floor 9, which is backwards for an item that exists for the
+  moment before death.
+- **A consumable may break a rule a permanent item may not, because it breaks it
+  once.** A mana potion breaks the movement-to-mana dependence outright, which
+  is the exact thing that makes `Siphon` unique-level — the difference is that
+  `Siphon` does it permanently. That licence is what the category is for, and it
+  is why two potions are enough: anything wanting to bend a rule *repeatedly*
+  should be an enchantment and pay an enchantment's costs.
+- **For a caster a mana potion is the reload, skipped**, which is the emergency
+  the sprinter shape (§1.3) creates: a boss arriving before the caster has
+  refilled.
+- **Potions are dungeon drops, never hub purchases, and CON is the reason.**
+  Healing grants health XP whoever poured it (§2.2), so a purchasable heal is a
+  purchasable stat. As drops they are self-limiting — you cannot grind
+  constitution off an item you can only get by fighting. It also keeps a
+  crafting bench out of the enchanter, whose scarce time is already spoken for.
+- **One potion per inventory slot, no stacking.** Stacking would quietly undo
+  the three-way trade §3.4 rests on: carrying four potions has to mean carrying
+  four fewer of everything else.

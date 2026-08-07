@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder, carried consumables |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -87,6 +87,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
 | Enchanter | `WearPerHit`, `StartingWearCapacity`, `CapacityPerEnchanting`, `CapacityPerRefinement`, `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance` |
 | Inventory | `PartyCarrySlots` |
+| Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `PotionDropChance` |
 
 Collecting them is worth as much as making them editable. Half the open
 questions in these documents are "this number, against that number" — the mana
