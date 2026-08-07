@@ -694,7 +694,7 @@ be chosen at the enchanter, and cannot be copied:
 | **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
 | **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWard` to 1 |
-| **Serrated** | 20 | 6 | Hit | Apply `Bleeding` — damage a turn from the weapon's own numbers, below |
+| **Serrated** | 20 | **scaled** | Hit | Apply `Bleeding` — damage *and* trigger cost from the weapon's own numbers, below |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
@@ -793,6 +793,17 @@ a dead stack in everything but name — and the fix is not to unpin it but to ha
 it off a ladder that is already climbing. A dagger you have fought with for a
 campaign bleeds harder because *you* are better with daggers, which is the same
 sentence §2.2 already makes true of every swing.
+
+**Its trigger cost rides the same ladder**, at the same `DotManaPerDamage`
+exchange rate the lingering elements use (§1.5) — so a proficient wielder's
+bleed costs more to apply exactly as it hurts more. The flat 6 the entry used to
+quote would have decayed into free by the end of a campaign, which is the
+tier-1 pin's problem restated: a borrowed ladder has to lift both numbers.
+
+That keeps the Efficiency dagger's economy tense at every depth rather than
+trivialising it. `Light` funds the triggers (§1.5), and the triggers get more
+expensive at exactly the rate the wielder gets better — so the split between
+swinging and banking stays a real decision at proficiency 20, not just at 2.
 
 It also keeps `Serrated` untransferable in practice without a rule forbidding
 it. Move it to a greataxe (§6.5) and the percentage lands on a bigger base

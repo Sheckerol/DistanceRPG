@@ -405,12 +405,19 @@
   a long climb (§3.3). The `Light` mana argument says the weapon can afford it,
   but "can afford" and "is worth it" are different claims, and this one decides
   whether Efficiency uniques are the best artifacts in the game or the worst.
-- **Is 216 too much for a tier-6 Nova?** That is the recomputed six-target total
-  at the starting constants (§1.5), against 72 under the old quadratic. It is
-  the binding number in the system and it cannot be judged on paper — it depends
-  entirely on what a floor-9 dummy's HP looks like after revival scaling (§3.2),
-  which nothing has pinned either. The levers are ranked in §1.5; what is
-  missing is the enemy HP curve to rank them against.
+- **What is `DotManaPerDamage`?** ⅓ is the worked example in §1.5 and it produces
+  a tier-6 six-target Nova costing 72 of a 160 pool, which feels right — two
+  throws and empty. But it is the single number governing how much of a
+  caster's pool the whole DoT layer consumes, and it now sets the Nova's balance
+  by itself. Too generous and the sprint never ends; too harsh and a deep wand
+  cannot afford to use the depth it ground out.
+- **Does a shape's per-target trigger cost want to be discounted?** A Nova
+  paying six full triggers is what prices the burst, but it also means area
+  damage costs strictly more per point than single-target — which is backwards
+  from most games and may read as a penalty for using the wand correctly. The
+  defence is that it is the same mana for the same damage, just delivered wider;
+  whether that survives contact with a player looking at a 72-mana button is a
+  different question.
 - **Does `Bleeding` want the same percentage constant as the elements?**
   `BleedPercent` and `SearPercentPerLevel` are now the same *kind* of number
   against different sources — a weapon's damage plus proficiency versus an

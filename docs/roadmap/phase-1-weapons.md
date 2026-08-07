@@ -1373,7 +1373,13 @@ rather than a special case:
 A unique that is a *rule* — `Sturdy`, `Siphon`, `Momentum` — needs no ladder,
 because a rule has no second tier. A unique that is a number does, and the pin
 would otherwise freeze it at whatever it did the day it dropped. So every one of
-them hangs off something already climbing:
+them hangs off something already climbing.
+
+**And the price rides the same ladder as the magnitude.** A borrowed ladder that
+lifts only one of the two would be the tier-1 pin's problem all over again,
+pointed the other way: the effect growing all campaign while the mana it costs
+stayed at whatever the entry was written with. Both numbers move together, or
+neither does.
 
 | Unique DoT | Applied by | Percentage of | Which climbs with |
 | --- | --- | --- | --- |
@@ -1406,6 +1412,10 @@ things and baking any of them at `1` would hide a decision:
 levelsApplied  = SearLevelsPerTier   × elementTier
 damagePerTurn  = max(1, SearPercentPerLevel × elementDamage × currentLevels)
 levelsLost     = SearDecayPerTurn                          // each turn
+
+expectedTotal  = damageOnFirstTick × triangularSum(levelsApplied, SearDecayPerTurn)
+                                   / levelsApplied
+triggerCost    = max(1, DotManaPerDamage × expectedTotal)   // §1.3
 ```
 
 | Constant | Controls | Bounded by |
@@ -1509,22 +1519,44 @@ same *never below 1* convention §1.6 already applies to a mitigated hit. Withou
 it a lingering element would do literally nothing until tier 2, which is the
 worst possible first impression for a unique.
 
-**The Nova is the binding constraint, and it moved.** Landing on every target in
-the shape, a tier-6 Nova catching six enemies now deals **216** over three turns
-where the quadratic version dealt 72. That is the number to watch, and it is
-tripled by exactly the change that made a deep `Flaming` leave a deep burn.
+### The price is a share of what it buys, so the curve pays for itself
 
-Two levers if it proves too much in play, in order of preference:
+**`triggerCost` is quoted against the expected total, not against the entry.**
+`DotManaPerDamage` is a mana-per-point exchange rate, so a lingering element
+costs in proportion to the damage it is about to do:
 
-| Lever | Effect | Why this order |
-| --- | --- | --- |
-| **`SearDecayPerTurn`** to 3 | Cuts the tail; tier 6 total 27, Nova 162 | Costs the least — it shortens a burn rather than weakening one |
-| **`SearLevelsPerTier`** below 1 | Sits inside the cube; halving it cuts the total roughly eightfold | Reaches furthest, but a `×4` wand applying 2 levels reads worse than one applying 4 |
+| Element tier | 1 | 2 | 4 | 6 | 8 |
+| --- | --- | --- | --- | --- | --- |
+| Total damage | 1 | 2 | 12 | 36 | 80 |
+| **Mana to apply it**, at `DotManaPerDamage` ⅓ | 1 | 1 | 4 | **12** | **27** |
 
-Note what the tier-1 pin on the unique is doing here: **the rule and the
-magnitude are on different ladders, and only one of them climbs** (§3.3). If the
-unique enchantment levelled as well, a fourth growing term would multiply into
-the three above.
+That keeps **damage per mana flat with tier**, which is the convention every
+catalogue enchantment already follows — §3.3 scales lock and potency together,
+so depth buys throughput rather than efficiency. A borrowed ladder that lifted
+the damage and not the price would have made the lingering elements the one
+place in the game where getting deeper made you *cheaper*.
+
+**Which is what actually answers the Nova.** A Nova applies its element to every
+target in the shape, and each application is a trigger — so six enemies is six
+triggers, not one. The tier-6 Nova that deals 216 now costs **72 mana** to
+throw, most of a caster's pool (§1.3), and it does that once:
+
+| | Damage | Mana | Rounds of a 160 pool |
+| --- | --- | --- | --- |
+| Tier-6 Nova, one target | 36 | 12 | Repeatable |
+| **Tier-6 Nova, six targets** | **216** | **72** | Twice, then empty |
+
+So the cubic curve is not a balance problem needing a nerf lever; it is a
+*sprinter's* burst (§1.3), and it is priced like one. **Re-price the stack
+rather than limit it** — §1.1's rule, reaching the enchantment layer. The two
+correction levers (`SearDecayPerTurn`, then `SearLevelsPerTier`) stay available
+and are now much less likely to be needed.
+
+Note what the tier-1 pin on the unique is doing here: **the rule is frozen and
+both numbers attached to it climb together** (§3.3). If the unique enchantment
+levelled as well, a fourth growing term would multiply into the three above —
+and it would multiply into the price too, which is why the pin is a
+simplification rather than a restriction.
 
 `SearLevelsPerTier` is the dial that changes the *shape* rather than the height,
 because it sits inside the square: halving it quarters the total. That makes it

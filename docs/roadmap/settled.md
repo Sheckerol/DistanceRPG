@@ -771,3 +771,24 @@
   too steep, ahead of `SearLevelsPerTier`: it shortens a burn rather than
   weakening one, and a `×4` wand applying 2 levels reads worse than one applying
   4.
+- **A borrowed ladder lifts the price as well as the magnitude.** A unique DoT's
+  `triggerCost` is `DotManaPerDamage × the expected total`, not a flat number on
+  the catalogue entry. Lifting only the effect would be the tier-1 pin's problem
+  pointed the other way — the damage growing all campaign while the mana stayed
+  at whatever the entry was written with, making the lingering elements the one
+  place in the game where getting deeper made you *cheaper*.
+- **Damage per mana therefore stays flat with tier**, which is the convention
+  every catalogue enchantment already follows (§3.3 scales lock and potency
+  together). Depth buys throughput, never efficiency.
+- **That is what answers the Nova, rather than a nerf lever.** Each target in the
+  shape is its own trigger, so the tier-6 six-target Nova that deals 216 costs
+  **72 mana** — most of a caster's pool, twice, then empty. The cubic curve is a
+  sprinter's burst (§1.3) and it is now priced like one. This is §1.1's
+  *re-price the stack rather than limit it* reaching the enchantment layer.
+  `SearDecayPerTurn` and `SearLevelsPerTier` stay available and are much less
+  likely to be needed.
+- **`Serrated`'s cost scales too**, at the same exchange rate. The flat 6 would
+  have decayed into free by the end of a campaign. It also keeps the Efficiency
+  dagger's economy tense at every depth: `Light` funds the triggers and the
+  triggers get more expensive at exactly the rate the wielder gets better, so
+  the swing-or-bank split is still a real decision at proficiency 20.
