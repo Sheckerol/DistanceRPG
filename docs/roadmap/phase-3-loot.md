@@ -781,8 +781,13 @@ BleedDamagePerTurn = BleedPercent × (weapon base damage + weapon proficiency le
 | **Weapon base damage** | The item | Nothing — it is what the dagger is |
 | **Proficiency level** | The *wielder* (§2.2) | Damage dealt with the class |
 
-**That is the first enchantment whose power belongs to the character rather than
-to the enchantment**, and it is the right exception to make here. A tier-1 pin
+**That is the general rule for unique DoTs, not a special case for this one**
+(§1.5). Every damage-over-time a unique applies takes a percentage of the damage
+its *source* deals — `Burning` and `Frostbite` off the wand's Flaming and Cold
+damage, `Poison` off its Acidic — and every one of those ladders is partly a
+character stat. `Serrated` rides proficiency; the wand DoTs ride INT.
+
+It is the right exception to make. A tier-1 pin
 would otherwise leave `Serrated` frozen at whatever it did the day it dropped —
 a dead stack in everything but name — and the fix is not to unpin it but to hang
 it off a ladder that is already climbing. A dagger you have fought with for a

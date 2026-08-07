@@ -405,3 +405,16 @@
   a long climb (§3.3). The `Light` mana argument says the weapon can afford it,
   but "can afford" and "is worth it" are different claims, and this one decides
   whether Efficiency uniques are the best artifacts in the game or the worst.
+- **Is 216 too much for a tier-6 Nova?** That is the recomputed six-target total
+  at the starting constants (§1.5), against 72 under the old quadratic. It is
+  the binding number in the system and it cannot be judged on paper — it depends
+  entirely on what a floor-9 dummy's HP looks like after revival scaling (§3.2),
+  which nothing has pinned either. The levers are ranked in §1.5; what is
+  missing is the enemy HP curve to rank them against.
+- **Does `Bleeding` want the same percentage constant as the elements?**
+  `BleedPercent` and `SearPercentPerLevel` are now the same *kind* of number
+  against different sources — a weapon's damage plus proficiency versus an
+  element's damage. Sharing one constant would be one fewer dial and would state
+  the rule once; keeping them apart admits that a martial weapon's base damage
+  and a wand's element damage are not on the same scale, and probably should not
+  be tuned together.

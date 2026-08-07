@@ -96,7 +96,7 @@
   which is the cleanest statement of what the two caster classes are for.
 - **A lingering element applies levels derived from the element's tier**, and
   every conversion is a **named constant** rather than a baked `1`:
-  `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`. Levels
+  `SearLevelsPerTier`, `SearPercentPerLevel`, `SearDecayPerTurn`. Levels
   **accumulate** on re-application and have no cap — the rider model §1.6
   already sets, so `Poison`, `Searing`, `Sundered` and `Weakened` are one family
   with one model and only the constants differ. That is what makes the tier-1
@@ -132,7 +132,7 @@
 - **The total is quadratic in tier**, the only such term in the design, and it
   lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
   square, so halving it quarters the total — that is the correction if deep
-  wands are too strong while shallow ones are fine. `SearDamagePerLevel` is the
+  wands are too strong while shallow ones are fine. `SearPercentPerLevel` is the
   correction if the whole curve is too high.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
@@ -738,3 +738,36 @@
   input — a deeper `Vampiric`, a deeper `Regeneration`, more attacks a turn —
   never the conversion. That is what stops a `Ward` engine compounding: every
   term feeding it climbs and the term converting it does not.
+- **Every unique enchantment that is a *magnitude* borrows a ladder**, taking a
+  percentage of the damage its source deals. That is the general rule and
+  `Serrated` was its first instance, not a special case. A unique is pinned at
+  tier 1, so a unique that is a *rule* needs no ladder — a rule has no second
+  tier — but a unique that is a number would otherwise be frozen at whatever it
+  did the day it dropped.
+- **The wand DoTs ride their element's damage**: `Burning` off the wand's
+  Flaming damage, `Frostbite` off its Cold, `Poison` off its Acidic. So
+  `SearDamagePerLevel` — a flat constant, and therefore a ladder the pin cannot
+  climb — becomes **`SearPercentPerLevel`**, applied to `elementDamage`. A deep
+  `Flaming` now leaves a deep burn.
+- **`Mire` is the exception, because its magnitude is not damage.** It cuts a
+  movement budget in movement units, where a percentage of a damage number means
+  nothing, so it keeps a flat cut per level and scales by level count alone.
+- **These ladders are partly a character stat**, which is new. Element damage
+  carries INT scaling, so a smarter caster burns harder with the same wand —
+  the same sentence §2.2 already makes true of a proficient fighter's bleed.
+  Unique magnitudes are the only place in the design where an item's power is
+  partly the person holding it.
+- **The lingering-element total is now cubic in tier**, not quadratic: levels
+  rise with tier, `elementDamage` rises with tier, and the tick count rises with
+  levels. That is the price of the change and it is why `SearPercentPerLevel` is
+  a percentage in the low tens — **start at 10%**. A tier-6 `Flaming` totals 36
+  where it used to total 12, and the tier-6 six-target Nova goes from 72 to
+  **216**, which is now the binding number in the whole system.
+- **`damagePerTurn` never falls below 1**, the same convention §1.6 applies to a
+  mitigated hit. At tier 1 the arithmetic truncates to nothing, and a lingering
+  element that does literally nothing until tier 2 is the worst possible first
+  impression for a unique.
+- **`SearDecayPerTurn` is the preferred correction lever** if the curve proves
+  too steep, ahead of `SearLevelsPerTier`: it shortens a burn rather than
+  weakening one, and a `×4` wand applying 2 levels reads worse than one applying
+  4.
