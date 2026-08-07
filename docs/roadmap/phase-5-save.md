@@ -32,6 +32,14 @@ paper**: the mana divisor (§1.3), the three Searing constants (§1.5), the
 revival step (§3.2), fight-length-dependent decay. Recompiling to try `8`
 instead of `16` is the difference between tuning a game and not tuning it.
 
+**`DotManaPerDamage` is the clearest case in the file.** It is a single
+exchange rate governing what the entire damage-over-time layer costs — every
+lingering element, every bleed, on every target in a shape (§1.5) — so it is
+both the number with the widest blast radius and the one with the least chance
+of being right first time. Nothing about it can be reasoned to a value; it needs
+a session, a wand, and a floor of enemies. A constant like that being compiled
+in would be the single worst hardcode in the project.
+
 So: a **`tuning.json` beside the executable**, read once at startup into
 `GameConstants`, overriding compiled defaults.
 

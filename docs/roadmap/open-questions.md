@@ -411,13 +411,16 @@
   caster's pool the whole DoT layer consumes, and it now sets the Nova's balance
   by itself. Too generous and the sprint never ends; too harsh and a deep wand
   cannot afford to use the depth it ground out.
-- **Does a shape's per-target trigger cost want to be discounted?** A Nova
-  paying six full triggers is what prices the burst, but it also means area
-  damage costs strictly more per point than single-target — which is backwards
-  from most games and may read as a penalty for using the wand correctly. The
-  defence is that it is the same mana for the same damage, just delivered wider;
-  whether that survives contact with a player looking at a 72-mana button is a
-  different question.
+- **Should a shape pay per target at all? Provisionally yes, and it is deliberately
+  the easy thing to reverse.** Charging each target its own trigger is what
+  prices the Nova's burst (§1.5), but it means area damage costs strictly more
+  per point than single-target — backwards from most games, and it may read as a
+  penalty for using the wand correctly. The defence is that it is the same mana
+  for the same damage delivered wider. The fallback is **one trigger per cast
+  regardless of how many it catches**, which is a one-line change and no new
+  constant: the Nova then costs 12 and deals 216, and `DotManaPerDamage` has to
+  carry the whole correction instead. Worth settling with a wand in hand rather
+  than on paper, and worth *not* building anything that assumes either answer.
 - **Does `Bleeding` want the same percentage constant as the elements?**
   `BleedPercent` and `SearPercentPerLevel` are now the same *kind* of number
   against different sources — a weapon's damage plus proficiency versus an

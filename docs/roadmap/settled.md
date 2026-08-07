@@ -792,3 +792,13 @@
   dagger's economy tense at every depth: `Light` funds the triggers and the
   triggers get more expensive at exactly the rate the wielder gets better, so
   the swing-or-bank split is still a real decision at proficiency 20.
+- **`DotManaPerDamage` lives in `tuning.json`, and it is the clearest case in
+  the file.** One exchange rate governs what the entire DoT layer costs — every
+  lingering element and every bleed, on every target in a shape — so it has the
+  widest blast radius of any scalar and the least chance of being right first
+  time. It cannot be reasoned to a value; it needs a session with a wand and a
+  floor of enemies.
+- **Charging a shape per target is provisional.** It is what prices the Nova's
+  burst, but the fallback — one trigger per cast however many it catches — is a
+  one-line change with no new constant, so nothing should be built that assumes
+  either answer.
