@@ -645,10 +645,43 @@
   only exist on the shape with two slots. This also settles where `Overheal`
   lives — a crit-heavy lifesteal dagger produces surplus healing without being a
   healer, and a staff never needed help finding value in healing.
-- **`Overheal` drops on the Efficiency dagger and nowhere else.** Every unique
-  enchantment is `neverRolled` and sits on exactly one weapon, so **transfer
-  (§6.5) is the only route to a second copy** — which is what makes the staff
-  build worth the tier it costs. An `Overheal` that already dropped on a healing
-  staff would leave transfer nothing to reward, and §3.3 names this as
-  transfer's best payoff case precisely because the staff is not where it
-  starts.
+- **`Overheal` drops on two weapons: the Efficiency dagger and a Staff of
+  Renewal unique.** The dagger pairs it with `Vampiric` — a selfish build
+  converting its own crits into its own survival — and the staff pairs it with
+  `Regeneration`, a party build turning a healer's routine waste into everyone's
+  shield. Not the same enchantment twice; picking one home would discard the
+  better half.
+- **A unique enchantment may have more than one home**, provided each home can
+  actually run it. That is not a loosening of what unique means — `neverRolled`
+  still holds, no service grants it, no other drop carries it. **A soul with a
+  dependency is defined by the dependency rather than by scarcity**, so it goes
+  everywhere the dependency can be met.
+- **The currency group is the combo platform.** `Light` generates mana from
+  unspent movement, `Resonant` discounts it at the trigger; both are
+  forge-limited to `×1` so neither can buy depth, and both are paid in souls
+  instead. They are therefore the only two shapes carrying two enchantments, and
+  the only place in the design where one enchantment may depend on another
+  existing.
+- **A `Light` artifact trades forged depth for souls at one stack each**, with a
+  floor of `signature ×2` — below that it is no deeper than the variant it
+  derives from and stops being an artifact. So `×3` buys two enchantments and
+  `×2` buys three, and three is the most any weapon in the game can carry.
+- **The Efficiency dagger is `CritWindow ×2, Light ×1` + `Serrated`,
+  `Vampiric` tier 3, `Overheal`** — three souls forming a *chain* rather than a
+  pair, each link consuming what the last produced: a hit becomes continuous
+  damage, damage becomes healing, surplus healing becomes `Ward`. Dropping the
+  third `CritWindow` is the point rather than a cost — `Vampiric` on a burst
+  weapon heals in spikes that mostly land on a full wielder and are thrown away,
+  so the dagger converts its output to a stream *in order to* make its healing
+  continuous.
+- **`Serrated` applies `Bleeding`**, which joins the level family alongside
+  `Poison`, `Searing`, `Sundered` and `Weakened` — the enchantment-and-status
+  pairing `Flaming`/`Burning` already uses.
+- **`Serrated`'s magnitude comes from the weapon and the wielder, not its
+  tier**: `BleedPercent × (base damage + proficiency level)`. It is the first
+  enchantment whose power belongs to the character, and it is the right
+  exception — a unique is pinned at tier 1 (§3.3), which would otherwise freeze
+  a *magnitude* forever and make it a dead stack. The fix is not to unpin it but
+  to hang it off a ladder already climbing (§2.2). It also makes `Serrated`
+  self-limiting on transfer: the soul moves, the proficiency term resets to the
+  new class's skill, and the strength does not follow.

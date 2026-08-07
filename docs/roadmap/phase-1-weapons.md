@@ -1073,7 +1073,7 @@ Everything else is unchanged.
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | **Siphon** | Finds the gap on 17+, and every kill funds the enchantments doing it |
 | Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | *Immovable* | Three retaliations at full reach, from a line that cannot be moved |
 | Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | *Piercing* | +3 a tile, and the shot does not stop at the first body |
-| *(unnamed)* | Dagger | Flensing Knife | `CritWindow ×3, Light ×1` | **`Vampiric` + `Overheal`** | Stabs itself a shield — the only martial weapon that runs a combo |
+| *(unnamed)* | Dagger | Flensing Knife | `CritWindow ×2, Light ×1` | **`Serrated` + `Vampiric` t3 + `Overheal`** | Stabs itself a shield — three souls in a line |
 
 **The four named enchantments each answer their weapon's own logic**, which is
 the test a pairing has to pass. `Sturdy` on the shield that already refuses
@@ -1131,7 +1131,7 @@ they are not interchangeable:
 | **Purity** | The class signature (already `×2`) | One deep modifier and nothing else — the purest expression the class has |
 | **Control** | Either the signature or the control modifier | Signature-deep with a rider, or shallow with a *brutal* rider |
 | **Support** | Same, on the support modifier | The party-facing version of the above |
-| **Efficiency** | The signature — **never `Light`** | Deep *and* cheap, and paid a **second enchantment** for the axis it spends on `Light` |
+| **Efficiency** | The signature — **never `Light`** | Deep *and* cheap, and paid in **enchantments** for the axis it spends on `Light` — one soul per stack given up, floor `×2` |
 
 Efficiency uniques cannot raise their own added modifier, because `Light` is
 forge-limited to `×1` (§1.1). An Efficiency unique is therefore forced onto the
@@ -1186,27 +1186,89 @@ interesting. **A `Light` weapon is the only martial platform that can sustain
 two triggers**, and giving it two is the design following the mana rather than
 decorating the weapon. The cheapness and the enchantments are the same fact.
 
-### Which makes the Efficiency unique the only martial weapon that runs a combo
+### Which makes the currency group the home of every combo
 
-One soul on a martial weapon has to stand alone. Two can *feed each other*, and
-that is a thing no other martial artifact in the game can do:
+One soul has to stand alone. Two can *feed each other*, and only two shapes in
+the game carry two — and they are the two halves of the currency group (§1.1),
+for the same reason:
+
+| | Its relationship to mana | Pays for two souls by |
+| --- | --- | --- |
+| **`Light`** — an Efficiency artifact | **Generates** it, from movement left unspent | Earning more |
+| **`Resonant`** — a caster artifact | **Discounts** it, at the trigger | Spending less |
+
+Both are forge-limited to `×1`, so neither can buy depth with its currency —
+and both arrive at the same compensation, which is why the rule reads the same
+on a dagger and a staff. **The currency group is the combo platform**, and it is
+the only place in the design where an enchantment is allowed to depend on
+another one existing.
+
+That is what makes `Overheal` placeable at all.
+
+### The rate is one forged stack per soul, and the dagger pays twice
+
+The trade is not a fixed allowance of two. **A `Light` artifact converts forged
+depth into enchantments, one stack at a time**, and the second soul is simply
+the first purchase every Efficiency unique makes:
+
+| Signature | Souls | |
+| --- | --- | --- |
+| `×3` | 2 | The default Efficiency unique — the spare `Light` axis, spent once |
+| `×2` | **3** | One more stack given up, one more soul bought |
+
+The floor is `×2`: at `×1` the weapon is no deeper than the variant it derives
+from and stops being an artifact at all. So three souls is the most any weapon
+in the game can carry, and it costs the last stack there is to spend.
 
 > **The Efficiency dagger** — from the Flensing Knife — carries
-> `CritWindow ×3, Light ×1`, **`Vampiric`**, and **`Overheal`**. It crits on
-> 17+, `Vampiric` heals it for the damage dealt (§3.3), and once that healing
-> runs past full `Overheal` banks the surplus as `Ward`. A dagger that stabs
-> itself a shield.
+> `CritWindow ×2, Light ×1`, **`Serrated`**, **`Vampiric` at tier 3**, and
+> **`Overheal`**. It cuts, the cut keeps bleeding, the bleeding feeds it, and
+> what it cannot use it wears. A dagger that stabs itself a shield.
 
-Neither half works alone. `Overheal` on a weapon with no healing source is
-inert, and `Vampiric` at full health is the resource §3.3 calls the one the game
-throws away. **The gimmick requires two slots, so it can only exist on the shape
-that has two** — which is the cleanest possible answer to what an Efficiency
-unique is *for*, and it arrives without inventing an enchantment.
+### Three souls make a chain, not a pair
 
-That also settles where `Overheal` lives. It wanted a weapon that produces
-surplus healing without being a healer, and a crit-heavy lifesteal dagger is a
-better home for it than the staff it was originally proposed on — a staff does
-not need help finding value in healing.
+Two enchantments can feed each other. Three can form a **line**, and each link
+here consumes exactly what the previous one produces:
+
+| | Turns | Into |
+| --- | --- | --- |
+| **`Serrated`** | A hit | Continuous damage — `Bleeding`, ticking every turn |
+| **`Vampiric`** at tier 3 | Damage dealt | Healing |
+| **`Overheal`** | Healing past full | `Ward` |
+
+That is why the dagger gives up a third stack of `CritWindow` rather than
+keeping it. `Vampiric` on a burst weapon heals in spikes, most of which land on
+a wielder who is already full and are thrown away; `Serrated` converts the
+weapon's output from spikes into a **stream**, which is the shape lifesteal
+actually wants. The dagger is not a crit weapon with lifesteal bolted on — it
+is a weapon that makes its damage continuous *in order to* make its healing
+continuous, and then banks the healing it cannot spend.
+
+**Every link is inert without the one before it.** `Overheal` with no healing
+source does nothing; `Vampiric` at full health is the resource §3.3 calls the
+one the game throws away; `Serrated` alone is a slow knife. The chain needs all
+three slots, so it can only exist on the shape that pays for three — which is
+the cleanest possible answer to what an Efficiency unique is *for*.
+
+**And it lives on both currency shapes, not one.** `Overheal` needs a partner,
+two shapes can supply one, and the two builds it produces are different enough
+that picking a single home would throw away the better half of the enchantment:
+
+| | Partner | Source of surplus | Who is shielded |
+| --- | --- | --- | --- |
+| **The Efficiency dagger** | `Vampiric`, fed by `Serrated` | Its own bleeding victims | The wielder, mid-fight |
+| **The Renewal staff** | `Regeneration` | Every tick landing on a healthy ally | Whoever was topped up |
+
+So a **unique enchantment may have more than one home**, provided each home can
+actually run it. That is not a loosening of what unique means — no drop rolls
+`Overheal` and no service grants it (§5.5) — it is the recognition that a soul
+with a *dependency* is defined by the dependency rather than by scarcity. It
+goes everywhere the dependency can be met, which for `Overheal` is exactly two
+weapons.
+
+The staff is the obvious build and the dagger is the surprising one. Both should
+exist: the staff teaches what the enchantment does, and the dagger is where a
+player discovers that healing is a thing a knife can do to itself.
 
 ### Caster uniques raise the enchantment instead
 
@@ -1227,7 +1289,7 @@ drop:
 
 | Shape | What it is | What no ordinary weapon can do |
 | --- | --- | --- |
-| **A unique enchantment** | One that exists nowhere else — the same treatment martial uniques get | Hold it at all |
+| **A unique enchantment** | One no drop can roll — the same treatment martial uniques get | Hold it at all |
 | **A high tier** | A catalogue enchantment arriving at tier 3 | Drop above tier 1 |
 | **Two enchantments** | Two non-opposing catalogue entries, both at tier 1 | Drop with more than one |
 
@@ -1236,6 +1298,7 @@ drop:
 | Rotwood | Staff | Staff of Blight | `Resonant ×1`, **Poison tier 3** | A rot that starts where an ordinary staff's ends |
 | The Long Candle | Wand | Wand of the Beam | `Resonant ×1`, **Shocking + Flaming** | A beam of plasma |
 | *(unnamed)* | Wand | Wand of the Nova | `Resonant ×1`, `Flaming`, **Burning** | A circle that keeps burning after it lands |
+| *(unnamed)* | Staff | Staff of Renewal | `Resonant ×1`, `Regeneration`, **`Overheal`** | Healing that stops being wasted on the healthy |
 
 ### A wand unique's own shape: the element lingers
 

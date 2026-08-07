@@ -634,8 +634,8 @@ second one would just be a cap by another name.
 
 ### Unique enchantments
 
-Four of these are **not in the catalogue** — they exist only on uniques (§1.5),
-cannot be chosen at the enchanter, and cannot be copied:
+These are **not in the catalogue** — they exist only on uniques (§1.5), cannot
+be chosen at the enchanter, and cannot be copied:
 
 | Enchantment | Lock | Trigger | Fires on | Effect |
 | --- | --- | --- | --- | --- |
@@ -644,12 +644,14 @@ cannot be chosen at the enchanter, and cannot be copied:
 | **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
 | **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWard` to 1 |
+| **Serrated** | 20 | 6 | Hit | Apply `Bleeding` — damage a turn from the weapon's own numbers, below |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
 movement. `Weightless` and `Momentum` refund the movement that *is* the game's
 currency. `Sturdy` denies death. `Overheal` un-wastes the one resource the
-design deliberately throws away. None of them is merely a larger number, and
+design deliberately throws away. `Serrated` takes its magnitude from the wielder
+rather than from its own tier. None of them is merely a larger number, and
 none of them belongs in a list the enchanter can hand out on request.
 
 That is the test for whether something is unique-level: **not "is it strong" but
@@ -686,28 +688,61 @@ wasted for *survival* while staying wasted for *progression*, and the sentence
 **It is the one unique enchantment that wants a second enchantment to matter**,
 and that requirement decides where it drops. `Overheal` on a weapon with no
 healing source is inert, so it can only be handed out on a shape that carries
-two souls — which is the `Light` artifact and nothing else (§1.5).
+more than one soul — which is the currency group, and nothing else (§1.5).
 
-**So it has exactly one home: the Efficiency dagger**, paired with `Vampiric`.
-Needing a partner is not a drawback worked around; it is a requirement, and
-`Overheal` goes where its dependency can be satisfied rather than where its
-effect is easiest to explain.
+**It has two homes, and it needs both:**
 
-**A staff version exists, and you build it.** Transfer (§6.5) is the only route
-to a second copy — every unique enchantment is `neverRolled` and sits on one
-weapon — so moving `Overheal` onto a Staff of Renewal costs a tier and a
-service, and turns a healer's routine overflow into a party-wide shield. That
-is the transfer rule paying off on the enchantment least obviously portable, and
-it only works *because* the staff is not where it starts. An `Overheal` that
-dropped on the obvious weapon would have nothing left to reward.
+| | Fed by | Source of surplus | Who is shielded |
+| --- | --- | --- | --- |
+| **The Efficiency dagger** | `Serrated` → `Vampiric` | Its own bleeding victims | The wielder, mid-fight |
+| **The Renewal staff** | `Regeneration` | Every tick landing on a healthy ally | Whoever was topped up |
 
-The two builds are genuinely different, which is what makes the move worth
-paying for:
+These are not the same enchantment twice. The dagger is a **selfish** build that
+converts its own damage into its own survival, and the staff is a **party**
+build that turns the healer's routine waste into everyone's shield. Picking one
+would throw away the better half of the thing.
 
-| | Source of surplus | Who gets the `Ward` |
+So a unique enchantment may live on more than one weapon, which is a narrower
+statement than it looks: `Overheal` is still `neverRolled`, still ungrantable by
+service, and still absent from every drop that is not one of those two artifacts
+(§5.5). What it is *not* is scarce for the sake of being scarce. **A soul with a
+dependency is defined by the dependency**, so it goes everywhere the dependency
+can be met — and for `Overheal` that is exactly two weapons.
+
+### `Serrated` scales off the weapon, because it cannot scale off tier
+
+`Serrated` applies **`Bleeding`**, a damage-over-time joining the level family
+(§1.7) alongside `Poison`, `Searing`, `Sundered` and `Weakened` — accumulating,
+ticking, decaying one a turn. It is the enchantment half of the pair, exactly as
+`Flaming` is to `Burning`.
+
+What is new is where its magnitude comes from. Every other enchantment's
+strength is a function of its **tier**, and a unique is pinned at tier 1 (§3.3)
+— which is precisely the constraint that made unique enchantments rules rather
+than magnitudes. `Serrated` is a magnitude, so it needs a ladder that is not
+tier, and it takes the two the weapon already has:
+
+```
+BleedDamagePerTurn = BleedPercent × (weapon base damage + weapon proficiency level)
+```
+
+| Term | Ladder it rides | Grows by |
 | --- | --- | --- |
-| **The dagger** (where it drops) | Its own crits, via `Vampiric` | The wielder, mid-fight |
-| **A healing staff** (where you move it) | Every overheal on a healthy party | Whoever was topped up
+| **Weapon base damage** | The item | Nothing — it is what the dagger is |
+| **Proficiency level** | The *wielder* (§2.2) | Damage dealt with the class |
+
+**That is the first enchantment whose power belongs to the character rather than
+to the enchantment**, and it is the right exception to make here. A tier-1 pin
+would otherwise leave `Serrated` frozen at whatever it did the day it dropped —
+a dead stack in everything but name — and the fix is not to unpin it but to hang
+it off a ladder that is already climbing. A dagger you have fought with for a
+campaign bleeds harder because *you* are better with daggers, which is the same
+sentence §2.2 already makes true of every swing.
+
+It also keeps `Serrated` untransferable in practice without a rule forbidding
+it. Move it to a greataxe (§6.5) and the percentage lands on a bigger base
+number, but the proficiency term resets to that character's axe skill — so the
+soul travels and the strength does not follow automatically.
 
 **The conversion is lossy, and that is the first of its two brakes.**
 `OverhealPerWard` — start at **5** — means 20 points of surplus healing becomes

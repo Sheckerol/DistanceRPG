@@ -72,7 +72,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Group | Keys |
 | --- | --- |
 | Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingMaxMana` |
-| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard` |
+| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard`, `BleedPercent`, `BleedDecayPerTurn` |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
@@ -223,7 +223,8 @@ Statline, forged spread, area shape, innate enchantment id.
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
 | A unique derives from a variant | Exactly one modifier at `×3`, plus its unique enchantment | §1.5 |
 | Casters carry exactly one innate enchantment | Staff fixed by variant, wand a damage type | §3.1 |
-| A `Light`-forged unique carries exactly **two** enchantments, one of them unique or tier 3 | A currency cannot carry an artifact's identity, so the souls do | §1.5 |
+| A `Light`-forged unique carries `signature ×n` with **`5 − n` enchantments**, `n` ≥ 2, one of them unique or tier 3 | A currency cannot carry an artifact's identity, so the souls do — at one soul per stack given up | §1.5 |
+| A unique enchantment with a dependency appears only on weapons carrying two enchantments | `Overheal` alone is inert; the check catches it being placed somewhere it cannot fire | §1.5 |
 
 §1.7 already lists "weapon data validation" as a caller of `Allowed`. This is
 that caller, and the point is that **no new validation code exists**.

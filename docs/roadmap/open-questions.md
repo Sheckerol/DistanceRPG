@@ -379,9 +379,23 @@
   guaranteed-nothing service that still costs runs of downtime. Silently
   allowing it is honest and consistent; showing the 0% and letting the player
   do it anyway risks reading as a bug rather than a rule.
+- **Does `Bleeding` damage feed `Vampiric`?** The dagger's whole chain (§1.5)
+  assumes it does — that is what turns a burst weapon into a stream. But
+  `Vampiric` fires on **Crit** and heals for damage dealt, and a bleed tick is
+  neither a hit nor a crit. Either the tick routes through the same damage
+  resolver and counts as the weapon's damage, or the dagger's `Vampiric` needs a
+  different trigger from the catalogue entry, or the chain is really
+  `Serrated` and `Vampiric` running in parallel off the same crits rather than
+  in series. The third reading still works and is a weaker item; the first is
+  what the design wants and is the one to check against `TurnSystem` first.
+- **`BleedPercent` and `BleedDecayPerTurn` are unset.** The percentage is quoted
+  against `base damage + proficiency level`, so it compounds with the one term
+  that grows all campaign — a flat 25% is a very different item at proficiency 2
+  and proficiency 20. Decay is the same dial §1.5 already argues about for the
+  lingering elements, and probably wants the same answer for the same reason.
 - **What are the other three Efficiency uniques' pairs?** The dagger is settled
-  (`Vampiric` + `Overheal`, §1.5) and it sets a high bar: the two souls should
-  *need* each other, not merely coexist. `Regeneration` + `Overheal` is the
+  (`Serrated` → `Vampiric` → `Overheal`, §1.5) and it sets a high bar: the souls
+  should *need* each other, not merely coexist. `Regeneration` + `Overheal` is the
   obvious second and is probably too obvious. The catalogue has few natural
   pairs — most entries stand alone perfectly well — so either three more genuine
   combos exist and want finding, or some Efficiency uniques take the tier-3

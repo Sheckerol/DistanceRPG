@@ -267,7 +267,7 @@ to live in the same structure: an int that accumulates and decays, differing
 only in being drained by the damage step as well as by the tick. The tick path
 handles it with one extra drain, not a second representation.
 
-Which means `Poison`, `Searing`, `Sundered`, `Weakened` and `Ward` all want the
+Which means `Poison`, `Searing`, `Sundered`, `Weakened`, `Bleeding` and `Ward` all want the
 **same representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
 `TickStatusEffects` path: apply an effect proportional to `Levels`, then
 decrement by that status's decay. Four effects, one code path, one HUD
