@@ -593,3 +593,39 @@
 - **Refinement improves whether the roll lands, not what it lands on.** Deepen
   stays common and a graft stays the surprise, so §1.1's ceilings remain the
   thing shaping a weapon rather than a drop table.
+- **`WearPerHit = 1`.** Per hit rather than per swing, per turn or scaled by
+  damage, so the pool is a plain count of work done — a multi-hit weapon is
+  neither rewarded nor punished, and the number stays one a player can hold in
+  their head while deciding whether to deposit.
+- **Wear is bounded by `WearCapacity`, and that ceiling *is* the durability
+  system** — read from the other end. `durability = WearCapacity − wear`; one
+  number, and the design keeps the wear direction as the vocabulary so the
+  counter only ever goes one way. Service repairs and spends in a single action,
+  because those were never two events.
+- **A fully worn weapon is not broken.** It swings identically; it simply stops
+  banking, so further hits are work done for free. That is the entire penalty,
+  and it is the right one — this design has no punishment mechanics, and
+  degradation would be a death spiral in a game whose way out of trouble is to
+  fight. It also supplies the bound on hoarding that §6.4's deposit-timing
+  decision needed: you cannot wait past full.
+- **`WearCapacity` grows with every service, and faster under refinement.** A
+  worked weapon is a tempered one. This makes refinement an *investment* rather
+  than only a gamble — better odds now and a bigger pool forever — and it is the
+  third thing loyalty compounds, alongside proficiency (§2.2) and stacks (§6.4).
+  A fresh drop cannot be shortcut into an heirloom, which is what makes "your
+  investment is not stranded" actually true.
+- **Attaching enchantment #n costs `n × EnchantmentWearCost` as well as `n`
+  runs**, so both prices say the same thing. This is what ties growing capacity
+  to breadth: a fifth soul demands a pool no fresh weapon could hold, so
+  capacity is the gate on breadth and refinement is the road to the next
+  enchantment rather than a detour from it. It also stops capacity growth from
+  pushing both services to `MaxImprovementChance` and dissolving the fork.
+- **A currency modifier can never make a unique unique.** `Light` and `Resonant`
+  are both forge-limited to `×1` (§1.1), so there is no `×3` to reach for and
+  the `×1` an artifact carries is the same one its common variant had. **Every
+  `Light`-forged artifact therefore carries a unique enchantment**, and the soul
+  is where its identity lives rather than an ornament on top. This is one rule
+  covering what §1.5 previously treated as two coincidences — the Efficiency
+  unique and the caster unique hit the same wall for the same reason. A `Light`
+  artifact's soul should also do something with *movement*, since that is the
+  currency `Light` trades in.

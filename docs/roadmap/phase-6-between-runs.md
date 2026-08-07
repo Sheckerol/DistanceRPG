@@ -15,8 +15,13 @@ descend → fight (weapons accrue wear), gather, survive
 ## 6.1 Wear is earned, not suffered
 
 **Nothing breaks.** Wear is not damage to repair — it is proof of use, and it
-is the enchanter's raw material. Swinging a weapon accrues wear; the enchanter
-consumes it to attach an enchantment.
+is the enchanter's raw material. Swinging a weapon accrues wear at
+**`WearPerHit = 1`**; the enchanter consumes it to attach an enchantment.
+
+One per hit rather than per swing, per turn or scaled by damage. It makes the
+pool a plain count of work done, it costs a multi-hit weapon nothing and grants
+it nothing, and it is the only version a player can hold in their head while
+deciding whether to deposit.
 
 That matches the philosophy the rest of the game already runs on: health levels
 from being healed, mana from being spent, proficiency from damage dealt. A
@@ -35,6 +40,68 @@ weapon's wear**, whatever the service bought — so the question is never
 That turns the pool from a counter into a decision. A weapon kept in rotation
 three runs longer walks into the shop worth more than the same weapon deposited
 at the first opportunity, and it is the player who decides which.
+
+### The pool has a ceiling, and the ceiling is the durability system
+
+Wear is bounded by **`WearCapacity`**, and that bound is the same number a
+durability system would track — read from the other end:
+
+| | Counts | Starts at | Ends at |
+| --- | --- | --- | --- |
+| **Durability** | Down, as you fight | Full | Worn out |
+| **Wear** | Up, as you fight | Empty | Full |
+
+`durability = WearCapacity − wear`. They are one number, and the design keeps
+the **wear** direction as the vocabulary so there is one counter going one way.
+Service is the repair, and it always restores the weapon completely — which is
+the same event as emptying the pool, seen from the other side. **A deposit
+repairs and spends in one action, because those were never two things.**
+
+### Bottoming out costs nothing but opportunity
+
+**A fully worn weapon is not broken, damaged, or worse in any way.** It swings
+for identical damage, at identical range, with every stack and every enchantment
+intact. What it stops doing is *banking*: further hits accrue nothing, because
+there is nowhere to put them.
+
+That is the whole penalty, and it is the right one. This design does not have
+punishment mechanics — nothing in it makes you weaker for having played — and a
+degradation penalty would be a death spiral in a game where the way out of
+trouble is to fight (§4.3). So the cost of running a weapon dry is **the work
+you did for free**, which is a cost the player can choose to pay and can always
+see coming.
+
+It also does something the design wanted anyway: **it is the bound on hoarding.**
+§6.4 makes waiting before a deposit genuinely worth it, and without a ceiling the
+optimal play would be to wait forever. The pool answers that without a rule — you
+cannot hoard past full, and a weapon sitting at its cap is telling you plainly
+that it is time to rotate it into the shop.
+
+### Every repair makes the weapon hold more
+
+**`WearCapacity` grows with every service**, and grows faster under refinement:
+
+| Service | Capacity gained |
+| --- | --- |
+| **Enchanting** | A little |
+| **Refinement** | **More** |
+
+A worked weapon is a tempered one. This is the third thing loyalty compounds —
+proficiency is per class (§2.2), stacks are per weapon (§6.4), and capacity is
+per weapon too, so an heirloom out-performs a fresh drop in three separate ways
+that all took the same route to get there.
+
+Two consequences worth naming, because they change what the two services mean:
+
+- **Refinement is not only a gamble; it is an investment.** Declining a soul
+  buys better odds *now* and a bigger pool *forever*. That is a genuinely
+  different shape from enchanting, which pays out immediately and compounds
+  slowly — and it is what makes the fork in §6.4 a strategy rather than a mood.
+- **A fresh drop cannot be refined into an heirloom quickly.** Its pool is
+  small, so it fills fast, empties fast, and rolls badly whichever service it
+  buys. Capacity is the part of a weapon that cannot be shortcut, which is
+  exactly what the "your investment is not stranded when a better base drops"
+  claim in §6.4 needs in order to be true.
 
 ## 6.2 The enchanter takes time, measured in runs
 
@@ -58,6 +125,18 @@ makes a 5-enchantment weapon rare **by construction** rather than by drop rate.
 runs and the full climb costs fourteen more. Casters are handed the first
 enchantment and pay for it in downtime, which keeps a free head start from being
 a free fifteen-run shortcut.
+
+**The wear cost climbs with the clock.** Attaching enchantment #n costs `n`
+runs of downtime *and* `n × EnchantmentWearCost` out of the pool, for one
+reason: the two prices should say the same thing. A fifth enchantment being five
+times the wait but the same material would make the material irrelevant by the
+end.
+
+That is what ties §6.1's growing capacity to breadth rather than leaving it a
+side benefit. A fifth enchantment demands a pool no fresh weapon could hold, so
+**capacity is the gate on breadth** and refinement — which grows it fastest — is
+the road to the next soul rather than a detour from it. Enchanting also grows
+the pool, just slower, so the gate is a gradient and never a wall.
 
 **The enchanter does not sell tiers.** Tier is earned by casting (§3.3), so
 service time prices **breadth only** — how many enchantments a weapon carries,
@@ -227,13 +306,14 @@ treadmill — your investment is not stranded when a better base drops.
 **Which is why it is a choice rather than a side effect.** Wear is the currency
 (§6.1) and the deposit is where it is spent; what it buys is up to you:
 
-| | You get | The improvement roll |
-| --- | --- | --- |
-| **Enchanting** | A **chosen** enchantment, guaranteed (§6.2) | **Really low** |
-| **Refinement** | Nothing attached at all | **Much better** |
+| | You get | The improvement roll | `WearCapacity` |
+| --- | --- | --- | --- |
+| **Enchanting** | A **chosen** enchantment, guaranteed (§6.2) | **Really low** | `+` a little |
+| **Refinement** | Nothing attached at all | **Much better** | **`+` more** |
 
-Refinement is the gamble: you give up the one guaranteed thing in itemisation
-for a better shot at the one thing that cannot be bought.
+Refinement is the gamble *and* the investment: you give up the one guaranteed
+thing in itemisation for a better shot at the one thing that cannot be bought,
+and a permanently bigger pool to try again from (§6.1).
 
 ### It is one mechanism, not two rates
 
@@ -242,12 +322,13 @@ consumes wear** — that is what §6.1 has always meant by raw material — and 
 improvement roll is paid for out of whatever is left:
 
 ```
+attachmentCost    = EnchantmentWearCost × (currentEnchantments + 1)   // §6.2
 improvementChance = min(MaxImprovementChance,
                         (wear − attachmentCost) / WearPerImprovementRoll)
 ```
 
-Enchanting takes `EnchantmentWearCost` off the top, so a routine deposit has
-little remainder and rolls at a token chance. Refinement pays for nothing, so
+Enchanting takes `attachmentCost` off the top, so a routine deposit has little
+remainder and rolls at a token chance. Refinement pays for nothing, so
 the entire pool pushes the roll. **The gap between the two is exactly the price
 of the enchantment**, quoted in the same units as everything else rather than as
 a second tuning knob.
@@ -267,6 +348,11 @@ Three things fall out that nothing had to state:
   is. Two refinements back to back on an empty weapon achieve precisely
   nothing, so the gamble needs no cooldown, no per-weapon limit and no guard of
   its own.
+- **The odds cannot run away from the costs.** Capacity growth would otherwise
+  push both services to the cap and dissolve the fork — but `attachmentCost`
+  climbs with breadth (§6.2), so a weapon that grows its pool is *keeping pace*
+  with what its next soul costs rather than outrunning the roll. The gap between
+  the two services survives to the end of a campaign.
 
 **The chance is capped.** A deep enough pool must never make a graft certain —
 the rarity below is load-bearing, and an uncapped curve would let a patient
@@ -372,7 +458,7 @@ New `Logic/Wear.cs`, `Logic/Enchanter.cs`, and a `CampaignState` that lives
 The existing distinction does the work for us: `DungeonState` is discarded on
 leaving, `CampaignState` is not.
 
-`Weapon` gains `Wear`; the unified attack resolver from Phase 0 is the single
+`Weapon` gains `Wear` and `WearCapacity`; the unified attack resolver from Phase 0 is the single
 place it accrues, and `Enchanter` is the single place it is spent (§6.4) — a
 deposit carries the chosen service with it, so the queue entry is
 `(weapon, service, wearAtDeposit)` rather than a weapon alone.

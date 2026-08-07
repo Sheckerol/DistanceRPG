@@ -1133,14 +1133,39 @@ they are not interchangeable:
 | **Efficiency** | The signature — **never `Light`** | Deep *and* cheap, the only shape that gets both |
 
 Efficiency uniques cannot raise their own added modifier, because `Light` is
-forge-limited to `×1` (§1.1). That turns out to be the more interesting
-outcome: an Efficiency unique is forced onto the class signature and comes out
-as `signature ×3, Light ×1` — the only weapons in the game that are both deep
-and cheap to swing.
+forge-limited to `×1` (§1.1). An Efficiency unique is therefore forced onto the
+class signature and comes out as `signature ×3, Light ×1` — the only weapons in
+the game that are both deep and cheap to swing.
 
 The Control and Support derivations are the richest, since they keep a second
 modifier. A Purity unique collapses to a single number, which is right for The
 Bulwark but would be dull four times over.
+
+### A unique carrying a currency puts its uniqueness in the soul
+
+`Light` and `Resonant` are the currency group (§1.1) and both are forge-limited
+to `×1`, which has a consequence for artifacts that is worth stating once rather
+than discovering twice: **a currency modifier can never be the thing that makes
+a unique unique.** There is no `×3` version of it to reach for, and the `×1` the
+artifact carries is the same `×1` the common variant it derives from already
+had.
+
+That is a sharper problem for Efficiency than for any other shape. Every other
+derivation keeps a *distinct* second modifier — The Bulwark's `Push`,
+Widowmaker's `CritMultiplier` — so the pair reads as an artifact. An Efficiency
+unique's second axis is `Light ×1`, which is on the Flensing Knife, the Hatchet
+and the Hunting Bow too. Strip the enchantment away and it is a variant with a
+deeper signature.
+
+**So every `Light`-forged artifact carries a unique enchantment**, and the
+enchantment is where its identity lives rather than an ornament on top of it.
+The `signature ×3` is what it is made of; the soul is what it *is*.
+
+**And a `Light` artifact's soul should pay in the currency `Light` trades in.**
+`Light` buys movement back (§1.1), so an Efficiency artifact whose unique
+enchantment does something with movement is the coherent version — the cheapness
+and the soul saying the same thing rather than sharing a hilt. Which souls the
+four Efficiency uniques carry is not settled; the constraint on them is.
 
 ### Caster uniques raise the enchantment instead
 
@@ -1149,10 +1174,12 @@ derivation rule has two ways to land — and only one of them is interesting.
 `Resonant ×3` is a staff that costs less mana, which is a fine modifier and a
 terrible legend. So:
 
-A caster unique gets the enchantment half of the rule and **not** the `×3` half,
-because the forge has no other option: `Resonant` is limited to `×1` (§1.1), so
-there is nothing on a caster a unique could raise. Exactly the parallel an
-Efficiency unique runs, which cannot raise its own `Light` either.
+A caster unique gets the enchantment half of the rule and **not** the `×3` half.
+That is the currency rule above, applied to the other half of the group — and on
+a caster it applies *completely*, because `Resonant` is the only modifier a
+caster has. An Efficiency unique still has a signature to deepen; a caster has
+nothing else at all, so the soul is not merely where the identity lives, it is
+the entire artifact.
 
 That leaves three shapes, and all three read as an artifact rather than a good
 drop:

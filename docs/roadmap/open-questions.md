@@ -356,20 +356,38 @@
   what Regeneration produces most of — but the argument for putting it somewhere
   stranger is that the `Vampiric` pairing is the better build and a staff does
   not need help finding value in healing.
-- **`EnchantmentWearCost`, `WearPerImprovementRoll` and `MaxImprovementChance`
-  are unset, and they only mean anything together.** The shape to aim at (§6.4):
-  a deposit made *as soon as the enchantment is affordable* should roll at
-  something like 5% — visibly a bonus rather than a plan — while the same
-  deposit refined instead lands nearer 30–40%. That fixes the ratio between the
-  first two: `EnchantmentWearCost` wants to be most of a typical deposit, and
-  `WearPerImprovementRoll` wants a typical deposit to be worth roughly a third
-  of a roll. `MaxImprovementChance` then decides how much a wear-hoarder can buy
-  — 50% keeps a graft a surprise; much higher and patience becomes a purchase.
-- **How fast does wear accrue?** `WearPerHit` is the input every number above is
-  quoted against, and nothing has pinned it. It also decides whether "fight
-  three more runs first" is a meaningful hoard or a rounding error, which is the
-  whole weight of the deposit-timing decision.
+- **The five enchanter constants are unset, and they only mean anything
+  together.** With `WearPerHit` settled at 1 they are all quoted in hits, which
+  makes them checkable against play. A worked starting point that produces the
+  shape §6.4 asks for — a first-opportunity deposit rolling ~10%, the same
+  deposit refined landing ~40%:
+
+  | Constant | Guess | Why |
+  | --- | --- | --- |
+  | `StartingWearCapacity` | 100 | ~1–2 runs to fill a fresh weapon, matching the 1-run cost of a first enchantment (§6.2) |
+  | `EnchantmentWearCost` | 75 | Most of a full first pool, so the leftover is genuinely a remainder |
+  | `WearPerImprovementRoll` | 250 | A full fresh pool is worth ~40% refined, ~10% enchanted |
+  | `CapacityPerEnchanting` | +5 | Slow compounding |
+  | `CapacityPerRefinement` | +20 | The investment half of the fork has to be felt |
+  | `MaxImprovementChance` | 50% | Patience buys a good chance, never a certainty |
+
+  The one to check first is `StartingWearCapacity` against real hit counts —
+  every other number is quoted against it, and nobody has counted how many times
+  one weapon actually swings in a run.
+- **Does the growth schedule keep up with `n × EnchantmentWearCost`?** A fifth
+  soul costs 375 wear at the guesses above, so the weapon must have reached a
+  capacity of 375 — roughly fifteen refinements, or far more services if the
+  player mostly enchants. That is either a satisfying campaign-long climb that
+  makes the fifteen-run figure in §6.2 real, or it is a wall that makes a
+  five-enchantment weapon unreachable in practice. The two schedules have to be
+  checked against each other, not separately.
 - **Should refinement be offered on a weapon with no wear at all?** It is a
   guaranteed-nothing service that still costs runs of downtime. Silently
   allowing it is honest and consistent; showing the 0% and letting the player
   do it anyway risks reading as a bug rather than a rule.
+- **Which souls do the four Efficiency uniques carry?** §1.5 now requires every
+  `Light`-forged artifact to have a unique enchantment, and argues it should do
+  something with movement since that is what `Light` trades in. `Weightless` is
+  the obvious such soul and is already on Feathered Death, which is a Control
+  derivation — so either it moves, or the Efficiency uniques need four movement
+  souls of their own and the catalogue has none spare.

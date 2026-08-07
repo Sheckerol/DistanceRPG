@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments and wear), active status effects |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -77,7 +77,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
-| Enchanter | `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance`, `WearPerHit` |
+| Enchanter | `WearPerHit`, `StartingWearCapacity`, `CapacityPerEnchanting`, `CapacityPerRefinement`, `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance` |
 | Inventory | `PartyCarrySlots` |
 
 Collecting them is worth as much as making them editable. Half the open
@@ -223,6 +223,7 @@ Statline, forged spread, area shape, innate enchantment id.
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
 | A unique derives from a variant | Exactly one modifier at `×3`, plus its unique enchantment | §1.5 |
 | Casters carry exactly one innate enchantment | Staff fixed by variant, wand a damage type | §3.1 |
+| Every unique forged with `Light` or `Resonant` names a unique enchantment | A currency cannot carry an artifact's identity | §1.5 |
 
 §1.7 already lists "weapon data validation" as a caller of `Allowed`. This is
 that caller, and the point is that **no new validation code exists**.
