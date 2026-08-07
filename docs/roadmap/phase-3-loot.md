@@ -683,18 +683,31 @@ collapse into a stat you grind by standing still. So the overflow stops being
 wasted for *survival* while staying wasted for *progression*, and the sentence
 "constitution grows by getting hurt and then healed" survives intact.
 
-**It is the one unique enchantment that wants a second enchantment to matter.**
-Alone on a healing staff it is a straightforward upgrade. Paired with
-`Vampiric` — heal the wielder for damage dealt — it becomes a melee build that
-turns excess lifesteal into a shield, on a weapon that never heals anyone
-otherwise. That is the transfer rule (§6.5) paying off on the enchantment least
-obviously portable, and the reason `Overheal` is not pinned to staves.
+**It is the one unique enchantment that wants a second enchantment to matter**,
+and that requirement decides where it drops. `Overheal` on a weapon with no
+healing source is inert, so it can only be handed out on a shape that carries
+two souls — which is the `Light` artifact and nothing else (§1.5).
 
-**Which is why it lives on the Efficiency dagger** (§1.5). Needing a partner is
-not a drawback to be worked around — it is a requirement, and exactly one
-martial shape can meet it. A `Light` artifact is the only one that carries two
-enchantments, so `Overheal` goes where its dependency can be satisfied rather
-than where its effect is easiest to explain.
+**So it has exactly one home: the Efficiency dagger**, paired with `Vampiric`.
+Needing a partner is not a drawback worked around; it is a requirement, and
+`Overheal` goes where its dependency can be satisfied rather than where its
+effect is easiest to explain.
+
+**A staff version exists, and you build it.** Transfer (§6.5) is the only route
+to a second copy — every unique enchantment is `neverRolled` and sits on one
+weapon — so moving `Overheal` onto a Staff of Renewal costs a tier and a
+service, and turns a healer's routine overflow into a party-wide shield. That
+is the transfer rule paying off on the enchantment least obviously portable, and
+it only works *because* the staff is not where it starts. An `Overheal` that
+dropped on the obvious weapon would have nothing left to reward.
+
+The two builds are genuinely different, which is what makes the move worth
+paying for:
+
+| | Source of surplus | Who gets the `Ward` |
+| --- | --- | --- |
+| **The dagger** (where it drops) | Its own crits, via `Vampiric` | The wielder, mid-fight |
+| **A healing staff** (where you move it) | Every overheal on a healthy party | Whoever was topped up
 
 **The conversion is lossy, and that is the first of its two brakes.**
 `OverhealPerWard` — start at **5** — means 20 points of surplus healing becomes

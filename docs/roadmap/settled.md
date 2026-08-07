@@ -645,3 +645,10 @@
   only exist on the shape with two slots. This also settles where `Overheal`
   lives — a crit-heavy lifesteal dagger produces surplus healing without being a
   healer, and a staff never needed help finding value in healing.
+- **`Overheal` drops on the Efficiency dagger and nowhere else.** Every unique
+  enchantment is `neverRolled` and sits on exactly one weapon, so **transfer
+  (§6.5) is the only route to a second copy** — which is what makes the staff
+  build worth the tier it costs. An `Overheal` that already dropped on a healing
+  staff would leave transfer nothing to reward, and §3.3 names this as
+  transfer's best payoff case precisely because the staff is not where it
+  starts.
