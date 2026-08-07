@@ -356,3 +356,20 @@
   what Regeneration produces most of — but the argument for putting it somewhere
   stranger is that the `Vampiric` pairing is the better build and a staff does
   not need help finding value in healing.
+- **`EnchantmentWearCost`, `WearPerImprovementRoll` and `MaxImprovementChance`
+  are unset, and they only mean anything together.** The shape to aim at (§6.4):
+  a deposit made *as soon as the enchantment is affordable* should roll at
+  something like 5% — visibly a bonus rather than a plan — while the same
+  deposit refined instead lands nearer 30–40%. That fixes the ratio between the
+  first two: `EnchantmentWearCost` wants to be most of a typical deposit, and
+  `WearPerImprovementRoll` wants a typical deposit to be worth roughly a third
+  of a roll. `MaxImprovementChance` then decides how much a wear-hoarder can buy
+  — 50% keeps a graft a surprise; much higher and patience becomes a purchase.
+- **How fast does wear accrue?** `WearPerHit` is the input every number above is
+  quoted against, and nothing has pinned it. It also decides whether "fight
+  three more runs first" is a meaningful hoard or a rounding error, which is the
+  whole weight of the deposit-timing decision.
+- **Should refinement be offered on a weapon with no wear at all?** It is a
+  guaranteed-nothing service that still costs runs of downtime. Silently
+  allowing it is honest and consistent; showing the 0% and letting the player
+  do it anyway risks reading as a bug rather than a rule.

@@ -572,3 +572,24 @@
   reload, so marching is when a caster refills — and `Resonant` buys sprint
   length before it buys sustain, so an efficient staff fights longest while
   still levelling its enchantment slowest (§3.3).
+- **A deposit buys one of two things: an enchantment, or a gamble.** Enchanting
+  attaches a chosen soul and leaves a token chance of the weapon improving;
+  **refinement** attaches nothing and rolls at much better odds (§6.4). It is
+  the same trade the whole design runs on — the guaranteed thing, or the rare
+  thing.
+- **The two rates are one mechanism.** Attaching consumes wear, and the
+  improvement roll is paid out of the remainder, so refinement's better odds are
+  literally *the price of the enchantment, unspent*. No second knob, and three
+  consequences arrive free: a fresh drop refines for nothing, hoarding wear
+  before a deposit is a real decision, and refinement cannot be spammed because
+  the pool — not the clock — is what limits it.
+- **A deposit empties the weapon's wear**, whichever service it bought. That is
+  what makes *when* to deposit a decision rather than a formality.
+- **Refinement costs the same downtime as the enchantment it replaced** and does
+  **not** advance the service rung. The gamble delays breadth; it never makes
+  breadth more expensive. A weapon at five enchantments therefore has refinement
+  as its only remaining service, which closes the fork at the top end without a
+  rule.
+- **Refinement improves whether the roll lands, not what it lands on.** Deepen
+  stays common and a graft stays the surprise, so §1.1's ceilings remain the
+  thing shaping a weapon rather than a drop table.

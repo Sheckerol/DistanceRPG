@@ -77,6 +77,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
+| Enchanter | `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance`, `WearPerHit` |
 | Inventory | `PartyCarrySlots` |
 
 Collecting them is worth as much as making them editable. Half the open

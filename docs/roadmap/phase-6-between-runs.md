@@ -26,6 +26,16 @@ Consequence worth stating plainly: **you cannot enchant a weapon you have not
 fought with.** A fresh unique straight off the floor is inert until it has done
 some work.
 
+### A deposit spends the whole pool
+
+Wear does not part-pay and it does not carry over. **Depositing empties the
+weapon's wear**, whatever the service bought — so the question is never
+*whether* to spend it, but **when**, and **on what** (§6.4).
+
+That turns the pool from a counter into a decision. A weapon kept in rotation
+three runs longer walks into the shop worth more than the same weapon deposited
+at the first opportunity, and it is the player who decides which.
+
 ## 6.2 The enchanter takes time, measured in runs
 
 Depositing a weapon starts a service clock. Service time is
@@ -90,6 +100,11 @@ campaign somewhere.
 The trade against a free innate is clean: **free but random, or chosen but
 costly.** A caster's staff arrives enchanted at no cost and no say; anything you
 actually want costs runs of downtime.
+
+**And you can decline it.** A deposit does not have to buy an enchantment — the
+alternative is to spend the same wear and the same downtime gambling on the
+weapon itself (§6.4). The chosen lever is always *available*; it is not always
+what you want.
 
 This is the second, independent cost on enchantment power. Max mana says *how
 much you can carry at once* (§3.3); service time says *and it is in the shop
@@ -198,16 +213,76 @@ It also means the mercy rule never has to be explained to a new player. They
 meet it later, in a real dungeon, at the moment it first does something — which
 is the right time to learn any rule.
 
-## 6.4 Service can improve the weapon
+## 6.4 A deposit buys one of two things
 
-Working a weapon has a **low chance of adding a modifier stack** — sometimes
-you make a thing better while working on it.
+Working a weapon has a chance of **adding a modifier stack** — sometimes you
+make a thing better while working on it.
 
 This is the mechanism that most directly delivers cross-run weapon progression.
 Enchantments are attachments; a modifier is the weapon itself getting better.
 An heirloom that has been through twenty services can genuinely out-roll a
 fresh drop, which is the payoff for loyalty and the answer to the upgrade
 treadmill — your investment is not stranded when a better base drops.
+
+**Which is why it is a choice rather than a side effect.** Wear is the currency
+(§6.1) and the deposit is where it is spent; what it buys is up to you:
+
+| | You get | The improvement roll |
+| --- | --- | --- |
+| **Enchanting** | A **chosen** enchantment, guaranteed (§6.2) | **Really low** |
+| **Refinement** | Nothing attached at all | **Much better** |
+
+Refinement is the gamble: you give up the one guaranteed thing in itemisation
+for a better shot at the one thing that cannot be bought.
+
+### It is one mechanism, not two rates
+
+The odds do not differ because a rule says so. **Attaching an enchantment
+consumes wear** — that is what §6.1 has always meant by raw material — and the
+improvement roll is paid for out of whatever is left:
+
+```
+improvementChance = min(MaxImprovementChance,
+                        (wear − attachmentCost) / WearPerImprovementRoll)
+```
+
+Enchanting takes `EnchantmentWearCost` off the top, so a routine deposit has
+little remainder and rolls at a token chance. Refinement pays for nothing, so
+the entire pool pushes the roll. **The gap between the two is exactly the price
+of the enchantment**, quoted in the same units as everything else rather than as
+a second tuning knob.
+
+Three things fall out that nothing had to state:
+
+- **A fresh drop refines for nothing.** No wear, no roll. §6.1 already said you
+  cannot enchant a weapon you have not fought with; it turns out you cannot
+  improve one either, and for the same reason.
+- **Hoarding wear becomes a real decision.** Deposit the moment you can afford
+  the enchantment and the improvement roll is a rounding error; fight several
+  more runs first and the *same* enchantment arrives with a genuine chance of
+  the weapon itself getting better. Breadth sooner, or breadth and a lottery
+  ticket later — and the weapon has to stay in rotation to earn the difference,
+  which is the behaviour every other system here rewards.
+- **Refinement cannot be spammed.** The clock is not what limits it; the pool
+  is. Two refinements back to back on an empty weapon achieve precisely
+  nothing, so the gamble needs no cooldown, no per-weapon limit and no guard of
+  its own.
+
+**The chance is capped.** A deep enough pool must never make a graft certain —
+the rarity below is load-bearing, and an uncapped curve would let a patient
+player *purchase* the one thing the design refuses to sell.
+
+### The clock is the same either way
+
+Refinement costs the downtime of the enchantment you declined —
+**current enchantment count + 1** runs (§6.2). He has the weapon for the same
+time; what differs is what he does with it. That keeps the fork about what you
+want rather than about scheduling, and it needs no anti-abuse rule because wear
+already decides how often refining is worth asking for.
+
+**Refinement does not advance the rung.** Nothing was attached, so the next
+enchantment costs what it would have cost anyway — the gamble delays breadth
+without ever making it more expensive.
 
 ### Two outcomes: deepen, or graft
 
@@ -216,6 +291,12 @@ treadmill — your investment is not stranded when a better base drops.
 | Nothing | The weapon comes back as it went in | **Most services** |
 | **Deepen** | `+1` stack on a modifier the weapon already carries | Uncommon, biased toward the class signature |
 | **Graft** | `+1` stack of a modifier it has never carried | **Rare** |
+
+Refinement raises the chance that the roll *lands*; it does not re-weight what
+lands. Deepen stays the common result and a graft stays the surprise, so a
+player who wants a specific graft is buying more attempts rather than better
+odds on the one they are after — which keeps §1.1's ceilings, not a drop table,
+as the thing standing between a weapon and its shape.
 
 **The rarity is load-bearing, not flavour.** It is the only thing standing
 between a weapon and its ceiling, and §1.1 deliberately caps nothing — so the
@@ -252,9 +333,6 @@ other twenty are handed out freely.
 
 Rules that keep it coherent:
 
-- **The chance scales with wear brought in.** The weapon you actually fought
-  with improves; the one you carried does not. Same principle as everywhere
-  else in the game.
 - **The §1.1 caps still bind.** A modifier at its ceiling cannot be deepened,
   and a weapon with every modifier capped rolls nothing at all.
 - **It competes with farming.** Deepening spends the same acquired budget
@@ -263,7 +341,10 @@ Rules that keep it coherent:
   depth now, or climb to it over twenty runs.
 - **A finished weapon is not inert.** Even with its signature capped, a weapon
   can still gain *breadth* through grafts at 5 apiece — which is what keeps a
-  max-farmed drop worth depositing at all.
+  max-farmed drop worth depositing at all. A weapon carrying all five
+  enchantments has nothing left to attach, so refinement is simply the only
+  service it can still buy: the fork closes itself at the top end without a
+  rule.
 
 ## 6.5 Transferring an enchantment
 
@@ -292,7 +373,9 @@ The existing distinction does the work for us: `DungeonState` is discarded on
 leaving, `CampaignState` is not.
 
 `Weapon` gains `Wear`; the unified attack resolver from Phase 0 is the single
-place it accrues.
+place it accrues, and `Enchanter` is the single place it is spent (§6.4) — a
+deposit carries the chosen service with it, so the queue entry is
+`(weapon, service, wearAtDeposit)` rather than a weapon alone.
 
 Phase 5's save format grows a campaign section, and it becomes the *outer*
 document — a save with no dungeon in progress is now a valid state, which it

@@ -41,7 +41,7 @@ use this table to find the file a section lives in.
 | [phase-3-loot](docs/roadmap/phase-3-loot.md) | §3.1–3.5 | Drops, the repeat-kill ladder, enchantments, consumables |
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
 | [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.8 | What is stored, in what format, and the five data files |
-| [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.6 | Wear, the enchanter, service and grafting, the hub |
+| [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.6 | Wear, the enchanter, enchant-or-refine, grafting, the hub |
 | [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
 | [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
 
