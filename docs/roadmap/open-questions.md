@@ -379,15 +379,14 @@
   guaranteed-nothing service that still costs runs of downtime. Silently
   allowing it is honest and consistent; showing the 0% and letting the player
   do it anyway risks reading as a bug rather than a rule.
-- **Is every damage instance a `Vampiric` trigger, including ones the wielder
-  did not cause this turn?** §3.3 fires it on damage dealt, which cleanly
-  includes bleed ticks — but ticks resolve on the *enemy's* turn, from a status
-  applied several turns ago, possibly by a weapon that has since been swapped
-  out. Either the status remembers who applied it and pays their `Vampiric`, or
-  triggers only fire for damage the wielder deals on their own turn and the
-  dagger's chain is weaker than §1.5 describes. The first is what the design
-  wants; it is also a back-reference from a status to a character, which nothing
-  else in the design needs.
+- **`OverhealDecayPerTurn` against `OverhealPerWard` is the real dial.** At
+  decay 1 and a ratio of 5, surplus must arrive at better than 1 a round to
+  convert at all, and at better than 5 a round to convert every round. That
+  band is narrow, and it is what decides whether `Overheal` is a build or a
+  curiosity — set it wrong and either a lone healer's stray tick becomes a
+  shield factory, or the dagger's stream evaporates between swings. The two
+  numbers want tuning together and against `Ward`'s own decay, which is a third
+  drain on the same output.
 - **`BleedPercent` and `BleedDecayPerTurn` are unset.** The percentage is quoted
   against `base damage + proficiency level`, so it compounds with the one term
   that grows all campaign — a flat 25% is a very different item at proficiency 2

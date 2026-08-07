@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the `Overheal` remainder |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -72,7 +72,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Group | Keys |
 | --- | --- |
 | Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingMaxMana` |
-| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard`, `BleedPercent`, `BleedDecayPerTurn` |
+| Statuses | `SearLevelsPerTier`, `SearDamagePerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard`, `OverhealDecayPerTurn`, `BleedPercent`, `BleedDecayPerTurn` |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |

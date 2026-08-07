@@ -1222,34 +1222,67 @@ in the game can carry, and it costs the last stack there is to spend.
 
 > **The Efficiency dagger** — from the Flensing Knife — carries
 > `CritWindow ×2, Light ×1`, **`Serrated`**, **`Vampiric` at tier 3**, and
-> **`Overheal`**. It cuts, the cut keeps bleeding, the bleeding feeds it, and
-> what it cannot use it wears. A dagger that stabs itself a shield.
+> **`Overheal`**. It cuts often, it drinks what it cuts, and it wears what it
+> cannot drink. A dagger that stabs itself a shield — and leaves a mess.
 
-### Three souls make a chain, not a pair
+### The engine is `Light`, and the pair on top of it is the combo
 
-Two enchantments can feed each other. Three can form a **line**, and each link
-here consumes exactly what the previous one produces:
+`Vampiric` heals a flat amount per damage *instance* (§3.3), which makes the
+question "how many times does this weapon do damage in a turn" and not "how
+hard". `Light` answers it twice over, from one modifier:
+
+| `Light` gives | Which supplies |
+| --- | --- |
+| **More attacks a turn** — a dagger at `×6` costs 12 movement instead of 30 | The instances `Vampiric` converts |
+| **Movement banked as mana** at end of turn (§1.1) | The 2-a-trigger those instances cost |
+
+So the two souls that matter run in **series** off an engine the third modifier
+is already providing:
 
 | | Turns | Into |
 | --- | --- | --- |
-| **`Serrated`** | A hit | Continuous damage — `Bleeding`, ticking every turn |
-| **`Vampiric`** at tier 3 | Every instance of damage — a swing, a bleed tick | 3 HP of healing, flat (§3.3) |
-| **`Overheal`** | Healing past full | `Ward` |
+| **`Vampiric`** at tier 3 | Each of a great many cheap hits | 3 HP of healing, flat |
+| **`Overheal`** | Healing past full | `Ward` (§3.3) |
 
-That is why the dagger gives up a third stack of `CritWindow` rather than
-keeping it. `Vampiric` heals a flat amount per damage *instance* (§3.3), so a
-burst weapon is the worst possible carrier for it — one enormous crit pays
-exactly as much as one pinprick. `Serrated` converts the weapon's output from
-spikes into a **stream** of instances, which is the shape lifesteal actually
-wants. The dagger is not a crit weapon with lifesteal bolted on — it
-is a weapon that makes its damage continuous *in order to* make its healing
-continuous, and then banks the healing it cannot spend.
+Neither works alone: `Overheal` on a weapon with no healing source is inert,
+and `Vampiric` at full health is the resource §3.3 calls the one the game throws
+away. **The pair needs two slots, so it can only exist on the shape that has
+two** — which is the answer to what an Efficiency unique is *for*.
 
-**Every link is inert without the one before it.** `Overheal` with no healing
-source does nothing; `Vampiric` at full health is the resource §3.3 calls the
-one the game throws away; `Serrated` alone is a slow knife. The chain needs all
-three slots, so it can only exist on the shape that pays for three — which is
-the cleanest possible answer to what an Efficiency unique is *for*.
+**And the engine has a governor built into it.** Movement spent attacking is
+movement not banked as mana, so the same budget pays for both the instances and
+the triggers that fire on them. A turn spent swinging thirteen times is a turn
+that generates almost no mana to pay for it. The dagger cannot simply be run at
+maximum; every turn is a split of one budget between *how often it drinks* and
+*whether it can afford to*. That tension is the item, and no rule was written
+for it.
+
+### `Serrated` is the theme, not a third link
+
+`Bleeding` does **not** trigger `Vampiric`. A tick is damage the *status* deals,
+on the enemy's turn, from a wound possibly left by a weapon since swapped out —
+and making it pay lifesteal would need a status to remember which character
+applied it, a back-reference nothing else in the design wants.
+
+So the dagger is a **pair plus a theme**, not a three-link chain, and that is
+the better item:
+
+| | Role | In the loop? |
+| --- | --- | --- |
+| `Vampiric` → `Overheal` | The engine's output, converted twice | **Yes** |
+| `Serrated` | Damage, and the reason it is a *knife* | No — and it does not need to be |
+
+**Not every soul on a combo weapon has to be in the combo.** Over-synergised
+items only work fully assembled and stop being readable; a weapon whose parts
+all feed each other is a machine rather than a knife. `Serrated` is the
+offensive soul on a weapon whose other two are defensive — the thing that makes
+it a serrated blade that drinks, rather than a lifesteal engine that happens to
+have an edge.
+
+It is also the honest simplification. A three-link chain read well on paper and
+cost a status-to-character back-reference, a trigger firing on the enemy's turn,
+and an ordering question between the tick and the heal. Theme is free; synergy
+is not, and this one was not worth its price.
 
 **And it lives on both currency shapes, not one.** `Overheal` needs a partner,
 two shapes can supply one, and the two builds it produces are different enough

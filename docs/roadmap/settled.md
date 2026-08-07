@@ -700,11 +700,41 @@
   *instances* — daggers, `Charges` throwers, lingering-element wands — which is
   a new itemisation axis, and the reason the Efficiency dagger trades a
   `CritWindow` stack for `Serrated`.
-- **`Overheal` carries a remainder rather than converting per heal.** Surplus
-  accumulates; each time it crosses `OverhealPerWard` it emits one `Ward` and
-  subtracts. Without it a tier-3 `Vampiric` dribbling 3 surplus at a time would
-  round to zero every tick and the enchantment whose purpose is to stop
-  discarding things would discard everything. One int, no round boundary to hang
-  off, and a dagger dribbling 3 converts at the same rate as a staff dumping 20.
-  The remainder is bounded below `OverhealPerWard`, so it is by construction
-  less than one point of pending shield.
+- **`Overheal`'s remainder is a hidden status effect.** Surplus accumulates into
+  it, it decays one a round like every other status, and it **resets to zero**
+  when it pays out. Without the accumulator a tier-3 `Vampiric` dribbling 3
+  surplus at a time would round to zero every tick and the enchantment whose
+  purpose is to stop discarding things would discard everything.
+- **Decay is what makes it a rate rather than a bucket.** Surplus has to arrive
+  faster than it drains, so a dagger swinging ten times a turn converts and a
+  party topping each other off in a corridor never does. Reset-rather-than-
+  subtract stops one enormous overheal banking change toward the next, which
+  keeps the staff's lumps and the dagger's stream honest against each other.
+  Hidden because nothing the player does responds to its exact value — the
+  readable version is "heal a lot, quickly, and shields appear".
+- **`Bleeding` does not trigger `Vampiric`.** A tick is damage the *status*
+  deals, on the enemy's turn, from a wound whose applier may no longer hold the
+  weapon — paying lifesteal on it needs a status to remember which character
+  left it, plus an ordering rule. Triggers fire on damage the wielder deals on
+  their own turn.
+- **So the Efficiency dagger is a pair plus a theme, not a three-link chain.**
+  `Vampiric` → `Overheal` is the loop; `Serrated` is the offensive soul on a
+  weapon whose other two are defensive. **Not every soul on a combo weapon has
+  to be in the combo** — over-synergised items only work fully assembled and
+  stop being readable. Theme is free and this synergy was not worth its price.
+- **`Light` is the engine, and it supplies both halves.** Cheap attacks are the
+  instances `Vampiric` converts (a dagger at `×6` costs 12 movement, not 30);
+  movement banked at end of turn is the mana those triggers cost. And because
+  one budget pays for both, the build governs itself — a turn spent swinging is
+  a turn not spent banking, so nobody runs it at maximum for free. No rule was
+  written for that.
+- **Unique enchantments are pinned at tier 1 permanently**, which §3.3
+  previously contradicted by claiming nothing sits at tier 1 forever. A unique
+  bends a rule rather than supplying a number, and a rule has no second tier.
+  They still accrue mana spent; it simply buys nothing. `Serrated` is the one
+  unique that *is* a magnitude, which is precisely why the pin forced it onto
+  the weapon's and wielder's ladders instead.
+- **`Overheal`'s exchange rate therefore never improves.** What grows is the
+  input — a deeper `Vampiric`, a deeper `Regeneration`, more attacks a turn —
+  never the conversion. That is what stops a `Ward` engine compounding: every
+  term feeding it climbs and the term converting it does not.

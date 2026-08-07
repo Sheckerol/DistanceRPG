@@ -513,9 +513,20 @@ healed, mana from being spent, weapon proficiency from damage dealt, wear from
 swinging. An enchantment levelling from the mana it spends is the same rule
 reaching the last system that lacked one.
 
-Every enchantment can level, because **every trigger costs something** (above).
-There is no enchantment in the game that fires for free, so there is none that
-sits at tier 1 forever.
+Every **catalogue** enchantment can level, because **every trigger costs
+something** (above). There is no enchantment in the game that fires for free, so
+there is none that *cannot* climb.
+
+**The unique enchantments are pinned at tier 1 and stay there**, which is not an
+oversight in that sentence but the point of it. A unique bends a rule rather
+than supplying a number (below), and a rule has no second tier — `Sturdy` cannot
+deny death harder. They still accrue mana spent, since every trigger still
+costs; it simply buys nothing, and that is the trade for holding an effect no
+catalogue entry is allowed to have.
+
+`Serrated` is the one unique that *is* a magnitude, which is exactly why it
+takes its scale from the weapon and the wielder instead (below). The pin is what
+forced that design rather than a complication for it.
 
 ### Tier is uncapped, because the pool is the cap
 
@@ -653,18 +664,25 @@ unpayable — a Bleeding room would cost more mana a turn than a caster spends
 casting. This is the enchantment-side version of what §1.1 does with stacks: if
 the behaviour is right and the numbers are wrong, re-price it.
 
-**Flat-per-instance turns `Vampiric` into a build rather than a bonus.** A
-greataxe swinging once heals `tier`; a dagger with `Serrated` running on three
-enemies heals `4 × tier` in the same turn without swinging at all. It stops
-being universally good and starts rewarding weapons that generate *instances* —
-daggers, `Charges` throwing weapons, wands whose element lingers. That is a
-real itemisation axis the design did not previously have, and it is the reason
-the Efficiency dagger drops a `CritWindow` stack for `Serrated` (§1.5): the
-weapon wants frequency, and a crit is one instance like any other.
+**Flat-per-instance turns `Vampiric` into a build rather than a bonus.** An axe
+swinging twice for 60 heals `2 × tier`; a `Light ×6` dagger swinging thirteen
+times for 12 apiece heals `13 × tier` off less total damage. It stops being
+universally good and starts rewarding weapons that generate *instances* —
+daggers, `Charges` throwing weapons, anything cheap to swing. That is a real
+itemisation axis the design did not previously have.
 
-It also explains, again, why the dagger is a `Light` weapon. A trigger that
-fires constantly needs mana constantly, and `Light` is the only martial modifier
-that produces any (§1.5).
+**`Light` is what supplies both halves**, which is why the `Vampiric` build
+lives on a `Light` weapon and nowhere else (§1.5). Cheap attacks are the
+instances; movement banked at end of turn is the mana those triggers cost.
+And because the same budget pays for both, the build governs itself — a turn
+spent swinging is a turn not spent banking, so nobody runs it at maximum for
+free.
+
+**`Bleeding` does not trigger it.** A tick is damage the *status* deals, on the
+enemy's turn, from a wound whose applier may no longer be holding the weapon —
+paying lifesteal on it would need a status to remember which character left it.
+Triggers fire on damage the wielder deals, on their own turn, which is the
+version that needs no back-reference and no ordering rule.
 
 These are **not in the catalogue** — they exist only on uniques (§1.5), cannot
 be chosen at the enchanter, and cannot be copied:
@@ -776,6 +794,13 @@ it. Move it to a greataxe (§6.5) and the percentage lands on a bigger base
 number, but the proficiency term resets to that character's axe skill — so the
 soul travels and the strength does not follow automatically.
 
+**`Overheal` is unique, so it is tier 1 for the whole campaign.** The ratio
+below never improves, the trigger cost never falls, and no amount of use makes
+the conversion kinder. What the player can grow is the *input* — a deeper
+`Vampiric`, a deeper `Regeneration`, more attacks a turn — never the exchange
+rate. That is what keeps a `Ward` engine from compounding: every term feeding it
+climbs, and the term converting it does not.
+
 **The conversion is lossy, and that is the first of its two brakes.**
 `OverhealPerWard` — start at **5** — means 20 points of surplus healing becomes
 4 points of `Ward`, and 4 points of `Ward` is 4 HP it will later save you. A
@@ -791,27 +816,41 @@ time — and `3 / 5` rounds to nothing. Every tick would be discarded, and the
 enchantment whose entire purpose is to stop discarding things would discard
 everything.
 
-**So `Overheal` carries a remainder.** Surplus healing accumulates into a
-counter; each time it crosses `OverhealPerWard` it emits one point of `Ward` and
-subtracts the cost. Nothing is ever rounded away:
+**So `Overheal` carries a remainder, and the remainder is a hidden status
+effect.** Surplus healing accumulates into it; it **decays one a round** like
+every other status (§1.7), and it **resets to zero** the moment it pays out:
 
 ```
 overhealPool += surplus
-ward         += overhealPool / OverhealPerWard
-overhealPool %= OverhealPerWard
+if overhealPool >= OverhealPerWard:
+    ward         += overhealPool / OverhealPerWard   // integer
+    overhealPool  = 0                                // reset, not remainder
+else at end of round:
+    overhealPool -= OverhealDecayPerTurn             // 1
 ```
 
-One int on the character, and it is the whole fix. The obvious alternative —
-totalling surplus across a round and converting once — is worse in three ways:
-it needs a round boundary to hang off, it behaves differently for a heal that
-straddles one, and it still discards the remainder at the end. The accumulator
-has no boundary at all, so a dagger dribbling 3 at a time and a staff dumping 20
-at once convert at exactly the same rate over any span.
+**Decay is what makes it a rate rather than a bucket.** Without it, healing that
+trickles in below any useful rate would still reach the threshold eventually, and
+a party standing in a corridor topping each other off would convert every wasted
+point in the game. With it, surplus has to arrive **faster than it drains** —
+which is exactly the condition the enchantment is meant to reward. A dagger
+swinging ten times a turn clears it comfortably; one stray heal every few rounds
+never converts at all, and should not.
 
-**The remainder is bounded below the conversion rate**, so at most
-`OverhealPerWard − 1` points of shield are ever pending. It persists rather than
-clearing between fights, which is not a carry worth guarding: it is by
-construction less than one point of `Ward`.
+**Reset rather than subtract**, so a single enormous overheal does not bank
+change toward the next one. That keeps the two homes (§1.5) honest against each
+other: the staff's big lumps convert at their ratio and stop, and the dagger's
+stream converts continuously, and neither accumulates credit it did not earn in
+the window.
+
+**Hidden, because it is bookkeeping rather than a decision.** Nothing the player
+does responds to its exact value — the readable version is "heal a lot, quickly,
+and shields appear", which is what they will see. It goes in the save (§5.1)
+and never in the HUD.
+
+Making it a status rather than a bare int is not decoration: it accumulates,
+ticks and decays, which is precisely the family §1.7 already has one
+representation for. It is the sixth member and it costs no new machinery.
 
 ### `Ward` is a pool that decays, and that is the second brake
 
