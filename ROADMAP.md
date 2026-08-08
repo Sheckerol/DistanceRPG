@@ -10,9 +10,9 @@ the clearest case, settling that dungeon's depth, its retirement and the
 workshop's availability at once; a weapon being *maintained* rather than
 levelling (§6.4) is what makes the graft roll the craftsman's eye instead of
 luck; and mana burning an enchantment's circle deeper into a particular weapon
-(§3.3) is why depth cannot be bought and why transfer costs a tier. Anything narrative that does not decide a
-mechanic does not belong in these files, and nothing here should be treated as
-the canonical account of the world.
+(§3.3) is why depth cannot be bought and why transfer costs a tier. Anything
+narrative that does not decide a mechanic does not belong in these files, and
+nothing here should be treated as the canonical account of the world.
 
 Six phases, in dependency order. Each is one PR off up-to-date `main`, per the
 workflow rule in `CLAUDE.md`.
