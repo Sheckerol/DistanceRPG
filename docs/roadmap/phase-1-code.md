@@ -312,12 +312,23 @@ thing** — which is a useful signal and worth not suppressing by adding a
 
 #### Three rules, because a table alone is not enough
 
-**1. Order is data, and §1.6 already specifies it.** `Block`, `Ward` and the
+**1. Order is data, and two things already specify it.** `Block`, `Ward` and the
 crit riders all handle `DamageTaken`, and running them in a different order
-gives a different answer. So a handler carries a **priority**, and §1.6's damage
-pipeline *is* the priority list for that event — read from it rather than
-reimplemented beside it. Undefined order among same-event handlers is exactly
-the class of side effect this architecture exists to prevent.
+gives a different answer. So a handler carries a **priority**, and it comes from
+one of two places rather than being invented per handler:
+
+| Handlers | Priority is | From |
+| --- | --- | --- |
+| Combat steps | The damage pipeline's step number | §1.6 |
+| **Enchantments on one weapon** | **Their index in `Weapon.Enchantments`** — attachment order | §3.3 |
+
+The second is why that list is a `IReadOnlyList` rather than a set: **order is
+gameplay**, so it is not free to normalise, sort or dedupe it anywhere. A
+migration that rebuilds a weapon's enchantments in a different sequence is a
+silent balance change.
+
+Undefined order among same-event handlers is exactly the class of side effect
+this architecture exists to prevent.
 
 **2. Handlers raise events by *queueing*, never by recursing.** Cascades are
 real and legitimate: `Vampiric` fires on `DamageDealt` → heals → raises
@@ -343,6 +354,10 @@ to find it. Key by event, sort by priority, and make the sort explicit.
   else rather than being its own path (below).
 - **Interactions become inspectable.** "What happens when I am hit" is a sorted
   list you can print, not a control-flow trace across three files.
+- **Partial payment is a payload concern, not a special case.** §3.3 has an
+  enchantment fire at the fraction of mana it could afford, which in this shape
+  is one handler scaling the payload it returns — the dispatcher does not need
+  to know that a partial fire is a different kind of thing, because it is not.
 
 ### One representation, and it is now literally one
 

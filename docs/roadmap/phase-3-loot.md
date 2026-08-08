@@ -497,6 +497,59 @@ xpToNextTier            = currentTierCost / INT
 Mana **spent**, which is the same quantity §2.2 already credits to max mana. One
 number, two ladders, no second definition.
 
+### Enchantments fire in attachment order, and pay in that order
+
+A weapon can carry five (§6.2), and a single trigger can set all of them off at
+once. **They resolve in the order they were attached** — first on, first to
+fire, first to be paid for — and each takes its mana from what the ones before
+it left.
+
+That makes **attachment order a build decision**, and it costs nothing to have:
+the enchanter already lets you pick *what* to attach (§6.2), so the sequence
+comes free with a choice you were making anyway. What it is not is free to
+*change* — moving an enchantment to the back of the queue means detaching and
+re-attaching, which is a transfer (§6.5): a tier and a service. **Order is
+decided once and paid for afterwards**, exactly like everything else here.
+
+The practical shape of the decision is that a weapon's mana runs out somewhere
+down the list, so you are really choosing **what fires at full strength when
+you are poor.** A dagger that leads with `Serrated` and trails with `Arcane`
+bleeds reliably and adds damage when it can afford to; reverse them and it is a
+damage weapon that sometimes bleeds.
+
+### Running out mid-list scales the effect rather than cancelling it
+
+When the pool cannot cover the next trigger in full, that enchantment **fires at
+the fraction it can pay for**:
+
+```
+ratio  = manaAvailable / manaWanted
+effect = fullStrength × ratio          // rounded down
+cost   = manaWanted × ratio            // it pays exactly for what it did
+```
+
+A half-paid `Serrated` applies half its levels. A half-paid `Arcane` deals half
+its bonus damage. Nothing is refunded and nothing is free — the enchantment did
+half a job and was charged for half a job.
+
+**A cliff was the alternative and it would have been much worse.** Binary
+failure means the fifth enchantment on a deep weapon is dead weight for most of
+a fight and then abruptly is not, which is the kind of behaviour that reads as a
+bug and prices badly at the enchanter. A ratio degrades the weapon smoothly as
+the pool drains, which is what a caster running low should feel like.
+
+**An effect that scales to nothing is a non-event.** If the ratio would round
+the effect to zero, the enchantment does not fire, pays nothing, and **passes
+the remainder down the list** — so a cheap enchantment behind an expensive one
+can still fire when the expensive one could not. That is the same non-event as a
+lock you cannot afford (§3.1), and it is what keeps the rule from producing a
+spend that bought nothing, which §1.1 forbids everywhere else.
+
+**`Resonant` is worth more than its discount suggests because of this.** Cutting
+trigger costs does not merely buy more triggers; it moves *where in the list*
+the pool runs dry, so it is the difference between four enchantments firing at
+full strength and two firing fully with a third at 40%.
+
 ### Tier is earned by use, not bought
 
 ```

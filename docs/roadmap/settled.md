@@ -948,3 +948,26 @@
   does not reduce the credit. This is also what forces the attack resolver to
   **return** a result rather than write one: the attacker cannot credit XP until
   the defender's handlers have handed the number back.
+- **Enchantments fire and pay in attachment order.** First on, first to fire,
+  first to be paid for, each taking mana from what the ones before it left. That
+  makes order a build decision that comes free with a choice you were already
+  making at the enchanter — and one that is *not* free to change, since
+  reordering means detaching and re-attaching, which is a transfer: a tier and a
+  service. The order of a five-enchantment weapon is a record of the order you
+  built it in.
+- **Running out of mana mid-list scales the effect rather than cancelling it.**
+  The enchantment fires at `manaAvailable / manaWanted` of full strength and
+  pays exactly for what it did. A cliff was the alternative and reads as a bug —
+  the fifth enchantment being dead weight for most of a fight and then abruptly
+  not. A ratio degrades the weapon smoothly as the pool drains, which is what
+  running low should feel like.
+- **An effect that scales to nothing is a non-event**: it does not fire, pays
+  nothing, and passes the remainder down the list, so a cheap enchantment behind
+  an expensive one can still fire. Same non-event as an unaffordable lock, and
+  it keeps the rule from producing a spend that bought nothing.
+- **This makes `Resonant` worth more than its discount suggests.** Cutting
+  trigger costs moves *where in the list* the pool runs dry — the difference
+  between four enchantments at full strength and two plus a third at 40%.
+- **`Weapon.Enchantments` is a list because order is gameplay**, so it must
+  never be normalised, sorted or deduped. A migration that rebuilds it in a
+  different sequence is a silent balance change.

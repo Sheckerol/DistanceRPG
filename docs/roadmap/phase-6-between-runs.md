@@ -197,6 +197,15 @@ alternative is to spend the same wear and the same downtime gambling on the
 weapon itself (§6.4). The chosen lever is always *available*; it is not always
 what you want.
 
+**Attaching also decides *order*, which is a second choice hidden in the first.**
+Enchantments fire and pay for themselves in the sequence they were attached
+(§3.3), so a new one always goes last — first in line for mana is whatever you
+put on first, back when the weapon had one slot filled. Reordering later means
+detaching and re-attaching, which is a transfer: a tier and another service
+(§6.5). **The order of a five-enchantment weapon is a record of the order you
+built it in**, and changing your mind about it is one of the more expensive
+things you can do.
+
 This is the second, independent cost on enchantment power. Max mana says *how
 much you can carry at once* (§3.3); service time says *and it is in the shop
 while you carry it*. Your best weapon is routinely unavailable.
