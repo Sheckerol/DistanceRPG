@@ -14,8 +14,8 @@ luck; and mana burning an enchantment's circle deeper into a particular weapon
 narrative that does not decide a mechanic does not belong in these files, and
 nothing here should be treated as the canonical account of the world.
 
-Six phases, in dependency order. Each is one PR off up-to-date `main`, per the
-workflow rule in `CLAUDE.md`.
+Six phases, in dependency order, shipping as seven PRs off up-to-date `main`
+per the workflow rule in `CLAUDE.md` — Phase 6 splits in two (below).
 
 | Phase | Theme | Depends on |
 | --- | --- | --- |
@@ -46,6 +46,8 @@ use this table to find the file a section lives in.
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
 | [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.8 | What is stored, in what format, and the five data files |
 | [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.7 | Wear, the enchanter, enchant-or-refine, grafting, the farm, the hub |
+| [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
+| [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
 
 **Phase 6 ships as two PRs.** It grew past the one-PR-per-phase rule in
 `CLAUDE.md`, and it splits cleanly because the halves share no state:
@@ -59,8 +61,6 @@ use this table to find the file a section lives in.
 through it and §3.3's transfer rule depends on it. 6b is additive and could
 slip a release without anything else noticing, which is the definition of a
 good seam.
-| [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
-| [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
 
 **Start with `phase-1-modifiers`.** Almost every later decision — loot depth,
 boss themes, the enchanter, what a unique even is — is expressed as stacks under
