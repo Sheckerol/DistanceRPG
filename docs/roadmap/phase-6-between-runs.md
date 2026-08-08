@@ -504,11 +504,24 @@ strand everything you invested — with it, the body is replaceable and the soul
 is the thing you built. **Tier 1 is the floor**: a tier-1 enchantment moves
 intact, because there is nothing left to take.
 
-The tier loss is what stops transfer being free re-rolling, and it is now the
-only place a tier can go *backwards*. It also bites hardest exactly where it
-should: a tier-6 enchantment represents hundreds of points of mana spent through
-it, and a move throws away the last and most expensive of those tiers. A shallow
-soul travels cheaply; a deep one is most of the reason you keep the body.
+**The tier loss has a cause rather than a justification.** Depth is the circle
+burned deeper by the mana driven through it, finding as it goes the path it most
+naturally follows through *that* weapon (§3.3). Cut the same figure into a
+different body and the deepest part of the burn — the part that was the old
+weapon's grain rather than the figure itself — has nothing to correspond to. It
+is the weapon-specific part of the work that is lost, which is exactly the part
+that took longest to earn.
+
+**Tier 1 travels intact for the same reason**: a circle that shallow has not yet
+found any path in particular, so there is nothing about it that belonged to the
+body it came from.
+
+Mechanically it does the two things it needs to. It stops transfer being free
+re-rolling, and it is the only place a tier can go *backwards*. And it bites
+hardest exactly where it should: a tier-6 enchantment represents hundreds of
+points of mana spent through it, and a move throws away the last and most
+expensive of those tiers. A shallow soul travels cheaply; a deep one is most of
+the reason you keep the body.
 
 **This is also the answer to a bad innate roll.** A wand that drops Cold when
 you wanted Flaming is not a dead weapon — it is a body with the

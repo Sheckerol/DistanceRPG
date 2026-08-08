@@ -5,9 +5,12 @@ not shipped behaviour — see the git history for what exists today.
 
 **This is a mechanics document, not the lore.** The setting is worked out
 elsewhere and most of it never touches these systems. Lore appears here only
-where it *earns* a rule — the enchanter powering the tutorial dungeon (§4.3) is
-the case, because it settles that dungeon's depth, its retirement and the
-workshop's availability at once. Anything narrative that does not decide a
+where it *earns* a rule. The enchanter powering the tutorial dungeon (§4.3) is
+the clearest case, settling that dungeon's depth, its retirement and the
+workshop's availability at once; a weapon being *maintained* rather than
+levelling (§6.4) is what makes the graft roll the craftsman's eye instead of
+luck; and mana burning an enchantment's circle deeper into a particular weapon
+(§3.3) is why depth cannot be bought and why transfer costs a tier. Anything narrative that does not decide a
 mechanic does not belong in these files, and nothing here should be treated as
 the canonical account of the world.
 

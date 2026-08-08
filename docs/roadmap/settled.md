@@ -942,3 +942,17 @@
   the first time — which is why grafts are rarer and why they cap shallower
   (§6.4). A fault corrected for twenty services is one he knows; a fault just
   found is one he has only begun on.
+- **Tier is the circle burned deeper.** Mana driven through an enchantment cuts
+  its figure further in, finding as it goes the path it most naturally follows
+  through *that* weapon. Depth is not knowledge the enchantment accumulates; it
+  is the mark getting deeper and truer to the thing it is cut into.
+- **That is why depth cannot be bought** (§6.2): the enchanter can *cut* a
+  circle, but only use can burn one in, and burning happens where the power
+  flows — in your hand, not on his bench. It is also why carrying an unfired
+  enchantment deepens nothing.
+- **And it gives the transfer tier-loss a cause rather than a justification**
+  (§6.5). The deepest part of the burn is the part shaped by the old weapon's
+  grain, and it has nothing to correspond to in a new body — so what is lost is
+  precisely the weapon-specific work, which is the part that took longest to
+  earn. **Tier 1 travels intact** because a circle that shallow has not yet
+  found any path in particular.

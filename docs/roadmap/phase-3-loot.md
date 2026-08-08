@@ -508,7 +508,25 @@ grows max mana (§2.2), counted a second time against the thing that spent it.
 An enchantment you fire constantly gets better at what it does, and one you
 carry does not.
 
-That is the pattern the whole game already runs on: health levels from being
+**What mana is doing is burning the circle deeper.** Every trigger drives power
+through the same figure, and the figure cuts further in — finding, as it goes,
+the path it most naturally wants to take through *this* weapon. Depth is not
+knowledge the enchantment accumulates; it is the mark getting deeper and truer
+to the thing it is cut into.
+
+Three rules fall out of that and stop being arbitrary:
+
+| Rule | Because |
+| --- | --- |
+| **Depth is earned, never sold** (§6.2) | The enchanter can *cut* a circle. Only use can burn one in, and burning happens where the power flows — in your hand, not on his bench |
+| **Carrying it is not enough** (above) | An unfired enchantment has nothing driven through it, so there is nothing to deepen |
+| **Transfer costs a tier** (§6.5) | The deepest part of the burn is the part shaped by that weapon's grain, and it does not survive the move |
+
+That last one is the strongest case for the reading: the tier loss on transfer
+was previously justified as *what stops transfer being free re-rolling*, which
+is a designer's reason. This gives it a cause.
+
+That is also the pattern the whole game already runs on: health levels from being
 healed, mana from being spent, weapon proficiency from damage dealt, wear from
 swinging. An enchantment levelling from the mana it spends is the same rule
 reaching the last system that lacked one.
