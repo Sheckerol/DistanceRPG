@@ -1381,18 +1381,31 @@ pointed the other way: the effect growing all campaign while the mana it costs
 stayed at whatever the entry was written with. Both numbers move together, or
 neither does.
 
-| Unique DoT | Applied by | Percentage of | Which climbs with |
+**What it takes a percentage *of* is the level count**, never the per-level
+effect — see the status model below. The ladder decides how many levels land;
+what a level is worth is fixed by the status forever.
+
+| Unique DoT | Applied by | Levels are a percentage of | Which climbs with |
 | --- | --- | --- | --- |
-| **`Bleeding`** | `Serrated` | Weapon base damage + proficiency level | The *wielder's* skill (§2.2) |
+| **`Bleeding`** | `Serrated` | Damage dealt by the weapon | The *wielder's* skill (§2.2) |
 | **`Burning`** | `Flaming` | The wand's Flaming damage | `Flaming`'s tier, and INT |
 | **`Frostbite`** | `Cold` | The wand's Cold damage | `Cold`'s tier, and INT |
 | **`Poison`** | `Acidic` | The wand's Acidic damage | `Acidic`'s tier, and INT |
-| **`Mire`** | `Shocking` | **Nothing — the exception** | See below |
+| **`Mire`** | `Shocking` | The wand's Shocking damage | `Shocking`'s tier, and INT |
 
-**`Mire` is the exception because its magnitude is not damage.** It cuts a
-movement budget, in movement units, and a percentage of a damage number has no
-meaning there. It keeps a flat cut per level and takes its scale from the level
-count alone.
+**`Mire` stopped being the exception**, and unifying the status model is what
+fixed it. Its *per-level effect* is not damage — it is a **10% cut to the
+target's movement budget** — but its *level count* comes off source damage
+exactly like every other status. The thing that could not take a percentage of
+damage was never the ladder; it was the effect, and the effect was never the
+ladder's job.
+
+**Mire above 100% paralyses.** Ten levels is the whole movement budget, and past
+that the target simply cannot move until decay brings it back under — which it
+does at one level a round, so a paralysis of `levels − 10` rounds is
+self-releasing and its length is visible on the same counter as everything else.
+No new state, no separate condition, and the most dramatic status in the game
+falls out of one number crossing ten.
 
 Notice what the middle three have in common with `Serrated`: the ladder is
 partly the **character**. A wand's element damage carries INT scaling (§3.3),
@@ -1401,168 +1414,102 @@ already makes true of a proficient fighter's bleed. The unique enchantments
 that are magnitudes are the only place in the design where an item's power is
 partly a stat.
 
-### Levels, not a number, and every conversion is a constant
+### One status model: levels, a trigger, and a fixed effect per level
 
-**Applying a lingering element grants levels derived from the element
-enchantment's tier.** How many, what each is worth, and how fast they burn off
-are **three separate named constants**, because they control three different
-things and baking any of them at `1` would hide a decision:
+Every status effect in the game is the **same three things**, and nothing else:
 
-```
-levelsApplied  = SearLevelsPerTier   × elementTier
-damagePerTurn  = max(1, SearPercentPerLevel × elementDamage × currentLevels)
-levelsLost     = SearDecayPerTurn                          // each turn
-
-expectedTotal  = damageOnFirstTick × triangularSum(levelsApplied, SearDecayPerTurn)
-                                   / levelsApplied
-triggerCost    = max(1, DotManaPerDamage × expectedTotal)   // §1.3
-```
-
-| Constant | Controls | Bounded by |
+| | Every status has | Which means |
 | --- | --- | --- |
-| `SearLevelsPerTier` | How sharply the effect scales with tier — it is **inside the square** | Nothing; this is the free one |
-| `SearPercentPerLevel` | Magnitude, as a share of the element's own hit | Enemy HP — and it multiplies against two growing terms, so it wants to be **small** |
-| `SearDecayPerTurn` | **Duration**, and therefore the total | Fight length. See below |
+| **1. A level count** | Levels accumulate on re-application and **decay by 1 at the end of a round** | One number to show, one decay rule to learn |
+| **2. A trigger** | The event that applies it — being hit, dealing damage, taking healing, a turn ending | The applier decides *when*, never *how much per level* |
+| **3. A fixed effect per level** | Constant for that status, forever. `Searing` is 1 damage a level whatever applied it | A level of a thing is always worth the same |
 
-**`SearPercentPerLevel` replaced a flat `SearDamagePerLevel`**, and the reason is
-the rule above: a bare constant is a ladder the tier-1 pin cannot climb, so a
-lingering element would have been frozen while the element applying it grew all
-campaign. Tying it to `elementDamage` is what makes a deep `Flaming` leave a
-deep burn.
+**The source varies only in how many levels it applies.** That is the whole of
+the model, and it is what the old three-constant version was groping toward:
 
-**It also means the total compounds harder than before**, and that is worth
-being plain about rather than discovering in play. Levels rise with tier and
-`elementDamage` rises with tier, so the total is now **cubic** in tier where it
-was quadratic — see the totals below. That is not a reason to abandon the
-change; it is the reason `SearPercentPerLevel` is a percentage in the low tens
-rather than a number near 1. **Start at 10%.**
+```
+levelsApplied = ApplyPercent × the source's own number   // set by the applier
+effectPerTurn = levels × EffectPerLevel                  // set by the status
+levelsLost    = 1                                        // universal
+```
 
-Everything else follows the rider rules §1.6 already sets, and deliberately so:
-levels **accumulate** on re-application rather than refreshing, and there is no
-cap. So `Poison`, `Searing`, `Sundered` and `Weakened` are **one family with one
-model** — a level count that accumulates, ticks, and decays. A player learns the
-rule once, the HUD needs one presentation, and only the constants differ.
+Two `Searing` wands make the point. If the enchantment applies 10% of the damage
+it deals, then a wand hitting for 100 stacks **10 levels** and one hitting for
+1000 stacks **100** — and in both cases a level is one point of burn. The wands
+differ in how hard they set the target alight, never in what a fire is.
 
-### Why decay is the interesting dial
+That is where the borrowed-ladder rule (above) actually lives now: a unique's
+magnitude was never the per-level effect, it is the **level count**, which is
+already a function of its source.
 
-Levels tick and *then* decay, so the total is a triangular-ish sum and **decay
-is what bounds it**. Compare a tier-6 `Flaming` under the three obvious
-settings, at `SearLevelsPerTier 1` and `SearPercentPerLevel 10%` against a
-potency-5 `Flaming` — so `elementDamage` is 30 and each level is worth 3 a turn:
+### A damage-over-time resolves at the end of the target's turn
 
-| `SearDecayPerTurn` | Levels each turn | Damage each turn | Total | Duration |
-| --- | --- | --- | --- | --- |
-| **1** | 6, 5, 4, 3, 2, 1 | 18, 15, 12, 9, 6, 3 | **63** | 6 turns |
-| **2** | 6, 4, 2 | 18, 12, 6 | **36** | 3 turns |
-| **3** | 6, 3 | 18, 9 | **27** | 2 turns |
+**Deal damage equal to the level, then reduce the level by one.** The tick *is*
+the decay, so a DoT needs no separate duration rule:
 
-**Decay is not merely a magnitude knob — it decides whether this is a
-damage-over-time effect or a delayed burst.** At 1 the room burns while the
-party repositions, which is the whole wand fantasy. At 3 it is a second hit
-arriving late. Somewhere around 2 is where it stays recognisably a burn while
-staying a number you can look at.
-
-The obvious constraint on it is *duration must not outlast the fight* — the
-deepest levels would tick against a corpse and a player who invested in tier got
-nothing, a dead stack in everything but name. That is right as far as it goes,
-but it is stated against a number that does not exist.
-
-**There is no such thing as "the fight length."** Two things set it and they
-move in opposite directions:
-
-| Pushes fights *shorter* | Pushes fights *longer* |
-| --- | --- |
-| Weapon proficiency — `+floor(L/2)` damage (§2.2) | Revival scaling — `+5` HP a cycle (§3.2) |
-| Weapon depth — farmed and grafted stacks | Deeper `DefeatCount` on what you chose to farm |
-
-So a party at proficiency one-shots an unfarmed dummy, and the same party
-against something it has killed fifteen times is in a long fight. Both happen in
-the same run, minutes apart. Tuning a decay constant against the average of
-those two would produce a number correct for neither.
-
-**The honest version of the constraint is narrower: duration should match the
-fights a *wand* is in.** A tier-6 `Flaming` is a late-campaign item — it has
-been levelled by hundreds of points of mana (§3.3) and its owner is fighting
-things worth that investment. It is not the weapon in the one-shot case, and a
-one-shot is not a fight it was going to matter in.
-
-Which leaves the short fight needing its own reward rather than needing the DoT
-to shrink, and §3.2 now gives it one: **a clean kill advances `DefeatCount` by
-2.** The trivial fight pays in farm progress instead of in burn damage. Two
-playstyles, two currencies, and neither constant has to compromise for the other
-— which is the actual resolution, rather than picking a decay that is wrong in
-half the situations.
-
-**Starting point: `SearLevelsPerTier 1`, `SearPercentPerLevel 10%`,
-`SearDecayPerTurn 2`** — 36 damage over 3 turns at tier 6. That is a real effect, it reads as burning, and
-it is roughly half what decay-1 produced. All three want play rather than
-argument, which is why they are constants rather than prose.
-
-### The totals are cubic in tier, and that is the cost of the change
-
-Worth seeing plainly, because it is the steepest curve in the design. Both
-levels *and* `elementDamage` rise with tier, and the tick count rises with
-levels — three growing terms, multiplied. At `SearLevelsPerTier 1`,
-`SearPercentPerLevel 10%`, `SearDecayPerTurn 2`, and a `Flaming` potency of 5
-(§3.3):
-
-| Element tier | 1 | 2 | 4 | 6 | 8 |
+| Turn | 1 | 2 | 3 | 4 | 5 |
 | --- | --- | --- | --- | --- | --- |
-| Levels applied | 1 | 2 | 4 | 6 | 8 |
-| `elementDamage` | 5 | 10 | 20 | 30 | 40 |
-| Damage on the first tick | **1** | 2 | 8 | 18 | 32 |
-| **Total over its life** | **1** | 2 | 12 | **36** | **80** |
+| Level | 5 | 4 | 3 | 2 | 1 |
+| Damage | 5 | 4 | 3 | 2 | 1 |
 
-**A floor of 1 keeps the shallow end alive.** At tier 1 the arithmetic is
-`0.1 × 5 × 1 = 0.5`, which truncates to nothing — so `damagePerTurn` takes the
-same *never below 1* convention §1.6 already applies to a mitigated hit. Without
-it a lingering element would do literally nothing until tier 2, which is the
-worst possible first impression for a unique.
+Five levels is five damage on arrival, fifteen in total, over five turns.
 
-### The price is a share of what it buys, so the curve pays for itself
+**So levels are magnitude and duration at once**, and that is the largest
+consequence of unifying the model. There is no decay dial any more — an earlier
+draft treated `SearDecayPerTurn` as *the* interesting constant precisely because
+it separated the two, and the unified model deliberately gives that up. One
+number now says how hard a burn starts, how long it lasts, and what it totals:
 
-**`triggerCost` is quoted against the expected total, not against the entry.**
-`DotManaPerDamage` is a mana-per-point exchange rate, so a lingering element
-costs in proportion to the damage it is about to do:
+```
+totalDamage = levels × (levels + 1) / 2
+duration    = levels turns
+```
 
-| Element tier | 1 | 2 | 4 | 6 | 8 |
-| --- | --- | --- | --- | --- | --- |
-| Total damage | 1 | 2 | 12 | 36 | 80 |
-| **Mana to apply it**, at `DotManaPerDamage` ⅓ | 1 | 1 | 4 | **12** | **27** |
+**Totals are quadratic in levels, and levels are linear in the source.** That is
+tamer than what it replaced by a whole power — and it dissolves the problem the
+previous version had to be priced out of. A tier-6 `Flaming` on a wand dealing
+30 applies 3 levels: **6 damage over 3 turns**, and a six-target Nova totals 36
+rather than 216. The cubic curve is gone because the model is simpler, not
+because a constant was tuned against it.
 
-That keeps **damage per mana flat with tier**, which is the convention every
-catalogue enchantment already follows — §3.3 scales lock and potency together,
-so depth buys throughput rather than efficiency. A borrowed ladder that lifted
-the damage and not the price would have made the lingering elements the one
-place in the game where getting deeper made you *cheaper*.
+### `ApplyPercent` now sets duration, which makes it sharp
 
-**Which is what actually answers the Nova.** A Nova applies its element to every
-target in the shape, and each application is a trigger — so six enemies is six
-triggers, not one. The tier-6 Nova that deals 216 now costs **72 mana** to
-throw, most of a caster's pool (§1.3), and it does that once:
+The percentage is the only dial left, and it does more than it used to. Because
+levels are turns, **it picks the length of the effect directly** — and fights are
+a handful of turns long:
 
-| | Damage | Mana | Rounds of a 160 pool |
+| `ApplyPercent` | Levels at `elementDamage` 30 | Total | Duration |
 | --- | --- | --- | --- |
-| Tier-6 Nova, one target | 36 | 12 | Repeatable |
-| **Tier-6 Nova, six targets** | **216** | **72** | Twice, then empty |
+| **10%** | 3 | 6 | 3 turns |
+| **25%** | 7 | 28 | 7 turns |
+| **50%** | 15 | 120 | **15 turns — outlasts the fight** |
 
-So the cubic curve is not a balance problem needing a nerf lever; it is a
-*sprinter's* burst (§1.3), and it is priced like one. **Re-price the stack
-rather than limit it** — §1.1's rule, reaching the enchantment layer. The two
-correction levers (`SearDecayPerTurn`, then `SearLevelsPerTier`) stay available
-and are now much less likely to be needed.
+So the band is narrow and the constant matters more than any number it replaced.
+Around 10–25% is where a burn stays a burn rather than becoming either a
+rounding error or a status that ticks against a corpse — the same constraint the
+old decay dial was carrying, arriving now on a different variable.
 
-Note what the tier-1 pin on the unique is doing here: **the rule is frozen and
-both numbers attached to it climb together** (§3.3). If the unique enchantment
-levelled as well, a fourth growing term would multiply into the three above —
-and it would multiply into the price too, which is why the pin is a
-simplification rather than a restriction.
+**And the effect per level stays 1.** `Searing`, `Bleeding` and `Poison` all
+deal one point a level; the design's whole DoT layer is therefore *supplementary*
+by construction, bounded above by roughly `fightLength² / 2`. That is a real
+decision and worth naming: damage-over-time in this game is a garnish on a
+weapon's output, never a build that replaces it.
 
-`SearLevelsPerTier` is the dial that changes the *shape* rather than the height,
-because it sits inside the square: halving it quarters the total. That makes it
-the right correction if deep wands prove too strong at the top while shallow
-ones feel fine, and `SearPercentPerLevel` the right one if the whole curve is
-simply too high.
+### The trigger is still priced against what it buys
+
+The borrowed-ladder rule above lifts the price with the magnitude, and it now
+has a closed form to quote against:
+
+```
+expectedTotal = levelsApplied × (levelsApplied + 1) / 2
+triggerCost   = max(1, DotManaPerDamage × expectedTotal)
+```
+
+So a deeper element still costs more to apply, at a rate that keeps damage per
+mana flat with tier — the convention §3.3 already runs on. What changed is only
+the curve underneath: the price is now quadratic in levels rather than tracking
+a cubic, which is why the six-target Nova costs a caster a real fraction of a
+pool without needing the whole thing.
 
 ### That resolves the tier-1 cap without breaking it
 

@@ -779,25 +779,30 @@ can be met — and for `Overheal` that is exactly two weapons.
 
 ### `Serrated` scales off the weapon, because it cannot scale off tier
 
-`Serrated` applies **`Bleeding`**, a damage-over-time joining the level family
-(§1.7) alongside `Poison`, `Searing`, `Sundered` and `Weakened` — accumulating,
-ticking, decaying one a turn. It is the enchantment half of the pair, exactly as
-`Flaming` is to `Burning`.
+`Serrated` applies **`Bleeding`** — the ordinary status model (§1.5) with the
+ordinary numbers. Its trigger is **damage dealt by the weapon**, its levels are
+`BleedPercent` of that damage, and a level is **1 physical damage a turn**,
+exactly as a level of `Searing` is one point of its element. It is the
+enchantment half of the pair, precisely as `Flaming` is to `Burning`.
 
-What is new is where its magnitude comes from. Every other enchantment's
+What is new is where its **level count** comes from. Every other enchantment's
 strength is a function of its **tier**, and a unique is pinned at tier 1 (§3.3)
 — which is precisely the constraint that made unique enchantments rules rather
 than magnitudes. `Serrated` is a magnitude, so it needs a ladder that is not
-tier, and it takes the two the weapon already has:
+tier, and it takes the one the weapon and wielder already climb together:
 
 ```
-BleedDamagePerTurn = BleedPercent × (weapon base damage + weapon proficiency level)
+levelsApplied = BleedPercent × damage this hit dealt
 ```
 
-| Term | Ladder it rides | Grows by |
+Damage dealt already carries both — the weapon's base damage and the wielder's
+proficiency bonus (§2.2) — so there is nothing to add up. **The ladder was
+already in the number.**
+
+| Inside "damage dealt" | Ladder it rides | Grows by |
 | --- | --- | --- |
-| **Weapon base damage** | The item | Nothing — it is what the dagger is |
-| **Proficiency level** | The *wielder* (§2.2) | Damage dealt with the class |
+| **Weapon base damage and stacks** | The item | Farming, grafting, deepening |
+| **Proficiency bonus** | The *wielder* (§2.2) | Damage dealt with the class |
 
 **That is the general rule for unique DoTs, not a special case for this one**
 (§1.5). Every damage-over-time a unique applies takes a percentage of the damage
@@ -851,17 +856,23 @@ enchantment whose entire purpose is to stop discarding things would discard
 everything.
 
 **So `Overheal` carries a remainder, and the remainder is a hidden status
-effect.** Surplus healing accumulates into it; it **decays one a round** like
-every other status (§1.7), and it **resets to zero** the moment it pays out:
+effect** — the same three things as any other (§1.5). Its trigger is **receiving
+healing above full**, it accumulates a level per point of surplus, and it decays
+one a round like everything else. Its only effect is to turn into `Ward`:
 
 ```
-overhealPool += surplus
+overhealPool += surplus                              // trigger: healing above full
 if overhealPool >= OverhealPerWard:
-    ward         += overhealPool / OverhealPerWard   // integer
+    ward         += overhealPool / OverhealPerWard   // several at once on a big heal
     overhealPool  = 0                                // reset, not remainder
 else at end of round:
-    overhealPool -= OverhealDecayPerTurn             // 1
+    overhealPool -= 1                                // universal decay
 ```
+
+**A large heal grants several `Ward` at once**, which is the integer division
+doing the obvious thing and is worth stating because it is what makes the Staff
+of Renewal build work at all: a single big overheal should not be rationed out
+one point at a time.
 
 **Decay is what makes it a rate rather than a bucket.** Without it, healing that
 trickles in below any useful rate would still reach the threshold eventually, and
@@ -892,19 +903,26 @@ representation for. It is the sixth member and it costs no new machinery.
 staff cast was its single source. With `Overheal` producing it continuously, an
 undecaying pool accumulates until the fight ends.
 
-So `Ward` keeps being a pool — points of damage it will absorb — and gains the
-one thing every other status already has:
+`Ward` is not a second shape. It is **the same status model as everything else**
+(§1.5) — a level count, a trigger, a fixed effect per level — and its trigger is
+simply the one no other status uses:
 
 | | |
 | --- | --- |
-| **Absorbing** | Spends **one point per HP saved**, one for one |
-| **The floor** | Never reduces a hit below **1 taken**, exactly as `Block` does (§1.1) |
+| **Trigger** | **Taking damage, from any source** |
+| **Effect per level** | Absorbs one point of it |
+| **On being triggered** | Damage reduces the level by the damage amount, and **1 damage still gets through** — the `Block` floor (§1.1) |
 | **Re-application** | Accumulates |
-| **Decay** | **One point per turn**, at the start of the wielder's turn |
+| **Decay** | One level a round, like every status |
 
-So a 20-damage hit into 20 `Ward` leaves **1 damage through and 1 point
-remaining** — 19 absorbed, 19 spent. And that last point is gone at the start of
-your next turn.
+So a 20-damage hit into 20 `Ward` leaves **1 damage through and 1 level
+remaining** — 19 absorbed, 19 spent. And that last level is gone at the end of
+the round.
+
+What looked like a pool was a level count all along; the only thing that made it
+seem different is that its trigger spends *many* levels at once rather than one.
+A burn ticks a level down per turn because a turn is one event. Being hit for 19
+is nineteen points of the same event.
 
 **Decay is slow against a fight and fast against a run**, which is the whole
 reason 1 a turn is the right number rather than a percentage. A shield survives
@@ -912,9 +930,9 @@ the engagement it was raised in and bleeds away on the walk to the next one, so
 `Ward` is something you carry *through* a fight and never something you arrive
 with. Nobody stockpiles a shield in the hub and cashes it on floor 9.
 
-**Two drains on one pool is what makes `Overheal` self-limiting**, and it needs
-no ceiling to do it. Levels arrive at `healing / 5` a turn, time removes one a
-turn regardless, and being hit removes them far faster than either. The
+**Two drains on one counter is what makes `Overheal` self-limiting**, and it
+needs no ceiling to do it. Levels arrive as healing overflows, time removes one
+a round regardless, and being hit removes them far faster than either. The
 equilibrium moves with how hard you are being hit — which is the §1.1 answer
 rather than the bespoke max-HP cap this was heading toward.
 

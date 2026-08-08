@@ -250,37 +250,60 @@ seven stacks of headroom instead of one.
 ### Everything else
 
 New `StatusEffectType` members: `Ward`, `Poison`, `Mire`, `Sundered`,
-`Weakened`, and **`Searing`** — the lingering element (§1.5), one member
-carrying a `DamageType` rather than a member per element. Shocking and Acidic
-need nothing new at all: they apply `Mire` and `Poison`, which the staves
-already bring.
+`Weakened`, `Bleeding`, the hidden `OverhealPool`, and **`Searing`** — the
+lingering element (§1.5), one member carrying a `DamageType` rather than a
+member per element. Shocking and Acidic need nothing new at all: they apply
+`Mire` and `Poison`, which the staves already bring.
 
-`Searing` carries a **level count**, not a magnitude, so it needs no reference
-back to the enchantment that applied it — the element's tier is read once at
-application and converted to levels there (§1.5). That is the simpler data model
-*and* it sidesteps the transferred-away-mid-fight case entirely: levels already
-on a target are levels, whatever happens to the wand afterwards.
+### One representation, and it is now literally one
 
-`Ward` is the one member that is genuinely a **pool** rather than a level count
-— points spent one per HP saved (§3.3) — but it shares the shape closely enough
-to live in the same structure: an int that accumulates and decays, differing
-only in being drained by the damage step as well as by the tick. The tick path
-handles it with one extra drain, not a second representation.
+§1.5 unified the status model, and the code shape follows exactly:
 
-Which means `Poison`, `Searing`, `Sundered`, `Weakened`, `Bleeding`, the hidden `Overheal` pool, and `Ward` all want the
-**same representation** — `(StatusEffectType, DamageType?, int Levels)` — and the same
-`TickStatusEffects` path: apply an effect proportional to `Levels`, then
-decrement by that status's decay. Four effects, one code path, one HUD
-presentation. Worth building that way from the start rather than converging on
-it after three of them exist separately.
+```csharp
+record StatusEffect(StatusEffectType Type, DamageType? Element, int Levels);
+```
 
-**The per-status numbers belong in a table, not in the path.** Searing needs
-three (§1.5) and the others will want theirs, so `GameConstants` should carry a
-row per status — levels granted per source unit, effect per level, decay per
-turn — and `TickStatusEffects` should read it rather than branching on type.
-That is what keeps "one model, different constants" true in the code and not
-just in the document, and it is the difference between tuning a burn in a data
-file and tuning it in a `switch`.
+Every status is that. `Poison`, `Searing`, `Bleeding`, `Mire`, `Sundered`,
+`Weakened`, `Ward` and the hidden `Overheal` pool differ in **three table
+values** and in nothing else:
+
+| Column | Example | Read by |
+| --- | --- | --- |
+| `EffectPerLevel` | `Searing` 1 damage, `Mire` 10% of movement, `Ward` 1 absorbed | The resolver |
+| `Trigger` | End of the target's turn, taking damage, receiving healing | The dispatcher |
+| `OnTrigger` | Tick-and-decrement, spend-many, convert-and-reset | The resolver |
+
+**Decay is not a column.** One level at the end of a round, universally, for
+every status in the game. The earlier draft carried a `DecayPerTurn` per status
+and it is gone — the same collapse §1.5 describes, where duration stopped being
+a separate dial.
+
+**How many levels an application grants is not a column either**, because it
+belongs to the *applier* rather than the status. An enchantment carries its own
+`ApplyPercent` and multiplies it by whatever number it has to hand — damage
+dealt, healing overflowed — and hands the resolver a level count. So `Searing`
+needs no back-reference to the wand that lit it: levels already on a target are
+levels, whatever happens to the weapon afterwards.
+
+That is what makes the table small enough to be data. It also means
+`TickStatusEffects` is one loop with no branching on type:
+
+```
+for each status:  apply EffectPerLevel × Levels  →  then OnTrigger's decrement
+end of round:     every status loses 1 level
+```
+
+Three of the eight need a word on how they land in that shape, because they look
+like exceptions and are not:
+
+- **`Ward`** spends many levels in one trigger rather than one — but being hit
+  for 19 is nineteen points of one event, where a turn passing is one. Same
+  loop, a different decrement.
+- **The `Overheal` pool** converts rather than damaging, and resets rather than
+  decrementing. Both are `OnTrigger` values.
+- **`Mire`** is the only one whose `EffectPerLevel` is not damage, and past ten
+  levels its accumulated 100% is a full movement budget — paralysis with no new
+  state, released by the same universal decay.
 
 `Enchantment` gains a `bool Unique`. It gates two things and nothing else: the
 enchanter's catalogue skips it (§6.4), and `Tier` is pinned at 1 (§3.3). Both
