@@ -866,16 +866,24 @@
   loadout decision happens every single run rather than once in the late
   campaign, a cautious player cannot hoard their way out of choosing, and the
   carry limit and the yield become one conversation instead of two.
-- **The farm therefore saturates**, which is a real limit on the breadth
-  argument it was recommended for: past the point where a batch exceeds the
-  slots you will spend, another first clear buys nothing usable. That is the
-  same shape as the clean kill (§3.2), which front-loads a farm and then puts
-  itself out of business — the design already prefers a reward that fades as it
-  stops being needed to one that scales forever. What saturation still buys is
-  **freedom in the split**, which does not cap: producing three times your carry
-  means you can take all mana potions into a caster-punishing floor. If it
-  saturates too early in play the **rate** is the dial, never the carry cap,
-  which is load-bearing for §3.4's three-way trade.
+- **Surplus yield buys quality, so the farm does not saturate.** A potion's
+  `quality` is just how many units of the batch went into it, and it multiplies
+  the share of max restored — no exchange table, no named tiers. §3.4 makes the
+  *slot* the scarce thing rather than the potion, so the way past a full
+  inventory is to make each slot worth more: a late party carries the same six
+  potions as an early one, each worth five times as much.
+- **Quality is linear on purpose**, so it buys slot efficiency rather than raw
+  value. Many small potions cover several crises; few large ones cover one
+  enormous save and lose granularity. **And a big potion wastes what it
+  overshoots** with no rule needed, since healing caps at missing HP — large
+  potions are lossiest exactly when they are least needed. A party carrying
+  `Overheal` is the exception, and pleasingly so: the overshoot becomes `Ward`,
+  so the build that wants enormous potions is the one that solved overhealing.
+- **It asymptotes rather than saturating, at a ceiling a player can name**: a
+  potion that heals you completely from 1 HP is the best potion there is, and
+  past that quality is pure overshoot. At 20% a level that is quality 5, so a
+  full loadout of six maximum-value potions is thirty units of yield — many
+  first clears deep, with every clear before it buying something felt.
 - **The alchemist arrives with the first non-tutorial clear**, and until then
   the whole category does not exist — no potions and no shelf. Same shape §6.3
   uses for the enchanter, one step later: beating the tutorial frees the

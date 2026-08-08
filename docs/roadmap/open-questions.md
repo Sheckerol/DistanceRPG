@@ -12,13 +12,21 @@
   either a ninth class on DEX, or moving throwing to DEX (thrown knives are
   plausibly dexterous, though it costs the STR-throws-heavy-things read), or
   accepting that STR is the martial-breadth stat and DEX the precision one.
-- **What is `FarmYieldPerClear`, and how early does the farm saturate?** Because
-  the batch spoils rather than banking (§6.6), yield above what the party will
-  carry is wasted outright — so this number decides both how well-supplied a run
-  is *and* how many first clears remain worth making. Too low and a full campaign
-  never fills a loadout; too high and the third dungeon is the last one that pays.
-  The dial is the rate, never the carry cap, which §3.4's three-way trade rests
-  on.
+- **What is `FarmYieldPerClear` against `HealthPotionPercent`?** The two together
+  set how far into a campaign the farm keeps paying (§6.6). Quality means yield
+  is never wasted, but the ceiling is still real — six potions at the quality
+  that heals from 1 HP is `6 / HealthPotionPercent` units, and once a batch
+  clears that, further clears buy nothing. At 20% and one unit per clear per
+  run, that is thirty units: reachable but distant. Raising the percentage
+  shortens the campaign the farm is interesting for; lowering it makes early
+  potions feel like nothing.
+- **Should mana quality and health quality cost the same?** They are the same
+  mechanic on two resources with very different shapes — health is spent by
+  being attacked and mana by choosing to cast (§1.3). A caster is far more able
+  to *avoid* running dry than a front-liner is to avoid being hit, which is an
+  argument that a mana potion should be the more expensive unit. It is also an
+  argument for leaving them equal and letting the player discover which they
+  actually need.
 - **Does one potion per slot survive contact with a real inventory?** It is the
   reading that keeps §3.4's three-way trade honest, and it may simply be
   annoying — four health potions is a sixth of the party's total carry. If it

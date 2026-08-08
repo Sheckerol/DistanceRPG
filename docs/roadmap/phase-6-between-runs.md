@@ -556,36 +556,64 @@ It also means the farm and the enchanter tick together. A run advances your
 weapons and stocks your shelf in one event, which is one fewer clock for a
 player to hold.
 
-### The real cost of a flow: the farm saturates
+### Quality is what surplus yield buys, so it does not saturate
 
-Because nothing banks, **yield above what the party can carry is simply
-wasted**, and that puts a ceiling on what clearing more dungeons is worth. Past
-the point where a run's batch exceeds the slots you are willing to spend, another
-first clear buys you nothing you can use.
+Because nothing banks, yield above what the party can carry would be wasted —
+which would put a ceiling on what clearing more dungeons is worth, and a
+saturating reward stops paying for the breadth this section was built to pay
+for.
 
-That is a genuine limit on the argument this section is built on — the farm was
-recommended because it pays for breadth, and a saturating reward stops paying.
-Worth being plain about rather than discovering late.
+**So yield buys strength as well as count.** A potion is mixed at a **quality**,
+and quality is simply how many units of the batch went into it:
 
-**It is still the right shape, for the same reason the clean kill is** (§3.2).
-That rule front-loads a farm and then puts itself out of business, and the design
-already decided that a reward which fades as it stops being needed is better than
-one that scales forever. The farm does the same thing on a different axis:
+```
+quality        = units of yield spent on this potion
+healthRestored = HealthPotionPercent × quality × maxHp     // §3.4
+```
 
-| | Matters most | Stops mattering when |
+No exchange table and no named tiers — one unit makes an ordinary potion, three
+units make one that is three times the drink. The alchemist's question is
+therefore two-dimensional: **how many, of what type, at what strength**, out of
+a fixed batch.
+
+That is the shape the constraint asked for. §3.4 makes the **slot** the scarce
+thing, not the potion, so the way to grow past a full inventory is to make each
+slot worth more. A late-campaign party does not carry more potions than an early
+one — it carries the same six, and each is worth five of the ones it started
+with.
+
+### Neither strength nor count dominates, which is why it is a choice
+
+Quality is deliberately **linear**: three units make a potion three times as
+large, not four times. So it buys no raw value at all — it buys *slot
+efficiency*, and it costs something real in exchange:
+
+| | Good for | Costs you |
 | --- | --- | --- |
-| **Clean kills** | Early cycles, while the dummy is trivial | Revival scaling outgrows your biggest hit |
-| **The farm** | While a batch is smaller than what you would carry | Your batch outgrows your slots |
+| **Many small** | Several separate crises; a long fight of attrition | Slots, one per drink |
+| **Few large** | One enormous save; the boss room | Granularity, and overheal (below) |
 
-And what saturation actually buys is **freedom in the split**, which does not
-cap. A party producing exactly its carry has to divide six potions between
-health and mana; a party producing three times its carry can take six of either.
-Being able to walk into a caster-punishing floor with nothing but mana potions
-is a real choice that a barely-fed farm cannot offer, and it keeps late clears
-worth something without letting the supply compound.
+**And a big potion wastes what it overshoots**, with no rule needed: healing is
+capped at missing HP (§3.4), so a quality-5 potion drunk at half health throws
+away most of itself. Large potions are lossier exactly when they are least
+needed, which is the counterweight that keeps small ones worth mixing.
 
-**If it still saturates too early in play, the rate is the dial** — not the carry
-cap, which is load-bearing for §3.4's three-way trade.
+A party carrying `Overheal` (§3.3) is the exception, and pleasingly so: the
+overshoot becomes `Ward` instead of vanishing, so the one build that wants
+enormous potions is the one that has solved overhealing. Nothing was written for
+that; it falls out of two rules meeting.
+
+### It asymptotes rather than saturating, and the ceiling is legible
+
+There is still an end state, but it is a long way out and it is one a player can
+name: **a potion that heals you completely from 1 HP is the best potion there
+is.** Past that, more quality is pure overshoot.
+
+At `HealthPotionPercent` 20% that is quality 5, so a full loadout of six
+maximum-value potions costs thirty units of yield — a farm many first clears
+deep. The reward curve flattens toward something recognisable instead of
+stopping dead at "your bag is full", and every clear before that point buys
+something you can feel.
 
 ### The presentation is an art question, not a design one
 

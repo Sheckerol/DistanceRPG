@@ -1029,6 +1029,11 @@ A percentage rides the ladders the character is already climbing — CON for
 health (§2.2), the mana pool for mana — so the potion in your bag on the last
 floor is as much of a save as the one you found on the first.
 
+**The percentage is per quality level**, and quality is how many units of the
+farm's batch went into mixing it (§6.6). One slot holds one potion whatever its
+strength, so quality is how a fixed inventory grows: a late party carries the
+same six potions as an early one, each worth five times as much.
+
 ### The mana potion is a rule-break, and that is what a consumable is for
 
 The caster economy rests on one sentence: **mana comes from movement left
@@ -1093,8 +1098,8 @@ thing in the game.
 worker with every *non-tutorial* dungeon beaten for the first time, yielding per
 run (§6.6). The alchemist who mixes them arrives with the first such clear, so
 the early campaign has no potions at all — and the batch is **a flow, not a
-stock**: you split it between health and mana when you collect it, and anything
-you leave with him has spoiled by the time you climb back out.
+stock**: you split it between health and mana *and strength* when you collect
+it, and anything you leave with him has spoiled by the time you climb back out.
 That keeps the rule intact: potions are still paid for by playing, at the
 steepest price the game charges for anything, and the class-locked drop table
 (§3.1) never needs a non-weapon outcome.
