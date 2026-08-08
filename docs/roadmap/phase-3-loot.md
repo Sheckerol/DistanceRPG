@@ -453,7 +453,7 @@ pool, they can afford one light enchantment, not five.
 | **Lock** | Max mana reserved while equipped; returned in full on unequip |
 | **Trigger cost** | Mana spent each time it fires |
 | **Condition** | What fires it — on hit, on crit, on kill, on being hit, on cast |
-| **Potency** | Effect magnitude, scaled by `rate(INT)` from §2.1 |
+| **Potency** | Effect magnitude, scaled by INT (§2.1) |
 | **Tier** | Uncapped; **earned by use** — mana it spends is its XP — lifting lock *and* potency together |
 
 Insufficient mana means it simply **does not fire** — no failure state, no
@@ -490,7 +490,8 @@ rather than spent, purely so a zero-cost Siphon could still level. With no
 zero-cost triggers left, the special case goes:
 
 ```
-enchantXp[enchantment] += manaSpent * rate(INT)
+enchantXp[enchantment] += manaSpent
+xpToNextTier            = currentTierCost / INT
 ```
 
 Mana **spent**, which is the same quantity §2.2 already credits to max mana. One
@@ -499,7 +500,8 @@ number, two ladders, no second definition.
 ### Tier is earned by use, not bought
 
 ```
-enchantXp[enchantment] += manaSpent * rate(INT)
+enchantXp[enchantment] += manaSpent
+xpToNextTier            = currentTierCost / INT
 ```
 
 **Mana is an enchantment's experience.** Every trigger it pays for feeds its own

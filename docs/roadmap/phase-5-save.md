@@ -79,13 +79,13 @@ Everything currently flagged as a knob, gathered in one place:
 
 | Group | Keys |
 | --- | --- |
-| Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingMaxMana` |
+| Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingPool` (25 — HP, mana and wear capacity alike) |
 | Statuses | `SearLevelsPerTier`, `SearPercentPerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard`, `OverhealDecayPerTurn`, `BleedPercent`, `BleedDecayPerTurn`, `DotManaPerDamage` |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
-| Enchanter | `WearPerHit`, `StartingWearCapacity`, `CapacityPerEnchanting`, `CapacityPerRefinement`, `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance` |
+| Enchanter | `WearPerHit`, `WearCapacityLadder` (25/30/40), `EnchantmentWearCost`, `GraftBaseChance` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
 

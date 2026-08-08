@@ -79,12 +79,24 @@ that it is time to rotate it into the shop.
 
 ### Every repair makes the weapon hold more
 
-**`WearCapacity` grows with every service**, and grows faster under refinement:
+**`WearCapacity` climbs an authored ladder**, one step per full bar cashed. A
+weapon has no stat to divide its threshold by (§2.1), so it needs the *whole*
+pool for every step:
 
-| Service | Capacity gained |
-| --- | --- |
-| **Enchanting** | A little |
-| **Refinement** | **More** |
+| Step | Capacity | Wear needed to reach the next |
+| --- | --- | --- |
+| Fresh | **25** | 25 |
+| Second | **30** | 30 |
+| Third | **40** | — |
+
+**Three steps and no fourth**, deliberately. A fourth is a number invented
+against a game nobody has played; these three are enough to see whether the
+curve feels like anything, and the ladder is authored rather than computed
+precisely so a fourth can be appended the moment play asks for one.
+
+The steps widen because the bar does. Reaching the third step means cashing 25
+and then 30 — 55 hits' worth of fighting on one weapon (§6.1), across at least
+two services and the downtime between them.
 
 A worked weapon is a tempered one. This is the third thing loyalty compounds —
 proficiency is per class (§2.2), stacks are per weapon (§6.4), and capacity is
@@ -379,48 +391,51 @@ the two and why they cap shallower (§6.4). A fault he has been correcting for
 twenty services is one he knows; a fault he has just found is one he has only
 begun on.
 
-### It is one mechanism, not two rates
+### A base rate, and a multiplier refinement earns
 
-The odds do not differ because a rule says so. **Attaching an enchantment
-consumes wear** — that is what §6.1 has always meant by raw material — and the
-improvement roll is paid for out of whatever is left:
+**Enchanting carries a flat 3% chance** that the weapon improves anyway — the
+smith noticing something while he had it open, and nothing more than that.
+
+**Refinement multiplies that base by how much of a bar was cashed:**
 
 ```
-attachmentCost    = EnchantmentWearCost × (currentEnchantments + 1)   // §6.2
-improvementChance = min(MaxImprovementChance,
-                        (wear − attachmentCost) / WearPerImprovementRoll)
+GraftBaseChance   = 3%
+improvementChance = GraftBaseChance × (1 + wear ÷ StartingWearCapacity)
 ```
 
-Enchanting takes `attachmentCost` off the top, so a routine deposit has little
-remainder and rolls at a token chance. Refinement pays for nothing, so
-the entire pool pushes the roll. **The gap between the two is exactly the price
-of the enchantment**, quoted in the same units as everything else rather than as
-a second tuning knob.
+`StartingWearCapacity` is 25 (§6.1), so a full fresh bar doubles the base to
+**6%**, and a weapon two steps up the ladder cashing 40 reaches **7.8%**.
+
+**Proportional rather than thresholded, and that is the point.** A rule that
+paid out on *whether* you refined would make cashing a single point of wear
+worth the same as bringing in a practically broken blade. Multiplying by the
+fraction of a bar means the reward tracks the work — which is the same principle
+§6.1 uses when it says a deposit's value is the wear you brought, not the fact
+that you showed up.
+
+Note what this is **not**. The two services no longer differ because one of them
+spends the pool on a soul and leaves a remainder; they differ because refinement
+is the smith working on the weapon *rather than* on something attached to it, and
+gets his full attention for it. Enchanting's 3% does not move with wear at all.
 
 Three things fall out that nothing had to state:
 
 - **A fresh drop refines for nothing.** No wear, no roll — nothing to repair.
   §6.1 already said you cannot enchant a weapon you have not fought with; it
   turns out you cannot improve one either, and for the same reason.
-- **Hoarding wear becomes a real decision.** Deposit the moment you can afford
-  the enchantment and the improvement roll is a rounding error; fight several
-  more runs first and the *same* enchantment arrives with a genuine chance of
-  the weapon itself getting better. Breadth sooner, or breadth and a lottery
-  ticket later — and the weapon has to stay in rotation to earn the difference,
-  which is the behaviour every other system here rewards.
+- **Hoarding wear is a decision, and it belongs to refinement.** A full bar
+  doubles the graft chance and a nearly-empty one barely moves it, so the
+  weapon has to stay in rotation to be worth refining. Enchanting is unaffected,
+  which sharpens the fork rather than blurring it: **bring a worn weapon to
+  refine, bring any weapon to enchant.**
 - **Refinement cannot be spammed.** The clock is not what limits it; the pool
   is. Two refinements back to back on an empty weapon achieve precisely
   nothing, so the gamble needs no cooldown, no per-weapon limit and no guard of
   its own.
-- **The odds cannot run away from the costs.** Capacity growth would otherwise
-  push both services to the cap and dissolve the fork — but `attachmentCost`
-  climbs with breadth (§6.2), so a weapon that grows its pool is *keeping pace*
-  with what its next soul costs rather than outrunning the roll. The gap between
-  the two services survives to the end of a campaign.
-
-**The chance is capped.** A deep enough pool must never make a graft certain —
-the rarity below is load-bearing, and an uncapped curve would let a patient
-player *purchase* the one thing the design refuses to sell.
+- **The odds cannot run away.** A weapon three steps up the ladder cashes 40
+  against a divisor of 25, so the multiplier reaches 2.6 and stops there — the
+  ladder is authored and short (§6.1), so there is no curve for it to climb.
+  A graft stays rare at every depth without needing a cap to say so.
 
 ### The clock is the same either way
 

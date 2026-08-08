@@ -520,17 +520,6 @@
   for *survival* while staying wasted for *progression*, and a healer cannot
   farm CON off a full-HP party. Its best use is paired with `Vampiric` on a
   weapon that never heals anyone otherwise.
-- **`Ward` is a pool that decays.** It absorbs **one point per HP saved**, never
-  reduces a hit below 1 taken (the `Block` floor), accumulates on
-  re-application, and loses **one point per turn** at the start of the wielder's
-  turn. So 20 damage into 20 `Ward` leaves 1 through and 1 remaining — and that
-  last point is gone next turn.
-- **Decay of 1 a turn is slow against a fight and fast against a run**, which is
-  why it is a flat point rather than a percentage: a shield survives the
-  engagement it was raised in and bleeds away on the walk to the next. Nobody
-  stockpiles `Ward` in the hub and cashes it on floor 9. Two drains on one pool
-  — decay and absorbing — is also what makes `Overheal` self-limiting without
-  any ceiling, since the equilibrium moves with how hard you are being hit.
 - **`Ward` is temporary health, not armour**, which is why crits do not bypass
   it. It does not reduce a hit, it takes it — so a crit finding the gap in
   armour makes sense and a crit finding the gap in *being alive* does not. That
@@ -608,18 +597,6 @@
   degradation would be a death spiral in a game whose way out of trouble is to
   fight. It also supplies the bound on hoarding that §6.4's deposit-timing
   decision needed: you cannot wait past full.
-- **`WearCapacity` grows with every service, and faster under refinement.** A
-  worked weapon is a tempered one. This makes refinement an *investment* rather
-  than only a gamble — better odds now and a bigger pool forever — and it is the
-  third thing loyalty compounds, alongside proficiency (§2.2) and stacks (§6.4).
-  A fresh drop cannot be shortcut into an heirloom, which is what makes "your
-  investment is not stranded" actually true.
-- **Attaching enchantment #n costs `n × EnchantmentWearCost` as well as `n`
-  runs**, so both prices say the same thing. This is what ties growing capacity
-  to breadth: a fifth soul demands a pool no fresh weapon could hold, so
-  capacity is the gate on breadth and refinement is the road to the next
-  enchantment rather than a detour from it. It also stops capacity growth from
-  pushing both services to `MaxImprovementChance` and dissolving the fork.
 - **A currency modifier can never make a unique unique.** `Light` and `Resonant`
   are both forge-limited to `×1` (§1.1), so there is no `×3` to reach for and
   the `×1` an artifact carries is the same one its common variant had. **Every
@@ -700,18 +677,6 @@
   *instances* — daggers, `Charges` throwers, lingering-element wands — which is
   a new itemisation axis, and the reason the Efficiency dagger trades a
   `CritWindow` stack for `Serrated`.
-- **`Overheal`'s remainder is a hidden status effect.** Surplus accumulates into
-  it, it decays one a round like every other status, and it **resets to zero**
-  when it pays out. Without the accumulator a tier-3 `Vampiric` dribbling 3
-  surplus at a time would round to zero every tick and the enchantment whose
-  purpose is to stop discarding things would discard everything.
-- **Decay is what makes it a rate rather than a bucket.** Surplus has to arrive
-  faster than it drains, so a dagger swinging ten times a turn converts and a
-  party topping each other off in a corridor never does. Reset-rather-than-
-  subtract stops one enormous overheal banking change toward the next, which
-  keeps the staff's lumps and the dagger's stream honest against each other.
-  Hidden because nothing the player does responds to its exact value — the
-  readable version is "heal a lot, quickly, and shields appear".
 - **`Bleeding` does not trigger `Vampiric`.** A tick is damage the *status*
   deals, on the enemy's turn, from a wound whose applier may no longer hold the
   weapon — paying lifesteal on it needs a status to remember which character
@@ -757,36 +722,12 @@
   the same sentence §2.2 already makes true of a proficient fighter's bleed.
   Unique magnitudes are the only place in the design where an item's power is
   partly the person holding it.
-- **The lingering-element total is now cubic in tier**, not quadratic: levels
-  rise with tier, `elementDamage` rises with tier, and the tick count rises with
-  levels. That is the price of the change and it is why `SearPercentPerLevel` is
-  a percentage in the low tens — **start at 10%**. A tier-6 `Flaming` totals 36
-  where it used to total 12, and the tier-6 six-target Nova goes from 72 to
-  **216**, which is now the binding number in the whole system.
-- **`damagePerTurn` never falls below 1**, the same convention §1.6 applies to a
-  mitigated hit. At tier 1 the arithmetic truncates to nothing, and a lingering
-  element that does literally nothing until tier 2 is the worst possible first
-  impression for a unique.
-- **`SearDecayPerTurn` is the preferred correction lever** if the curve proves
-  too steep, ahead of `SearLevelsPerTier`: it shortens a burn rather than
-  weakening one, and a `×4` wand applying 2 levels reads worse than one applying
-  4.
 - **A borrowed ladder lifts the price as well as the magnitude.** A unique DoT's
   `triggerCost` is `DotManaPerDamage × the expected total`, not a flat number on
   the catalogue entry. Lifting only the effect would be the tier-1 pin's problem
   pointed the other way — the damage growing all campaign while the mana stayed
   at whatever the entry was written with, making the lingering elements the one
   place in the game where getting deeper made you *cheaper*.
-- **Damage per mana therefore stays flat with tier**, which is the convention
-  every catalogue enchantment already follows (§3.3 scales lock and potency
-  together). Depth buys throughput, never efficiency.
-- **That is what answers the Nova, rather than a nerf lever.** Each target in the
-  shape is its own trigger, so the tier-6 six-target Nova that deals 216 costs
-  **72 mana** — most of a caster's pool, twice, then empty. The cubic curve is a
-  sprinter's burst (§1.3) and it is now priced like one. This is §1.1's
-  *re-price the stack rather than limit it* reaching the enchantment layer.
-  `SearDecayPerTurn` and `SearLevelsPerTier` stay available and are much less
-  likely to be needed.
 - **`Serrated`'s cost scales too**, at the same exchange rate. The flat 6 would
   have decayed into free by the end of a campaign. It also keeps the Efficiency
   dagger's economy tense at every depth: `Light` funds the triggers and the
@@ -956,3 +897,47 @@
   precisely the weapon-specific work, which is the part that took longest to
   earn. **Tier 1 travels intact** because a circle that shallow has not yet
   found any path in particular.
+
+## Superseding pass — the unified status model and the 1–4 stat scale
+
+- **One status model.** A level count decaying 1 at the end of a round, a
+  trigger, and an effect per level that is fixed for that status forever. The
+  source varies only in **how many levels** it applies (§1.5). This replaced
+  three per-status constants with one per-*applier* percentage, and made §1.7's
+  "one representation" claim literally true rather than nearly true.
+- **A DoT resolves at the end of the target's turn** — damage equal to level,
+  then level minus one — so the tick *is* the decay. Levels are therefore
+  magnitude and duration at once, and the old `SearDecayPerTurn` duration dial
+  is gone. Totals fell from cubic to quadratic and the 216-target Nova became 36:
+  the curve was fixed by simplifying the model, not by pricing against it.
+- **Effect per level is 1 damage** for `Searing`, `Bleeding` and `Poison`, which
+  makes the whole DoT layer supplementary by construction — bounded above by
+  about `fightLength² / 2`. Damage over time is a garnish, never a build.
+- **`Mire` stopped being an exception.** Its per-level effect is a 10% movement
+  cut rather than damage, but its level count comes off source damage like every
+  other status. **Past ten levels it paralyses**, released by the same universal
+  decay, with no new state and no separate condition.
+- **`Ward` is a level count too**, not a second shape. Its trigger is taking
+  damage from any source; damage reduces the level by the damage amount and 1
+  still gets through. Being hit for 19 is nineteen points of one event, where a
+  turn passing is one — same loop, different decrement.
+- **Stats run 1–4 and every character is a permutation of them.** Every spread
+  sums to 10; everyone is excellent at one thing and hopeless at one thing, and
+  the difference between members is entirely *which*. A 4 against a 1 is already
+  a fourfold difference in growth rate, which is as wide as any progression
+  system needs.
+- **Max HP, max mana and wear capacity all start at 25**, and all grow by
+  `currentMax / governingStat` XP per point — CON, INT, and a flat 1 for
+  weapons, which have no nature to divide by. The stat is a **rate, not a
+  bonus**: everyone opens the game identical and diverges, which turns §2.1's
+  thesis into arithmetic. It self-slows, because the threshold is the current
+  bar.
+- **`WearCapacity` is an authored ladder: 25 → 30 → 40**, one step per full bar
+  cashed, and **no fourth step until play asks for one**. Authored rather than
+  computed precisely so a fourth can be appended.
+- **Grafting is 3% base when enchanting**, multiplied by
+  `1 + wear ÷ StartingWearCapacity` when refining — so a full fresh bar doubles
+  it to 6%. Proportional rather than thresholded, so cashing one point of wear
+  is not worth the same as bringing in a practically broken blade. Enchanting's
+  3% does not move with wear at all, which sharpens the fork: **bring a worn
+  weapon to refine, bring any weapon to enchant.**

@@ -326,14 +326,6 @@
   deep one. That may be the right variety or it may dilute the shape that makes
   the Candle read as an artifact. Worth deciding before more uniques are
   authored, since it is the difference between a shape and a one-off.
-- **`OverhealPerWard` and `WardDecayPerTurn` are unset.** 5 and 1 are the
-  starting guesses (§3.3), and they set the equilibrium between them: a
-  mid-level Regeneration on a healthy target should roughly *hold* a small
-  shield rather than growing one. Accumulating means the stockpile problem is
-  back; losing ground means `Overheal` does nothing on the staff it most
-  obviously belongs to. `WardDecayPerTurn` is the one that has to be checked
-  against walking distance rather than fight length — its job is to be gone by
-  the next engagement.
 - **Is Siphon still the engine at trigger 5?** It restores mana on a kill and
   now costs 5 to do it, so its net depends on a restore value nobody has set.
   Less pressing than it was, since Siphon is now unique-level and the ordinary
@@ -367,31 +359,6 @@
   party, their innate stats and their opening weapons are content by the same
   argument, and they are the thing a designer tweaks while tuning the tutorial.
   Not specced; it is the obvious fifth file and nobody has asked for it yet.
-- **The five enchanter constants are unset, and they only mean anything
-  together.** With `WearPerHit` settled at 1 they are all quoted in hits, which
-  makes them checkable against play. A worked starting point that produces the
-  shape §6.4 asks for — a first-opportunity deposit rolling ~10%, the same
-  deposit refined landing ~40%:
-
-  | Constant | Guess | Why |
-  | --- | --- | --- |
-  | `StartingWearCapacity` | 100 | ~1–2 runs to fill a fresh weapon, matching the 1-run cost of a first enchantment (§6.2) |
-  | `EnchantmentWearCost` | 75 | Most of a full first pool, so the leftover is genuinely a remainder |
-  | `WearPerImprovementRoll` | 250 | A full fresh pool is worth ~40% refined, ~10% enchanted |
-  | `CapacityPerEnchanting` | +5 | Slow compounding |
-  | `CapacityPerRefinement` | +20 | The investment half of the fork has to be felt |
-  | `MaxImprovementChance` | 50% | Patience buys a good chance, never a certainty |
-
-  The one to check first is `StartingWearCapacity` against real hit counts —
-  every other number is quoted against it, and nobody has counted how many times
-  one weapon actually swings in a run.
-- **Does the growth schedule keep up with `n × EnchantmentWearCost`?** A fifth
-  soul costs 375 wear at the guesses above, so the weapon must have reached a
-  capacity of 375 — roughly fifteen refinements, or far more services if the
-  player mostly enchants. That is either a satisfying campaign-long climb that
-  makes the fifteen-run figure in §6.2 real, or it is a wall that makes a
-  five-enchantment weapon unreachable in practice. The two schedules have to be
-  checked against each other, not separately.
 - **`OverhealDecayPerTurn` against `OverhealPerWard` is the real dial.** At
   decay 1 and a ratio of 5, surplus must arrive at better than 1 a round to
   convert at all, and at better than 5 a round to convert every round. That
@@ -441,3 +408,20 @@
   the rule once; keeping them apart admits that a martial weapon's base damage
   and a wand's element damage are not on the same scale, and probably should not
   be tuned together.
+- **What is `ApplyPercent` for each element?** The unified status model (§1.5)
+  makes this the sharpest constant in the DoT layer, because levels are duration
+  as well as magnitude — 10% of a tier-6 wand's 30 damage is a 3-turn burn, 25%
+  is a 7-turn one, and 50% outlasts the fight. The band is roughly 10–25% and
+  each applier wants its own value, but they cannot be judged until enemy HP and
+  fight length exist.
+- **Do the 1–4 permutation spreads produce four distinct characters?** §2.1 gives
+  every member the numbers 1–4 in some order, so the *rule* is settled and the
+  four assignments are a first guess. B and C differ only by swapping STR and
+  CON, which may or may not read as two different characters in play.
+- **Is `currentMax / stat` the right threshold shape?** It self-slows, which is
+  wanted, but it also means a CON 1 character's first max-HP point costs the
+  same 25 as their twenty-fifth costs a CON 4 character. Whether that reads as
+  natural divergence or as the wizard never growing at all is a play question.
+- **Does the three-step wear ladder need a fourth?** §6.1 stops at 40 on purpose.
+  A fourth step is the first thing to add if weapons feel like they stop
+  developing, and the ladder is authored rather than computed so it can be.
