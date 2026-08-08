@@ -997,3 +997,18 @@
   minimum-1 rule operating on what it was written against. The consequence is
   that enchantment damage is slightly better into armour than a raw swing —
   real, adjustable, one line, with proportional attribution as the alternative.
+- **Answer a strong build with a counter, not a nerf.** The third time the
+  design has reached for this shape: §1.1 re-prices a modifier rather than
+  capping it, §6.4 limits at the forge rather than forbidding a graft, and
+  enchantment damage being better into armour (§1.6) is met by **a shielding
+  enchantment** rather than by changing how `Block` attributes. Nerfing costs
+  one line and reaches everyone silently, including builds that were fine; a
+  counter costs a slot, a service, a lock and a trigger, and reaches only the
+  fight where someone chose to bring it.
+- **It needs no new mechanic**: a catalogue entry whose `EffectPerLevel` absorbs
+  a point of *enchantment* damage, sitting beside `Block` as the second armour
+  for the second damage source. It works on both sides, so a party leaning on
+  `Arcane` eventually meets dummies that shrug it off — a better lesson than the
+  number quietly having been smaller all along.
+- **This is also what keeps the arms race in the data files** (§5.5). A counter
+  is an entry someone adds; a rebalance is a recompile and an argument.

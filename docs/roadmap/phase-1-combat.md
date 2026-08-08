@@ -182,13 +182,38 @@ enchantments added, and the payload keeps them apart the whole way down. **Only
 the weapon's share teaches you the weapon** (§2.2) — a knife that hurts because
 of the `Arcane` on it has not made anyone better with knives.
 
-**Block comes off the weapon's share first**, which is the one judgment call in
-the step above. Armour stops blows; it is not obvious it should stop the
-lightning riding one, and taking it off the weapon's share keeps `Block`'s
-minimum-1 rule operating on the thing `Block` was written against. The
-consequence is that enchantment damage is slightly better into armour than a
-raw swing is, which is a real effect and an adjustable one — it is a single
-line, and the alternative is proportional attribution.
+**Block comes off the weapon's share first.** Armour stops blows; it is not
+obvious it should stop the lightning riding one, and taking it off the weapon's
+share keeps `Block`'s minimum-1 rule operating on the thing `Block` was written
+against.
+
+The consequence is real: **enchantment damage is better into armour than a raw
+swing is**, so there is a build in stacking damage enchantments against heavily
+blocking targets. That is intended, and if it proves too strong the answer is
+**a shielding enchantment rather than a change to this line.**
+
+### Answer a strong build with a counter, not a nerf
+
+This is worth stating as a rule, because it is the third time the design has
+reached for it. §1.1 re-prices a modifier rather than capping it; §6.4 limits at
+the forge rather than forbidding a graft; and here, an over-strong damage
+enchantment is met by **something a player can go and get**.
+
+| | Costs | Who it reaches |
+| --- | --- | --- |
+| **Nerfing the attribution** | One line | Everyone, silently, including builds that were fine |
+| **A shielding enchantment** | A slot, a service, a lock, a trigger | Only the fight where someone chose to bring it |
+
+The shape it would take needs nothing new: a catalogue enchantment whose
+`EffectPerLevel` absorbs a point of **enchantment** damage, sitting beside
+`Block` as the second armour for the second damage source (§2.2). It works on
+both sides of the fight, exactly as `Block` and the crit riders do — so a party
+that leans on `Arcane` will eventually meet dummies that shrug it off, which is
+a better lesson than the number quietly having been smaller all along.
+
+**Keeping the arms race in content rather than in constants is also what keeps
+it in the data files** (§5.5). A counter is an entry someone adds; a rebalance
+is a recompile and an argument.
 
 **This is what forces the attack resolver to return a result rather than write
 one.** Damage is not a number the attacker computes and applies; it is a value
