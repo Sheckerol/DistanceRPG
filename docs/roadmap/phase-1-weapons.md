@@ -1218,7 +1218,14 @@ the first purchase every Efficiency unique makes:
 
 The floor is `×2`: at `×1` the weapon is no deeper than the variant it derives
 from and stops being an artifact at all. So three souls is the most any weapon
-in the game can carry, and it costs the last stack there is to spend.
+in the game **arrives** carrying, and it costs the last stack there is to spend.
+
+**Five is still the ceiling** — the enchanter builds breadth and stops at five
+(§6.2), and a weapon that dropped with three simply starts that climb four rows
+down the service table. The trade here buys a *head start*, not a higher cap:
+the Efficiency dagger walks out of the floor with three-fifths of a finished
+weapon's souls and pays the same fifteen-run climb minus what it was handed,
+exactly as a caster does with its one (§6.2).
 
 > **The Efficiency dagger** — from the Flensing Knife — carries
 > `CritWindow ×2, Light ×1`, **`Serrated`**, **`Vampiric` at tier 3**, and

@@ -171,9 +171,17 @@ gain by a fractional rate.
 Level effects: `+floor(L / 2)` damage, and `-1` movement cost per 3 levels
 (floored so a weapon never becomes free).
 
-Staves deal no damage, so their proficiency is fed by **effect level applied**
-rather than damage — and wands by total damage dealt across every target in the
-shape, which makes wand levelling reward good shape placement.
+**The casters look like exceptions to the rule above and are not.** A staff
+deals no damage, so its proficiency is fed by **status levels applied** (§1.5) —
+which is the staff's own output stated in the only units it has. A wand's
+proficiency is fed by damage across every target in the shape, which rewards
+good placement.
+
+Both work because a caster's enchantment is **forged** (§3.1): a wand's element
+*is* the wand, so its damage is the weapon's own share, not something attached
+later. The rule is the same one martial weapons follow — you level on what the
+weapon is — and it only looks different because for a caster, what the weapon is
+happens to be an enchantment.
 
 ### Health XP
 

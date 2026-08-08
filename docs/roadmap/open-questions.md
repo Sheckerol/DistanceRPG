@@ -301,12 +301,6 @@
   (§1.5). It decides how much surplus healing a point of `Ward` costs, and it is
   the one number standing between the Staff of Renewal build and a shield
   factory.
-- **Should the riders take the same treatment?** `Sundered` and `Weakened` are
-  now the only members of the level family with their conversions written into
-  prose (`1` per level, decay `1`) rather than named constants. If Searing needs
-  three dials, they probably deserve theirs too — and it would let the shared
-  `TickStatusEffects` path read every status the same way instead of
-  special-casing one.
 - **What happens to a wand unique whose element is transferred off?** §1.5 says
   the lingering effect goes quiet, which is correct but harsh — the artifact
   becomes inert rather than merely worse, and nothing else in the design has
@@ -347,7 +341,7 @@
   a glitch.
 - **How much of an enchantment's effect can `EffectKind` express?** §5.6 has an
   entry name a behaviour and supply parameters, which works cleanly for Arcane
-  (damage), Vampiric (heal by damage dealt) and the elements. It works less
+  (damage), Vampiric (a flat heal per tier) and the elements. It works less
   obviously for `Sturdy` (survive at 1 HP), `Momentum` (refund part of a
   swing's movement), `Overheal` (intercept surplus healing) and `Echoing`
   (trigger the weapon's class feature again) —
@@ -384,7 +378,8 @@
   penalty for using the wand correctly. The defence is that it is the same mana
   for the same damage delivered wider. The fallback is **one trigger per cast
   regardless of how many it catches**, which is a one-line change and no new
-  constant: the Nova then costs 12 and deals 216, and `DotManaPerDamage` has to
+  constant: at the §1.5 starting numbers a tier-6 six-target Nova still deals its
+  36 but pays one trigger's 2 mana instead of six, and `DotManaPerDamage` has to
   carry the whole correction instead. Worth settling with a wand in hand rather
   than on paper, and worth *not* building anything that assumes either answer.
 - **What is `ApplyPercent` for each element?** The unified status model (§1.5)

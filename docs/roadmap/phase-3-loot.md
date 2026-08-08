@@ -854,14 +854,14 @@ levelsApplied = BleedPercent × the WEAPON's damage this hit    // §1.6
 made it, and an `Arcane` discharge riding the same swing did not cut anyone
 deeper. Same line §2.2 draws for proficiency, and drawn for the same reason.
 
-Damage dealt already carries both — the weapon's base damage and the wielder's
-proficiency bonus (§2.2) — so there is nothing to add up. **The ladder was
-already in the number.**
+The weapon's damage already carries both ladders — what the item is and how good
+its wielder has become — so there is nothing to add up. **The ladder was already
+in the number.**
 
-| Inside "damage dealt" | Ladder it rides | Grows by |
+| Inside the weapon's share | Ladder it rides | Grows by |
 | --- | --- | --- |
 | **Weapon base damage and stacks** | The item | Farming, grafting, deepening |
-| **Proficiency bonus** | The *wielder* (§2.2) | Damage dealt with the class |
+| **Proficiency bonus** | The *wielder* (§2.2) | The weapon's own damage dealt |
 
 **That is the general rule for unique DoTs, not a special case for this one**
 (§1.5). Every damage-over-time a unique applies takes a percentage of the damage

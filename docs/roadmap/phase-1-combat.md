@@ -134,8 +134,12 @@ Two consequences worth stating:
 
 ### Damage pipeline
 
-`CombatRules.ResolveAttack` gains two steps, ordered so Block stays last and
-its minimum-1 guarantee holds:
+`CombatRules.ResolveAttack` becomes an ordered chain rather than a calculation
+— it is the canonical handler order for `DamageTaken` (§1.7), and every step
+below is a handler that transforms the payload and returns it. `Block` is not
+last, but it is the last thing that *reduces* damage, which is what its
+minimum-1 guarantee needs: everything after it either moves damage somewhere
+other than HP or reacts to the hit:
 
 ```
 1. roll d20   → base damage    (× CritMultiplier, or halved on a natural 1)

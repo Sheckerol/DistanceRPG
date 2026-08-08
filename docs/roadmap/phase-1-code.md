@@ -449,7 +449,7 @@ should read off one `blocked` flag rather than re-testing the crit separately.
 
 `TurnSystem` gains: cleave and area target selection, a riposte hook, push/drag
 displacement, per-turn charge tracking, an overwatch reaction during the enemy
-phase, and the five new effects in the now-universal `TickStatusEffects`. Mire
+phase, and the eight statuses in the now-universal `TickStatusEffects`. Mire
 reduces `EffectiveMax` in `PartyMemberState.StartTurn` and the enemy budget in
 `StartEnemyAction`. Sundered and Weakened are read by `CombatRules`, so
 `ResolveAttack` needs the attacker passed in — today it only takes the two

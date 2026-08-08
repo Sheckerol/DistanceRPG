@@ -621,7 +621,9 @@
 - **A `Light` artifact trades forged depth for souls at one stack each**, with a
   floor of `signature ×2` — below that it is no deeper than the variant it
   derives from and stops being an artifact. So `×3` buys two enchantments and
-  `×2` buys three, and three is the most any weapon in the game can carry.
+  `×2` buys three, and three is the most any weapon in the game *arrives*
+  carrying. **Five remains the ceiling** (§6.2) — the trade buys a head start on
+  the service climb, not a higher cap.
 - **The Efficiency dagger is `CritWindow ×2, Light ×1` + `Serrated`,
   `Vampiric` tier 3, `Overheal`** — three souls forming a *chain* rather than a
   pair, each link consuming what the last produced: a hit becomes continuous
