@@ -1092,7 +1092,9 @@ thing in the game.
 **Nothing drops potions. The hub produces them** — a farm that grows by one
 worker with every *non-tutorial* dungeon beaten for the first time, yielding per
 run (§6.6). The alchemist who mixes them arrives with the first such clear, so
-the early campaign has no potions at all.
+the early campaign has no potions at all — and the batch is **a flow, not a
+stock**: you split it between health and mana when you collect it, and anything
+you leave with him has spoiled by the time you climb back out.
 That keeps the rule intact: potions are still paid for by playing, at the
 steepest price the game charges for anything, and the class-locked drop table
 (§3.1) never needs a non-weapon outcome.

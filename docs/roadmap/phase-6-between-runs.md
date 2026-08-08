@@ -461,11 +461,31 @@ produces at a rate set by how many dungeons you have beaten *once*.
 potionsProduced per run = FarmYieldPerClear × non-tutorial dungeons first-cleared
 ```
 
-The player takes the yield as health or mana potions in whatever split they
-want. Choice rather than a roll, for the same reason enchantments are chosen
-(§6.2): the system needs levers the player operates directly, and an emergency
-supply that arrives random is an emergency you were handed rather than one you
-prepared for.
+### You split it yourself, and what you leave behind spoils
+
+**Talking to the alchemist is where the batch becomes potions.** You divide the
+run's yield between health and mana in whatever proportion you want — choice
+rather than a roll, for the same reason enchantments are chosen (§6.2): the
+system needs levers the player operates directly, and an emergency supply that
+arrives random is an emergency you were handed rather than one you prepared for.
+
+**What you do not pick up is gone.** It does not wait on a shelf, it is not
+there when you climb back out, and next run's batch is a fresh one. A mixed
+potion keeps exactly as long as the trip it was mixed for.
+
+So **the farm is a flow, not a stock**, and that single rule does most of the
+work in this section:
+
+| | If the yield banked | As it actually is |
+| --- | --- | --- |
+| The decision | Made once, in the late campaign, forever | **Every run, before every descent** |
+| Growing the farm | Compounds without limit | Raises the *ceiling* on one trip |
+| A cautious player | Hoards, then never has to choose | Cannot hoard, so always chooses |
+
+It also means the carry limit and the yield are the same conversation rather
+than two. §3.4 makes a potion cost an inventory slot against weapons and haul;
+now that trade is decided at the moment the potions are handed to you, with the
+run's whole supply in front of you and nothing recoverable afterwards.
 
 ### The alchemist arrives with the first real clear, and the tutorial does not count
 
@@ -536,30 +556,43 @@ It also means the farm and the enchanter tick together. A run advances your
 weapons and stocks your shelf in one event, which is one fewer clock for a
 player to hold.
 
-### The objection, and why it does not land
+### The real cost of a flow: the farm saturates
 
-**It is an accumulator, and accumulators erode scarcity.** A late-campaign party
-has cleared everything, produces the maximum every run, and walks in with a full
-shelf — at which point potions stop being emergency first aid and become
-routine.
+Because nothing banks, **yield above what the party can carry is simply
+wasted**, and that puts a ceiling on what clearing more dungeons is worth. Past
+the point where a run's batch exceeds the slots you are willing to spend, another
+first clear buys you nothing you can use.
 
-The answer is that **the shelf was never the constraint; the carry is** (§3.4).
-One potion per inventory slot, 24 slots party-wide, contested with weapons and
-with everything you intend to carry out. A stockpile of a hundred potions in the
-hub and a stockpile of six change nothing about the decision at the mouth of the
-dungeon, which is still *how many is this trip worth*.
+That is a genuine limit on the argument this section is built on — the farm was
+recommended because it pays for breadth, and a saturating reward stops paying.
+Worth being plain about rather than discovering late.
 
-So the farm does not make potions abundant. It makes them **available**, and
-moves the question from "did I find any" to "how many am I willing to give up
-weapons and haul for". That is a strictly better question, and it is the same
-trade §6.2 makes when it says enchantments are the one thing in itemisation that
-is chosen rather than rolled.
+**It is still the right shape, for the same reason the clean kill is** (§3.2).
+That rule front-loads a farm and then puts itself out of business, and the design
+already decided that a reward which fades as it stops being needed is better than
+one that scales forever. The farm does the same thing on a different axis:
 
-**Where it could still go wrong** is the rate. One potion per clear per run is
-generous by design — the carry cap is doing the limiting — but if it turns out
-the interesting decision is *rationing across a run* rather than *loading out
-before one*, the rate is the dial and it should come down hard rather than the
-carry cap going up.
+| | Matters most | Stops mattering when |
+| --- | --- | --- |
+| **Clean kills** | Early cycles, while the dummy is trivial | Revival scaling outgrows your biggest hit |
+| **The farm** | While a batch is smaller than what you would carry | Your batch outgrows your slots |
+
+And what saturation actually buys is **freedom in the split**, which does not
+cap. A party producing exactly its carry has to divide six potions between
+health and mana; a party producing three times its carry can take six of either.
+Being able to walk into a caster-punishing floor with nothing but mana potions
+is a real choice that a barely-fed farm cannot offer, and it keeps late clears
+worth something without letting the supply compound.
+
+**If it still saturates too early in play, the rate is the dial** — not the carry
+cap, which is load-bearing for §3.4's three-way trade.
+
+### The presentation is an art question, not a design one
+
+Whether the hub visibly gains a person per clear, or the farm simply reports a
+bigger number, changes nothing mechanical. It changes a great deal about whether
+a first clear *reads* as a reward — but that is a matter for how the hub is
+drawn, and it does not belong in this document.
 
 ## 6.7 Code impact
 

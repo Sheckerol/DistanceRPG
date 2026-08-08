@@ -12,18 +12,13 @@
   either a ninth class on DEX, or moving throwing to DEX (thrown knives are
   plausibly dexterous, though it costs the STR-throws-heavy-things read), or
   accepting that STR is the martial-breadth stat and DEX the precision one.
-- **What is `FarmYieldPerClear`, and is the interesting decision loading out or
-  rationing?** One potion per clear per run (§6.6) is generous on purpose,
-  because the carry cap is meant to do the limiting — the question at the
-  dungeon mouth should be *how many is this trip worth*. If play shows the
-  better question is *when do I drink the third one*, the rate should come down
-  hard rather than the carry cap going up, since raising the cap would dissolve
-  the three-way trade §3.4 rests on.
-- **Does the farm want to be visible?** It is the first hub system the player
-  can watch grow, and "one more worker" is a legible reward for a first clear in
-  a way a number on a shelf is not. That is presentation rather than mechanics,
-  but it is the difference between the farm reading as a reward and reading as a
-  resupply counter.
+- **What is `FarmYieldPerClear`, and how early does the farm saturate?** Because
+  the batch spoils rather than banking (§6.6), yield above what the party will
+  carry is wasted outright — so this number decides both how well-supplied a run
+  is *and* how many first clears remain worth making. Too low and a full campaign
+  never fills a loadout; too high and the third dungeon is the last one that pays.
+  The dial is the rate, never the carry cap, which §3.4's three-way trade rests
+  on.
 - **Does one potion per slot survive contact with a real inventory?** It is the
   reading that keeps §3.4's three-way trade honest, and it may simply be
   annoying — four health potions is a sixth of the party's total carry. If it

@@ -860,12 +860,22 @@
   so the hub advances weapons and stocks the shelf in one event. A hub that
   worked while the player was *idle* would be the first reward here not paid for
   by playing.
-- **The shelf was never the constraint; the carry is.** One potion per slot
-  against 24 contested party-wide slots (§3.4) means a stockpile of a hundred
-  and a stockpile of six pose the same question at the dungeon mouth. So the
-  farm makes potions *available* rather than abundant, moving the question from
-  "did I find any" to "how many is this trip worth" — luck to choice, the same
-  move §6.2 makes for enchantments.
+- **The batch is a flow, not a stock.** You split the run's yield between health
+  and mana at the alchemist, and **what you do not pick up spoils** — it is not
+  waiting when you climb back out, and next run's batch is fresh. So the
+  loadout decision happens every single run rather than once in the late
+  campaign, a cautious player cannot hoard their way out of choosing, and the
+  carry limit and the yield become one conversation instead of two.
+- **The farm therefore saturates**, which is a real limit on the breadth
+  argument it was recommended for: past the point where a batch exceeds the
+  slots you will spend, another first clear buys nothing usable. That is the
+  same shape as the clean kill (§3.2), which front-loads a farm and then puts
+  itself out of business — the design already prefers a reward that fades as it
+  stops being needed to one that scales forever. What saturation still buys is
+  **freedom in the split**, which does not cap: producing three times your carry
+  means you can take all mana potions into a caster-punishing floor. If it
+  saturates too early in play the **rate** is the dial, never the carry cap,
+  which is load-bearing for §3.4's three-way trade.
 - **The alchemist arrives with the first non-tutorial clear**, and until then
   the whole category does not exist — no potions and no shelf. Same shape §6.3
   uses for the enchanter, one step later: beating the tutorial frees the
