@@ -971,3 +971,29 @@
 - **`Weapon.Enchantments` is a list because order is gameplay**, so it must
   never be normalised, sorted or deduped. A migration that rebuilds it in a
   different sequence is a silent balance change.
+- **Weapon XP is fed by the weapon's own damage only.** Attached enchantments
+  fire on the successful-hit chain and their damage is tracked separately, so a
+  wizard holding an `Arcane` dagger does not out-level a real thief at daggers.
+  Proficiency measures the weapon; crediting it for what is bolted to the weapon
+  would let the party's worst knife-fighter become its best on the strength of a
+  stat with nothing to do with knives.
+- **Each ladder is fed by the thing it actually is.** The wizard's knife climbs
+  dagger proficiency slowly and its `Arcane` quickly, both true at once and
+  neither leaking. That is §2.1's thesis pointed the other way: C never becomes
+  the better caster however long they swing a staff, and D never becomes the
+  better knife-fighter however much damage their knife does.
+- **A forged enchantment is part of the weapon and does count.** §3.1 already
+  drew that line, and it has to hold or a **wand would have no XP source at
+  all**, since a wand's damage *is* its element. The distinction is not
+  weapon-versus-magic but **what the weapon is** versus what was attached later.
+- **`Serrated` reads the weapon's share too** — the wound is as deep as the blow
+  that made it, and an `Arcane` discharge riding the same swing did not cut
+  anyone deeper.
+- **The clean-kill test still counts everything**, because it asks *could this
+  have killed it outright* — a question about output rather than craft. Two
+  questions, two numbers, both already in the payload.
+- **`Block` comes off the weapon's share first.** Armour stops blows; it is not
+  obvious it should stop the lightning riding one, and this keeps `Block`'s
+  minimum-1 rule operating on what it was written against. The consequence is
+  that enchantment damage is slightly better into armour than a raw swing —
+  real, adjustable, one line, with proportional attribution as the alternative.

@@ -111,9 +111,40 @@ weaponXp[member][class] += damageDealt            # AFTER mitigation — §1.6
 xpToNext(L) = 100 * L / governingStat             # triangular, tune later
 ```
 
-**`damageDealt` is the mitigated number, not the rolled one**, and that is a
-decision rather than a detail. It is `Dealt` from §1.6's pipeline: after the
-defender's `Block`, before their `Ward`. Three things follow:
+**`damageDealt` is the weapon's own mitigated damage** — after the defender's
+`Block`, before their `Ward`, and **excluding anything an attached enchantment
+added** (§1.6).
+
+### A wizard with a knife does not out-level a real thief
+
+Proficiency measures *the weapon*, so it cannot be fed by what is bolted to the
+weapon. An INT-4 caster holding a dagger with `Arcane` on it puts out real
+damage — and almost none of it is knife-work. Crediting that to dagger
+proficiency would let the party's worst knife-fighter become its best on the
+strength of a stat that has nothing to do with knives.
+
+**Each ladder is fed by the thing it actually is**, which is the same rule the
+rest of §2.2 already runs on:
+
+| Ladder | Fed by | So the wizard's knife |
+| --- | --- | --- |
+| Dagger proficiency | The **dagger's** damage | Climbs slowly — they are bad at knives |
+| The `Arcane` on it | Mana spent through it (§3.3) | Climbs fast — they are good at magic |
+
+Both are true at once and neither leaks into the other. That is §2.1's thesis
+pointed the other way: *C will never be the better caster however long they
+swing a staff*, and equally, D will never be the better knife-fighter however
+much damage their knife does.
+
+**A forged enchantment is part of the weapon and does count.** §3.1 already
+draws this line — an innate enchantment is forged in the §1.1 sense, "part of
+what the weapon is, not something piled on afterwards" — and it has to, or a
+**wand would have no XP source at all**, since a wand's damage *is* its element
+(§1.4). A staff's effect is likewise the staff. The distinction is not
+weapon-versus-magic; it is **what the weapon is** versus what was attached to it
+later.
+
+Three further things follow from the mitigated part:
 
 - **A crit fast-forwards proficiency**, twice over. It multiplies the damage
   *and* skips `Block` entirely (§1.6), so a natural 20 into an armoured target
@@ -124,6 +155,10 @@ defender's `Block`, before their `Ward`. Three things follow:
   the same principle every other pool in the game runs on.
 - **`Ward` does not reduce it**, because `Ward` is temporary health rather than
   mitigation (§3.3). Damage that lands on a shield was still dealt.
+- **The clean-kill test (§3.2) still counts everything.** It asks *could this
+  have killed it outright*, which is a question about output rather than about
+  craft — so enchantment damage counts there and not here. Two questions, two
+  numbers, both already in the payload.
 
 This is also the requirement that shapes §1.7's handler contract: the attacker
 cannot credit XP until the defender's handlers have run and **handed the number

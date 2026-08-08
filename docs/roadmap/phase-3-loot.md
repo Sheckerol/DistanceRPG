@@ -847,8 +847,12 @@ than magnitudes. `Serrated` is a magnitude, so it needs a ladder that is not
 tier, and it takes the one the weapon and wielder already climb together:
 
 ```
-levelsApplied = BleedPercent × damage this hit dealt
+levelsApplied = BleedPercent × the WEAPON's damage this hit    // §1.6
 ```
+
+**The weapon's share, not the total** — the wound is as deep as the blow that
+made it, and an `Arcane` discharge riding the same swing did not cut anyone
+deeper. Same line §2.2 draws for proficiency, and drawn for the same reason.
 
 Damage dealt already carries both — the weapon's base damage and the wielder's
 proficiency bonus (§2.2) — so there is nothing to add up. **The ladder was

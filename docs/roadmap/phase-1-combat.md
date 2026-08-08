@@ -141,13 +141,16 @@ its minimum-1 guarantee holds:
 1. roll d20   → base damage    (× CritMultiplier, or halved on a natural 1)
 2. attacker's Weakened          → subtract
 3. defender's Sundered          → add
-4. defender's Block             → absorb, never below 1 taken
+   ── this is the WEAPON's damage, and only this ──────────────────
+4. attached enchantments fire    → add, tracked separately — §2.2
+5. defender's Block             → absorb, off the weapon's share first,
+                                  never below 1 taken
                                   SKIPPED ENTIRELY on a crit
    ── the DEALT amount is fixed here ──────────────────────────────
-5. defender's Ward              → spend 1 per point taken; temporary HP,
+6. defender's Ward              → spend 1 per point taken; temporary HP,
                                   so NOT skipped on a crit — §3.3
    ── the amount reaching HP is fixed here ────────────────────────
-6. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
+7. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
 ```
 
 ### The pipeline has two outputs, and the design already needed both
@@ -171,6 +174,21 @@ wrong in three of them:
 | `Serrated` levels (§3.3) | **`Dealt`** | The wound is as deep as the blow that made it |
 | The clean-kill test (§3.2) | **`Dealt`** | Already specified as *after mitigation* |
 | Death, and `Sturdy` | **`Taken`** | Only HP kills you |
+
+### And it tracks two *sources*, because they mean different things
+
+`Dealt` is the sum of the weapon's own damage and whatever its attached
+enchantments added, and the payload keeps them apart the whole way down. **Only
+the weapon's share teaches you the weapon** (§2.2) — a knife that hurts because
+of the `Arcane` on it has not made anyone better with knives.
+
+**Block comes off the weapon's share first**, which is the one judgment call in
+the step above. Armour stops blows; it is not obvious it should stop the
+lightning riding one, and taking it off the weapon's share keeps `Block`'s
+minimum-1 rule operating on the thing `Block` was written against. The
+consequence is that enchantment damage is slightly better into armour than a
+raw swing is, which is a real effect and an adjustable one — it is a single
+line, and the alternative is proportional attribution.
 
 **This is what forces the attack resolver to return a result rather than write
 one.** Damage is not a number the attacker computes and applies; it is a value
