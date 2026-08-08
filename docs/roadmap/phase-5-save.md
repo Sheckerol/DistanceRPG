@@ -87,7 +87,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
 | Enchanter | `WearPerHit`, `StartingWearCapacity`, `CapacityPerEnchanting`, `CapacityPerRefinement`, `EnchantmentWearCost`, `WearPerImprovementRoll`, `MaxImprovementChance` |
 | Inventory | `PartyCarrySlots` |
-| Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `PotionDropChance` |
+| Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
 
 Collecting them is worth as much as making them editable. Half the open
 questions in these documents are "this number, against that number" — the mana

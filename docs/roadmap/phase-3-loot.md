@@ -1087,8 +1087,15 @@ something you *do*, and gold would be the first exception.
 
 So "hub purchase" is not a rejected option so much as an unavailable one, and
 inventing an economy to sell two items would be a system built for the smallest
-thing in the game. Potions drop in the dungeon because that is where everything
-else comes from.
+thing in the game.
+
+**Nothing drops potions. The hub produces them** — a farm that grows by one
+worker with every *non-tutorial* dungeon beaten for the first time, yielding per
+run (§6.6). The alchemist who mixes them arrives with the first such clear, so
+the early campaign has no potions at all.
+That keeps the rule intact: potions are still paid for by playing, at the
+steepest price the game charges for anything, and the class-locked drop table
+(§3.1) never needs a non-weapon outcome.
 
 That also keeps the enchanter out of it. He is a weapon service (§6.2), his time
 is the scarce thing, and a crafting bench would be a second queue competing for

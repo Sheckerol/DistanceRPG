@@ -451,10 +451,121 @@ you wanted Flaming is not a dead weapon — it is a body with the
 wrong soul in it, and the enchanter moves souls. The roll sets what you start
 with, never what you end with.
 
-## 6.6 Code impact
+## 6.6 The farm — where potions come from
+
+**Every first-time clear adds someone to the hub**, and the hub makes potions
+while you are away. Not a shop and not a crafting bench: a **farm** that
+produces at a rate set by how many dungeons you have beaten *once*.
+
+```
+potionsProduced per run = FarmYieldPerClear × non-tutorial dungeons first-cleared
+```
+
+The player takes the yield as health or mana potions in whatever split they
+want. Choice rather than a roll, for the same reason enchantments are chosen
+(§6.2): the system needs levers the player operates directly, and an emergency
+supply that arrives random is an emergency you were handed rather than one you
+prepared for.
+
+### The alchemist arrives with the first real clear, and the tutorial does not count
+
+**Nobody mixes potions until you have beaten a dungeon that is not the
+tutorial.** The alchemist is one of the people a first clear brings back, and
+until then the category does not exist — no potions on the shelf and no shelf.
+
+That is the same shape §6.3 already uses for the enchanter, one step later:
+
+| Opens | On | Because |
+| --- | --- | --- |
+| **The workshop** | Beating the tutorial | It frees the enchanter, who was powering the golems (§6.3) |
+| **The farm** | Beating a *real* dungeon | It brings back the first people to work it |
+
+**The tutorial not counting is the same exclusion it already gets everywhere
+else** — no mercy tick, no cooldown, no return visit (§6.3) — and it needs no
+new rule to say so, because the tutorial cannot be cleared *twice* and the farm
+counts first clears of dungeons you can go back to.
+
+The effect on pacing is worth having deliberately: **the early campaign has no
+potions at all.** A party learns to survive on positioning, the healer's mana
+and the movement budget before it ever learns to drink, so first aid arrives as
+a thing that changes how you fight rather than as a thing you always had. And
+the first real clear — already the hardest gate in the game — hands over an
+entire category rather than a number going up.
+
+### It pays for the one thing nothing else pays for
+
+This design is **depth-biased everywhere**. Farm one dummy, deepen one weapon,
+level one enchantment, work one heirloom for twenty services — every ladder in
+it rewards going *further into* something you already have.
+
+A first clear is the exception that had no reward attached:
+
+| | Pays | With |
+| --- | --- | --- |
+| Repeat clears | Service ticks, drops, farmed stacks | §6.3, §3.2 |
+| Depth in a weapon | Stacks, tiers, capacity | §3.2, §6.4 |
+| **A dungeon's *first* clear** | **Nothing, until now** | — |
+
+And the design was already *pushing* toward breadth without paying for it. A
+cleared dungeon goes on cooldown for `bossFloor` runs (§4.2), so the correct
+play is to go somewhere new — a pressure with no reward on the other side of it.
+**The farm attaches the reward to the thing the cooldown already forces.**
+
+### It is production, not purchase, so the invariant holds
+
+§3.4 rests on there being **no currency in this game**: every cost is something
+you do — runs of downtime, accumulated wear, turns spent camping, mana spent
+casting. A shop would have been the first exception.
+
+A farm is not. It is priced in *dungeons beaten*, which is the most expensive
+thing on the list, and it is paid before the goods arrive rather than after. The
+rule survives intact, and the awkward question §3.4 left open — what a potion
+even drops off, given the drop table is class-locked to weapons (§3.1) — simply
+disappears. **Nothing drops potions.** No non-weapon outcome in the loot table,
+no floor containers, no new system.
+
+### Production ticks per run, not per turn and not per minute
+
+This is the one condition worth insisting on. **A run is the unit**, exactly as
+it is for the enchanter's service clock (§6.2), and for the same reason: the hub
+working while you are away is a rhythm this design already has, and a hub
+working while you are *idle* would be the first reward in the game that is not
+paid for by playing.
+
+It also means the farm and the enchanter tick together. A run advances your
+weapons and stocks your shelf in one event, which is one fewer clock for a
+player to hold.
+
+### The objection, and why it does not land
+
+**It is an accumulator, and accumulators erode scarcity.** A late-campaign party
+has cleared everything, produces the maximum every run, and walks in with a full
+shelf — at which point potions stop being emergency first aid and become
+routine.
+
+The answer is that **the shelf was never the constraint; the carry is** (§3.4).
+One potion per inventory slot, 24 slots party-wide, contested with weapons and
+with everything you intend to carry out. A stockpile of a hundred potions in the
+hub and a stockpile of six change nothing about the decision at the mouth of the
+dungeon, which is still *how many is this trip worth*.
+
+So the farm does not make potions abundant. It makes them **available**, and
+moves the question from "did I find any" to "how many am I willing to give up
+weapons and haul for". That is a strictly better question, and it is the same
+trade §6.2 makes when it says enchantments are the one thing in itemisation that
+is chosen rather than rolled.
+
+**Where it could still go wrong** is the rate. One potion per clear per run is
+generous by design — the carry cap is doing the limiting — but if it turns out
+the interesting decision is *rationing across a run* rather than *loading out
+before one*, the rate is the dial and it should come down hard rather than the
+carry cap going up.
+
+## 6.7 Code impact
 
 New `Logic/Wear.cs`, `Logic/Enchanter.cs`, and a `CampaignState` that lives
-*outside* `DungeonState` (§4.3) — party, stable, enchanter queue, run counter.
+*outside* `DungeonState` (§4.3) — party, stable, enchanter queue, run counter,
+the set of dungeons cleared at least once, and the farm's stock.
 The existing distinction does the work for us: `DungeonState` is discarded on
 leaving, `CampaignState` is not.
 

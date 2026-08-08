@@ -844,3 +844,38 @@
 - **One potion per inventory slot, no stacking.** Stacking would quietly undo
   the three-way trade §3.4 rests on: carrying four potions has to mean carrying
   four fewer of everything else.
+- **Potions come from a farm in the hub, not from drops.** Every first-time
+  clear adds a worker; the farm yields per run and the player takes the split
+  between health and mana. This pays for the one thing nothing else in the
+  design paid for — the design is depth-biased everywhere, and a dungeon's
+  *first* clear had no reward attached even though the cooldown (§4.2) was
+  already pushing the party toward breadth. The farm attaches a reward to what
+  the cooldown forces.
+- **It is production, not purchase, so the no-currency invariant survives.**
+  Priced in dungeons beaten — the steepest cost in the game — and paid before
+  the goods arrive. It also dissolves the question of what a potion drops off:
+  nothing does, so the class-locked drop table needs no non-weapon outcome and
+  the design needs no containers.
+- **Production ticks per run**, the same unit as the enchanter's service clock,
+  so the hub advances weapons and stocks the shelf in one event. A hub that
+  worked while the player was *idle* would be the first reward here not paid for
+  by playing.
+- **The shelf was never the constraint; the carry is.** One potion per slot
+  against 24 contested party-wide slots (§3.4) means a stockpile of a hundred
+  and a stockpile of six pose the same question at the dungeon mouth. So the
+  farm makes potions *available* rather than abundant, moving the question from
+  "did I find any" to "how many is this trip worth" — luck to choice, the same
+  move §6.2 makes for enchantments.
+- **The alchemist arrives with the first non-tutorial clear**, and until then
+  the whole category does not exist — no potions and no shelf. Same shape §6.3
+  uses for the enchanter, one step later: beating the tutorial frees the
+  enchanter and opens the workshop; beating a real dungeon brings back the
+  people who work the farm.
+- **The tutorial does not count toward the farm**, which needs no new rule — it
+  is the same exclusion it already gets from mercy ticks, cooldowns and return
+  visits, and it cannot be first-cleared twice anyway.
+- **So the early campaign has no potions at all**, deliberately. A party learns
+  to survive on positioning, the healer's mana and the movement budget before it
+  learns to drink, and first aid arrives as something that changes how you fight
+  rather than something you always had. The first real clear — already the
+  hardest gate in the game — hands over a whole category instead of a number.

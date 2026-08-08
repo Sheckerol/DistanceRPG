@@ -540,7 +540,7 @@ gets gated on `!BossDefeated`, which is the same flag that turns `EnemyDefeated`
 into a drop rather than just a `DefeatCount` increment.
 
 **Cooldowns are campaign state, not dungeon state.** A cleared dungeon outlives
-the `DungeonState` that was cleared, so `CampaignState` (§6.6) holds
+the `DungeonState` that was cleared, so `CampaignState` (§6.7) holds
 `Dictionary<DungeonId, int> LockedUntilRun` against its run counter — the same
 counter §6.3 already advances for service. A dungeon is selectable when
 `runCounter >= LockedUntilRun[id]`, absent means available, and the tutorial is
