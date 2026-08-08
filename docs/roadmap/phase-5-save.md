@@ -269,6 +269,8 @@ in the enchanter's catalogue.
 | Check | Rule | From |
 | --- | --- | --- |
 | Trigger cost is **never zero** | No enchantment fires free, ever | §3.3 |
+| An entry quotes a flat trigger cost **or** applies a status, never both | A status applier prices off its level count, so a flat cost would decay into free | §3.5 |
+| Every innate stat spread is a permutation of 1–4 | Free to check, silently wrong if it drifts | §2.1 |
 | `unique` entries appear in `neverRolled` | One question, one answer, cross-checked | §5.5 |
 | Damage-type opposition is symmetric and total | Four types, two pairs, every type opposed by exactly one | §1.4 |
 | A lingering element names an element that exists | Searing is nothing without its `Flaming` | §1.5 |

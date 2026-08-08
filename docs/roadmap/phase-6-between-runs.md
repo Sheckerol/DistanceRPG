@@ -772,6 +772,25 @@ place it accrues, and `Enchanter` is the single place it is spent (§6.4) — a
 deposit carries the chosen service with it, so the queue entry is
 `(weapon, service, wearAtDeposit)` rather than a weapon alone.
 
+`Enchanter` needs the two services as one call taking which was chosen, because
+they share everything except what the wear buys:
+
+```csharp
+record Deposit(Weapon Weapon, Service Service, int WearAtDeposit);
+enum Service { Enchant, Refine }
+```
+
+The graft roll is `GraftBaseChance` for `Enchant` and
+`GraftBaseChance * (1 + wear / StartingWearCapacity)` for `Refine` (§6.4) — one
+expression, one branch, and the capacity ladder (§6.1) is a `int[] {25, 30, 40}`
+rather than a formula so a fourth step is an edit and not a redesign.
+
+`Logic/Farm.cs` is small enough to question whether it is a file: a clear set, a
+yield computed from its count, and a split the player chooses. It earns one
+anyway, because the *spoilage* rule (§6.6) is the kind of thing that gets
+quietly broken by a later change unless there is somewhere obvious for it to
+live — the batch must never reach `CampaignState`.
+
 Phase 5's save format grows a campaign section, and it becomes the *outer*
 document — a save with no dungeon in progress is now a valid state, which it
 is not today.

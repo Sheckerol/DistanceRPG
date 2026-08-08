@@ -136,10 +136,24 @@ them actively grows the pool that pays for them.
 
 ## 2.3 Code impact
 
-New `Logic/InnateStats.cs` (the four values plus `RateFor`) and
-`Logic/Progression.cs` (pools and curves). `PartyMemberState` gains `Stats`,
-`WeaponXp`, `HpXp`, `ManaXp`; `MaxHp` and `MaxMana` become computed rather than
-the constants they are today (`PartyMemberState.cs:16,21`).
+New `Logic/InnateStats.cs` (the four values) and `Logic/Progression.cs` (pools
+and thresholds). `PartyMemberState` gains `Stats`, `WeaponXp`, `HpXp`, `ManaXp`;
+`MaxHp` and `MaxMana` become computed rather than the constants they are today
+(`PartyMemberState.cs:16,21`).
+
+**There is no rate multiplier anywhere.** XP is credited raw and the stat
+divides the *threshold* (§2.1), so `Progression` exposes one function and every
+pool calls it:
+
+```csharp
+static int XpToNext(int currentMax, int stat) => currentMax / stat;   // stat 1..4
+```
+
+That keeps the four pools on one mechanism, keeps every XP credit an integer,
+and means a stat can never introduce a fractional gain that has to be rounded
+somewhere. `InnateStats` should **validate that a spread is a permutation of
+1–4** at load (§2.1) — it is the kind of invariant that is free to check and
+silently wrong if it drifts.
 
 `TurnSystem` credits XP at existing sites: the unified attack resolver
 (damage), `TickStatusEffects` (healing), and `TryCast` (mana spent).

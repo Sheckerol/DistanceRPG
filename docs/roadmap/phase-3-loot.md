@@ -1176,6 +1176,49 @@ is shared and immutable.
 `Tier` is an `int` with no upper bound; `EffectiveLock` and `EffectivePotency`
 are `Base × Tier`. Nothing in the type should express a maximum.
 
+**Uniques do not follow that line, and the type has to say so.** A unique is
+pinned at tier 1 (§3.3), so `Base × Tier` would freeze it — which is why a
+unique that is a *magnitude* carries an `ApplyPercent` and reads its scale off
+the source instead (§1.5):
+
+```csharp
+int LevelsFor(int sourceNumber) => Unique
+    ? (int)(ApplyPercent * sourceNumber)      // Serrated, and every element
+    : (int)(ApplyPercent * sourceNumber * Tier);
+```
+
+Its **trigger cost** follows the same rule rather than the entry's flat number,
+or the price would decay into free across a campaign while the effect grew:
+
+```csharp
+int TriggerCost(int levels) => Math.Max(1,
+    (int)(DotManaPerDamage * levels * (levels + 1) / 2));
+```
+
+So `Enchantment` carries `ApplyPercent` and `StatusEffectType? Applies`
+alongside lock and potency, and the flat `Trigger` column is **absent for every
+entry that applies a status**. A validation check belongs here (§5.7): an
+enchantment may quote a flat trigger cost or apply a status, never both.
+
+### Consumables and the farm
+
+New `Logic/Alchemist.cs` and a `Potion` record — `(PotionType Type, int
+Quality)` and nothing else, since §3.4 makes quality a plain multiplier on a
+share of max. Potions live in inventory slots as ordinary items, one per slot,
+so `PartyMemberState.Inventory` needs to hold something other than a `Weapon`
+and that is the only structural change they force.
+
+The farm belongs to `CampaignState` (§6.7), not here: a `HashSet` of
+first-cleared dungeon ids and the current batch. **The batch is not saved
+between runs** — it spoils (§6.6), so it is computed at the hub and discarded,
+which means the only thing persisted is the clear set.
+
+`TurnSystem` needs a consumable-use path costing `PotionUseCost` movement. It
+routes healing through the **same** call `TickStatusEffects` uses, so the
+missing-HP cap and the `hpXp` credit both apply without a second code path —
+which is what makes §3.4's "a potion grants health XP" true by construction
+rather than by remembering to.
+
 **Tier is derived from XP, not stored.** An enchantment instance carries `Xp`
 and computes `Tier` from a curve in `Progression.cs`, exactly as
 `WeaponXp`/`HpXp`/`ManaXp` already work (§2.2). That keeps one levelling
