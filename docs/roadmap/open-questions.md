@@ -392,18 +392,6 @@
   makes the fifteen-run figure in §6.2 real, or it is a wall that makes a
   five-enchantment weapon unreachable in practice. The two schedules have to be
   checked against each other, not separately.
-- **Does the XP framing want the cash-out to be *deterministic*?** §6.4 now names
-  wear as the weapon's own XP and refinement as cashing it out — and an XP bar
-  that might give you nothing when it fills is not how the metaphor usually
-  behaves. The mechanic is still a probability roll, and there is a stated reason
-  for that: §6.4 argues grafting is "the only place the game tells you a story
-  you did not ask for" in an itemisation system that is otherwise entirely
-  determined. But this session has moved away from RNG everywhere else —
-  enchantments chosen not rolled, potions produced not dropped, the batch split
-  by hand — and a deterministic version would still gate the ceiling perfectly
-  well, on `WearPerImprovementRoll` and the slow growth of `WearCapacity` rather
-  than on luck. Roughly: keep the roll and accept the metaphor is loose, or make
-  it a threshold and give up the one surprise in itemisation.
 - **`OverhealDecayPerTurn` against `OverhealPerWard` is the real dial.** At
   decay 1 and a ratio of 5, surplus must arrive at better than 1 a round to
   convert at all, and at better than 5 a round to convert every round. That

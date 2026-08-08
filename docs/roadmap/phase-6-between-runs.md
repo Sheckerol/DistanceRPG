@@ -315,33 +315,69 @@ Refinement is the gamble *and* the investment: you give up the one guaranteed
 thing in itemisation for a better shot at the one thing that cannot be bought,
 and a permanently bigger pool to try again from (§6.1).
 
-### Wear is the weapon's own XP, and refinement is cashing it out
+### Wear is what makes a weapon workable, and refinement is maintenance
 
-The mechanic below is easier to hold if it is named for what it is. **Every
-other ladder in this game belongs to a character** — proficiency per class
-(§2.2), constitution from being healed, an enchantment's tier from mana spent.
-The weapon itself had none, and wear is it:
+The mechanic below is easier to hold if it is named for what it is — and the
+name is not *experience*. **People grow. Things are built and repaired**, and
+the distinction is the whole of it:
 
-| | Earns | Spends it |
+| | Improves by | Which is |
 | --- | --- | --- |
-| **The wielder** | Proficiency, CON, INT, by doing the thing | Automatically, on levelling |
-| **The weapon** | **Wear, by being swung** | **At the enchanter, deliberately** |
+| **The wielder** | Proficiency, CON, INT — doing the thing | Growth |
+| **The weapon** | **Wear, cashed at the enchanter** | **Work done to it** |
 
-So refinement is not a lottery ticket bolted onto a service. It is **the weapon
-levelling up**, and the enchanter is where the banked XP gets cashed. Enchanting
-is what happens when you spend most of that bank on a soul instead.
+A weapon does not learn. It gets **worn**, and a worn weapon is one a craftsman
+can do something with: material can be worked into the places it has thinned,
+and there is somewhere for a new magic circle to be cut. Refinement is
+maintenance that happens to be magical.
 
-That is what answers the *should refinement be offered on an unworn weapon*
-question, and it answers it by dissolving it. **No wear is an empty XP bar.**
-Nothing about it reads as a bug: a player who has never swung a sword and asks
-for it to be improved is asking to level up without fighting, which is a refusal
-every game they have played already makes. There is no 0% to explain, because
-the thing that is missing is the *progress*, not the odds.
+That is also why wear gates *both* services and why the price of a soul climbs
+(§6.2). A circle needs to have **ingrained** itself before another can be laid
+beside it without erasing it — so a weapon carrying four is harder to add a
+fifth to, in material and in the smith's time, and the two prices climbing
+together stops being a balance decision and starts being the same fact stated
+twice.
 
-It also puts the rest of §6.1 in one sentence. Bottoming out costs nothing but
-opportunity because a full XP bar simply stops filling; capacity growing per
-service is the bar getting longer; and *a deposit spends the whole pool* is what
-cashing out means.
+**And it answers the unworn-weapon question without a metaphor**, because it is
+simply true: *a pristine blade has nothing to repair.* There is no 0% to explain
+and no rule to write. A craftsman handed a weapon that has never been swung has
+no work to do on it, which every player already understands about every craft.
+
+The rest of §6.1 follows the same way. Bottoming out costs nothing but
+opportunity because a weapon can only be *so* worn before further use tells the
+smith nothing new; capacity growing per service is the weapon becoming
+better-made and so able to take more work before it needs him again; and *a
+deposit spends the whole pool* is what finishing a repair means.
+
+### The graft is not luck; it is the craftsman's eye
+
+§6.4 keeps its roll, and the reason is better than "the design needs one
+surprise."
+
+**A craftsman looking at his own work sees the mistakes.** Every time — the
+weak spot, the thing missed, the shortcut taken under time pressure. What comes
+back changed is not a lottery win; it is *what he happened to notice this pass*,
+and what he noticed depends on the weapon, on where it wore, and on how long he
+had with it.
+
+So the Disarming Kris that returns carrying `Block` has a cause: he found a flaw
+in the metal and reinforced it, and reinforced it well enough that the blade now
+turns a blow. Nobody asked for that. He was fixing a mistake.
+
+That reading earns the randomness rather than merely permitting it, and it lands
+on the right side of a fork this document had open:
+
+| | Would mean | Rejected because |
+| --- | --- | --- |
+| **A threshold** — bank enough, get a stack | The weapon is levelling | It makes the weapon a character, and things do not grow |
+| **A roll** — what he saw this time | The weapon is being worked on | *This* — and it keeps the one outcome the player did not choose |
+
+It also explains the deepening-versus-grafting split with no extra rule.
+Deepening is the same flaw seen again and worked further; a graft is a *new*
+one, spotted for the first time — which is exactly why grafts are the rarer of
+the two and why they cap shallower (§6.4). A fault he has been correcting for
+twenty services is one he knows; a fault he has just found is one he has only
+begun on.
 
 ### It is one mechanism, not two rates
 
@@ -363,9 +399,9 @@ a second tuning knob.
 
 Three things fall out that nothing had to state:
 
-- **A fresh drop refines for nothing.** No wear, no roll — an empty bar, cashed
-  out. §6.1 already said you cannot enchant a weapon you have not fought with;
-  it turns out you cannot improve one either, and for the same reason.
+- **A fresh drop refines for nothing.** No wear, no roll — nothing to repair.
+  §6.1 already said you cannot enchant a weapon you have not fought with; it
+  turns out you cannot improve one either, and for the same reason.
 - **Hoarding wear becomes a real decision.** Deposit the moment you can afford
   the enchantment and the improvement roll is a rounding error; fight several
   more runs first and the *same* enchantment arrives with a genuine chance of

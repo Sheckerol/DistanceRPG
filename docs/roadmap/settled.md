@@ -915,15 +915,30 @@
   (§1.3), and taxing it taxes the thing the design built on purpose. Equal is
   the honest start, and the free split is what will reveal the answer: if every
   party mixes the same ratio every run, the prices are wrong.
-- **Wear is the weapon's own XP, and refinement is cashing it out.** Every other
-  ladder in the game belongs to a character — proficiency per class,
-  constitution from being healed, an enchantment's tier from mana spent — and
-  the weapon had none. Naming it that way explains the whole of §6.1 in one
-  sentence: bottoming out is a full bar that stops filling, capacity growing per
-  service is the bar getting longer, and *a deposit spends the whole pool* is
-  what cashing out means.
-- **So refinement on an unworn weapon needs no rule and reads as no bug.** No
-  wear is an **empty XP bar**, not a 0% that looks broken. Asking to improve a
-  weapon you have never swung is asking to level up without fighting, which is a
-  refusal every player already understands. What is missing is the progress, not
-  the odds.
+- **Wear is what makes a weapon workable, and refinement is maintenance — not
+  experience.** People grow; things are built and repaired. A weapon does not
+  learn, it gets worn, and a worn weapon is one a craftsman can do something
+  with: material worked into the places it thinned, somewhere for a new magic
+  circle to be cut.
+- **That is why wear gates both services and why a soul's price climbs**
+  (§6.2). A circle has to ingrain itself before another can be laid beside it
+  without erasing it, so a weapon carrying four is harder to add a fifth to — in
+  material and in the smith's time. The two prices climbing together stops being
+  a balance decision and becomes the same fact stated twice.
+- **Refinement on an unworn weapon needs no rule, and needs no metaphor**: a
+  pristine blade has nothing to repair. There is no 0% to explain. A craftsman
+  handed a weapon never swung has no work to do on it, which every player
+  already understands about every craft.
+- **The graft stays a roll, because it is the craftsman's eye rather than
+  luck.** A craftsman looking at his own work sees the mistakes — every time.
+  What comes back changed is *what he happened to notice this pass*. The
+  Disarming Kris that returns with `Block` has a cause: he found a flaw in the
+  metal and reinforced it well enough that the blade now turns a blow. That
+  earns the randomness rather than merely permitting it, and it settles the
+  threshold-versus-roll fork — a threshold would mean the weapon is levelling,
+  and things do not grow.
+- **It also explains deepen-versus-graft with no extra rule.** Deepening is the
+  same flaw seen again and worked further; a graft is a *new* one, spotted for
+  the first time — which is why grafts are rarer and why they cap shallower
+  (§6.4). A fault corrected for twenty services is one he knows; a fault just
+  found is one he has only begun on.
