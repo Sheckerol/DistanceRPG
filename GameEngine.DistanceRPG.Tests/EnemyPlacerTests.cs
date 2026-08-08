@@ -95,4 +95,36 @@ public class EnemyPlacerTests
         if (spawns.Count >= 10)
             Assert.True(spawns.Select(s => s.WeaponIdx).Distinct().Count() > 1);
     }
+
+    [Fact]
+    public void PlaceEnemies_StaffHealersOnlyInCrowdedRooms_AtMostOnePerRoom()
+    {
+        var map = Map();
+        var spawns = EnemyPlacer.PlaceEnemies(map, Seed);
+
+        foreach (var room in map.DebugRooms)
+        {
+            var inRoom = spawns.Where(s =>
+            {
+                int c = (int)(s.X / GameConstants.Tile), r = (int)(s.Y / GameConstants.Tile);
+                return c >= room.X && c < room.X + room.W && r >= room.Y && r < room.Y + room.H;
+            }).ToList();
+
+            int staves = inRoom.Count(s => s.WeaponIdx == GameConstants.StaffWeaponIdx);
+            Assert.InRange(staves, 0, 1); // never more than one healer per room
+            if (staves == 1)
+                Assert.True(inRoom.Count >= GameConstants.MinEnemiesForStaffHealer,
+                    "a healer should only appear in a room of 3+ enemies");
+        }
+    }
+
+    [Fact]
+    public void PlaceEnemies_HealerConversionIsDeterministic()
+    {
+        var first = EnemyPlacer.PlaceEnemies(Map(), Seed);
+        var second = EnemyPlacer.PlaceEnemies(Map(), Seed);
+        Assert.Equal(
+            first.Select(s => s.WeaponIdx),
+            second.Select(s => s.WeaponIdx));
+    }
 }

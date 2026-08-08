@@ -17,14 +17,23 @@ public static class EnemyPlacer
     private const long SeedSalt = 0x9E3779B9;
 
     /// <summary>
-    /// Deterministic spawns for a map seed: logic-space centre positions plus
-    /// a uniformly random weapon (index into <see cref="GameConstants.Weapons"/>)
-    /// per dummy.
+    /// Deterministic spawns for a map seed: logic-space centre positions plus a
+    /// weapon (index into <see cref="GameConstants.Weapons"/>) per dummy. Rank
+    /// and file roll only attack weapons; a crowded room
+    /// (<see cref="GameConstants.MinEnemiesForStaffHealer"/>+ enemies) may then
+    /// convert one of its members into a staff healer.
     /// </summary>
     public static List<(float X, float Y, int WeaponIdx)> PlaceEnemies(MapData map, long mapSeed)
     {
         var rng = new Mulberry32(mapSeed ^ SeedSalt);
         var spawns = new List<(float X, float Y, int WeaponIdx)>();
+
+        // Ordinary enemies never roll a staff — it heals, it can't fight — so
+        // the loadout draw is restricted to the non-caster weapons.
+        var attackWeapons = new List<int>();
+        for (int i = 0; i < GameConstants.Weapons.Count; i++)
+            if (!GameConstants.Weapons[i].IsCaster)
+                attackWeapons.Add(i);
 
         // DebugRooms is the pristine room list — FogBoxBuilder appends
         // synthetic union rooms to Rooms, which must not spawn anything.
@@ -34,6 +43,7 @@ public static class EnemyPlacer
 
             int count = rng.NextInt(0, MaxEnemiesPerRoom);
             var taken = new HashSet<(int R, int C)>();
+            int roomStart = spawns.Count;
             for (int i = 0; i < count; i++)
             {
                 // A few tries to find a free tile; small rooms may not fit all.
@@ -46,9 +56,21 @@ public static class EnemyPlacer
                     spawns.Add((
                         c * GameConstants.Tile + GameConstants.Tile / 2f,
                         r * GameConstants.Tile + GameConstants.Tile / 2f,
-                        rng.NextInt(0, GameConstants.Weapons.Count - 1)));
+                        attackWeapons[rng.NextInt(0, attackWeapons.Count - 1)]));
                     break;
                 }
+            }
+
+            // A crowded room may field a healer: swap one placed member's
+            // weapon for the staff. Rolled after placement so the per-room draw
+            // order stays stable; the roll happens only when the room qualifies.
+            int placed = spawns.Count - roomStart;
+            if (placed >= GameConstants.MinEnemiesForStaffHealer
+                && rng.NextDouble() < GameConstants.StaffHealerChance)
+            {
+                int pick = roomStart + rng.NextInt(0, placed - 1);
+                var (x, y, _) = spawns[pick];
+                spawns[pick] = (x, y, GameConstants.StaffWeaponIdx);
             }
         }
 

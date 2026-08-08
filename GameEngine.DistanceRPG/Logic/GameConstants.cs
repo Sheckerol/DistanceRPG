@@ -41,6 +41,12 @@ public static class GameConstants
     /// <summary>Turns after defeat before a dummy resurrects.</summary>
     public const int DummyResurrectTurns = 10;
 
+    /// <summary>A room needs at least this many enemies to roll a staff healer.</summary>
+    public const int MinEnemiesForStaffHealer = 3;
+
+    /// <summary>Chance a qualifying room converts one of its enemies into a staff healer.</summary>
+    public const double StaffHealerChance = 0.5;
+
     public static readonly IReadOnlyList<Weapon> Weapons = new[]
     {
         new Weapon("Dagger", Range: 40, Damage: 15, Cost: 30,
