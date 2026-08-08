@@ -25,7 +25,8 @@ workflow rule in `CLAUDE.md`.
 | 3 | Loot drops and enchantments | 1, 2 |
 | 4 | Multiple floors | — (but lands after 3) |
 | 5 | Save / load | 0–4 |
-| 6 | Between runs: wear, the enchanter, the hub | 1–5 |
+| 6a | Between runs: wear, the enchanter, the two services | 1–5 |
+| 6b | The hub: the farm, the alchemist, consumables | 6a |
 
 ## Where everything lives
 
@@ -45,6 +46,19 @@ use this table to find the file a section lives in.
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
 | [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.8 | What is stored, in what format, and the five data files |
 | [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.7 | Wear, the enchanter, enchant-or-refine, grafting, the farm, the hub |
+
+**Phase 6 ships as two PRs.** It grew past the one-PR-per-phase rule in
+`CLAUDE.md`, and it splits cleanly because the halves share no state:
+
+| | Sections | Why it can go alone |
+| --- | --- | --- |
+| **6a** | §6.1–6.5, §6.7 | Wear, capacity, the two services, transfer. Needs `CampaignState` and the stable; touches `Weapon` and the enchanter queue |
+| **6b** | §6.6, §3.4 | The farm, the alchemist, potions. Needs only a clear set and an inventory slot that can hold a non-weapon |
+
+6a is the one the rest of the design leans on — §1.1's ceilings are reached
+through it and §3.3's transfer rule depends on it. 6b is additive and could
+slip a release without anything else noticing, which is the definition of a
+good seam.
 | [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
 | [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
 
