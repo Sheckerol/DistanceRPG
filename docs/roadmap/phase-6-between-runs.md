@@ -315,6 +315,34 @@ Refinement is the gamble *and* the investment: you give up the one guaranteed
 thing in itemisation for a better shot at the one thing that cannot be bought,
 and a permanently bigger pool to try again from (§6.1).
 
+### Wear is the weapon's own XP, and refinement is cashing it out
+
+The mechanic below is easier to hold if it is named for what it is. **Every
+other ladder in this game belongs to a character** — proficiency per class
+(§2.2), constitution from being healed, an enchantment's tier from mana spent.
+The weapon itself had none, and wear is it:
+
+| | Earns | Spends it |
+| --- | --- | --- |
+| **The wielder** | Proficiency, CON, INT, by doing the thing | Automatically, on levelling |
+| **The weapon** | **Wear, by being swung** | **At the enchanter, deliberately** |
+
+So refinement is not a lottery ticket bolted onto a service. It is **the weapon
+levelling up**, and the enchanter is where the banked XP gets cashed. Enchanting
+is what happens when you spend most of that bank on a soul instead.
+
+That is what answers the *should refinement be offered on an unworn weapon*
+question, and it answers it by dissolving it. **No wear is an empty XP bar.**
+Nothing about it reads as a bug: a player who has never swung a sword and asks
+for it to be improved is asking to level up without fighting, which is a refusal
+every game they have played already makes. There is no 0% to explain, because
+the thing that is missing is the *progress*, not the odds.
+
+It also puts the rest of §6.1 in one sentence. Bottoming out costs nothing but
+opportunity because a full XP bar simply stops filling; capacity growing per
+service is the bar getting longer; and *a deposit spends the whole pool* is what
+cashing out means.
+
 ### It is one mechanism, not two rates
 
 The odds do not differ because a rule says so. **Attaching an enchantment
@@ -335,9 +363,9 @@ a second tuning knob.
 
 Three things fall out that nothing had to state:
 
-- **A fresh drop refines for nothing.** No wear, no roll. §6.1 already said you
-  cannot enchant a weapon you have not fought with; it turns out you cannot
-  improve one either, and for the same reason.
+- **A fresh drop refines for nothing.** No wear, no roll — an empty bar, cashed
+  out. §6.1 already said you cannot enchant a weapon you have not fought with;
+  it turns out you cannot improve one either, and for the same reason.
 - **Hoarding wear becomes a real decision.** Deposit the moment you can afford
   the enchantment and the improvement roll is a rounding error; fight several
   more runs first and the *same* enchantment arrives with a genuine chance of

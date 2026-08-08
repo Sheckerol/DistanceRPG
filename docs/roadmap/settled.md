@@ -915,3 +915,15 @@
   (§1.3), and taxing it taxes the thing the design built on purpose. Equal is
   the honest start, and the free split is what will reveal the answer: if every
   party mixes the same ratio every run, the prices are wrong.
+- **Wear is the weapon's own XP, and refinement is cashing it out.** Every other
+  ladder in the game belongs to a character — proficiency per class,
+  constitution from being healed, an enchantment's tier from mana spent — and
+  the weapon had none. Naming it that way explains the whole of §6.1 in one
+  sentence: bottoming out is a full bar that stops filling, capacity growing per
+  service is the bar getting longer, and *a deposit spends the whole pool* is
+  what cashing out means.
+- **So refinement on an unworn weapon needs no rule and reads as no bug.** No
+  wear is an **empty XP bar**, not a 0% that looks broken. Asking to improve a
+  weapon you have never swung is asking to level up without fighting, which is a
+  refusal every player already understands. What is missing is the progress, not
+  the odds.
