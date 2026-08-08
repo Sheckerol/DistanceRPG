@@ -615,6 +615,51 @@ deep. The reward curve flattens toward something recognisable instead of
 stopping dead at "your bag is full", and every clear before that point buys
 something you can feel.
 
+### Tune the total, not the rate — the dungeon count is not settled yet
+
+`FarmYieldPerClear` cannot be picked in isolation, because what a fully explored
+campaign actually produces is that number **times however many dungeons exist**,
+and how many exist is a content decision nobody has made. Pick the rate first
+and every dungeon added afterwards silently inflates the whole system.
+
+So state the target the way §1.3 states `MovementUnitsPerMana` — as the rule
+rather than the number:
+
+> **A campaign that has cleared everything should produce about one full loadout
+> of maximum-quality potions per run.**
+
+```
+FarmYieldPerClear = (PartyCarrySlots-worth of potions ÷ HealthPotionPercent)
+                    ÷ number of non-tutorial dungeons
+```
+
+Then the count can change without retuning. Six dungeons or sixteen, the
+end state is the same and only the pace of arrival differs — which is the right
+thing for the count to control, since it is also how much *game* there is.
+
+**`HealthPotionPercent` is the half that decides the span**, not the height. It
+sets how many units a maximum potion costs, and therefore how much of a campaign
+passes before the farm stops mattering. Low, and early potions feel like
+nothing; high, and the ceiling arrives while there are still dungeons left to
+find.
+
+### Mana and health are equivalent until play says otherwise
+
+`ManaPotionPercent` starts **equal** to `HealthPotionPercent` — one unit of yield
+buys the same share of either pool, and the split is a pure preference.
+
+There is a real argument that they should not be. The two resources are spent
+differently: **health is spent by being attacked and mana by choosing to cast**
+(§1.3). A caster can decline to run dry in a way a front-liner cannot decline to
+be hit, which makes mana the more *avoidable* emergency and so arguably the more
+expensive unit.
+
+The counter is that the caster's shape is a sprinter's (§1.3) — the dry spell is
+not a mistake, it is the class working as designed — and charging extra to
+shorten it taxes the thing the design deliberately built. Equal is the honest
+starting point, and the split being a free choice is what will make the answer
+obvious: if every party mixes the same ratio every run, the prices are wrong.
+
 ### The presentation is an art question, not a design one
 
 Whether the hub visibly gains a person per clear, or the farm simply reports a

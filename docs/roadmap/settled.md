@@ -897,3 +897,21 @@
   learns to drink, and first aid arrives as something that changes how you fight
   rather than something you always had. The first real clear — already the
   hardest gate in the game — hands over a whole category instead of a number.
+- **The farm's target is stated as a total, not a rate**, because the dungeon
+  count is an unmade content decision and a per-clear number would inflate
+  silently with every dungeon added. The rule: *a campaign that has cleared
+  everything produces about one full loadout of maximum-quality potions per
+  run*, with `FarmYieldPerClear` derived by dividing by however many dungeons
+  end up existing. Same move as `MovementUnitsPerMana` (§1.3) — state the rule
+  so it re-derives when its inputs move.
+- **`HealthPotionPercent` sets the span rather than the height.** It decides how
+  many units a maximum potion costs and therefore how much of a campaign passes
+  before the farm stops mattering.
+- **`ManaPotionPercent` starts equal to `HealthPotionPercent`**, making the split
+  a pure preference. The argument for charging more for mana is that health is
+  spent by being attacked while mana is spent by *choosing* to cast, so a caster
+  can decline to run dry where a front-liner cannot decline to be hit. The
+  counter is that the dry spell is the sprinter shape working as designed
+  (§1.3), and taxing it taxes the thing the design built on purpose. Equal is
+  the honest start, and the free split is what will reveal the answer: if every
+  party mixes the same ratio every run, the prices are wrong.
