@@ -24,7 +24,7 @@ needs and wider than most survive.
 
 | Member | STR | DEX | CON | INT | Starts with | Teaches |
 | --- | --- | --- | --- | --- | --- | --- |
-| A | 3 | **4** | 1 | 2 | Dagger | Crit windows |
+| A | 1 | **4** | 2 | 3 | Dagger | Crit windows |
 | B | 3 | 2 | **4** | 1 | Sword & shield | Block |
 | C | **4** | 2 | 3 | 1 | **Axe** | Cleave, and beating armour |
 | D | 2 | 3 | 1 | **4** | **Staff of Renewal** | Buffs, mana |
