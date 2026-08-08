@@ -255,6 +255,95 @@ lingering element (§1.5), one member carrying a `DamageType` rather than a
 member per element. Shocking and Acidic need nothing new at all: they apply
 `Mire` and `Poison`, which the staves already bring.
 
+### Everything hangs off an event table, and handlers return rather than write
+
+Modifiers, enchantments and statuses are **~47 behaviours** that can all be
+present at once. None of them may reach into `TurnSystem` directly, and none may
+be a `case` in a `switch` that a new entry has to be added to. Instead each
+declares **which events it handles**, and one dispatcher runs the handlers.
+
+**This is the code half of a promise §5.4 already made.** Content lives in JSON
+so that adding a modifier is a data edit — but if its *behaviour* is six
+scattered `switch` arms, that promise is only half true and the half that is
+false is the expensive one. A dispatch table is what makes the data-driven claim
+honest.
+
+#### The contract: transform and return, never mutate
+
+A handler is **`apply this effect, hand back the result so the next one can
+act on it`** — a chain, not a broadcast:
+
+```csharp
+delegate TPayload Handler<TPayload>(TPayload payload, ActorState self, ActorState other);
+```
+
+Each event has one payload record, and the chain's final payload **is** the
+outcome:
+
+```csharp
+record DamagePayload(int Amount, DamageType Type, bool IsCrit,
+                     int Dealt, int Absorbed);   // §1.6's two outputs
+```
+
+**No handler writes to the world.** They return a changed payload; the
+dispatcher applies the settled result once, at the end. That is what keeps
+"`Block` reduced it, then `Ward` swallowed some, and the attacker still learns
+what it dealt" a single readable flow rather than three systems racing to be
+the one that mutates `Hp`.
+
+#### The events
+
+```csharp
+enum GameEvent {
+    AttackDeclared, DamageComputed, DamageDealt, DamageTaken, Crit, Killed,
+    HealingReceived, HealingAboveFull, ManaSpent, MovementSpent,
+    TurnStart, TurnEnd, RoundEnd,
+    ThreatZoneEntered, Cast,
+}
+```
+
+Every trigger the design already names lands on one of these — `Brace` on
+`ThreatZoneEntered`, `Vampiric` on `DamageDealt`, `Serrated` on `DamageDealt`,
+`Siphon` on `Killed`, `Overheal` on `HealingAboveFull`, `Sturdy` on
+`DamageTaken`, every status decay on `RoundEnd`. **If a new mechanic needs an
+event that is not here, that is the design telling you it is a new *kind* of
+thing** — which is a useful signal and worth not suppressing by adding a
+`Misc` member.
+
+#### Three rules, because a table alone is not enough
+
+**1. Order is data, and §1.6 already specifies it.** `Block`, `Ward` and the
+crit riders all handle `DamageTaken`, and running them in a different order
+gives a different answer. So a handler carries a **priority**, and §1.6's damage
+pipeline *is* the priority list for that event — read from it rather than
+reimplemented beside it. Undefined order among same-event handlers is exactly
+the class of side effect this architecture exists to prevent.
+
+**2. Handlers raise events by *queueing*, never by recursing.** Cascades are
+real and legitimate: `Vampiric` fires on `DamageDealt` → heals → raises
+`HealingAboveFull` → `Overheal` → grants `Ward`. A DoT tick during `RoundEnd`
+can raise `Killed`. `Echoing` re-triggers a class feature. Recursion here makes
+stack depth a gameplay variable and makes reentrancy bugs look like balance
+bugs. So the dispatcher owns a queue, drains it, and **bounds the depth — with
+exceeding it treated as a bug rather than clamped silently.**
+
+**3. The subscriber list is an ordered structure, not a `Dictionary` iterated
+directly.** `Logic/` is deterministic and the golden tests pin call order
+(standing constraints). .NET's `Dictionary` enumeration order is not a contract,
+so a bare `Dictionary<GameEvent, List<Handler>>` iterated for dispatch is a
+latent nondeterminism that would surface as *flaky golden tests* — the worst way
+to find it. Key by event, sort by priority, and make the sort explicit.
+
+#### What it buys
+
+- **Adding a modifier is: one JSON entry, one handler, one priority.** Nothing
+  existing is edited, which is the actual test of whether this worked.
+- **`TickStatusEffects` stops being special.** It is the `RoundEnd` and
+  `TurnEnd` handlers for eight statuses, sharing the dispatcher with everything
+  else rather than being its own path (below).
+- **Interactions become inspectable.** "What happens when I am hit" is a sorted
+  list you can print, not a control-flow trace across three files.
+
 ### One representation, and it is now literally one
 
 §1.5 unified the status model, and the code shape follows exactly:

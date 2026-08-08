@@ -107,9 +107,27 @@ Character A holds a **Dagger proficiency**; any dagger they pick up wields at
 that level. Loot never resets progress, so Phase 3 cannot fight Phase 2.
 
 ```
-weaponXp[member][class] += damageDealt
-xpToNext(L) = 100 * L / governingStat      # triangular, tune later
+weaponXp[member][class] += damageDealt            # AFTER mitigation — §1.6
+xpToNext(L) = 100 * L / governingStat             # triangular, tune later
 ```
+
+**`damageDealt` is the mitigated number, not the rolled one**, and that is a
+decision rather than a detail. It is `Dealt` from §1.6's pipeline: after the
+defender's `Block`, before their `Ward`. Three things follow:
+
+- **A crit fast-forwards proficiency**, twice over. It multiplies the damage
+  *and* skips `Block` entirely (§1.6), so a natural 20 into an armoured target
+  can be worth several ordinary swings of XP. Crit builds level fastest, which
+  is a distinction the classes did not otherwise have.
+- **Armour slows you down.** Hitting a heavily-blocking target for 12 of a
+  rolled 20 credits 12. You learn from the damage you actually did, which is
+  the same principle every other pool in the game runs on.
+- **`Ward` does not reduce it**, because `Ward` is temporary health rather than
+  mitigation (§3.3). Damage that lands on a shield was still dealt.
+
+This is also the requirement that shapes §1.7's handler contract: the attacker
+cannot credit XP until the defender's handlers have run and **handed the number
+back**. Damage is a value that returns, not one that is written.
 
 Same shape as every other pool (§2.1): the XP is raw, and the **stat divides the
 threshold**. One mechanism, four applications, and nothing anywhere multiplies a

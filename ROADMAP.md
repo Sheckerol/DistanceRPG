@@ -87,6 +87,14 @@ These hold for every phase:
 - **Tunable numbers live in `tuning.json`** (§5.3), read once at startup, never
   hot-reloaded, always with a compiled fallback. Nothing the golden tests pin
   may ever go in it.
+- **Behaviour attaches through the event table** (§1.7), never through a
+  `switch` a new entry has to be added to. A handler **transforms a payload and
+  returns it** so the next one can act on the result — nothing mutates the world
+  mid-chain, and the dispatcher applies the settled outcome once. Order is a
+  declared priority (§1.6's damage pipeline is the canonical one), raised events
+  **queue rather than recurse**, and the subscriber list is an ordered structure
+  rather than a `Dictionary` iterated directly, because dispatch order is
+  covered by the determinism rule above.
 - **Content lives in `restricted.json`, `weapons.json`, `enchantments.json` and
   `dungeons.json`** (§5.4–5.8), loaded in that order and validated at load,
   referenced everywhere by **stable string id** rather than by index. Only

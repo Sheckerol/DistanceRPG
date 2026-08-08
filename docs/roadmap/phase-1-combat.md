@@ -143,7 +143,38 @@ its minimum-1 guarantee holds:
 3. defender's Sundered          → add
 4. defender's Block             → absorb, never below 1 taken
                                   SKIPPED ENTIRELY on a crit
+   ── the DEALT amount is fixed here ──────────────────────────────
 5. defender's Ward              → spend 1 per point taken; temporary HP,
                                   so NOT skipped on a crit — §3.3
+   ── the amount reaching HP is fixed here ────────────────────────
 6. on a crit, apply `CritWeaken` / `CritSunder` stacks to the defender
 ```
+
+### The pipeline has two outputs, and the design already needed both
+
+**`Dealt` is the number after mitigation and before absorption; `Taken` is what
+actually reached hit points.** They differ by whatever `Ward` swallowed, and the
+distinction is not bookkeeping — it falls straight out of §3.3's rule that
+**`Ward` is temporary health, not armour**:
+
+| | Is | So a hit into it |
+| --- | --- | --- |
+| **`Block`** | Mitigation | Was never dealt. It is *prevented* |
+| **`Ward`** | Temporary hit points | **Was** dealt. It landed on a pool that is not HP |
+
+Four things read one or the other, and getting them from the same step would be
+wrong in three of them:
+
+| Reads | Which | Why |
+| --- | --- | --- |
+| Weapon XP (§2.2) | **`Dealt`** | You did that damage; where it landed is the defender's business |
+| `Serrated` levels (§3.3) | **`Dealt`** | The wound is as deep as the blow that made it |
+| The clean-kill test (§3.2) | **`Dealt`** | Already specified as *after mitigation* |
+| Death, and `Sturdy` | **`Taken`** | Only HP kills you |
+
+**This is what forces the attack resolver to return a result rather than write
+one.** Damage is not a number the attacker computes and applies; it is a value
+that passes through the defender's handlers and **comes back**, because the
+attacker cannot credit XP or apply a bleed until it knows what the defender did
+to it. That requirement is the whole reason §1.7 states the handler contract the
+way it does.

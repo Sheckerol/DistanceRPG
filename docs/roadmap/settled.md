@@ -922,3 +922,29 @@
   is not worth the same as bringing in a practically broken blade. Enchanting's
   3% does not move with wear at all, which sharpens the fork: **bring a worn
   weapon to refine, bring any weapon to enchant.**
+- **Behaviour attaches through an event table, and handlers transform and
+  return.** A handler is *apply this effect, hand back the result so the next
+  one can act on it* — a chain rather than a broadcast, with nothing mutating
+  the world mid-chain and the dispatcher applying the settled outcome once. This
+  is the code half of the promise the JSON content files make: if adding a
+  modifier means editing six switch arms, "content is data" is only half true.
+- **Order is a declared priority, and the damage pipeline is the canonical
+  one.** Block, Ward and the crit riders all handle the same event, so undefined
+  order among them is exactly the side effect the architecture exists to
+  prevent. Raised events **queue rather than recurse** (cascades are real:
+  Vampiric to healing to Overheal to Ward), with bounded depth treated as a bug
+  rather than clamped. The subscriber list is an ordered structure, never a
+  Dictionary iterated directly, because dispatch order falls under the
+  determinism constraint and would surface as flaky golden tests.
+- **The damage pipeline has two outputs.** `Dealt` is after mitigation and
+  before absorption; `Taken` is what reached hit points. They differ by whatever
+  Ward swallowed, which follows from Ward being temporary health rather than
+  armour. Weapon XP, Serrated's levels and the clean-kill test all read `Dealt`;
+  death and Sturdy read `Taken`.
+- **Weapon XP is credited on mitigated damage.** A crit fast-forwards
+  proficiency twice over — it multiplies damage *and* skips Block — so crit
+  builds level fastest, a distinction the classes did not otherwise have.
+  Armour slows you down, since you learn from the damage you actually did. Ward
+  does not reduce the credit. This is also what forces the attack resolver to
+  **return** a result rather than write one: the attacker cannot credit XP until
+  the defender's handlers have handed the number back.
