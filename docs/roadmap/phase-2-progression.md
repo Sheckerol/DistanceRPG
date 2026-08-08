@@ -29,15 +29,26 @@ needs and wider than most survive.
 | C | **4** | 2 | 3 | 1 | **Axe** | Cleave, and beating armour |
 | D | 2 | 3 | 1 | **4** | **Staff of Renewal** | Buffs, mana |
 
-B is the party's body and C is its arm — the same shape with STR and CON
-swapped, which is exactly the difference between the one who holds a line and
-the one who breaks it. A and D share CON 1 and are the two who cannot afford to
-be hit, for opposite reasons.
+**The four spreads fall into two pairs, and the pairs split opposite halves of
+the stat list:**
+
+| | Top two, swapped | Bottom two, swapped |
+| --- | --- | --- |
+| **Front line** — B and C | CON 4 / STR 3, and STR 4 / CON 3 | INT 2 / DEX 1, and DEX 2 / INT 1 |
+| **Back line** — A and D | DEX 4 / INT 3, and INT 4 / DEX 3 | CON 2 / STR 1, and STR 2 / CON 1 |
+
+So B is the party's body and C is its arm — the difference between the one who
+holds a line and the one who breaks it — while A and D divide speed and mind the
+same way. Each pair is a mirror of the other's ranking, which means no stat is
+anyone's 4 twice and every stat is somebody's best.
+
+**D is the only CON 1 in the party**, which makes the caster the single thing
+that must not be reached — not a shared frailty but a specific one.
 
 **Expect to move these after playing.** The permutation rule is the part worth
 keeping; which member gets which permutation is a first guess.
 
-The axe goes to C, the only member whose STR 7 suits it. D gives up the second
+The axe goes to C, the only member whose STR 4 suits it. D gives up the second
 spear for a staff — at STR 3 they would never level a martial weapon well
 anyway, and a party with no caster never discovers half the game.
 

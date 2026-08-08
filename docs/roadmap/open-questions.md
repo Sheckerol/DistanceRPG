@@ -296,12 +296,11 @@
   simply the winning one, and unlike the DoTs it does not scale down against
   spread-out enemies — it lands fully on each. Worth checking against the
   friendly-fire scorer too, since an enemy wand with it would be brutal.
-- **The three Searing constants need play, not argument.** `1 / 1 / 2` is a
-  starting point (§1.5), not a claim: 12 damage over 3 turns at tier 6, and 72
-  across a six-target Nova. `SearDecayPerTurn` is the one that cannot be picked
-  on paper, and it is tuned against the length of the fights a *deep wand* is
-  in — not against fights in general, which range from one-shot to fifteen
-  cycles in the same run (§1.5).
+- **Is `OverhealPerWard` 5?** It is the only surviving conversion constant in
+  the status layer, now that decay is universal and per-level effects are fixed
+  (§1.5). It decides how much surplus healing a point of `Ward` costs, and it is
+  the one number standing between the Staff of Renewal build and a shield
+  factory.
 - **Should the riders take the same treatment?** `Sundered` and `Weakened` are
   now the only members of the level family with their conversions written into
   prose (`1` per level, decay `1`) rather than named constants. If Searing needs
@@ -359,19 +358,6 @@
   party, their innate stats and their opening weapons are content by the same
   argument, and they are the thing a designer tweaks while tuning the tutorial.
   Not specced; it is the obvious fifth file and nobody has asked for it yet.
-- **`OverhealDecayPerTurn` against `OverhealPerWard` is the real dial.** At
-  decay 1 and a ratio of 5, surplus must arrive at better than 1 a round to
-  convert at all, and at better than 5 a round to convert every round. That
-  band is narrow, and it is what decides whether `Overheal` is a build or a
-  curiosity — set it wrong and either a lone healer's stray tick becomes a
-  shield factory, or the dagger's stream evaporates between swings. The two
-  numbers want tuning together and against `Ward`'s own decay, which is a third
-  drain on the same output.
-- **`BleedPercent` and `BleedDecayPerTurn` are unset.** The percentage is quoted
-  against `base damage + proficiency level`, so it compounds with the one term
-  that grows all campaign — a flat 25% is a very different item at proficiency 2
-  and proficiency 20. Decay is the same dial §1.5 already argues about for the
-  lingering elements, and probably wants the same answer for the same reason.
 - **What are the other three Efficiency uniques' pairs?** The dagger is settled
   (`Serrated` → `Vampiric` → `Overheal`, §1.5) and it sets a high bar: the souls
   should *need* each other, not merely coexist. `Regeneration` + `Overheal` is the
@@ -401,13 +387,6 @@
   constant: the Nova then costs 12 and deals 216, and `DotManaPerDamage` has to
   carry the whole correction instead. Worth settling with a wand in hand rather
   than on paper, and worth *not* building anything that assumes either answer.
-- **Does `Bleeding` want the same percentage constant as the elements?**
-  `BleedPercent` and `SearPercentPerLevel` are now the same *kind* of number
-  against different sources — a weapon's damage plus proficiency versus an
-  element's damage. Sharing one constant would be one fewer dial and would state
-  the rule once; keeping them apart admits that a martial weapon's base damage
-  and a wand's element damage are not on the same scale, and probably should not
-  be tuned together.
 - **What is `ApplyPercent` for each element?** The unified status model (§1.5)
   makes this the sharpest constant in the DoT layer, because levels are duration
   as well as magnitude — 10% of a tier-6 wand's 30 damage is a 3-turn burn, 25%
@@ -416,8 +395,9 @@
   fight length exist.
 - **Do the 1–4 permutation spreads produce four distinct characters?** §2.1 gives
   every member the numbers 1–4 in some order, so the *rule* is settled and the
-  four assignments are a first guess. B and C differ only by swapping STR and
-  CON, which may or may not read as two different characters in play.
+  four assignments are a first guess. The pairs mirror each other cleanly on
+  paper — B/C split STR and CON, A/D split DEX and INT — but whether a party
+  reads as four people or as two pairs is a play question.
 - **Is `currentMax / stat` the right threshold shape?** It self-slows, which is
   wanted, but it also means a CON 1 character's first max-HP point costs the
   same 25 as their twenty-fifth costs a CON 4 character. Whether that reads as

@@ -87,8 +87,8 @@ Status effects are universal (Phase 0), so enemy crits apply riders to the
 party — a dagger dummy with `CritWindow ×1` crits on 10% of swings. Three things
 keep that from spiralling:
 
-- Riders decay one level per turn on their own, and an enemy critting on 10%
-  cannot outrun that decay for long.
+- Riders decay one level a round like every status (§1.5), and an enemy critting
+  on 10% cannot outrun that decay for long.
 - `Sundered` is a flat `+1` per level added **after** the multiplier in the
   pipeline below, not a multiplier itself, so it cannot compound with the crit
   spike into a one-shot.

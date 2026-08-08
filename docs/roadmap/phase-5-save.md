@@ -80,7 +80,8 @@ Everything currently flagged as a knob, gathered in one place:
 | Group | Keys |
 | --- | --- |
 | Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingPool` (25 — HP, mana and wear capacity alike) |
-| Statuses | `SearLevelsPerTier`, `SearPercentPerLevel`, `SearDecayPerTurn`, `RiderDamagePerLevel`, `RiderDecayPerTurn`, `WardDecayPerTurn`, `OverhealPerWard`, `OverhealDecayPerTurn`, `BleedPercent`, `BleedDecayPerTurn`, `DotManaPerDamage` |
+| Statuses | `EffectPerLevel` per status (`Searing` 1, `Mire` 10%, `Ward` 1), `OverhealPerWard`, `DotManaPerDamage`. **No decay constants** — one level a round, universally (§1.5) |
+| Appliers | `ApplyPercent` per enchantment — the one number that decides how many levels a source grants |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |

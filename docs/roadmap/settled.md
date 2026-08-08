@@ -94,22 +94,6 @@
   needed anything new, and they share one `StatusEffectType` carrying a
   `DamageType`. So a wand unique is *the staff's effect delivered over an area*,
   which is the cleanest statement of what the two caster classes are for.
-- **A lingering element applies levels derived from the element's tier**, and
-  every conversion is a **named constant** rather than a baked `1`:
-  `SearLevelsPerTier`, `SearPercentPerLevel`, `SearDecayPerTurn`. Levels
-  **accumulate** on re-application and have no cap — the rider model §1.6
-  already sets, so `Poison`, `Searing`, `Sundered` and `Weakened` are one family
-  with one model and only the constants differ. That is what makes the tier-1
-  cap survivable: the rule ("the element lingers") is fixed while the depth
-  rides a catalogue enchantment that levels normally. It also makes the element
-  a **prerequisite** — transfer the `Flaming` off and the burn goes quiet.
-- **Decay is the dial that matters most**, because it decides whether this is a
-  damage-over-time effect or a delayed burst. It is **not** tuned against "the
-  fight length", which does not exist — proficiency and weapon depth push fights
-  shorter while revival scaling pushes them longer, so the same party has
-  one-shot fights and fifteen-cycle fights minutes apart. It is tuned against
-  the fights a *wand* is in, which are the long ones by construction.
-  Starting point `1 / 1 / 2`: 12 damage over 3 turns at tier 6.
 - **A clean kill — a killing blow dealing at least the target's *max* HP —
   advances `DefeatCount` by 2.** The test is the swing against their
   constitution, not against whatever is left of them, which makes it uncheesable
@@ -129,11 +113,6 @@
   thing that kills you: there is no free-value version, only a get-further-into-
   trouble-faster version. It is the one reward in the design nobody chose to
   pursue, which is exactly what makes it memorable.
-- **The total is quadratic in tier**, the only such term in the design, and it
-  lands on every target in the shape. `SearLevelsPerTier` sits *inside* the
-  square, so halving it quarters the total — that is the correction if deep
-  wands are too strong while shallow ones are fine. `SearPercentPerLevel` is the
-  correction if the whole curve is too high.
 - **Caster uniques take one of three shapes** — a unique enchantment, a
   catalogue one at tier 3 (the only place a drop starts above tier 1), or **two
   non-opposing catalogue entries** (the only place a drop carries more than one).
@@ -712,8 +691,10 @@
 - **The wand DoTs ride their element's damage**: `Burning` off the wand's
   Flaming damage, `Frostbite` off its Cold, `Poison` off its Acidic. So
   `SearDamagePerLevel` — a flat constant, and therefore a ladder the pin cannot
-  climb — becomes **`SearPercentPerLevel`**, applied to `elementDamage`. A deep
-  `Flaming` now leaves a deep burn.
+  climb — becomes an `ApplyPercent` on the *level count*. A deep `Flaming` now
+  leaves a deep burn. (Superseded in shape by the unified status model below,
+  which moved the percentage from damage-per-level onto levels-applied; the
+  principle it establishes is unchanged.)
 - **`Mire` is the exception, because its magnitude is not damage.** It cuts a
   movement budget in movement units, where a percentage of a damage number means
   nothing, so it keeps a flat cut per level and scales by level count alone.

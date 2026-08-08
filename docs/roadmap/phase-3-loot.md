@@ -899,11 +899,11 @@ Making it a status rather than a bare int is not decoration: it accumulates,
 ticks and decays, which is precisely the family §1.7 already has one
 representation for. It is the sixth member and it costs no new machinery.
 
-### `Ward` is a pool that decays, and that is the second brake
+### `Ward` decays, and that is the second brake
 
-`Ward` was going to be a pool that never decays, which was fine only while a
+`Ward` was going to be a counter that never decays, which was fine only while a
 staff cast was its single source. With `Overheal` producing it continuously, an
-undecaying pool accumulates until the fight ends.
+undecaying one accumulates until the fight ends.
 
 `Ward` is not a second shape. It is **the same status model as everything else**
 (§1.5) — a level count, a trigger, a fixed effect per level — and its trigger is
