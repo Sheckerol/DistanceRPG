@@ -1054,21 +1054,45 @@ that most changes a caster's fight is not more mana per turn but *not having to
 walk*. That makes mana potions the party's answer to a boss that arrives before
 the caster has refilled, which is exactly the emergency the shape creates.
 
-### They come from the dungeon, not the hub, and the reason is CON
+### A potion grants health XP, and the missing-HP cap is why that is safe
 
 Health potions restore HP, and §2.2 grows constitution from `hpRestored`. So a
-potion **does** grant health XP — carving out an exception would need a reason,
+potion **does** grant health XP. Carving out an exception would need a reason,
 and "you were healed" is true whoever poured it.
 
-Which settles where they come from. **A purchasable heal is a purchasable
-stat**: if potions were a hub commodity, a player with gold could stand in a
-corridor drinking their constitution up. As dungeon drops on the loot stream
-they are self-limiting — you cannot grind CON off an item you can only get by
-fighting, and the fighting is what the ladder was measuring anyway.
+**It needs no guard, because healing is capped at missing HP**
+(`TurnSystem.cs:589`). A character at full health who drinks restores nothing
+and therefore learns nothing — the potion is simply wasted. There is no
+standing-in-a-corridor version of this: `hpXp` can only ever cash in damage that
+was actually taken, and a potion cannot manufacture the wound it heals.
+
+Which makes a potion a **legitimate** source of constitution rather than a leak,
+and on exactly the terms §2.2 wanted: *get hurt, then get healed*. Who did the
+healing was never part of the rule. All a potion changes is that the party can
+convert a wound without spending the healer's mana, and the wound still had to
+be earned by getting hit.
+
+That also puts `Overheal`'s guard in its proper place. `Overheal` grants no
+health XP (below), and the reason is that it operates **past** the cap — surplus
+healing is by definition what lands on a full-HP target, so it is the one heal
+the missing-HP rule does not already bound. The cap protects ordinary healing;
+`Overheal` needed a rule because it steps outside it.
+
+### They come from the dungeon because there is nothing to buy them with
+
+**This design has no currency.** Nothing is priced in money anywhere: the
+enchanter charges in runs of downtime and accumulated wear (§6.2, §6.4), farming
+charges in turns, depth charges in mana spent. Every cost in the game is
+something you *do*, and gold would be the first exception.
+
+So "hub purchase" is not a rejected option so much as an unavailable one, and
+inventing an economy to sell two items would be a system built for the smallest
+thing in the game. Potions drop in the dungeon because that is where everything
+else comes from.
 
 That also keeps the enchanter out of it. He is a weapon service (§6.2), his time
-is the scarce thing, and a crafting bench would be a second economy competing
-for it.
+is the scarce thing, and a crafting bench would be a second queue competing for
+it.
 
 ### One per slot
 

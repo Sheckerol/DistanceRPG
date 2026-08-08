@@ -824,11 +824,23 @@
 - **For a caster a mana potion is the reload, skipped**, which is the emergency
   the sprinter shape (§1.3) creates: a boss arriving before the caster has
   refilled.
-- **Potions are dungeon drops, never hub purchases, and CON is the reason.**
-  Healing grants health XP whoever poured it (§2.2), so a purchasable heal is a
-  purchasable stat. As drops they are self-limiting — you cannot grind
-  constitution off an item you can only get by fighting. It also keeps a
-  crafting bench out of the enchanter, whose scarce time is already spoken for.
+- **A potion grants health XP, and needs no guard**, because healing is capped
+  at missing HP (`TurnSystem.cs:589`). A full-HP character who drinks restores
+  nothing and learns nothing, so `hpXp` can only ever cash in damage actually
+  taken — a potion cannot manufacture the wound it heals. That makes it a
+  legitimate constitution source on exactly §2.2's terms: get hurt, then get
+  healed, and who poured it was never part of the rule.
+- **That is also where `Overheal`'s guard belongs.** It grants no health XP
+  because it operates *past* the cap — surplus healing is by definition what
+  lands on a full-HP target, so it is the one heal the missing-HP rule does not
+  already bound. The cap protects ordinary healing; `Overheal` needed a rule
+  because it steps outside it.
+- **Potions are dungeon drops because the design has no currency.** Nothing is
+  priced in money anywhere — the enchanter charges in downtime and wear, farming
+  in turns, depth in mana spent. Every cost is something you *do*. Hub purchase
+  is unavailable rather than rejected, and inventing an economy to sell two
+  items would be a system built for the smallest thing in the game. It also
+  keeps a crafting bench out of the enchanter, whose scarce time is spoken for.
 - **One potion per inventory slot, no stacking.** Stacking would quietly undo
   the three-way trade §3.4 rests on: carrying four potions has to mean carrying
   four fewer of everything else.

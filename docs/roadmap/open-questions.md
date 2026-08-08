@@ -12,8 +12,8 @@
   either a ninth class on DEX, or moving throwing to DEX (thrown knives are
   plausibly dexterous, though it costs the STR-throws-heavy-things read), or
   accepting that STR is the martial-breadth stat and DEX the precision one.
-- **What drops a potion?** §3.4 settles that they are dungeon drops rather than
-  hub purchases, but not what they come *off*. Enemies already drop weapons
+- **What drops a potion?** §3.4 settles that they come from the dungeon — there
+  being no currency to buy them with — but not what they come *off*. Enemies already drop weapons
   class-locked (§3.1), and hanging potions on the same kill would mean the
   8-class table needs a non-weapon outcome. The alternatives are a separate
   loot-stream roll independent of the kill, or floor-placed containers, which
