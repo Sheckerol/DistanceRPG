@@ -48,6 +48,15 @@ who learns the depth only by reaching it. That is what keeps the depth-scaled
 payout below from being scummable: you cannot re-enter until you see a floor
 you like, because a cleared dungeon is locked and a failed one re-rolls.
 
+**Finding the boss floor does not commit you to fighting it.** Standing on it
+and choosing to retreat instead is a legitimate way to end the run — you keep
+the mercy tick and your run XP (§4.4's three outcomes) but forfeit the deep
+payout and re-roll the depth for next time, same as retreating from any other
+floor. That re-roll is accepted as part of the risk/reward rather than an
+exploit to close off: it costs the climb back out through the whole gauntlet
+either way, so declining a boss you cannot yet beat is a real decision, not a
+free peek.
+
 ### Killing the boss stops resurrection
 
 Dummies revive after 10 turns today (`TurnSystem.cs:532`), and sooner the more
@@ -483,6 +492,41 @@ go back for.
 
 Navigation is not the challenge: floors persist within a visit (§4.1), so the
 map and the fog are already known. The way out is a combat problem.
+
+### Three outcomes, not two
+
+A run ends one of three ways, and only one of them should feel like nothing
+happened:
+
+| Outcome | This run's loot & `DefeatCount` | This run's weapon/mana/stat XP | Mercy tick (floor 3+) |
+| --- | --- | --- | --- |
+| **Boss kill** | Collected on the way out | Kept | — (a win, not a mercy) |
+| **Retreat** (leave alive, boss unfought) | Forfeited | **Kept** | Yes |
+| **Death** (party wipe) | Forfeited | **Clawed back by `DeathXpLossPercent`** | Yes |
+
+Retreating and dying already share the mercy tick (§6.3) — they should not
+also share an XP outcome. A fighting retreat means the party survived, so the
+progression earned along the way is real and stays real; that is the whole
+reward for climbing back out without the boss. A wipe takes some of that back,
+which is what makes death feel different from a bad extraction rather than the
+same shrug with worse flavour text.
+
+**The loss is a tunable percentage, not a hard revert.** `DeathXpLossPercent`
+(§5.3, `tuning.json`) says how much of *this run's* gain in each XP pool is
+rolled back on `GameOver` (`TurnSystem.cs:620`) — at 100% death fully erases
+the run's progress, at 0% it is purely a loot/DefeatCount forfeiture with no
+XP penalty at all, and anything between is a partial clawback. Nobody can pick
+this number on paper (§5.3 already makes that argument for `DotManaPerDamage`;
+the same reasoning applies here), so it ships as data from the start rather
+than a hardcoded 100% that would need a recompile to soften.
+
+**This needs a snapshot at dungeon entry.** Party XP pools (weapon
+proficiency, mana, HP/stat growth) are captured the moment the party steps
+into the dungeon; on a wipe, each pool is rolled back by `DeathXpLossPercent`
+of its gain since that snapshot, then the snapshot is discarded. Any other
+run-ending path — boss kill, retreat — discards the snapshot untouched.
+Innate stats never move (§2.1), so there is nothing to snapshot there. §5.1's
+save format needs this snapshot added to the `Run` group.
 
 ### You cannot carry it all
 

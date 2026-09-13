@@ -6,7 +6,7 @@ Lands last, once the state model above is final.
 
 | Group | Contents |
 | --- | --- |
-| Run | Map seed, current floor index, turn count |
+| Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
 | Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder, carried consumables |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
@@ -83,9 +83,9 @@ Everything currently flagged as a knob, gathered in one place:
 | Statuses | `EffectPerLevel` per status (`Searing` 1, `Mire` 10%, `Ward` 1), `OverhealPerWard`, `DotManaPerDamage`. **No decay constants** — one level a round, universally (§1.5) |
 | Appliers | `ApplyPercent` per enchantment — the one number that decides how many levels a source grants |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
-| Farming | `DefeatStackChance`, `FarmStackAllowance`, `ReviveStep`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
+| Farming | `DefeatStackChance`, `ReviveStepPercent`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
-| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor` |
+| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
 | Enchanter | `WearPerHit`, `WearCapacityLadder` (25/30/40), `EnchantmentWearCost`, `GraftBaseChance` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
@@ -108,8 +108,8 @@ question that matters: *are these the same numbers?*
 
 ## 5.4 The content files, and what they share
 
-Four files hold content: **`restricted.json`**, **`weapons.json`**,
-**`enchantments.json`**, **`dungeons.json`**. They are a different kind of thing
+Five files hold content: **`restricted.json`**, **`weapons.json`**,
+**`enchantments.json`**, **`dungeons.json`**, **`party.json`**. They are a different kind of thing
 from `tuning.json`, which is scalars — these carry **invariants**, so they are
 validated rather than clamped.
 
@@ -165,15 +165,17 @@ All four follow the same rules, and it is worth stating once:
 The files reference each other in one direction, so they load in one order:
 
 ```
-tuning.json → restricted.json → enchantments.json → weapons.json → dungeons.json
+tuning.json → restricted.json → enchantments.json → weapons.json → dungeons.json → party.json
 ```
 
 `restricted.json` is the predicates everything after it is checked against;
 `weapons.json` names enchantment ids for caster innates and unique souls;
 `dungeons.json` names a modifier for its theme, and its **drop table is computed
-from the weapon list** rather than read. A cycle here would be a design error
-rather than a loader problem — if content ever needs to reference forward, the
-thing it is reaching for probably belongs in code.
+from the weapon list** rather than read. `party.json` loads last because it is
+the only file that names *specific weapon ids* rather than classes or
+variants — a starting loadout is a concrete item, not a roll. A cycle here
+would be a design error rather than a loader problem — if content ever needs
+to reference forward, the thing it is reaching for probably belongs in code.
 
 ## 5.5 `restricted.json` — what may coexist, and what may be rolled
 
@@ -297,7 +299,7 @@ the tutorial needs.
 | `theme` | A `ModifierType`. Forged on the boss's own drop, added to the roll pool for every other drop in the dungeon (§4.3) |
 | `attunement` | A damage type, or none. Applies to everything the dungeon spawns (§1.4) |
 | `bossFloorMin` / `bossFloorMax` | `5`–`10` for ordinary dungeons; the tutorial pins both to `2` |
-| `boss` | Statline plus innate modifiers — the golem is `Block ×3` whatever it holds |
+| `boss` | Statline plus innate modifiers. The golem: **80 HP, `MovementBudget 40`** (slow, in a game where the party moves on a ~160-unit budget), innate `Block ×3` whatever it holds, and it **does roll a weapon like a dummy does** — forged with the theme, same as every other drop in the dungeon (§4.3) |
 | `retiresOnClear` | Tutorial only. Everything else takes the `bossFloor`-run cooldown (§4.3) |
 
 **The drop table is computed, not authored.** §4.3 says a themed boss cannot
@@ -320,3 +322,21 @@ edit that makes `Brace` legal on axes changes the Brace dungeon's drop table
 The second is the one that will get broken by accident, because a theme that is
 *not* a class signature still works — it just quietly means that dungeon can
 never produce its unique, and nothing else in the game announces the difference.
+
+## 5.9 `party.json`
+
+The four-character starting roster: name, innate stat spread (§2.1, a
+permutation of 1–4), and starting weapon **by id**, referencing an entry in
+`weapons.json`. This is what a designer edits while tuning the tutorial, so it
+gets a file for the same reason weapons and dungeons do — a starting loadout
+is content, not a constant.
+
+| Field | Notes |
+| --- | --- |
+| `id`, `name` | Stable id for saves; display name |
+| `stats` | `{ STR, DEX, CON, INT }`, one permutation of 1–4 (§2.1, validated per §5.7's checklist) |
+| `startingWeaponId` | A `weapons.json` id. Must exist, and the class must be one the roster wants represented |
+
+Party B/C/D's own identities (which pair splits which stats, which debuff
+staff D carries) are decided in this file, not hardcoded — changing the
+tutorial's fourth character to try a different stat pairing is a data edit.

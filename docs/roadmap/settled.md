@@ -43,6 +43,199 @@
 - **The casters' second forged axis is that enchantment, not `CritMultiplier`.**
   Multiplying an applied effect on a natural 20 is a rounding event on 5% of
   casts. Caster uniques follow, arriving at tier 3.
+- **A caster's crit and fumble move mana cost, not just effect level.** On top
+  of §1.6's doubled effect level, a natural 20 halves that cast's mana cost
+  (floor) and a natural 1 doubles it. This gives the d20 a second, sharper
+  consequence for staves and wands specifically — a cheap efficient burst on a
+  crit, a real punish for fishing on a fumble — without reopening
+  `CritMultiplier`, which stays a martial-only stat.
+- **STR keeping four weapon classes to DEX's three is accepted, not fixed.**
+  STR is the martial-breadth stat (axe, spear, throwing, sword); DEX is the
+  precision one (dagger, bow, sword). No class moves, no ninth class is added.
+- **A held weapon's reaction-on-swap question is moot by the existing turn
+  rule.** Reactions all resolve during the opposing side's movement (§1.1),
+  and a weapon swap only happens on the player's own turn, so there is never a
+  window where a swap changes which reaction is live mid-resolution. Whatever
+  is equipped when the enemy phase begins is what reacts.
+- **A shape's enchantment trigger costs one payment per cast, not one per
+  target caught.** A six-target Nova pays `DotManaPerDamage × expectedTotal`
+  once, the same as a single-target Blast at the same tier, while still
+  dealing its full total to every target hit. Area damage ends up strictly
+  cheaper per point of damage than single-target — the shape's reward for
+  catching more than one thing, not a tax on it. (§1.5, `DotManaPerDamage`.)
+- **Efficiency uniques keep the costed-soul design as the standard shape.** A
+  second soul — mana cost every trigger, starts at tier 1 — beats a plain free
+  second modifier for this unique tier, even though it is slower to pay off;
+  the dagger's `Serrated → Vampiric → Overheal` is the template every other
+  Efficiency unique should aim for, not the exception. Authoring the remaining
+  three classes' pairs (§1.5's open item) is content work, not a design
+  question, and can trail Phase 1 code rather than block it — a class can ship
+  with a placeholder single-modifier unique until its pair is found.
+- **`WearCapacity` is already the answer to "does wear cap."** §6.1's
+  authored ladder gives wear a ceiling that *rises* with every full repair, and
+  depositing already spends the whole pool (§6.1's "no 0% to explain," "a
+  deposit's value is the wear you brought") — so wear is both fully consumed
+  per attachment and capped, exactly the combination asked for. Ship the
+  existing three-step ladder; add a fourth step later if playtesting shows
+  weapons plateauing at 40, per §6.1's own note that the ladder is authored
+  precisely so it can grow.
+- **A batch of balance questions are accepted as designed, to be watched
+  during playtest rather than pre-solved on paper** — each is a case where the
+  doc's own reasoning already leans toward "probably fine" and no amount of
+  further analysis substitutes for actually fighting it:
+  - `CritMultiplier ×1` on dagger/throwing (crits for `×3`) stays as designed.
+  - `Longshot`×`CritWindow` compounding on a deep bow is accepted; revisit once
+    the kiting AI exists and archers can actually choose their range.
+  - The 50%-per-defeat stack roll stays flat, not decaying.
+  - A boss does not scale with the deepest `DefeatCount` farmed on its floor —
+    a farmed floor being more dangerous than its own boss is accepted as the
+    price of farming, not patched with boss scaling.
+  - Accumulated `Sundered` depth in a long fight is accepted; the per-level
+    `+1` is the dial if it ever proves too much.
+  - `Light ×6` stacking with `Charges` (54 of 160 mana for 9 throws) is
+    accepted as the intended shape — `Charges` is already the binding cap.
+  - The enchanter keeps its two-newest-slots rule as the legible middle
+    ground between a hard slot count and a pure last-in queue.
+  - One guaranteed tier-1 enchantment on every caster drop stays as designed —
+    it costs a permanent extra run of service time and a lock a low-INT
+    character can't afford, which is enough of a tax.
+  - Whether the uncapped enchantment tier self-limits fast enough against
+    max-mana growth is accepted as unsimulated; a superlinear lock-scaling
+    dial is the fix if play shows it runs away, not a cap.
+  - Mana spending feeding both max mana and enchantment tier at once (§2.2,
+    §3.3) stays a deliberate double credit.
+  - A rolled innate becoming a free tier-1 copy of something already in the
+    catalogue late in a campaign is accepted — it's still free, and campaigns
+    end.
+  - `Resonant` reading as straightforwardly stronger on wands than staves
+    (asymmetric ladders, §1.4) is observed and accepted, not adjusted for.
+  - The `Light`/`Resonant` exclusion forcing a wizard's dagger into a
+    non-Efficiency variant is accepted as the intended trade.
+  - `resurrectTurns = max(3, 10 − DefeatCount)`'s front-loaded slope is kept
+    as designed; `10 − n/2` is the fallback if the front half of a farm feels
+    too samey.
+  - The retreat gauntlet hitting hardest at whoever farmed deepest and then
+    balked is accepted as the intended lesson, not a trap to soften.
+  - A clean kill on an area weapon (a Nova advancing every target's
+    `DefeatCount`) keeps no per-swing cap — it's the area weapon's reward for
+    being one, matching the "feature not bug" read already settled for a
+    single clean kill (§3.2).
+  - `UniqueChanceMidpoint` stays at `DefeatCount 20` pending real numbers from
+    `ReviveStepPercent` play — if a twenty-times-revived dummy proves
+    unsurvivable or trivial, the midpoint moves to match, not the other way
+    round.
+  - The fully-worked crit dagger's endgame ceiling (~120 damage on a 45% crit
+    chance, armour ignored) is accepted; no single weapon is forged deep in
+    both crit dials any more, which is most of the argument that it's fine.
+  - Whether the four 1–4 innate-stat permutations (§2.1) read as four distinct
+    characters, and whether `currentMax / stat` as the HP/mana growth
+    threshold reads as natural divergence rather than one character never
+    growing, are both play questions with no action to take before playing.
+- **`EnemyPlacer` rolls only the six close-range classes until kiting AI and
+  the wand placement scorer both exist** (§1.2, §1.4); friendly fire stays off
+  until then. This was already the working interim rule, now formalised as
+  settled rather than sitting as an open question.
+- **A short presentation/UX backlog, not blocking Phase 1–5 code:** surface
+  the accidental clean-kill (a crit jumping `DefeatCount` by 2) as a connected
+  beat rather than a silent number change; show the enchanter mid-ritual and
+  unavailable during the tutorial rather than simply absent; surface the
+  boss-floor lockout/re-roll trade-off in the encounter prompt before a player
+  commits (§4.3); how much of the enchanter's stake is spoken aloud is a
+  narrative-pass question, not a mechanics one — only load-bearing lore
+  belongs in these docs. What the hub actually looks like (layout, discovery,
+  repeat themes) is explicitly Phase 6 scope, not decided here.
+- **A batch of provisional numbers are picked now so nothing blocks
+  implementation, each tunable via `tuning.json` (§5.3) and expected to move
+  after real play:**
+  - `HealthPotionPercent` / `ManaPotionPercent` = 20%, equal to each other.
+  - Consumables stay **one potion per slot, no stacking**; if that proves too
+    harsh in practice the fix is more inventory slots, not stacking.
+  - Potions are **self-only**, not ally-targeted — simpler, and keeps the
+    movement cost landing on whoever benefits.
+  - Friendly-fire damage to allies stays **half**, and the AI's ally-weight
+    scoring stays a **flat ×1.5** regardless of the ally's role or remaining
+    HP — both are the "flat first" version the docs already argued for.
+  - Party member D carries **Mire**, not Blight — the on-theme choice for a
+    game where movement is the resource, over the more legible-but-generic
+    Poison demonstration.
+  - The party carry limit stays **24** (6 slots × 4 characters).
+  - A caster's starting **max mana is 160**.
+  - `DotManaPerDamage` = **⅓**, the worked example already in §1.5.
+  - `ApplyPercent` per element: **Flaming 20%, Cold 15%, Shocking 25%, Acidic
+    15%** — spread within the doc's own 10–25% band rather than one value for
+    all four, so the elements don't all produce identically-paced burns.
+  - `OverhealPerWard` = **5**.
+- **A fumble does not get a self-rider.** `RollOutcome.Weak` stays exactly
+  what it is — halved damage, nothing more. A symmetric self-`Weakened` on a
+  natural 1 was considered and rejected: crit riders, block riders and a
+  fumble rider firing in the same turn is too much status churn to track and
+  telegraph for the value it adds.
+- **The enchanter refuses a transfer that would strand a unique's lingering
+  effect.** Rather than letting a wand unique's element move off and leave the
+  effect quietly inert, the service simply cannot be requested — consistent
+  with how a lock or a mana cost the party can't pay never fails silently
+  elsewhere in this design (§3.3, §6.5). No new UI needed to explain a trap
+  that no longer exists.
+- **Theme is a dungeon-level property, not a per-floor one.** A themed dungeon
+  attunes every floor it has; an unthemed dungeon attunes none of them. There
+  is no floor-by-floor variation within one dungeon to track. Four wand types
+  in two opposed pairs is accepted as tight-but-sufficient for now — worth
+  revisiting only if playtesting shows a two-wand stable trivialising every
+  matchup. (§1.4, §4.3.)
+- **The type-chart multiplier applies before `Block`, not after.** It happens
+  in the same pipeline slot as `Sundered`/`Weakened` (§1.6, steps 1–3) —
+  building the weapon's own damage — before `Block` absorbs at step 5. A
+  resisted hit into heavy armour can land for very little; a resisted crit
+  skips `Block` per the existing crit rule and still lands its halved damage
+  in full. (§1.4, §1.6.)
+- **The Reaver forges `Splitting ×2`, not `×1`**, so the anti-armour axe the
+  tutorial teaches you to want (§4.3) starts stronger against `Block` from the
+  moment it drops (ceiling `×7`, 21 ignored of 24) rather than only fully
+  answering armour once reforged into the unique Shieldbreaker (`×8`, 24). Both
+  values need updating anywhere the old `×1`/`×6`/18 numbers were quoted.
+- **The dummy's revival step scales proportionally, not flatly.**
+  `ReviveStepPercent` (§5.3, tunable) adds a percentage of the dummy's own
+  current damage/HP per revival rather than a flat number, so a dagger dummy
+  and an axe dummy grow at the same relative rate instead of the flat `+5`
+  landing 56% on one and 28% on the other. Compounds geometrically; the
+  three-way roll (damage / health / both) is unchanged. (§3.2.)
+- **The hub ships with 6 non-tutorial dungeons for the first playable
+  version.** Small enough to author quickly, large enough that one dungeon's
+  boss lockout (5–10 runs) doesn't dominate a rotation the way it would at 4,
+  and not so large it needs adjusting the existing `bossFloor`-based lockout
+  formula the way 10 would invite. `FarmYieldPerClear` (§6.6) is defined in
+  terms of the count so a 7th dungeon added later does not silently inflate
+  the system.
+- **A run has three outcomes: boss kill, retreat, death** — not two. Boss kill
+  collects the run's loot and keeps its XP. A fighting retreat (leaving alive
+  without the boss, including declining a found boss floor) keeps the run's
+  XP but forfeits loot/`DefeatCount` progress. Death forfeits loot too, and
+  additionally claws back `DeathXpLossPercent` (§5.3, tunable) of the run's XP
+  gain, rolled back from a snapshot taken at dungeon entry. Retreat and death
+  already shared the mercy tick (§6.3, floor 3+); they no longer share an XP
+  outcome — surviving the climb out is what earns the difference. (§4.4, §5.1.)
+- **Finding a dungeon's boss floor does not commit you to fighting it.**
+  Declining and retreating instead is a legitimate choice — it re-rolls the
+  depth for next visit, accepted as part of the risk/reward rather than an
+  exploit, since it still costs the full gauntlet back out. (§4.3.)
+- **A farmed weapon's stack total has no bespoke ceiling — only the
+  per-modifier `forged + 5` cap from §1.1.** The old flat 10-stack-per-weapon
+  limit is removed. A two-modifier weapon still finishes at 10 total around
+  `DefeatCount 20`; a three-modifier weapon can finish all three at 15 total,
+  taking roughly 1.5× the cycles. Breadth is rewarded for being breadth, with
+  no extra rule — the same argument §1.1 already made against bespoke
+  ceilings, now applied to the farm. (§3.2.)
+- **Graft breadth has no explicit cap — `GraftBaseChance` (3%) is the only
+  defence.** A weapon can in principle collect many distinct grafted modifiers,
+  but at 3% (doubled at most by a full wear bar, §6.4) it should stay rare in
+  practice without an extra rule. Revisit with an explicit per-weapon
+  distinct-modifier cap only if playtesting shows heavily-serviced weapons
+  actually accumulating breadth this way.
+- **Sword's `Push` stays always-on.** It fires on every hit, same as the rest
+  of the sword's kit; occasionally shoving a target out of an axe's cleave or a
+  spear's threat zone is accepted as a small tactical cost of mixing a sword
+  into the front line, not a bug to design out. `Push` stays opt-in only on the
+  Halberd, where it is the class's whole pitch rather than a side effect.
 - **`Resonant` is efficiency, not magnitude** — −10% per stack off *every* point of
   mana the weapon spends, cast costs and enchantment triggers alike. Tier sets
   how hard an effect lands; `Resonant` sets what it costs. Forged on casters only,

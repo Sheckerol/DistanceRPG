@@ -159,16 +159,21 @@ with it, over and over, for as many cycles as you have made it come back. The
 drop arrives with the levelling already done, which is the same thing farming
 does for everything else.
 
-**A farm grants at most 10 stacks**, and §1.1's per-modifier cap of 5 is what
-forces those across **at least two modifiers**. There is no new rule doing that
-— five is simply as much as one modifier can take, so the eleventh point of
-investment has nowhere to go but sideways.
+**There is no farm-wide total cap — only §1.1's per-modifier ceiling of
+`forged + 5`.** The roll above already skips any modifier that has reached it,
+so a farm simply keeps investing in whatever the weapon still has room in until
+every modifier it carries is capped. A two-modifier weapon caps at 10 total; a
+three-modifier weapon has room for 15, and gets there in roughly 1.5× the
+cycles, since the same 50% roll now has three homes to land in instead of two.
+Breadth is rewarded for being breadth, with no extra rule — exactly the
+argument §1.1 already makes against bespoke ceilings, applied to the farm too.
 
-Enchantment tiers are **not** capped (§3.3), so they take the same allowance of
-five as a rule of the farm rather than a property of the enchantment: farming
-can bank five tiers' worth and no more. Beyond that the enchantment levels the
-way every other one does — by being cast with, by you. Farming buys a head
-start, never the climb.
+Enchantment tiers are **not** capped (§3.3), but farming's contribution to one
+is: landing on the innate-enchantment entry is subject to the same `+5`
+ceiling as any other entry in the roll, so farming can bank five tiers' worth
+through that entry and no more. Beyond that the enchantment levels the way
+every other one does — by being cast with, by you. Farming buys a head start,
+never the climb.
 
 The allowance is never wasted, because **no weapon is forged with fewer than two
 axes** (§1.2). Every class baseline carries a second modifier for exactly this
@@ -189,13 +194,18 @@ five fights and a grind party in ten, and both arrive at the same drop.
 | 5 | ~2.5 | 1% |
 | 10 | ~5 | 3.5% |
 | 15 | ~7.5 | 11% |
-| **20** | **10 — the farm's allowance, spent** | **25%** |
-| 30+ | 10 | 47% |
+| **20** | **10 — a two-modifier weapon's ceilings, both spent** | **25%** |
+| 30+ | 15 — a three-modifier weapon's ceilings, all spent | 47% |
 
-At 50% a defeat, the allowance runs out around `DefeatCount 20` — which is
-exactly where the unique curve below is steepest. **The weapon stops improving
-at the moment the gamble gets interesting**, so the deep farm is unambiguously a
-lottery from that point rather than a mix of two rewards.
+At 50% a defeat, a **two-modifier** weapon's stacks run out around
+`DefeatCount 20` — exactly where the unique curve is steepest, so it stops
+improving right as the gamble gets interesting. A **three-modifier** weapon has
+half again as much room and does not exhaust it until roughly `DefeatCount 30`,
+by which point the unique curve is already past its steepest climb — so
+breadth costs you the moment where "still improving" and "the coin flip gets
+good" overlap, in exchange for a fuller weapon at the end. The unique roll
+itself never depends on stacks — only on `DefeatCount` — so it keeps climbing
+either way.
 
 ### Which weapon you farm matters more than how long
 
@@ -206,19 +216,22 @@ decides where a farm can go:
 | --- | --- | --- |
 | Tower Guard | `Block ×2`, `Push ×1` | `Block ×7`, `Push ×6` — **both maxed** |
 | Assassin's Fang | `CritWindow ×2`, `CritMultiplier ×1` | `CritWindow ×7`, `CritMultiplier ×6` — both maxed |
-| Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | 10 spread across three, **none maxed** |
+| Disarming Kris | `CritWindow`, `CritMultiplier`, `CritWeaken` | All three maxed, given ~1.5× the cycles of a two-modifier weapon |
 | Staff of Blight | `Resonant ×1`, innate enchantment | `Resonant ×6` and **five tiers** — the only farm that buys potency |
 
-**A two-modifier weapon can be finished; a three-modifier weapon cannot.** Ten
-stacks fill two ceilings exactly and leave nothing over, so a Purity variant
-farmed to the end is *complete* — every dial at its cap. A three-modifier weapon
-has fifteen stacks of room and only ten to fill it, so it comes out good at
-three things rather than perfect at two, with five slots left for the enchanter.
+**Every weapon can be finished; a three-modifier weapon just takes longer.** A
+two-modifier weapon fills both ceilings in the same cycles a farm already
+spends getting there (`DefeatCount ~20`); a three-modifier weapon has fifty
+percent more room and needs roughly fifty percent more cycles (`~30`) to fill
+it, with no cap forcing a choice between them. Committing to the extra cycles
+buys the same completeness on a broader weapon — the trade is time against the
+unique roll's own climb (above), not against how much of the weapon you get to
+finish.
 
-That is a genuine trade rather than a strict ordering. Purity concentrates and
-finishes; Control and Support spread and stay open. And it reverses cleanly
-against §6.4 — the weapon farming can complete is the one the enchanter has
-nothing left to do with.
+Purity still finishes fastest; Control and Support simply finish later rather
+than never. And it still reverses cleanly against §6.4 — whichever weapon
+farming has actually completed is the one the enchanter has nothing left to do
+with.
 
 Choosing the weapon to farm is therefore choosing the *shape* of what you get
 out, not just how much.
@@ -306,19 +319,21 @@ one of three outcomes:
 
 | Roll | Gains |
 | --- | --- |
-| Damage | **+5 damage** |
-| Health | **+5 max HP**, restored full |
-| Both | **+5 damage and +5 max HP** |
+| Damage | **+`ReviveStepPercent`** of current damage |
+| Health | **+`ReviveStepPercent`** of current max HP, restored full |
+| Both | **+`ReviveStepPercent`** to both |
 
-One third each. **`+5` is a placeholder** — the step is unlikely to survive
-contact, since against a party dealing 10–18 a swing `+5` HP is small and `+5`
-damage is large, and a flat number means far more on a dagger dummy than an axe
-one. What matters here is the *shape*: a fixed step, rolled between two axes,
+One third each, rounded to the nearest whole point. **The step scales off the
+dummy's own weapon rather than a flat number**, so a dagger dummy and an axe
+dummy grow at the same *relative* rate instead of the same absolute one — a
+flat `+5` landed far harder on a 9-damage dagger dummy (56%) than an 18-damage
+axe dummy (28%), which `ReviveStepPercent` (§5.3, tunable) fixes at the root.
+It also compounds geometrically rather than additively, which is the right
+shape for a threat curve that is supposed to accelerate the longer a farm runs.
+
+`ReviveStepPercent` itself is still a placeholder pending play — what carries
+over from the flat version is the *shape*: a step rolled between two axes,
 compounding every cycle without limit.
-
-At that placeholder, five cycles is roughly `+17` damage and `+17` HP in
-expectation — a dummy that opened the run as scenery finishes it as a genuine
-threat, and at fifteen cycles it is something else entirely.
 
 **This is the cost the ladder was missing.** §3.2 above prices farming in the
 weapon's long-term potential, which is real but abstract. This prices it in the
@@ -762,12 +777,14 @@ be chosen at the enchanter, and cannot be copied:
 
 | Enchantment | Lock | Trigger | Fires on | Effect |
 | --- | --- | --- | --- | --- |
-| **Siphon** | 20 | 5 | Kill | Restore mana, net positive |
+| **Siphon** | 20 | 5 | Kill | Restore **15 mana** — net `+10` a kill |
 | **Weightless** | 25 | 5 | Attack | Attacks cost less movement |
 | **Sturdy** | 30 | 40 | Lethal damage | Survive at 1 HP instead |
 | **Momentum** | 30 | 10 | Kill | Refund part of the swing's movement cost |
 | **Overheal** | 25 | 8 | Healing above full | Convert the excess into `Ward` at `OverhealPerWard` to 1 |
 | **Serrated** | 20 | **scaled** | Hit | Apply `Bleeding` — damage *and* trigger cost from the weapon's own numbers, below |
+| **Immovable** | 25 | 10 | Attempted displacement, enemy's turn | Negate the `Push`/`Drag`/`Rout` entirely |
+| **Piercing** | 20 | 6 | Hit | The shot continues to the next target in line, rolling the same hit again |
 
 Look at what they have in common: **every one of them bends a rule the rest of
 the game is built on.** `Siphon` breaks the mana economy's dependence on unspent
