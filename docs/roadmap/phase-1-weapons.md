@@ -38,11 +38,11 @@ exactly two shapes:
 
 Three forged stacks either way, never on fewer than two modifiers.
 
-**The mechanical reason is the farm.** A repeat-kill farm grants up to 10 stacks
-and §1.1 caps each modifier at 5 acquired (§3.2), so a single-modifier weapon
-could only ever absorb half of what farming offers. A Purity variant would have
-been the one weapon in the game you could not fully invest in — precisely
-backwards, since it is the one that most wants depth.
+**The mechanical reason is the farm.** §1.1 caps each modifier at 5 acquired
+stacks (§3.2), so a single-modifier weapon could only ever absorb one
+modifier's worth of what farming offers, however long you farmed it. A Purity
+variant would have been the one weapon in the game you could not fully invest
+in — precisely backwards, since it is the one that most wants depth.
 
 The second modifier is **class-specific**, and each one says something the
 signature alone does not:
@@ -409,7 +409,7 @@ Rooms already hold 0–4 dummies and nothing today rewards being surrounded.
 | --- | --- | --- | --- | --- | --- |
 | Efficiency | Hatchet | 60 | 18 | 60 | `Light ×1` |
 | Purity | Great Axe | 60 | 18 | 60 | `Cleave ×1` → 2 extra targets |
-| Control | Reaver | 60 | 18 | 60 | `Splitting ×1` |
+| Control | Reaver | 60 | 18 | 60 | `Splitting ×2` |
 | Support | Routing Axe | 60 | 18 | 60 | `Rout ×1` |
 
 - **Splitting** — ignores 3 of the target's Block per stack. Axes split
@@ -971,6 +971,13 @@ of resistant enemies should be a poor cast rather than an illegal one — nothin
 in this game has a zero, and a resisted Nova that still softens a room keeps the
 class playable in its worst matchup.
 
+**The type multiplier applies before `Block`**, as part of building the
+weapon's own damage — the same slot crits and `Sundered`/`Weakened` occupy in
+the pipeline (§1.6, steps 1–3), before `Block` absorbs at step 5. A resisted
+hit into a heavily-armoured target can end up dealing very little, and crits
+already skip `Block` entirely (§1.6), so a resisted crit still lands its
+halved damage in full.
+
 Tier scales the type's contribution along with everything else, so a tier-5
 Flaming is both more damage and more of what the chart multiplies. That is the
 axis a caster who commits to one element is building, and the chart is the cost
@@ -1071,8 +1078,8 @@ Everything else is unchanged.
 | Feathered Death | Throwing | Bandolier | `Charges ×3, CritMultiplier ×1` | **Weightless** | Four throws that barely cost anything to make |
 | Shieldbreaker | Axe | Reaver | `Cleave ×1, Opportunist ×1, Splitting ×3` | **Momentum** | Ignores 9 Block across the swing, and every kill pays for the next |
 | Widowmaker | Dagger | Assassin's Fang | `CritWindow ×3, CritMultiplier ×1` | **Siphon** | Finds the gap on 17+, and every kill funds the enchantments doing it |
-| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | *Immovable* | Three retaliations at full reach, from a line that cannot be moved |
-| Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | *Piercing* | +3 a tile, and the shot does not stop at the first body |
+| Hoplite's Wall | Spear | Phalanx Spear | `Brace ×3, Longshot ×1` | **Immovable** | Three retaliations at full reach, from a line that cannot be moved |
+| Stormcrow | Ranged | Longbow | `Longshot ×3, CritWindow ×1` | **Piercing** | +3 a tile, and the shot does not stop at the first body |
 | *(unnamed)* | Dagger | Flensing Knife | `CritWindow ×2, Light ×1` | **`Serrated` + `Vampiric` t3 + `Overheal`** | Stabs itself a shield — three souls in a line |
 
 **The four named enchantments each answer their weapon's own logic**, which is
@@ -1083,12 +1090,13 @@ kills several things at once, so the refund fires several times. `Siphon` on the
 dagger, because the enchanted dagger (§3.3) is the build that runs out of mana
 and this is the weapon that does not.
 
-**`Immovable` and `Piercing` are proposals**, not settled — the spear and the
-bow need one each and the four in §3.3 were spoken for. `Immovable` fires when
-something tries to displace you and negates it, which is the phalanx fantasy and
-a real counter to `Push`/`Drag`/`Rout`. `Piercing` fires on a hit and carries
-the shot to the next target in line. Both obey the trigger-cost rule; neither
-has numbers yet.
+**`Immovable` and `Piercing` are settled**, alongside the other unique-only
+enchantments (§3.3): `Immovable` — lock 25, trigger 10, fires on an attempted
+`Push`/`Drag`/`Rout` on the wielder's own turn's opponent-phase and negates it
+entirely, the phalanx fantasy and a real counter to displacement. `Piercing` —
+lock 20, trigger 6, fires on a hit and carries the shot to the next target in
+line, rolling the same hit again. Both obey the trigger-cost rule like every
+other unique enchantment.
 
 **Why a unique enchantment rather than a second `×3`.** Depth was already
 available — the derivation rule could simply have allowed two — and it would
@@ -1517,6 +1525,14 @@ mana flat with tier — the convention §3.3 already runs on. What changed is on
 the curve underneath: the price is now quadratic in levels rather than tracking
 a cubic, which is why the six-target Nova costs a caster a real fraction of a
 pool without needing the whole thing.
+
+**The trigger fires once per cast, not once per target the shape catches.**
+`triggerCost` above is paid a single time regardless of how many bodies are in
+the shape — a six-target Nova pays one `DotManaPerDamage × expectedTotal`, the
+same as a one-target Blast at the same tier, even though it deals its full
+`expectedTotal` to every target it hits. Area damage is therefore strictly more
+efficient per point than single-target, which is the shape's reward for
+catching more than one thing rather than a cost for doing so.
 
 ### That resolves the tier-1 cap without breaking it
 

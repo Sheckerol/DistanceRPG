@@ -716,12 +716,15 @@ deep. The reward curve flattens toward something recognisable instead of
 stopping dead at "your bag is full", and every clear before that point buys
 something you can feel.
 
-### Tune the total, not the rate — the dungeon count is not settled yet
+### Tune the total, not the rate
 
 `FarmYieldPerClear` cannot be picked in isolation, because what a fully explored
-campaign actually produces is that number **times however many dungeons exist**,
-and how many exist is a content decision nobody has made. Pick the rate first
-and every dungeon added afterwards silently inflates the whole system.
+campaign actually produces is that number **times however many dungeons exist**.
+The hub ships with **6 non-tutorial dungeons** for the first playable version —
+enough that no single dungeon's boss lockout dominates a rotation, without
+authoring more content than a first pass needs — but the formula below is kept
+in terms of the count rather than baked to 6, so adding a 7th dungeon later
+does not silently inflate the whole system.
 
 So state the target the way §1.3 states `MovementUnitsPerMana` — as the rule
 rather than the number:

@@ -95,8 +95,8 @@ These hold for every phase:
   **queue rather than recurse**, and the subscriber list is an ordered structure
   rather than a `Dictionary` iterated directly, because dispatch order is
   covered by the determinism rule above.
-- **Content lives in `restricted.json`, `weapons.json`, `enchantments.json` and
-  `dungeons.json`** (§5.4–5.8), loaded in that order and validated at load,
+- **Content lives in `restricted.json`, `weapons.json`, `enchantments.json`,
+  `dungeons.json` and `party.json`** (§5.4–5.8), loaded in that order and validated at load,
   referenced everywhere by **stable string id** rather than by index. Only
   *behaviour* stays in code — relations are data too, or adding a modifier would
   still be a recompile. A dungeon's drop table is computed rather than authored.
