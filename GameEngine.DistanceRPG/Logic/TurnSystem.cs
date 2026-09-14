@@ -77,21 +77,27 @@ public sealed class TurnSystem
     private bool _enemyTurnPending;   // banner is up; enemy turn starts when it ends
     private bool _nextEnemyPending;   // pause before the next enemy acts (or control returns)
 
-    // Brace bookkeeping: spear-wielders threaten a zone. Members NOT already
-    // holding the acting enemy in reach are snapshotted before it walks; any
-    // of them whose reach it enters retaliates for free, up to the weapon's
-    // Brace value uses per turn. (The prototype only braced the enemy's own
-    // chosen target — with formations and many enemies, the nearest member
-    // is always the target and back-row spears would never fire.)
-    private readonly List<PartyMemberState> _braceCandidates = new();
-    private readonly Dictionary<PartyMemberState, int> _braceUsesThisTurn = new();
-
-    // Enemy-side brace mirror: spear dummies threaten a zone too. Pairs
-    // already in reach at the start of the player turn never trigger; a
-    // character whose movement carries them into a seen spear enemy's reach
-    // eats a free poke, up to the enemy weapon's Brace value per turn.
-    private readonly HashSet<(EnemyState Enemy, PartyMemberState Member)> _inEnemyReach = new();
-    private readonly Dictionary<EnemyState, int> _enemyBraceUsesThisTurn = new();
+    // ── Threat zones ─────────────────────────────────────────────────────────
+    // Spear-wielders on both sides threaten a zone: whoever walks *into* their
+    // reach eats a free attack, up to the weapon's Brace value uses per turn.
+    // Standing inside when the zone arms never triggers — walking in is what
+    // costs. Both directions run on the same ThreatZone (entry-edge pair set +
+    // per-bracer use pool) and differ only in when they arm and whether a pair
+    // re-arms on leaving reach:
+    //  - Party braces arm per enemy walk (ArmPartyBraces): every living member
+    //    holding a Brace weapon watches the acting enemy, those already holding
+    //    it in reach marked inside. A member stabs a given walk at most once —
+    //    pairs are never released mid-walk. (The prototype only braced the
+    //    enemy's own chosen target — with formations and many enemies, the
+    //    nearest member is always the target and back-row spears would never
+    //    fire.)
+    //  - Enemy braces arm once per player turn (StartPlayerTurn, after
+    //    resurrections) for every live enemy, seen or not. A member whose
+    //    movement carries them into a *seen* spear enemy's reach eats a free
+    //    poke; leaving reach releases the pair, so a later re-entry costs again.
+    private readonly ThreatZone _partyBraces = new();
+    private readonly ThreatZone _enemyBraces = new();
+    private readonly List<PartyMemberState> _braceWatchers = new(); // party bracers armed against the current walk
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
@@ -120,24 +126,21 @@ public sealed class TurnSystem
         {
             if (!enemy.Alive) continue;
 
-            bool inReach = EnemyAi.CanHit(enemy, mover, enemy.Weapon, _grid);
-            if (!inReach)
+            if (!EnemyAi.CanHit(enemy, mover, enemy.Weapon, _grid))
             {
-                _inEnemyReach.Remove((enemy, mover));
+                _enemyBraces.Leave(enemy, mover); // leaving reach re-arms the pair
                 continue;
             }
-            if (!_inEnemyReach.Add((enemy, mover))) continue; // was already in reach
+            if (!_enemyBraces.Enter(enemy, mover)) continue; // was already in reach
 
             var brace = enemy.Weapon.GetAbility(AbilityType.Brace);
             if (brace == null) continue;
             if (!_seenThisTurn.Contains(enemy)) continue; // no ambushes from the fog
+            if (_enemyBraces.UsesThisTurn(enemy) >= brace.Value) continue;
 
-            _enemyBraceUsesThisTurn.TryGetValue(enemy, out int used);
-            if (used >= brace.Value) continue;
-
-            _enemyBraceUsesThisTurn[enemy] = used + 1;
+            _enemyBraces.Spend(enemy);
             EnemyBraceTriggered?.Invoke(enemy);
-            ResolveAttackOnCharacter(enemy, mover);
+            ResolveAttackOnCharacter(enemy, enemy.Weapon, mover);
             if (Phase == TurnPhase.GameOver) return;
         }
     }
@@ -159,7 +162,7 @@ public sealed class TurnSystem
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
         if (w == null || w.IsCaster || c.DistLeft < w.Cost) return false; // a staff heals allies, it can't strike
-        return EnemyAi.CharCanHit(c, enemy, w, _grid);
+        return EnemyAi.CanHit(c, enemy, w, _grid);
     }
 
     /// <summary>Attack an enemy with the given member. Returns false if not allowed.</summary>
@@ -169,7 +172,7 @@ public sealed class TurnSystem
         var w = c.EquippedWeapon!;
 
         c.DistLeft = MathF.Max(0f, c.DistLeft - w.Cost);
-        ResolveAttackOnEnemy(w, enemy);
+        ResolveAttackOnEnemy(c, w, enemy);
         return true;
     }
 
@@ -184,7 +187,7 @@ public sealed class TurnSystem
         var w = caster.EquippedWeapon;
         if (w == null || !w.IsCaster) return false;
         if (caster.DistLeft < w.Cost || caster.Mana < w.ManaCost) return false;
-        return CanCastOn(caster, ally, w);
+        return EnemyAi.CanHit(caster, ally, w, _grid);
     }
 
     /// <summary>
@@ -204,13 +207,6 @@ public sealed class TurnSystem
         return true;
     }
 
-    private bool CanCastOn(PartyMemberState caster, PartyMemberState ally, Weapon w)
-    {
-        if (!CombatRules.InAttackRange(caster.X, caster.Y, caster.Radius, ally.X, ally.Y, ally.Radius, w))
-            return false;
-        return LineOfSight.HasLineOfSight(_grid, caster.X, caster.Y, ally.X, ally.Y);
-    }
-
     /// <summary>End the player turn: bank leftover movement, then run the enemy.</summary>
     public void EndTurn()
     {
@@ -221,7 +217,7 @@ public sealed class TurnSystem
         {
             totalSaved += c.EndTurnSaveMovement();
             c.RegenManaFromUnusedMovement();
-            TickStatusEffects(c);
+            TickStatusEffects(c, (a, h) => CharacterHealed?.Invoke(a, h));
         }
 
         Phase = TurnPhase.TurnEnding;
@@ -331,7 +327,7 @@ public sealed class TurnSystem
             return;
         }
 
-        SnapshotBraceCandidates(enemy);
+        ArmPartyBraces(enemy);
         var blocked = OccupiedTilesExcept(enemy);
 
         var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget, blocked);
@@ -354,7 +350,7 @@ public sealed class TurnSystem
     /// </summary>
     private void StartHealerAction(EnemyState healer)
     {
-        SnapshotBraceCandidates(healer);
+        ArmPartyBraces(healer);
         var blocked = OccupiedTilesExcept(healer);
 
         if (!EnemyAi.HasLivingAlly(healer, _enemies))
@@ -370,7 +366,7 @@ public sealed class TurnSystem
         var ally = EnemyAi.SelectHealTarget(healer, _enemies);
         // No wounded ally, or one already in reach, or standing pat while unseen:
         // skip straight to the cast phase (which no-ops if nothing's castable).
-        if (ally == null || healer.TurnsSinceSeen >= 2 || EnemyAi.CanHealFrom(healer, ally, _grid))
+        if (ally == null || healer.TurnsSinceSeen >= 2 || EnemyAi.CanHit(healer, ally, healer.Weapon, _grid))
         {
             BeginAttackPhase();
             return;
@@ -383,17 +379,22 @@ public sealed class TurnSystem
         BeginWalk(waypoints);
     }
 
-    // Snapshot who could NOT reach this enemy yet — walking into their reach is
-    // what triggers a brace.
-    private void SnapshotBraceCandidates(EnemyState enemy)
+    // Before an enemy walks, the party's spear-wielders arm against it. Anyone
+    // already holding it in reach is marked inside — walking *into* reach is
+    // what triggers a brace, standing there is not.
+    private void ArmPartyBraces(EnemyState enemy)
     {
-        _braceCandidates.Clear();
+        _partyBraces.Clear();
+        _braceWatchers.Clear();
         foreach (var member in _party)
         {
+            if (!member.Alive) continue;
             var w = member.EquippedWeapon;
-            if (member.Alive && w?.GetAbility(AbilityType.Brace) != null
-                && !EnemyAi.CharCanHit(member, enemy, w, _grid))
-                _braceCandidates.Add(member);
+            if (w == null || w.GetAbility(AbilityType.Brace) == null) continue;
+
+            _braceWatchers.Add(member);
+            if (EnemyAi.CanHit(member, enemy, w, _grid))
+                _partyBraces.MarkInside(member, enemy);
         }
     }
 
@@ -518,31 +519,31 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// Fire a free retaliation from each brace candidate whose reach contains
-    /// the enemy right now. A member stabs a given walk at most once (they
-    /// leave the candidate list), and the weapon's Brace value caps their
-    /// uses per turn across all walks.
+    /// Fire a free retaliation from each armed member whose reach contains the
+    /// enemy right now. A member stabs a given walk at most once (the pair is
+    /// marked inside for the rest of the walk), and the weapon's Brace value
+    /// caps their uses per turn across all walks.
     /// </summary>
     private void TryBracesAgainst(EnemyState enemy)
     {
-        for (int i = _braceCandidates.Count - 1; i >= 0; i--)
+        for (int i = _braceWatchers.Count - 1; i >= 0; i--)
         {
             if (!enemy.Alive) return;
-            var member = _braceCandidates[i];
+            var member = _braceWatchers[i];
             if (!member.Alive) continue;
 
             var weapon = member.EquippedWeapon;
-            var brace = weapon?.GetAbility(AbilityType.Brace);
+            if (weapon == null) continue;
+            var brace = weapon.GetAbility(AbilityType.Brace);
             if (brace == null) continue;
 
-            _braceUsesThisTurn.TryGetValue(member, out int used);
-            if (used >= brace.Value) continue;
-            if (!EnemyAi.CharCanHit(member, enemy, weapon, _grid)) continue;
+            if (_partyBraces.UsesThisTurn(member) >= brace.Value) continue;
+            if (!EnemyAi.CanHit(member, enemy, weapon, _grid)) continue;
+            if (!_partyBraces.Enter(member, enemy)) continue; // stood inside when the walk began, or already stabbed this walk
 
-            _braceCandidates.RemoveAt(i);
-            _braceUsesThisTurn[member] = used + 1;
+            _partyBraces.Spend(member);
             BraceTriggered?.Invoke(member);
-            ResolveAttackOnEnemy(weapon!, enemy);
+            ResolveAttackOnEnemy(member, weapon, enemy);
         }
     }
 
@@ -594,7 +595,7 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        ResolveAttackOnCharacter(enemy, target);
+        ResolveAttackOnCharacter(enemy, enemy.Weapon, target);
         if (Phase == TurnPhase.GameOver) return;
 
         _timer = AttackBeatSeconds;
@@ -611,7 +612,7 @@ public sealed class TurnSystem
         var ally = EnemyAi.SelectHealTarget(healer, _enemies);
 
         if (!healer.Alive || _enemyBudget < scaledCost
-            || ally == null || !EnemyAi.CanHealFrom(healer, ally, _grid))
+            || ally == null || !EnemyAi.CanHit(healer, ally, healer.Weapon, _grid))
         {
             _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
@@ -634,7 +635,7 @@ public sealed class TurnSystem
         // End of the enemy turn: regen ticks on the allies a healer mended,
         // before resurrections (which restore full HP) are considered.
         foreach (var enemy in _enemies)
-            TickEnemyStatusEffects(enemy);
+            TickStatusEffects(enemy, (a, h) => EnemyHealed?.Invoke(a, h));
 
         foreach (var enemy in _enemies)
         {
@@ -654,18 +655,18 @@ public sealed class TurnSystem
             }
         }
 
-        _braceUsesThisTurn.Clear();
-        _enemyBraceUsesThisTurn.Clear();
+        _partyBraces.ResetUses();
+        _enemyBraces.ResetUses();
 
         // Snapshot who already stands inside each live enemy's reach (after
         // resurrections placed everyone): those pairs never brace this turn.
-        _inEnemyReach.Clear();
+        _enemyBraces.Clear();
         foreach (var enemy in _enemies)
         {
             if (!enemy.Alive) continue;
             foreach (var member in _party)
                 if (member.Alive && EnemyAi.CanHit(enemy, member, enemy.Weapon, _grid))
-                    _inEnemyReach.Add((enemy, member));
+                    _enemyBraces.MarkInside(enemy, member);
         }
 
         foreach (var c in _party)
@@ -678,98 +679,87 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// End-of-turn status tick: each Regeneration effect heals HP equal to its
-    /// level (capped at missing HP), then loses a level and is dropped at zero.
-    /// A dead member simply sheds every effect — regen can't resurrect.
+    /// Status tick for any actor, run at the end of that side's turn: each
+    /// Regeneration effect heals HP equal to its level (capped at missing HP),
+    /// then loses a level and is dropped at zero. A dead actor simply sheds every
+    /// effect — regen can't resurrect. The caller lends its side's healed event,
+    /// so CharacterHealed and EnemyHealed stay separately typed for the HUD.
     /// </summary>
-    private void TickStatusEffects(PartyMemberState c)
+    private static void TickStatusEffects<TActor>(TActor actor, Action<TActor, int>? onHealed)
+        where TActor : ActorState
     {
-        if (!c.Alive)
+        if (!actor.Alive)
         {
-            c.StatusEffects.Clear();
+            actor.StatusEffects.Clear();
             return;
         }
 
-        for (int i = c.StatusEffects.Count - 1; i >= 0; i--)
+        for (int i = actor.StatusEffects.Count - 1; i >= 0; i--)
         {
-            var effect = c.StatusEffects[i];
+            var effect = actor.StatusEffects[i];
             if (effect.Type == StatusEffectType.Regeneration)
             {
-                int healed = Math.Min(effect.Level, c.MaxHp - c.Hp);
+                int healed = Math.Min(effect.Level, actor.MaxHp - actor.Hp);
                 if (healed > 0)
                 {
-                    c.Hp += healed;
-                    CharacterHealed?.Invoke(c, healed);
+                    actor.Hp += healed;
+                    onHealed?.Invoke(actor, healed);
                 }
             }
 
             if (--effect.Level <= 0)
-                c.StatusEffects.RemoveAt(i);
-        }
-    }
-
-    /// <summary>Enemy mirror of <see cref="TickStatusEffects"/>, run at end of the enemy turn.</summary>
-    private void TickEnemyStatusEffects(EnemyState e)
-    {
-        if (!e.Alive)
-        {
-            e.StatusEffects.Clear();
-            return;
-        }
-
-        for (int i = e.StatusEffects.Count - 1; i >= 0; i--)
-        {
-            var effect = e.StatusEffects[i];
-            if (effect.Type == StatusEffectType.Regeneration)
-            {
-                int healed = Math.Min(effect.Level, e.MaxHp - e.Hp);
-                if (healed > 0)
-                {
-                    e.Hp += healed;
-                    EnemyHealed?.Invoke(e, healed);
-                }
-            }
-
-            if (--effect.Level <= 0)
-                e.StatusEffects.RemoveAt(i);
+                actor.StatusEffects.RemoveAt(i);
         }
     }
 
     // ── Shared attack plumbing ───────────────────────────────────────────────
 
-    private void ResolveAttackOnCharacter(EnemyState enemy, PartyMemberState target)
+    /// <summary>
+    /// The one place an attack lands, whoever swings and whoever is hit: roll the
+    /// attacker's weapon against the target's, take the clamped damage off the
+    /// target's HP, raise the caller's hit event, then decide death. The caller
+    /// lends its side's typed hit event so the HUD's CharacterHit / EnemyHit feeds
+    /// stay exactly as they are; what a death *means* (movement lost, defeat turn,
+    /// party wipe) is the typed wrappers' business. Returns true when the target
+    /// died. <paramref name="attacker"/> is not consulted yet — Phase 1's
+    /// attacker-side modifiers and Phase 6's wear read it here; Phase 3 widens
+    /// the return when it needs the resolution's post-block, pre-clamp damage.
+    /// </summary>
+    private bool ResolveAttackOn<TTarget>(
+        ActorState attacker, Weapon attackerWeapon, TTarget target,
+        Action<TTarget, AttackResolution>? onHit)
+        where TTarget : ActorState
     {
-        var resolution = CombatRules.ResolveAttack(enemy.Weapon, target.EquippedWeapon, _rollD20);
+        var resolution = CombatRules.ResolveAttack(attackerWeapon, target.EquippedWeapon, _rollD20);
         target.Hp = Math.Max(0, target.Hp - resolution.Damage);
-        CharacterHit?.Invoke(target, resolution);
+        onHit?.Invoke(target, resolution);
 
-        if (target.Hp <= 0)
+        if (target.Hp > 0) return false;
+        target.Alive = false;
+        return true;
+    }
+
+    private void ResolveAttackOnCharacter(ActorState attacker, Weapon attackerWeapon, PartyMemberState target)
+    {
+        if (!ResolveAttackOn(attacker, attackerWeapon, target, (t, r) => CharacterHit?.Invoke(t, r))) return;
+
+        target.SavedMovement = 0;
+        CharacterDied?.Invoke(target);
+
+        if (_party.All(c => !c.Alive))
         {
-            target.Alive = false;
-            target.SavedMovement = 0;
-            CharacterDied?.Invoke(target);
-
-            if (_party.All(c => !c.Alive))
-            {
-                Phase = TurnPhase.GameOver;
-                _timer = GameOverPauseSeconds;
-                GameOver?.Invoke();
-            }
+            Phase = TurnPhase.GameOver;
+            _timer = GameOverPauseSeconds;
+            GameOver?.Invoke();
         }
     }
 
-    private void ResolveAttackOnEnemy(Weapon attackerWeapon, EnemyState enemy)
+    private void ResolveAttackOnEnemy(ActorState attacker, Weapon attackerWeapon, EnemyState target)
     {
-        var resolution = CombatRules.ResolveAttack(attackerWeapon, enemy.Weapon, _rollD20);
-        enemy.Hp = Math.Max(0, enemy.Hp - resolution.Damage);
-        EnemyHit?.Invoke(enemy, resolution);
+        if (!ResolveAttackOn(attacker, attackerWeapon, target, (t, r) => EnemyHit?.Invoke(t, r))) return;
 
-        if (enemy.Hp <= 0)
-        {
-            enemy.Alive = false;
-            enemy.DefeatedAtTurn = TurnCount;
-            EnemyDefeated?.Invoke(enemy);
-        }
+        target.DefeatedAtTurn = TurnCount;
+        EnemyDefeated?.Invoke(target);
     }
 
     private static float Dist2(EnemyState enemy, PartyMemberState c)

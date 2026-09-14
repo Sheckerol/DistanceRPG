@@ -3,30 +3,28 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <summary>
 /// Gameplay state of one party member, ported from the prototype's per-char
 /// object. Position is the circle centre in logic space (pixels, y-down).
+/// Position, HP, radius and status effects are the shared <see cref="ActorState"/>.
 /// </summary>
-public sealed class PartyMemberState
+public sealed class PartyMemberState : ActorState
 {
     public required string Id { get; init; }
     public required int ColorIndex { get; init; }
 
-    public float X { get; set; }
-    public float Y { get; set; }
+    public PartyMemberState()
+    {
+        Hp = GameConstants.PlayerHp;
+    }
 
-    public int Hp { get; set; } = GameConstants.PlayerHp;
-    public int MaxHp { get; } = GameConstants.PlayerHp;
-    public bool Alive { get; set; } = true;
+    public override int MaxHp => GameConstants.PlayerHp;
 
     /// <summary>Mana pool for casting staves; persists across turns.</summary>
     public int Mana { get; set; } = GameConstants.MaxMana;
     public int MaxMana => GameConstants.MaxMana;
 
-    /// <summary>Active heal-over-time and other ongoing effects.</summary>
-    public List<StatusEffect> StatusEffects { get; } = new();
-
     /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
     public Weapon?[] Inventory { get; } = new Weapon?[3];
 
-    public Weapon? EquippedWeapon => Inventory[0];
+    public override Weapon? EquippedWeapon => Inventory[0];
 
     /// <summary>Movement budget left this turn, in logic units.</summary>
     public float DistLeft { get; set; } = GameConstants.MaxDistance;
@@ -37,7 +35,7 @@ public sealed class PartyMemberState
     /// <summary>Banked at end of turn (half the unspent budget, capped).</summary>
     public float SavedMovement { get; set; }
 
-    public float Radius => GameConstants.PlayerHalf;
+    public override float Radius => GameConstants.PlayerHalf;
 
     /// <summary>
     /// Start-of-turn reset: cash in the saved movement bonus, refill the budget.
@@ -82,25 +80,4 @@ public sealed class PartyMemberState
         Mana = Math.Min(MaxMana, Mana + regen);
         return Mana - before;
     }
-
-    /// <summary>
-    /// Add a status effect, stacking its level onto any existing effect of the
-    /// same type. Returns the (possibly merged) effect now on the member.
-    /// </summary>
-    public StatusEffect ApplyStatusEffect(StatusEffectType type, int level)
-    {
-        var existing = StatusEffects.FirstOrDefault(e => e.Type == type);
-        if (existing != null)
-        {
-            existing.Level += level;
-            return existing;
-        }
-        var added = new StatusEffect { Type = type, Level = level };
-        StatusEffects.Add(added);
-        return added;
-    }
-
-    /// <summary>Level of the given effect currently on the member, 0 if absent.</summary>
-    public int StatusLevel(StatusEffectType type)
-        => StatusEffects.FirstOrDefault(e => e.Type == type)?.Level ?? 0;
 }
