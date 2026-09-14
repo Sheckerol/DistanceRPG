@@ -269,9 +269,51 @@ public class ModifierRulesTests
         Assert.Equal(2, rules.AcquiredHeadroom);
         Assert.Equal(3, rules.Cap(Brace, 1));
         Assert.Equal(8, rules.Resolve(Block, 2));
-        Assert.Equal(0, rules.Resolve(CritMultiplier, 1));   // absent offset and per-stack fall back to 0
+        Assert.Equal(3, rules.Resolve(CritMultiplier, 1));   // absent offset and per-stack fall back per key to the compiled 2 + 1
         Assert.Equal(1, rules.MaxForged(Block));              // override
-        Assert.Equal(3, rules.MaxForged(Light));              // fallback
+        Assert.Equal(1, rules.MaxForged(Light));              // absent: the compiled override
+        Assert.Equal(3, rules.MaxForged(Brace));              // in neither table: 3
+    }
+
+    [Fact]
+    public void PartialTuningTables_FallBackPerKey_ToTheCompiledDefaults()
+    {
+        // A file that re-prices one modifier replaces the whole table on the
+        // record; the rules still read every other key at its compiled value.
+        var partial = new Tuning
+        {
+            PerStack = new Dictionary<ModifierType, int> { [Block] = 4 },
+            Offset = new Dictionary<ModifierType, int> { [Charges] = 0 },
+            MaxForged = new Dictionary<ModifierType, int> { [Block] = 1 },
+        };
+        var rules = new ModifierRules(partial, ContentDefaults.Restricted);
+
+        foreach (var t in All)
+        {
+            Assert.Equal(t == Block ? 4 : Rules.PerStack(t), rules.PerStack(t));
+            Assert.Equal(t == Charges ? 0 : Rules.Offset(t), rules.Offset(t));
+            Assert.Equal(t == Block ? 1 : Rules.MaxForged(t), rules.MaxForged(t));
+        }
+
+        // No dead stacks from a partial file: every priced modifier is still worth something.
+        foreach (var t in All.Where(t => t is not (OnHitPoison or Momentum)))
+            Assert.True(rules.PerStack(t) > 0, $"{t}: a partial table zeroed its stacks");
+
+        // An explicit zero is an override, not an absence.
+        var zeroed = new ModifierRules(new Tuning { PerStack = new Dictionary<ModifierType, int> { [Block] = 0 } }, ContentDefaults.Restricted);
+        Assert.Equal(0, zeroed.PerStack(Block));
+        Assert.Equal(0, zeroed.Resolve(Block, 3));
+    }
+
+    [Fact]
+    public void Rules_RefuseAModifierRelationNamingAnEnchantment()
+    {
+        // Allowed sees a weapon's modifiers and nothing else, so the member could only be dropped.
+        var restricted = new RestrictedData([["flaming", nameof(Light)]], new Dictionary<string, string[]>(),
+            new Dictionary<string, string>(), [], []);
+        var ex = Assert.Throws<ContentException>(() => new ModifierRules(new Tuning(), restricted));
+        Assert.Equal(nameof(Light), ex.EntryId);
+        Assert.Equal(ContentValidator.RuleModifierRelationIds, ex.Rule);
     }
 
     [Fact]

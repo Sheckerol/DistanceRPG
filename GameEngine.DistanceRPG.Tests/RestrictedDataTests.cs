@@ -154,6 +154,29 @@ public class RestrictedDataTests
     }
 
     [Fact]
+    public void Validator_RejectsAModifierRelationNamingAnEnchantment()
+    {
+        // ModifierRules.Allowed has no enchantment view, so such a rule could only be dropped silently.
+        var known = KnownPlus("flaming", "cold", "burning");
+
+        var requires = Assert.Throws<ContentException>(() =>
+            ContentValidator.ValidateRestricted(
+                Data(requires: new Dictionary<string, string[]> { ["Riposte"] = ["flaming"] }), known));
+        Assert.Equal("Riposte", requires.EntryId);
+        Assert.Equal(ContentValidator.RuleModifierRelationIds, requires.Rule);
+
+        var mixed = Assert.Throws<ContentException>(() =>
+            ContentValidator.ValidateRestricted(Data(excludes: [["flaming", "Light"]]), known));
+        Assert.Equal("Light", mixed.EntryId);   // the modifier is the entry, wherever it sits in the group
+        Assert.Equal(ContentValidator.RuleModifierRelationIds, mixed.Rule);
+
+        // Relations keyed by an enchantment are the catalogue's business and pass here.
+        ContentValidator.ValidateRestricted(
+            Data(excludes: [["flaming", "cold"]], requires: new Dictionary<string, string[]> { ["burning"] = ["flaming"] }),
+            known);   // does not throw
+    }
+
+    [Fact]
     public void Validator_AcceptsRelationsOverEnchantmentIds_OnceTheyAreKnown()
     {
         var data = Data(

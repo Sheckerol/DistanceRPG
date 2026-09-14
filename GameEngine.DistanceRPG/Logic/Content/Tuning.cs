@@ -7,16 +7,33 @@ namespace GameEngine.DistanceRPG.Logic;
 /// fallbacks as the initialisers: a partial file is valid key by key and the
 /// game runs with no file at all. Read once at startup, never hot-reloaded.
 /// Ratios are integer divisors whose names say what they convert. Nothing the
-/// golden tests pin belongs here.
+/// golden tests pin belongs here. The tables are per-key overlays on the
+/// compiled instance: readers go through <see cref="Lookup"/>, so a file that
+/// names one entry leaves the rest at their compiled values and a deserialiser
+/// may replace a table wholesale without merging it.
 /// </summary>
 public sealed record Tuning
 {
+    /// <summary>
+    /// Read <paramref name="key"/> from one of this instance's tables, falling
+    /// back per key to the compiled table (§5.3: a missing key means the compiled
+    /// default) and then to <paramref name="fallback"/> for a key in neither.
+    /// </summary>
+    public int Lookup<TKey>(Func<Tuning, IReadOnlyDictionary<TKey, int>> table, TKey key, int fallback)
+        where TKey : notnull
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        return table(this).TryGetValue(key, out var value)
+            ? value
+            : table(ContentDefaults.Tuning).GetValueOrDefault(key, fallback);
+    }
+
     // ---- Modifiers (§1.1) ----
 
     /// <summary>Acquired stacks a modifier may gain above its forged count: <c>cap(t) = forged(t) + AcquiredHeadroom</c>.</summary>
     public int AcquiredHeadroom { get; init; } = 5;
 
-    /// <summary>What one stack is worth, per modifier — the §1.1 table. First-pass targets, not tuned values.</summary>
+    /// <summary>What one stack is worth, per modifier — the §1.1 table. First-pass targets, not tuned values. Complete: every member has a row, so no stack is ever worth nothing by omission.</summary>
     public IReadOnlyDictionary<ModifierType, int> PerStack { get; init; } = new Dictionary<ModifierType, int>
     {
         [Brace] = 1,           // +1 retaliation
@@ -44,7 +61,7 @@ public sealed record Tuning
         [Momentum] = 0,        // enchantment-only: never a modifier stack
     };
 
-    /// <summary>What a modifier grants before its first stack; absent means 0.</summary>
+    /// <summary>What a modifier grants before its first stack; absent falls back to this compiled table, then 0.</summary>
     public IReadOnlyDictionary<ModifierType, int> Offset { get; init; } = new Dictionary<ModifierType, int>
     {
         [CritMultiplier] = 2,  // the base x2
@@ -52,9 +69,10 @@ public sealed record Tuning
     };
 
     /// <summary>
-    /// Forge-limit overrides; absent means 3 (a unique raises one modifier to x3
-    /// and nothing is forged past it). The currency pair shares the limit of 1
-    /// because they share a shape and exclude each other.
+    /// Forge-limit overrides; absent falls back to this compiled table, then 3
+    /// (a unique raises one modifier to x3 and nothing is forged past it). The
+    /// currency pair shares the limit of 1 because they share a shape and
+    /// exclude each other.
     /// </summary>
     public IReadOnlyDictionary<ModifierType, int> MaxForged { get; init; } = new Dictionary<ModifierType, int>
     {
@@ -68,15 +86,21 @@ public sealed record Tuning
     public IReadOnlyDictionary<StatusEffectType, int> EffectPerLevel { get; init; } = new Dictionary<StatusEffectType, int>
     {
         [StatusEffectType.Regeneration] = 1,   // 1 HP restored per level at the target's turn end
+        // TODO(sub-step 4): with the members, add Ward 1, Poison 1, Bleeding 1, Searing 1, Mire 10 (percent of the
+        // movement budget) — PHASE1WEAPONS-309 — and 1d's Sundered 1, Weakened 1, OverhealPool 1, Softened 1.
     };
 
     /// <summary>Surplus healing points that convert into one Ward level.</summary>
     public int OverhealPerWard { get; init; } = 5;
 
     /// <summary>
-    /// Expected damage-over-time points bought per point of trigger mana: the
-    /// §1.5 <c>DotManaPerDamage = 1/3</c>, stored as the integer divisor §5.3 asks
-    /// for (<c>triggerCost = max(1, expectedTotal / DotDamagePerMana)</c>).
+    /// Expected damage-over-time points bought per point of trigger mana. This is
+    /// the docs' <c>DotManaPerDamage = 1/3</c> (§1.5; settled.md fixes the value)
+    /// stored as its integer reciprocal, because §5.3 makes every ratio an integer
+    /// divisor named by its units: <c>triggerCost = max(1, expectedTotal / DotDamagePerMana)</c>.
+    /// Loader note: the <c>tuning.json</c> key is <c>DotDamagePerMana</c>, this
+    /// property's name; there is no <c>DotManaPerDamage</c> key, since 1/3 cannot be
+    /// written as an integer under that name.
     /// </summary>
     public int DotDamagePerMana { get; init; } = 3;
 

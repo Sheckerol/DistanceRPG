@@ -10,6 +10,7 @@ namespace GameEngine.DistanceRPG.Logic;
 public static class ContentValidator
 {
     public const string RuleUnknownId = "id does not resolve to a modifier or an enchantment";
+    public const string RuleModifierRelationIds = "a modifier relation may only name modifier ids";
     public const string RuleKindValue = "kind must be melee, ranged or caster";
     public const string RuleSelfExclusion = "an id may not exclude itself";
     public const string RuleExcludesSymmetric = "excludes must close symmetrically";
@@ -18,12 +19,12 @@ public static class ContentValidator
     public const string RuleRequiresConflict = "an id may not require two ids that exclude each other";
 
     /// <summary>
-    /// The §5.5 checks on <c>restricted.json</c>: every id resolves, no id
-    /// excludes itself, excludes closes symmetrically, requires is acyclic, and
-    /// nothing both requires and excludes the same id. <paramref name="knownIds"/>
-    /// is every modifier and enchantment id content may name. (The "every
-    /// forgedOnly id is forged on at least one weapon" check needs the weapon
-    /// list and lives with the weapon checks.)
+    /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier
+    /// relation names only modifiers, no id excludes itself, excludes closes
+    /// symmetrically, requires is acyclic, and nothing both requires and excludes
+    /// the same id. <paramref name="knownIds"/> is every modifier and enchantment
+    /// id content may name. (The "every forgedOnly id is forged on at least one
+    /// weapon" check needs the weapon list and lives with the weapon checks.)
     /// </summary>
     public static void ValidateRestricted(RestrictedData data, IReadOnlySet<string> knownIds)
     {
@@ -49,6 +50,9 @@ public static class ContentValidator
         }
         RequireKnown(data.ForgedOnly, knownIds);
         RequireKnown(data.NeverRolled, knownIds);
+
+        // A relation keyed by a modifier names only modifiers; see the method.
+        ValidateModifierRelations(data);
 
         // No id excludes itself: a group naming an id twice would.
         foreach (var group in data.Excludes)
@@ -81,6 +85,34 @@ public static class ContentValidator
                 if (excludes.TryGetValue(p, out var excludedByP) && prerequisites.Any(excludedByP.Contains))
                     throw new ContentException(id, RuleRequiresConflict);
         }
+    }
+
+    /// <summary>
+    /// A relation keyed by a modifier names only modifiers: a <c>requires</c> row
+    /// keyed by one, and an exclusion group containing one. <see cref="ModifierRules.Allowed"/>
+    /// sees a weapon's modifiers and nothing else, so a modifier requiring or
+    /// excluding an enchantment id could only be dropped on the way in — the
+    /// rule that silently does not apply, which the id check exists to prevent.
+    /// Relations keyed by an enchantment are free to name enchantments; they are
+    /// read beside the enchantment catalogue. The entry named is the modifier.
+    /// <see cref="ModifierRules"/> runs this itself as well, so the rules can
+    /// never be built around a dropped relation.
+    /// </summary>
+    public static void ValidateModifierRelations(RestrictedData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        var isModifier = (string id) => ModifierRules.ModifierIds.Contains(id);
+
+        foreach (var group in data.Excludes)
+        {
+            var modifier = group.FirstOrDefault(isModifier);
+            if (modifier != null && !group.All(isModifier))
+                throw new ContentException(modifier, RuleModifierRelationIds);
+        }
+
+        foreach (var (id, needs) in data.Requires.OrderBy(r => r.Key, StringComparer.Ordinal))
+            if (isModifier(id) && !needs.All(isModifier))
+                throw new ContentException(id, RuleModifierRelationIds);
     }
 
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)

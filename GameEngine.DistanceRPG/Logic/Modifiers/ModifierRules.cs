@@ -33,17 +33,24 @@ public sealed class ModifierRules
 
     /// <summary>
     /// Build the rules from data. Enchantment ids share the relations file
-    /// (§5.5) but not these tables: members that are not modifiers are dropped
-    /// here and validated alongside the enchantment catalogue instead.
+    /// (§5.5) but not these tables: a relation keyed by an enchantment is
+    /// skipped here and validated alongside the enchantment catalogue instead,
+    /// while a modifier relation naming an enchantment is refused
+    /// (<see cref="ContentValidator.RuleModifierRelationIds"/>) rather than
+    /// quietly losing the member <see cref="Allowed"/> could never see.
     /// </summary>
     public ModifierRules(Tuning tuning, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(tuning);
         ArgumentNullException.ThrowIfNull(restricted);
+        ContentValidator.ValidateModifierRelations(restricted);   // never build around a dropped relation
 
         _tuning = tuning;
         AcquiredHeadroom = tuning.AcquiredHeadroom;
 
+        // After the check above a group is all modifiers or none, and a
+        // modifier-keyed requires row names only modifiers: the filter below
+        // drops whole enchantment relations and nothing else.
         Excludes = Symmetric(restricted.Excludes.Select(group => Modifiers(group)));
         ForgedOnly = new SortedSet<ModifierType>(Modifiers(restricted.ForgedOnly));   // enum order: deterministic to enumerate
 
@@ -68,18 +75,22 @@ public sealed class ModifierRules
     /// </summary>
     public int AcquiredHeadroom { get; }
 
+    // The three tables read per key through Tuning.Lookup: a partial table
+    // overrides the modifiers it names and leaves the rest at their compiled
+    // values (§5.3), so a file that re-prices one stack never kills the others.
+
     /// <summary>What one stack of <paramref name="t"/> is worth (the §1.1 table).</summary>
-    public int PerStack(ModifierType t) => _tuning.PerStack.GetValueOrDefault(t, 0);
+    public int PerStack(ModifierType t) => _tuning.Lookup(x => x.PerStack, t, fallback: 0);
 
     /// <summary>What <paramref name="t"/> grants before its first stack: CritMultiplier's base x2, Charges' first throw.</summary>
-    public int Offset(ModifierType t) => _tuning.Offset.GetValueOrDefault(t, DefaultOffset);
+    public int Offset(ModifierType t) => _tuning.Lookup(x => x.Offset, t, DefaultOffset);
 
     /// <summary>
     /// The most of <paramref name="t"/> any weapon may be forged with. Checked when
     /// a weapon is built — by the content validator — never in <see cref="ModifierSet.With"/>:
     /// it constrains the forge and never acquisition.
     /// </summary>
-    public int MaxForged(ModifierType t) => _tuning.MaxForged.GetValueOrDefault(t, DefaultMaxForged);
+    public int MaxForged(ModifierType t) => _tuning.Lookup(x => x.MaxForged, t, DefaultMaxForged);
 
     /// <summary>These two cannot coexist. The symmetric closure of the file's groups.</summary>
     public IReadOnlyDictionary<ModifierType, ModifierType[]> Excludes { get; }

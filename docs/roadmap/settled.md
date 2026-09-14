@@ -160,7 +160,10 @@
     Poison demonstration.
   - The party carry limit stays **24** (6 slots × 4 characters).
   - A caster's starting **max mana is 160**.
-  - `DotManaPerDamage` = **⅓**, the worked example already in §1.5.
+  - `DotManaPerDamage` = **⅓**, the worked example already in §1.5. Stored as
+    its integer reciprocal, `DotDamagePerMana = 3` — the `Tuning` property and
+    the `tuning.json` key — because §5.3 makes every ratio an integer divisor
+    named by its units; there is no `DotManaPerDamage` key.
   - `ApplyPercent` per element: **Flaming 20%, Cold 15%, Shocking 25%, Acidic
     15%** — spread within the doc's own 10–25% band rather than one value for
     all four, so the elements don't all produce identically-paced burns.
