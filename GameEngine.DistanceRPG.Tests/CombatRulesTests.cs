@@ -8,6 +8,16 @@ public class CombatRulesTests
     private static Weapon Sword => GameConstants.Weapons[1];  // dmg 10, block 3
     private static Weapon Spear => GameConstants.Weapons[2];  // dmg 7, brace
 
+    /// <summary>Resolve through the compiled chain with a party member holding each weapon (null: unarmed).</summary>
+    private static AttackResolution Resolve(Weapon attackerWeapon, Weapon? defenderWeapon, int roll)
+    {
+        var attacker = new PartyMemberState { Id = "A", ColorIndex = 0 };
+        attacker.Inventory[0] = attackerWeapon;
+        var defender = new PartyMemberState { Id = "B", ColorIndex = 0 };
+        defender.Inventory[0] = defenderWeapon;
+        return CombatRules.ResolveAttack(attacker, defender, attackerWeapon, distanceUnits: 0, () => roll);
+    }
+
     [Fact]
     public void NormalRoll_DealsBaseDamage()
     {
@@ -49,7 +59,7 @@ public class CombatRulesTests
     public void Block_AbsorbsUpToItsValue()
     {
         // Spear (7 dmg) into Sword (block 3) â†’ 4 through, 3 absorbed
-        var res = CombatRules.ResolveAttack(Spear, Sword, () => 10);
+        var res = Resolve(Spear, Sword, roll: 10);
         Assert.Equal(4, res.Damage);
         Assert.Equal(3, res.Blocked);
     }
@@ -59,7 +69,7 @@ public class CombatRulesTests
     {
         var feather = new Weapon("Feather", 10, 2, 0, []);
         // 2 dmg into block 3: absorb is capped at damage-1 = 1
-        var res = CombatRules.ResolveAttack(feather, Sword, () => 10);
+        var res = Resolve(feather, Sword, roll: 10);
         Assert.Equal(1, res.Damage);
         Assert.Equal(1, res.Blocked);
     }
@@ -67,11 +77,11 @@ public class CombatRulesTests
     [Fact]
     public void NoBlockAbility_NothingAbsorbed()
     {
-        var res = CombatRules.ResolveAttack(Sword, Dagger, () => 10);
+        var res = Resolve(Sword, Dagger, roll: 10);
         Assert.Equal(10, res.Damage);
         Assert.Equal(0, res.Blocked);
 
-        var noDefender = CombatRules.ResolveAttack(Sword, null, () => 10);
+        var noDefender = Resolve(Sword, null, roll: 10);
         Assert.Equal(10, noDefender.Damage);
     }
 

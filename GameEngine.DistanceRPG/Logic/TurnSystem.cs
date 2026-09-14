@@ -99,6 +99,17 @@ public sealed class TurnSystem
     private readonly ThreatZone _enemyBraces = new();
     private readonly List<PartyMemberState> _braceWatchers = new(); // party bracers armed against the current walk
 
+    // ── The event table ──────────────────────────────────────────────────────
+    // Every behaviour hangs off this one dispatcher (§1.7): the compiled
+    // chains are registered once, and this system registers the appliers —
+    // the places the settled results are written — because they raise its
+    // typed events. Raises happen at the phase boundaries and when an attack
+    // lands; anything a handler or applier triggers is queued, never raised.
+    private readonly EventTable _events = new();
+
+    /// <summary>The table, for tests that probe the raise points and the queued follow-ups.</summary>
+    internal EventTable Events => _events;
+
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -108,6 +119,9 @@ public sealed class TurnSystem
         _party = party;
         _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
+
+        Behaviours.RegisterAll(_events);
+        _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
     }
 
     /// <summary>
@@ -217,6 +231,9 @@ public sealed class TurnSystem
         {
             totalSaved += c.EndTurnSaveMovement();
             c.RegenManaFromUnusedMovement();
+            // The member's turn ends here; the status tick beside it becomes
+            // that event's handlers once the status table lands.
+            _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c, c);
             TickStatusEffects(c, (a, h) => CharacterHealed?.Invoke(a, h));
         }
 
@@ -305,6 +322,7 @@ public sealed class TurnSystem
     private void StartEnemyAction(EnemyState enemy)
     {
         _enemyBudget = GameConstants.EnemyMove;
+        _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
 
         if (enemy.IsHealer)
         {
@@ -629,13 +647,23 @@ public sealed class TurnSystem
 
     private void StartPlayerTurn()
     {
+        // End of the enemy turn: each enemy's turn ends (regen ticks on the
+        // allies a healer mended), then the round — one player phase and one
+        // enemy phase — closes for every actor. All of it under the turn that
+        // is ending, and before resurrections (which restore full HP) are
+        // considered.
+        foreach (var enemy in _enemies)
+        {
+            _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+            TickStatusEffects(enemy, (a, h) => EnemyHealed?.Invoke(a, h));
+        }
+        foreach (var member in _party)
+            _events.Raise(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Party), member, member);
+        foreach (var enemy in _enemies)
+            _events.Raise(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+
         _seenThisTurn.Clear();
         TurnCount++;
-
-        // End of the enemy turn: regen ticks on the allies a healer mended,
-        // before resurrections (which restore full HP) are considered.
-        foreach (var enemy in _enemies)
-            TickStatusEffects(enemy, (a, h) => EnemyHealed?.Invoke(a, h));
 
         foreach (var enemy in _enemies)
         {
@@ -671,7 +699,9 @@ public sealed class TurnSystem
 
         foreach (var c in _party)
         {
-            if (c.Alive) c.StartTurn();
+            if (!c.Alive) continue;
+            c.StartTurn();
+            _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c, c);
         }
 
         Phase = TurnPhase.Player;
@@ -715,33 +745,61 @@ public sealed class TurnSystem
     // ── Shared attack plumbing ───────────────────────────────────────────────
 
     /// <summary>
-    /// The one place an attack lands, whoever swings and whoever is hit: roll the
-    /// attacker's weapon against the target's, take the clamped damage off the
-    /// target's HP, raise the caller's hit event, then decide death. The caller
-    /// lends its side's typed hit event so the HUD's CharacterHit / EnemyHit feeds
-    /// stay exactly as they are; what a death *means* (movement lost, defeat turn,
-    /// party wipe) is the typed wrappers' business. Returns true when the target
-    /// died. <paramref name="attacker"/> is not consulted yet — Phase 1's
-    /// attacker-side modifiers and Phase 6's wear read it here; Phase 3 widens
-    /// the return when it needs the resolution's post-block, pre-clamp damage.
+    /// The one place an attack lands, whoever swings and whoever is hit: the
+    /// attacker's natural roll and the surface distance seed a DamagePayload,
+    /// DamageTaken runs the §1.6 chain on this system's table, and the applier
+    /// (<see cref="ApplyDamage"/>) writes the settled result once — HP, the
+    /// side's typed hit event, the queued follow-ups. What a death *means*
+    /// (movement lost, defeat turn, party wipe) stays the typed wrappers'
+    /// business, which runs after the raise returns. Returns true when the
+    /// target died.
     /// </summary>
-    private bool ResolveAttackOn<TTarget>(
-        ActorState attacker, Weapon attackerWeapon, TTarget target,
-        Action<TTarget, AttackResolution>? onHit)
-        where TTarget : ActorState
+    private bool ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target)
     {
-        var resolution = CombatRules.ResolveAttack(attackerWeapon, target.EquippedWeapon, _rollD20);
-        target.Hp = Math.Max(0, target.Hp - resolution.Damage);
-        onHit?.Invoke(target, resolution);
+        CombatRules.Resolve(_events, attacker, target, attackerWeapon,
+            CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20);
+        return !target.Alive;
+    }
 
-        if (target.Hp > 0) return false;
-        target.Alive = false;
-        return true;
+    /// <summary>
+    /// The DamageTaken applier — the single world-write for a hit. Takes
+    /// <see cref="DamagePayload.Taken"/> off the target's HP, lands the settled
+    /// status applications on both sides, raises the target side's typed hit
+    /// event with the projected resolution (so the CharacterHit / EnemyHit feeds
+    /// stay exactly as they are), and queues the follow-ups for the table to
+    /// drain after it returns: Killed on a death, DamageDealt always, Crit on a
+    /// crit. Death consequences belong to the typed wrappers.
+    /// </summary>
+    private void ApplyDamage(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
+    {
+        target.Hp = Math.Max(0, target.Hp - settled.Taken);
+        if (!settled.ApplyToDefender.IsDefaultOrEmpty)
+            foreach (var status in settled.ApplyToDefender)
+                target.ApplyStatusEffect(status.Type, status.Levels);
+        if (!settled.ApplyToAttacker.IsDefaultOrEmpty)
+            foreach (var status in settled.ApplyToAttacker)
+                attacker.ApplyStatusEffect(status.Type, status.Levels);
+
+        var resolution = CombatRules.Project(settled);
+        switch (target)
+        {
+            case PartyMemberState member: CharacterHit?.Invoke(member, resolution); break;
+            case EnemyState enemy: EnemyHit?.Invoke(enemy, resolution); break;
+        }
+
+        if (target.Hp <= 0)
+        {
+            target.Alive = false;
+            table.Enqueue(GameEvent.Killed, new KillPayload(settled.Weapon, settled.Dealt, settled.Taken), attacker, target);
+        }
+        table.Enqueue(GameEvent.DamageDealt, settled, attacker, target);
+        if (settled.IsCrit)
+            table.Enqueue(GameEvent.Crit, new CritPayload(settled.Weapon, settled.Roll), attacker, target);
     }
 
     private void ResolveAttackOnCharacter(ActorState attacker, Weapon attackerWeapon, PartyMemberState target)
     {
-        if (!ResolveAttackOn(attacker, attackerWeapon, target, (t, r) => CharacterHit?.Invoke(t, r))) return;
+        if (!ResolveAttackOn(attacker, attackerWeapon, target)) return;
 
         target.SavedMovement = 0;
         CharacterDied?.Invoke(target);
@@ -756,7 +814,7 @@ public sealed class TurnSystem
 
     private void ResolveAttackOnEnemy(ActorState attacker, Weapon attackerWeapon, EnemyState target)
     {
-        if (!ResolveAttackOn(attacker, attackerWeapon, target, (t, r) => EnemyHit?.Invoke(t, r))) return;
+        if (!ResolveAttackOn(attacker, attackerWeapon, target)) return;
 
         target.DefeatedAtTurn = TurnCount;
         EnemyDefeated?.Invoke(target);

@@ -27,6 +27,30 @@ public abstract class ActorState
     /// <summary>The weapon this actor fights with right now; null when unarmed.</summary>
     public abstract Weapon? EquippedWeapon { get; }
 
+    /// <summary>
+    /// Modifiers the actor carries whatever it is holding — the golem's Block
+    /// (§4.3). Added to the weapon's at resolution time, never to any weapon's
+    /// cap: a weapon's ceiling comes from its own forged spread alone.
+    /// </summary>
+    public ModifierSet Innate { get; set; } = ModifierSet.Empty;
+
+    /// <summary>Stacks of <paramref name="t"/> in play for this actor: the equipped weapon's plus the innate ones.</summary>
+    public int Stacks(ModifierType t) => (EquippedWeapon?.Modifiers.Stacks(t) ?? 0) + Innate.Stacks(t);
+
+    /// <summary>
+    /// The §1.1 value of <paramref name="t"/> for this actor. Weapon and innate
+    /// stacks resolve together, so a modifier's offset applies once.
+    /// </summary>
+    public int Value(ModifierType t) => GameContent.Current.Modifiers.Resolve(t, Stacks(t));
+
+    /// <summary>
+    /// Mana pool for casting. Every trigger costs mana on both sides, so an
+    /// enemy caster carries one too; full at spawn.
+    /// </summary>
+    public int Mana { get; set; } = GameConstants.MaxMana;
+
+    public virtual int MaxMana => GameConstants.MaxMana;
+
     /// <summary>Active heal-over-time and other ongoing effects.</summary>
     public List<StatusEffect> StatusEffects { get; } = new();
 

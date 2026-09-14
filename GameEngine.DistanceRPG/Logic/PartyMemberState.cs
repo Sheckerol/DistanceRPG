@@ -17,10 +17,6 @@ public sealed class PartyMemberState : ActorState
 
     public override int MaxHp => GameConstants.PlayerHp;
 
-    /// <summary>Mana pool for casting staves; persists across turns.</summary>
-    public int Mana { get; set; } = GameConstants.MaxMana;
-    public int MaxMana => GameConstants.MaxMana;
-
     /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
     public Weapon?[] Inventory { get; } = new Weapon?[3];
 
