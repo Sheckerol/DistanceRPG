@@ -63,8 +63,9 @@ public abstract class ActorState
     /// Overwatch's banked shots: holding fire this turn arms the actor's
     /// Overwatch value here, which makes its ranged reach a threat zone until
     /// the turn ends — a target entering it is shot for free, one shot per
-    /// held stack. Zero when nothing is held; cleared when the next player
-    /// turn starts.
+    /// held stack. Counts down as they fire, so it reads as the shots still
+    /// held: zero when nothing is, and cleared when the next player turn
+    /// starts or the weapon that held them is swapped away.
     /// </summary>
     public int HeldShots { get; set; }
 

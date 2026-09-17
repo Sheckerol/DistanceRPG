@@ -374,6 +374,54 @@ public class TurnSystemTests
     }
 
     [Fact]
+    public void EnemyPhase_RearmsZones_ForWhateverIsEquippedWhenItBegins()
+    {
+        var grid = new int[20, 30];
+        // S swaps dagger for pike (a raw inventory swap, unannounced) with the
+        // dummy already four tiles off: outside the dagger's 40, inside the
+        // pike's 128. Whatever is equipped when the enemy phase begins is what
+        // reacts, and a mover already inside a reach when it arms never fires
+        // on its first step: the dummy walks two tiles closer, unbraced.
+        var s = Char("S", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto");
+        s.Inventory[1] = TestWeapons.Get("skirmishers_pike");
+        var enemy = new EnemyState { X = s.X + 4 * Tile, Y = s.Y };   // surface 100
+        var turns = new TurnSystem(grid, new[] { s }, new[] { enemy }, () => 10);
+        int braces = 0;
+        turns.BraceTriggered += _ => braces++;
+
+        (s.Inventory[0], s.Inventory[1]) = (s.Inventory[1], s.Inventory[0]);
+        Assert.Equal("skirmishers_pike", s.EquippedWeapon!.Id);
+        Assert.True(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));
+
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 10f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        Assert.True(enemy.X < s.X + 4 * Tile);   // it walked, into sword reach
+        Assert.Equal(0, braces);
+        Assert.Equal(GameConstants.DummyHp, enemy.Hp);
+
+        // The same swap with the dummy outside the pike's reach as well:
+        // walking in is a real entry, and the pike answers it.
+        var p = Char("P", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto");
+        p.Inventory[1] = TestWeapons.Get("skirmishers_pike");
+        var walker = new EnemyState { X = p.X + 250f, Y = p.Y };   // outside 128 + 28
+        var turns2 = new TurnSystem(grid, new[] { p }, new[] { walker }, () => 10);
+        int braces2 = 0;
+        turns2.BraceTriggered += _ => braces2++;
+        (p.Inventory[0], p.Inventory[1]) = (p.Inventory[1], p.Inventory[0]);
+
+        turns2.NotifyEnemyVisible(walker, true);
+        turns2.EndTurn();
+        Advance(turns2, 10f);
+
+        Assert.Equal(TurnPhase.Player, turns2.Phase);
+        Assert.Equal(1, braces2);
+        Assert.Equal(GameConstants.DummyHp - 4, walker.Hp);   // the pike's 7 into Block 3
+    }
+
+    [Fact]
     public void GameOver_WhenLastCharacterDies()
     {
         var grid = new int[20, 20];

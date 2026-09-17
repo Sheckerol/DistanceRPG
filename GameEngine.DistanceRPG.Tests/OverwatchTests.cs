@@ -26,6 +26,13 @@ public class OverwatchTests
     private static EnemyState Approacher(PartyMemberState a, int row)
         => new() { X = a.X + 320f + 28f + 60f, Y = At(row, 0).Y };
 
+    /// <summary>A dummy on a tile's centre, with enough HP that nothing here kills it by accident.</summary>
+    private static EnemyState Enemy(int r, int c, string weaponId = "arming_sword", int hp = 200)
+    {
+        var (x, y) = At(r, c);
+        return new EnemyState { X = x, Y = y, Weapon = TestWeapons.Get(weaponId), Hp = hp };
+    }
+
     private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)
     {
         for (float t = 0f; t < seconds; t += dt)
@@ -122,6 +129,64 @@ public class OverwatchTests
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(0, a.HeldShots);         // a held shot lapses with the turn
         Assert.True(turns.CanOverwatch(a));   // and can be held again
+    }
+
+    [Fact]
+    public void HeldShots_CountDownAsTheyFire_AndLapseWithASwap()
+    {
+        // Overwatch x2 holds two shots. On the party's own turn B's sword
+        // shoves a dummy into the Crossbow's reach: one shot goes (2 to 1, and
+        // A cannot hold again while a shot is held); a second dummy shoved in
+        // takes the other (1 to 0, and A cannot hold again because this turn's
+        // pool is spent). The reading is the shots still held, not the shots
+        // armed.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 2, "crossbow");
+        a.EquippedWeapon!.Acquire(Overwatch, 1);
+        var b = Char("B", 5, 14, "tower_guard");
+        var e1 = Enemy(5, 13);   // eleven tiles from A: 352 less both radii is 324, just past the bow's 320
+        var e2 = Enemy(4, 13);
+        var turns = new TurnSystem(grid, new[] { a, b }, new[] { e1, e2 }, () => 10);
+        int shots = 0;
+        turns.OverwatchTriggered += _ => shots++;
+        Assert.False(EnemyAi.CanHit(a, e1, a.EquippedWeapon!, grid));
+        Assert.False(EnemyAi.CanHit(a, e2, a.EquippedWeapon!, grid));
+
+        Assert.True(turns.TryOverwatch(a));
+        Assert.Equal(2, a.HeldShots);
+
+        Assert.True(turns.TryAttack(b, e1));
+        Assert.Equal(At(5, 12), (e1.X, e1.Y));
+        Assert.Equal(1, shots);
+        Assert.Equal(1, a.HeldShots);
+        Assert.False(turns.CanOverwatch(a));   // a shot is still held
+        Assert.Equal(200 - 7 - 2, e1.Hp);      // the sword's 10 and the bolt's 5, each into Block 3
+
+        b.DistLeft = GameConstants.MaxDistance;
+        Assert.True(turns.TryAttack(b, e2));
+        Assert.Equal(At(4, 12), (e2.X, e2.Y));
+        Assert.Equal(2, shots);
+        Assert.Equal(0, a.HeldShots);
+        Assert.False(turns.CanOverwatch(a));   // nothing held, but this turn's two shots are spent
+        Assert.Equal(200 - 7 - 2, e2.Hp);
+
+        // A swap lets a held shot lapse with the weapon that held it (the
+        // movement it cost is not refunded), and a swap back may hold anew.
+        var c = Char("C", 5, 2, "crossbow");
+        var far = Enemy(15, 15);
+        var swap = new TurnSystem(grid, new[] { c }, new[] { far }, () => 10);
+        Assert.True(swap.TryOverwatch(c));
+        Assert.Equal(1, c.HeldShots);
+        float spent = c.DistLeft;
+        c.Inventory[1] = c.Inventory[0];
+        c.Inventory[0] = TestWeapons.Get("weakspot_stiletto");
+        swap.NotifyWeaponChanged(c);
+        Assert.Equal(0, c.HeldShots);
+        Assert.Equal(spent, c.DistLeft);
+        Assert.False(swap.CanOverwatch(c));    // a dagger holds no shot
+        (c.Inventory[0], c.Inventory[1]) = (c.Inventory[1], c.Inventory[0]);
+        swap.NotifyWeaponChanged(c);
+        Assert.True(swap.CanOverwatch(c));     // nothing fired, so the pool is untouched: it can be held again
     }
 
     [Fact]

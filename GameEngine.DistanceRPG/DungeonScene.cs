@@ -608,11 +608,13 @@ public class DungeonScene : Scene
         return true;
     }
 
-    /// <summary>Swap an inventory slot with the equipped slot (slot 0).</summary>
+    /// <summary>Swap an inventory slot with the equipped slot (slot 0), and tell the turn system the member's reach has changed.</summary>
     private void EquipSlot(int slot)
     {
-        var inventory = ActiveCharacter.State.Inventory;
+        var state = ActiveCharacter.State;
+        var inventory = state.Inventory;
         (inventory[0], inventory[slot]) = (inventory[slot], inventory[0]);
+        _turns.NotifyWeaponChanged(state);   // a threat zone follows its weapon: re-arm it, and a held shot lapses
     }
 
     private void UpdateActiveCharacterMovement(float deltaTime)

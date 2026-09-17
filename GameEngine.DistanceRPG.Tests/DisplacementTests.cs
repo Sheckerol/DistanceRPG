@@ -427,4 +427,101 @@ public class DisplacementTests
         Assert.Equal(2, hits);
         Assert.Equal(GameConstants.PlayerHp - 10 - 7, a.Hp);   // no shield on a dagger: the sword's 10 and the spear's 7 in full
     }
+
+    [Fact]
+    public void WeaponSwap_RearmsTheZone_ADeeperShoveInsideTheNewReach_IsNoEntry()
+    {
+        // S swaps dagger for pike with the dummy three tiles off: outside the
+        // dagger's 40, inside the pike's 128. The swap re-arms S's zone with
+        // the dummy already inside it, so A's sword shoving it a tile closer
+        // is a deeper step, not an entry: no brace.
+        var grid = new int[20, 20];
+        var s = Char("S", 5, 2, "weakspot_stiletto");
+        s.Inventory[1] = TestWeapons.Get("skirmishers_pike");
+        var a = Char("A", 5, 6, "tower_guard");
+        var enemy = Enemy(5, 5);   // surface 68 from S
+        var turns = new TurnSystem(grid, new[] { s, a }, new[] { enemy }, () => 10);
+        int braces = 0;
+        turns.BraceTriggered += _ => braces++;
+
+        (s.Inventory[0], s.Inventory[1]) = (s.Inventory[1], s.Inventory[0]);
+        turns.NotifyWeaponChanged(s);
+        Assert.True(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));
+
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.Equal(At(5, 4), (enemy.X, enemy.Y));   // shoved west, toward S: still inside
+        Assert.Equal(0, braces);
+        Assert.Equal(200 - 7, enemy.Hp);
+
+        // Out and back in is an entry, swap or no swap.
+        (enemy.X, enemy.Y) = At(5, 8);   // six tiles off: outside the pike's reach
+        turns.NotifyActorMoved(enemy, MoveKind.Forced);
+        (enemy.X, enemy.Y) = At(5, 5);
+        turns.NotifyActorMoved(enemy, MoveKind.Forced);
+        Assert.Equal(1, braces);
+    }
+
+    [Fact]
+    public void WeaponSwap_ReleasesThePair_AShoveIntoTheShorterReach_IsAnEntry()
+    {
+        // The other way: S holds the pike with the dummy inside its reach (the
+        // pair marked when the roster was fixed), then swaps to a short brace
+        // weapon the dummy is outside of. The swap releases the pair, so A's
+        // sword shoving the dummy into the short reach is a real entry and the
+        // brace fires; a stale pair would have swallowed it.
+        var grid = new int[20, 20];
+        var s = Char("S", 5, 2, "skirmishers_pike");
+        s.Inventory[1] = TestWeapons.Make("Short Pike", 40, 7, 55, (Brace, 1));
+        var a = Char("A", 5, 6, "tower_guard");
+        var enemy = Enemy(5, 5);   // surface 68 from S: inside 128, outside 40
+        var turns = new TurnSystem(grid, new[] { s, a }, new[] { enemy }, () => 10);
+        var braced = new List<PartyMemberState>();
+        turns.BraceTriggered += c => braced.Add(c);
+        Assert.True(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));
+
+        (s.Inventory[0], s.Inventory[1]) = (s.Inventory[1], s.Inventory[0]);
+        turns.NotifyWeaponChanged(s);
+        Assert.False(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));
+
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.Equal(At(5, 4), (enemy.X, enemy.Y));   // surface 36: inside the short reach now
+        Assert.Equal(new[] { s }, braced);
+        Assert.Equal(200 - 7 - 4, enemy.Hp);   // the sword's 10 and the short pike's 7, each into Block 3
+    }
+
+    [Fact]
+    public void ShoveThroughAZone_ReactionResolvesAtTheCrossingDistance()
+    {
+        // Push x3 carries the dummy from tile 6 to 9 of the row, through S's
+        // reach (tiles 7..10). The brace is earned at the crossing, tile 7,
+        // four tiles from S, and resolves after the shove has finished with
+        // the dummy two tiles from S: the free attack carries the crossing
+        // distance, not where the shove left its target.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 5, "tower_guard");
+        a.EquippedWeapon!.Acquire(Push, 2);
+        var s = Char("S", 5, 11, "skirmishers_pike");
+        var enemy = Enemy(5, 6);
+        var turns = new TurnSystem(grid, new[] { a, s }, new[] { enemy }, () => 10);
+        var crossings = new List<int>();
+        turns.Events.On<ThreatPayload>(GameEvent.ThreatZoneEntered, new HandlerPriority(9, 9), "probe", (p, self, _) =>
+        {
+            if (self == s) crossings.Add(p.DistanceUnits);
+            return p;
+        });
+        var braceDistances = new List<int>();
+        turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 9), "probe", (p, self, _) =>
+        {
+            if (self == s) braceDistances.Add(p.DistanceUnits);
+            return p;
+        });
+
+        Assert.True(turns.TryAttack(a, enemy));
+
+        Assert.Equal(At(5, 9), (enemy.X, enemy.Y));
+        Assert.Equal(100, Assert.Single(crossings));                              // four tiles less both radii, read at tile 7
+        Assert.Equal(Assert.Single(crossings), Assert.Single(braceDistances));   // and carried into the free attack
+        Assert.Equal(36, CombatRules.SurfaceDistanceUnits(s, enemy));            // two tiles: where the shove left it
+        Assert.Equal(200 - 7 - 4, enemy.Hp);
+    }
 }

@@ -91,8 +91,11 @@ public sealed class TurnSystem
     // value in uses per turn. One ThreatZone per side holds the (reactor,
     // mover) pairs currently inside a reach and each reactor's uses this turn.
     // The pair sets are kept true continuously: snapshotted when the roster is
-    // fixed and at each player turn's start (after resurrections place
-    // everyone), refreshed silently for the reactor whenever *it* moves, and
+    // fixed, at each player turn's start (after resurrections place everyone)
+    // and at each enemy phase's start (whatever is equipped when the enemy
+    // phase begins is what reacts), refreshed silently for the reactor
+    // whenever *it* moves or changes weapon (a reach can change without a
+    // step: NotifyWeaponChanged), and
     // crossed — with the reactions raised — whenever the *mover* does, whether
     // it walked or was shoved. Standing inside a zone when it arms never
     // triggers; walking or being moved in is what costs, and leaving releases
@@ -107,7 +110,10 @@ public sealed class TurnSystem
     private readonly Dictionary<ActorState, Side> _sides = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Func<bool>> _mayReact = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Action> _braceFeeds = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<ModifierType, Action<ActorState>> _reactionFeeds;
+    // What firing a reaction of each source does besides queueing the free
+    // attack: the typed announcement, and for Overwatch letting one held shot
+    // go. A new reaction source adds its entry here; the applier is untouched.
+    private readonly Dictionary<ModifierType, Action<ActorState>> _onReactionFired;
     private readonly ReactionPool _ripostes = new();
 
     // ── The event table ──────────────────────────────────────────────────────
@@ -181,11 +187,15 @@ public sealed class TurnSystem
         }
         _rosters = [party.ToArray<ActorState>(), enemies.ToArray<ActorState>()];
         _zones = [_partyZone, _enemyZone];
-        _reactionFeeds = new Dictionary<ModifierType, Action<ActorState>>
+        _onReactionFired = new Dictionary<ModifierType, Action<ActorState>>
         {
             [ModifierType.Brace] = reactor => _braceFeeds[reactor](),
             [ModifierType.Opportunist] = reactor => OpportunistTriggered?.Invoke(reactor),
-            [ModifierType.Overwatch] = reactor => OverwatchTriggered?.Invoke(reactor),
+            [ModifierType.Overwatch] = reactor =>
+            {
+                reactor.HeldShots = Math.Max(0, reactor.HeldShots - 1);   // the shot held is the shot fired
+                OverwatchTriggered?.Invoke(reactor);
+            },
         };
 
         SnapshotZones();
@@ -226,6 +236,26 @@ public sealed class TurnSystem
         TryReactionsAgainst(mover, ZoneEdge.Enter, kind);
         if (!_events.Running)
             RunHeldDeaths();
+    }
+
+    /// <summary>
+    /// Scene calls this after an actor's equipped weapon changes (an inventory
+    /// swap): a reach can change without a step, so the actor's own zone is
+    /// re-read from where everyone stands, silently — a mover already inside
+    /// the new reach is marked so and never fires until it leaves and comes
+    /// back, one now outside a shorter reach is released so a real entry
+    /// counts again. A held shot lapses with the weapon that held it; the
+    /// movement it cost is not refunded. Nothing fires: nobody moved.
+    /// </summary>
+    public void NotifyWeaponChanged(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        if (!_sides.ContainsKey(actor))
+            throw new InvalidOperationException("Changed the weapon of an actor that is not on this turn system's roster.");
+
+        actor.HeldShots = 0;
+        if (actor.Alive)
+            RefreshZoneOf(actor);
     }
 
     /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
@@ -410,6 +440,13 @@ public sealed class TurnSystem
         // in that order; a handler that only means the living checks Alive.
         foreach (var enemy in _enemies)
             RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy);
+
+        // Whatever is equipped when the enemy phase begins is what reacts
+        // (settled): both sides' zones re-arm from where everyone stands and
+        // what everyone holds, so a swap made this turn is accounted for even
+        // if it went unannounced — a mover already inside a reach never fires
+        // on its first step; one outside it fires on walking in.
+        SnapshotZones();
 
         _enemyIdx = -1;
         AdvanceToNextEnemy();
@@ -649,8 +686,9 @@ public sealed class TurnSystem
     /// <summary>
     /// Rebuild both sides' pair sets from where everyone stands: a mover
     /// already inside a reach is marked so, and never fires that zone until it
-    /// leaves and comes back. Run when the roster is fixed and at each player
-    /// turn's start, after resurrections have placed everyone.
+    /// leaves and comes back. Run when the roster is fixed, at each player
+    /// turn's start (after resurrections have placed everyone) and at each
+    /// enemy phase's start (with whatever is equipped by then).
     /// </summary>
     private void SnapshotZones()
     {
@@ -664,8 +702,9 @@ public sealed class TurnSystem
 
     /// <summary>
     /// The zone of <paramref name="reactor"/> follows it: every living actor on
-    /// the other side is marked inside or released according to where the
-    /// reactor now stands. Silent — a reactor walking up to a target has not
+    /// the other side is marked inside or released according to what the
+    /// reactor now holds and where it now stands, after a step or a swap.
+    /// Silent — a reactor walking up to a target has not
     /// made the target move, and only the mover's own crossing fires anything.
     /// </summary>
     private void RefreshZoneOf(ActorState reactor)
@@ -711,8 +750,11 @@ public sealed class TurnSystem
                 : !inside && zone.Leave(reactor, mover);
             if (!crossed) continue;
 
+            // The distance is read here, at the crossing: the reaction it earns
+            // may resolve only after the shove that caused it has finished.
             _events.Enqueue(GameEvent.ThreatZoneEntered,
-                new ThreatPayload(mover, kind, edge, ImmutableArray<Reaction>.Empty), reactor, mover);
+                new ThreatPayload(mover, kind, edge, ImmutableArray<Reaction>.Empty,
+                    CombatRules.SurfaceDistanceUnits(reactor, mover)), reactor, mover);
         }
     }
 
@@ -722,8 +764,14 @@ public sealed class TurnSystem
     /// armed (an enemy's only once seen this turn), and the reactor has a use
     /// of the reaction's modifier left this turn — spent whether the crossing
     /// was a walk or a shove, which is what bounds a displacement chain. The
-    /// free attack is queued as a DamageTaken from reactor to mover and told
-    /// to the side's typed brace event or the reaction's own.
+    /// free attack is queued as a DamageTaken from reactor to mover at the
+    /// distance the crossing was read at (not where a finished shove left the
+    /// mover), told to the side's typed brace event or the reaction's own, and
+    /// for Overwatch lets one held shot go. The use pool is the zone's, keyed
+    /// by reactor alone: a weapon holds at most one of Brace, Opportunist and
+    /// Overwatch (one exclusion group), so it is the weapon's budget, as the
+    /// design asks; an innate stack of one beside a weapon's stack of another
+    /// (Phase 2) would share it, and is where the pool grows a modifier key.
     /// </summary>
     private void ApplyReactions(ThreatPayload settled, ActorState reactor, ActorState mover, EventTable table)
     {
@@ -738,10 +786,10 @@ public sealed class TurnSystem
             if (zone.UsesThisTurn(who) >= who.Value(reaction.Source)) continue;
             zone.Spend(who);
 
-            if (_reactionFeeds.TryGetValue(reaction.Source, out var announce))
-                announce(who);
+            if (_onReactionFired.TryGetValue(reaction.Source, out var fired))
+                fired(who);
             table.Enqueue(GameEvent.DamageTaken,
-                DamagePayload.Initial(reaction.Weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(who, mover)), who, mover);
+                DamagePayload.Initial(reaction.Weapon, _rollD20(), settled.DistanceUnits), who, mover);
         }
     }
 

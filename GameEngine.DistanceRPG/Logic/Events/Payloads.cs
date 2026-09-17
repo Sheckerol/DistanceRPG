@@ -140,7 +140,19 @@ public sealed record Reaction(ActorState Reactor, Weapon Weapon, ModifierType So
 /// rather than as a second event: §1.7 forbids casual members, and the exit
 /// side is the same function watching the other edge.
 /// </summary>
-public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edge, ImmutableArray<Reaction> Reactions);
+/// <param name="Mover">The actor whose move crossed the edge.</param>
+/// <param name="Kind">Whether the mover chose the move or was shoved.</param>
+/// <param name="Edge">Which edge of the reactor's zone the move crossed.</param>
+/// <param name="Reactions">What the crossing earned: appended by the handlers, spent and fired by the applier.</param>
+/// <param name="DistanceUnits">
+/// Surface distance from the reactor to the mover at the crossing, in logic
+/// units (32 per tile), rounded up. A reaction is earned at the crossing and
+/// resolves at that distance: inside a running cascade it fires only once the
+/// shove that caused it has finished, by which time the mover may stand deeper
+/// in the zone or out the far side, and a distance-priced step (Longshot) must
+/// see where the mover was struck, not where it landed.
+/// </param>
+public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edge, ImmutableArray<Reaction> Reactions, int DistanceUnits);
 
 /// <summary><see cref="GameEvent.Cast"/>.</summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost);
