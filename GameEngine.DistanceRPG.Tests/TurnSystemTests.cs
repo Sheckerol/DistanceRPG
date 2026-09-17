@@ -6,10 +6,10 @@ public class TurnSystemTests
 {
     private const float Tile = GameConstants.Tile;
 
-    private static PartyMemberState Char(string id, float x, float y, int weaponIdx = 0)
+    private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
         var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
-        c.Inventory[0] = GameConstants.Weapons[weaponIdx];
+        c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
 
@@ -64,7 +64,7 @@ public class TurnSystemTests
     public void TryAttack_SpendsCost_DamagesEnemy_AndRespectsRules()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger: dmg 15, cost 30, range 40
+        var a = Char("A", 5 * Tile, 5 * Tile, weaponId: "weakspot_stiletto"); // dagger: dmg 15, cost 30, range 40
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile }; // 50px away, surface 22 â‰¤ 40
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -72,7 +72,7 @@ public class TurnSystemTests
         turns.EnemyHit += (_, r) => res = r;
 
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(GameConstants.MaxDistance - 30f, a.DistLeft);
+        Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // the stiletto's 30: no Light
         Assert.NotNull(res);
         // Dagger 15 into sword block 3 â†’ 12
         Assert.Equal(12, res.Value.Damage);
@@ -87,7 +87,7 @@ public class TurnSystemTests
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
-        a.DistLeft = 29f; // dagger costs 30
+        a.DistLeft = a.EquippedWeapon!.ResolvedCost - 1; // one short of the dagger's 30
         Assert.False(turns.TryAttack(a, enemy));
 
         a.DistLeft = 160f;
@@ -95,8 +95,8 @@ public class TurnSystemTests
         Assert.False(turns.TryAttack(a, enemy));
 
         // In range (spear) but a wall tile sits between attacker and enemy.
-        a.Inventory[0] = GameConstants.Weapons[2]; // spear, range 130
-        enemy.X = 7 * Tile + 16f;                  // ~110px away, within reach
+        a.Inventory[0] = TestWeapons.Get("skirmishers_pike"); // spear, range 128
+        enemy.X = 7 * Tile + 16f;                             // 80px away, surface 52: within reach
         grid[5, 6] = 1;                            // wall in the middle column
         Assert.False(turns.TryAttack(a, enemy));
 
@@ -138,7 +138,7 @@ public class TurnSystemTests
     public void EnemyTurn_WhenSeenAndAdjacent_AttacksThreeTimesWithSword()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger defender: no block
+        var a = Char("A", 5 * Tile, 5 * Tile, weaponId: "weakspot_stiletto"); // dagger defender: no block
         var enemy = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -193,9 +193,9 @@ public class TurnSystemTests
     public void Brace_TriggersWhenEnemyWalksIntoSpearRange()
     {
         var grid = new int[20, 30];
-        // Spear char; enemy 250px away: outside spear reach (130+28=158),
+        // Spear char; enemy 250px away: outside spear reach (128+28=156),
         // after its 100px approach it lands at 150px â†’ inside reach.
-        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponId: "skirmishers_pike");
         var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -221,10 +221,10 @@ public class TurnSystemTests
         // targets the leader, but walking in crosses the back row's spear
         // reach. (The prototype only braced the enemy's own target, which a
         // formation's leader always eats — brace is a threat zone now.)
-        var a = Char("A", 8 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
-        var b = Char("B", 7 * Tile + 16, 5 * Tile + 16, weaponIdx: 1);
-        var c = Char("C", 6 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
-        var d = Char("D", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 2);
+        var a = Char("A", 8 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto");
+        var b = Char("B", 7 * Tile + 16, 5 * Tile + 16, weaponId: "tower_guard");
+        var c = Char("C", 6 * Tile + 16, 5 * Tile + 16, weaponId: "skirmishers_pike");
+        var d = Char("D", 5 * Tile + 16, 5 * Tile + 16, weaponId: "skirmishers_pike");
         var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
         var turns = new TurnSystem(grid, new[] { a, b, c, d }, new[] { enemy }, () => 10);
 
@@ -254,11 +254,8 @@ public class TurnSystemTests
         // One char with a Brace-2 pike, one with the standard Brace-1 spear,
         // side by side; two enemies walk in from the same direction in one
         // turn. The pike retaliates against both, the spear only the first.
-        var pikeWeapon = new Weapon("Pike", Range: 130, Damage: 7, Cost: 40,
-            new[] { new WeaponAbility(AbilityType.Brace, 2) });
-        var p = Char("P", 5 * Tile + 16, 5 * Tile + 16);
-        p.Inventory[0] = pikeWeapon;
-        var s = Char("S", 5 * Tile + 16, 6 * Tile + 16, weaponIdx: 2); // spear
+        var p = Char("P", 5 * Tile + 16, 5 * Tile + 16, weaponId: "phalanx_spear"); // Brace x2
+        var s = Char("S", 5 * Tile + 16, 6 * Tile + 16, weaponId: "skirmishers_pike"); // spear
 
         var e1 = new EnemyState { X = p.X + 250f, Y = p.Y };
         var e2 = new EnemyState { X = p.X + 250f, Y = s.Y };
@@ -283,9 +280,9 @@ public class TurnSystemTests
         // the walk's midpoint: inside spear reach only mid-walk (out of reach
         // both where the enemy starts and where it stops). C covers the end
         // of the walk. Both must stab during the single approach.
-        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
-        var s = Char("S", 376f, 5 * Tile + 16 + 154f, weaponIdx: 2);
-        var c = Char("C", 296f, 5 * Tile + 16 + 96f, weaponIdx: 2);
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto");
+        var s = Char("S", 376f, 5 * Tile + 16 + 154f, weaponId: "skirmishers_pike");
+        var c = Char("C", 296f, 5 * Tile + 16 + 96f, weaponId: "skirmishers_pike");
         var enemy = new EnemyState { X = a.X + 250f, Y = a.Y };
         var turns = new TurnSystem(grid, new[] { a, s, c }, new[] { enemy }, () => 10);
 
@@ -305,11 +302,11 @@ public class TurnSystemTests
     public void EnemyBrace_PokesACharacterWalkingIntoASeenSpearDummysReach()
     {
         var grid = new int[20, 30];
-        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0); // dagger: no block
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto"); // dagger: no block
         var enemy = new EnemyState
         {
             X = a.X + 200f, Y = a.Y,
-            Weapon = GameConstants.Weapons[2], // spear, Brace 1
+            Weapon = TestWeapons.Get("skirmishers_pike"), // spear, Brace x1
         };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -317,7 +314,7 @@ public class TurnSystemTests
         turns.EnemyBraceTriggered += _ => enemyBraces++;
         turns.NotifyEnemyVisible(enemy, true);
 
-        // Outside spear reach (172 surface > 130): stepping around is safe.
+        // Outside spear reach (162 surface > 128): stepping around is safe.
         a.X += 10f;
         turns.NotifyCharacterMoved(a);
         Assert.Equal(0, enemyBraces);
@@ -346,11 +343,11 @@ public class TurnSystemTests
     public void EnemyBrace_DoesNotTrigger_FromUnseenEnemies_OrWhenAlreadyInReach()
     {
         var grid = new int[20, 30];
-        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponIdx: 0);
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto");
         var enemy = new EnemyState
         {
             X = a.X + 150f, Y = a.Y, // already inside spear reach
-            Weapon = GameConstants.Weapons[2],
+            Weapon = TestWeapons.Get("skirmishers_pike"),
         };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -402,7 +399,7 @@ public class TurnSystemTests
     public void TwoAdjacentEnemies_BothActInSequence()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, weaponIdx: 0); // dagger defender: no block
+        var a = Char("A", 5 * Tile, 5 * Tile, weaponId: "weakspot_stiletto"); // dagger defender: no block
         var e1 = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
         var e2 = new EnemyState { X = 5 * Tile - 60f, Y = 5 * Tile };
         var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);

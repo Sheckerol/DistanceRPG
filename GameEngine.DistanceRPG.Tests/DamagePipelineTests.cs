@@ -7,12 +7,9 @@ public class DamagePipelineTests
 {
     private const float Tile = GameConstants.Tile;
 
-    // The only index-bearing lines in this class: sub-step 3 swaps these four
-    // for TestWeapons.Get(id) when the catalogue replaces the list.
-    private static Weapon Dagger => GameConstants.Weapons[0];   // dmg 15, CritRange 4 -> CritWindow x4
-    private static Weapon Sword => GameConstants.Weapons[1];    // dmg 10, Block 3 -> Block x1
-    private static Weapon Spear => GameConstants.Weapons[2];    // dmg 7, Brace 1 -> Brace x1
-    private static Weapon Staff => GameConstants.Weapons[GameConstants.StaffWeaponIdx];   // HealCast -> no stacks
+    // Catalogue instances shared across this class, read-only: nothing here Acquires on them.
+    private static readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
+    private static readonly Weapon Spear = TestWeapons.Get("skirmishers_pike");     // dmg 7, Brace x1
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
     {
@@ -37,7 +34,7 @@ public class DamagePipelineTests
     [Fact]
     public void Crit_SkipsBlockEntirely_BeforeMinOneClamp()
     {
-        var attacker = Member(new Weapon("Maul", 40, 18, 30, []));
+        var attacker = Member(TestWeapons.Make("Maul", 40, 18, 30));
         var bulwark = Member(null, "B");
         bulwark.Innate = ModifierSet.Of((Block, 8));   // 24 absorbed: the Bulwark's ceiling
         Assert.Equal(24, bulwark.Value(Block));
@@ -74,9 +71,9 @@ public class DamagePipelineTests
 
         // Innate CritWindow widens the wielder's window the same way.
         attacker.Innate = ModifierSet.Of((CritWindow, 2));
-        Assert.Equal(14, CombatRules.CritThreshold(attacker));   // 20 - (4 + 2)
-        Assert.Equal(RollOutcome.Crit, Resolve(attacker, golem, 14).Roll.Outcome);
-        Assert.Equal(16, CombatRules.CritThreshold(Dagger));     // the weapon alone knows nothing of it
+        Assert.Equal(17, CombatRules.CritThreshold(attacker));   // 20 - (1 + 2)
+        Assert.Equal(RollOutcome.Crit, Resolve(attacker, golem, 17).Roll.Outcome);
+        Assert.Equal(19, CombatRules.CritThreshold(Dagger));     // the weapon alone knows nothing of it
     }
 
     [Fact]
@@ -99,33 +96,6 @@ public class DamagePipelineTests
         Assert.Equal(12, res.Value.Damage);
         Assert.Equal(0, enemy.Hp);            // HP is what gets clamped
         Assert.False(enemy.Alive);
-    }
-
-    [Fact]
-    public void Legacy_DaggerStillCritsOn16_SwordStillBlocks3()
-    {
-        // The parity bridge from the shipped abilities, deleted with them.
-        Assert.Equal(4, Dagger.Modifiers.Stacks(CritWindow));
-        Assert.Equal(16, CombatRules.CritThreshold(Dagger));
-        Assert.Equal(1, Sword.Modifiers.Stacks(Block));
-        Assert.Equal(3, Sword.Modifiers.Value(Block));
-        Assert.Equal(1, Spear.Modifiers.Stacks(Brace));
-        Assert.Equal(ModifierSet.Empty, Staff.Modifiers);
-
-        var attacker = Member(Dagger);
-        var defender = new EnemyState();   // sword
-
-        var crit = Resolve(attacker, defender, 16);
-        Assert.Equal(RollOutcome.Crit, crit.Roll.Outcome);
-        Assert.Equal(30, crit.Roll.Damage);   // x2: CritMultiplier's offset alone
-        Assert.Equal(30, crit.Dealt);
-        Assert.Equal(0, crit.Blocked);
-
-        var normal = Resolve(attacker, defender, 15);
-        Assert.Equal(RollOutcome.Normal, normal.Roll.Outcome);
-        Assert.Equal(15, normal.Roll.Damage);
-        Assert.Equal(3, normal.Blocked);
-        Assert.Equal(12, normal.Taken);
     }
 
     [Fact]
@@ -200,7 +170,7 @@ public class DamagePipelineTests
         a.X = 5 * Tile;
         a.Y = 5 * Tile;
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile, Hp = 20 };
-        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 16);   // the dagger crits on 16: 30, Block skipped
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 19);   // the dagger crits on 19: 15 x3 = 45, Block skipped
 
         var log = new List<string>();
         turns.Events.On<KillPayload>(GameEvent.Killed, new HandlerPriority(9, 0), "probe",
@@ -218,13 +188,13 @@ public class DamagePipelineTests
         Assert.True(turns.TryAttack(a, enemy));
 
         var hit = Assert.Single(hits);
-        Assert.Equal(30, hit.Dealt);
-        Assert.Equal(30, hit.Damage);
+        Assert.Equal(45, hit.Dealt);
+        Assert.Equal(45, hit.Damage);
         Assert.Equal(0, hit.Blocked);
         Assert.Equal(0, enemy.Hp);
         Assert.False(enemy.Alive);
         Assert.Equal(1, defeated);
-        Assert.Equal(new[] { "killed 30/30 alive=False", "dealt 30/30 hp=0", "crit 16" }, log);
+        Assert.Equal(new[] { "killed 45/45 alive=False", "dealt 45/45 hp=0", "crit 19" }, log);
 
         // A survivable, blocked hit queues DamageDealt alone.
         log.Clear();

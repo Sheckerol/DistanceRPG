@@ -160,10 +160,10 @@ public sealed class TurnSystem
             }
             if (!_enemyBraces.Enter(enemy, mover)) continue; // was already in reach
 
-            var brace = enemy.Weapon.GetAbility(AbilityType.Brace);
-            if (brace == null) continue;
+            int braces = enemy.Value(ModifierType.Brace);   // weapon plus innate: retaliations per turn
+            if (braces <= 0) continue;
             if (!_seenThisTurn.Contains(enemy)) continue; // no ambushes from the fog
-            if (_enemyBraces.UsesThisTurn(enemy) >= brace.Value) continue;
+            if (_enemyBraces.UsesThisTurn(enemy) >= braces) continue;
 
             _enemyBraces.Spend(enemy);
             EnemyBraceTriggered?.Invoke(enemy);
@@ -188,7 +188,7 @@ public sealed class TurnSystem
     {
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
-        if (w == null || w.IsCaster || c.DistLeft < w.Cost) return false; // a staff heals allies, it can't strike
+        if (w == null || w.IsCaster || c.DistLeft < w.ResolvedCost) return false; // a caster casts, it can't strike
         return EnemyAi.CanHit(c, enemy, w, _grid);
     }
 
@@ -198,38 +198,42 @@ public sealed class TurnSystem
         if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - w.Cost);
+        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
         ResolveAttackOnEnemy(c, w, enemy);
         return true;
     }
 
     /// <summary>
     /// Can the caster cast their equipped staff on <paramref name="ally"/>
-    /// (self allowed)? Needs a caster weapon, enough movement and mana, and the
-    /// ally within range and line of sight.
+    /// (self allowed)? Needs a staff whose innate effect lands on allies — a
+    /// debuff staff has no ally cast — enough movement and mana at the
+    /// resolved costs, and the ally within range and line of sight.
     /// </summary>
     public bool CanCast(PartyMemberState caster, PartyMemberState ally)
     {
         if (Phase != TurnPhase.Player || !caster.Alive || !ally.Alive) return false;
         var w = caster.EquippedWeapon;
         if (w == null || !w.IsCaster) return false;
-        if (caster.DistLeft < w.Cost || caster.Mana < w.ManaCost) return false;
+        var innate = w.Innate;
+        if (innate?.Def.Applies == null || innate.Def.Targets == TargetSide.Enemy) return false;
+        if (caster.DistLeft < w.ResolvedCost || caster.Mana < w.ResolvedManaCost) return false;
         return EnemyAi.CanHit(caster, ally, w, _grid);
     }
 
     /// <summary>
-    /// Cast the equipped staff on an ally: spend movement and mana, then stack
-    /// its heal-over-time buff. Returns false if the cast is not allowed.
+    /// Cast the equipped staff on an ally: spend movement and mana at the
+    /// resolved costs, then stack the innate enchantment's status at the
+    /// levels its potency grants. Returns false if the cast is not allowed.
     /// </summary>
     public bool TryCast(PartyMemberState caster, PartyMemberState ally)
     {
         if (!CanCast(caster, ally)) return false;
         var w = caster.EquippedWeapon!;
-        var heal = w.GetAbility(AbilityType.HealCast)!;
+        var innate = w.Innate!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.Cost);
-        caster.Mana -= w.ManaCost;
-        var effect = ally.ApplyStatusEffect(StatusEffectType.Regeneration, heal.Value);
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        caster.Mana -= w.ResolvedManaCost;
+        var effect = ally.ApplyStatusEffect(innate.Def.Applies!.Value, innate.LevelsFor(innate.Def.Potency));
         CharacterBuffed?.Invoke(ally, effect);
         return true;
     }
@@ -426,7 +430,7 @@ public sealed class TurnSystem
         {
             if (!member.Alive) continue;
             var w = member.EquippedWeapon;
-            if (w == null || w.GetAbility(AbilityType.Brace) == null) continue;
+            if (w == null || member.Value(ModifierType.Brace) <= 0) continue;
 
             _braceWatchers.Add(member);
             if (EnemyAi.CanHit(member, enemy, w, _grid))
@@ -570,10 +574,10 @@ public sealed class TurnSystem
 
             var weapon = member.EquippedWeapon;
             if (weapon == null) continue;
-            var brace = weapon.GetAbility(AbilityType.Brace);
-            if (brace == null) continue;
+            int braces = member.Value(ModifierType.Brace);
+            if (braces <= 0) continue;
 
-            if (_partyBraces.UsesThisTurn(member) >= brace.Value) continue;
+            if (_partyBraces.UsesThisTurn(member) >= braces) continue;
             if (!EnemyAi.CanHit(member, enemy, weapon, _grid)) continue;
             if (!_partyBraces.Enter(member, enemy)) continue; // stood inside when the walk began, or already stabbed this walk
 
@@ -601,7 +605,7 @@ public sealed class TurnSystem
 
         // Attack cost scales the same way the prototype scaled it: the enemy's
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.Cost;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.ResolvedCost;
 
         if (!enemy.Alive || _enemyBudget < scaledCost)
         {
@@ -638,13 +642,14 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// A healer's attack-phase beat: cast Regeneration on the most-wounded ally
-    /// in reach, spending scaled budget, one cast per beat until dry or nobody
-    /// needs mending. A fleeing/idle healer simply finds no target and passes.
+    /// A healer's attack-phase beat: cast its staff's innate effect on the
+    /// most-wounded ally in reach, spending scaled budget, one cast per beat
+    /// until dry or nobody needs mending. A fleeing/idle healer simply finds
+    /// no target and passes.
     /// </summary>
     private void TryEnemyHealBeat(EnemyState healer)
     {
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * healer.Weapon.Cost;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * healer.Weapon.ResolvedCost;
         var ally = EnemyAi.SelectHealTarget(healer, _enemies);
 
         if (!healer.Alive || _enemyBudget < scaledCost
@@ -656,8 +661,8 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        var heal = healer.Weapon.GetAbility(AbilityType.HealCast)!;
-        var effect = ally.ApplyStatusEffect(StatusEffectType.Regeneration, heal.Value);
+        var innate = healer.Weapon.Innate!;   // a healer is a caster whose innate lands on allies
+        var effect = ally.ApplyStatusEffect(innate.Def.Applies!.Value, innate.LevelsFor(innate.Def.Potency));
         EnemyBuffed?.Invoke(ally, effect);
 
         _timer = AttackBeatSeconds;

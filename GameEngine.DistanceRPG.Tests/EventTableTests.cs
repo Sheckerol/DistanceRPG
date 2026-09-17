@@ -7,8 +7,8 @@ public class EventTableTests
 {
     private const float Tile = GameConstants.Tile;
 
-    // The only index-bearing line in this class: sub-step 3 swaps it for TestWeapons.Get("weakspot_stiletto").
-    private static Weapon Dagger => GameConstants.Weapons[0];   // dmg 15, CritRange 4 -> CritWindow x4
+    // A catalogue instance shared across this class, read-only: nothing here Acquires on it.
+    private static readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
 
     /// <summary>A payload that records which handlers touched it, in order.</summary>
     private sealed record Trace(ImmutableList<string> Steps)
@@ -242,9 +242,9 @@ public class EventTableTests
             payload = next;
         }
 
-        // The chain did all its work on the payload alone.
+        // The chain did all its work on the payload alone: a natural 20 on the stiletto is 15 x3, Block skipped.
         Assert.True(payload.IsCrit);
-        Assert.Equal(30, payload.Taken);
+        Assert.Equal(45, payload.Taken);
         Assert.Equal(30, defender.Hp);
     }
 

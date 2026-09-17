@@ -121,15 +121,15 @@ public sealed class DungeonHud
         var weapon = active.EquippedWeapon;
         string weaponLabel = weapon == null
             ? $"[{active.Id}] (NO WEAPON)"
-            : $"[{active.Id}] {weapon.Name}  {WeaponStats(weapon)}{AbilitySuffix(weapon)}";
+            : $"[{active.Id}] {weapon.Name}  {WeaponStats(weapon)}{ModifierReadout(weapon)}";
         DrawCentered(w, 42f, weaponLabel, 1.5f, Yellow);
     }
 
-    /// <summary>Core stat block for a weapon label — a staff drops damage for mana.</summary>
+    /// <summary>Core stat block for a weapon label — a caster drops damage for mana. Costs are the resolved numbers: the player reads what a swing costs, never a percentage.</summary>
     private static string WeaponStats(Weapon weapon)
         => weapon.IsCaster
-            ? $"RNG:{weapon.Range}  MOVE:{weapon.Cost}  MANA:{weapon.ManaCost}"
-            : $"DMG:{weapon.Damage}  RNG:{weapon.Range}  COST:{weapon.Cost}";
+            ? $"RNG:{weapon.Range}  MOVE:{weapon.ResolvedCost}  MANA:{weapon.ResolvedManaCost}"
+            : $"DMG:{weapon.Damage}  RNG:{weapon.Range}  COST:{weapon.ResolvedCost}";
 
     // Party selector layout, shared between drawing and click hit-testing.
     private const float SelectorX = 14f;
@@ -220,7 +220,7 @@ public sealed class DungeonHud
             var color = slot == 0 ? Yellow : White;
             string label = weapon == null
                 ? $"{slot + 1}  - EMPTY -"
-                : $"{slot + 1}  {weapon.Name}  {WeaponStats(weapon)}{AbilitySuffix(weapon)}";
+                : $"{slot + 1}  {weapon.Name}  {WeaponStats(weapon)}{ModifierReadout(weapon)}";
             _text.DrawText(label, cx - 190f, y, 2f, weapon == null ? DarkGrey : color);
         }
 
@@ -238,16 +238,14 @@ public sealed class DungeonHud
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string AbilitySuffix(Weapon weapon)
+    /// <summary>The weapon's modifier stacks as <c>NAME xN</c> in table order, and a caster's innate effect after them.</summary>
+    private static string ModifierReadout(Weapon weapon)
     {
-        var parts = weapon.Abilities.Select(a => a.Type switch
-        {
-            AbilityType.Block => $"BLOCK {a.Value}",
-            AbilityType.CritRange => $"CRIT +{a.Value}",
-            AbilityType.Brace => "BRACE",
-            AbilityType.HealCast => $"HEAL {a.Value}",
-            _ => a.Type.ToString().ToUpperInvariant(),
-        }).ToList();
+        var parts = weapon.Modifiers.Entries
+            .Select(e => $"{e.Type.ToString().ToUpperInvariant()} x{e.Stacks}")
+            .ToList();
+        if (weapon.Innate is { } innate)
+            parts.Add(innate.Def.Name.ToUpperInvariant());
         return parts.Count > 0 ? "  * " + string.Join("  ", parts) : "";
     }
 

@@ -1,12 +1,16 @@
-﻿using GameEngine.DistanceRPG.Logic;
+using GameEngine.DistanceRPG.Logic;
+using static GameEngine.DistanceRPG.Logic.ModifierType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
 public class CombatRulesTests
 {
-    private static Weapon Dagger => GameConstants.Weapons[0]; // dmg 15, crit +4
-    private static Weapon Sword => GameConstants.Weapons[1];  // dmg 10, block 3
-    private static Weapon Spear => GameConstants.Weapons[2];  // dmg 7, brace
+    private static Weapon Dagger => TestWeapons.Get("weakspot_stiletto"); // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
+    private static Weapon Sword => TestWeapons.Get("tower_guard");        // dmg 10, Block x2 (absorbs 6), Push x1
+    private static Weapon Spear => TestWeapons.Get("skirmishers_pike");   // dmg 7, Brace x1, Longshot x1, Light x1
+
+    /// <summary>A Block x1 sword: the shipped 3 absorbed, without Tower Guard's second stack or Riposte Blade's counter.</summary>
+    private static Weapon BlockSword => TestWeapons.Make("Sword", 80, 10, 50, (Block, 1));
 
     /// <summary>Resolve through the compiled chain with a party member holding each weapon (null: unarmed).</summary>
     private static AttackResolution Resolve(Weapon attackerWeapon, Weapon? defenderWeapon, int roll)
@@ -31,17 +35,17 @@ public class CombatRulesTests
     {
         var roll = CombatRules.RollAttack(Sword, () => 20);
         Assert.Equal(RollOutcome.Crit, roll.Outcome);
-        Assert.Equal(20, roll.Damage); // doubled
+        Assert.Equal(20, roll.Damage); // doubled: CritMultiplier's offset alone on a sword
     }
 
     [Theory]
-    [InlineData(16, RollOutcome.Crit)]   // dagger crit window is 20-4 = 16+
-    [InlineData(15, RollOutcome.Normal)]
+    [InlineData(19, RollOutcome.Crit)]   // dagger baseline CritWindow x1: crit on 19-20, not the prototype's 16+
+    [InlineData(18, RollOutcome.Normal)]
     public void CritRangeAbility_WidensCritWindow(int roll, RollOutcome expected)
     {
         var result = CombatRules.RollAttack(Dagger, () => roll);
         Assert.Equal(expected, result.Outcome);
-        Assert.Equal(expected == RollOutcome.Crit ? 30 : 15, result.Damage);
+        Assert.Equal(expected == RollOutcome.Crit ? 45 : 15, result.Damage);   // CritMultiplier x1: x3 when it lands
     }
 
     [Fact]
@@ -51,15 +55,15 @@ public class CombatRulesTests
         Assert.Equal(RollOutcome.Weak, roll.Outcome);
         Assert.Equal(3, roll.Damage); // floor(7 / 2)
 
-        var oneDamage = new Weapon("Pin", 10, 1, 0, []);
+        var oneDamage = TestWeapons.Make("Pin", 10, 1, 0);
         Assert.Equal(1, CombatRules.RollAttack(oneDamage, () => 1).Damage);
     }
 
     [Fact]
     public void Block_AbsorbsUpToItsValue()
     {
-        // Spear (7 dmg) into Sword (block 3) â†’ 4 through, 3 absorbed
-        var res = Resolve(Spear, Sword, roll: 10);
+        // Spear (7 dmg) into a Block x1 sword (3) -> 4 through, 3 absorbed
+        var res = Resolve(Spear, BlockSword, roll: 10);
         Assert.Equal(4, res.Damage);
         Assert.Equal(3, res.Blocked);
     }
@@ -67,9 +71,9 @@ public class CombatRulesTests
     [Fact]
     public void Block_AlwaysLetsOneDamageThrough()
     {
-        var feather = new Weapon("Feather", 10, 2, 0, []);
+        var feather = TestWeapons.Make("Feather", 10, 2, 0);
         // 2 dmg into block 3: absorb is capped at damage-1 = 1
-        var res = Resolve(feather, Sword, roll: 10);
+        var res = Resolve(feather, BlockSword, roll: 10);
         Assert.Equal(1, res.Damage);
         Assert.Equal(1, res.Blocked);
     }
@@ -88,28 +92,37 @@ public class CombatRulesTests
     [Fact]
     public void InAttackRange_SubtractsBothRadii()
     {
-        // Surface-to-surface exactly at range â†’ in range
-        float d = Dagger.Range + 14f + 14f;
-        Assert.True(CombatRules.InAttackRange(0, 0, 14f, d, 0, 14f, Dagger));
-        Assert.False(CombatRules.InAttackRange(0, 0, 14f, d + 0.1f, 0, 14f, Dagger));
+        // Surface-to-surface exactly at range -> in range
+        var dagger = Dagger;
+        float d = dagger.Range + 14f + 14f;
+        Assert.True(CombatRules.InAttackRange(0, 0, 14f, d, 0, 14f, dagger));
+        Assert.False(CombatRules.InAttackRange(0, 0, 14f, d + 0.1f, 0, 14f, dagger));
     }
 
     [Fact]
     public void StartingWeapons_MatchPrototype()
     {
-        // The three prototype weapons keep indices 0-2 (parity); the Staff is an
-        // engine-side addition appended after them.
-        Assert.Equal(new[] { "Dagger", "Sword", "Spear" }, GameConstants.Weapons.Take(3).Select(w => w.Name));
-        Assert.Equal(new[] { 0, 1, 2, 2 }, GameConstants.CharStartingWeaponIdx);
+        // The three prototype classes keep their places 0-2 (parity, now on the
+        // class enum rather than a weapon list); the loadout is dagger, sword,
+        // axe, staff by stable id.
+        Assert.Equal(
+            new[] { WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear },
+            Enum.GetValues<WeaponClass>().Take(3));
+        Assert.Equal(
+            new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
+            GameConstants.CharStartingWeaponIds);
+        Assert.Equal(
+            new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
+            GameConstants.StartingBagWeaponIds);
     }
 
     [Fact]
     public void Staff_IsACasterWithManaCost()
     {
-        var staff = GameConstants.Weapons[GameConstants.StaffWeaponIdx];
-        Assert.Equal("Staff", staff.Name);
+        Assert.Equal("Staff of Renewal", GameContent.Current.Weapons["staff_of_renewal"].Name);
+        var staff = TestWeapons.Get("staff_of_renewal");
         Assert.True(staff.IsCaster);
-        Assert.True(staff.ManaCost > 0);
-        Assert.NotNull(staff.GetAbility(AbilityType.HealCast));
+        Assert.Equal(15, staff.ManaCost);
+        Assert.Equal("regeneration", Assert.Single(staff.Enchantments).Id);
     }
 }

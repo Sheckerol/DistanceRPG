@@ -86,8 +86,9 @@ public sealed record Tuning
     public IReadOnlyDictionary<StatusEffectType, int> EffectPerLevel { get; init; } = new Dictionary<StatusEffectType, int>
     {
         [StatusEffectType.Regeneration] = 1,   // 1 HP restored per level at the target's turn end
-        // TODO(sub-step 4): with the members, add Ward 1, Poison 1, Bleeding 1, Searing 1, Mire 10 (percent of the
-        // movement budget) — PHASE1WEAPONS-309 — and 1d's Sundered 1, Weakened 1, OverhealPool 1, Softened 1.
+        // TODO(sub-step 4): with the status table, add the rows for the members the enchantment data already
+        // names — Ward 1, Poison 1, Bleeding 1, Searing 1, Mire 10 (percent of the movement budget) —
+        // PHASE1WEAPONS-309 — and 1d's Sundered 1, Weakened 1, OverhealPool 1, Softened 1.
     };
 
     /// <summary>Surplus healing points that convert into one Ward level.</summary>

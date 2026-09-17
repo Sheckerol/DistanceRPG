@@ -6,10 +6,10 @@ public class EnemyAiTests
 {
     private const float Tile = GameConstants.Tile;
 
-    private static PartyMemberState Char(string id, float x, float y, int weaponIdx = 0)
+    private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
         var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
-        c.Inventory[0] = GameConstants.Weapons[weaponIdx];
+        c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
 

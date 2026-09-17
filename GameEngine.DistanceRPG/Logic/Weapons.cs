@@ -1,66 +1,111 @@
 namespace GameEngine.DistanceRPG.Logic;
 
-public enum AbilityType
-{
-    /// <summary>Widens the crit window: crit on rolls ≥ 20 - value.</summary>
-    CritRange,
-
-    /// <summary>Absorbs up to <c>value</c> incoming damage, never below 1 taken.</summary>
-    Block,
-
-    /// <summary>Free attack when the enemy moves into this character's range.</summary>
-    Brace,
-
-    /// <summary>
-    /// A staff cast: instead of attacking, applies a <see cref="StatusEffectType.Regeneration"/>
-    /// buff to a targeted ally. <c>Value</c> is the buff level added per cast.
-    /// </summary>
-    HealCast,
-}
-
-public sealed record WeaponAbility(AbilityType Type, int Value);
-
 /// <summary>
-/// A weapon. Range and Cost are in logic units (the original game's pixels,
-/// 32 per tile); Cost is subtracted from the wielder's movement budget per
-/// swing. <paramref name="ManaCost"/> is spent per use in addition to Cost —
-/// zero for ordinary weapons, positive for staves that cast.
+/// A weapon as an item: the statline and identity of its <see cref="WeaponDef"/>,
+/// the modifier stacks it carries (§1.1) and the enchantments attached to it
+/// (§3.3). Range and Cost are in logic units (32 per tile); Cost is subtracted
+/// from the wielder's movement budget per swing or cast, ManaCost from the mana
+/// pool per cast. A class rather than a record because <see cref="Modifiers"/>
+/// is the live total: <see cref="Forged"/> is the identity spread, fixed at
+/// construction and never written, and exists only to compute the ceiling;
+/// <see cref="Modifiers"/> is forged plus acquired, and is what every
+/// resolution site reads. Made by <see cref="WeaponCatalogue.Instantiate"/>,
+/// one instance per item.
 /// </summary>
-public sealed record Weapon(
-    string Name, int Range, int Damage, int Cost,
-    IReadOnlyList<WeaponAbility> Abilities, int ManaCost = 0)
+public sealed class Weapon
 {
-    public WeaponAbility? GetAbility(AbilityType type)
-        => Abilities.FirstOrDefault(a => a.Type == type);
+    /// <summary>Percentages are integers out of this.</summary>
+    private const int Percent = 100;
 
-    /// <summary>True for a staff — a weapon that casts a buff rather than striking.</summary>
-    public bool IsCaster => GetAbility(AbilityType.HealCast) != null;
+    public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        ArgumentNullException.ThrowIfNull(enchantments);
+
+        Id = def.Id;
+        Name = def.Name;
+        Class = def.Class;
+        Role = def.Role;
+        Range = def.Range;
+        Damage = def.Damage;
+        Cost = def.Cost;
+        ManaCost = def.ManaCost;
+        Forged = ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+        Modifiers = Forged;
+        Enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
+        AreaShape = def.Shape;
+        Unique = def.Unique;
+        Resolve();
+    }
+
+    public string Id { get; }
+    public string Name { get; }
+    public WeaponClass Class { get; }
+    public VariantRole? Role { get; }
+    public int Range { get; }
+    public int Damage { get; }
+    public int Cost { get; }
+    public int ManaCost { get; }
+
+    /// <summary>The identity spread — class baseline, variant role, unique spread, dungeon theme — fixed here and never written again.</summary>
+    public ModifierSet Forged { get; }
+
+    /// <summary>The live total, forged plus acquired: what every resolution site reads.</summary>
+    public ModifierSet Modifiers { get; private set; }
+
+    /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped.</summary>
+    public IReadOnlyList<Enchantment> Enchantments { get; }
+
+    /// <summary>A wand's geometry; null for everything else.</summary>
+    public AreaShape? AreaShape { get; }
+
+    public bool Unique { get; }
+
+    /// <summary>The sort of weapon the relations file means by "kind": staff and wand cast, bow and throwing are ranged, the rest melee.</summary>
+    public static WeaponKind KindOf(WeaponClass cls) => cls switch
+    {
+        WeaponClass.Staff or WeaponClass.Wand => WeaponKind.Caster,
+        WeaponClass.Ranged or WeaponClass.Throwing => WeaponKind.Ranged,
+        _ => WeaponKind.Melee,
+    };
+
+    public WeaponKind Kind => KindOf(Class);
+
+    /// <summary>True for a staff or wand — a weapon that casts rather than strikes.</summary>
+    public bool IsCaster => Kind == WeaponKind.Caster;
+
+    /// <summary>A caster's innate enchantment — the effect a staff casts, the element a wand carries — first in attachment order; null on a martial weapon.</summary>
+    public Enchantment? Innate => IsCaster && Enchantments.Count > 0 ? Enchantments[0] : null;
 
     /// <summary>
-    /// The §1.1 modifier stacks every resolution site reads, bridged from
-    /// <see cref="Abilities"/> so the shipped values hold until the catalogue
-    /// replaces abilities with a forged spread: <c>CritRange n</c> is
-    /// <c>CritWindow ×n</c> (the dagger still crits on 16+), <c>Block v</c> is
-    /// <c>Block ×(v / 3)</c> (3 absorbed per stack, so the sword's 3 is one
-    /// stack), <c>Brace n</c> is <c>Brace ×n</c>, and <c>HealCast</c> carries no
-    /// stacks. Computed once at construction.
+    /// The movement a swing or cast costs after Light's discount:
+    /// <c>Cost * (100 - Modifiers.Value(Light)) / 100</c>, truncated. Computed
+    /// once and cached, so the HUD and the movement gate agree on one number.
     /// </summary>
-    public ModifierSet Modifiers { get; } = Bridge(Abilities);
+    public int ResolvedCost { get; private set; }
 
-    /// <summary>What one Block stack absorbs — the §1.1 per-stack value the bridge divides the legacy figure by.</summary>
-    private const int LegacyBlockPerStack = 3;
+    /// <summary>The mana a cast costs after Resonant's discount, the same shape against <see cref="ManaCost"/>.</summary>
+    public int ResolvedManaCost { get; private set; }
 
-    // The parity bridge, deleted with AbilityType: a translation of the legacy
-    // ability list, not a behaviour switch.
-    private static ModifierSet Bridge(IReadOnlyList<WeaponAbility> abilities)
-        => ModifierSet.Of(abilities
-            .Where(a => a.Type != AbilityType.HealCast)   // a cast is an enchantment, not a stack
-            .Select(a => a.Type switch
-            {
-                AbilityType.CritRange => (ModifierType.CritWindow, a.Value),
-                AbilityType.Block => (ModifierType.Block, a.Value / LegacyBlockPerStack),
-                AbilityType.Brace => (ModifierType.Brace, a.Value),
-                _ => throw new ArgumentOutOfRangeException(nameof(abilities), a.Type, "No modifier bridge for this ability."),
-            })
-            .ToArray());
+    /// <summary>
+    /// The one mutator: add <paramref name="n"/> acquired stacks of
+    /// <paramref name="t"/>, clamped to forged plus the acquired headroom, and
+    /// refresh the resolved costs. Farm depth, grafts and improvements are all
+    /// this call.
+    /// </summary>
+    public void Acquire(ModifierType t, int n)
+    {
+        Modifiers = Modifiers.With(t, n, Forged);
+        Resolve();
+    }
+
+    public int Stacks(ModifierType t) => Modifiers.Stacks(t);
+
+    private void Resolve()
+    {
+        ResolvedCost = Cost * (Percent - Modifiers.Value(ModifierType.Light)) / Percent;
+        ResolvedManaCost = ManaCost * (Percent - Modifiers.Value(ModifierType.Resonant)) / Percent;
+    }
+
+    public override string ToString() => $"{Name} ({Id}: {Modifiers})";
 }

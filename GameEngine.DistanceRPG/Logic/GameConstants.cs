@@ -4,6 +4,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// Gameplay constants carried over from the Phaser prototype. Distances stay
 /// in the original logic units (pixels, <see cref="Tile"/> = 32 per tile);
 /// the 3D presentation layer converts to world units when placing geometry.
+/// Weapons live in the content catalogue (<see cref="GameContent.Weapons"/>)
+/// and are named here by stable string id, never by index.
 /// </summary>
 public static class GameConstants
 {
@@ -47,23 +49,21 @@ public static class GameConstants
     /// <summary>Chance a qualifying room converts one of its enemies into a staff healer.</summary>
     public const double StaffHealerChance = 0.5;
 
-    public static readonly IReadOnlyList<Weapon> Weapons = new[]
-    {
-        new Weapon("Dagger", Range: 40, Damage: 15, Cost: 30,
-            new[] { new WeaponAbility(AbilityType.CritRange, 4) }),
-        new Weapon("Sword", Range: 80, Damage: 10, Cost: 50,
-            new[] { new WeaponAbility(AbilityType.Block, 3) }),
-        new Weapon("Spear", Range: 130, Damage: 7, Cost: 40,
-            new[] { new WeaponAbility(AbilityType.Brace, 1) }),
-        new Weapon("Staff", Range: 100, Damage: 0, Cost: 40,
-            new[] { new WeaponAbility(AbilityType.HealCast, 1) }, ManaCost: 15),
-    };
+    /// <summary>
+    /// Starting weapon id per party member A–D: dagger, sword, axe, staff
+    /// (§2.1 names the classes; <c>party.json</c> will decide the items, so
+    /// these are Phase 1's provisional picks).
+    /// </summary>
+    public static readonly IReadOnlyList<string> CharStartingWeaponIds =
+        ["weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal"];
 
-    /// <summary>Index of the Staff in <see cref="Weapons"/>.</summary>
-    public const int StaffWeaponIdx = 3;
-
-    /// <summary>Starting weapon index (into <see cref="Weapons"/>) per party member A–D.</summary>
-    public static readonly IReadOnlyList<int> CharStartingWeaponIdx = new[] { 0, 1, 2, 2 };
+    /// <summary>
+    /// Slot-1 weapon id per party member: the engine-side Staff of Renewal
+    /// for A–C, a healer option for anyone, as today; D, the caster, carries
+    /// the Staff of Mire beside its own.
+    /// </summary>
+    public static readonly IReadOnlyList<string> StartingBagWeaponIds =
+        ["staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire"];
 
     public static readonly IReadOnlyList<string> CharIds = new[] { "A", "B", "C", "D" };
 }

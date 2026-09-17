@@ -6,18 +6,18 @@ public class EnemyHealerTests
 {
     private const float Tile = GameConstants.Tile;
 
-    private static PartyMemberState Char(string id, float x, float y, int weaponIdx = 0)
+    private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
         var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
-        c.Inventory[0] = GameConstants.Weapons[weaponIdx];
+        c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
 
-    private static EnemyState Enemy(float x, float y, int weaponIdx = 1)
-        => new() { X = x, Y = y, Weapon = GameConstants.Weapons[weaponIdx] };
+    private static EnemyState Enemy(float x, float y, string weaponId = "arming_sword")
+        => new() { X = x, Y = y, Weapon = TestWeapons.Get(weaponId) };
 
     private static EnemyState Healer(float x, float y)
-        => new() { X = x, Y = y, Weapon = GameConstants.Weapons[GameConstants.StaffWeaponIdx] };
+        => new() { X = x, Y = y, Weapon = TestWeapons.Get("staff_of_renewal") };
 
     private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)
     {

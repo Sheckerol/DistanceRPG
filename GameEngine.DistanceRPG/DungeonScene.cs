@@ -276,8 +276,9 @@ public class DungeonScene : Scene
                 X = tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
                 Y = tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f,
             };
-            state.Inventory[0] = GameConstants.Weapons[GameConstants.CharStartingWeaponIdx[i]];
-            state.Inventory[1] = GameConstants.Weapons[GameConstants.StaffWeaponIdx]; // healer option for anyone
+            var catalogue = GameContent.Current.Weapons;
+            state.Inventory[0] = catalogue.Instantiate(GameConstants.CharStartingWeaponIds[i]);
+            state.Inventory[1] = catalogue.Instantiate(GameConstants.StartingBagWeaponIds[i]); // a staff for everyone
 
             var character = new CharacterObject(state, PartyColors[i]);
             _party.Add(character);
@@ -294,9 +295,9 @@ public class DungeonScene : Scene
     /// </summary>
     private void SpawnEnemies()
     {
-        foreach (var (x, y, weaponIdx) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
+        foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            var state = new EnemyState { X = x, Y = y, Weapon = GameConstants.Weapons[weaponIdx] };
+            var state = new EnemyState { X = x, Y = y, Weapon = GameContent.Current.Weapons.Instantiate(weaponId) };
             var enemy = new EnemyObject(state, EnemyColor);
             _enemies.Add(enemy);
             AddGameObject(enemy);

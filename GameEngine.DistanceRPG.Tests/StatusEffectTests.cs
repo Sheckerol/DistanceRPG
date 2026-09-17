@@ -5,19 +5,21 @@ namespace GameEngine.DistanceRPG.Tests;
 public class StatusEffectTests
 {
     private const float Tile = GameConstants.Tile;
-    private static Weapon Staff => GameConstants.Weapons[GameConstants.StaffWeaponIdx];
 
-    private static PartyMemberState Char(string id, float x, float y, int weaponIdx = 0)
+    /// <summary>The Staff of Renewal's statline: Resonant x1 resolves its 15 mana to 13.</summary>
+    private static Weapon Staff => TestWeapons.Get("staff_of_renewal");
+
+    private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
         var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
-        c.Inventory[0] = GameConstants.Weapons[weaponIdx];
+        c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
 
     private static (TurnSystem turns, PartyMemberState a, PartyMemberState b) Scene(float bOffsetX = 30f)
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, GameConstants.StaffWeaponIdx);
+        var a = Char("A", 5 * Tile, 5 * Tile, "staff_of_renewal");
         var b = Char("B", 5 * Tile + bOffsetX, 5 * Tile);
         var enemy = new EnemyState { X = 18 * Tile, Y = 18 * Tile };
         var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10);
@@ -37,7 +39,7 @@ public class StatusEffectTests
 
         Assert.Equal(1, b.StatusLevel(StatusEffectType.Regeneration));
         Assert.Equal(GameConstants.MaxDistance - Staff.Cost, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana - Staff.ManaCost, a.Mana);
+        Assert.Equal(GameConstants.MaxMana - Staff.ResolvedManaCost, a.Mana);   // 13, Resonant x1; the innate's trigger arrives with the cast economy
         Assert.NotNull(buffed);
         Assert.Equal(1, buffed!.Level);
     }
@@ -52,7 +54,7 @@ public class StatusEffectTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(3, b.StatusLevel(StatusEffectType.Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 3 * Staff.ManaCost, a.Mana);
+        Assert.Equal(GameConstants.MaxMana - 3 * Staff.ResolvedManaCost, a.Mana);
     }
 
     [Fact]
@@ -68,7 +70,7 @@ public class StatusEffectTests
     public void Cast_BlockedWithoutMana()
     {
         var (turns, a, b) = Scene();
-        a.Mana = Staff.ManaCost - 1;
+        a.Mana = Staff.ResolvedManaCost - 1;
         Assert.False(turns.CanCast(a, b));
         Assert.False(turns.TryCast(a, b));
         Assert.Equal(0, b.StatusLevel(StatusEffectType.Regeneration));
@@ -86,7 +88,7 @@ public class StatusEffectTests
     public void Staff_CannotAttackEnemies()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, GameConstants.StaffWeaponIdx);
+        var a = Char("A", 5 * Tile, 5 * Tile, "staff_of_renewal");
         var enemy = new EnemyState { X = 5 * Tile + 30f, Y = 5 * Tile }; // well within staff range
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -100,7 +102,7 @@ public class StatusEffectTests
     public void RegularWeapon_CannotCast()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, 0); // Dagger
+        var a = Char("A", 5 * Tile, 5 * Tile, "weakspot_stiletto"); // a dagger
         var b = Char("B", 5 * Tile + 30f, 5 * Tile);
         var turns = new TurnSystem(grid, new[] { a, b }, new[] { new EnemyState { X = 18 * Tile, Y = 18 * Tile } }, () => 10);
 

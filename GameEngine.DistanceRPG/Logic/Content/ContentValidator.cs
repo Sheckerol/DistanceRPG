@@ -2,8 +2,9 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The well-formedness checks content must pass before anything reads it
-/// (§5.4, §5.5). The relations are validated first because they are the
-/// predicates everything after them is checked against. Every failure throws a
+/// (§5.4–§5.7). The relations are validated first because they are the
+/// predicates everything after them is checked against; the enchantments next,
+/// because the weapons name them; the weapons last. Every failure throws a
 /// <see cref="ContentException"/> naming the entry and the rule; the first
 /// failure aborts, in a fixed check order, so the report is deterministic.
 /// </summary>
@@ -17,6 +18,27 @@ public static class ContentValidator
     public const string RuleRequiresAcyclic = "requires must be acyclic";
     public const string RuleRequiresAndExcludes = "an id may not both require and exclude the same id";
     public const string RuleRequiresConflict = "an id may not require two ids that exclude each other";
+
+    public const string RuleDuplicateId = "an id is declared more than once";
+    public const string RuleZeroTrigger = "a trigger cost is never zero";
+    public const string RuleTriggerXorApplies = "an entry quotes a flat trigger cost or applies a status, never both";
+    public const string RuleApplierNamesStatus = "a status applier names the status it applies";
+    public const string RuleElementNamesType = "an elemental entry names the damage type it carries";
+    public const string RuleOpposition = "damage-type opposition must be symmetric and total";
+
+    public const string RuleForgedNotAllowed = "every forged spread must be allowed";
+    public const string RuleMaxForged = "nothing is forged past MaxForged";
+    public const string RuleTwoForgedAxes = "no weapon is forged with fewer than two modifiers";
+    public const string RuleCasterForged = "a caster is forged Resonant x1 and nothing else";
+    public const string RuleCasterInnate = "a caster carries exactly one innate enchantment";
+    public const string RuleWandShape = "a wand carries an area shape and nothing else does";
+    public const string RuleRoleOnMartialOnly = "only a martial variant carries a role";
+    public const string RuleVariantRoles = "a martial class has four variants, one per role";
+    public const string RuleClassBaseline = "a class baseline is its signature plus a second modifier";
+    public const string RuleVariantDelta = "a variant is its class baseline plus exactly one added modifier type";
+    public const string RuleEfficiencyAddsLight = "an Efficiency variant adds Light x1";
+    public const string RulePurityDeepensBaseline = "a Purity variant deepens a baseline modifier";
+    public const string RuleForgedOnlyUnused = "every forgedOnly id is forged on at least one weapon";
 
     /// <summary>
     /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier
@@ -114,6 +136,232 @@ public static class ContentValidator
             if (isModifier(id) && !needs.All(isModifier))
                 throw new ContentException(id, RuleModifierRelationIds);
     }
+
+    /// <summary>
+    /// The §5.7 checks that need the entries alone: ids are unique, no trigger
+    /// cost is zero (no enchantment fires free, ever), an entry quotes a flat
+    /// trigger cost or applies a status and never both (a status applier prices
+    /// off its level count, so a flat cost would decay into free), a status
+    /// applier names its status, and an elemental entry names its type.
+    /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
+    /// </summary>
+    public static void ValidateEnchantments(EnchantmentsData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var e in data.Enchantments)
+        {
+            if (!seen.Add(e.Id))
+                throw new ContentException(e.Id, RuleDuplicateId);
+            if (e.Trigger is <= 0)
+                throw new ContentException(e.Id, RuleZeroTrigger, $"trigger {e.Trigger}");
+            if ((e.Trigger != null) == (e.Applies != null))
+                throw new ContentException(e.Id, RuleTriggerXorApplies,
+                    e.Trigger != null ? "quotes a trigger and applies a status" : "quotes no trigger and applies nothing");
+            if (e.Effect == EffectKind.ApplyStatus && e.Applies == null)
+                throw new ContentException(e.Id, RuleApplierNamesStatus);
+            if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
+                throw new ContentException(e.Id, RuleElementNamesType);
+        }
+    }
+
+    /// <summary>
+    /// §1.4's chart as content (S:278): four types, two pairs, every type opposed
+    /// by exactly one. Each <see cref="DamageType"/> other than None is carried by
+    /// exactly one elemental entry, and the exclusion groups of
+    /// <paramref name="restricted"/> oppose every element to exactly one other,
+    /// both ways.
+    /// </summary>
+    public static void ValidateOpposition(EnchantmentsData data, RestrictedData restricted)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(restricted);
+
+        var elements = data.Enchantments.Where(e => e.Effect == EffectKind.ElementalDamage).ToList();
+        var byType = new Dictionary<DamageType, EnchantmentDef>();
+        foreach (var e in elements)
+        {
+            var type = e.DamageType ?? DamageType.None;
+            if (!byType.TryAdd(type, e))
+                throw new ContentException(e.Id, RuleOpposition, $"{type} is carried by '{byType[type].Id}' as well");
+        }
+        foreach (var type in Enum.GetValues<DamageType>())
+            if (type != DamageType.None && !byType.ContainsKey(type))
+                throw new ContentException(type.ToString(), RuleOpposition, "no innate enchantment carries it");
+
+        var excludes = Closure(restricted.Excludes);
+        var elementIds = new HashSet<string>(elements.Select(e => e.Id), StringComparer.Ordinal);
+        foreach (var e in elements)
+        {
+            var opposed = excludes.TryGetValue(e.Id, out var set) ? set.Where(elementIds.Contains).ToList() : new List<string>();
+            if (opposed.Count != 1)
+                throw new ContentException(e.Id, RuleOpposition, $"opposed by {opposed.Count} elements, not one");
+            if (!excludes.TryGetValue(opposed[0], out var back) || !back.Contains(e.Id))
+                throw new ContentException(e.Id, RuleOpposition, $"'{opposed[0]}' does not oppose it back");
+        }
+    }
+
+    /// <summary>
+    /// The §5.6 checks on <c>weapons.json</c> (S:231-240): ids are unique; every
+    /// enchantment a weapon names resolves; every forged modifier is allowed
+    /// beside the rest of its spread — the state every later roll deepens
+    /// from, asked of <see cref="ModifierRules.Allowed"/> with the whole spread
+    /// present, because a from-zero build-up would refuse the forge's own
+    /// <c>Charges</c>, and the forge is exactly what <c>forgedOnly</c> reserves
+    /// the first stack for; nothing is forged past <see cref="ModifierRules.MaxForged"/>;
+    /// a martial weapon is forged on at least two modifiers and a caster on
+    /// <c>Resonant x1</c> alone beside its one innate enchantment (a staff's
+    /// fixed status effect; a wand's element, supplied at instantiation); only
+    /// wands carry a shape and only martial variants a role; each martial class
+    /// fields four variants, one per role, on a two-modifier baseline, every
+    /// variant adding exactly one modifier type to it (Efficiency <c>Light x1</c>,
+    /// Purity a baseline modifier again, Control and Support a new one); and
+    /// every <c>forgedOnly</c> id is forged somewhere, or it could never exist.
+    /// Unique derivation is checked with the uniques.
+    /// </summary>
+    public static void ValidateWeapons(WeaponsData data, ModifierRules rules, RestrictedData restricted, EnchantmentCatalogue enchantments)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(restricted);
+        ArgumentNullException.ThrowIfNull(enchantments);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var def in data.Weapons)
+            if (!seen.Add(def.Id))
+                throw new ContentException(def.Id, RuleDuplicateId);
+
+        foreach (var def in data.Weapons)
+        {
+            var spread = Spread(def);
+            var kind = Weapon.KindOf(def.Class);
+
+            foreach (var reference in def.Enchantments)
+                if (!enchantments.TryGet(reference.Id, out _))
+                    throw new ContentException(def.Id, RuleUnknownId, reference.Id);
+
+            foreach (var (t, n) in spread.Entries)
+            {
+                if (!rules.Allowed(t, kind, spread))
+                    throw new ContentException(def.Id, RuleForgedNotAllowed, $"{t} x{n} on a {kind} weapon beside {spread}");
+                if (n > rules.MaxForged(t))
+                    throw new ContentException(def.Id, RuleMaxForged, $"{t} x{n}, MaxForged {rules.MaxForged(t)}");
+            }
+
+            if (kind == WeaponKind.Caster)
+            {
+                if (!spread.Equals(ModifierSet.Of((ModifierType.Resonant, 1))))
+                    throw new ContentException(def.Id, RuleCasterForged, spread.ToString());
+                if (def.Role != null)
+                    throw new ContentException(def.Id, RuleRoleOnMartialOnly, def.Role.ToString());
+                if ((def.Class == WeaponClass.Wand) != (def.Shape != null))
+                    throw new ContentException(def.Id, RuleWandShape);
+                ValidateCasterInnate(def, enchantments);
+            }
+            else
+            {
+                if (spread.Entries.Count() < 2)
+                    throw new ContentException(def.Id, RuleTwoForgedAxes, spread.ToString());
+                if (def.Shape != null)
+                    throw new ContentException(def.Id, RuleWandShape);
+                if (!def.Unique && def.Role == null)
+                    throw new ContentException(def.Id, RuleRoleOnMartialOnly, "a martial variant carries no role");
+            }
+        }
+
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            if (Weapon.KindOf(cls) == WeaponKind.Caster)
+                continue;   // casters vary by effect and shape, not by role
+            var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
+            if (variants.Count == 0)
+                continue;   // a class the file leaves out is not malformed, only absent
+            ValidateVariants(cls, variants);
+        }
+
+        foreach (var id in restricted.ForgedOnly)
+            if (ModifierRules.TryParseId(id, out var t) && !data.Weapons.Any(w => w.Forged.GetValueOrDefault(t) > 0))
+                throw new ContentException(id, RuleForgedOnlyUnused);
+    }
+
+    private static void ValidateCasterInnate(WeaponDef def, EnchantmentCatalogue enchantments)
+    {
+        var attached = def.Enchantments.Select(r => enchantments[r.Id]).ToList();
+        if (def.Class == WeaponClass.Staff)
+        {
+            // Fixed by variant: the first enchantment is the effect it casts.
+            if (attached.Count == 0 || attached[0].Effect != EffectKind.ApplyStatus || attached[0].Applies == null)
+                throw new ContentException(def.Id, RuleCasterInnate, "a staff's first enchantment is the status it casts");
+            if (attached[0].Targets == TargetSide.Any)
+                throw new ContentException(def.Id, RuleCasterInnate, "a staff's effect targets allies or enemies, not either");
+            if (!def.Unique && attached.Count != 1)
+                throw new ContentException(def.Id, RuleCasterInnate, $"{attached.Count} enchantments on a variant");
+        }
+        else
+        {
+            // A wand's innate is a damage type: rolled with the drop, so a variant
+            // lists none and the caller supplies it; a unique may fix its element.
+            if (!def.Unique && attached.Count != 0)
+                throw new ContentException(def.Id, RuleCasterInnate, "a wand variant's element is supplied at instantiation");
+            if (attached.Count > 0 && attached[0].Effect != EffectKind.ElementalDamage)
+                throw new ContentException(def.Id, RuleCasterInnate, "a wand's first enchantment is its element");
+        }
+    }
+
+    private static void ValidateVariants(WeaponClass cls, List<WeaponDef> variants)
+    {
+        foreach (var role in Enum.GetValues<VariantRole>())
+        {
+            int count = variants.Count(v => v.Role == role);
+            if (count != 1)
+                throw new ContentException(cls.ToString(), RuleVariantRoles, $"{count} {role} variants");
+        }
+
+        // The baseline is what every variant of the class carries: the per-type
+        // minimum over the four, which leaves each variant's own addition out.
+        var baseline = new Dictionary<ModifierType, int>();
+        foreach (var t in Enum.GetValues<ModifierType>())
+        {
+            int min = variants.Min(v => v.Forged.GetValueOrDefault(t));
+            if (min > 0)
+                baseline[t] = min;
+        }
+        if (baseline.Count != 2)
+            throw new ContentException(cls.ToString(), RuleClassBaseline,
+                $"baseline is {string.Join(", ", baseline.Select(b => $"{b.Key} x{b.Value}"))}");
+
+        foreach (var v in variants)
+        {
+            var added = v.Forged
+                .Where(f => f.Value > baseline.GetValueOrDefault(f.Key))
+                .Select(f => f.Key)
+                .ToList();
+            if (added.Count != 1)
+                throw new ContentException(v.Id, RuleVariantDelta, $"adds {added.Count} modifier types to the {cls} baseline");
+
+            var t = added[0];
+            switch (v.Role)
+            {
+                case VariantRole.Efficiency:
+                    if (t != ModifierType.Light || v.Forged[t] != 1)
+                        throw new ContentException(v.Id, RuleEfficiencyAddsLight, $"adds {t} x{v.Forged[t]}");
+                    break;
+                case VariantRole.Purity:
+                    if (!baseline.ContainsKey(t))
+                        throw new ContentException(v.Id, RulePurityDeepensBaseline, $"adds {t}, which the baseline does not carry");
+                    break;
+                default:
+                    if (baseline.ContainsKey(t))
+                        throw new ContentException(v.Id, RuleVariantDelta, $"deepens {t} instead of adding a modifier");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>A def's forged spread as a set, unclamped: the forge is bounded by MaxForged above, never by the acquisition cap.</summary>
+    private static ModifierSet Spread(WeaponDef def)
+        => ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
 
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)
     {

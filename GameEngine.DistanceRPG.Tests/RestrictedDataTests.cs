@@ -32,7 +32,7 @@ public class RestrictedDataTests
     {
         var known = KnownPlus(ContentDefaults.EnchantmentIds.ToArray());
         ContentValidator.ValidateRestricted(ContentDefaults.Restricted, known);   // does not throw
-        Assert.NotNull(GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.EnchantmentIds));
+        Assert.NotNull(GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons));
         Assert.NotNull(GameContent.Current);   // the static init loaded the same defaults
     }
 
@@ -194,7 +194,8 @@ public class RestrictedDataTests
     public void GameContent_Load_AbortsOnInvalidRelations_AndLeavesCurrentUntouched()
     {
         var before = GameContent.Current;
-        var ex = Assert.Throws<ContentException>(() => GameContent.Load(new Tuning(), Data(excludes: [["Brace", "Brace"]])));
+        var ex = Assert.Throws<ContentException>(() =>
+            GameContent.Load(new Tuning(), Data(excludes: [["Brace", "Brace"]]), ContentDefaults.Enchantments, ContentDefaults.Weapons));
         Assert.Equal(ContentValidator.RuleSelfExclusion, ex.Rule);
         Assert.Same(before, GameContent.Current);
     }
@@ -202,7 +203,11 @@ public class RestrictedDataTests
     [Fact]
     public void GameContent_Load_BuildsRulesFromTheData_WithoutBecomingCurrent()
     {
-        var content = GameContent.Load(new Tuning { AcquiredHeadroom = 1 }, Data(excludes: [["Block", "Cleave"]]));
+        // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked against.
+        var content = GameContent.Load(
+            new Tuning { AcquiredHeadroom = 1 },
+            Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]]),
+            ContentDefaults.Enchantments, ContentDefaults.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);
         Assert.NotSame(content, GameContent.Current);

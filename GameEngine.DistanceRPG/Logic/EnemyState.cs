@@ -6,6 +6,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public sealed class EnemyState : ActorState
 {
+    /// <summary>What a dummy holds unless told otherwise: the Efficiency sword — Block x1, Push x1, Light x1.</summary>
+    public const string DefaultWeaponId = "arming_sword";
+
     public EnemyState()
     {
         Hp = GameConstants.DummyHp;
@@ -13,13 +16,14 @@ public sealed class EnemyState : ActorState
 
     public override int MaxHp => GameConstants.DummyHp;
 
-    public Weapon Weapon { get; set; } = GameConstants.Weapons[1]; // Sword
+    /// <summary>A fresh instance per enemy: acquired stacks are per item, so two dummies never share one.</summary>
+    public Weapon Weapon { get; set; } = GameContent.Current.Weapons.Instantiate(DefaultWeaponId);
 
     /// <summary>The weapon this enemy fights with is <see cref="Weapon"/>, which is never null.</summary>
     public override Weapon? EquippedWeapon => Weapon;
 
-    /// <summary>True for a staff-wielding support enemy that heals its allies.</summary>
-    public bool IsHealer => Weapon.IsCaster;
+    /// <summary>True for a support caster — a staff whose innate effect lands on allies — that mends its side rather than fighting.</summary>
+    public bool IsHealer => Weapon.Innate?.Def.Targets == TargetSide.Ally;
 
     public override float Radius => (GameConstants.Tile - 4f) / 2f;
 
