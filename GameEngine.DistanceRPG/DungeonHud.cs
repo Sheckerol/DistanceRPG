@@ -168,9 +168,7 @@ public sealed class DungeonHud
             if (hasHover && hovered == i && state.Alive)
                 color = Vector4.Lerp(color, White, 0.5f);
             string marker = isActive ? ">" : " ";
-            int regen = state.StatusLevel(StatusEffectType.Regeneration);
-            string buff = regen > 0 ? $" +{regen}" : "";
-            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}{buff}", SelectorX, SelectorTop + i * SelectorRowPitch, 2f, color);
+            _text.DrawText($"{marker}{i + 1} {state.Id} {state.Hp}{StatusBadges(state)}", SelectorX, SelectorTop + i * SelectorRowPitch, 2f, color);
         }
     }
 
@@ -187,9 +185,7 @@ public sealed class DungeonHud
             DrawCenteredAt(px.X, px.Y - 18f, $"{name} [{enemy.Weapon.Name}]", 1.5f,
                 enemy.IsHealer ? Cyan : Orange);
 
-            int regen = enemy.StatusLevel(StatusEffectType.Regeneration);
-            string hp = regen > 0 ? $"{enemy.Hp}/{enemy.MaxHp} +{regen}" : $"{enemy.Hp}/{enemy.MaxHp}";
-            DrawCenteredAt(px.X, px.Y, hp, 1.5f, White);
+            DrawCenteredAt(px.X, px.Y, $"{enemy.Hp}/{enemy.MaxHp}{StatusBadges(enemy)}", 1.5f, White);
         }
     }
 
@@ -237,6 +233,38 @@ public sealed class DungeonHud
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>Four-letter badges per status, so a row of them fits the 5-px font; the regen badge keeps its old <c>+N</c> shape.</summary>
+    private static readonly IReadOnlyDictionary<StatusEffectType, string> Badges = new Dictionary<StatusEffectType, string>
+    {
+        [StatusEffectType.Ward] = "WARD",
+        [StatusEffectType.Poison] = "POIS",
+        [StatusEffectType.Mire] = "MIRE",
+        [StatusEffectType.Sundered] = "SUND",
+        [StatusEffectType.Weakened] = "WEAK",
+        [StatusEffectType.Bleeding] = "BLED",
+        [StatusEffectType.Searing] = "SEAR",
+        [StatusEffectType.Softened] = "SOFT",
+    };
+
+    /// <summary>
+    /// The actor's statuses as badges — <c>+3</c> for regeneration as before,
+    /// <c>SUND 2  WEAK 1  MIRE 4  WARD 5</c> for the rest, in the order they
+    /// landed; the hidden overheal pool is not shown. Empty when clean.
+    /// </summary>
+    internal static string StatusBadges(ActorState actor)
+    {
+        var parts = new List<string>();
+        foreach (var e in actor.StatusEffects)
+        {
+            if (e.Type == StatusEffectType.OverhealPool) continue;
+            if (e.Type == StatusEffectType.Regeneration)
+                parts.Add($"+{e.Levels}");
+            else
+                parts.Add($"{Badges.GetValueOrDefault(e.Type, e.Type.ToString().ToUpperInvariant())} {e.Levels}");
+        }
+        return parts.Count > 0 ? " " + string.Join("  ", parts) : "";
+    }
 
     /// <summary>The weapon's modifier stacks as <c>NAME xN</c> in table order, and a caster's innate effect after them.</summary>
     private static string ModifierReadout(Weapon weapon)

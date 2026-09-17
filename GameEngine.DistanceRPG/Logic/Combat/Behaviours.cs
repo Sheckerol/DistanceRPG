@@ -12,6 +12,7 @@ public static class Behaviours
     {
         ArgumentNullException.ThrowIfNull(table);
         CombatBehaviours.Register(table);
-        // Status, displacement and reaction, and enchantment behaviours register here as they land.
+        StatusBehaviours.Register(table);
+        // Displacement and reaction, and enchantment behaviours register here as they land.
     }
 }

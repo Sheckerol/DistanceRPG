@@ -1,11 +1,37 @@
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
+using static GameEngine.DistanceRPG.Logic.StatusEffectType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
 public class DamagePipelineTests
 {
     private const float Tile = GameConstants.Tile;
+
+    private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)
+    {
+        for (float t = 0f; t < seconds; t += dt)
+            turns.Update(dt);
+    }
+
+    /// <summary>
+    /// A member and an enemy 50 units apart on an open grid under a turn
+    /// system, so the applier writes; the enemy's HP is raised so nothing
+    /// here kills it by accident.
+    /// </summary>
+    private static (TurnSystem turns, PartyMemberState a, EnemyState enemy) Duel(Weapon attackerWeapon, Weapon enemyWeapon, Func<int> roll)
+    {
+        var grid = new int[20, 20];
+        var a = Member(attackerWeapon);
+        a.X = 5 * Tile;
+        a.Y = 5 * Tile;
+        var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile, Weapon = enemyWeapon, Hp = 200 };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, roll);
+        return (turns, a, enemy);
+    }
+
+    private static Weapon Club => TestWeapons.Make("Club", 40, 10, 30);
+    private static Weapon Fists => TestWeapons.Make("Fists", 40, 1, 0);   // an enemy weapon with no Block
 
     // Catalogue instances shared across this class, read-only: nothing here Acquires on them.
     private static readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
@@ -231,5 +257,141 @@ public class DamagePipelineTests
 
         e.X = 10f;   // overlapping circles: never negative
         Assert.Equal(0, CombatRules.SurfaceDistanceUnits(a, e));
+    }
+
+    [Fact]
+    public void Ward_TakesWhatWasDealt_AfterBlock_OnCritsToo_DownToZero()
+    {
+        // 10 into Ward 4, no Block, no crit: Dealt 10, Taken 6, the Ward spent to nothing.
+        var (turns, a, enemy) = Duel(Club, Fists, () => 10);
+        enemy.ApplyStatus(Ward, null, 4);
+        AttackResolution? hit = null;
+        turns.EnemyHit += (_, r) => hit = r;
+        Assert.True(turns.TryAttack(a, enemy));
+        var res = hit!.Value;
+        Assert.Equal((10, 6, 4, 0), (res.Dealt, res.Taken, res.WardSpent, res.Blocked));
+        Assert.Equal(200 - 6, enemy.Hp);
+        Assert.Equal(0, enemy.StatusLevel(Ward));
+
+        // 10 non-crit into Block x1 (3) and Ward 4: Block first, off the weapon's share, then Ward off what was dealt — Dealt 7, Taken 3.
+        var (turns2, b, blocker) = Duel(Club, TestWeapons.Get("arming_sword"), () => 10);
+        blocker.ApplyStatus(Ward, null, 4);
+        AttackResolution? hit2 = null;
+        turns2.EnemyHit += (_, r) => hit2 = r;
+        Assert.True(turns2.TryAttack(b, blocker));
+        var res2 = hit2!.Value;
+        Assert.Equal((7, 3, 4, 3), (res2.Dealt, res2.Taken, res2.WardSpent, res2.Blocked));
+        Assert.Equal(200 - 3, blocker.Hp);
+        Assert.Equal(0, blocker.StatusLevel(Ward));
+
+        // A crit of 20 into Block x8 (24) and Ward 5: Block skipped, Ward not — it is temporary health, not armour. Dealt 20, Taken 15.
+        var (turns3, c, bulwark) = Duel(Club, Fists, () => 20);
+        bulwark.Innate = ModifierSet.Of((Block, 8));
+        bulwark.ApplyStatus(Ward, null, 5);
+        AttackResolution? hit3 = null;
+        turns3.EnemyHit += (_, r) => hit3 = r;
+        Assert.True(turns3.TryAttack(c, bulwark));
+        var res3 = hit3!.Value;
+        Assert.Equal(RollOutcome.Crit, res3.Roll.Outcome);
+        Assert.Equal((20, 15, 5, 0), (res3.Dealt, res3.Taken, res3.WardSpent, res3.Blocked));
+        Assert.Equal(200 - 15, bulwark.Hp);
+        Assert.Equal(0, bulwark.StatusLevel(Ward));
+    }
+
+    [Fact]
+    public void FullyWardedHit_CreditsDealt_TakesNothing_AndDoesNotKill()
+    {
+        // Block lets one through; Ward may take a hit all the way to zero. The hit was still
+        // dealt — weapon XP, Serrated and the clean-kill test read that — and nothing died.
+        var (turns, a, enemy) = Duel(Club, Fists, () => 10);
+        enemy.Hp = 1;
+        enemy.ApplyStatus(Ward, null, 20);
+        var log = new List<string>();
+        turns.Events.On<DamagePayload>(GameEvent.DamageDealt, new HandlerPriority(9, 9), "probe",
+            (p, _, _) => { log.Add($"dealt {p.Dealt} taken {p.Taken}"); return p; });
+        turns.Events.On<KillPayload>(GameEvent.Killed, new HandlerPriority(9, 9), "probe",
+            (p, _, _) => { log.Add("killed"); return p; });
+        int defeated = 0;
+        turns.EnemyDefeated += _ => defeated++;
+
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.Equal(new[] { "dealt 10 taken 0" }, log);
+        Assert.Equal(1, enemy.Hp);
+        Assert.True(enemy.Alive);
+        Assert.Equal(0, defeated);
+        Assert.Equal(10, enemy.StatusLevel(Ward));
+    }
+
+    [Fact]
+    public void NaturalOne_HalvesThenRunsRemainingSteps()
+    {
+        // Spear 7 on a natural 1: halved to 3 (step 1); the attacker's Weakened 1 -> 2 (step 2);
+        // the defender's Sundered 2 -> 4 (step 3); Block x1 absorbs 3 -> Dealt 1 (step 5);
+        // Ward 1 swallows it -> Taken 0 (step 6); not a crit, so the CritSunder stacks do not land (step 7).
+        var attacker = Member(TestWeapons.Make("Pike", 128, 7, 55, (CritSunder, 2)));
+        attacker.ApplyStatus(Weakened, null, 1);
+        var defender = new EnemyState();   // the arming sword: Block x1
+        defender.ApplyStatus(Sundered, null, 2);
+        defender.ApplyStatus(Ward, null, 1);
+
+        var weak = Settle(attacker, defender, roll: 1);
+        Assert.Equal(RollOutcome.Weak, weak.Outcome);
+        Assert.Equal(4, weak.WeaponShare);
+        Assert.Equal(3, weak.Absorbed);
+        Assert.Equal(1, weak.Dealt);
+        Assert.Equal(1, weak.WardSpent);
+        Assert.Equal(0, weak.Taken);
+        Assert.True(weak.Blocked);
+        Assert.Empty(weak.ApplyToDefender);
+    }
+
+    [Fact]
+    public void Overheal_ConvertsSurplusToWardAtFiveToOne_AndResets()
+    {
+        // A member one HP short, Regeneration 3, and twelve surplus points banked in the
+        // hidden pool: the tick heals 1 and overflows 2; the overflow's HealingAboveFull
+        // converts the pool — 12 / 5 = 2 Ward, the 2 left over lost — and the pool is gone.
+        var grid = new int[20, 20];
+        var a = Member(Dagger);
+        a.X = 5 * Tile;
+        a.Y = 5 * Tile;
+        var enemy = new EnemyState { X = 15 * Tile, Y = 15 * Tile };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+        a.Hp = a.MaxHp - 1;
+        a.ApplyStatus(Regeneration, null, 3);
+        a.ApplyStatus(OverhealPool, null, 12);
+        var healed = new List<int>();
+        turns.CharacterHealed += (_, amount) => healed.Add(amount);
+
+        turns.EndTurn();
+
+        Assert.Equal(a.MaxHp, a.Hp);
+        Assert.Equal(new[] { 1 }, healed);
+        Assert.Equal(2, a.StatusLevel(Ward));
+        Assert.Equal(0, a.StatusLevel(OverhealPool));
+        Assert.Equal(2, a.StatusLevel(Regeneration));
+
+        // Under five points converts to nothing and still resets: lossy, not banked across heals.
+        var b = Member(Dagger, "B");
+        b.X = 5 * Tile;
+        b.Y = 7 * Tile;
+        var turns2 = new TurnSystem(grid, new[] { b }, new[] { new EnemyState { X = 15 * Tile, Y = 15 * Tile } }, () => 10);
+        b.ApplyStatus(Regeneration, null, 1);   // at full HP: all of it overflows
+        b.ApplyStatus(OverhealPool, null, 4);
+        turns2.EndTurn();
+        Assert.Equal(0, b.StatusLevel(Ward));
+        Assert.Equal(0, b.StatusLevel(OverhealPool));
+
+        // With no surplus to trigger it, the pool decays like everything else: one level a round.
+        var c = Member(Dagger, "C");
+        c.X = 5 * Tile;
+        c.Y = 9 * Tile;
+        var turns3 = new TurnSystem(grid, new[] { c }, new[] { new EnemyState { X = 15 * Tile, Y = 15 * Tile } }, () => 10);
+        c.ApplyStatus(OverhealPool, null, 3);
+        turns3.EndTurn();
+        Advance(turns3, 3f);
+        Assert.Equal(TurnPhase.Player, turns3.Phase);
+        Assert.Equal(2, c.StatusLevel(OverhealPool));
+        Assert.Equal(0, c.StatusLevel(Ward));
     }
 }

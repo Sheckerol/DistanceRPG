@@ -39,6 +39,7 @@ public class DungeonScene : Scene
     private static readonly Vector4 EnemyColor = Rgb(0xf5a623);
     private static readonly Vector4 DeadColor = Rgb(0x555555);
     private static readonly Vector4 HealColor = Rgb(0x44dd77);
+    private static readonly Vector4 TickColor = Rgb(0xb06ee0);   // a status tick's damage: neither a hit's red nor a heal's green
 
     private static readonly Vector4[] PartyColors =
     {
@@ -431,9 +432,9 @@ public class DungeonScene : Scene
 
         _turns.CharacterBuffed += (c, effect) =>
         {
-            Log.Info($"[Combat] {c.Id} gains {effect.Type} Lv{effect.Level}");
+            Log.Info($"[Combat] {c.Id} gains {effect.Type} Lv{effect.Levels}");
             var obj = _party.First(p => p.State == c);
-            _hud.AddFloatingText(obj.Position, $"REGEN Lv{effect.Level}", HealColor, -52f);
+            _hud.AddFloatingText(obj.Position, $"{StatusLabel(effect)} Lv{effect.Levels}", HealColor, -52f);
         };
 
         _turns.CharacterHealed += (c, amount) =>
@@ -445,10 +446,10 @@ public class DungeonScene : Scene
 
         _turns.EnemyBuffed += (enemy, effect) =>
         {
-            Log.Info($"[Combat] Enemy healer casts {effect.Type} Lv{effect.Level}");
+            Log.Info($"[Combat] Enemy healer casts {effect.Type} Lv{effect.Levels}");
             var obj = EnemyObjectFor(enemy);
             if (obj.IsActive)
-                _hud.AddFloatingText(obj.Position, $"REGEN Lv{effect.Level}", HealColor, -52f);
+                _hud.AddFloatingText(obj.Position, $"{StatusLabel(effect)} Lv{effect.Levels}", HealColor, -52f);
         };
 
         _turns.EnemyHealed += (enemy, amount) =>
@@ -457,6 +458,13 @@ public class DungeonScene : Scene
             var obj = EnemyObjectFor(enemy);
             if (obj.IsActive)
                 _hud.AddFloatingText(obj.Position, $"+{amount}", HealColor, 8f);
+        };
+
+        _turns.ActorStatusTicked += (actor, tick) =>
+        {
+            Log.Info($"[Combat] {tick.Type} ticks {tick.Damage} — HP {actor.Hp}");
+            if (TryObjectFor(actor, out var obj) && obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"-{tick.Damage} {tick.Type.ToString().ToUpperInvariant()}", TickColor, 8f);
         };
 
         _turns.EnemyFleeing += enemy =>
@@ -937,6 +945,23 @@ public class DungeonScene : Scene
     }
 
     private EnemyObject EnemyObjectFor(EnemyState state) => _enemies.First(e => e.State == state);
+
+    /// <summary>The scene object of an actor on either side, for events the turn system raises per actor rather than per side.</summary>
+    private bool TryObjectFor(ActorState actor, out GameObject obj)
+    {
+        GameObject? found = actor switch
+        {
+            PartyMemberState member => _party.FirstOrDefault(p => p.State == member),
+            EnemyState enemy => _enemies.FirstOrDefault(e => e.State == enemy),
+            _ => null,
+        };
+        obj = found!;
+        return found != null;
+    }
+
+    /// <summary>A status as its floating-text label: REGEN, WARD, POISON, MIRE and so on, from the type's own name.</summary>
+    private static string StatusLabel(StatusEffect effect)
+        => effect.Type == StatusEffectType.Regeneration ? "REGEN" : effect.Type.ToString().ToUpperInvariant();
 
     /// <summary>Live enemies as collision blockers; corpses are walkable.</summary>
     private List<GridCollision.Circle> LiveEnemyBlockers()

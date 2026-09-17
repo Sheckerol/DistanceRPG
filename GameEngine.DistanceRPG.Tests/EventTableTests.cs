@@ -187,9 +187,14 @@ public class EventTableTests
             new[]
             {
                 "DamageTaken (1,0) RollToBase",
+                "DamageTaken (2,0) Weakened",
+                "DamageTaken (3,0) Sundered",
                 "DamageTaken (3,9) FixWeaponShare",
                 "DamageTaken (5,0) Block",
+                "DamageTaken (6,0) Ward",
                 "DamageTaken (6,9) FixTaken",
+                "DamageTaken (7,0) CritRiders",
+                "DamageTaken (7,1) BlockWeaken",
             },
             chain.Select(h => h.ToString()));
         Assert.Equal(chain.OrderBy(h => h.Priority), chain);
@@ -225,13 +230,16 @@ public class EventTableTests
         attacker.X = 10f;
         attacker.Y = 20f;
         attacker.Mana = 40;
-        attacker.ApplyStatusEffect(StatusEffectType.Regeneration, 2);
+        attacker.ApplyStatus(StatusEffectType.Regeneration, null, 2);
+        attacker.ApplyStatus(StatusEffectType.Weakened, null, 1);
         var defender = new EnemyState { X = 50f, Y = 20f, Hp = 30, Innate = ModifierSet.Of((ModifierType.Block, 1)) };
-        defender.ApplyStatusEffect(StatusEffectType.Regeneration, 1);
+        defender.ApplyStatus(StatusEffectType.Regeneration, null, 1);
+        defender.ApplyStatus(StatusEffectType.Sundered, null, 1);
+        defender.ApplyStatus(StatusEffectType.Ward, null, 3);
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(4, chain.Count);
+        Assert.Equal(9, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);
@@ -242,10 +250,16 @@ public class EventTableTests
             payload = next;
         }
 
-        // The chain did all its work on the payload alone: a natural 20 on the stiletto is 15 x3, Block skipped.
+        // The chain did all its work on the payload alone: a natural 20 on the stiletto is 15 x3,
+        // Weakened 1 off, Sundered 1 on, Block skipped, Ward 3 swallowed — and the stiletto's
+        // CritSunder settled as a rider, not as a write.
         Assert.True(payload.IsCrit);
-        Assert.Equal(45, payload.Taken);
+        Assert.Equal(45, payload.Dealt);
+        Assert.Equal(3, payload.WardSpent);
+        Assert.Equal(42, payload.Taken);
+        Assert.Equal(new StatusApplication(StatusEffectType.Sundered, null, 1), Assert.Single(payload.ApplyToDefender));
         Assert.Equal(30, defender.Hp);
+        Assert.Equal(3, defender.StatusLevel(StatusEffectType.Ward));
     }
 
     [Fact]
@@ -261,18 +275,19 @@ public class EventTableTests
 
         var log = new List<string>();
         string Who(ActorState actor) => actor == a ? "A" : "E";
-        turns.Events.On<TurnPayload>(GameEvent.TurnEnd, new HandlerPriority(9, 0), "probe", (p, s, o) =>
+        // Probes sit at (9,9), after every compiled handler on these events (the status decay is (9,0)).
+        turns.Events.On<TurnPayload>(GameEvent.TurnEnd, new HandlerPriority(9, 9), "probe", (p, s, o) =>
         {
             Assert.Same(s, o);
             log.Add($"TurnEnd {Who(s)} {p.Side} t{p.TurnCount}");
             return p;
         });
-        turns.Events.On<TurnPayload>(GameEvent.RoundEnd, new HandlerPriority(9, 0), "probe", (p, s, _) =>
+        turns.Events.On<TurnPayload>(GameEvent.RoundEnd, new HandlerPriority(9, 9), "probe", (p, s, _) =>
         {
             log.Add($"RoundEnd {Who(s)} t{p.TurnCount}");
             return p;
         });
-        turns.Events.On<TurnPayload>(GameEvent.TurnStart, new HandlerPriority(9, 0), "probe", (p, s, _) =>
+        turns.Events.On<TurnPayload>(GameEvent.TurnStart, new HandlerPriority(9, 9), "probe", (p, s, _) =>
         {
             log.Add($"TurnStart {Who(s)} {p.Side} t{p.TurnCount}");
             return p;
@@ -320,7 +335,7 @@ public class EventTableTests
         var names = new Dictionary<ActorState, string> { [a] = "A", [fallen] = "B", [acting] = "E1", [passive] = "E2", [dead] = "E3" };
         var log = new List<string>();
         foreach (var evt in new[] { GameEvent.TurnStart, GameEvent.TurnEnd, GameEvent.RoundEnd })
-            turns.Events.On<TurnPayload>(evt, new HandlerPriority(9, 0), "probe", (p, s, o) =>
+            turns.Events.On<TurnPayload>(evt, new HandlerPriority(9, 9), "probe", (p, s, o) =>
             {
                 Assert.Same(s, o);
                 log.Add($"{evt} {names[s]}");
@@ -351,5 +366,5 @@ public class EventTableTests
 
     private static string Snapshot(ActorState a)
         => $"{a.Hp}/{a.Mana}/{a.X}/{a.Y}/{a.Alive}/"
-           + string.Join(",", a.StatusEffects.Select(e => $"{e.Type}:{e.Level}"));
+           + string.Join(",", a.StatusEffects.Select(e => $"{e.Type}:{e.Element}:{e.Levels}"));
 }

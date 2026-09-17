@@ -82,13 +82,23 @@ public sealed record Tuning
 
     // ---- Statuses (§1.5) ----
 
-    /// <summary>The constant effect of one level of each status. No decay constants: one level a round, universally.</summary>
+    /// <summary>
+    /// The constant effect of one level of each status — the §1.5 table's
+    /// third column, the only dial a status has. Complete: every member has a
+    /// row. No decay constants: one level a round, universally.
+    /// </summary>
     public IReadOnlyDictionary<StatusEffectType, int> EffectPerLevel { get; init; } = new Dictionary<StatusEffectType, int>
     {
         [StatusEffectType.Regeneration] = 1,   // 1 HP restored per level at the target's turn end
-        // TODO(sub-step 4): with the status table, add the rows for the members the enchantment data already
-        // names — Ward 1, Poison 1, Bleeding 1, Searing 1, Mire 10 (percent of the movement budget) —
-        // PHASE1WEAPONS-309 — and 1d's Sundered 1, Weakened 1, OverhealPool 1, Softened 1.
+        [StatusEffectType.Ward] = 1,           // 1 point absorbed per level, spent as it absorbs
+        [StatusEffectType.Poison] = 1,         // 1 damage per level at the target's turn end
+        [StatusEffectType.Mire] = 10,          // 10 percent of the movement budget cut per level; ten levels is all of it
+        [StatusEffectType.Sundered] = 1,       // +1 taken per level from every weapon hit
+        [StatusEffectType.Weakened] = 1,       // -1 dealt per level, floored at 1
+        [StatusEffectType.Bleeding] = 1,       // 1 damage per level at the target's turn end
+        [StatusEffectType.OverhealPool] = 1,   // 1 surplus healing point per level; OverhealPerWard of them make one Ward level
+        [StatusEffectType.Searing] = 1,        // 1 damage per level at the target's turn end, whatever element lit it
+        [StatusEffectType.Softened] = 1,       // 1 Block stripped per level for the round
     };
 
     /// <summary>Surplus healing points that convert into one Ward level.</summary>

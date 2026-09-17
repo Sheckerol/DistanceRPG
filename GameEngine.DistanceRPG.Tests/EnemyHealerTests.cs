@@ -80,7 +80,7 @@ public class EnemyHealerTests
         var buffed = new List<int>();
         var healed = new List<int>();
         var turns = new TurnSystem(grid, new[] { party }, new[] { healer, ally }, () => 10);
-        turns.EnemyBuffed += (e, eff) => { if (e == ally) buffed.Add(eff.Level); };
+        turns.EnemyBuffed += (e, eff) => { if (e == ally) buffed.Add(eff.Levels); };
         turns.EnemyHealed += (e, amt) => { if (e == ally) healed.Add(amt); };
 
         turns.EndTurn();

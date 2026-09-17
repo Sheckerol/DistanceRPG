@@ -4,13 +4,15 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The compiled steps of the §1.6 damage pipeline that are no modifier's or
-/// status's own behaviour: the roll, the two dividers, and Block. Each is a
-/// <see cref="Handler{TPayload}"/> on <see cref="GameEvent.DamageTaken"/> at
-/// its step number, so the chain <see cref="EventTable.HandlersFor"/> prints
-/// reads like the doc: (1,0) roll → (2) Weakened → (3) Sundered → (3,9) the
-/// weapon's share fixed → (4) enchantments → (5,0) Block → (6) Ward → (6,9)
-/// the amount reaching HP fixed → (7) crit riders → (8) displacement. On this
-/// event <c>self</c> is the attacker and <c>other</c> the defender.
+/// status's own behaviour: the roll, the two dividers, and Block — plus the
+/// healing pipeline's one bookkeeping step. Each is a
+/// <see cref="Handler{TPayload}"/> at its step number, so the chain
+/// <see cref="EventTable.HandlersFor"/> prints reads like the doc: (1,0) roll →
+/// (2) Weakened → (3) Sundered → (3,9) the weapon's share fixed → (4)
+/// enchantments → (5,0) Block → (6) Ward → (6,9) the amount reaching HP fixed →
+/// (7) crit riders → (8) displacement. On DamageTaken <c>self</c> is the
+/// attacker and <c>other</c> the defender; on HealingReceived <c>self</c> is
+/// the actor healed.
 /// </summary>
 public static class CombatBehaviours
 {
@@ -18,6 +20,7 @@ public static class CombatBehaviours
     public static readonly HandlerPriority FixWeaponSharePriority = new(3, 9);
     public static readonly HandlerPriority BlockPriority = new(5, 0);
     public static readonly HandlerPriority FixTakenPriority = new(6, 9);
+    public static readonly HandlerPriority CapToMissingHpPriority = new(1, 0);
 
     /// <summary>Register the compiled steps on <paramref name="table"/>, in step order.</summary>
     public static void Register(EventTable table)
@@ -27,6 +30,7 @@ public static class CombatBehaviours
         table.On<DamagePayload>(GameEvent.DamageTaken, FixWeaponSharePriority, "FixWeaponShare", Step3_FixWeaponShare);
         table.On<DamagePayload>(GameEvent.DamageTaken, BlockPriority, "Block", Step5_Block);
         table.On<DamagePayload>(GameEvent.DamageTaken, FixTakenPriority, "FixTaken", Step6_FixTaken);
+        table.On<HealPayload>(GameEvent.HealingReceived, CapToMissingHpPriority, "CapToMissingHp", CapToMissingHp);
     }
 
     /// <summary>
@@ -94,4 +98,17 @@ public static class CombatBehaviours
     /// </summary>
     public static DamagePayload Step6_FixTaken(DamagePayload payload, ActorState self, ActorState other)
         => payload with { Taken = payload.Dealt - payload.WardSpent };
+
+    /// <summary>
+    /// The healing pipeline's one compiled step, at (1,0) on HealingReceived:
+    /// what of the amount the healed actor can take — never past full — is
+    /// <see cref="HealPayload.Applied"/>, and the rest is the
+    /// <see cref="HealPayload.Overflow"/> that HealingAboveFull carries to
+    /// whatever banks surplus. Anything reacting to the heal itself runs after.
+    /// </summary>
+    public static HealPayload CapToMissingHp(HealPayload payload, ActorState self, ActorState other)
+    {
+        int applied = Math.Clamp(payload.Amount, 0, Math.Max(0, self.MaxHp - self.Hp));
+        return payload with { Applied = applied, Overflow = payload.Amount - applied };
+    }
 }

@@ -25,7 +25,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Taken">What reached hit points. Death and Sturdy read this.</param>
 /// <param name="WeaponShare">The weapon's own damage after step 3 — the only part that teaches the weapon.</param>
 /// <param name="EnchantmentShare">What attached enchantments added at step 4, kept apart the whole way down.</param>
-/// <param name="WardSpent">Ward levels spent at step 6: dealt, but landed on a pool that is not HP.</param>
+/// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP.</param>
 /// <param name="Roll">The natural d20, rolled before the chain so step 1 is pure.</param>
 /// <param name="Outcome">Crit, Weak (a natural 1) or Normal, decided at step 1.</param>
 /// <param name="Weapon">The attacker's weapon.</param>
@@ -68,6 +68,17 @@ public sealed record DamagePayload(
 public sealed record StatusApplication(StatusEffectType Type, DamageType? Element, int Levels);
 
 /// <summary>
+/// One status's settled outcome at a trigger, written once by the raising
+/// event's applier: the HP it removes (<paramref name="Damage"/>) or restores
+/// (<paramref name="Healing"/>, which becomes a queued
+/// <see cref="GameEvent.HealingReceived"/>), and the level change it takes —
+/// negative for a tick's decrement, a decay, a shed or a reset, positive for a
+/// grant such as the Ward the overheal pool converts into. A status handler
+/// appends these to the boundary payloads instead of touching the actor.
+/// </summary>
+public sealed record StatusTick(StatusEffectType Type, DamageType? Element, int Damage, int Healing, int LevelsDelta);
+
+/// <summary>
 /// A settled shove: <paramref name="Tiles"/> steps of the 4-directional unit
 /// (<paramref name="DirRow"/>, <paramref name="DirCol"/>) along the dominant
 /// axis of attacker→target (reversed for Drag), applied one tile at a time and
@@ -78,11 +89,20 @@ public sealed record Displacement(int Tiles, int DirRow, int DirCol);
 /// <summary><see cref="GameEvent.AttackDeclared"/>.</summary>
 public sealed record AttackPayload(Weapon Weapon, ActorState Target, int DistanceUnits);
 
-/// <summary><see cref="GameEvent.HealingReceived"/> and <see cref="GameEvent.HealingAboveFull"/>.</summary>
-public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source);
+/// <summary>
+/// <see cref="GameEvent.HealingReceived"/> and <see cref="GameEvent.HealingAboveFull"/>.
+/// On both, <c>self</c> is the actor healed — whose behaviours react to the
+/// surplus — and <c>other</c> the source, the same actor for a regeneration
+/// tick. The raiser seeds <paramref name="Amount"/>; the chain settles what
+/// was <paramref name="Applied"/> (never past full) and the
+/// <paramref name="Overflow"/>, which HealingAboveFull then carries.
+/// <paramref name="Ticks"/> holds the status changes the chain settled (the
+/// hidden pool's conversion), applied once by the event's applier.
+/// </summary>
+public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source, ImmutableArray<StatusTick> Ticks = default);
 
-/// <summary><see cref="GameEvent.Killed"/>: the weapon that did it and the killing hit's two outputs.</summary>
-public sealed record KillPayload(Weapon Weapon, int Dealt, int Taken);
+/// <summary><see cref="GameEvent.Killed"/>: the weapon that did it — null when a status tick did — and the killing hit's two outputs.</summary>
+public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken);
 
 /// <summary><see cref="GameEvent.Crit"/>.</summary>
 public sealed record CritPayload(Weapon Weapon, int Roll);
@@ -100,9 +120,11 @@ public sealed record MovementPayload(int Wanted, int Spent, string Source);
 /// actor as both <c>self</c> and <c>other</c>. Each actor sees the three once
 /// per round, in that order: the events say a phase opened or closed for the
 /// actor, not that it acted, and a handler that only means the living checks
-/// <see cref="ActorState.Alive"/>.
+/// <see cref="ActorState.Alive"/>. <paramref name="Ticks"/> is what the status
+/// handlers settled for the actor — its turn-end ticks, its round-end decay —
+/// written once by the event's applier.
 /// </summary>
-public sealed record TurnPayload(int TurnCount, Side Side);
+public sealed record TurnPayload(int TurnCount, Side Side, ImmutableArray<StatusTick> Ticks = default);
 
 /// <summary>A reaction a threat-zone handler appends: who fires, and with what.</summary>
 public sealed record Reaction(ActorState Reactor, Weapon Weapon);

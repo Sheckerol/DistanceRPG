@@ -5,7 +5,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// circle centre in logic space — pixels, y-down, 32 per tile), hit points, a
 /// reach radius, the weapon it fights with, and the status effects it carries.
 /// Status effects live here so a buff or debuff can land on either side through
-/// one mechanism, and the turn system's attack resolver, status tick and threat
+/// one mechanism, and the turn system's attack resolver, status ticks and threat
 /// zones are written against this type rather than against a side.
 /// </summary>
 public abstract class ActorState
@@ -59,27 +59,67 @@ public abstract class ActorState
 
     public virtual int MaxMana => GameConstants.MaxMana;
 
-    /// <summary>Active heal-over-time and other ongoing effects.</summary>
+    /// <summary>
+    /// The statuses on this actor: one immutable <see cref="StatusEffect"/> per
+    /// (Type, Element), in the order they first landed, each replaced whole
+    /// when its levels change. Read freely; written through
+    /// <see cref="ApplyStatus"/> and <see cref="AdjustStatus"/>.
+    /// </summary>
     public List<StatusEffect> StatusEffects { get; } = new();
 
     /// <summary>
-    /// Add a status effect, stacking its level onto any existing effect of the
-    /// same type. Returns the (possibly merged) effect now on the actor.
+    /// Land <paramref name="levels"/> of a status: re-application accumulates
+    /// onto the entry already there rather than refreshing anything, because
+    /// levels are magnitude and duration at once (§1.5, §1.6). The applier
+    /// decided how many; this only adds them. Returns the entry now on the actor.
     /// </summary>
-    public StatusEffect ApplyStatusEffect(StatusEffectType type, int level)
+    public StatusEffect ApplyStatus(StatusEffectType type, DamageType? element, int levels)
     {
-        var existing = StatusEffects.FirstOrDefault(e => e.Type == type);
-        if (existing != null)
-        {
-            existing.Level += level;
-            return existing;
-        }
-        var added = new StatusEffect { Type = type, Level = level };
-        StatusEffects.Add(added);
-        return added;
+        ArgumentOutOfRangeException.ThrowIfLessThan(levels, 1);
+        return AdjustStatus(type, element, levels)!;
     }
 
-    /// <summary>Level of the given effect currently on the actor, 0 if absent.</summary>
-    public int StatusLevel(StatusEffectType type)
-        => StatusEffects.FirstOrDefault(e => e.Type == type)?.Level ?? 0;
+    /// <summary>
+    /// Change the levels of (<paramref name="type"/>, <paramref name="element"/>)
+    /// by <paramref name="delta"/> — positive accumulates, negative is a tick's
+    /// decrement, a decay, a spend or a reset — and drop the entry once it
+    /// reaches zero: a status at level 0 is removed, never kept empty. Returns
+    /// the entry now on the actor, or null when it is gone. The one write path.
+    /// </summary>
+    public StatusEffect? AdjustStatus(StatusEffectType type, DamageType? element, int delta)
+    {
+        if (StatusRules.KeysOnElement(type))
+        {
+            if (element is null or DamageType.None)
+                throw new ArgumentException($"{type} is keyed on the element that lit it; give one.", nameof(element));
+        }
+        else if (element != null)
+        {
+            throw new ArgumentException($"{type} carries no element.", nameof(element));
+        }
+
+        int i = StatusEffects.FindIndex(e => e.Type == type && e.Element == element);
+        int levels = (i >= 0 ? StatusEffects[i].Levels : 0) + delta;
+        if (levels <= 0)
+        {
+            if (i >= 0) StatusEffects.RemoveAt(i);
+            return null;
+        }
+
+        var entry = new StatusEffect(type, element, levels);
+        if (i >= 0) StatusEffects[i] = entry;
+        else StatusEffects.Add(entry);
+        return entry;
+    }
+
+    /// <summary>
+    /// Levels of <paramref name="type"/> on the actor, 0 if absent. With an
+    /// <paramref name="element"/>, that entry alone; without one, every entry of
+    /// the type together — which for an element-keyed status is the sum of its
+    /// burns, and for any other is its one entry.
+    /// </summary>
+    public int StatusLevel(StatusEffectType type, DamageType? element = null)
+        => element is null
+            ? StatusEffects.Where(e => e.Type == type).Sum(e => e.Levels)
+            : StatusEffects.FirstOrDefault(e => e.Type == type && e.Element == element)?.Levels ?? 0;
 }

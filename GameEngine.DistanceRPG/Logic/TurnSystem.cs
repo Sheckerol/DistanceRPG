@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>Combat/turn phases, mirroring the prototype's implicit state machine.</summary>
@@ -66,6 +68,7 @@ public sealed class TurnSystem
     public event Action<EnemyState, StatusEffect>? EnemyBuffed;             // enemy healer's cast landed on an ally
     public event Action<EnemyState, int>? EnemyHealed;                      // end-of-enemy-turn regen tick
     public event Action<EnemyState>? EnemyFleeing;                          // lone healer turning tail
+    public event Action<ActorState, StatusTick>? ActorStatusTicked;         // a damage-over-time tick took HP (healing ticks arrive as CharacterHealed/EnemyHealed)
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -117,6 +120,12 @@ public sealed class TurnSystem
     // as a third typed list and a third feed, and the applier is untouched.
     private readonly Dictionary<ActorState, Action<AttackResolution>> _hitFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // The same for what a heal restored and for a death: the appliers write
+    // the number and hand the side's typed event, or the side's death
+    // consequences, to the feed the roster fixed for that actor.
+    private readonly Dictionary<ActorState, Action<int>> _healFeeds = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ActorState, Action> _deathFeeds = new(ReferenceEqualityComparer.Instance);
+
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -129,12 +138,25 @@ public sealed class TurnSystem
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
+        _events.Applies<TurnPayload>(GameEvent.TurnEnd, ApplyStatusTicks);
+        _events.Applies<TurnPayload>(GameEvent.RoundEnd, ApplyStatusTicks);
+        _events.Applies<HealPayload>(GameEvent.HealingReceived, ApplyHealing);
+        _events.Applies<HealPayload>(GameEvent.HealingAboveFull, ApplyHealingAboveFull);
 
-        // The roster is fixed here, and with it which typed feed each actor's hits reach.
+        // The roster is fixed here, and with it which typed feed each actor's
+        // hits, heals and death reach.
         foreach (var member in party)
+        {
             _hitFeeds[member] = resolution => CharacterHit?.Invoke(member, resolution);
+            _healFeeds[member] = amount => CharacterHealed?.Invoke(member, amount);
+            _deathFeeds[member] = () => OnCharacterDied(member);
+        }
         foreach (var enemy in enemies)
+        {
             _hitFeeds[enemy] = resolution => EnemyHit?.Invoke(enemy, resolution);
+            _healFeeds[enemy] = amount => EnemyHealed?.Invoke(enemy, amount);
+            _deathFeeds[enemy] = () => OnEnemyDefeated(enemy);
+        }
     }
 
     /// <summary>
@@ -233,7 +255,7 @@ public sealed class TurnSystem
 
         caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
         caster.Mana -= w.ResolvedManaCost;
-        var effect = ally.ApplyStatusEffect(innate.Def.Applies!.Value, innate.LevelsFor(innate.Def.Potency));
+        var effect = ally.ApplyStatus(innate.Def.Applies!.Value, null, innate.LevelsFor(innate.Def.Potency));
         CharacterBuffed?.Invoke(ally, effect);
         return true;
     }
@@ -248,11 +270,13 @@ public sealed class TurnSystem
         {
             totalSaved += c.EndTurnSaveMovement();
             c.RegenManaFromUnusedMovement();
-            // The member's turn ends here; the status tick beside it becomes
-            // that event's handlers once the status table lands.
+            // The member's turn ends here: the status ticks are this event's
+            // handlers, and its applier writes what they settled.
             _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c, c);
-            TickStatusEffects(c, (a, h) => CharacterHealed?.Invoke(a, h));
         }
+
+        // A tick can take the last member: the wipe stands, the turn does not go on.
+        if (Phase == TurnPhase.GameOver) return;
 
         Phase = TurnPhase.TurnEnding;
         _timer = BannerSeconds;
@@ -344,7 +368,8 @@ public sealed class TurnSystem
 
     private void StartEnemyAction(EnemyState enemy)
     {
-        _enemyBudget = GameConstants.EnemyMove;
+        // The budget after Mire's cut, the same 10% a level the party pays.
+        _enemyBudget = StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove);
 
         if (enemy.IsHealer)
         {
@@ -662,7 +687,7 @@ public sealed class TurnSystem
 
         _enemyBudget -= scaledCost;
         var innate = healer.Weapon.Innate!;   // a healer is a caster whose innate lands on allies
-        var effect = ally.ApplyStatusEffect(innate.Def.Applies!.Value, innate.LevelsFor(innate.Def.Potency));
+        var effect = ally.ApplyStatus(innate.Def.Applies!.Value, null, innate.LevelsFor(innate.Def.Potency));
         EnemyBuffed?.Invoke(ally, effect);
 
         _timer = AttackBeatSeconds;
@@ -670,16 +695,15 @@ public sealed class TurnSystem
 
     private void StartPlayerTurn()
     {
-        // End of the enemy turn: each enemy's turn ends (regen ticks on the
-        // allies a healer mended; the dead shed theirs), then the round — one
-        // player phase and one enemy phase — closes for every actor. The whole
-        // roster, whatever its state; all of it under the turn that is ending,
-        // and before resurrections (which restore full HP) are considered.
+        // End of the enemy turn: each enemy's turn ends (its statuses tick —
+        // regen on the allies a healer mended, poison on the poisoned; the dead
+        // shed theirs), then the round — one player phase and one enemy phase —
+        // closes for every actor and every status not ticked at a turn's end
+        // loses its level. The whole roster, whatever its state; all of it
+        // under the turn that is ending, and before resurrections (which
+        // restore full HP) are considered.
         foreach (var enemy in _enemies)
-        {
             _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
-            TickStatusEffects(enemy, (a, h) => EnemyHealed?.Invoke(a, h));
-        }
         foreach (var member in _party)
             _events.Raise(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Party), member, member);
         foreach (var enemy in _enemies)
@@ -733,38 +757,79 @@ public sealed class TurnSystem
         PlayerTurnStarted?.Invoke();
     }
 
-    /// <summary>
-    /// Status tick for any actor, run at the end of that side's turn: each
-    /// Regeneration effect heals HP equal to its level (capped at missing HP),
-    /// then loses a level and is dropped at zero. A dead actor simply sheds every
-    /// effect — regen can't resurrect. The caller lends its side's healed event,
-    /// so CharacterHealed and EnemyHealed stay separately typed for the HUD.
-    /// </summary>
-    private static void TickStatusEffects<TActor>(TActor actor, Action<TActor, int>? onHealed)
-        where TActor : ActorState
-    {
-        if (!actor.Alive)
-        {
-            actor.StatusEffects.Clear();
-            return;
-        }
+    // ── Status ticks and healing ─────────────────────────────────────────────
 
-        for (int i = actor.StatusEffects.Count - 1; i >= 0; i--)
+    /// <summary>
+    /// The TurnEnd and RoundEnd applier — the one place a status tick is
+    /// written. The status handlers settled a <see cref="StatusTick"/> per
+    /// status for the actor; this applies them in order: a damage tick takes
+    /// HP and can kill, in which case the dead shed everything, Killed is
+    /// queued with no weapon, and the side's death consequences run through
+    /// the actor's typed feed; a healing tick queues HealingReceived, whose
+    /// own applier restores the HP; a level change lands on the status list,
+    /// which drops an entry at zero. Dead actors take no damage and no heal —
+    /// regen cannot resurrect — but do shed.
+    /// </summary>
+    private void ApplyStatusTicks(TurnPayload settled, ActorState self, ActorState other, EventTable table)
+        => ApplyTicks(settled.Ticks, self, table);
+
+    private void ApplyTicks(ImmutableArray<StatusTick> ticks, ActorState self, EventTable table)
+    {
+        if (ticks.IsDefaultOrEmpty) return;
+        foreach (var tick in ticks)
         {
-            var effect = actor.StatusEffects[i];
-            if (effect.Type == StatusEffectType.Regeneration)
+            if (self.Alive && tick.Damage > 0)
             {
-                int healed = Math.Min(effect.Level, actor.MaxHp - actor.Hp);
-                if (healed > 0)
+                self.Hp = Math.Max(0, self.Hp - tick.Damage);
+                ActorStatusTicked?.Invoke(self, tick);
+                if (self.Hp <= 0)
                 {
-                    actor.Hp += healed;
-                    onHealed?.Invoke(actor, healed);
+                    self.Alive = false;
+                    self.StatusEffects.Clear();
+                    table.Enqueue(GameEvent.Killed, new KillPayload(Weapon: null, tick.Damage, tick.Damage), self, self);
+                    Died(self);
+                    return;
                 }
             }
-
-            if (--effect.Level <= 0)
-                actor.StatusEffects.RemoveAt(i);
+            if (self.Alive && tick.Healing > 0)
+                table.Enqueue(GameEvent.HealingReceived, new HealPayload(tick.Healing, Applied: 0, Overflow: 0, tick.Type.ToString()), self, self);
+            if (tick.LevelsDelta != 0)
+                self.AdjustStatus(tick.Type, tick.Element, tick.LevelsDelta);
         }
+    }
+
+    /// <summary>
+    /// The HealingReceived applier: restore what the chain settled as applied
+    /// — never past full, never on the dead — tell the side's typed healed
+    /// feed, land any status the chain settled, and queue HealingAboveFull
+    /// with the overflow so whatever banks surplus healing can react to it.
+    /// </summary>
+    private void ApplyHealing(HealPayload settled, ActorState self, ActorState other, EventTable table)
+    {
+        if (!self.Alive) return;
+        int applied = Math.Clamp(settled.Applied, 0, self.MaxHp - self.Hp);
+        self.Hp += applied;
+        if (applied > 0)
+        {
+            if (!_healFeeds.TryGetValue(self, out var healed))
+                throw new InvalidOperationException("Healed an actor that is not on this turn system's roster.");
+            healed(applied);
+        }
+        ApplyTicks(settled.Ticks, self, table);
+        if (settled.Overflow > 0)
+            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default }, self, other);
+    }
+
+    /// <summary>The HealingAboveFull applier: the status changes the chain settled — the hidden pool converting into Ward.</summary>
+    private void ApplyHealingAboveFull(HealPayload settled, ActorState self, ActorState other, EventTable table)
+        => ApplyTicks(settled.Ticks, self, table);
+
+    /// <summary>An actor died outside a hit: the side's consequences, through the feed the roster fixed.</summary>
+    private void Died(ActorState actor)
+    {
+        if (!_deathFeeds.TryGetValue(actor, out var died))
+            throw new InvalidOperationException("An actor that is not on this turn system's roster died.");
+        died();
     }
 
     // ── Shared attack plumbing ───────────────────────────────────────────────
@@ -788,25 +853,32 @@ public sealed class TurnSystem
 
     /// <summary>
     /// The DamageTaken applier — the single world-write for a hit. Takes
-    /// <see cref="DamagePayload.Taken"/> off the target's HP, lands the settled
-    /// status applications on both sides, hands the projected resolution to the
-    /// target's typed hit feed (CharacterHit or EnemyHit, fixed when the roster
-    /// was typed at construction — never by asking the target its kind), and
-    /// queues the follow-ups for the table to drain after it returns, in this
-    /// order: Killed on a death, DamageDealt always, Crit on a crit. The order
-    /// is a ruling of the decomposition (1b rule 5), pinned by
-    /// DamagePipelineTests, not an accident of this method. Death consequences
-    /// belong to the typed wrappers.
+    /// <see cref="DamagePayload.Taken"/> off the target's HP, spends the Ward
+    /// levels that swallowed the rest, lands the settled status applications
+    /// on both sides (riders on the defender, BlockWeaken on the attacker),
+    /// hands the projected resolution to the target's typed hit feed
+    /// (CharacterHit or EnemyHit, fixed when the roster was typed at
+    /// construction — never by asking the target its kind), and queues the
+    /// follow-ups for the table to drain after it returns, in this order:
+    /// Killed on a death, DamageDealt always, Crit on a crit. The order is a
+    /// ruling of the decomposition (1b rule 5), pinned by DamagePipelineTests,
+    /// not an accident of this method. Death consequences belong to the typed
+    /// wrappers.
     /// </summary>
     private void ApplyDamage(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
     {
         target.Hp = Math.Max(0, target.Hp - settled.Taken);
+        if (settled.WardSpent > 0)
+        {
+            int perLevel = Math.Max(1, StatusRules.EffectPerLevel(StatusEffectType.Ward));
+            target.AdjustStatus(StatusEffectType.Ward, null, -((settled.WardSpent + perLevel - 1) / perLevel));
+        }
         if (!settled.ApplyToDefender.IsDefaultOrEmpty)
             foreach (var status in settled.ApplyToDefender)
-                target.ApplyStatusEffect(status.Type, status.Levels);
+                target.ApplyStatus(status.Type, status.Element, status.Levels);
         if (!settled.ApplyToAttacker.IsDefaultOrEmpty)
             foreach (var status in settled.ApplyToAttacker)
-                attacker.ApplyStatusEffect(status.Type, status.Levels);
+                attacker.ApplyStatus(status.Type, status.Element, status.Levels);
 
         if (!_hitFeeds.TryGetValue(target, out var hitFeed))
             throw new InvalidOperationException("Hit an actor that is not on this turn system's roster.");
@@ -815,6 +887,7 @@ public sealed class TurnSystem
         if (target.Hp <= 0)
         {
             target.Alive = false;
+            target.StatusEffects.Clear();   // the dead shed everything
             table.Enqueue(GameEvent.Killed, new KillPayload(settled.Weapon, settled.Dealt, settled.Taken), attacker, target);
         }
         table.Enqueue(GameEvent.DamageDealt, settled, attacker, target);
@@ -824,8 +897,19 @@ public sealed class TurnSystem
 
     private void ResolveAttackOnCharacter(ActorState attacker, Weapon attackerWeapon, PartyMemberState target)
     {
-        if (!ResolveAttackOn(attacker, attackerWeapon, target)) return;
+        if (ResolveAttackOn(attacker, attackerWeapon, target))
+            OnCharacterDied(target);
+    }
 
+    private void ResolveAttackOnEnemy(ActorState attacker, Weapon attackerWeapon, EnemyState target)
+    {
+        if (ResolveAttackOn(attacker, attackerWeapon, target))
+            OnEnemyDefeated(target);
+    }
+
+    /// <summary>What a party member's death means, however it came: the bank is lost, the scene is told, and the last one falling ends the game.</summary>
+    private void OnCharacterDied(PartyMemberState target)
+    {
         target.SavedMovement = 0;
         CharacterDied?.Invoke(target);
 
@@ -837,10 +921,9 @@ public sealed class TurnSystem
         }
     }
 
-    private void ResolveAttackOnEnemy(ActorState attacker, Weapon attackerWeapon, EnemyState target)
+    /// <summary>What an enemy's death means, however it came: the defeat turn the resurrection timer counts from, and the scene is told.</summary>
+    private void OnEnemyDefeated(EnemyState target)
     {
-        if (!ResolveAttackOn(attacker, attackerWeapon, target)) return;
-
         target.DefeatedAtTurn = TurnCount;
         EnemyDefeated?.Invoke(target);
     }

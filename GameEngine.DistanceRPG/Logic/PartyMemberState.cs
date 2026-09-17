@@ -25,7 +25,7 @@ public sealed class PartyMemberState : ActorState
     /// <summary>Movement budget left this turn, in logic units.</summary>
     public float DistLeft { get; set; } = GameConstants.MaxDistance;
 
-    /// <summary>This turn's cap: base budget plus movement saved last turn.</summary>
+    /// <summary>This turn's cap: base budget plus movement saved last turn, less what Mire cut.</summary>
     public float EffectiveMax { get; set; } = GameConstants.MaxDistance;
 
     /// <summary>Banked at end of turn (half the unspent budget, capped).</summary>
@@ -34,13 +34,15 @@ public sealed class PartyMemberState : ActorState
     public override float Radius => GameConstants.PlayerHalf;
 
     /// <summary>
-    /// Start-of-turn reset: cash in the saved movement bonus, refill the budget.
+    /// Start-of-turn reset: cash in the saved movement bonus, refill the budget,
+    /// then take Mire's cut off the whole of it — 10% a level, and at ten
+    /// levels the budget is gone, which is all paralysis is (§1.5).
     /// </summary>
     public void StartTurn()
     {
         float bonus = SavedMovement;
         SavedMovement = 0;
-        EffectiveMax = GameConstants.MaxDistance + bonus;
+        EffectiveMax = StatusBehaviours.MiredBudget(this, GameConstants.MaxDistance + bonus);
         DistLeft = EffectiveMax;
     }
 
