@@ -60,6 +60,15 @@ public abstract class ActorState
     public virtual int MaxMana => GameConstants.MaxMana;
 
     /// <summary>
+    /// Overwatch's banked shots: holding fire this turn arms the actor's
+    /// Overwatch value here, which makes its ranged reach a threat zone until
+    /// the turn ends — a target entering it is shot for free, one shot per
+    /// held stack. Zero when nothing is held; cleared when the next player
+    /// turn starts.
+    /// </summary>
+    public int HeldShots { get; set; }
+
+    /// <summary>
     /// The statuses on this actor: one immutable <see cref="StatusEffect"/> per
     /// (Type, Element), in the order they first landed, each replaced whole
     /// when its levels change. Read freely; written through

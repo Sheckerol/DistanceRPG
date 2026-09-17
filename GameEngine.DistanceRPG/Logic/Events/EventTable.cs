@@ -49,6 +49,13 @@ public sealed class EventTable
     private int _generation;
 
     /// <summary>
+    /// True while a raise or a drain is in progress — the window in which a
+    /// follow-up must queue, and in which the world is mid-cascade and its
+    /// consequences (a death's, say) wait for the outermost call to return.
+    /// </summary>
+    internal bool Running => _running;
+
+    /// <summary>
     /// Register a behaviour on <paramref name="evt"/> at <paramref name="priority"/>.
     /// The chain is re-sorted by (priority, registration order) on every call;
     /// a priority already taken on that event throws, because undefined order

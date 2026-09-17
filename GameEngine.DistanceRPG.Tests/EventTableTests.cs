@@ -195,6 +195,9 @@ public class EventTableTests
                 "DamageTaken (6,9) FixTaken",
                 "DamageTaken (7,0) CritRiders",
                 "DamageTaken (7,1) BlockWeaken",
+                "DamageTaken (8,0) Push",
+                "DamageTaken (8,1) Drag",
+                "DamageTaken (8,2) Rout",
             },
             chain.Select(h => h.ToString()));
         Assert.Equal(chain.OrderBy(h => h.Priority), chain);
@@ -236,7 +239,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(9, chain.Count);
+        Assert.Equal(12, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);
@@ -346,16 +349,17 @@ public class EventTableTests
         // TurnStart, TurnEnd and RoundEnd once, in that order, so no handler
         // ever gets a TurnEnd or RoundEnd without the TurnStart before it.
         var grid = new int[20, 20];
+        grid[5, 4] = 1;   // a wall directly behind A: the sword's Push x1 has nowhere to shove it, so all three beats land
         var a = Member();
-        a.X = 5 * Tile;
-        a.Y = 5 * Tile;
+        a.X = 5 * Tile + 16;   // on the tile's centre, so the wall does not touch the sight line
+        a.Y = 5 * Tile + 16;
         a.Inventory[0] = Dagger;
         var fallen = Member("B");
         fallen.X = 5 * Tile;
         fallen.Y = 7 * Tile;
         fallen.Hp = 0;
         fallen.Alive = false;
-        var acting = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile };   // adjacent and seen: it acts
+        var acting = new EnemyState { X = 5 * Tile + 16 + 60f, Y = 5 * Tile + 16 };   // adjacent and seen: it acts
         var passive = new EnemyState { X = 15 * Tile, Y = 15 * Tile };      // unseen since spawn, nobody in reach
         var dead = new EnemyState { X = 15 * Tile, Y = 5 * Tile, Hp = 0, Alive = false };
         var turns = new TurnSystem(grid, new[] { a, fallen }, new[] { acting, passive, dead }, () => 10);

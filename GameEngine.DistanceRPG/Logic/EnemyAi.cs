@@ -173,9 +173,11 @@ public static class EnemyAi
     /// <summary>
     /// Mask actor-occupied tiles as walls on a copy — the Pathfinder itself must
     /// stay JS-identical (golden tests), so it never learns about actors. The
-    /// mover's own tile is never masked.
+    /// mover's own tile is never masked. Shared read-only with displacement
+    /// (<see cref="Displacer"/>), which stops a shove at the same tiles a walk
+    /// routes around.
     /// </summary>
-    private static int[,] MaskBlocked(int[,] grid, IReadOnlyCollection<(int R, int C)>? blocked, int selfR, int selfC)
+    internal static int[,] MaskBlocked(int[,] grid, IReadOnlyCollection<(int R, int C)>? blocked, int selfR, int selfC)
     {
         if (blocked is not { Count: > 0 }) return grid;
         grid = (int[,])grid.Clone();

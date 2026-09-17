@@ -475,7 +475,38 @@ public class DungeonScene : Scene
                 _hud.AddFloatingText(obj.Position, "FLEE!", new Vector4(1f, 0.8f, 0.3f, 1f), -52f);
         };
 
+        _turns.ActorDisplaced += (actor, tiles) =>
+        {
+            Log.Info($"[Combat] shoved {tiles} tile(s)");
+            if (!TryObjectFor(actor, out var obj)) return;
+            switch (obj)
+            {
+                case CharacterObject member:
+                    member.SyncTransform();
+                    UpdateFogFor(member);
+                    break;
+                case EnemyObject enemy:
+                    enemy.SyncTransform();
+                    UpdateEnemyVisibility();
+                    break;
+            }
+            if (obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"SHOVED {tiles}", new Vector4(1f, 0.75f, 0.45f, 1f), -60f);
+        };
+
+        _turns.OpportunistTriggered += actor => AnnounceReaction(actor, "OPPORTUNIST!");
+        _turns.OverwatchTriggered += actor => AnnounceReaction(actor, "OVERWATCH!");
+        _turns.RiposteTriggered += actor => AnnounceReaction(actor, "RIPOSTE!");
+
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
+    }
+
+    /// <summary>A reaction's floating callout over whoever fired it, on either side.</summary>
+    private void AnnounceReaction(ActorState actor, string label)
+    {
+        Log.Info($"[Combat] {label}");
+        if (TryObjectFor(actor, out var obj) && obj.IsActive)
+            _hud.AddFloatingText(obj.Position, label, new Vector4(0.53f, 1f, 1f, 1f), -52f);
     }
 
     private void WireInput()
@@ -519,6 +550,13 @@ public class DungeonScene : Scene
 
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
+        // O holds fire: a ranged weapon with Overwatch banks its shot against
+        // whatever walks into reach on the enemy turn.
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (!AnyMenuOpen && _turns.TryOverwatch(ActiveCharacter.State))
+                Log.Info($"[Combat] {ActiveCharacter.State.Id} holds fire");
+        }, Keys.O);
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
         input.SubscribeToMouseButtonPressed(_ => HandleClick(), MouseButton.Left);

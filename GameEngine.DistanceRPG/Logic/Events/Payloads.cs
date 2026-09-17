@@ -35,6 +35,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="ApplyToAttacker">Statuses to land on the attacker (BlockWeaken).</param>
 /// <param name="Displace">Push, Drag or Rout settled here, applied once at step 8.</param>
 /// <param name="ManaToSpend">Enchantment trigger payments accumulated in list order, spent once by the applier.</param>
+/// <param name="FromCleave">True on a hit a cleave fanned out to beyond its primary target; Rout is Push applied to everything the cleave caught, the primary included, so it shoves either way.</param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int WardSpent,
@@ -43,7 +44,8 @@ public sealed record DamagePayload(
     ImmutableArray<StatusApplication> ApplyToDefender,
     ImmutableArray<StatusApplication> ApplyToAttacker,
     Displacement? Displace,
-    int ManaToSpend)
+    int ManaToSpend,
+    bool FromCleave = false)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with
@@ -126,8 +128,12 @@ public sealed record MovementPayload(int Wanted, int Spent, string Source);
 /// </summary>
 public sealed record TurnPayload(int TurnCount, Side Side, ImmutableArray<StatusTick> Ticks = default);
 
-/// <summary>A reaction a threat-zone handler appends: who fires, and with what.</summary>
-public sealed record Reaction(ActorState Reactor, Weapon Weapon);
+/// <summary>
+/// A reaction a threat-zone handler appends: who fires, with what, and on
+/// which modifier's per-turn budget (<paramref name="Source"/>) — the
+/// applier spends a use of it and queues the free attack.
+/// </summary>
+public sealed record Reaction(ActorState Reactor, Weapon Weapon, ModifierType Source);
 
 /// <summary>
 /// <see cref="GameEvent.ThreatZoneEntered"/>. The edge travels in the payload

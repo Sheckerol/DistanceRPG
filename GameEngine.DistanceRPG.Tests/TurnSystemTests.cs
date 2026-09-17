@@ -138,8 +138,9 @@ public class TurnSystemTests
     public void EnemyTurn_WhenSeenAndAdjacent_AttacksThreeTimesWithSword()
     {
         var grid = new int[20, 20];
-        var a = Char("A", 5 * Tile, 5 * Tile, weaponId: "weakspot_stiletto"); // dagger defender: no block
-        var enemy = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
+        grid[5, 4] = 1; // a wall directly behind A: the sword's Push x1 has nowhere to shove it, so every beat lands in reach
+        var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, weaponId: "weakspot_stiletto"); // dagger defender: no block; on its tile's centre so the wall does not touch the sight line
+        var enemy = new EnemyState { X = 5 * Tile + 16 + 60f, Y = 5 * Tile + 16 }; // sword range
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
         int hits = 0;
@@ -402,6 +403,9 @@ public class TurnSystemTests
         var a = Char("A", 5 * Tile, 5 * Tile, weaponId: "weakspot_stiletto"); // dagger defender: no block
         var e1 = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile }; // sword range
         var e2 = new EnemyState { X = 5 * Tile - 60f, Y = 5 * Tile };
+        // Each sword hit shoves A a tile toward the other enemy, whose own tile
+        // then stops the next shove (an occupied tile ends a displacement, as a
+        // wall would): every beat stays in reach.
         var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);
 
         int hits = 0;

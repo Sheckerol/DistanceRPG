@@ -69,6 +69,10 @@ public sealed class TurnSystem
     public event Action<EnemyState, int>? EnemyHealed;                      // end-of-enemy-turn regen tick
     public event Action<EnemyState>? EnemyFleeing;                          // lone healer turning tail
     public event Action<ActorState, StatusTick>? ActorStatusTicked;         // a damage-over-time tick took HP (healing ticks arrive as CharacterHealed/EnemyHealed)
+    public event Action<ActorState, int>? ActorDisplaced;                   // shoved or dragged this many tiles, one at a time through the move path
+    public event Action<ActorState>? OpportunistTriggered;                  // a free attack on a target that chose to leave reach
+    public event Action<ActorState>? OverwatchTriggered;                    // a held shot fired at a target entering reach
+    public event Action<ActorState>? RiposteTriggered;                      // a successful block answered with a counter-swing
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -80,27 +84,31 @@ public sealed class TurnSystem
     private bool _enemyTurnPending;   // banner is up; enemy turn starts when it ends
     private bool _nextEnemyPending;   // pause before the next enemy acts (or control returns)
 
-    // ── Threat zones ─────────────────────────────────────────────────────────
-    // Spear-wielders on both sides threaten a zone: whoever walks *into* their
-    // reach eats a free attack, up to the weapon's Brace value uses per turn.
-    // Standing inside when the zone arms never triggers — walking in is what
-    // costs. Both directions run on the same ThreatZone (entry-edge pair set +
-    // per-bracer use pool) and differ only in when they arm and whether a pair
-    // re-arms on leaving reach:
-    //  - Party braces arm per enemy walk (ArmPartyBraces): every living member
-    //    holding a Brace weapon watches the acting enemy, those already holding
-    //    it in reach marked inside. A member stabs a given walk at most once —
-    //    pairs are never released mid-walk. (The prototype only braced the
-    //    enemy's own chosen target — with formations and many enemies, the
-    //    nearest member is always the target and back-row spears would never
-    //    fire.)
-    //  - Enemy braces arm once per player turn (StartPlayerTurn, after
-    //    resurrections) for every live enemy, seen or not. A member whose
-    //    movement carries them into a *seen* spear enemy's reach eats a free
-    //    poke; leaving reach releases the pair, so a later re-entry costs again.
-    private readonly ThreatZone _partyBraces = new();
-    private readonly ThreatZone _enemyBraces = new();
-    private readonly List<PartyMemberState> _braceWatchers = new(); // party bracers armed against the current walk
+    // ── Threat zones and reaction pools ──────────────────────────────────────
+    // A reactor's reach is a threat zone facing the other side: whoever crosses
+    // its edge is answered for free — a spear's brace or a held shot on the way
+    // in, an axe's opportunity attack on a chosen way out — up to the weapon's
+    // value in uses per turn. One ThreatZone per side holds the (reactor,
+    // mover) pairs currently inside a reach and each reactor's uses this turn.
+    // The pair sets are kept true continuously: snapshotted when the roster is
+    // fixed and at each player turn's start (after resurrections place
+    // everyone), refreshed silently for the reactor whenever *it* moves, and
+    // crossed — with the reactions raised — whenever the *mover* does, whether
+    // it walked or was shoved. Standing inside a zone when it arms never
+    // triggers; walking or being moved in is what costs, and leaving releases
+    // the pair so a later re-entry counts again. Both sides run the same code:
+    // the only asymmetry is that an enemy's zone is armed only once it has been
+    // seen this turn (no ambushes from the fog). Riposte answers being hit
+    // rather than being approached, so its uses live in their own pool.
+    private readonly ThreatZone _partyZone = new();     // party reactors watching enemy movers
+    private readonly ThreatZone _enemyZone = new();     // enemy reactors watching party movers
+    private readonly ThreatZone[] _zones;               // by the reactor's Side
+    private readonly IReadOnlyList<ActorState>[] _rosters;   // by Side
+    private readonly Dictionary<ActorState, Side> _sides = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ActorState, Func<bool>> _mayReact = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ActorState, Action> _braceFeeds = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ModifierType, Action<ActorState>> _reactionFeeds;
+    private readonly ReactionPool _ripostes = new();
 
     // ── The event table ──────────────────────────────────────────────────────
     // Every behaviour hangs off this one dispatcher (§1.7): the compiled
@@ -126,11 +134,11 @@ public sealed class TurnSystem
     private readonly Dictionary<ActorState, Action<int>> _healFeeds = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Action> _deathFeeds = new(ReferenceEqualityComparer.Instance);
 
-    // Actors a status tick killed during the raise in progress. Their death
-    // consequences run once the raise returns — the queued Killed chain
-    // drained — which is where the typed wrappers run them for a hit, so a
-    // Killed behaviour sees the same world whichever way the actor died.
-    private readonly List<ActorState> _tickDeaths = new();
+    // Actors that died inside the raise in progress — a hit, a status tick, a
+    // queued reaction or counter deep in a cascade. Their death consequences
+    // run once the outermost raise returns, the queued Killed chain drained,
+    // so a Killed behaviour sees the same world whichever way the actor died.
+    private readonly List<ActorState> _heldDeaths = new();
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
@@ -148,56 +156,76 @@ public sealed class TurnSystem
         _events.Applies<TurnPayload>(GameEvent.RoundEnd, ApplyStatusTicks);
         _events.Applies<HealPayload>(GameEvent.HealingReceived, ApplyHealing);
         _events.Applies<HealPayload>(GameEvent.HealingAboveFull, ApplyHealingAboveFull);
+        _events.Applies<ThreatPayload>(GameEvent.ThreatZoneEntered, ApplyReactions);
 
         // The roster is fixed here, and with it which typed feed each actor's
-        // hits, heals and death reach.
+        // hits, heals, death and brace reach, which side it fights on, and
+        // whether its zone may fire right now.
         foreach (var member in party)
         {
             _hitFeeds[member] = resolution => CharacterHit?.Invoke(member, resolution);
             _healFeeds[member] = amount => CharacterHealed?.Invoke(member, amount);
             _deathFeeds[member] = () => OnCharacterDied(member);
+            _braceFeeds[member] = () => BraceTriggered?.Invoke(member);
+            _sides[member] = Side.Party;
+            _mayReact[member] = static () => true;                       // the party's zones are always armed
         }
         foreach (var enemy in enemies)
         {
             _hitFeeds[enemy] = resolution => EnemyHit?.Invoke(enemy, resolution);
             _healFeeds[enemy] = amount => EnemyHealed?.Invoke(enemy, amount);
             _deathFeeds[enemy] = () => OnEnemyDefeated(enemy);
+            _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
+            _sides[enemy] = Side.Enemy;
+            _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
+        _rosters = [party.ToArray<ActorState>(), enemies.ToArray<ActorState>()];
+        _zones = [_partyZone, _enemyZone];
+        _reactionFeeds = new Dictionary<ModifierType, Action<ActorState>>
+        {
+            [ModifierType.Brace] = reactor => _braceFeeds[reactor](),
+            [ModifierType.Opportunist] = reactor => OpportunistTriggered?.Invoke(reactor),
+            [ModifierType.Overwatch] = reactor => OverwatchTriggered?.Invoke(reactor),
+        };
+
+        SnapshotZones();
     }
 
     /// <summary>
     /// Scene calls this after a character's position changes during the
-    /// player phase. Walking into a seen, live, spear-wielding enemy's reach
-    /// triggers its brace: a free retaliation, up to the weapon's Brace value
-    /// per turn. Leaving reach re-arms the pair (further entries still cost
-    /// the enemy a use). Pairs already in reach when the turn began never
-    /// trigger — standing ground is safe, walking in is not.
+    /// player phase: a voluntary walk on the one move path
+    /// (<see cref="NotifyActorMoved"/>).
     /// </summary>
-    public void NotifyCharacterMoved(PartyMemberState mover)
+    public void NotifyCharacterMoved(PartyMemberState mover) => NotifyActorMoved(mover, MoveKind.Voluntary);
+
+    /// <summary>
+    /// The one move path (§1.2, §1.7): call this after an actor's position
+    /// changes, whether it walked (<see cref="MoveKind.Voluntary"/>) or was
+    /// shoved (<see cref="MoveKind.Forced"/>). The actor's own threat zone
+    /// follows it silently; then every zone on the other side whose edge the
+    /// move crossed raises <see cref="GameEvent.ThreatZoneEntered"/> — the
+    /// exit edge first, then the entry edge — and the reactions its handlers
+    /// settle are spent and fired by the applier: a brace or a held shot on
+    /// entry however the move came about, an opportunity attack on a chosen
+    /// exit only. Standing inside a zone when it armed never triggers —
+    /// walking in is what costs — and leaving re-arms the pair. A party
+    /// member's zone is always armed; an enemy's only once it has been seen
+    /// this turn. Inside a running cascade the crossings queue behind it (a
+    /// shove's braces fire once the shove has finished); otherwise they
+    /// resolve, and any death they caused settles, before this returns.
+    /// </summary>
+    public void NotifyActorMoved(ActorState mover, MoveKind kind)
     {
-        if (Phase != TurnPhase.Player || !mover.Alive) return;
+        ArgumentNullException.ThrowIfNull(mover);
+        if (Phase == TurnPhase.GameOver || !mover.Alive) return;
+        if (!_sides.ContainsKey(mover))
+            throw new InvalidOperationException("Moved an actor that is not on this turn system's roster.");
 
-        foreach (var enemy in _enemies)
-        {
-            if (!enemy.Alive) continue;
-
-            if (!EnemyAi.CanHit(enemy, mover, enemy.Weapon, _grid))
-            {
-                _enemyBraces.Leave(enemy, mover); // leaving reach re-arms the pair
-                continue;
-            }
-            if (!_enemyBraces.Enter(enemy, mover)) continue; // was already in reach
-
-            int braces = enemy.Value(ModifierType.Brace);   // weapon plus innate: retaliations per turn
-            if (braces <= 0) continue;
-            if (!_seenThisTurn.Contains(enemy)) continue; // no ambushes from the fog
-            if (_enemyBraces.UsesThisTurn(enemy) >= braces) continue;
-
-            _enemyBraces.Spend(enemy);
-            EnemyBraceTriggered?.Invoke(enemy);
-            ResolveAttackOnCharacter(enemy, enemy.Weapon, mover);
-            if (Phase == TurnPhase.GameOver) return;
-        }
+        RefreshZoneOf(mover);
+        TryReactionsAgainst(mover, ZoneEdge.Exit, kind);
+        TryReactionsAgainst(mover, ZoneEdge.Enter, kind);
+        if (!_events.Running)
+            RunHeldDeaths();
     }
 
     /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
@@ -227,7 +255,7 @@ public sealed class TurnSystem
         var w = c.EquippedWeapon!;
 
         c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
-        ResolveAttackOnEnemy(c, w, enemy);
+        ResolveAttackOn(c, w, enemy);
         return true;
     }
 
@@ -263,6 +291,41 @@ public sealed class TurnSystem
         caster.Mana -= w.ResolvedManaCost;
         var effect = ally.ApplyStatus(innate.Def.Applies!.Value, null, innate.LevelsFor(innate.Def.Potency));
         CharacterBuffed?.Invoke(ally, effect);
+        return true;
+    }
+
+    /// <summary>
+    /// Can the member hold fire? Overwatch is ranged only — holding a shot is
+    /// what a nocked arrow does — and the member needs Overwatch stacks, the
+    /// swing's movement to spare, no shot already held, and shots left in this
+    /// turn's pool: once the held shots have all fired, holding again would
+    /// buy nothing.
+    /// </summary>
+    public bool CanOverwatch(PartyMemberState c)
+    {
+        if (Phase != TurnPhase.Player || !c.Alive) return false;
+        var w = c.EquippedWeapon;
+        if (w == null || w.IsCaster || w.Kind != WeaponKind.Ranged) return false;
+        int shots = c.Value(ModifierType.Overwatch);
+        if (shots <= 0 || c.HeldShots > 0) return false;
+        if (_partyZone.UsesThisTurn(c) >= shots) return false;
+        return c.DistLeft >= w.ResolvedCost;
+    }
+
+    /// <summary>
+    /// Bank the shot instead of firing: spend the weapon's resolved cost and
+    /// arm the member's Overwatch value in held shots, which makes its reach a
+    /// threat zone — an enemy entering it during the enemy turn is shot for
+    /// free, one shot per stack — until the next player turn clears them.
+    /// Returns false if not allowed.
+    /// </summary>
+    public bool TryOverwatch(PartyMemberState c)
+    {
+        if (!CanOverwatch(c)) return false;
+        var w = c.EquippedWeapon!;
+
+        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
+        c.HeldShots = c.Value(ModifierType.Overwatch);
         return true;
     }
 
@@ -399,7 +462,6 @@ public sealed class TurnSystem
             return;
         }
 
-        ArmPartyBraces(enemy);
         var blocked = OccupiedTilesExcept(enemy);
 
         var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget, blocked);
@@ -422,7 +484,6 @@ public sealed class TurnSystem
     /// </summary>
     private void StartHealerAction(EnemyState healer)
     {
-        ArmPartyBraces(healer);
         var blocked = OccupiedTilesExcept(healer);
 
         if (!EnemyAi.HasLivingAlly(healer, _enemies))
@@ -451,36 +512,17 @@ public sealed class TurnSystem
         BeginWalk(waypoints);
     }
 
-    // Before an enemy walks, the party's spear-wielders arm against it. Anyone
-    // already holding it in reach is marked inside — walking *into* reach is
-    // what triggers a brace, standing there is not.
-    private void ArmPartyBraces(EnemyState enemy)
-    {
-        _partyBraces.Clear();
-        _braceWatchers.Clear();
-        foreach (var member in _party)
-        {
-            if (!member.Alive) continue;
-            var w = member.EquippedWeapon;
-            if (w == null || member.Value(ModifierType.Brace) <= 0) continue;
-
-            _braceWatchers.Add(member);
-            if (EnemyAi.CanHit(member, enemy, w, _grid))
-                _partyBraces.MarkInside(member, enemy);
-        }
-    }
-
-    // Every other living actor blocks this enemy's path — enemies act
+    // Every other living actor blocks this actor's path — enemies act
     // sequentially, so each planner queues behind the ones already in position
-    // instead of piling onto the same tile.
-    private HashSet<(int R, int C)> OccupiedTilesExcept(EnemyState enemy)
+    // instead of piling onto the same tile — and stops a shove the same way.
+    private HashSet<(int R, int C)> OccupiedTilesExcept(ActorState self)
     {
         var blocked = new HashSet<(int R, int C)>();
         foreach (var other in _enemies)
-            if (other != enemy && other.Alive)
+            if (other != self && other.Alive)
                 blocked.Add(TileOf(other.X, other.Y));
         foreach (var member in _party)
-            if (member.Alive)
+            if (member != self && member.Alive)
                 blocked.Add(TileOf(member.X, member.Y));
         return blocked;
     }
@@ -574,10 +616,16 @@ public sealed class TurnSystem
             }
         }
 
-        // Braces resolve mid-walk: every spear-wielder stabs the moment the
-        // enemy crosses into their reach — zones merely passed through count,
-        // not just wherever the walk ends. A kill stops the walk on the spot.
-        TryBracesAgainst(enemy);
+        // Reactions resolve mid-walk: every zone the enemy crosses into fires
+        // the moment it does — a spear's brace, a held shot — and every zone it
+        // chooses to leave fires the axe watching the exit; zones merely passed
+        // through count, not just wherever the walk ends. A kill stops the walk
+        // on the spot, and so does a shove: a reaction that displaced the enemy
+        // moved it off the path it planned, so the rest of the walk is dropped
+        // and it acts from where it landed.
+        float plannedX = enemy.X, plannedY = enemy.Y;
+        NotifyActorMoved(enemy, MoveKind.Voluntary);
+        if (Phase == TurnPhase.GameOver) return;   // a counter from inside the cascade took the last member
         if (!enemy.Alive)
         {
             Phase = TurnPhase.EnemyAttacking;
@@ -585,39 +633,119 @@ public sealed class TurnSystem
             _timer = BraceDeathPauseSeconds;
             return;
         }
+        if (enemy.X != plannedX || enemy.Y != plannedY)
+        {
+            _waypointIdx = _waypoints.Count;
+            BeginAttackPhase();
+            return;
+        }
 
         if (_waypointIdx >= _waypoints.Count)
             BeginAttackPhase();
     }
 
+    // ── Threat zones ─────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Fire a free retaliation from each armed member whose reach contains the
-    /// enemy right now. A member stabs a given walk at most once (the pair is
-    /// marked inside for the rest of the walk), and the weapon's Brace value
-    /// caps their uses per turn across all walks.
+    /// Rebuild both sides' pair sets from where everyone stands: a mover
+    /// already inside a reach is marked so, and never fires that zone until it
+    /// leaves and comes back. Run when the roster is fixed and at each player
+    /// turn's start, after resurrections have placed everyone.
     /// </summary>
-    private void TryBracesAgainst(EnemyState enemy)
+    private void SnapshotZones()
     {
-        for (int i = _braceWatchers.Count - 1; i >= 0; i--)
+        _partyZone.Clear();
+        _enemyZone.Clear();
+        foreach (var roster in _rosters)
+            foreach (var reactor in roster)
+                if (reactor.Alive)
+                    RefreshZoneOf(reactor);
+    }
+
+    /// <summary>
+    /// The zone of <paramref name="reactor"/> follows it: every living actor on
+    /// the other side is marked inside or released according to where the
+    /// reactor now stands. Silent — a reactor walking up to a target has not
+    /// made the target move, and only the mover's own crossing fires anything.
+    /// </summary>
+    private void RefreshZoneOf(ActorState reactor)
+    {
+        var side = _sides[reactor];
+        var zone = _zones[(int)side];
+        var weapon = reactor.EquippedWeapon;
+        foreach (var mover in _rosters[(int)Opposite(side)])
         {
-            if (!enemy.Alive) return;
-            var member = _braceWatchers[i];
-            if (!member.Alive) continue;
-
-            var weapon = member.EquippedWeapon;
-            if (weapon == null) continue;
-            int braces = member.Value(ModifierType.Brace);
-            if (braces <= 0) continue;
-
-            if (_partyBraces.UsesThisTurn(member) >= braces) continue;
-            if (!EnemyAi.CanHit(member, enemy, weapon, _grid)) continue;
-            if (!_partyBraces.Enter(member, enemy)) continue; // stood inside when the walk began, or already stabbed this walk
-
-            _partyBraces.Spend(member);
-            BraceTriggered?.Invoke(member);
-            ResolveAttackOnEnemy(member, weapon, enemy);
+            if (mover.Alive && weapon != null && EnemyAi.CanHit(reactor, mover, weapon, _grid))
+                zone.MarkInside(reactor, mover);
+            else
+                zone.Leave(reactor, mover);
         }
     }
+
+    /// <summary>
+    /// The generalised brace resolver, taking which edge it cares about: for
+    /// every reactor on the other side whose reach <paramref name="mover"/>
+    /// just crossed on <paramref name="edge"/>, raise
+    /// <see cref="GameEvent.ThreatZoneEntered"/> with the reactor as self and
+    /// the mover as other — the handlers decide what the crossing earns, the
+    /// applier spends and fires it. Same lookup, same pool, same resolver for a
+    /// spear's entry, a held shot's entry and an axe's exit (§1.2).
+    /// </summary>
+    private void TryReactionsAgainst(ActorState mover, ZoneEdge edge, MoveKind kind)
+    {
+        var reactorSide = Opposite(_sides[mover]);
+        var zone = _zones[(int)reactorSide];
+        foreach (var reactor in _rosters[(int)reactorSide])
+        {
+            if (!mover.Alive) return;   // a reaction already resolved took it: nothing further crosses anything
+            if (!reactor.Alive)
+            {
+                zone.Leave(reactor, mover);
+                continue;
+            }
+
+            var weapon = reactor.EquippedWeapon;
+            bool inside = weapon != null && EnemyAi.CanHit(reactor, mover, weapon, _grid);
+            bool crossed = edge == ZoneEdge.Enter
+                ? inside && zone.Enter(reactor, mover)
+                : !inside && zone.Leave(reactor, mover);
+            if (!crossed) continue;
+
+            _events.Enqueue(GameEvent.ThreatZoneEntered,
+                new ThreatPayload(mover, kind, edge, ImmutableArray<Reaction>.Empty), reactor, mover);
+        }
+    }
+
+    /// <summary>
+    /// The ThreatZoneEntered applier: each reaction the handlers settled is
+    /// fired if its reactor and the mover still stand, the reactor's zone is
+    /// armed (an enemy's only once seen this turn), and the reactor has a use
+    /// of the reaction's modifier left this turn — spent whether the crossing
+    /// was a walk or a shove, which is what bounds a displacement chain. The
+    /// free attack is queued as a DamageTaken from reactor to mover and told
+    /// to the side's typed brace event or the reaction's own.
+    /// </summary>
+    private void ApplyReactions(ThreatPayload settled, ActorState reactor, ActorState mover, EventTable table)
+    {
+        if (settled.Reactions.IsDefaultOrEmpty) return;
+        foreach (var reaction in settled.Reactions)
+        {
+            var who = reaction.Reactor;
+            if (!who.Alive || !mover.Alive) continue;
+            if (!_mayReact[who]()) continue;
+
+            var zone = _zones[(int)_sides[who]];
+            if (zone.UsesThisTurn(who) >= who.Value(reaction.Source)) continue;
+            zone.Spend(who);
+
+            if (_reactionFeeds.TryGetValue(reaction.Source, out var announce))
+                announce(who);
+            table.Enqueue(GameEvent.DamageTaken,
+                DamagePayload.Initial(reaction.Weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(who, mover)), who, mover);
+        }
+    }
+
+    private static Side Opposite(Side side) => side == Side.Party ? Side.Enemy : Side.Party;
 
     private void BeginAttackPhase()
     {
@@ -667,7 +795,7 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        ResolveAttackOnCharacter(enemy, enemy.Weapon, target);
+        ResolveAttackOn(enemy, enemy.Weapon, target);
         if (Phase == TurnPhase.GameOver) return;
 
         _timer = AttackBeatSeconds;
@@ -737,19 +865,17 @@ public sealed class TurnSystem
             }
         }
 
-        _partyBraces.ResetUses();
-        _enemyBraces.ResetUses();
-
-        // Snapshot who already stands inside each live enemy's reach (after
-        // resurrections placed everyone): those pairs never brace this turn.
-        _enemyBraces.Clear();
-        foreach (var enemy in _enemies)
-        {
-            if (!enemy.Alive) continue;
-            foreach (var member in _party)
-                if (member.Alive && EnemyAi.CanHit(enemy, member, enemy.Weapon, _grid))
-                    _enemyBraces.MarkInside(enemy, member);
-        }
+        // A new turn: every reaction's uses are restored, held shots lapse,
+        // and both sides' zones re-arm from where everyone now stands (after
+        // resurrections placed everyone): pairs already inside never fire this
+        // turn.
+        _partyZone.ResetUses();
+        _enemyZone.ResetUses();
+        _ripostes.Reset();
+        foreach (var roster in _rosters)
+            foreach (var actor in roster)
+                actor.HeldShots = 0;
+        SnapshotZones();
 
         // The player phase opens for every member, the fallen included — the
         // boundary events are the roster's; only the budget refill is the living's.
@@ -795,7 +921,7 @@ public sealed class TurnSystem
                     self.Alive = false;
                     self.StatusEffects.Clear();
                     table.Enqueue(GameEvent.Killed, new KillPayload(Weapon: null, tick.Damage, tick.Damage), self, self);
-                    _tickDeaths.Add(self);
+                    _heldDeaths.Add(self);
                     return;
                 }
             }
@@ -837,23 +963,27 @@ public sealed class TurnSystem
     /// Raise one of the three boundary events for one actor — as both self and
     /// other — and then run the death consequences of anyone a tick killed in
     /// it. The raise drained the queued Killed chain before returning, so this
-    /// is the tick death's counterpart of the typed wrappers running
-    /// <see cref="OnCharacterDied"/>/<see cref="OnEnemyDefeated"/> after
-    /// <see cref="ResolveAttackOn"/> returns: a Killed behaviour sees the same
+    /// is the tick death's counterpart of <see cref="ResolveAttackOn"/> running
+    /// them after a hit's raise returns: a Killed behaviour sees the same
     /// world whichever way the actor died.
     /// </summary>
     private void RaiseBoundary(GameEvent evt, TurnPayload payload, ActorState actor)
     {
         _events.Raise(evt, payload, actor, actor);
-        RunTickDeaths();
+        RunHeldDeaths();
     }
 
-    /// <summary>The side's consequences for each actor a tick killed in the raise that just returned, through the feed the roster fixed.</summary>
-    private void RunTickDeaths()
+    /// <summary>
+    /// The side's consequences for each actor that died in the raise that
+    /// just returned — the primary target of a hit, a tick's victim, a mover a
+    /// queued brace took, an attacker a counter took — through the feed the
+    /// roster fixed, in the order they fell. Never called mid-cascade.
+    /// </summary>
+    private void RunHeldDeaths()
     {
-        if (_tickDeaths.Count == 0) return;
-        var died = _tickDeaths.ToArray();
-        _tickDeaths.Clear();
+        if (_heldDeaths.Count == 0) return;
+        var died = _heldDeaths.ToArray();
+        _heldDeaths.Clear();
         foreach (var actor in died)
         {
             if (!_deathFeeds.TryGetValue(actor, out var feed))
@@ -869,17 +999,16 @@ public sealed class TurnSystem
     /// attacker's natural roll and the surface distance seed a DamagePayload,
     /// DamageTaken runs the §1.6 chain on this system's table, and the applier
     /// (<see cref="ApplyDamage"/>) writes the settled result once — HP, the
-    /// side's typed hit event, the queued follow-ups. What a death *means*
-    /// (movement lost, defeat turn, party wipe) stays the typed wrappers'
-    /// business, which runs after the raise returns. Returns true when the
-    /// target died.
+    /// side's typed hit event, the queued follow-ups: a counter, a shove and
+    /// the braces it fires, all drained before the raise returns. What a death
+    /// *means* (movement lost, defeat turn, party wipe) runs after it, for
+    /// everyone the cascade took, through <see cref="RunHeldDeaths"/>.
     /// </summary>
-    private bool ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target)
+    private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target)
     {
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
             CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20);
-        RunTickDeaths();   // nothing ticks inside a hit's cascade today; if something ever does, its death does not wait for the next boundary
-        return !target.Alive;
+        RunHeldDeaths();
     }
 
     /// <summary>
@@ -889,15 +1018,21 @@ public sealed class TurnSystem
     /// on both sides (riders on the defender, BlockWeaken on the attacker),
     /// hands the projected resolution to the target's typed hit feed
     /// (CharacterHit or EnemyHit, fixed when the roster was typed at
-    /// construction — never by asking the target its kind), and queues the
-    /// follow-ups for the table to drain after it returns, in this order:
+    /// construction — never by asking the target its kind), then, on a
+    /// survivor, answers a successful block with the defender's Riposte and
+    /// performs the settled displacement tile by tile (step 8), and queues
+    /// the follow-ups for the table to drain after it returns, in this order:
     /// Killed on a death, DamageDealt always, Crit on a crit. The order is a
     /// ruling of the decomposition (1b rule 5), pinned by DamagePipelineTests,
-    /// not an accident of this method. Death consequences belong to the typed
-    /// wrappers.
+    /// not an accident of this method. Death consequences are held for the
+    /// outermost raise. A queued hit whose parties are no longer both standing
+    /// — a second brace on a mover the first one killed — lands on nothing: a
+    /// corpse neither swings nor is struck.
     /// </summary>
     private void ApplyDamage(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
     {
+        if (!attacker.Alive || !target.Alive) return;
+
         target.Hp = Math.Max(0, target.Hp - settled.Taken);
         if (settled.WardSpent > 0)
         {
@@ -920,22 +1055,69 @@ public sealed class TurnSystem
             target.Alive = false;
             target.StatusEffects.Clear();   // the dead shed everything
             table.Enqueue(GameEvent.Killed, new KillPayload(settled.Weapon, settled.Dealt, settled.Taken), attacker, target);
+            _heldDeaths.Add(target);
+        }
+        else
+        {
+            // You absorb the hit, then you answer it — from where you stood
+            // when it landed; then the blow moves you.
+            if (settled.Blocked)
+                TryRiposte(target, attacker, table);
+            if (settled.Displace is { Tiles: > 0 } shove)
+                ApplyDisplacement(target, shove);
         }
         table.Enqueue(GameEvent.DamageDealt, settled, attacker, target);
         if (settled.IsCrit)
             table.Enqueue(GameEvent.Crit, new CritPayload(settled.Weapon, settled.Roll), attacker, target);
     }
 
-    private void ResolveAttackOnCharacter(ActorState attacker, Weapon attackerWeapon, PartyMemberState target)
+    /// <summary>
+    /// The riposte hook: a successful block — never a crit, which a block
+    /// never happens to — grants the defender a free counter-swing at the
+    /// attacker, up to its Riposte value a turn, provided it can reach: the
+    /// counter is a strike with the defender's own weapon, so a shield-bearer
+    /// blocking an arrow from across the room has nothing to answer with.
+    /// Queued as a DamageTaken from defender to attacker, so the counter is a
+    /// hit like any other: it can be blocked, riposted back within the
+    /// attacker's own budget, and it shoves if the blade does.
+    /// </summary>
+    private void TryRiposte(ActorState defender, ActorState attacker, EventTable table)
     {
-        if (ResolveAttackOn(attacker, attackerWeapon, target))
-            OnCharacterDied(target);
+        int counters = defender.Value(ModifierType.Riposte);
+        if (counters <= 0 || _ripostes.Uses(defender, ModifierType.Riposte) >= counters) return;
+        var weapon = defender.EquippedWeapon;
+        if (weapon == null || weapon.IsCaster || !EnemyAi.CanHit(defender, attacker, weapon, _grid)) return;
+
+        _ripostes.Spend(defender, ModifierType.Riposte);
+        RiposteTriggered?.Invoke(defender);
+        table.Enqueue(GameEvent.DamageTaken,
+            DamagePayload.Initial(weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(defender, attacker)), defender, attacker);
     }
 
-    private void ResolveAttackOnEnemy(ActorState attacker, Weapon attackerWeapon, EnemyState target)
+    /// <summary>
+    /// Step 8, applied once: move the target the settled number of tiles, one
+    /// at a time, setting it down on each tile's centre and sending every step
+    /// through the move path as a forced move — so the zones it is shoved
+    /// into fire (their braces queue behind the shove and resolve once it has
+    /// finished), the zones it is shoved out of do not, and it is never
+    /// teleported past either. A wall or an occupied tile stops it short.
+    /// </summary>
+    private void ApplyDisplacement(ActorState target, Displacement shove)
     {
-        if (ResolveAttackOn(attacker, attackerWeapon, target))
-            OnEnemyDefeated(target);
+        int moved = 0;
+        for (int i = 0; i < shove.Tiles && target.Alive; i++)
+        {
+            var next = Displacer.NextTile(target, shove, _grid, OccupiedTilesExcept(target));
+            if (next == null) break;
+
+            var (x, y) = Displacer.CentreOf(next.Value.R, next.Value.C);
+            target.X = x;
+            target.Y = y;
+            moved++;
+            NotifyActorMoved(target, MoveKind.Forced);
+        }
+        if (moved > 0)
+            ActorDisplaced?.Invoke(target, moved);
     }
 
     /// <summary>What a party member's death means, however it came: the bank is lost, the scene is told, and the last one falling ends the game.</summary>
