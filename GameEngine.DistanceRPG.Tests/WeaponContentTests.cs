@@ -278,6 +278,12 @@ public class WeaponContentTests
         Assert.Equal(12, knife.ResolvedCost);
         Assert.Equal(1, knife.Forged.Stacks(Light));   // the forged spread never moves
 
+        // The same x6 on the axe: 60 x 40 / 100 = 24, the modifiers doc's own example.
+        var hatchet = TestWeapons.Get("hatchet");
+        hatchet.Acquire(Light, 5);
+        Assert.Equal(6, hatchet.Stacks(Light));
+        Assert.Equal(24, hatchet.ResolvedCost);
+
         // A maxed Light x5 halves any weapon: dagger 30 -> 15, sword 50 -> 25, axe 60 -> 30.
         foreach (var (id, halved) in new[] { ("weakspot_stiletto", 15), ("tower_guard", 25), ("great_axe", 30) })
         {
@@ -416,9 +422,18 @@ public class WeaponContentTests
     [Fact]
     public void Validator_RefusesIllegalWeapons_NamingEntryAndRule()
     {
-        // Past MaxForged: Light x2.
+        // Past MaxForged: Light x2, and Resonant x2 on a staff, caught before the caster check reads the spread.
         var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, 2)) });
         Assert.Equal(("flensing_knife", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
+        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, 2)) });
+        Assert.Equal(("staff_of_mire", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
+
+        // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of.
+        ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, -1)) });
+        Assert.Equal(("flensing_knife", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
+        Assert.Contains("Light x-1", ex.Message);
+        ex = LoadWith("darts", w => w with { Forged = Spread((CritMultiplier, 1), (Charges, 1), (Light, 0)) });
+        Assert.Equal(("darts", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
 
         // The wrong kind: Brace on a bow.
         ex = LoadWith("crossbow", w => w with { Forged = Spread((Longshot, 1), (CritWindow, 1), (Brace, 1)) });
@@ -439,6 +454,18 @@ public class WeaponContentTests
         Assert.Equal(("hatchet", ContentValidator.RuleEfficiencyAddsLight), (ex.EntryId, ex.Rule));
         ex = LoadWith("great_axe", w => w with { Forged = Spread((Cleave, 1), (Opportunist, 1), (Splitting, 1)) });
         Assert.Equal(("great_axe", ContentValidator.RulePurityDeepensBaseline), (ex.EntryId, ex.Rule));
+        ex = LoadWith("tower_guard", w => w with { Forged = Spread((Block, 1), (Push, 2)) });   // deepens the second axis, not the signature
+        Assert.Equal(("tower_guard", ContentValidator.RulePurityDeepensBaseline), (ex.EntryId, ex.Rule));
+        Assert.Contains("signature Block", ex.Message);
+
+        // A class whose baseline lost its signature: every dagger forged Block where CritWindow was.
+        var bludgeons = new WeaponsData(ContentDefaults.Weapons.Weapons
+            .Select(w => w.Class == WeaponClass.Dagger
+                ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
+                : w)
+            .ToList());
+        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, bludgeons));
+        Assert.Equal(("Dagger", ContentValidator.RuleClassBaseline), (ex.EntryId, ex.Rule));
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));
 

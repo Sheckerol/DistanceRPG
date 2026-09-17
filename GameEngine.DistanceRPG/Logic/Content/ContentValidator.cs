@@ -27,6 +27,7 @@ public static class ContentValidator
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
 
     public const string RuleForgedNotAllowed = "every forged spread must be allowed";
+    public const string RuleForgedStackCount = "a forged stack count is at least one";
     public const string RuleMaxForged = "nothing is forged past MaxForged";
     public const string RuleTwoForgedAxes = "no weapon is forged with fewer than two modifiers";
     public const string RuleCasterForged = "a caster is forged Resonant x1 and nothing else";
@@ -37,8 +38,26 @@ public static class ContentValidator
     public const string RuleClassBaseline = "a class baseline is its signature plus a second modifier";
     public const string RuleVariantDelta = "a variant is its class baseline plus exactly one added modifier type";
     public const string RuleEfficiencyAddsLight = "an Efficiency variant adds Light x1";
-    public const string RulePurityDeepensBaseline = "a Purity variant deepens a baseline modifier";
+    public const string RulePurityDeepensBaseline = "a Purity variant deepens the class signature";
     public const string RuleForgedOnlyUnused = "every forgedOnly id is forged on at least one weapon";
+
+    /// <summary>
+    /// The "class feature" column of the §1.2 table (phase-1-modifiers.md:16-25):
+    /// the modifier a class is named for, which every variant of the class
+    /// carries and a Purity variant deepens. Compiled, like <see cref="Weapon.KindOf"/>,
+    /// because a class is code and so is what it is for. Casters are absent:
+    /// they vary by effect and shape rather than by role and are never checked
+    /// as variants.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<WeaponClass, ModifierType> Signature = new Dictionary<WeaponClass, ModifierType>
+    {
+        [WeaponClass.Dagger] = ModifierType.CritWindow,
+        [WeaponClass.Sword] = ModifierType.Block,
+        [WeaponClass.Spear] = ModifierType.Brace,
+        [WeaponClass.Axe] = ModifierType.Cleave,
+        [WeaponClass.Ranged] = ModifierType.Longshot,
+        [WeaponClass.Throwing] = ModifierType.Charges,
+    };
 
     /// <summary>
     /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier
@@ -204,7 +223,8 @@ public static class ContentValidator
 
     /// <summary>
     /// The §5.6 checks on <c>weapons.json</c> (S:231-240): ids are unique; every
-    /// enchantment a weapon names resolves; every forged modifier is allowed
+    /// enchantment a weapon names resolves; every forged stack count is at least
+    /// one; every forged modifier is allowed
     /// beside the rest of its spread — the state every later roll deepens
     /// from, asked of <see cref="ModifierRules.Allowed"/> with the whole spread
     /// present, because a from-zero build-up would refuse the forge's own
@@ -216,7 +236,7 @@ public static class ContentValidator
     /// wands carry a shape and only martial variants a role; each martial class
     /// fields four variants, one per role, on a two-modifier baseline, every
     /// variant adding exactly one modifier type to it (Efficiency <c>Light x1</c>,
-    /// Purity a baseline modifier again, Control and Support a new one); and
+    /// Purity the class signature again, Control and Support a new one); and
     /// every <c>forgedOnly</c> id is forged somewhere, or it could never exist.
     /// Unique derivation is checked with the uniques.
     /// </summary>
@@ -320,6 +340,7 @@ public static class ContentValidator
 
         // The baseline is what every variant of the class carries: the per-type
         // minimum over the four, which leaves each variant's own addition out.
+        // Two modifiers, one of them the class signature.
         var baseline = new Dictionary<ModifierType, int>();
         foreach (var t in Enum.GetValues<ModifierType>())
         {
@@ -327,9 +348,10 @@ public static class ContentValidator
             if (min > 0)
                 baseline[t] = min;
         }
-        if (baseline.Count != 2)
+        var signature = Signature[cls];
+        if (baseline.Count != 2 || !baseline.ContainsKey(signature))
             throw new ContentException(cls.ToString(), RuleClassBaseline,
-                $"baseline is {string.Join(", ", baseline.Select(b => $"{b.Key} x{b.Value}"))}");
+                $"baseline is {string.Join(", ", baseline.Select(b => $"{b.Key} x{b.Value}"))}, signature {signature}");
 
         foreach (var v in variants)
         {
@@ -348,8 +370,8 @@ public static class ContentValidator
                         throw new ContentException(v.Id, RuleEfficiencyAddsLight, $"adds {t} x{v.Forged[t]}");
                     break;
                 case VariantRole.Purity:
-                    if (!baseline.ContainsKey(t))
-                        throw new ContentException(v.Id, RulePurityDeepensBaseline, $"adds {t}, which the baseline does not carry");
+                    if (t != signature)
+                        throw new ContentException(v.Id, RulePurityDeepensBaseline, $"adds {t}, not the {cls} signature {signature}");
                     break;
                 default:
                     if (baseline.ContainsKey(t))
@@ -359,9 +381,21 @@ public static class ContentValidator
         }
     }
 
-    /// <summary>A def's forged spread as a set, unclamped: the forge is bounded by MaxForged above, never by the acquisition cap.</summary>
+    /// <summary>
+    /// A def's forged spread as a set, unclamped: the forge is bounded by
+    /// MaxForged above, never by the acquisition cap. A zero or negative count
+    /// is refused here, naming the entry, before <see cref="ModifierSet.Of"/>
+    /// would refuse it as an argument: invalid content aborts as content
+    /// (§5.4). The compiled defaults cannot carry one; a file can. Walked in
+    /// enum order so the count reported is the same one every run.
+    /// </summary>
     private static ModifierSet Spread(WeaponDef def)
-        => ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+    {
+        foreach (var (t, n) in def.Forged.OrderBy(kv => kv.Key))
+            if (n <= 0)
+                throw new ContentException(def.Id, RuleForgedStackCount, $"{t} x{n}");
+        return ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+    }
 
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)
     {
