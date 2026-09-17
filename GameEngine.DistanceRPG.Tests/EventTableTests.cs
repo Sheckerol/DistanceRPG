@@ -231,11 +231,8 @@ public class EventTableTests
         attacker.Y = 20f;
         attacker.Mana = 40;
         attacker.ApplyStatus(StatusEffectType.Regeneration, null, 2);
-        attacker.ApplyStatus(StatusEffectType.Weakened, null, 1);
         var defender = new EnemyState { X = 50f, Y = 20f, Hp = 30, Innate = ModifierSet.Of((ModifierType.Block, 1)) };
         defender.ApplyStatus(StatusEffectType.Regeneration, null, 1);
-        defender.ApplyStatus(StatusEffectType.Sundered, null, 1);
-        defender.ApplyStatus(StatusEffectType.Ward, null, 3);
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
@@ -250,9 +247,38 @@ public class EventTableTests
             payload = next;
         }
 
-        // The chain did all its work on the payload alone: a natural 20 on the stiletto is 15 x3,
-        // Weakened 1 off, Sundered 1 on, Block skipped, Ward 3 swallowed — and the stiletto's
-        // CritSunder settled as a rider, not as a write.
+        // The chain did all its work on the payload alone: a natural 20 on the stiletto is 15 x3, Block skipped.
+        Assert.True(payload.IsCrit);
+        Assert.Equal(45, payload.Taken);
+        Assert.Equal(30, defender.Hp);
+    }
+
+    [Fact]
+    public void StatusHandlers_DoNotMutateActors()
+    {
+        // The same walk with every status handler given something to read — the attacker
+        // Weakened, the defender Sundered and Warded, the stiletto's CritSunder riding the
+        // crit — settles it all on the payload: Weakened 1 off, Sundered 1 on, Block skipped,
+        // Ward 3 swallowed, the rider appended. Not a level and not a hit point is written.
+        var table = new EventTable();
+        Behaviours.RegisterAll(table);
+
+        var attacker = Member();
+        attacker.Inventory[0] = Dagger;
+        attacker.ApplyStatus(StatusEffectType.Weakened, null, 1);
+        var defender = new EnemyState { Hp = 30, Innate = ModifierSet.Of((ModifierType.Block, 1)) };
+        defender.ApplyStatus(StatusEffectType.Sundered, null, 1);
+        defender.ApplyStatus(StatusEffectType.Ward, null, 3);
+
+        var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
+        foreach (var (info, handler) in table.Chain<DamagePayload>(GameEvent.DamageTaken))
+        {
+            string before = Snapshot(attacker) + " | " + Snapshot(defender);
+            payload = handler(payload, attacker, defender);
+            string after = Snapshot(attacker) + " | " + Snapshot(defender);
+            Assert.True(before == after, $"{info} wrote to an actor: {before} became {after}");
+        }
+
         Assert.True(payload.IsCrit);
         Assert.Equal(45, payload.Dealt);
         Assert.Equal(3, payload.WardSpent);
@@ -260,6 +286,8 @@ public class EventTableTests
         Assert.Equal(new StatusApplication(StatusEffectType.Sundered, null, 1), Assert.Single(payload.ApplyToDefender));
         Assert.Equal(30, defender.Hp);
         Assert.Equal(3, defender.StatusLevel(StatusEffectType.Ward));
+        Assert.Equal(1, defender.StatusLevel(StatusEffectType.Sundered));
+        Assert.Equal(1, attacker.StatusLevel(StatusEffectType.Weakened));
     }
 
     [Fact]

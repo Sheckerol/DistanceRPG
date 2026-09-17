@@ -63,7 +63,14 @@ public enum StatusTrigger
     /// <summary>Healing past full — <see cref="GameEvent.HealingAboveFull"/>.</summary>
     ReceivingHealing,
 
-    /// <summary>The end of the round — <see cref="GameEvent.RoundEnd"/>: a status nothing fires, read where it applies and moved only by the universal decay.</summary>
+    /// <summary>
+    /// The end of the round — <see cref="GameEvent.RoundEnd"/>: what the Reset
+    /// rows fire on, and the one event that moves a status nothing fires. Mire,
+    /// Sundered and Weakened are read where they apply — a movement budget,
+    /// pipeline steps 2 and 3 — and lose their levels only to the universal
+    /// decay, so their rows name the decay's event with
+    /// <see cref="OnTrigger.None"/> beside it: one convention for all three.
+    /// </summary>
     RoundEnd,
 }
 
@@ -86,8 +93,17 @@ public enum OnTrigger
     None,
 }
 
-/// <summary>A status table row: the two behaviour columns of §1.7. The third column, the effect per level, is a tunable.</summary>
-public sealed record StatusRule(StatusEffectType Type, StatusTrigger Trigger, OnTrigger OnTrigger);
+/// <summary>
+/// A status table row: the two behaviour columns of §1.7 — the third column,
+/// the effect per level, is a tunable — and two flags the handlers read
+/// instead of asking a type: whether a tick's effect restores HP rather than
+/// removing it (<paramref name="RestoresHp"/>, the heal-over-time rows) and
+/// whether entries key on the element that lit them
+/// (<paramref name="KeyedOnElement"/>, the lingering element). A second
+/// heal-over-time or a second element-keyed status is a row, not an edit.
+/// </summary>
+public sealed record StatusRule(StatusEffectType Type, StatusTrigger Trigger, OnTrigger OnTrigger,
+    bool RestoresHp = false, bool KeyedOnElement = false);
 
 /// <summary>
 /// The compiled status table. Decay is not a column: every status loses one
@@ -101,15 +117,15 @@ public static class StatusRules
 {
     public static IReadOnlyDictionary<StatusEffectType, StatusRule> Table { get; } = Build(
     [
-        new(StatusEffectType.Regeneration, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement),
+        new(StatusEffectType.Regeneration, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement, RestoresHp: true),
         new(StatusEffectType.Ward, StatusTrigger.TakingDamage, OnTrigger.SpendMany),
         new(StatusEffectType.Poison, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement),
-        new(StatusEffectType.Mire, StatusTrigger.RoundEnd, OnTrigger.None),          // read where budgets are set
-        new(StatusEffectType.Sundered, StatusTrigger.TakingDamage, OnTrigger.None),  // read at pipeline step 3
-        new(StatusEffectType.Weakened, StatusTrigger.TakingDamage, OnTrigger.None),  // read at pipeline step 2
+        new(StatusEffectType.Mire, StatusTrigger.RoundEnd, OnTrigger.None),          // nothing fires it: read where budgets are set, moved by the decay alone
+        new(StatusEffectType.Sundered, StatusTrigger.RoundEnd, OnTrigger.None),      // nothing fires it: read at pipeline step 3, moved by the decay alone
+        new(StatusEffectType.Weakened, StatusTrigger.RoundEnd, OnTrigger.None),      // nothing fires it: read at pipeline step 2, moved by the decay alone
         new(StatusEffectType.Bleeding, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement),
         new(StatusEffectType.OverhealPool, StatusTrigger.ReceivingHealing, OnTrigger.ConvertAndReset),
-        new(StatusEffectType.Searing, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement),
+        new(StatusEffectType.Searing, StatusTrigger.TurnEnd, OnTrigger.TickAndDecrement, KeyedOnElement: true),
         new(StatusEffectType.Softened, StatusTrigger.RoundEnd, OnTrigger.Reset),
     ]);
 
@@ -122,8 +138,8 @@ public static class StatusRules
     /// <summary>Whether the round-end sweep takes this status's level: every status but those that tick at their own turn's end, whose tick is their decay.</summary>
     public static bool DecaysAtRoundEnd(StatusEffectType type) => Of(type).Trigger != StatusTrigger.TurnEnd;
 
-    /// <summary>Whether entries of this type are keyed on an element: the lingering element carries the type that lit it; nothing else does.</summary>
-    public static bool KeysOnElement(StatusEffectType type) => type == StatusEffectType.Searing;
+    /// <summary>Whether entries of this type are keyed on an element — the row's flag: the lingering element carries the type that lit it; nothing else does.</summary>
+    public static bool KeysOnElement(StatusEffectType type) => Of(type).KeyedOnElement;
 
     private static IReadOnlyDictionary<StatusEffectType, StatusRule> Build(StatusRule[] rows)
     {

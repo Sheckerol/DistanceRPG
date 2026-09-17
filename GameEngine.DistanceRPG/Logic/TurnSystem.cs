@@ -126,6 +126,12 @@ public sealed class TurnSystem
     private readonly Dictionary<ActorState, Action<int>> _healFeeds = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Action> _deathFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // Actors a status tick killed during the raise in progress. Their death
+    // consequences run once the raise returns — the queued Killed chain
+    // drained — which is where the typed wrappers run them for a hit, so a
+    // Killed behaviour sees the same world whichever way the actor died.
+    private readonly List<ActorState> _tickDeaths = new();
+
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -271,8 +277,9 @@ public sealed class TurnSystem
             totalSaved += c.EndTurnSaveMovement();
             c.RegenManaFromUnusedMovement();
             // The member's turn ends here: the status ticks are this event's
-            // handlers, and its applier writes what they settled.
-            _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c, c);
+            // handlers, its applier writes what they settled, and a tick
+            // death's consequences follow once the raise has returned.
+            RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c);
         }
 
         // A tick can take the last member: the wipe stands, the turn does not go on.
@@ -339,7 +346,7 @@ public sealed class TurnSystem
         // so every actor sees TurnStart, TurnEnd and RoundEnd once per round,
         // in that order; a handler that only means the living checks Alive.
         foreach (var enemy in _enemies)
-            _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+            RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy);
 
         _enemyIdx = -1;
         AdvanceToNextEnemy();
@@ -703,11 +710,11 @@ public sealed class TurnSystem
         // under the turn that is ending, and before resurrections (which
         // restore full HP) are considered.
         foreach (var enemy in _enemies)
-            _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+            RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy);
         foreach (var member in _party)
-            _events.Raise(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Party), member, member);
+            RaiseBoundary(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Party), member);
         foreach (var enemy in _enemies)
-            _events.Raise(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+            RaiseBoundary(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Enemy), enemy);
 
         _seenThisTurn.Clear();
         TurnCount++;
@@ -750,7 +757,7 @@ public sealed class TurnSystem
         {
             if (c.Alive)
                 c.StartTurn();
-            _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c, c);
+            RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c);
         }
 
         Phase = TurnPhase.Player;
@@ -764,8 +771,9 @@ public sealed class TurnSystem
     /// written. The status handlers settled a <see cref="StatusTick"/> per
     /// status for the actor; this applies them in order: a damage tick takes
     /// HP and can kill, in which case the dead shed everything, Killed is
-    /// queued with no weapon, and the side's death consequences run through
-    /// the actor's typed feed; a healing tick queues HealingReceived, whose
+    /// queued with no weapon, and the side's death consequences are held for
+    /// <see cref="RaiseBoundary"/> to run once the raise — and with it the
+    /// Killed chain — has returned; a healing tick queues HealingReceived, whose
     /// own applier restores the HP; a level change lands on the status list,
     /// which drops an entry at zero. Dead actors take no damage and no heal —
     /// regen cannot resurrect — but do shed.
@@ -787,7 +795,7 @@ public sealed class TurnSystem
                     self.Alive = false;
                     self.StatusEffects.Clear();
                     table.Enqueue(GameEvent.Killed, new KillPayload(Weapon: null, tick.Damage, tick.Damage), self, self);
-                    Died(self);
+                    _tickDeaths.Add(self);
                     return;
                 }
             }
@@ -807,7 +815,8 @@ public sealed class TurnSystem
     private void ApplyHealing(HealPayload settled, ActorState self, ActorState other, EventTable table)
     {
         if (!self.Alive) return;
-        int applied = Math.Clamp(settled.Applied, 0, self.MaxHp - self.Hp);
+        // Never past full — and no fault on an actor already past it (a fixture's HP, a maximum lowered later): nothing to restore is zero.
+        int applied = Math.Clamp(settled.Applied, 0, Math.Max(0, self.MaxHp - self.Hp));
         self.Hp += applied;
         if (applied > 0)
         {
@@ -824,12 +833,33 @@ public sealed class TurnSystem
     private void ApplyHealingAboveFull(HealPayload settled, ActorState self, ActorState other, EventTable table)
         => ApplyTicks(settled.Ticks, self, table);
 
-    /// <summary>An actor died outside a hit: the side's consequences, through the feed the roster fixed.</summary>
-    private void Died(ActorState actor)
+    /// <summary>
+    /// Raise one of the three boundary events for one actor — as both self and
+    /// other — and then run the death consequences of anyone a tick killed in
+    /// it. The raise drained the queued Killed chain before returning, so this
+    /// is the tick death's counterpart of the typed wrappers running
+    /// <see cref="OnCharacterDied"/>/<see cref="OnEnemyDefeated"/> after
+    /// <see cref="ResolveAttackOn"/> returns: a Killed behaviour sees the same
+    /// world whichever way the actor died.
+    /// </summary>
+    private void RaiseBoundary(GameEvent evt, TurnPayload payload, ActorState actor)
     {
-        if (!_deathFeeds.TryGetValue(actor, out var died))
-            throw new InvalidOperationException("An actor that is not on this turn system's roster died.");
-        died();
+        _events.Raise(evt, payload, actor, actor);
+        RunTickDeaths();
+    }
+
+    /// <summary>The side's consequences for each actor a tick killed in the raise that just returned, through the feed the roster fixed.</summary>
+    private void RunTickDeaths()
+    {
+        if (_tickDeaths.Count == 0) return;
+        var died = _tickDeaths.ToArray();
+        _tickDeaths.Clear();
+        foreach (var actor in died)
+        {
+            if (!_deathFeeds.TryGetValue(actor, out var feed))
+                throw new InvalidOperationException("An actor that is not on this turn system's roster died.");
+            feed();
+        }
     }
 
     // ── Shared attack plumbing ───────────────────────────────────────────────
@@ -848,6 +878,7 @@ public sealed class TurnSystem
     {
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
             CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20);
+        RunTickDeaths();   // nothing ticks inside a hit's cascade today; if something ever does, its death does not wait for the next boundary
         return !target.Alive;
     }
 

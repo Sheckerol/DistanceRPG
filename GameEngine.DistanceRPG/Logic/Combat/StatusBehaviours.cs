@@ -167,10 +167,10 @@ public static class StatusBehaviours
         => TurnEndTick(payload, self, restoresHp: false);
 
     /// <summary>
-    /// (1,1) on TurnEnd: the heal-over-time — the shipped Regeneration, the
-    /// one row whose level restores HP instead of removing it — heals its
-    /// level, then loses one. The heal is queued as HealingReceived, so what
-    /// it cannot apply reaches HealingAboveFull like any other surplus.
+    /// (1,1) on TurnEnd: the heal-over-time rows — the ones the table flags as
+    /// restoring HP instead of removing it; the shipped Regeneration — heal
+    /// their level, then lose one. The heal is queued as HealingReceived, so
+    /// what it cannot apply reaches HealingAboveFull like any other surplus.
     /// </summary>
     public static TurnPayload RegenTick(TurnPayload payload, ActorState self, ActorState other)
         => TurnEndTick(payload, self, restoresHp: true);
@@ -227,7 +227,9 @@ public static class StatusBehaviours
         var ticks = OrEmpty(payload.Ticks);
         int perWard = Math.Max(1, GameContent.Current.Tuning.OverhealPerWard);
 
-        foreach (var type in StatusRules.Table.Keys)
+        // The types in their declared order, so the order of the ticks this
+        // settles is data rather than a dictionary's enumeration.
+        foreach (var type in Enum.GetValues<StatusEffectType>())
         {
             var rule = StatusRules.Of(type);
             if (rule.Trigger != StatusTrigger.ReceivingHealing || rule.OnTrigger != OnTrigger.ConvertAndReset) continue;
@@ -265,9 +267,11 @@ public static class StatusBehaviours
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>The shipped heal-over-time is the one table row whose level restores HP; every other tick removes it.</summary>
-    private static bool RestoresHp(StatusEffectType type) => type == Regeneration;
-
+    /// <summary>
+    /// The turn-end tick the two tick handlers share: every row that ticks at
+    /// the actor's turn's end and whose <see cref="StatusRule.RestoresHp"/>
+    /// flag matches settles its level as damage or as healing, and loses one.
+    /// </summary>
     private static TurnPayload TurnEndTick(TurnPayload payload, ActorState self, bool restoresHp)
     {
         if (!self.Alive) return payload;
@@ -276,7 +280,7 @@ public static class StatusBehaviours
         {
             var rule = StatusRules.Of(e.Type);
             if (rule.Trigger != StatusTrigger.TurnEnd || rule.OnTrigger != OnTrigger.TickAndDecrement) continue;
-            if (RestoresHp(e.Type) != restoresHp || Settled(ticks, e)) continue;
+            if (rule.RestoresHp != restoresHp || Settled(ticks, e)) continue;
             int effect = e.Levels * StatusRules.EffectPerLevel(e.Type);
             ticks.Add(new StatusTick(e.Type, e.Element,
                 Damage: restoresHp ? 0 : effect, Healing: restoresHp ? effect : 0, LevelsDelta: -1));

@@ -185,6 +185,30 @@ public class StatusEffectTests
     }
 
     [Fact]
+    public void EndTurn_RegenOnAnActorPastFull_RestoresNothing_AndStillDecays()
+    {
+        // HP above the maximum — a fixture's, or a maximum lowered later — leaves the tick
+        // nothing to restore: it applies zero without faulting, the whole tick overflows,
+        // and the level still comes off.
+        var (turns, _, b) = Scene();
+        b.Hp = b.MaxHp + 900;
+        b.ApplyStatus(Regeneration, null, 3);
+
+        var healed = new List<int>();
+        turns.CharacterHealed += (c, amount) => { if (c == b) healed.Add(amount); };
+        var overflowed = new List<int>();
+        turns.Events.On<HealPayload>(GameEvent.HealingAboveFull, new HandlerPriority(9, 9), "probe",
+            (p, s, _) => { if (s == b) overflowed.Add(p.Overflow); return p; });
+
+        turns.EndTurn();
+
+        Assert.Equal(b.MaxHp + 900, b.Hp);
+        Assert.Empty(healed);
+        Assert.Equal(new[] { 3 }, overflowed);
+        Assert.Equal(2, b.StatusLevel(Regeneration));
+    }
+
+    [Fact]
     public void EndTurn_DeadMemberShedsEffects()
     {
         var (turns, _, b) = Scene();
@@ -284,6 +308,17 @@ public class StatusEffectTests
         Assert.Equal(OnTrigger.None, StatusRules.Of(Mire).OnTrigger);
         Assert.Equal(OnTrigger.None, StatusRules.Of(Sundered).OnTrigger);
         Assert.Equal(OnTrigger.None, StatusRules.Of(Weakened).OnTrigger);
+
+        // The passive rows — nothing fires them; they are read where they apply — name the one event
+        // that moves their levels, the round-end decay: one convention for all three.
+        foreach (var type in new[] { Mire, Sundered, Weakened })
+            Assert.Equal(StatusTrigger.RoundEnd, StatusRules.Of(type).Trigger);
+
+        // The two flags the handlers read instead of asking a type: which tick restores HP, and which status keys on an element.
+        Assert.Equal(new[] { Regeneration }, Enum.GetValues<StatusEffectType>().Where(t => StatusRules.Of(t).RestoresHp));
+        Assert.Equal(new[] { Searing }, Enum.GetValues<StatusEffectType>().Where(t => StatusRules.Of(t).KeyedOnElement));
+        Assert.True(StatusRules.KeysOnElement(Searing));
+        Assert.False(StatusRules.KeysOnElement(Poison));
 
         // Decay is not a column: the turn-end tickers take their loss as the tick, everything else at the round's end.
         foreach (var type in Enum.GetValues<StatusEffectType>())
@@ -437,6 +472,46 @@ public class StatusEffectTests
         Assert.True(over);
         Assert.Equal(TurnPhase.GameOver, turns.Phase);
         Assert.Empty(a.StatusEffects);
+    }
+
+    [Fact]
+    public void TickDeath_DrainsKilled_BeforeTheDeathConsequences_LikeAHit()
+    {
+        // However an actor dies, a Killed behaviour sees the same world: the queued Killed chain
+        // drains inside the raise, and the side's consequences — CharacterDied and the wipe check,
+        // EnemyDefeated and the defeat turn — run after it returns, as the typed wrappers run them
+        // for a hit. A's poison takes it at its turn's end, the enemy's at the enemy phase's end.
+        var grid = new int[20, 20];
+        var a = Char("A", 5 * Tile, 5 * Tile);
+        a.Hp = 2;
+        a.ApplyStatus(Poison, null, 5);
+        var b = Char("B", 5 * Tile, 7 * Tile);   // survives, so A's fall is not a wipe
+        var enemy = new EnemyState { X = 18 * Tile, Y = 18 * Tile, Hp = 3 };
+        enemy.ApplyStatus(Poison, null, 5);
+        var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10);
+
+        int died = 0, defeated = 0;
+        turns.CharacterDied += _ => died++;
+        turns.EnemyDefeated += _ => defeated++;
+        var seen = new List<string>();
+        turns.Events.On<KillPayload>(GameEvent.Killed, new HandlerPriority(9, 9), "probe", (p, s, _) =>
+        {
+            seen.Add($"{(s == a ? "A" : "E")} weapon={p.Weapon?.Id ?? "none"} died={died} defeated={defeated} alive={s.Alive}");
+            return p;
+        });
+
+        Round(turns);
+
+        Assert.Equal(new[]
+        {
+            "A weapon=none died=0 defeated=0 alive=False",
+            "E weapon=none died=1 defeated=0 alive=False",
+        }, seen);
+        Assert.Equal((1, 1), (died, defeated));
+        Assert.False(a.Alive);
+        Assert.False(enemy.Alive);
+        Assert.Equal(0, enemy.DefeatedAtTurn);
+        Assert.True(b.Alive);
     }
 
     [Fact]
