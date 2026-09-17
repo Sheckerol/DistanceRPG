@@ -95,8 +95,12 @@ public sealed record MovementPayload(int Wanted, int Spent, string Source);
 
 /// <summary>
 /// <see cref="GameEvent.TurnStart"/>, <see cref="GameEvent.TurnEnd"/> and
-/// <see cref="GameEvent.RoundEnd"/>, raised per actor at the phase boundaries
-/// with that actor as both <c>self</c> and <c>other</c>.
+/// <see cref="GameEvent.RoundEnd"/>, raised at the phase boundaries for every
+/// actor on the roster — alive, dead, or sitting the phase out — with that
+/// actor as both <c>self</c> and <c>other</c>. Each actor sees the three once
+/// per round, in that order: the events say a phase opened or closed for the
+/// actor, not that it acted, and a handler that only means the living checks
+/// <see cref="ActorState.Alive"/>.
 /// </summary>
 public sealed record TurnPayload(int TurnCount, Side Side);
 

@@ -6,9 +6,13 @@ namespace GameEngine.DistanceRPG.Tests;
 public class DamagePipelineTests
 {
     private const float Tile = GameConstants.Tile;
+
+    // The only index-bearing lines in this class: sub-step 3 swaps these four
+    // for TestWeapons.Get(id) when the catalogue replaces the list.
     private static Weapon Dagger => GameConstants.Weapons[0];   // dmg 15, CritRange 4 -> CritWindow x4
     private static Weapon Sword => GameConstants.Weapons[1];    // dmg 10, Block 3 -> Block x1
     private static Weapon Spear => GameConstants.Weapons[2];    // dmg 7, Brace 1 -> Brace x1
+    private static Weapon Staff => GameConstants.Weapons[GameConstants.StaffWeaponIdx];   // HealCast -> no stacks
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
     {
@@ -106,7 +110,7 @@ public class DamagePipelineTests
         Assert.Equal(1, Sword.Modifiers.Stacks(Block));
         Assert.Equal(3, Sword.Modifiers.Value(Block));
         Assert.Equal(1, Spear.Modifiers.Stacks(Brace));
-        Assert.Equal(ModifierSet.Empty, GameConstants.Weapons[GameConstants.StaffWeaponIdx].Modifiers);
+        Assert.Equal(ModifierSet.Empty, Staff.Modifiers);
 
         var attacker = Member(Dagger);
         var defender = new EnemyState();   // sword

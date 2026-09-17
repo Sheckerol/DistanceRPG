@@ -110,6 +110,13 @@ public sealed class TurnSystem
     /// <summary>The table, for tests that probe the raise points and the queued follow-ups.</summary>
     internal EventTable Events => _events;
 
+    // The typed hit feed of each actor on the roster, keyed by the actor
+    // itself. The constructor's typed lists are the one place an actor's kind
+    // is known, so the DamageTaken applier looks its target up here rather
+    // than asking what kind of actor it struck; a third kind of actor arrives
+    // as a third typed list and a third feed, and the applier is untouched.
+    private readonly Dictionary<ActorState, Action<AttackResolution>> _hitFeeds = new(ReferenceEqualityComparer.Instance);
+
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -122,6 +129,12 @@ public sealed class TurnSystem
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
+
+        // The roster is fixed here, and with it which typed feed each actor's hits reach.
+        foreach (var member in party)
+            _hitFeeds[member] = resolution => CharacterHit?.Invoke(member, resolution);
+        foreach (var enemy in enemies)
+            _hitFeeds[enemy] = resolution => EnemyHit?.Invoke(enemy, resolution);
     }
 
     /// <summary>
@@ -294,6 +307,12 @@ public sealed class TurnSystem
                 enemy.TurnsSinceSeen++;
         }
 
+        // The enemy phase opens for the whole roster — acting, passive or dead —
+        // so every actor sees TurnStart, TurnEnd and RoundEnd once per round,
+        // in that order; a handler that only means the living checks Alive.
+        foreach (var enemy in _enemies)
+            _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
+
         _enemyIdx = -1;
         AdvanceToNextEnemy();
     }
@@ -322,7 +341,6 @@ public sealed class TurnSystem
     private void StartEnemyAction(EnemyState enemy)
     {
         _enemyBudget = GameConstants.EnemyMove;
-        _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
 
         if (enemy.IsHealer)
         {
@@ -648,10 +666,10 @@ public sealed class TurnSystem
     private void StartPlayerTurn()
     {
         // End of the enemy turn: each enemy's turn ends (regen ticks on the
-        // allies a healer mended), then the round — one player phase and one
-        // enemy phase — closes for every actor. All of it under the turn that
-        // is ending, and before resurrections (which restore full HP) are
-        // considered.
+        // allies a healer mended; the dead shed theirs), then the round — one
+        // player phase and one enemy phase — closes for every actor. The whole
+        // roster, whatever its state; all of it under the turn that is ending,
+        // and before resurrections (which restore full HP) are considered.
         foreach (var enemy in _enemies)
         {
             _events.Raise(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy, enemy);
@@ -697,10 +715,12 @@ public sealed class TurnSystem
                     _enemyBraces.MarkInside(enemy, member);
         }
 
+        // The player phase opens for every member, the fallen included — the
+        // boundary events are the roster's; only the budget refill is the living's.
         foreach (var c in _party)
         {
-            if (!c.Alive) continue;
-            c.StartTurn();
+            if (c.Alive)
+                c.StartTurn();
             _events.Raise(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c, c);
         }
 
@@ -764,11 +784,14 @@ public sealed class TurnSystem
     /// <summary>
     /// The DamageTaken applier — the single world-write for a hit. Takes
     /// <see cref="DamagePayload.Taken"/> off the target's HP, lands the settled
-    /// status applications on both sides, raises the target side's typed hit
-    /// event with the projected resolution (so the CharacterHit / EnemyHit feeds
-    /// stay exactly as they are), and queues the follow-ups for the table to
-    /// drain after it returns: Killed on a death, DamageDealt always, Crit on a
-    /// crit. Death consequences belong to the typed wrappers.
+    /// status applications on both sides, hands the projected resolution to the
+    /// target's typed hit feed (CharacterHit or EnemyHit, fixed when the roster
+    /// was typed at construction — never by asking the target its kind), and
+    /// queues the follow-ups for the table to drain after it returns, in this
+    /// order: Killed on a death, DamageDealt always, Crit on a crit. The order
+    /// is a ruling of the decomposition (1b rule 5), pinned by
+    /// DamagePipelineTests, not an accident of this method. Death consequences
+    /// belong to the typed wrappers.
     /// </summary>
     private void ApplyDamage(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
     {
@@ -780,12 +803,9 @@ public sealed class TurnSystem
             foreach (var status in settled.ApplyToAttacker)
                 attacker.ApplyStatusEffect(status.Type, status.Levels);
 
-        var resolution = CombatRules.Project(settled);
-        switch (target)
-        {
-            case PartyMemberState member: CharacterHit?.Invoke(member, resolution); break;
-            case EnemyState enemy: EnemyHit?.Invoke(enemy, resolution); break;
-        }
+        if (!_hitFeeds.TryGetValue(target, out var hitFeed))
+            throw new InvalidOperationException("Hit an actor that is not on this turn system's roster.");
+        hitFeed(CombatRules.Project(settled));
 
         if (target.Hp <= 0)
         {

@@ -7,6 +7,9 @@ public class EventTableTests
 {
     private const float Tile = GameConstants.Tile;
 
+    // The only index-bearing line in this class: sub-step 3 swaps it for TestWeapons.Get("weakspot_stiletto").
+    private static Weapon Dagger => GameConstants.Weapons[0];   // dmg 15, CritRange 4 -> CritWindow x4
+
     /// <summary>A payload that records which handlers touched it, in order.</summary>
     private sealed record Trace(ImmutableList<string> Steps)
     {
@@ -170,7 +173,7 @@ public class EventTableTests
         Assert.Throws<InvalidOperationException>(() =>
             table.On<KillPayload>(GameEvent.Killed, new HandlerPriority(1, 0), "kill", (p, _, _) => p));
         Assert.Throws<InvalidOperationException>(() =>
-            table.Raise(GameEvent.Killed, new KillPayload(GameConstants.Weapons[0], 1, 1), Member(), new EnemyState()));
+            table.Raise(GameEvent.Killed, new KillPayload(Dagger, 1, 1), Member(), new EnemyState()));
     }
 
     [Fact]
@@ -218,7 +221,7 @@ public class EventTableTests
         Behaviours.RegisterAll(table);
 
         var attacker = Member();
-        attacker.Inventory[0] = GameConstants.Weapons[0];   // dagger
+        attacker.Inventory[0] = Dagger;
         attacker.X = 10f;
         attacker.Y = 20f;
         attacker.Mana = 40;
@@ -226,7 +229,7 @@ public class EventTableTests
         var defender = new EnemyState { X = 50f, Y = 20f, Hp = 30, Innate = ModifierSet.Of((ModifierType.Block, 1)) };
         defender.ApplyStatusEffect(StatusEffectType.Regeneration, 1);
 
-        var payload = DamagePayload.Initial(GameConstants.Weapons[0], roll: 20, distanceUnits: 22);
+        var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
         Assert.Equal(4, chain.Count);
         foreach (var (info, handler) in chain)
@@ -252,7 +255,7 @@ public class EventTableTests
         var a = Member();
         a.X = 5 * Tile;
         a.Y = 5 * Tile;
-        a.Inventory[0] = GameConstants.Weapons[0];
+        a.Inventory[0] = Dagger;
         var enemy = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile };   // adjacent and seen: it acts
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -289,6 +292,61 @@ public class EventTableTests
             "RoundEnd E t0",
             "TurnStart A Party t1",
         }, log);
+    }
+
+    [Fact]
+    public void TurnSystem_RaisesTurnBoundaryEvents_ForTheWholeRoster_AliveOrNot()
+    {
+        // Two members, one fallen; three enemies: one that acts, one passive
+        // (never seen, nobody in reach — it skips its action) and one dead. The
+        // boundary events do not care: every actor on the roster sees
+        // TurnStart, TurnEnd and RoundEnd once, in that order, so no handler
+        // ever gets a TurnEnd or RoundEnd without the TurnStart before it.
+        var grid = new int[20, 20];
+        var a = Member();
+        a.X = 5 * Tile;
+        a.Y = 5 * Tile;
+        a.Inventory[0] = Dagger;
+        var fallen = Member("B");
+        fallen.X = 5 * Tile;
+        fallen.Y = 7 * Tile;
+        fallen.Hp = 0;
+        fallen.Alive = false;
+        var acting = new EnemyState { X = 5 * Tile + 60f, Y = 5 * Tile };   // adjacent and seen: it acts
+        var passive = new EnemyState { X = 15 * Tile, Y = 15 * Tile };      // unseen since spawn, nobody in reach
+        var dead = new EnemyState { X = 15 * Tile, Y = 5 * Tile, Hp = 0, Alive = false };
+        var turns = new TurnSystem(grid, new[] { a, fallen }, new[] { acting, passive, dead }, () => 10);
+
+        var names = new Dictionary<ActorState, string> { [a] = "A", [fallen] = "B", [acting] = "E1", [passive] = "E2", [dead] = "E3" };
+        var log = new List<string>();
+        foreach (var evt in new[] { GameEvent.TurnStart, GameEvent.TurnEnd, GameEvent.RoundEnd })
+            turns.Events.On<TurnPayload>(evt, new HandlerPriority(9, 0), "probe", (p, s, o) =>
+            {
+                Assert.Same(s, o);
+                log.Add($"{evt} {names[s]}");
+                return p;
+            });
+
+        turns.NotifyEnemyVisible(acting, true);
+        turns.EndTurn();
+        Advance(turns, 6f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        Assert.Equal(new[]
+        {
+            "TurnEnd A", "TurnEnd B",
+            "TurnStart E1", "TurnStart E2", "TurnStart E3",
+            "TurnEnd E1", "TurnEnd E2", "TurnEnd E3",
+            "RoundEnd A", "RoundEnd B", "RoundEnd E1", "RoundEnd E2", "RoundEnd E3",
+            "TurnStart A", "TurnStart B",
+        }, log);
+
+        // The events say the phase opened for them, not that they acted: the
+        // passive one stayed put and the dead stayed dead.
+        Assert.Equal((15 * Tile, 15 * Tile), (passive.X, passive.Y));
+        Assert.False(dead.Alive);
+        Assert.False(fallen.Alive);
+        Assert.Equal(GameConstants.PlayerHp - 30, a.Hp);   // the acting enemy's three sword beats still landed on A
     }
 
     private static string Snapshot(ActorState a)

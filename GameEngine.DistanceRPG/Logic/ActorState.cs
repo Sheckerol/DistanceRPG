@@ -45,9 +45,17 @@ public abstract class ActorState
 
     /// <summary>
     /// Mana pool for casting. Every trigger costs mana on both sides, so an
-    /// enemy caster carries one too; full at spawn.
+    /// enemy caster carries one too; full at spawn — a pool nobody has written
+    /// reads as this actor's own <see cref="MaxMana"/>, so a kind that overrides
+    /// the maximum spawns full as well.
     /// </summary>
-    public int Mana { get; set; } = GameConstants.MaxMana;
+    public int Mana
+    {
+        get => _mana ?? MaxMana;
+        set => _mana = value;
+    }
+
+    private int? _mana;
 
     public virtual int MaxMana => GameConstants.MaxMana;
 
