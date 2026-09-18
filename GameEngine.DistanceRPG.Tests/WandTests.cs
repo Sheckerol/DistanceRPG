@@ -531,6 +531,48 @@ public class WandTests
         Assert.Equal(34, GameContent.Current.Weapons.All.Count);
     }
 
+    [Fact]
+    public void StatusApplier_OnAWand_IsRefusedContent()
+    {
+        // An area cast is aimed at a point and names the caster as its own Target, so a status-applying
+        // cast entry — a staff's kind — on a wand would land its status on the caster. Content that puts
+        // one on a wand is refused, naming the entry and the rule, wherever it sits behind the element;
+        // what such an entry should mean on an area cast (every caught actor, or nothing) is Phase 3's.
+        var ex = LoadWith(UniqueWand("test_hex_wand", "flaming", "poison"));
+        Assert.Equal(("test_hex_wand", ContentValidator.RuleWandNoStatusApplier), (ex.EntryId, ex.Rule));
+        Assert.Contains("'poison' applies Poison", ex.Message);
+        ex = LoadWith(UniqueWand("test_mending_wand", "cold", "regeneration"));
+        Assert.Equal(("test_mending_wand", ContentValidator.RuleWandNoStatusApplier), (ex.EntryId, ex.Rule));
+
+        // Ahead of the element it is refused already: a wand's first enchantment is its element.
+        ex = LoadWith(UniqueWand("test_hex_first", "poison", "flaming"));
+        Assert.Equal(("test_hex_first", ContentValidator.RuleCasterInnate), (ex.EntryId, ex.Rule));
+
+        // The rule is the wand's alone: a staff casts one as a matter of course, and a martial weapon may
+        // carry one (the counter is transferable) — its Cast never runs.
+        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, Dagger("test_venom_knife", "poison")]));
+        Assert.Equal("poison", Assert.Single(TestWeapons.Get("test_venom_knife").Enchantments).Id);
+        Assert.Equal("regeneration", TestWeapons.Get("staff_of_renewal").Innate!.Id);
+        Assert.Equal(33, GameContent.Current.Weapons.All.Count);
+
+        // And a wand's own cast lands nothing on the caster it names as its Target: the element types the
+        // cast, ApplyToTarget stays empty, and no status event fires for the caster's own Nova.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 5, "wand_of_the_nova", Flaming);
+        var enemy = Enemy(5, 7);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+        var casts = CastProbe(turns);
+        int statuses = 0;
+        turns.CharacterBuffed += (_, _) => statuses++;
+        turns.ActorStatusApplied += (_, _, _) => statuses++;
+        Assert.True(turns.TryCastArea(a, (a.X, a.Y)));
+        Assert.Same(a, Assert.Single(casts).Target);
+        Assert.True(casts[0].ApplyToTarget.IsDefaultOrEmpty);
+        Assert.Empty(a.StatusEffects);
+        Assert.Equal(0, statuses);
+        Assert.Equal(200 - 8, enemy.Hp);
+    }
+
     // ── Casts crit too ───────────────────────────────────────────────────────
 
     [Fact]

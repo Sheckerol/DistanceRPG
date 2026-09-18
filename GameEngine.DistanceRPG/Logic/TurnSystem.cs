@@ -427,11 +427,11 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Can the caster cast their equipped wand with its shape aimed at
-    /// <paramref name="aim"/>, a point in logic units? Needs a wand — a caster
-    /// whose innate is an element and which carries a shape — enough movement
-    /// and mana at the resolved costs, and at least one actor caught: a cast is
-    /// a hit, and a shape with nobody in it has nothing to hit, exactly as a
-    /// staff needs its target in reach. A Blast's aim is the point it centres
+    /// <paramref name="aim"/>, a point in logic units? Needs a wand — the one
+    /// weapon that carries a shape — enough movement and mana at the resolved
+    /// costs, and at least one actor caught: a cast is a hit, and a shape with
+    /// nobody in it has nothing to hit, exactly as a staff needs its target in
+    /// reach. A Blast's aim is the point it centres
     /// on (pulled back to the wand's reach), a Cone's or Beam's the direction
     /// from the caster, and a Nova ignores it. The element's trigger is no
     /// gate: unaffordable, it does not fire and the hits land untyped.
@@ -446,9 +446,13 @@ public sealed class TurnSystem
         return AreaTargets(caster, aim).Count > 0;
     }
 
-    /// <summary>A wand: a caster with a shape whose innate is an element (§1.4).</summary>
-    private static bool IsAreaCaster(Weapon w)
-        => w.IsCaster && w.AreaShape != null && w.Innate?.Def.Effect == EffectKind.ElementalDamage;
+    /// <summary>
+    /// A wand: the weapon that carries a shape (§1.4). The shape is the whole
+    /// test — content fixes a shape on a Wand and on nothing else, and
+    /// instantiation fixes a wand's element — so no kind of innate is asked
+    /// here, and <see cref="AreaTargets"/> gates on the same datum.
+    /// </summary>
+    private static bool IsAreaCaster(Weapon w) => w.AreaShape != null;
 
     /// <summary>
     /// The actors a cast of <paramref name="caster"/>'s wand aimed at
@@ -1388,7 +1392,7 @@ public sealed class TurnSystem
     {
         var weapon = caster.EquippedWeapon!;   // the callers gated on it: a cast is with what the caster holds
         var targets = AreaTargets(caster, aim);
-        var innate = weapon.Innate!;
+        var innate = weapon.Innate!;   // a wand's element: instantiation refuses a wand without one
         var roll = CombatRules.RollToCast(_rollD20(), CombatRules.CritThreshold(caster),
             innate.LevelsFor(innate.Def.Potency), weapon.ResolvedManaCost);
         var settled = _events.Raise(GameEvent.Cast,

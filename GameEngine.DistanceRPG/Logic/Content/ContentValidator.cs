@@ -35,6 +35,7 @@ public static class ContentValidator
     public const string RuleCasterForged = "a caster is forged Resonant x1 and nothing else";
     public const string RuleCasterInnate = "a caster carries exactly one innate enchantment";
     public const string RuleWandShape = "a wand carries an area shape and nothing else does";
+    public const string RuleWandNoStatusApplier = "a wand carries no status-applying enchantment: an area cast names no target to land it on";
     public const string RuleRoleOnMartialOnly = "only a martial variant carries a role";
     public const string RuleVariantRoles = "a martial class has four variants, one per role";
     public const string RuleClassBaseline = "a class baseline is its signature plus a second modifier";
@@ -241,7 +242,9 @@ public static class ContentValidator
     /// a martial weapon is forged on at least two modifiers and a caster on
     /// <c>Resonant x1</c> alone beside its one innate enchantment (a staff's
     /// fixed status effect; a wand's element, supplied at instantiation); only
-    /// wands carry a shape and only martial variants a role; each martial class
+    /// wands carry a shape, no wand carries a status-applying enchantment (an
+    /// area cast is aimed at a point and names no target to land one on), and
+    /// only martial variants carry a role; each martial class
     /// fields four variants, one per role, on a two-modifier baseline, every
     /// variant adding exactly one modifier type to it (Efficiency <c>Light x1</c>,
     /// Purity the class signature again, Control and Support a new one); no
@@ -350,6 +353,15 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleCasterInnate, "a wand variant's element is supplied at instantiation");
             if (attached.Count > 0 && attached[0].Effect != EffectKind.ElementalDamage)
                 throw new ContentException(def.Id, RuleCasterInnate, "a wand's first enchantment is its element");
+            // An area cast is aimed at a point and names the caster as its own
+            // target (the Cast payload's ruling), so a status-applying cast
+            // entry — a staff's kind — would land its status on the caster.
+            // Refused, wherever it sits in the list, until Phase 3 decides what
+            // one means on a wand: every caught actor, or nothing. Hit-side
+            // kinds (a lingering element) fire on the hits and are unaffected.
+            var applier = attached.FirstOrDefault(e => e.Effect == EffectKind.ApplyStatus);
+            if (applier != null)
+                throw new ContentException(def.Id, RuleWandNoStatusApplier, $"'{applier.Id}' applies {applier.Applies}");
         }
     }
 

@@ -189,6 +189,10 @@ public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edg
 /// element every hit the shape fans out to carries into the chart, typed by
 /// the element entry for one payment of its trigger — once per cast, not once
 /// per target caught — and None for a staff, or when no element could fire.
+/// For the same reason a status-applying cast entry (a staff's kind) has no
+/// place on a wand — its status would land on the caster — and the content
+/// validator refuses one (<see cref="ContentValidator.RuleWandNoStatusApplier"/>);
+/// what such an entry should mean on an area cast is Phase 3's to decide.
 /// </summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
     ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None);
