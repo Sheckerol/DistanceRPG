@@ -9,8 +9,19 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public static class GameConstants
 {
-    /// <summary>Logic units per map tile.</summary>
-    public const float Tile = 32f;
+    /// <summary>
+    /// Logic units per map tile: the one units-to-tiles conversion, named for
+    /// what it converts (the <c>MovementUnitsPerMana</c> pattern, never a bare
+    /// rate). What Longshot's "per tile" and a shove's "one tile" divide by.
+    /// </summary>
+    public const float LogicUnitsPerTile = 32f;
+
+    /// <summary>
+    /// The tile size in logic units: the short name tile geometry (centres,
+    /// tile-of, line of sight, collision) reads. The same number as
+    /// <see cref="LogicUnitsPerTile"/>, which unit conversions name instead.
+    /// </summary>
+    public const float Tile = LogicUnitsPerTile;
 
     /// <summary>Movement budget per character per turn, in logic units.</summary>
     public const float MaxDistance = 160f;

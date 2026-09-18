@@ -364,18 +364,19 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Swap the weapon in <paramref name="slot"/> with the equipped one (slot
-    /// 0): spend the swap's movement through <see cref="GameEvent.MovementSpent"/>
-    /// when there is any to spend, exchange the slots, and re-arm the
-    /// member's threat zone for the new reach — a held shot lapses with the
-    /// weapon that held it. Returns false if not allowed.
+    /// 0): spend the swap's movement through <see cref="GameEvent.MovementSpent"/>,
+    /// raised for every swap so the event is the one record of them all (a
+    /// free swap settles at zero and the applier writes nothing), exchange
+    /// the slots, and re-arm the member's threat zone for the new reach — a
+    /// held shot lapses with the weapon that held it. Returns false if not
+    /// allowed.
     /// </summary>
     public bool TrySwap(PartyMemberState c, int slot)
     {
         if (!CanSwap(c, slot)) return false;
 
         int cost = SwapCost;
-        if (cost > 0)
-            _events.Raise(GameEvent.MovementSpent, new MovementPayload(cost, cost, "swap"), c, c);
+        _events.Raise(GameEvent.MovementSpent, new MovementPayload(cost, cost, "swap"), c, c);
         (c.Inventory[0], c.Inventory[slot]) = (c.Inventory[slot], c.Inventory[0]);
         NotifyWeaponChanged(c);
         return true;
@@ -1107,8 +1108,8 @@ public sealed class TurnSystem
 
     /// <summary>
     /// The MovementSpent applier: take what the chain settled as spent off the
-    /// actor's budget, through the feed the roster fixed for it — never by
-    /// asking the actor its kind.
+    /// actor's budget (nothing, for a free swap raised at zero), through the
+    /// feed the roster fixed for it — never by asking the actor its kind.
     /// </summary>
     private void ApplyMovementSpent(MovementPayload settled, ActorState self, ActorState other, EventTable table)
     {

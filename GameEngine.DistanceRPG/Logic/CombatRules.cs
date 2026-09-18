@@ -157,13 +157,13 @@ public static class CombatRules
 
     /// <summary>
     /// A distance in logic units as the whole tiles it spans, rounded up —
-    /// the conversion goes through <see cref="GameConstants.Tile"/>, the logic
-    /// units per map tile, never a bare rate — so a fraction past a tile
-    /// boundary is the next tile: 96 units are three tiles and 97 are four.
-    /// What Longshot prices; zero for nothing.
+    /// the conversion goes through <see cref="GameConstants.LogicUnitsPerTile"/>,
+    /// the constant named for what it converts, never a bare rate — so a
+    /// fraction past a tile boundary is the next tile: 96 units are three
+    /// tiles and 97 are four. What Longshot prices; zero for nothing.
     /// </summary>
     public static int TilesSpanned(int distanceUnits)
-        => (int)MathF.Ceiling(Math.Max(0, distanceUnits) / GameConstants.Tile);
+        => (int)MathF.Ceiling(Math.Max(0, distanceUnits) / GameConstants.LogicUnitsPerTile);
 
     /// <summary>
     /// Center-to-center distance check with both radii subtracted, matching the

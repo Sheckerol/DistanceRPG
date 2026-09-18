@@ -11,6 +11,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public static class Displacer
 {
+    /// <summary>The units-to-tiles conversion a shove's "one tile" goes through, named for what it converts.</summary>
+    private const float UnitsPerTile = GameConstants.LogicUnitsPerTile;
+
     /// <summary>
     /// The tile <paramref name="mover"/> would step onto next under
     /// <paramref name="d"/>, or null when that tile is off the grid, a wall,
@@ -53,14 +56,14 @@ public static class Displacer
             : (dy > 0f ? 1 : -1, 0);
     }
 
-    /// <summary>The tile an actor's centre stands in.</summary>
+    /// <summary>The tile an actor's centre stands in: its position over <see cref="GameConstants.LogicUnitsPerTile"/>.</summary>
     public static (int R, int C) TileOf(ActorState actor)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        return ((int)MathF.Floor(actor.Y / GameConstants.Tile), (int)MathF.Floor(actor.X / GameConstants.Tile));
+        return ((int)MathF.Floor(actor.Y / UnitsPerTile), (int)MathF.Floor(actor.X / UnitsPerTile));
     }
 
     /// <summary>The centre of a tile in logic units — where a displaced actor is set down.</summary>
     public static (float X, float Y) CentreOf(int r, int c)
-        => (c * GameConstants.Tile + GameConstants.Tile / 2f, r * GameConstants.Tile + GameConstants.Tile / 2f);
+        => (c * UnitsPerTile + UnitsPerTile / 2f, r * UnitsPerTile + UnitsPerTile / 2f);
 }

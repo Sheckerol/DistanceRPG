@@ -44,7 +44,8 @@ public class TurnEconomyTests
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("longbow", a.EquippedWeapon!.Id);
         Assert.Equal(GameConstants.MaxDistance, a.DistLeft);
-        Assert.Empty(spent);
+        // A free swap is still a swap: the event records it, settled at zero, so whatever counts swaps sees every one.
+        Assert.Equal(new[] { (0, 0, "swap"), (0, 0, "swap") }, spent);
 
         // Combat begins: the swap costs 20, spent through MovementSpent.
         turns.NotifyEnemyVisible(enemy, true);
@@ -54,7 +55,8 @@ public class TurnEconomyTests
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("weakspot_stiletto", a.EquippedWeapon!.Id);
         Assert.Equal(GameConstants.MaxDistance - 20, a.DistLeft);
-        Assert.Equal((20, 20, "swap"), Assert.Single(spent));
+        Assert.Equal((20, 20, "swap"), spent[^1]);
+        Assert.Equal(3, spent.Count);
 
         // A bow user caught at knife range pays 20 to swap and 30 to swing: 50 for the first hit.
         Assert.True(turns.TryAttack(a, enemy));
@@ -67,12 +69,13 @@ public class TurnEconomyTests
         Assert.False(turns.TrySwap(a, 1));
         Assert.Equal("weakspot_stiletto", a.EquippedWeapon!.Id);
         Assert.Equal(19f, a.DistLeft);
-        Assert.Single(spent);
+        Assert.Equal(3, spent.Count);   // a refused swap raises nothing
         a.DistLeft = 20f;
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("longbow", a.EquippedWeapon!.Id);
         Assert.Equal(0f, a.DistLeft);
-        Assert.Equal(2, spent.Count);
+        Assert.Equal((20, 20, "swap"), spent[^1]);
+        Assert.Equal(4, spent.Count);
 
         // An empty slot is nothing to swap to, slot 0 is the equipped slot itself, and there is no slot 3.
         a.DistLeft = GameConstants.MaxDistance;
@@ -92,7 +95,8 @@ public class TurnEconomyTests
         float before = a.DistLeft;
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal(before, a.DistLeft);
-        Assert.Equal(2, spent.Count);
+        Assert.Equal((0, 0, "swap"), spent[^1]);   // free again, and still on the record
+        Assert.Equal(5, spent.Count);
 
         // Not on the enemy's turn, and never for the fallen.
         var b = Char("B", 5 * Tile + 16, 5 * Tile + 16, "longbow");
