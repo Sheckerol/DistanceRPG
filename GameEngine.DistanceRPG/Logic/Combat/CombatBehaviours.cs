@@ -7,21 +7,28 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The compiled steps of the §1.6 damage pipeline that are no status's own
 /// behaviour — the roll, the two dividers, and Block — and the attack-shape
 /// modifiers that change what a swing <em>is</em> at the step they act on:
-/// Longshot pricing the distance into the base at (1,1), Splitting folded into
-/// Block's arithmetic, Pin and Softening riding any hit at (7,2) and (7,3) —
-/// plus the healing pipeline's one bookkeeping step. Each is a
-/// <see cref="Handler{TPayload}"/> at its step number, so the chain
-/// <see cref="EventTable.HandlersFor"/> prints reads like the doc: (1,0) roll →
-/// (1,1) Longshot → (2) Weakened → (3) Sundered → (3,9) the weapon's share fixed
-/// → (4) enchantments → (5,0) Block → (6) Ward → (6,9) the amount reaching HP
-/// fixed → (7) crit riders, BlockWeaken, Pin, Softening → (8) displacement. On
+/// Longshot pricing the distance into the base at (1,1), friendly fire pricing
+/// an ally's share of an area cast at (1,2), the attunement chart multiplying a
+/// typed hit at (3,1), Splitting folded into Block's arithmetic, Pin and
+/// Softening riding any hit at (7,2) and (7,3) — plus the healing pipeline's
+/// one bookkeeping step. Each is a <see cref="Handler{TPayload}"/> at its step
+/// number, so the chain <see cref="EventTable.HandlersFor"/> prints reads like
+/// the doc: (1,0) roll → (1,1) Longshot → (1,2) friendly fire → (2) Weakened →
+/// (3) Sundered → (3,1) the type chart → (3,9) the weapon's share fixed → (4)
+/// enchantments → (5,0) Block → (6) Ward → (6,9) the amount reaching HP fixed →
+/// (7) crit riders, BlockWeaken, Pin, Softening → (8) displacement. On
 /// DamageTaken <c>self</c> is the attacker and <c>other</c> the defender; on
 /// HealingReceived <c>self</c> is the actor healed.
 /// </summary>
 public static class CombatBehaviours
 {
+    /// <summary>Percentages are integers out of this.</summary>
+    private const int Percent = 100;
+
     public static readonly HandlerPriority RollToBasePriority = new(1, 0);
     public static readonly HandlerPriority LongshotPriority = new(1, 1);
+    public static readonly HandlerPriority FriendlyFirePriority = new(1, 2);
+    public static readonly HandlerPriority TypeChartPriority = new(3, 1);
     public static readonly HandlerPriority FixWeaponSharePriority = new(3, 9);
     public static readonly HandlerPriority BlockPriority = new(5, 0);
     public static readonly HandlerPriority FixTakenPriority = new(6, 9);
@@ -35,6 +42,8 @@ public static class CombatBehaviours
         ArgumentNullException.ThrowIfNull(table);
         table.On<DamagePayload>(GameEvent.DamageTaken, RollToBasePriority, "RollToBase", Step1_RollToBase);
         table.On<DamagePayload>(GameEvent.DamageTaken, LongshotPriority, "Longshot", Longshot);
+        table.On<DamagePayload>(GameEvent.DamageTaken, FriendlyFirePriority, "FriendlyFire", FriendlyFire);
+        table.On<DamagePayload>(GameEvent.DamageTaken, TypeChartPriority, "TypeChart", TypeChart);
         table.On<DamagePayload>(GameEvent.DamageTaken, FixWeaponSharePriority, "FixWeaponShare", Step3_FixWeaponShare);
         table.On<DamagePayload>(GameEvent.DamageTaken, BlockPriority, "Block", Step5_Block);
         table.On<DamagePayload>(GameEvent.DamageTaken, FixTakenPriority, "FixTaken", Step6_FixTaken);
@@ -99,6 +108,55 @@ public static class CombatBehaviours
         if (perTile <= 0) return 0;
         int paying = Math.Max(0, CombatRules.TilesSpanned(distanceUnits) - GameContent.Current.Tuning.LongshotFreeTiles);
         return perTile * paying;
+    }
+
+    /// <summary>
+    /// Step 1.2: a hit on the attacker's own side — an area cast catching an
+    /// ally, which only happens while friendly fire is on (§1.4) — lands at
+    /// <see cref="Tuning.FriendlyFireAllyPercent"/> of the base step 1 and
+    /// Longshot resolved, never below 1. Half by default: the full-strength
+    /// mechanic is the sharper one, but it waits on a placement scorer good
+    /// enough not to detonate its own side. A hit on the far side passes through.
+    /// </summary>
+    public static DamagePayload FriendlyFire(DamagePayload payload, ActorState self, ActorState other)
+    {
+        if (!payload.OnAlly) return payload;
+        int amount = Math.Max(1, payload.Amount * GameContent.Current.Tuning.FriendlyFireAllyPercent / Percent);
+        return payload with { Amount = amount, WeaponShare = amount };
+    }
+
+    /// <summary>
+    /// Step 3.1: the attunement chart (§1.4). A typed hit into a target attuned
+    /// to the same type is halved — it cancels, but never to nothing: a
+    /// resisted Nova still softens a room; into the opposed type it is x1.5,
+    /// truncated; unrelated, untyped (every martial swing), or an unattuned
+    /// target, unchanged. It runs here, building the weapon's own damage in the
+    /// slot Sundered and Weakened occupy, before Block absorbs at step 5 — so a
+    /// resisted hit into heavy armour can land for very little, and a resisted
+    /// crit, which skips Block, still lands its halved damage in full. Which two
+    /// types oppose is content: the catalogue's chart, read off the exclusion
+    /// groups the elements sit in, never a matrix here.
+    /// </summary>
+    public static DamagePayload TypeChart(DamagePayload payload, ActorState self, ActorState other)
+    {
+        int amount = AgainstAttunement(payload.Amount, payload.Type, other.Attunement);
+        return amount == payload.Amount ? payload : payload with { Amount = amount };
+    }
+
+    /// <summary>
+    /// The chart as a pure function: <paramref name="amount"/> of
+    /// <paramref name="type"/> into a target attuned to <paramref name="attunement"/>
+    /// — halved for the same type (floored at 1), x1.5 truncated for the
+    /// opposed one, unchanged otherwise and for an untyped hit or an unattuned target.
+    /// </summary>
+    public static int AgainstAttunement(int amount, DamageType type, DamageType? attunement)
+    {
+        if (type == DamageType.None || attunement is null or DamageType.None) return amount;
+        if (attunement == type)
+            return Math.Max(1, amount / CombatRules.ResistedDamageDivisor);
+        if (GameContent.Current.Enchantments.Opposes(type, attunement.Value))
+            return amount * CombatRules.OpposedDamagePercent / Percent;
+        return amount;
     }
 
     /// <summary>

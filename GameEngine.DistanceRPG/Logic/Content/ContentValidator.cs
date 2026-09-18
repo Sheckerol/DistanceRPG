@@ -26,6 +26,8 @@ public static class ContentValidator
     public const string RuleElementNamesType = "an elemental entry names the damage type it carries";
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
 
+    public const string RuleEnchantmentsExcluded = "a weapon's enchantments never include two that exclude each other";
+
     public const string RuleForgedNotAllowed = "every forged spread must be allowed";
     public const string RuleForgedStackCount = "a forged stack count is at least one";
     public const string RuleMaxForged = "nothing is forged past MaxForged";
@@ -190,9 +192,10 @@ public static class ContentValidator
     /// by exactly one. Each <see cref="DamageType"/> other than None is carried by
     /// exactly one elemental entry, and the exclusion groups of
     /// <paramref name="restricted"/> oppose every element to exactly one other,
-    /// both ways.
+    /// both ways. Returns the chart it validated — each type to the one that
+    /// opposes it — for the catalogue to answer the type-chart step with.
     /// </summary>
-    public static void ValidateOpposition(EnchantmentsData data, RestrictedData restricted)
+    public static IReadOnlyDictionary<DamageType, DamageType> ValidateOpposition(EnchantmentsData data, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(restricted);
@@ -202,6 +205,8 @@ public static class ContentValidator
         foreach (var e in elements)
         {
             var type = e.DamageType ?? DamageType.None;
+            if (type == DamageType.None)
+                throw new ContentException(e.Id, RuleElementNamesType);
             if (!byType.TryAdd(type, e))
                 throw new ContentException(e.Id, RuleOpposition, $"{type} is carried by '{byType[type].Id}' as well");
         }
@@ -210,15 +215,18 @@ public static class ContentValidator
                 throw new ContentException(type.ToString(), RuleOpposition, "no innate enchantment carries it");
 
         var excludes = Closure(restricted.Excludes);
-        var elementIds = new HashSet<string>(elements.Select(e => e.Id), StringComparer.Ordinal);
+        var byId = elements.ToDictionary(e => e.Id, StringComparer.Ordinal);
+        var chart = new Dictionary<DamageType, DamageType>();
         foreach (var e in elements)
         {
-            var opposed = excludes.TryGetValue(e.Id, out var set) ? set.Where(elementIds.Contains).ToList() : new List<string>();
+            var opposed = excludes.TryGetValue(e.Id, out var set) ? set.Where(byId.ContainsKey).ToList() : new List<string>();
             if (opposed.Count != 1)
                 throw new ContentException(e.Id, RuleOpposition, $"opposed by {opposed.Count} elements, not one");
             if (!excludes.TryGetValue(opposed[0], out var back) || !back.Contains(e.Id))
                 throw new ContentException(e.Id, RuleOpposition, $"'{opposed[0]}' does not oppose it back");
+            chart[e.DamageType!.Value] = byId[opposed[0]].DamageType!.Value;
         }
+        return chart;
     }
 
     /// <summary>
@@ -236,9 +244,13 @@ public static class ContentValidator
     /// wands carry a shape and only martial variants a role; each martial class
     /// fields four variants, one per role, on a two-modifier baseline, every
     /// variant adding exactly one modifier type to it (Efficiency <c>Light x1</c>,
-    /// Purity the class signature again, Control and Support a new one); and
-    /// every <c>forgedOnly</c> id is forged somewhere, or it could never exist.
-    /// Unique derivation is checked with the uniques.
+    /// Purity the class signature again, Control and Support a new one); no
+    /// weapon arrives with two enchantments that exclude each other — opposed
+    /// types cannot share a weapon (§1.4), Flaming and Cold excluding each
+    /// other exactly as Push and Drag do, off the same groups, while
+    /// non-opposing types stack freely; and every <c>forgedOnly</c> id is
+    /// forged somewhere, or it could never exist. Unique derivation is checked
+    /// with the uniques.
     /// </summary>
     public static void ValidateWeapons(WeaponsData data, ModifierRules rules, RestrictedData restricted, EnchantmentCatalogue enchantments)
     {
@@ -252,6 +264,7 @@ public static class ContentValidator
             if (!seen.Add(def.Id))
                 throw new ContentException(def.Id, RuleDuplicateId);
 
+        var excludes = Closure(restricted.Excludes);
         foreach (var def in data.Weapons)
         {
             var spread = Spread(def);
@@ -260,6 +273,17 @@ public static class ContentValidator
             foreach (var reference in def.Enchantments)
                 if (!enchantments.TryGet(reference.Id, out _))
                     throw new ContentException(def.Id, RuleUnknownId, reference.Id);
+
+            // One hit cannot be two contradictory things: an entry's enchantments
+            // never include a pair the relations exclude, in attachment order so
+            // the pair reported is the same one every run.
+            for (int i = 0; i < def.Enchantments.Count; i++)
+                for (int j = i + 1; j < def.Enchantments.Count; j++)
+                {
+                    string a = def.Enchantments[i].Id, b = def.Enchantments[j].Id;
+                    if (excludes.TryGetValue(a, out var excludedByA) && excludedByA.Contains(b))
+                        throw new ContentException(def.Id, RuleEnchantmentsExcluded, $"'{a}' and '{b}'");
+                }
 
             foreach (var (t, n) in spread.Entries)
             {

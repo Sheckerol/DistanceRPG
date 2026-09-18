@@ -36,6 +36,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Displace">Push, Drag or Rout settled here, applied once at step 8.</param>
 /// <param name="ManaToSpend">Enchantment trigger payments accumulated in list order, spent once by the applier.</param>
 /// <param name="FromCleave">True on a hit a cleave fanned out to beyond its primary target; Rout is Push applied to everything the cleave caught, the primary included, so it shoves either way.</param>
+/// <param name="OnAlly">True on a hit that landed on the attacker's own side — an area cast catching an ally, which only happens while friendly fire is on — priced at <see cref="Tuning.FriendlyFireAllyPercent"/> at (1,2).</param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int WardSpent,
@@ -45,15 +46,19 @@ public sealed record DamagePayload(
     ImmutableArray<StatusApplication> ApplyToAttacker,
     Displacement? Displace,
     int ManaToSpend,
-    bool FromCleave = false)
+    bool FromCleave = false,
+    bool OnAlly = false)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with
     /// nothing computed and the lists empty rather than default.
+    /// <paramref name="type"/> is the element the hit carries into the chart —
+    /// a wand's, settled by its cast — and None for a martial swing;
     /// <paramref name="fromCleave"/> marks a hit the swing fanned out to beyond
-    /// its primary target.
+    /// its primary target; <paramref name="onAlly"/> a hit on the attacker's
+    /// own side.
     /// </summary>
-    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None, bool fromCleave = false)
+    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None, bool fromCleave = false, bool onAlly = false)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         return new DamagePayload(
@@ -65,7 +70,8 @@ public sealed record DamagePayload(
             ApplyToAttacker: ImmutableArray<StatusApplication>.Empty,
             Displace: null,
             ManaToSpend: 0,
-            FromCleave: fromCleave);
+            FromCleave: fromCleave,
+            OnAlly: onAlly);
     }
 }
 
@@ -176,10 +182,16 @@ public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edg
 /// <paramref name="ApplyToTarget"/> and what its trigger cost to
 /// <paramref name="ManaToSpend"/>, in attachment order, each paying out of what
 /// the cast and the entries before it left; the applier writes both once and
-/// queues the one <see cref="ManaPayload"/> record of the cast.
+/// queues the one <see cref="ManaPayload"/> record of the cast. A wand's area
+/// cast (§1.4) is aimed at a point rather than an actor, so its record names
+/// the caster as its own <paramref name="Target"/>, the way a boundary event
+/// names the actor twice, and the loop settles <paramref name="Type"/>: the
+/// element every hit the shape fans out to carries into the chart, typed by
+/// the element entry for one payment of its trigger — once per cast, not once
+/// per target caught — and None for a staff, or when no element could fire.
 /// </summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
-    ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0);
+    ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None);
 
 /// <summary>Whether a move was chosen: Brace fires on entry either way, Opportunist only on a voluntary exit (§1.2).</summary>
 public enum MoveKind { Voluntary, Forced }

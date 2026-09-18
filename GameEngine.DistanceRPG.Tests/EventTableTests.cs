@@ -214,8 +214,10 @@ public class EventTableTests
             {
                 "DamageTaken (1,0) RollToBase",
                 "DamageTaken (1,1) Longshot",
+                "DamageTaken (1,2) FriendlyFire",
                 "DamageTaken (2,0) Weakened",
                 "DamageTaken (3,0) Sundered",
+                "DamageTaken (3,1) TypeChart",
                 "DamageTaken (3,9) FixWeaponShare",
                 "DamageTaken (4,0) Enchantments",
                 "DamageTaken (5,0) Block",
@@ -240,9 +242,9 @@ public class EventTableTests
         var enchanted = Member();
         enchanted.Inventory[0] = TestWeapons.Enchanted("Charged Knife", 32, 10, 30, "shocking", "flaming");
         var rows = table.HandlersFor(GameEvent.DamageTaken, enchanted).Select(h => h.ToString()).ToList();
-        Assert.Equal(chain.Take(5).Select(h => h.ToString()), rows.Take(5));
-        Assert.Equal(new[] { "DamageTaken (4,0) shocking@0", "DamageTaken (4,1) flaming@1" }, rows.Skip(5).Take(2));
-        Assert.Equal(chain.Skip(6).Select(h => h.ToString()), rows.Skip(7));
+        Assert.Equal(chain.Take(7).Select(h => h.ToString()), rows.Take(7));
+        Assert.Equal(new[] { "DamageTaken (4,0) shocking@0", "DamageTaken (4,1) flaming@1" }, rows.Skip(7).Take(2));
+        Assert.Equal(chain.Skip(8).Select(h => h.ToString()), rows.Skip(9));
     }
 
     [Fact]
@@ -277,7 +279,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(16, chain.Count);
+        Assert.Equal(18, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);

@@ -11,10 +11,11 @@ namespace GameEngine.DistanceRPG.Logic;
 /// looked up by <see cref="EffectKind"/> in the table of the event it fires
 /// on: a new soul is one entry in one table, never an edit to the loop. The
 /// loop runs on <see cref="GameEvent.Cast"/>, where a staff's innate applies
-/// its status (§1.3 "a cast is a hit"), and at step 4 of
+/// its status (§1.3 "a cast is a hit") and a wand's element types the cast for
+/// one payment of its trigger (§1.4), and at step 4 of
 /// <see cref="GameEvent.DamageTaken"/>, where a hit's enchantments add their
-/// share beside the weapon's (§1.6) — a table no kind is in yet: the wands'
-/// element and the souls that ride a hit are entries in it when they land. A
+/// share beside the weapon's (§1.6) — the element's own contribution now, the
+/// souls that ride a hit as entries when they land. A
 /// loop's step is its own on its event: <see cref="EventTable.HandlersFor"/>
 /// prints the loop as one row per attached entry at (step, attachment index),
 /// so attachment order reads as the priority it is, and
@@ -50,19 +51,26 @@ public static class EnchantmentBehaviours
     /// </summary>
     public delegate DamagePayload DamageBehaviour(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other);
 
-    /// <summary>The per-kind behaviours on Cast. A kind absent here does nothing on a cast — the elements and the souls fire on hits.</summary>
+    /// <summary>The per-kind behaviours on Cast: a staff's effect applies its status, a wand's element types the cast. A kind absent here does nothing on a cast — the souls fire on hits.</summary>
     private static readonly IReadOnlyDictionary<EffectKind, CastBehaviour> OnCast = new Dictionary<EffectKind, CastBehaviour>
     {
         [EffectKind.ApplyStatus] = ApplyStatus,
+        [EffectKind.ElementalDamage] = ElementOnCast,
     };
 
     /// <summary>
-    /// The per-kind behaviours at step 4 of a hit. No kind is in it yet: the
-    /// wands' <see cref="EffectKind.ElementalDamage"/> and the souls that ride
-    /// a hit are each an entry here when they land, and nothing in the loop.
-    /// A kind absent here adds nothing to a hit — the staff innates cast.
+    /// The per-kind behaviours at step 4 of a hit: the wands' element adds its
+    /// own contribution beside the weapon's share; the souls that ride a hit
+    /// are each an entry here when they land, and nothing in the loop. A kind
+    /// absent here adds nothing to a hit — the staff innates cast.
     /// </summary>
-    private static readonly IReadOnlyDictionary<EffectKind, DamageBehaviour> OnDamageTaken = new Dictionary<EffectKind, DamageBehaviour>();
+    private static readonly IReadOnlyDictionary<EffectKind, DamageBehaviour> OnDamageTaken = new Dictionary<EffectKind, DamageBehaviour>
+    {
+        [EffectKind.ElementalDamage] = ElementalDamage,
+    };
+
+    /// <summary>A type is whole or nothing: the one "level" an element's cast fires at, so its flat trigger is paid in full or not at all.</summary>
+    private const int OneType = 1;
 
     /// <summary>Register the loop on <paramref name="table"/>, on each event it runs on, expanded for printing into the actor's attached entries.</summary>
     public static void Register(EventTable table)
@@ -137,6 +145,45 @@ public static class EnchantmentBehaviours
             ApplyToTarget = OrEmpty(payload.ApplyToTarget).Add(new StatusApplication(type, element, levels)),
             ManaToSpend = payload.ManaToSpend + paid,
         };
+    }
+
+    /// <summary>
+    /// The wand innates' behaviour on a cast (§1.4): the element types the
+    /// cast — every hit the shape fans out to carries it into the attunement
+    /// chart — for one payment of its trigger, once per cast and not once per
+    /// target caught (settled): a six-target Nova pays what a one-target Blast
+    /// pays. A type is whole or nothing, so the trigger is paid in full or the
+    /// element is a non-event that types nothing and pays nothing
+    /// (<see cref="PartialFire"/> over the one type). A hit carries exactly one
+    /// type: the first element in attachment order types the cast, and what a
+    /// second element on one weapon does to a hit is the Long Candle's question
+    /// (§1.5), not answered here.
+    /// </summary>
+    public static CastPayload ElementOnCast(CastPayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
+    {
+        var type = enchantment.Def.DamageType ?? DamageType.None;
+        if (type == DamageType.None)
+            throw new InvalidOperationException($"'{enchantment.Id}' carries no damage type; the content validator lets no such element through.");
+        if (payload.Type != DamageType.None) return payload;   // typed already by the element before it
+
+        var (fired, paid) = PartialFire(enchantment, weapon, OneType, manaLeft);
+        if (fired <= 0) return payload;
+        return payload with { Type = type, ManaToSpend = payload.ManaToSpend + paid };
+    }
+
+    /// <summary>
+    /// The wand innates' behaviour on a hit, at step 4: what the element adds
+    /// beside the weapon's share — its potency's levels, which Phase 1 prices
+    /// at nothing (the tier's contribution and INT scaling are §3.3's) — goes
+    /// into <see cref="DamagePayload.EnchantmentShare"/>, tracked apart from
+    /// the weapon's the whole way down. It pays nothing here: its trigger is
+    /// the cast's, paid once for every hit the shape caught, and the type
+    /// itself rode in on the payload from that cast, ahead of the chart at (3,1).
+    /// </summary>
+    public static DamagePayload ElementalDamage(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
+    {
+        int added = enchantment.LevelsFor(enchantment.Def.Potency);
+        return added <= 0 ? payload : payload with { EnchantmentShare = payload.EnchantmentShare + added };
     }
 
     /// <summary>The levels one cast of <paramref name="enchantment"/> applies: its potency's, doubled on a crit (§1.6).</summary>

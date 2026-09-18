@@ -103,7 +103,7 @@ public sealed class DungeonHud
         else
         {
             DrawCentered(w, h - 24f,
-                "WASD MOVE - CLICK ENEMY ATTACK - STAFF: CLICK ALLY HEAL - O OVERWATCH - SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM",
+                "WASD MOVE - CLICK ENEMY ATTACK - STAFF: CLICK ALLY HEAL - WAND: CLICK FLOOR AIM, N NOVA - O OVERWATCH - SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM",
                 1.2f, Grey);
         }
 

@@ -44,6 +44,17 @@ public abstract class ActorState
     public int Value(ModifierType t) => GameContent.Current.Modifiers.Resolve(t, Stacks(t));
 
     /// <summary>
+    /// The damage type this actor is attuned to, or null: what a typed hit
+    /// resolves against on the chart (§1.4) — the same type halved, the
+    /// opposed one x1.5, anything else unchanged. Attunement is the dungeon's,
+    /// not the individual's: a themed floor (§4.3, Phase 4) sets it on every
+    /// enemy it spawns and an unthemed one on none, and a party member never
+    /// carries one. Declared here so the chart's handler reads it off whoever
+    /// was hit without asking what kind of actor that is.
+    /// </summary>
+    public DamageType? Attunement { get; set; }
+
+    /// <summary>
     /// Mana pool for casting. Every trigger costs mana on both sides, so an
     /// enemy caster carries one too; full at spawn — a pool nobody has written
     /// reads as this actor's own <see cref="MaxMana"/>, so a kind that overrides

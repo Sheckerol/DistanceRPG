@@ -102,6 +102,12 @@ public static class CombatRules
     /// <summary>A cast fumble — a natural 1 — doubles that cast's mana (settled): a real punish for fishing.</summary>
     public const int CastFumbleManaMultiplier = 2;
 
+    /// <summary>The attunement chart's "Same" (§1.4): the hit is halved — it cancels, but never to nothing.</summary>
+    public const int ResistedDamageDivisor = 2;
+
+    /// <summary>The attunement chart's "Opposed" (§1.4): x1.5, as a percentage, truncated.</summary>
+    public const int OpposedDamagePercent = 150;
+
     /// <summary>
     /// A cast's step 1 as a pure function of its inputs, the counterpart of
     /// <see cref="RollToBase"/>: staves and wands roll d20 like attacks, in the
@@ -134,9 +140,13 @@ public static class CombatRules
     /// the attacker as <c>self</c> and the defender as <c>other</c>, and project
     /// the settled payload. Whatever the table's applier does with the result
     /// has happened by the time this returns. <paramref name="fromCleave"/>
-    /// marks a hit the swing fanned out to beyond its primary target.
+    /// marks a hit the swing fanned out to beyond its primary target;
+    /// <paramref name="type"/> is the element a wand's cast settled for its
+    /// hits (None for a swing); <paramref name="onAlly"/> marks an area cast's
+    /// hit on the attacker's own side.
     /// </summary>
-    public static AttackResolution Resolve(EventTable table, ActorState attacker, ActorState defender, Weapon weapon, int distanceUnits, Func<int> rollD20, bool fromCleave = false)
+    public static AttackResolution Resolve(EventTable table, ActorState attacker, ActorState defender, Weapon weapon, int distanceUnits, Func<int> rollD20,
+        bool fromCleave = false, DamageType type = DamageType.None, bool onAlly = false)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(attacker);
@@ -144,7 +154,7 @@ public static class CombatRules
         ArgumentNullException.ThrowIfNull(weapon);
         ArgumentNullException.ThrowIfNull(rollD20);
 
-        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits, fromCleave: fromCleave);
+        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits, type, fromCleave, onAlly);
         var settled = table.Raise(GameEvent.DamageTaken, initial, attacker, defender);
         return Project(settled);
     }

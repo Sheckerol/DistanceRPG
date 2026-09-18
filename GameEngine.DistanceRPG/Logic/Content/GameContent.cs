@@ -54,8 +54,7 @@ public sealed class GameContent
         ContentValidator.ValidateRestricted(restricted, knownIds);
         var modifiers = new ModifierRules(tuning, restricted);
 
-        var enchantmentCatalogue = new EnchantmentCatalogue(enchantments, tuning);   // runs ValidateEnchantments
-        ContentValidator.ValidateOpposition(enchantments, restricted);
+        var enchantmentCatalogue = new EnchantmentCatalogue(enchantments, tuning, restricted);   // runs ValidateEnchantments, then ValidateOpposition for its chart
 
         ContentValidator.ValidateWeapons(weapons, modifiers, restricted, enchantmentCatalogue);
         var weaponCatalogue = new WeaponCatalogue(weapons, enchantmentCatalogue);

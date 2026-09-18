@@ -557,6 +557,15 @@ public class DungeonScene : Scene
             if (!AnyMenuOpen && _turns.TryOverwatch(ActiveCharacter.State))
                 Log.Info($"[Combat] {ActiveCharacter.State.Id} holds fire");
         }, Keys.O);
+        // N casts a Nova: the one wand shape centred on the caster, so it needs
+        // no aim. The other three are aimed by a click on the floor or on an enemy.
+        input.SubscribeToKeyPressed(_ =>
+        {
+            if (AnyMenuOpen) return;
+            var state = ActiveCharacter.State;
+            if (state.EquippedWeapon?.AreaShape?.Kind == AreaShapeKind.Nova)
+                CastArea(state, (state.X, state.Y));
+        }, Keys.N);
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
         input.SubscribeToMouseButtonPressed(_ => HandleClick(), MouseButton.Left);
@@ -826,13 +835,17 @@ public class DungeonScene : Scene
             {
                 bestT = tEnemy;
                 var target = enemy.State;
-                // A caster's enemy-click is a cast (a debuff staff lands its
-                // effect; a support staff has no enemy cast, and the click does
-                // nothing) and a martial weapon's is a swing.
-                bool casting = ActiveCharacter.State.EquippedWeapon?.IsCaster == true;
-                action = casting
-                    ? () => _turns.TryCast(ActiveCharacter.State, target)
-                    : () => _turns.TryAttack(ActiveCharacter.State, target);
+                // A wand's enemy-click aims its shape at the enemy (a Blast on
+                // it, a Cone or Beam toward it); a staff's is a cast (a debuff
+                // staff lands its effect; a support staff has no enemy cast,
+                // and the click does nothing); a martial weapon's is a swing.
+                var held = ActiveCharacter.State.EquippedWeapon;
+                if (held?.AreaShape != null)
+                    action = () => CastArea(ActiveCharacter.State, (target.X, target.Y));
+                else if (held?.IsCaster == true)
+                    action = () => _turns.TryCast(ActiveCharacter.State, target);
+                else
+                    action = () => _turns.TryAttack(ActiveCharacter.State, target);
             }
         }
 
@@ -859,7 +872,33 @@ public class DungeonScene : Scene
             }
         }
 
+        // Nothing under the cursor: a wand aimed by a point (a Blast's centre,
+        // a Cone's or Beam's direction) casts at the floor point the ray meets.
+        if (action == null
+            && ActiveCharacter.State.EquippedWeapon?.AreaShape is { Kind: not AreaShapeKind.Nova }
+            && FloorPointOf(origin, dir) is { } aim)
+            action = () => CastArea(ActiveCharacter.State, aim);
+
         action?.Invoke();
+    }
+
+    /// <summary>Cast the active wand at <paramref name="aim"/> (logic units) through the turn system, which prices it and refuses an empty shape.</summary>
+    private void CastArea(PartyMemberState caster, (float X, float Y) aim)
+    {
+        var wand = caster.EquippedWeapon;
+        if (_turns.TryCastArea(caster, aim))
+            Log.Info($"[Combat] {caster.Id} casts {wand?.Name}");
+        else
+            Log.Info($"[Combat] {caster.Id} cannot cast {wand?.Name} there ({_turns.AreaTargets(caster, aim).Count} in the shape, movement {caster.DistLeft:0}, mana {caster.Mana})");
+    }
+
+    /// <summary>The floor point, in logic units, where the mouse ray meets the floor plane; null when it never does.</summary>
+    private static (float X, float Y)? FloorPointOf(Vector3 origin, Vector3 dir)
+    {
+        if (MathF.Abs(dir.Y) < 1e-6f) return null;
+        float t = -origin.Y / dir.Y;
+        if (t <= 0f) return null;
+        return WorldSpace.ToLogic(origin + dir * t);
     }
 
     private static bool RayHitsSphere(Vector3 origin, Vector3 dir, Vector3 center, float radius, out float t)

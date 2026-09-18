@@ -426,6 +426,72 @@ public sealed class TurnSystem
     }
 
     /// <summary>
+    /// Can the caster cast their equipped wand with its shape aimed at
+    /// <paramref name="aim"/>, a point in logic units? Needs a wand — a caster
+    /// whose innate is an element and which carries a shape — enough movement
+    /// and mana at the resolved costs, and at least one actor caught: a cast is
+    /// a hit, and a shape with nobody in it has nothing to hit, exactly as a
+    /// staff needs its target in reach. A Blast's aim is the point it centres
+    /// on (pulled back to the wand's reach), a Cone's or Beam's the direction
+    /// from the caster, and a Nova ignores it. The element's trigger is no
+    /// gate: unaffordable, it does not fire and the hits land untyped.
+    /// </summary>
+    public bool CanCastArea(PartyMemberState caster, (float X, float Y) aim)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+        if (Phase != TurnPhase.Player || !caster.Alive) return false;
+        var w = caster.EquippedWeapon;
+        if (w == null || !IsAreaCaster(w)) return false;
+        if (caster.DistLeft < w.ResolvedCost || caster.Mana < w.ResolvedManaCost) return false;
+        return AreaTargets(caster, aim).Count > 0;
+    }
+
+    /// <summary>A wand: a caster with a shape whose innate is an element (§1.4).</summary>
+    private static bool IsAreaCaster(Weapon w)
+        => w.IsCaster && w.AreaShape != null && w.Innate?.Def.Effect == EffectKind.ElementalDamage;
+
+    /// <summary>
+    /// The actors a cast of <paramref name="caster"/>'s wand aimed at
+    /// <paramref name="aim"/> would catch right now, nearest first: everyone on
+    /// the far side inside the shape and in sight, and — only while friendly
+    /// fire is on (<see cref="Tuning.FriendlyFireEnabled"/>, off until the
+    /// placement scorer and the kiting AI exist) — the caster's own side as
+    /// well, the caster itself never. Empty for anything but a wand, or for
+    /// an actor off the roster. The scene's aim preview reads this; the cast
+    /// reads it once, at the cast.
+    /// </summary>
+    public IReadOnlyList<ActorState> AreaTargets(ActorState caster, (float X, float Y) aim)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+        var shape = caster.EquippedWeapon?.AreaShape;
+        if (shape == null || !_sides.TryGetValue(caster, out var side))
+            return Array.Empty<ActorState>();
+
+        IEnumerable<ActorState> candidates = _rosters[(int)Opposite(side)];
+        if (GameContent.Current.Tuning.FriendlyFireEnabled)
+            candidates = candidates.Concat(_rosters[(int)side]);
+        return AreaShapes.Targets(shape, caster, aim, candidates, _grid);
+    }
+
+    /// <summary>
+    /// Cast the equipped wand at <paramref name="aim"/>: spend the cast's
+    /// resolved movement, then resolve it through the table — one Cast,
+    /// paying the cast's mana and the element's trigger once, and one hit per
+    /// actor the shape caught, every one typed with the element and on the one
+    /// roll the cast made (<see cref="CastAreaWith"/>). Returns false if the
+    /// cast is not allowed.
+    /// </summary>
+    public bool TryCastArea(PartyMemberState caster, (float X, float Y) aim)
+    {
+        if (!CanCastArea(caster, aim)) return false;
+        var w = caster.EquippedWeapon!;
+
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        CastAreaWith(caster, aim);
+        return true;
+    }
+
+    /// <summary>
     /// Can the member hold fire? Overwatch is ranged only — holding a shot is
     /// what a nocked arrow does — and the member needs Overwatch stacks, the
     /// swing's movement to spare, no shot already held, and shots left in this
@@ -1239,12 +1305,17 @@ public sealed class TurnSystem
     /// *means* (movement lost, defeat turn, party wipe) runs after it, for
     /// everyone the cascade took, through <see cref="RunHeldDeaths"/>.
     /// <paramref name="fromCleave"/> marks a hit a swing fanned out to beyond
-    /// its primary target.
+    /// its primary target; <paramref name="type"/> is the element an area
+    /// cast settled for its hits, <paramref name="roll"/> the one natural roll
+    /// that cast made and every hit shares (a swing rolls its own), and
+    /// <paramref name="onAlly"/> marks a hit on the attacker's own side.
     /// </summary>
-    private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target, bool fromCleave = false)
+    private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target, bool fromCleave = false,
+        DamageType type = DamageType.None, int? roll = null, bool onAlly = false)
     {
+        Func<int> rollD20 = roll is int shared ? () => shared : _rollD20;
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
-            CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20, fromCleave);
+            CombatRules.SurfaceDistanceUnits(attacker, target), rollD20, fromCleave, type, onAlly);
         RunHeldDeaths();
     }
 
@@ -1294,6 +1365,42 @@ public sealed class TurnSystem
         _events.Raise(GameEvent.Cast,
             new CastPayload(weapon, target, roll.Roll, roll.IsCrit, roll.IsFumble, roll.Levels, roll.ManaCost), caster, target);
         RunHeldDeaths();
+    }
+
+    /// <summary>
+    /// The one place an area cast lands (§1.4). The targets are chosen at the
+    /// cast — everyone the shape catches from where the caster stands, nearest
+    /// first, so nothing the first hit sets off can hide a body from it. The
+    /// caster rolls once, in its own crit window, and that roll settles the
+    /// cast (a crit halves the mana, a fumble doubles it) and every hit alike
+    /// (a crit doubles them all with Block skipped, a natural 1 halves them
+    /// all): one roll per cast, shared by every target, because the mana rule
+    /// is per cast. Cast then runs the enchantment chain once, the caster
+    /// standing in as its own target — an area cast is aimed at a point, not
+    /// an actor — where the element pays its trigger once for the whole shape
+    /// and types the cast, and the applier spends the mana. Then each hit
+    /// resolves through <see cref="ResolveAttackOn"/> as a swing does, one
+    /// after another, carrying the settled type into the chart at (3,1) and,
+    /// on an ally, the friendly-fire mark for (1,2); the cast stops short when
+    /// the caster has fallen to a counter or the game is over.
+    /// </summary>
+    private void CastAreaWith(ActorState caster, (float X, float Y) aim)
+    {
+        var weapon = caster.EquippedWeapon!;   // the callers gated on it: a cast is with what the caster holds
+        var targets = AreaTargets(caster, aim);
+        var innate = weapon.Innate!;
+        var roll = CombatRules.RollToCast(_rollD20(), CombatRules.CritThreshold(caster),
+            innate.LevelsFor(innate.Def.Potency), weapon.ResolvedManaCost);
+        var settled = _events.Raise(GameEvent.Cast,
+            new CastPayload(weapon, caster, roll.Roll, roll.IsCrit, roll.IsFumble, roll.Levels, roll.ManaCost), caster, caster);
+        RunHeldDeaths();
+
+        var side = _sides[caster];
+        foreach (var target in targets)
+        {
+            if (Phase == TurnPhase.GameOver || !caster.Alive) return;
+            ResolveAttackOn(caster, weapon, target, type: settled.Type, roll: roll.Roll, onAlly: _sides[target] == side);
+        }
     }
 
     /// <summary>
