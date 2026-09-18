@@ -64,6 +64,10 @@ public sealed class EventTable
     /// <paramref name="expand"/> names, for an actor, what the handler will run
     /// in order (the enchantment loop's attached entries) for
     /// <see cref="HandlersFor"/> to print; a handler that runs one thing leaves it null.
+    /// An expanding handler owns its step on the event: it prints at (step,
+    /// attachment index), so a compiled handler beside it on that step would
+    /// print an index that is not its place in the chain — registering one,
+    /// in either order, throws.
     /// </summary>
     public void On<TPayload>(GameEvent evt, HandlerPriority priority, string name, Handler<TPayload> handler,
         Func<ActorState, IEnumerable<string>>? expand = null)
@@ -78,6 +82,15 @@ public sealed class EventTable
         if (taken != null)
             throw new InvalidOperationException(
                 $"{evt} already runs '{taken.Name}' at {priority}; '{name}' cannot share it. Order among same-event handlers is declared, never undefined.");
+
+        // An expanding handler prints its entries at (its step, attachment index): the step is its alone.
+        var onStep = chain.FirstOrDefault(e => e.Priority.Step == priority.Step);
+        if (onStep != null && (onStep.Expand != null || expand != null))
+        {
+            var (loop, compiled) = onStep.Expand != null ? (onStep.Name, name) : (name, onStep.Name);
+            throw new InvalidOperationException(
+                $"{evt} step {priority.Step} belongs to '{loop}', which prints its entries at (step, attachment index); '{compiled}' cannot share the step.");
+        }
 
         chain.Add(new Entry
         {
@@ -190,7 +203,9 @@ public sealed class EventTable
     /// actor: one row per name it expands to, at (its step, index) with the
     /// name suffixed <c>@index</c>, so the index-is-priority contract of
     /// attachment order is inspectable; with nothing to expand it stays as its
-    /// own row. Without an actor the list is the compiled handlers alone.
+    /// own row. The step is that handler's alone (<see cref="On{TPayload}"/>
+    /// refuses company on it), so the printed rows sit where the chain runs
+    /// them. Without an actor the list is the compiled handlers alone.
     /// </summary>
     public IReadOnlyList<HandlerInfo> HandlersFor(GameEvent evt, ActorState? self = null)
     {

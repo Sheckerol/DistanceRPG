@@ -181,7 +181,8 @@ public sealed class DungeonHud
             if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
             var enemy = obj.State;
-            string name = enemy.IsSupportCaster ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY";
+            // HEALER is what mends (the innate's status restores HP); every other caster, warding or debuffing, is CASTER.
+            string name = enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY";
             DrawCenteredAt(px.X, px.Y - 18f, $"{name} [{enemy.Weapon.Name}]", 1.5f,
                 enemy.Weapon.IsCaster ? Cyan : Orange);
 

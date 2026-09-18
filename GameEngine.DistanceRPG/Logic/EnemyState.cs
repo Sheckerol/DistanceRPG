@@ -29,6 +29,15 @@ public sealed class EnemyState : ActorState
     /// </summary>
     public bool IsSupportCaster => Weapon.Innate?.Def.Targets == TargetSide.Ally;
 
+    /// <summary>
+    /// True for a caster whose innate mends — its status restores HP, the
+    /// status row's flag rather than its type. A support caster that is not
+    /// this shields or buffs: the nameplate calls only a mender HEALER, and
+    /// the AI picks a mender's target by wounds. The beat itself reads
+    /// <see cref="IsSupportCaster"/>.
+    /// </summary>
+    public bool IsHealer => Weapon.Innate?.Def.Applies is { } type && StatusRules.Of(type).RestoresHp;
+
     public override float Radius => (GameConstants.Tile - 4f) / 2f;
 
     /// <summary>Turn index when the dummy was defeated; -1 while alive.</summary>

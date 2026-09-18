@@ -28,6 +28,23 @@ public static class TestWeapons
             Forged: spread, Enchantments: [], Shape: null, Unique: false, DerivedFrom: null);
         return new Weapon(def, []);
     }
+
+    /// <summary>
+    /// An ad-hoc dagger-class weapon with no forged spread and the catalogue
+    /// enchantments <paramref name="enchantmentIds"/> attached in that order at
+    /// tier 1, for what reads a weapon's list — the loop's printed chain. The
+    /// catalogue's validation (a caster's innate, a wand's element) is not this.
+    /// </summary>
+    public static Weapon Enchanted(string name, int range, int damage, int cost, params string[] enchantmentIds)
+    {
+        var catalogue = GameContent.Current.Enchantments;
+        var def = new WeaponDef(
+            Id: "test_" + name.ToLowerInvariant().Replace(' ', '_'), Name: name, Class: WeaponClass.Dagger, Role: null,
+            Range: range, Damage: damage, Cost: cost, ManaCost: 0,
+            Forged: new Dictionary<ModifierType, int>(), Enchantments: enchantmentIds.Select(id => new EnchantmentRef(id)).ToList(),
+            Shape: null, Unique: false, DerivedFrom: null);
+        return new Weapon(def, enchantmentIds.Select(id => new Enchantment(catalogue[id], Tier: 1)).ToList());
+    }
 }
 
 /// <summary>

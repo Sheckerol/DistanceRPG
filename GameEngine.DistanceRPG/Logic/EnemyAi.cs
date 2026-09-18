@@ -175,7 +175,7 @@ public static class EnemyAi
     /// </summary>
     public static EnemyState? SelectSupportTarget(EnemyState caster, IReadOnlyList<EnemyState> enemies)
     {
-        if (caster.Weapon.Innate?.Def.Applies is { } type && StatusRules.Of(type).RestoresHp)
+        if (caster.IsHealer)
             return SelectHealTarget(caster, enemies);
 
         EnemyState? best = null;

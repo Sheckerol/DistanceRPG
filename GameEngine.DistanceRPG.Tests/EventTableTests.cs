@@ -63,6 +63,32 @@ public class EventTableTests
     }
 
     [Fact]
+    public void ExpandingHandler_OwnsItsStep()
+    {
+        // The enchantment loop prints its entries at (its step, attachment index), so a compiled handler
+        // beside it on the step would print an index that is not its place in the chain: refused, in
+        // either order of registration.
+        static IEnumerable<string> Two(ActorState _) => new[] { "a", "b" };
+        var table = new EventTable();
+        table.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(4, 0), "Loop", (p, _, _) => p, expand: Two);
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            table.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(4, 1), "Beside", (p, _, _) => p));
+        Assert.Contains("Loop", ex.Message);
+        Assert.Contains("Beside", ex.Message);
+
+        var reversed = new EventTable();
+        reversed.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(4, 1), "Beside", (p, _, _) => p);
+        Assert.Throws<InvalidOperationException>(() =>
+            reversed.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(4, 0), "Loop", (p, _, _) => p, expand: Two));
+
+        // The steps either side are anyone's, and the loop's rows print at its step, indexed by entry.
+        table.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(3, 9), "Before", (p, _, _) => p);
+        table.On<Trace>(GameEvent.DamageTaken, new HandlerPriority(5, 0), "After", (p, _, _) => p);
+        Assert.Equal(new[] { "DamageTaken (3,9) Before", "DamageTaken (4,0) a@0", "DamageTaken (4,1) b@1", "DamageTaken (5,0) After" },
+            table.HandlersFor(GameEvent.DamageTaken, Member()).Select(h => h.ToString()));
+    }
+
+    [Fact]
     public void Raise_InsideHandler_Throws_EnqueueIsDrained()
     {
         var self = Member();
@@ -191,6 +217,7 @@ public class EventTableTests
                 "DamageTaken (2,0) Weakened",
                 "DamageTaken (3,0) Sundered",
                 "DamageTaken (3,9) FixWeaponShare",
+                "DamageTaken (4,0) Enchantments",
                 "DamageTaken (5,0) Block",
                 "DamageTaken (6,0) Ward",
                 "DamageTaken (6,9) FixTaken",
@@ -206,8 +233,16 @@ public class EventTableTests
         Assert.Equal(chain.OrderBy(h => h.Priority), chain);
         Assert.Empty(table.HandlersFor(GameEvent.Killed));
 
-        // With an actor: the same list until weapons carry enchantments to expand.
+        // With an actor the loop prints as what it will run for them: nothing attached (or no weapon)
+        // leaves the list as it is; a weapon carrying entries lists them at step 4, one row per entry at
+        // its attachment index, so the index-is-priority contract reads off the chain.
         Assert.Equal(chain, table.HandlersFor(GameEvent.DamageTaken, Member()));
+        var enchanted = Member();
+        enchanted.Inventory[0] = TestWeapons.Enchanted("Charged Knife", 32, 10, 30, "shocking", "flaming");
+        var rows = table.HandlersFor(GameEvent.DamageTaken, enchanted).Select(h => h.ToString()).ToList();
+        Assert.Equal(chain.Take(5).Select(h => h.ToString()), rows.Take(5));
+        Assert.Equal(new[] { "DamageTaken (4,0) shocking@0", "DamageTaken (4,1) flaming@1" }, rows.Skip(5).Take(2));
+        Assert.Equal(chain.Skip(6).Select(h => h.ToString()), rows.Skip(7));
     }
 
     [Fact]
@@ -242,7 +277,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(15, chain.Count);
+        Assert.Equal(16, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);
