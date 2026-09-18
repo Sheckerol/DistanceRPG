@@ -181,9 +181,9 @@ public sealed class DungeonHud
             if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
             var enemy = obj.State;
-            string name = enemy.IsHealer ? "HEALER" : "DUMMY";
+            string name = enemy.IsSupportCaster ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY";
             DrawCenteredAt(px.X, px.Y - 18f, $"{name} [{enemy.Weapon.Name}]", 1.5f,
-                enemy.IsHealer ? Cyan : Orange);
+                enemy.Weapon.IsCaster ? Cyan : Orange);
 
             DrawCenteredAt(px.X, px.Y, $"{enemy.Hp}/{enemy.MaxHp}{StatusBadges(enemy)}", 1.5f, White);
         }

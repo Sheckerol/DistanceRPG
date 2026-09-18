@@ -61,21 +61,4 @@ public sealed class PartyMemberState : ActorState
         SavedMovement = save;
         return save;
     }
-
-    /// <summary>
-    /// Convert the movement left unspent this turn into mana: a fully idle turn
-    /// (nothing moved) restores <c>MaxMana / <see cref="GameConstants.ManaRegenTurns"/></c>,
-    /// scaling linearly with the unused fraction of the base budget. Casting a
-    /// staff spends movement, so it eats into this the same way walking does.
-    /// Returns the mana actually regained.
-    /// </summary>
-    public int RegenManaFromUnusedMovement()
-    {
-        if (!Alive || Mana >= MaxMana) return 0;
-        float frac = Math.Clamp(DistLeft / GameConstants.MaxDistance, 0f, 1f);
-        int regen = (int)MathF.Round(frac * MaxMana / GameConstants.ManaRegenTurns);
-        int before = Mana;
-        Mana = Math.Min(MaxMana, Mana + regen);
-        return Mana - before;
-    }
 }

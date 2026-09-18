@@ -135,8 +135,17 @@ public sealed record Tuning
 
     /// <summary>
     /// Banked movement (logic units, 32 per tile) that buys one mana at end of
-    /// turn: <c>manaRegained = unspentMovement / MovementUnitsPerMana</c>. Derived
-    /// so a caster at Resonant x6 sustains one cast a round standing still.
+    /// turn: <c>manaRegained = unspentMovement / MovementUnitsPerMana</c>, an
+    /// integer divisor rather than a fractional rate, so the file reads correctly
+    /// and nothing drifts ("1 per point" would be 32 mana a tile). Derived from
+    /// one calibration target rather than picked (§1.3), so it re-derives when
+    /// anything it depends on moves: a caster at Resonant x6 carrying a tier-1
+    /// enchantment sustains one cast a round while standing still:
+    /// <c>(movementBudget - castCost) / (castMana + triggerMana, at x6)
+    /// = (160 - 40) / (8 + 3) = 120 / 11 ~ 10.9 -> 10</c>.
+    /// A fully banked turn is 16 mana; a turn spent on one cast banks 120 and
+    /// pays 12, against the 11 spent: a hair above break-even, forever.
+    /// Nothing below x6 sustains, and that cliff is deliberate.
     /// </summary>
     public int MovementUnitsPerMana { get; init; } = 10;
 

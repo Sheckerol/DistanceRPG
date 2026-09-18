@@ -60,6 +60,26 @@ public abstract class ActorState
     public virtual int MaxMana => GameConstants.MaxMana;
 
     /// <summary>
+    /// Convert movement left unspent at the end of the actor's action into
+    /// mana, the only route mana comes back by (§1.3): every
+    /// <see cref="Tuning.MovementUnitsPerMana"/> units bank one point, the
+    /// remainder is lost, and the pool never passes <see cref="MaxMana"/>. A
+    /// party member banks what is left of its budget at its turn's end, an
+    /// enemy what its action left; casting spends movement, so it eats into
+    /// this the same way walking does: the more you cast, the less mana you
+    /// can spend. Returns the mana actually regained; nothing for the dead.
+    /// </summary>
+    public int RegenManaFromUnusedMovement(float unspentMovement)
+    {
+        if (!Alive || Mana >= MaxMana) return 0;
+        int unitsPerMana = Math.Max(1, GameContent.Current.Tuning.MovementUnitsPerMana);
+        int regained = (int)(MathF.Max(0f, unspentMovement) / unitsPerMana);
+        int before = Mana;
+        Mana = Math.Min(MaxMana, Mana + regained);
+        return Mana - before;
+    }
+
+    /// <summary>
     /// Overwatch's banked shots: holding fire this turn arms the actor's
     /// Overwatch value here, which makes its ranged reach a threat zone until
     /// the turn ends — a target entering it is shot for free, one shot per

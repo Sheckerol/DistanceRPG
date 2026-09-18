@@ -33,6 +33,7 @@ public sealed class EventTable
         public required string Name { get; init; }
         public required Delegate Handler { get; init; }
         public required Func<object, ActorState, ActorState, object> Invoke { get; init; }
+        public Func<ActorState, IEnumerable<string>>? Expand { get; init; }
     }
 
     private sealed record Pending(GameEvent Event, object Payload, ActorState Self, ActorState Other, int Generation);
@@ -60,8 +61,12 @@ public sealed class EventTable
     /// The chain is re-sorted by (priority, registration order) on every call;
     /// a priority already taken on that event throws, because undefined order
     /// among same-event handlers is exactly what this table exists to prevent.
+    /// <paramref name="expand"/> names, for an actor, what the handler will run
+    /// in order (the enchantment loop's attached entries) for
+    /// <see cref="HandlersFor"/> to print; a handler that runs one thing leaves it null.
     /// </summary>
-    public void On<TPayload>(GameEvent evt, HandlerPriority priority, string name, Handler<TPayload> handler)
+    public void On<TPayload>(GameEvent evt, HandlerPriority priority, string name, Handler<TPayload> handler,
+        Func<ActorState, IEnumerable<string>>? expand = null)
         where TPayload : class
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -83,6 +88,7 @@ public sealed class EventTable
             Invoke = (payload, self, other) =>
                 handler((TPayload)payload, self, other)
                 ?? throw new InvalidOperationException($"{evt} handler '{name}' returned no payload."),
+            Expand = expand,
         });
         chain.Sort(static (a, b) =>
         {
@@ -179,16 +185,30 @@ public sealed class EventTable
 
     /// <summary>
     /// The chain for <paramref name="evt"/> as a sorted list you can print.
-    /// <paramref name="self"/> is where that actor's enchantment entries will
-    /// be expanded (step 4, index = attachment order) once weapons carry
-    /// enchantments; until then the list is the compiled handlers alone.
+    /// With <paramref name="self"/> given, a handler registered with an
+    /// expansion (the enchantment loop) is listed as what it will run for that
+    /// actor: one row per name it expands to, at (its step, index) with the
+    /// name suffixed <c>@index</c>, so the index-is-priority contract of
+    /// attachment order is inspectable; with nothing to expand it stays as its
+    /// own row. Without an actor the list is the compiled handlers alone.
     /// </summary>
     public IReadOnlyList<HandlerInfo> HandlersFor(GameEvent evt, ActorState? self = null)
     {
         var chain = _chains[Index(evt)];
         if (chain == null)
             return Array.Empty<HandlerInfo>();
-        return chain.Select(e => new HandlerInfo(evt, e.Priority, e.Name)).ToArray();
+
+        var rows = new List<HandlerInfo>(chain.Count);
+        foreach (var entry in chain)
+        {
+            var expanded = self != null && entry.Expand != null ? entry.Expand(self).ToList() : null;
+            if (expanded is { Count: > 0 })
+                for (int i = 0; i < expanded.Count; i++)
+                    rows.Add(new HandlerInfo(evt, new HandlerPriority(entry.Priority.Step, i), $"{expanded[i]}@{i}"));
+            else
+                rows.Add(new HandlerInfo(evt, entry.Priority, entry.Name));
+        }
+        return rows;
     }
 
     /// <summary>The typed chain, in dispatch order, for tests that wrap each handler.</summary>

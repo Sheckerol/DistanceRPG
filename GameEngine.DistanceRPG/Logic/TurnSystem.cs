@@ -63,12 +63,13 @@ public sealed class TurnSystem
     public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action<EnemyState>? EnemyBraceTriggered;
-    public event Action<PartyMemberState, StatusEffect>? CharacterBuffed;   // staff cast landed
+    public event Action<PartyMemberState, StatusEffect>? CharacterBuffed;   // a cast landed a status on the member: an ally's buff or an enemy's debuff
     public event Action<PartyMemberState, int>? CharacterHealed;            // end-of-turn regen tick (HP restored)
-    public event Action<EnemyState, StatusEffect>? EnemyBuffed;             // enemy healer's cast landed on an ally
+    public event Action<EnemyState, StatusEffect>? EnemyBuffed;             // a cast landed a status on the enemy: its healer's mend or the party's debuff
     public event Action<EnemyState, int>? EnemyHealed;                      // end-of-enemy-turn regen tick
     public event Action<EnemyState>? EnemyFleeing;                          // lone healer turning tail
     public event Action<ActorState, StatusTick>? ActorStatusTicked;         // a damage-over-time tick took HP (healing ticks arrive as CharacterHealed/EnemyHealed)
+    public event Action<ActorState, StatusEffect, ActorState>? ActorStatusApplied;   // a cast landed a status on the target (first) from the source (last), either side
     public event Action<ActorState, int>? ActorDisplaced;                   // shoved or dragged this many tiles, one at a time through the move path
     public event Action<ActorState>? OpportunistTriggered;                  // a free attack on a target that chose to leave reach
     public event Action<ActorState>? OverwatchTriggered;                    // a held shot fired at a target entering reach
@@ -140,6 +141,10 @@ public sealed class TurnSystem
     private readonly Dictionary<ActorState, Action<int>> _healFeeds = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Action> _deathFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for a cast's status landing: the Cast applier hands the entry now on
+    // the target to the side's typed event (CharacterBuffed, EnemyBuffed) the same way.
+    private readonly Dictionary<ActorState, Action<StatusEffect>> _statusFeeds = new(ReferenceEqualityComparer.Instance);
+
     // And for movement spent through the table (a swap): the applier takes the
     // settled amount off the budget the roster fixed for the actor — a party
     // member's DistLeft, the acting enemy's budget.
@@ -178,6 +183,8 @@ public sealed class TurnSystem
         _events.Applies<HealPayload>(GameEvent.HealingAboveFull, ApplyHealingAboveFull);
         _events.Applies<ThreatPayload>(GameEvent.ThreatZoneEntered, ApplyReactions);
         _events.Applies<MovementPayload>(GameEvent.MovementSpent, ApplyMovementSpent);
+        _events.Applies<CastPayload>(GameEvent.Cast, ApplyCast);
+        _events.Applies<ManaPayload>(GameEvent.ManaSpent, ApplyManaSpent);
 
         // The roster is fixed here, and with it which typed feed each actor's
         // hits, heals, death, brace and movement reach, which side it fights
@@ -187,6 +194,7 @@ public sealed class TurnSystem
             _hitFeeds[member] = resolution => CharacterHit?.Invoke(member, resolution);
             _healFeeds[member] = amount => CharacterHealed?.Invoke(member, amount);
             _deathFeeds[member] = () => OnCharacterDied(member);
+            _statusFeeds[member] = effect => CharacterBuffed?.Invoke(member, effect);
             _braceFeeds[member] = () => BraceTriggered?.Invoke(member);
             _movementFeeds[member] = spent => member.DistLeft = MathF.Max(0f, member.DistLeft - spent);
             _sides[member] = Side.Party;
@@ -197,6 +205,7 @@ public sealed class TurnSystem
             _hitFeeds[enemy] = resolution => EnemyHit?.Invoke(enemy, resolution);
             _healFeeds[enemy] = amount => EnemyHealed?.Invoke(enemy, amount);
             _deathFeeds[enemy] = () => OnEnemyDefeated(enemy);
+            _statusFeeds[enemy] = effect => EnemyBuffed?.Invoke(enemy, effect);
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
             _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
             _sides[enemy] = Side.Enemy;
@@ -383,37 +392,36 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// Can the caster cast their equipped staff on <paramref name="ally"/>
-    /// (self allowed)? Needs a staff whose innate effect lands on allies — a
-    /// debuff staff has no ally cast — enough movement and mana at the
-    /// resolved costs, and the ally within range and line of sight.
+    /// Can the caster cast their equipped staff on <paramref name="target"/>?
+    /// Needs a staff whose innate effect lands on the target's side (a buff on
+    /// an ally or on the caster itself, a debuff on an enemy), enough movement
+    /// and mana at the resolved costs, and the target within range and line
+    /// of sight. The innate's trigger is no gate: unaffordable, it scales or
+    /// does not fire (<see cref="EnchantmentBehaviours"/>).
     /// </summary>
-    public bool CanCast(PartyMemberState caster, PartyMemberState ally)
+    public bool CanCast(PartyMemberState caster, ActorState target)
     {
-        if (Phase != TurnPhase.Player || !caster.Alive || !ally.Alive) return false;
-        var w = caster.EquippedWeapon;
-        if (w == null || !w.IsCaster) return false;
-        var innate = w.Innate;
-        if (innate?.Def.Applies == null || innate.Def.Targets == TargetSide.Enemy) return false;
-        if (caster.DistLeft < w.ResolvedCost || caster.Mana < w.ResolvedManaCost) return false;
-        return EnemyAi.CanHit(caster, ally, w, _grid);
+        ArgumentNullException.ThrowIfNull(caster);
+        ArgumentNullException.ThrowIfNull(target);
+        if (Phase != TurnPhase.Player || !CanCastOn(caster, target)) return false;
+        var w = caster.EquippedWeapon!;   // CanCastOn gated on it
+        return caster.DistLeft >= w.ResolvedCost && caster.Mana >= w.ResolvedManaCost;
     }
 
     /// <summary>
-    /// Cast the equipped staff on an ally: spend movement and mana at the
-    /// resolved costs, then stack the innate enchantment's status at the
-    /// levels its potency grants. Returns false if the cast is not allowed.
+    /// Cast the equipped staff on <paramref name="target"/>: spend the cast's
+    /// resolved movement, then resolve the cast through the table. A staff's
+    /// cast is its hit (§1.3), so it rolls, crits, fumbles and pays through
+    /// <see cref="CastWith"/> as a swing lands through
+    /// <see cref="ResolveAttackOn"/>. Returns false if the cast is not allowed.
     /// </summary>
-    public bool TryCast(PartyMemberState caster, PartyMemberState ally)
+    public bool TryCast(PartyMemberState caster, ActorState target)
     {
-        if (!CanCast(caster, ally)) return false;
+        if (!CanCast(caster, target)) return false;
         var w = caster.EquippedWeapon!;
-        var innate = w.Innate!;
 
         caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
-        caster.Mana -= w.ResolvedManaCost;
-        var effect = ally.ApplyStatus(innate.Def.Applies!.Value, null, innate.LevelsFor(innate.Def.Potency));
-        CharacterBuffed?.Invoke(ally, effect);
+        CastWith(caster, target);
         return true;
     }
 
@@ -461,7 +469,7 @@ public sealed class TurnSystem
         foreach (var c in _party)
         {
             totalSaved += c.EndTurnSaveMovement();
-            c.RegenManaFromUnusedMovement();
+            c.RegenManaFromUnusedMovement(c.DistLeft);
             // The member's turn ends here: the status ticks are this event's
             // handlers, its applier writes what they settled, and a tick
             // death's consequences follow once the raise has returned.
@@ -552,15 +560,25 @@ public sealed class TurnSystem
     /// Hand the enemy turn to the next enemy that will actually do something;
     /// when none remain, the player turn starts. Dead enemies and passive
     /// ones — unseen for 2+ turns with nobody in reach — skip instantly, so a
-    /// maze full of idle dummies costs no wall-clock time.
+    /// maze full of idle dummies costs no wall-clock time. On the way past,
+    /// each enemy banks the budget it left as mana by the party's divisor
+    /// (§1.3): the one that just acted whatever its action left, an idle one
+    /// the whole of its (mired) budget.
     /// </summary>
     private void AdvanceToNextEnemy()
     {
+        if (_enemyIdx >= 0 && _enemyIdx < _enemies.Count)
+            ActingEnemy.RegenManaFromUnusedMovement(_enemyBudget);
+
         while (++_enemyIdx < _enemies.Count)
         {
             var enemy = _enemies[_enemyIdx];
             if (!enemy.Alive) continue;
-            if (enemy.TurnsSinceSeen >= 2 && !HasPassiveAction(enemy)) continue;
+            if (enemy.TurnsSinceSeen >= 2 && !HasPassiveAction(enemy))
+            {
+                enemy.RegenManaFromUnusedMovement(StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove));
+                continue;
+            }
 
             StartEnemyAction(enemy);
             return;
@@ -574,9 +592,9 @@ public sealed class TurnSystem
         // The budget after Mire's cut, the same 10% a level the party pays.
         _enemyBudget = StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove);
 
-        if (enemy.IsHealer)
+        if (enemy.IsSupportCaster)
         {
-            StartHealerAction(enemy);
+            StartSupportAction(enemy);
             return;
         }
 
@@ -611,35 +629,37 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// A staff healer's turn: while it has a living ally it moves to mend the
-    /// most-wounded one (then casts in the attack phase); alone, it flees the
-    /// party. Unseen healers stay put but still cast on any ally already in reach.
+    /// A support caster's turn (a staff whose innate lands on allies): while
+    /// it has a living ally it moves to reach the one its effect is for (the
+    /// most-wounded for a mending staff, the nearest for any other buff), then
+    /// casts in the attack phase; alone, it flees the party. Unseen casters
+    /// stay put but still cast on an ally already in reach.
     /// </summary>
-    private void StartHealerAction(EnemyState healer)
+    private void StartSupportAction(EnemyState caster)
     {
-        var blocked = OccupiedTilesExcept(healer);
+        var blocked = OccupiedTilesExcept(caster);
 
-        if (!EnemyAi.HasLivingAlly(healer, _enemies))
+        if (!EnemyAi.HasLivingAlly(caster, _enemies))
         {
-            EnemyFleeing?.Invoke(healer);
-            var (flee, fleeLeft) = EnemyAi.PlanFlee(healer, _party, _grid, _enemyBudget, blocked);
+            EnemyFleeing?.Invoke(caster);
+            var (flee, fleeLeft) = EnemyAi.PlanFlee(caster, _party, _grid, _enemyBudget, blocked);
             _enemyBudget = fleeLeft;
-            if (flee.Count == 0) { BeginAttackPhase(); return; } // cornered — beats will no-op
+            if (flee.Count == 0) { BeginAttackPhase(); return; } // cornered: beats will no-op
             BeginWalk(flee);
             return;
         }
 
-        var ally = EnemyAi.SelectHealTarget(healer, _enemies);
-        // No wounded ally, or one already in reach, or standing pat while unseen:
+        var ally = EnemyAi.SelectSupportTarget(caster, _enemies);
+        // Nobody to cast on, or the ally already in reach, or standing pat while unseen:
         // skip straight to the cast phase (which no-ops if nothing's castable).
-        if (ally == null || healer.TurnsSinceSeen >= 2 || EnemyAi.CanHit(healer, ally, healer.Weapon, _grid))
+        if (ally == null || caster.TurnsSinceSeen >= 2 || EnemyAi.CanHit(caster, ally, caster.Weapon, _grid))
         {
             BeginAttackPhase();
             return;
         }
 
         var (waypoints, remaining) = EnemyAi.PlanApproach(
-            healer, ally.X, ally.Y, ally.Radius, healer.Weapon.Range, _grid, _enemyBudget, blocked);
+            caster, ally.X, ally.Y, ally.Radius, caster.Weapon.Range, _grid, _enemyBudget, blocked);
         _enemyBudget = remaining;
         if (waypoints.Count == 0) { BeginAttackPhase(); return; }
         BeginWalk(waypoints);
@@ -672,14 +692,15 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Does this enemy have a reason to act while passive (unseen 2+ turns)? An
-    /// attacker needs someone in reach; a healer needs a wounded ally to mend.
-    /// A lone healer only flees once it's actually seen — there's no point
-    /// running through the fog from a party that can't see it — so while unseen
-    /// it stays put like any other idle dummy.
+    /// attacker, or a debuff caster, needs someone in reach; a support caster
+    /// needs an ally its effect is for. A lone support caster only flees once
+    /// it's actually seen (there's no point running through the fog from a
+    /// party that can't see it), so while unseen it stays put like any other
+    /// idle dummy.
     /// </summary>
     private bool HasPassiveAction(EnemyState enemy)
-        => enemy.IsHealer
-            ? EnemyAi.HasLivingAlly(enemy, _enemies) && EnemyAi.SelectHealTarget(enemy, _enemies) != null
+        => enemy.IsSupportCaster
+            ? EnemyAi.HasLivingAlly(enemy, _enemies) && EnemyAi.SelectSupportTarget(enemy, _enemies) != null
             : AnyHittableBy(enemy);
 
     private static (int R, int C) TileOf(float x, float y)
@@ -901,9 +922,9 @@ public sealed class TurnSystem
     {
         var enemy = ActingEnemy;
 
-        if (enemy.IsHealer)
+        if (enemy.Weapon.IsCaster)
         {
-            TryEnemyHealBeat(enemy);
+            TryEnemyCastBeat(enemy);
             return;
         }
 
@@ -919,24 +940,12 @@ public sealed class TurnSystem
             return;
         }
 
-        var hittable = _party.Where(c => c.Alive && EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid)).ToList();
-        if (hittable.Count == 0)
+        var target = NearestHittable(enemy);
+        if (target == null)
         {
             _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
             return;
-        }
-
-        var target = hittable[0];
-        float bestDist = Dist2(enemy, target);
-        for (int i = 1; i < hittable.Count; i++)
-        {
-            float d = Dist2(enemy, hittable[i]);
-            if (d < bestDist)
-            {
-                target = hittable[i];
-                bestDist = d;
-            }
         }
 
         _enemyBudget -= scaledCost;
@@ -947,19 +956,43 @@ public sealed class TurnSystem
         _timer = AttackBeatSeconds;
     }
 
-    /// <summary>
-    /// A healer's attack-phase beat: cast its staff's innate effect on the
-    /// most-wounded ally in reach, spending scaled budget, one cast per beat
-    /// until dry or nobody needs mending. A fleeing/idle healer simply finds
-    /// no target and passes.
-    /// </summary>
-    private void TryEnemyHealBeat(EnemyState healer)
+    /// <summary>The nearest living party member <paramref name="enemy"/>'s weapon reaches from where it stands (ties in roster order), or null.</summary>
+    private PartyMemberState? NearestHittable(EnemyState enemy)
     {
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * healer.Weapon.ResolvedCost;
-        var ally = EnemyAi.SelectHealTarget(healer, _enemies);
+        PartyMemberState? target = null;
+        float bestDist = float.MaxValue;
+        foreach (var c in _party)
+        {
+            if (!c.Alive || !EnemyAi.CanHit(enemy, c, enemy.Weapon, _grid)) continue;
+            float d = Dist2(enemy, c);
+            if (d < bestDist)
+            {
+                target = c;
+                bestDist = d;
+            }
+        }
+        return target;
+    }
 
-        if (!healer.Alive || _enemyBudget < scaledCost
-            || ally == null || !EnemyAi.CanHit(healer, ally, healer.Weapon, _grid))
+    /// <summary>
+    /// A caster's attack-phase beat: cast its staff on the target its innate
+    /// is for (a support staff on the ally it mends or buffs, a debuff staff
+    /// on the nearest party member in reach), spending scaled budget and mana
+    /// at the resolved costs, one cast per beat until dry, out of mana or out
+    /// of targets. Through the same cast core as the party's, so it rolls,
+    /// crits and pays its triggers the same way. A fleeing or idle caster
+    /// simply finds no target and passes.
+    /// </summary>
+    private void TryEnemyCastBeat(EnemyState caster)
+    {
+        var weapon = caster.Weapon;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * weapon.ResolvedCost;
+        ActorState? target = caster.IsSupportCaster
+            ? EnemyAi.SelectSupportTarget(caster, _enemies)
+            : NearestHittable(caster);
+
+        if (_enemyBudget < scaledCost || caster.Mana < weapon.ResolvedManaCost
+            || target == null || !CanCastOn(caster, target))
         {
             _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
@@ -967,9 +1000,8 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        var innate = healer.Weapon.Innate!;   // a healer is a caster whose innate lands on allies
-        var effect = ally.ApplyStatus(innate.Def.Applies!.Value, null, innate.LevelsFor(innate.Def.Potency));
-        EnemyBuffed?.Invoke(ally, effect);
+        CastWith(caster, target);
+        if (Phase == TurnPhase.GameOver) return;
 
         _timer = AttackBeatSeconds;
     }
@@ -1214,6 +1246,96 @@ public sealed class TurnSystem
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
             CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20, fromCleave);
         RunHeldDeaths();
+    }
+
+    // ── Casting ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The cast every caster makes, whichever side, before its own budget is
+    /// asked: a staff in hand whose innate applies a status (a wand's area
+    /// cast is its own path), the target on the side the innate lands on
+    /// (the caster's own for a buff, itself included; the other for a debuff)
+    /// and within range and sight. Off-roster actors cast on nobody.
+    /// </summary>
+    private bool CanCastOn(ActorState caster, ActorState target)
+    {
+        if (!caster.Alive || !target.Alive) return false;
+        var w = caster.EquippedWeapon;
+        if (w == null || !w.IsCaster) return false;
+        var innate = w.Innate;
+        if (innate?.Def.Applies == null) return false;
+        if (!_sides.TryGetValue(caster, out var casterSide) || !_sides.TryGetValue(target, out var targetSide)) return false;
+        if (!TargetsSide(innate.Def.Targets, sameSide: casterSide == targetSide)) return false;
+        return EnemyAi.CanHit(caster, target, w, _grid);
+    }
+
+    /// <summary>Whether an effect for <paramref name="targets"/> may land across <paramref name="sameSide"/>: a buff on its own side, a debuff on the other, either for one that takes any.</summary>
+    private static bool TargetsSide(TargetSide targets, bool sameSide)
+        => targets == TargetSide.Any || (targets == TargetSide.Ally) == sameSide;
+
+    /// <summary>
+    /// The one place a cast lands, whoever casts (§1.3 "a cast is a hit"):
+    /// the caster's natural roll, the same d20 a swing makes in the same crit
+    /// window, settles what it did to the cast (<see cref="CombatRules.RollToCast"/>:
+    /// a crit doubles the innate's levels and halves the mana, a fumble
+    /// doubles the mana), Cast runs the enchantment chain on this system's
+    /// table (the innate's status at its levels, the trigger paid out of what
+    /// the cast left, in attachment order) and the applier
+    /// (<see cref="ApplyCast"/>) writes the settled result once. Deaths a
+    /// cast's cascade caused settle after it, as after a hit; no Phase 1 cast
+    /// causes one.
+    /// </summary>
+    private void CastWith(ActorState caster, ActorState target)
+    {
+        var weapon = caster.EquippedWeapon!;   // the callers gated on it: a cast is with what the caster holds
+        var innate = weapon.Innate!;
+        var roll = CombatRules.RollToCast(_rollD20(), CombatRules.CritThreshold(caster),
+            innate.LevelsFor(innate.Def.Potency), weapon.ResolvedManaCost);
+        _events.Raise(GameEvent.Cast,
+            new CastPayload(weapon, target, roll.Roll, roll.IsCrit, roll.IsFumble, roll.Levels, roll.ManaCost), caster, target);
+        RunHeldDeaths();
+    }
+
+    /// <summary>
+    /// The Cast applier, the single world-write for a cast. Lands the settled
+    /// status applications on the target, telling the target's typed feed
+    /// (CharacterBuffed or EnemyBuffed, fixed when the roster was typed, never
+    /// by asking the target its kind) and <see cref="ActorStatusApplied"/> of
+    /// each, then queues the one ManaSpent record of the cast: the cast's own
+    /// mana plus the triggers its enchantments paid, spent by that event's
+    /// applier and never past the pool (a fumble's doubled cost empties it, it
+    /// does not overdraw it). A cast whose parties are no longer both standing
+    /// lands on nothing.
+    /// </summary>
+    private void ApplyCast(CastPayload settled, ActorState caster, ActorState target, EventTable table)
+    {
+        if (!caster.Alive || !target.Alive) return;
+
+        if (!settled.ApplyToTarget.IsDefaultOrEmpty)
+        {
+            if (!_statusFeeds.TryGetValue(target, out var applied))
+                throw new InvalidOperationException("Cast on an actor that is not on this turn system's roster.");
+            foreach (var status in settled.ApplyToTarget)
+            {
+                var effect = target.ApplyStatus(status.Type, status.Element, status.Levels);
+                applied(effect);
+                ActorStatusApplied?.Invoke(target, effect, caster);
+            }
+        }
+
+        int wanted = settled.ManaCost + settled.ManaToSpend;
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, caster.Mana), settled.Weapon.Id), caster, target);
+    }
+
+    /// <summary>
+    /// The ManaSpent applier: take what the chain settled as spent off the
+    /// actor's pool (every actor carries one, so no feed is needed), never
+    /// below zero, and nothing for a spend settled at zero.
+    /// </summary>
+    private void ApplyManaSpent(ManaPayload settled, ActorState self, ActorState other, EventTable table)
+    {
+        if (settled.Spent <= 0) return;
+        self.Mana = Math.Max(0, self.Mana - settled.Spent);
     }
 
     /// <summary>

@@ -15,6 +15,6 @@ public static class Behaviours
         StatusBehaviours.Register(table);
         DisplacementBehaviours.Register(table);
         ReactionBehaviours.Register(table);
-        // Enchantment behaviours register here as they land.
+        EnchantmentBehaviours.Register(table);
     }
 }

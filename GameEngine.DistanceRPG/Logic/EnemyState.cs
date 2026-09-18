@@ -22,8 +22,12 @@ public sealed class EnemyState : ActorState
     /// <summary>The weapon this enemy fights with is <see cref="Weapon"/>, which is never null.</summary>
     public override Weapon? EquippedWeapon => Weapon;
 
-    /// <summary>True for a support caster — a staff whose innate effect lands on allies — that mends its side rather than fighting.</summary>
-    public bool IsHealer => Weapon.Innate?.Def.Targets == TargetSide.Ally;
+    /// <summary>
+    /// True for a support caster (a staff whose innate effect lands on allies)
+    /// that mends or shields its side rather than fighting. A caster that is
+    /// not this is a debuff caster: an attacker whose swing is a cast.
+    /// </summary>
+    public bool IsSupportCaster => Weapon.Innate?.Def.Targets == TargetSide.Ally;
 
     public override float Radius => (GameConstants.Tile - 4f) / 2f;
 

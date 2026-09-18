@@ -112,7 +112,15 @@ public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken);
 /// <summary><see cref="GameEvent.Crit"/>.</summary>
 public sealed record CritPayload(Weapon Weapon, int Roll);
 
-/// <summary><see cref="GameEvent.ManaSpent"/>.</summary>
+/// <summary>
+/// <see cref="GameEvent.ManaSpent"/>: the one record of a spend — queued by the
+/// Cast applier once per cast with the cast's own mana plus the triggers its
+/// enchantments paid, <paramref name="Source"/> the weapon's id — whose applier
+/// takes <paramref name="Spent"/> off the pool. <paramref name="Wanted"/> is what
+/// the spend asked for; <paramref name="Spent"/> never exceeds the pool, so a
+/// fumble's doubled cost empties it rather than overdrawing it. Enchantment XP
+/// (§3.3) is counted on <paramref name="Spent"/>: the discounted mana actually paid.
+/// </summary>
 public sealed record ManaPayload(int Wanted, int Spent, string Source);
 
 /// <summary><see cref="GameEvent.MovementSpent"/> — attack, cast and swap costs in Phase 1.</summary>
@@ -157,8 +165,21 @@ public sealed record Reaction(ActorState Reactor, Weapon Weapon, ModifierType So
 /// </param>
 public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edge, ImmutableArray<Reaction> Reactions, int DistanceUnits);
 
-/// <summary><see cref="GameEvent.Cast"/>.</summary>
-public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost);
+/// <summary>
+/// <see cref="GameEvent.Cast"/>: a staff's hit (§1.3). <c>self</c> is the caster
+/// and <c>other</c> the <paramref name="Target"/>. The raiser rolls the d20
+/// before the chain and settles what the roll did to the cast — a crit doubles
+/// <paramref name="Levels"/>, the innate's levels, and halves
+/// <paramref name="ManaCost"/>, the weapon's resolved mana; a fumble doubles the
+/// mana and leaves the levels (§1.6, settled) — so the chain is pure. The
+/// enchantment loop then appends what each entry lands on the target to
+/// <paramref name="ApplyToTarget"/> and what its trigger cost to
+/// <paramref name="ManaToSpend"/>, in attachment order, each paying out of what
+/// the cast and the entries before it left; the applier writes both once and
+/// queues the one <see cref="ManaPayload"/> record of the cast.
+/// </summary>
+public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
+    ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0);
 
 /// <summary>Whether a move was chosen: Brace fires on entry either way, Opportunist only on a voluntary exit (§1.2).</summary>
 public enum MoveKind { Voluntary, Forced }

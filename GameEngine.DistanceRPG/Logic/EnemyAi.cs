@@ -166,6 +166,29 @@ public static class EnemyAi
         return best;
     }
 
+    /// <summary>
+    /// The ally a support caster casts on: for a mending staff (its innate
+    /// restores HP, the status row's flag rather than its type) the
+    /// most-wounded living ally, none when nobody is wounded; for any other
+    /// buff the nearest living ally, in reach or not (the walk closes the gap
+    /// and the beat casts only in reach). Null when there is nobody to cast on.
+    /// </summary>
+    public static EnemyState? SelectSupportTarget(EnemyState caster, IReadOnlyList<EnemyState> enemies)
+    {
+        if (caster.Weapon.Innate?.Def.Applies is { } type && StatusRules.Of(type).RestoresHp)
+            return SelectHealTarget(caster, enemies);
+
+        EnemyState? best = null;
+        float bestDist = float.MaxValue;
+        foreach (var e in enemies)
+        {
+            if (e == caster || !e.Alive) continue;
+            float d = DistSq(caster, e);
+            if (d < bestDist) { best = e; bestDist = d; }
+        }
+        return best;
+    }
+
     /// <summary>True when the healer has at least one other living enemy to support.</summary>
     public static bool HasLivingAlly(EnemyState healer, IReadOnlyList<EnemyState> enemies)
         => enemies.Any(e => e != healer && e.Alive);
@@ -236,10 +259,10 @@ public static class EnemyAi
         return best;
     }
 
-    private static float DistSq(EnemyState enemy, PartyMemberState c)
+    private static float DistSq(ActorState a, ActorState b)
     {
-        float dx = enemy.X - c.X;
-        float dy = enemy.Y - c.Y;
+        float dx = a.X - b.X;
+        float dy = a.Y - b.Y;
         return dx * dx + dy * dy;
     }
 }

@@ -11,6 +11,17 @@ public class StatusEffectTests
     /// <summary>The Staff of Renewal's statline: Resonant x1 resolves its 15 mana to 13.</summary>
     private static Weapon Staff => TestWeapons.Get("staff_of_renewal");
 
+    /// <summary>What one Renewal cast takes from the pool: the staff's resolved mana (13, Resonant x1) plus the innate's resolved trigger for the one level it applies (1).</summary>
+    private static int RenewalCastMana
+    {
+        get
+        {
+            var staff = Staff;
+            var regeneration = staff.Innate!;
+            return staff.ResolvedManaCost + regeneration.ResolvedTriggerCost(staff, regeneration.LevelsFor(regeneration.Def.Potency));
+        }
+    }
+
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
         var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
@@ -63,7 +74,7 @@ public class StatusEffectTests
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
         Assert.Equal(GameConstants.MaxDistance - Staff.Cost, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana - Staff.ResolvedManaCost, a.Mana);   // 13, Resonant x1; the innate's trigger arrives with the cast economy
+        Assert.Equal(GameConstants.MaxMana - RenewalCastMana, a.Mana);   // 13 (Resonant x1) plus the innate's 1 trigger
         Assert.NotNull(buffed);
         Assert.Equal(1, buffed!.Levels);
     }
@@ -78,7 +89,7 @@ public class StatusEffectTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(3, b.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 3 * Staff.ResolvedManaCost, a.Mana);
+        Assert.Equal(GameConstants.MaxMana - 3 * RenewalCastMana, a.Mana);
     }
 
     [Fact]
@@ -223,23 +234,55 @@ public class StatusEffectTests
     }
 
     [Fact]
-    public void EndTurn_FullyIdleTurnRegensOneTenthOfMana()
+    public void EndTurn_IdleTurnRegens16_Half8()
     {
+        // Mana comes back only from movement left unspent, MovementUnitsPerMana (10) units a point:
+        // a fully idle turn banks the whole 160 for 16, half the budget left is 8. The old tenth of
+        // the pool a turn (10) went with the divisor it came from.
         var (turns, a, _) = Scene();
         a.Mana = 0;
-        // a.DistLeft is a full budget (nothing moved) → full regen slice.
-        turns.EndTurn();
-        Assert.Equal(GameConstants.MaxMana / GameConstants.ManaRegenTurns, a.Mana);
+        turns.EndTurn();   // a.DistLeft is a full budget: nothing moved
+        Assert.Equal(16, a.Mana);
+        Assert.Equal((int)(GameConstants.MaxDistance / GameContent.Current.Tuning.MovementUnitsPerMana), a.Mana);
+
+        var (turns2, a2, _) = Scene();
+        a2.Mana = 0;
+        a2.DistLeft = GameConstants.MaxDistance / 2f;   // half the budget left unspent
+        turns2.EndTurn();
+        Assert.Equal(8, a2.Mana);
     }
 
     [Fact]
-    public void EndTurn_ManaRegenScalesWithUnusedMovement()
+    public void Regen_IsDerivedFromMovementUnitsPerMana()
     {
-        var (turns, a, _) = Scene();
-        a.Mana = 0;
-        a.DistLeft = GameConstants.MaxDistance / 2f; // half the budget left unspent
-        turns.EndTurn();
-        Assert.Equal(GameConstants.MaxMana / GameConstants.ManaRegenTurns / 2, a.Mana);
+        // The divisor is derived, not picked: a caster at Resonant x6 with a tier-1 enchantment sustains
+        // one cast a round standing still, (160 - 40) / (8 + 3) = 120 / 11 ~ 10.9 -> 10. The 8 is a
+        // base-20 staff's cast at x6; the 3 is the doc's tier-1 trigger at x6.
+        var staff = TestWeapons.Get("staff_of_warding");
+        staff.Acquire(Resonant, 5);   // x6, the ceiling: five acquired over the forged one
+        Assert.Equal((6, 8), (staff.Stacks(Resonant), staff.ResolvedManaCost));
+        const int TriggerManaAtSix = 3;
+        int derived = ((int)GameConstants.MaxDistance - staff.Cost) / (staff.ResolvedManaCost + TriggerManaAtSix);
+        Assert.Equal(10, derived);
+        Assert.Equal(derived, GameContent.Current.Tuning.MovementUnitsPerMana);
+
+        // A fully banked turn is 16 mana; a turn spent on one cast banks 120 and pays 12, against the 11 spent.
+        var caster = Char("A", 0, 0, "staff_of_warding");
+        caster.Mana = 0;
+        Assert.Equal(16, caster.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        caster.Mana = 0;
+        Assert.Equal(12, caster.RegenManaFromUnusedMovement(GameConstants.MaxDistance - staff.Cost));
+        Assert.True(12 >= staff.ResolvedManaCost + TriggerManaAtSix);
+
+        // Never past the pool, nothing from nothing, and nothing for the dead.
+        caster.Mana = GameConstants.MaxMana - 3;
+        Assert.Equal(3, caster.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        Assert.Equal(GameConstants.MaxMana, caster.Mana);
+        caster.Mana = 0;
+        Assert.Equal(0, caster.RegenManaFromUnusedMovement(9f));
+        caster.Alive = false;
+        Assert.Equal(0, caster.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        Assert.Equal(0, caster.Mana);
     }
 
     [Fact]

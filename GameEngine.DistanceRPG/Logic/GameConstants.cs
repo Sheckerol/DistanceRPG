@@ -35,15 +35,11 @@ public static class GameConstants
     public const int PlayerHp = 100;
     public const int DummyHp = 50;
 
-    /// <summary>Mana pool per party member, for casting staves.</summary>
-    public const int MaxMana = 100;
-
     /// <summary>
-    /// Turns of fully-idle movement needed to refill mana from empty: each end
-    /// of turn converts the unused fraction of the base budget into
-    /// <c>MaxMana / ManaRegenTurns</c> mana.
+    /// Mana pool per actor, for casts and for enchantment triggers; it comes
+    /// back only from unspent movement (<see cref="Tuning.MovementUnitsPerMana"/>).
     /// </summary>
-    public const int ManaRegenTurns = 10;
+    public const int MaxMana = 100;
 
     /// <summary>Enemy movement budget per turn, in logic units.</summary>
     public const float EnemyMove = 100f;

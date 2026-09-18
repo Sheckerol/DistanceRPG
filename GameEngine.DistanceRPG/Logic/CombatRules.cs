@@ -14,6 +14,9 @@ public enum RollOutcome
 /// <summary>The raw d20 attack roll before the defender's mitigation.</summary>
 public readonly record struct AttackRoll(int Roll, int Damage, RollOutcome Outcome);
 
+/// <summary>The raw d20 cast roll before the chain: what it did to the innate's levels and to the cast's mana.</summary>
+public readonly record struct CastRoll(int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost);
+
 /// <summary>
 /// An attack as the HUD and tests see it, projected from the settled
 /// <see cref="DamagePayload"/>: the roll, the pipeline's two outputs —
@@ -88,6 +91,32 @@ public static class CombatRules
         ArgumentNullException.ThrowIfNull(weapon);
         ArgumentNullException.ThrowIfNull(rollD20);
         return RollToBase(rollD20(), weapon.Damage, CritThreshold(weapon), weapon.Modifiers.Value(ModifierType.CritMultiplier));
+    }
+
+    /// <summary>A cast crit doubles the effect level applied — the crit axis the caster classes keep (§1.6).</summary>
+    public const int CastCritLevelMultiplier = 2;
+
+    /// <summary>A cast crit halves that cast's mana, floored (settled): a cheap efficient burst.</summary>
+    public const int CastCritManaDivisor = 2;
+
+    /// <summary>A cast fumble — a natural 1 — doubles that cast's mana (settled): a real punish for fishing.</summary>
+    public const int CastFumbleManaMultiplier = 2;
+
+    /// <summary>
+    /// A cast's step 1 as a pure function of its inputs, the counterpart of
+    /// <see cref="RollToBase"/>: staves and wands roll d20 like attacks, in the
+    /// caster's own crit window. A natural roll at or above
+    /// <paramref name="critThreshold"/> doubles <paramref name="levels"/> and
+    /// halves <paramref name="manaCost"/>; a natural 1 doubles the mana and
+    /// leaves the levels; anything else is the cast as priced.
+    /// </summary>
+    public static CastRoll RollToCast(int roll, int critThreshold, int levels, int manaCost)
+    {
+        if (roll >= critThreshold)
+            return new CastRoll(roll, IsCrit: true, IsFumble: false, levels * CastCritLevelMultiplier, manaCost / CastCritManaDivisor);
+        if (roll == 1)
+            return new CastRoll(roll, IsCrit: false, IsFumble: true, levels, manaCost * CastFumbleManaMultiplier);
+        return new CastRoll(roll, IsCrit: false, IsFumble: false, levels, manaCost);
     }
 
     /// <summary>

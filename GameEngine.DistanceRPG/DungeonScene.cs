@@ -431,11 +431,7 @@ public class DungeonScene : Scene
         };
 
         _turns.CharacterBuffed += (c, effect) =>
-        {
-            Log.Info($"[Combat] {c.Id} gains {effect.Type} Lv{effect.Levels}");
-            var obj = _party.First(p => p.State == c);
-            _hud.AddFloatingText(obj.Position, $"{StatusLabel(effect)} Lv{effect.Levels}", HealColor, -52f);
-        };
+            Log.Info($"[Combat] {c.Id} now carries {effect.Type} Lv{effect.Levels}");
 
         _turns.CharacterHealed += (c, amount) =>
         {
@@ -445,11 +441,15 @@ public class DungeonScene : Scene
         };
 
         _turns.EnemyBuffed += (enemy, effect) =>
+            Log.Info($"[Combat] Enemy now carries {effect.Type} Lv{effect.Levels}");
+
+        // A cast's status landing, whoever cast it on whom: the label is the
+        // status's own name; the colour says whether it came from the target's side.
+        _turns.ActorStatusApplied += (target, effect, source) =>
         {
-            Log.Info($"[Combat] Enemy healer casts {effect.Type} Lv{effect.Levels}");
-            var obj = EnemyObjectFor(enemy);
-            if (obj.IsActive)
-                _hud.AddFloatingText(obj.Position, $"{StatusLabel(effect)} Lv{effect.Levels}", HealColor, -52f);
+            bool hostile = (target is PartyMemberState) != (source is PartyMemberState);
+            if (TryObjectFor(target, out var obj) && obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"{StatusLabel(effect)} Lv{effect.Levels}", hostile ? TickColor : HealColor, -52f);
         };
 
         _turns.EnemyHealed += (enemy, amount) =>
@@ -826,7 +826,13 @@ public class DungeonScene : Scene
             {
                 bestT = tEnemy;
                 var target = enemy.State;
-                action = () => _turns.TryAttack(ActiveCharacter.State, target);
+                // A caster's enemy-click is a cast (a debuff staff lands its
+                // effect; a support staff has no enemy cast, and the click does
+                // nothing) and a martial weapon's is a swing.
+                bool casting = ActiveCharacter.State.EquippedWeapon?.IsCaster == true;
+                action = casting
+                    ? () => _turns.TryCast(ActiveCharacter.State, target)
+                    : () => _turns.TryAttack(ActiveCharacter.State, target);
             }
         }
 
@@ -839,12 +845,14 @@ public class DungeonScene : Scene
                 bestT = tChar;
                 int idx = i;
                 var target = member.State;
-                // A staff-wielder's ally-click is always a heal — identical
+                // A support staff's ally-click is always a cast — identical
                 // rules in and out of combat, spending the caster's movement.
                 // It never falls back to a leader-switch, which would reset the
-                // march formation mid-explore. Without a staff, the click
-                // selects the ally as the new leader instead.
-                bool casting = ActiveCharacter.State.EquippedWeapon?.IsCaster == true;
+                // march formation mid-explore. Without one (a martial weapon,
+                // or a debuff staff, which has no ally cast) the click selects
+                // the ally as the new leader instead.
+                var weapon = ActiveCharacter.State.EquippedWeapon;
+                bool casting = weapon is { IsCaster: true } && weapon.Innate?.Def.Targets != TargetSide.Enemy;
                 action = casting
                     ? () => _turns.TryCast(ActiveCharacter.State, target)
                     : () => SetActiveCharacter(idx);
