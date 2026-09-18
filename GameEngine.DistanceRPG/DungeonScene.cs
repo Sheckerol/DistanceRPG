@@ -608,13 +608,20 @@ public class DungeonScene : Scene
         return true;
     }
 
-    /// <summary>Swap an inventory slot with the equipped slot (slot 0), and tell the turn system the member's reach has changed.</summary>
+    /// <summary>
+    /// Swap an inventory slot with the equipped slot (slot 0) through the turn
+    /// system, which prices it — 20 movement once combat has begun, free out of
+    /// it — refuses an empty slot or a budget too short, and re-arms the
+    /// member's threat zone for the new reach (a held shot lapses with the
+    /// weapon that held it).
+    /// </summary>
     private void EquipSlot(int slot)
     {
         var state = ActiveCharacter.State;
-        var inventory = state.Inventory;
-        (inventory[0], inventory[slot]) = (inventory[slot], inventory[0]);
-        _turns.NotifyWeaponChanged(state);   // a threat zone follows its weapon: re-arm it, and a held shot lapses
+        if (_turns.TrySwap(state, slot))
+            Log.Info($"[Combat] {state.Id} equips {state.EquippedWeapon?.Name} (swap cost {_turns.SwapCost})");
+        else
+            Log.Info($"[Combat] {state.Id} cannot swap to slot {slot} (cost {_turns.SwapCost}, movement {state.DistLeft:0})");
     }
 
     private void UpdateActiveCharacterMovement(float deltaTime)

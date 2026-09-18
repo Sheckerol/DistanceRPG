@@ -187,6 +187,7 @@ public class EventTableTests
             new[]
             {
                 "DamageTaken (1,0) RollToBase",
+                "DamageTaken (1,1) Longshot",
                 "DamageTaken (2,0) Weakened",
                 "DamageTaken (3,0) Sundered",
                 "DamageTaken (3,9) FixWeaponShare",
@@ -195,6 +196,8 @@ public class EventTableTests
                 "DamageTaken (6,9) FixTaken",
                 "DamageTaken (7,0) CritRiders",
                 "DamageTaken (7,1) BlockWeaken",
+                "DamageTaken (7,2) Pin",
+                "DamageTaken (7,3) Softening",
                 "DamageTaken (8,0) Push",
                 "DamageTaken (8,1) Drag",
                 "DamageTaken (8,2) Rout",
@@ -239,7 +242,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(12, chain.Count);
+        Assert.Equal(15, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);

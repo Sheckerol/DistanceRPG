@@ -95,7 +95,7 @@ public class RiposteTests
         int farCounters = 0;
         far.RiposteTriggered += _ => farCounters++;
         Hit(far, archer, c, 10);
-        Assert.Equal(GameConstants.PlayerHp - 2, c.Hp);   // 5 into Block 3, blocked all the same
+        Assert.Equal(GameConstants.PlayerHp - 6, c.Hp);   // 5 + 4 (Longshot x1: seven tiles, four past the free three) into Block 3, blocked all the same
         Assert.Equal(0, farCounters);
         Assert.Equal(200, archer.Hp);
     }

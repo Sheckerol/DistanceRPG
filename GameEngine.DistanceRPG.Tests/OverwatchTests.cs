@@ -67,7 +67,7 @@ public class OverwatchTests
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Same(a, Assert.Single(fired));
         Assert.Equal(1, hits);
-        Assert.Equal(GameConstants.DummyHp - 2, enemy.Hp);   // 5 into Block 3
+        Assert.Equal(GameConstants.DummyHp - 9, enemy.Hp);   // 5 + 7 (Longshot x1: the crossing is at the tenth tile) into Block 3
 
         var b = Char("B", 5, 2, "crossbow");
         var walker = Approacher(b, 5);
@@ -106,8 +106,8 @@ public class OverwatchTests
 
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(2, shots);
-        Assert.Equal(GameConstants.DummyHp - 2, e1.Hp);
-        Assert.Equal(GameConstants.DummyHp - 2, e2.Hp);
+        Assert.Equal(GameConstants.DummyHp - 9, e1.Hp);   // 5 + 7 (Longshot x1 at the tenth tile) into Block 3
+        Assert.Equal(GameConstants.DummyHp - 9, e2.Hp);
         Assert.Equal(GameConstants.DummyHp, e3.Hp);
     }
 
@@ -160,7 +160,7 @@ public class OverwatchTests
         Assert.Equal(1, shots);
         Assert.Equal(1, a.HeldShots);
         Assert.False(turns.CanOverwatch(a));   // a shot is still held
-        Assert.Equal(200 - 7 - 2, e1.Hp);      // the sword's 10 and the bolt's 5, each into Block 3
+        Assert.Equal(200 - 7 - 9, e1.Hp);      // the sword's 10 and the bolt's 5 + 7 (Longshot x1 at the tenth tile), each into Block 3
 
         b.DistLeft = GameConstants.MaxDistance;
         Assert.True(turns.TryAttack(b, e2));
@@ -168,7 +168,7 @@ public class OverwatchTests
         Assert.Equal(2, shots);
         Assert.Equal(0, a.HeldShots);
         Assert.False(turns.CanOverwatch(a));   // nothing held, but this turn's two shots are spent
-        Assert.Equal(200 - 7 - 2, e2.Hp);
+        Assert.Equal(200 - 7 - 9, e2.Hp);
 
         // A swap lets a held shot lapse with the weapon that held it (the
         // movement it cost is not refunded), and a swap back may hold anew.

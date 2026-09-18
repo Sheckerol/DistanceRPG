@@ -50,8 +50,10 @@ public sealed record DamagePayload(
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with
     /// nothing computed and the lists empty rather than default.
+    /// <paramref name="fromCleave"/> marks a hit the swing fanned out to beyond
+    /// its primary target.
     /// </summary>
-    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None)
+    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None, bool fromCleave = false)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         return new DamagePayload(
@@ -62,7 +64,8 @@ public sealed record DamagePayload(
             ApplyToDefender: ImmutableArray<StatusApplication>.Empty,
             ApplyToAttacker: ImmutableArray<StatusApplication>.Empty,
             Displace: null,
-            ManaToSpend: 0);
+            ManaToSpend: 0,
+            FromCleave: fromCleave);
     }
 }
 

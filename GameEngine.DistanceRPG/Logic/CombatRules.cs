@@ -104,9 +104,10 @@ public static class CombatRules
     /// pure, seed the payload, raise <see cref="GameEvent.DamageTaken"/> with
     /// the attacker as <c>self</c> and the defender as <c>other</c>, and project
     /// the settled payload. Whatever the table's applier does with the result
-    /// has happened by the time this returns.
+    /// has happened by the time this returns. <paramref name="fromCleave"/>
+    /// marks a hit the swing fanned out to beyond its primary target.
     /// </summary>
-    public static AttackResolution Resolve(EventTable table, ActorState attacker, ActorState defender, Weapon weapon, int distanceUnits, Func<int> rollD20)
+    public static AttackResolution Resolve(EventTable table, ActorState attacker, ActorState defender, Weapon weapon, int distanceUnits, Func<int> rollD20, bool fromCleave = false)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(attacker);
@@ -114,7 +115,7 @@ public static class CombatRules
         ArgumentNullException.ThrowIfNull(weapon);
         ArgumentNullException.ThrowIfNull(rollD20);
 
-        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits);
+        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits, fromCleave: fromCleave);
         var settled = table.Raise(GameEvent.DamageTaken, initial, attacker, defender);
         return Project(settled);
     }
@@ -153,6 +154,16 @@ public static class CombatRules
     /// </summary>
     public static int SurfaceDistanceUnits(ActorState a, ActorState b)
         => Math.Max(0, (int)MathF.Ceiling(SurfaceDistance(a, b)));
+
+    /// <summary>
+    /// A distance in logic units as the whole tiles it spans, rounded up —
+    /// the conversion goes through <see cref="GameConstants.Tile"/>, the logic
+    /// units per map tile, never a bare rate — so a fraction past a tile
+    /// boundary is the next tile: 96 units are three tiles and 97 are four.
+    /// What Longshot prices; zero for nothing.
+    /// </summary>
+    public static int TilesSpanned(int distanceUnits)
+        => (int)MathF.Ceiling(Math.Max(0, distanceUnits) / GameConstants.Tile);
 
     /// <summary>
     /// Center-to-center distance check with both radii subtracted, matching the

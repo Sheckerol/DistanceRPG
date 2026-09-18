@@ -140,6 +140,20 @@ public sealed class TurnSystem
     private readonly Dictionary<ActorState, Action<int>> _healFeeds = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ActorState, Action> _deathFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for movement spent through the table (a swap): the applier takes the
+    // settled amount off the budget the roster fixed for the actor — a party
+    // member's DistLeft, the acting enemy's budget.
+    private readonly Dictionary<ActorState, Action<int>> _movementFeeds = new(ReferenceEqualityComparer.Instance);
+
+    // ── Turn economy ─────────────────────────────────────────────────────────
+    // Attacks each actor has chosen to make since its side's turn began — a
+    // brace, a held shot, a counter or an opportunity attack is a reaction and
+    // counts for nothing — read by the Charges cap: an actor with Charges
+    // stacks may choose its Charges value of attacks a turn (one throw plus one
+    // per stack) and no more, whatever movement is left; without stacks only
+    // the budget binds. Reset when each side's turn starts.
+    private readonly Dictionary<ActorState, int> _attacksThisTurn = new(ReferenceEqualityComparer.Instance);
+
     // Actors that died inside the raise in progress — a hit, a status tick, a
     // queued reaction or counter deep in a cascade. Their death consequences
     // run once the outermost raise returns, the queued Killed chain drained,
@@ -163,16 +177,18 @@ public sealed class TurnSystem
         _events.Applies<HealPayload>(GameEvent.HealingReceived, ApplyHealing);
         _events.Applies<HealPayload>(GameEvent.HealingAboveFull, ApplyHealingAboveFull);
         _events.Applies<ThreatPayload>(GameEvent.ThreatZoneEntered, ApplyReactions);
+        _events.Applies<MovementPayload>(GameEvent.MovementSpent, ApplyMovementSpent);
 
         // The roster is fixed here, and with it which typed feed each actor's
-        // hits, heals, death and brace reach, which side it fights on, and
-        // whether its zone may fire right now.
+        // hits, heals, death, brace and movement reach, which side it fights
+        // on, and whether its zone may fire right now.
         foreach (var member in party)
         {
             _hitFeeds[member] = resolution => CharacterHit?.Invoke(member, resolution);
             _healFeeds[member] = amount => CharacterHealed?.Invoke(member, amount);
             _deathFeeds[member] = () => OnCharacterDied(member);
             _braceFeeds[member] = () => BraceTriggered?.Invoke(member);
+            _movementFeeds[member] = spent => member.DistLeft = MathF.Max(0f, member.DistLeft - spent);
             _sides[member] = Side.Party;
             _mayReact[member] = static () => true;                       // the party's zones are always armed
         }
@@ -182,6 +198,7 @@ public sealed class TurnSystem
             _healFeeds[enemy] = amount => EnemyHealed?.Invoke(enemy, amount);
             _deathFeeds[enemy] = () => OnEnemyDefeated(enemy);
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
+            _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
@@ -270,22 +287,97 @@ public sealed class TurnSystem
 
     // ── Player actions ───────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Can the member attack the enemy? A martial weapon in hand, the swing's
+    /// resolved movement to spare, an attack left under Charges, and the
+    /// enemy in reach and sight.
+    /// </summary>
     public bool CanAttack(PartyMemberState c, EnemyState enemy)
     {
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
         if (w == null || w.IsCaster || c.DistLeft < w.ResolvedCost) return false; // a caster casts, it can't strike
+        if (!HasAttackLeft(c)) return false;                                      // Charges is a cap: the throws are spent whatever movement is left
         return EnemyAi.CanHit(c, enemy, w, _grid);
     }
 
-    /// <summary>Attack an enemy with the given member. Returns false if not allowed.</summary>
+    /// <summary>
+    /// Attack an enemy with the given member: the swing's movement is paid
+    /// once, however many targets a cleave fans it out to. Returns false if
+    /// not allowed.
+    /// </summary>
     public bool TryAttack(PartyMemberState c, EnemyState enemy)
     {
         if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
         c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
-        ResolveAttackOn(c, w, enemy);
+        CountAttack(c);
+        AttackWith(c, enemy);
+        return true;
+    }
+
+    /// <summary>Attacks <paramref name="actor"/> has chosen to make since its side's turn began; reactions count for nothing.</summary>
+    public int AttacksThisTurn(ActorState actor)
+        => _attacksThisTurn.TryGetValue(actor, out int attacks) ? attacks : 0;
+
+    /// <summary>
+    /// The attacks <paramref name="actor"/> may choose to make a turn under
+    /// <see cref="ModifierType.Charges"/> — its Charges value, one throw plus
+    /// one per stack — or null when it holds no Charges stacks and only the
+    /// movement budget binds. A cap, never a grant: granted from zero it would
+    /// make a bow worse, which is why Charges is forged only (§1.1).
+    /// </summary>
+    public int? AttacksPerTurn(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        return actor.Stacks(ModifierType.Charges) > 0 ? actor.Value(ModifierType.Charges) : null;
+    }
+
+    /// <summary>Whether <paramref name="actor"/> may choose another attack this turn: under its Charges cap, or uncapped.</summary>
+    public bool HasAttackLeft(ActorState actor)
+        => AttacksPerTurn(actor) is not int cap || AttacksThisTurn(actor) < cap;
+
+    private void CountAttack(ActorState actor) => _attacksThisTurn[actor] = AttacksThisTurn(actor) + 1;
+
+    /// <summary>
+    /// What a weapon swap costs right now: <see cref="Tuning.WeaponSwapCost"/>
+    /// movement once a live enemy has been seen this turn — the combat-footing
+    /// signal that also grants marching — and nothing out of combat, so
+    /// loadout management between fights stays free while a mid-fight swap is
+    /// a real decision: a bow user caught at knife range pays the swap and
+    /// then the swing (§1.2).
+    /// </summary>
+    public int SwapCost => AnyLiveEnemySeenThisTurn ? GameContent.Current.Tuning.WeaponSwapCost : 0;
+
+    /// <summary>
+    /// Can the member swap the weapon in <paramref name="slot"/> for the
+    /// equipped one? The slot must hold a weapon — a swap equips something —
+    /// and the member must have the swap's movement to spare.
+    /// </summary>
+    public bool CanSwap(PartyMemberState c, int slot)
+    {
+        if (Phase != TurnPhase.Player || !c.Alive) return false;
+        if (slot <= 0 || slot >= c.Inventory.Length || c.Inventory[slot] == null) return false;
+        return c.DistLeft >= SwapCost;
+    }
+
+    /// <summary>
+    /// Swap the weapon in <paramref name="slot"/> with the equipped one (slot
+    /// 0): spend the swap's movement through <see cref="GameEvent.MovementSpent"/>
+    /// when there is any to spend, exchange the slots, and re-arm the
+    /// member's threat zone for the new reach — a held shot lapses with the
+    /// weapon that held it. Returns false if not allowed.
+    /// </summary>
+    public bool TrySwap(PartyMemberState c, int slot)
+    {
+        if (!CanSwap(c, slot)) return false;
+
+        int cost = SwapCost;
+        if (cost > 0)
+            _events.Raise(GameEvent.MovementSpent, new MovementPayload(cost, cost, "swap"), c, c);
+        (c.Inventory[0], c.Inventory[slot]) = (c.Inventory[slot], c.Inventory[0]);
+        NotifyWeaponChanged(c);
         return true;
     }
 
@@ -425,6 +517,9 @@ public sealed class TurnSystem
 
     private void StartEnemyTurn()
     {
+        // The enemy side's turn starts: its chosen attacks are counted afresh.
+        _attacksThisTurn.Clear();
+
         // Seen bookkeeping happens once for everyone, before anyone acts.
         foreach (var enemy in _enemies)
         {
@@ -815,7 +910,8 @@ public sealed class TurnSystem
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
         float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.ResolvedCost;
 
-        if (!enemy.Alive || _enemyBudget < scaledCost)
+        // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
+        if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
         {
             _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
@@ -843,7 +939,8 @@ public sealed class TurnSystem
         }
 
         _enemyBudget -= scaledCost;
-        ResolveAttackOn(enemy, enemy.Weapon, target);
+        CountAttack(enemy);
+        AttackWith(enemy, target);
         if (Phase == TurnPhase.GameOver) return;
 
         _timer = AttackBeatSeconds;
@@ -914,12 +1011,13 @@ public sealed class TurnSystem
         }
 
         // A new turn: every reaction's uses are restored, held shots lapse,
-        // and both sides' zones re-arm from where everyone now stands (after
-        // resurrections placed everyone): pairs already inside never fire this
-        // turn.
+        // the party's chosen attacks are counted afresh, and both sides' zones
+        // re-arm from where everyone now stands (after resurrections placed
+        // everyone): pairs already inside never fire this turn.
         _partyZone.ResetUses();
         _enemyZone.ResetUses();
         _ripostes.Reset();
+        _attacksThisTurn.Clear();
         foreach (var roster in _rosters)
             foreach (var actor in roster)
                 actor.HeldShots = 0;
@@ -1008,6 +1106,19 @@ public sealed class TurnSystem
         => ApplyTicks(settled.Ticks, self, table);
 
     /// <summary>
+    /// The MovementSpent applier: take what the chain settled as spent off the
+    /// actor's budget, through the feed the roster fixed for it — never by
+    /// asking the actor its kind.
+    /// </summary>
+    private void ApplyMovementSpent(MovementPayload settled, ActorState self, ActorState other, EventTable table)
+    {
+        if (settled.Spent <= 0) return;
+        if (!_movementFeeds.TryGetValue(self, out var spend))
+            throw new InvalidOperationException("Spent the movement of an actor that is not on this turn system's roster.");
+        spend(settled.Spent);
+    }
+
+    /// <summary>
     /// Raise one of the three boundary events for one actor — as both self and
     /// other — and then run the death consequences of anyone a tick killed in
     /// it. The raise drained the queued Killed chain before returning, so this
@@ -1043,7 +1154,50 @@ public sealed class TurnSystem
     // ── Shared attack plumbing ───────────────────────────────────────────────
 
     /// <summary>
-    /// The one place an attack lands, whoever swings and whoever is hit: the
+    /// The one swing, whoever swings, with whatever they hold: the primary
+    /// target is resolved, then —
+    /// the attacker's <see cref="ModifierType.Cleave"/> value in extra targets,
+    /// nearest first among the other actors of the far side the weapon
+    /// reaches, all chosen at the swing so nothing the first hit sets off can
+    /// hide a target from it — each extra target is resolved as a hit the
+    /// cleave fanned out (<see cref="DamagePayload.FromCleave"/>, which Rout
+    /// reads), the movement having been paid once by the caller. Every hit
+    /// settles, cascades and holds its deaths through
+    /// <see cref="ResolveAttackOn"/>, one after another, each on its own roll;
+    /// the swing stops short when its attacker has fallen to a counter or the
+    /// game is over.
+    /// </summary>
+    private void AttackWith(ActorState attacker, ActorState primary)
+    {
+        var weapon = attacker.EquippedWeapon!;   // the callers gated on it: a swing is with what the attacker holds
+        var caught = CleaveTargets(attacker, weapon, primary);
+        ResolveAttackOn(attacker, weapon, primary);
+        foreach (var target in caught)
+        {
+            if (Phase == TurnPhase.GameOver || !attacker.Alive) return;
+            ResolveAttackOn(attacker, weapon, target, fromCleave: true);
+        }
+    }
+
+    /// <summary>
+    /// The other living actors on the far side that <paramref name="weapon"/>
+    /// reaches from where <paramref name="attacker"/> stands, nearest first —
+    /// ties in roster order, a stable sort, so the choice is data and never a
+    /// roll — up to the attacker's Cleave value; none without it.
+    /// </summary>
+    private List<ActorState> CleaveTargets(ActorState attacker, Weapon weapon, ActorState primary)
+    {
+        int extra = attacker.Value(ModifierType.Cleave);
+        if (extra <= 0) return new List<ActorState>();
+        return _rosters[(int)Opposite(_sides[attacker])]
+            .Where(t => t != primary && t.Alive && EnemyAi.CanHit(attacker, t, weapon, _grid))
+            .OrderBy(t => Dist2(attacker, t))
+            .Take(extra)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The one place a hit lands, whoever swings and whoever is hit: the
     /// attacker's natural roll and the surface distance seed a DamagePayload,
     /// DamageTaken runs the §1.6 chain on this system's table, and the applier
     /// (<see cref="ApplyDamage"/>) writes the settled result once — HP, the
@@ -1051,11 +1205,13 @@ public sealed class TurnSystem
     /// the braces it fires, all drained before the raise returns. What a death
     /// *means* (movement lost, defeat turn, party wipe) runs after it, for
     /// everyone the cascade took, through <see cref="RunHeldDeaths"/>.
+    /// <paramref name="fromCleave"/> marks a hit a swing fanned out to beyond
+    /// its primary target.
     /// </summary>
-    private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target)
+    private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target, bool fromCleave = false)
     {
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
-            CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20);
+            CombatRules.SurfaceDistanceUnits(attacker, target), _rollD20, fromCleave);
         RunHeldDeaths();
     }
 
@@ -1189,10 +1345,10 @@ public sealed class TurnSystem
         EnemyDefeated?.Invoke(target);
     }
 
-    private static float Dist2(EnemyState enemy, PartyMemberState c)
+    private static float Dist2(ActorState a, ActorState b)
     {
-        float dx = enemy.X - c.X;
-        float dy = enemy.Y - c.Y;
+        float dx = a.X - b.X;
+        float dy = a.Y - b.Y;
         return dx * dx + dy * dy;
     }
 }

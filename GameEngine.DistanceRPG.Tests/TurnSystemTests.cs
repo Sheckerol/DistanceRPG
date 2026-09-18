@@ -321,11 +321,12 @@ public class TurnSystemTests
         Assert.Equal(0, enemyBraces);
         Assert.Equal(GameConstants.PlayerHp, a.Hp);
 
-        // Walk into reach: one free spear poke (7, no block from a dagger).
+        // Walk into reach: one free spear poke (7, plus Longshot x1's +1 for
+        // a hit at the fourth tile — surface 122 — and no block from a dagger).
         a.X = enemy.X - 150f;
         turns.NotifyCharacterMoved(a);
         Assert.Equal(1, enemyBraces);
-        Assert.Equal(GameConstants.PlayerHp - 7, a.Hp);
+        Assert.Equal(GameConstants.PlayerHp - 8, a.Hp);
 
         // Deeper movement inside reach: no second trigger.
         a.X += 20f;
@@ -418,7 +419,7 @@ public class TurnSystemTests
 
         Assert.Equal(TurnPhase.Player, turns2.Phase);
         Assert.Equal(1, braces2);
-        Assert.Equal(GameConstants.DummyHp - 4, walker.Hp);   // the pike's 7 into Block 3
+        Assert.Equal(GameConstants.DummyHp - 5, walker.Hp);   // the pike's 7 + 1 (Longshot x1 at the fourth tile, where it crossed in) into Block 3
     }
 
     [Fact]

@@ -102,7 +102,7 @@ public class DisplacementTests
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(1, braces);
         Assert.Equal(1, hits);
-        Assert.Equal(GameConstants.DummyHp - 4, enemy.Hp);   // 7 into Block 3
+        Assert.Equal(GameConstants.DummyHp - 5, enemy.Hp);   // 7 + 1 (Longshot x1 at the fourth tile, where it crossed in) into Block 3
         // It crossed into reach on tile 10 of the row and was set down on tile 11: out of reach again.
         Assert.Equal((5, 11), TileOf(enemy));
         Assert.Equal(At(5, 11), (enemy.X, enemy.Y));
@@ -130,7 +130,20 @@ public class DisplacementTests
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
         Assert.Equal(new[] { 2 }, tiles);
 
-        // Adjacent already: nothing to pull it onto, and no event for a shove that moved nothing.
+        // Adjacent already: nothing to pull it onto, and no event for a shove
+        // that moved nothing. The harpoon's Charges x1 has spent both of this
+        // turn's throws, so the third comes next turn: the dummy sits the
+        // enemy phase out far from everyone and unseen, then is set back down
+        // beside the thrower (a set-down through the move path, not a shove).
+        Assert.False(turns.CanAttack(a, enemy));
+        (enemy.X, enemy.Y) = At(15, 15);
+        turns.NotifyActorMoved(enemy, MoveKind.Forced);
+        turns.EndTurn();
+        Advance(turns, 3f);
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        (enemy.X, enemy.Y) = At(5, 6);
+        turns.NotifyActorMoved(enemy, MoveKind.Forced);
+        Assert.Equal(new[] { 2 }, tiles);
         a.DistLeft = GameConstants.MaxDistance;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
@@ -235,7 +248,7 @@ public class DisplacementTests
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
         Assert.Equal(new[] { s }, braced);
         Assert.Equal(2, hits);
-        Assert.Equal(200 - 7 - 4, enemy.Hp);   // the sword's 10 and the spear's 7, each into Block 3
+        Assert.Equal(200 - 7 - 5, enemy.Hp);   // the sword's 10 and the spear's 7 + 1 (Longshot x1 at the fourth tile), each into Block 3
         Assert.Equal(GameConstants.MaxDistance, s.DistLeft);
         Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
     }
@@ -259,7 +272,7 @@ public class DisplacementTests
 
         Assert.Equal(At(5, 8), (enemy.X, enemy.Y));
         Assert.Equal(new[] { s1, s2 }, braced);
-        Assert.Equal(200 - 7 - 4 - 4, enemy.Hp);
+        Assert.Equal(200 - 7 - 5 - 5, enemy.Hp);   // each spear's 7 + 1 (Longshot x1: both crossings are at the fourth tile) into Block 3
     }
 
     [Fact]
@@ -396,7 +409,7 @@ public class DisplacementTests
 
         Assert.Equal(new[] { "H2", "H1", "H2", "H1", "H2", "H1" }, braced);
         Assert.Equal(7, hits);   // the sword and six braces
-        Assert.Equal(200 - 7 - 6 * 4, enemy.Hp);
+        Assert.Equal(200 - 7 - 6 * 5, enemy.Hp);   // every link is a brace at the fourth tile: 7 + 1 (Longshot x1) into Block 3
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));   // the last link, H1's, left it in H2's exhausted reach
         Assert.True(enemy.Alive);
         Assert.Equal(TurnPhase.Player, turns.Phase);
@@ -425,7 +438,7 @@ public class DisplacementTests
         Assert.Equal(At(5, 4), (a.X, a.Y));
         Assert.Equal(new[] { spear }, braced);
         Assert.Equal(2, hits);
-        Assert.Equal(GameConstants.PlayerHp - 10 - 7, a.Hp);   // no shield on a dagger: the sword's 10 and the spear's 7 in full
+        Assert.Equal(GameConstants.PlayerHp - 10 - 8, a.Hp);   // no shield on a dagger: the sword's 10 and the spear's 7 + 1 (Longshot x1 at the fourth tile) in full
     }
 
     [Fact]
@@ -522,6 +535,6 @@ public class DisplacementTests
         Assert.Equal(100, Assert.Single(crossings));                              // four tiles less both radii, read at tile 7
         Assert.Equal(Assert.Single(crossings), Assert.Single(braceDistances));   // and carried into the free attack
         Assert.Equal(36, CombatRules.SurfaceDistanceUnits(s, enemy));            // two tiles: where the shove left it
-        Assert.Equal(200 - 7 - 4, enemy.Hp);
+        Assert.Equal(200 - 7 - 5, enemy.Hp);   // and Longshot priced the crossing's fourth tile, not the two tiles it landed at: 7 + 1 into Block 3
     }
 }
