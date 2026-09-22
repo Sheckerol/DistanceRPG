@@ -214,16 +214,34 @@ public static class EnchantmentBehaviours
     /// The loop on Cast: <c>self</c> is the caster, <c>other</c> the target.
     /// Each attached entry with a cast behaviour fires in list order, seeing
     /// what the cast's own mana and the entries before it left of the pool.
+    /// <para>
+    /// Each entry's own application is attributed as it fires — the movement of
+    /// the levels in <see cref="CastPayload.ApplyToTarget"/> across that one
+    /// call — and a forged entry's goes into
+    /// <see cref="CastPayload.ForgedLevels"/> as well, which is what the cast
+    /// credits the staff's ladder with (§2.2). The same six lines
+    /// <see cref="DamageTakenLoop"/> attributes a hit's share with, for the same
+    /// reason: a staff's status application is not innate to the weapon def, it
+    /// is an entry's, so without this a grafted applier would level the staff it
+    /// was bolted onto. The difference is taken inside the loop and never off
+    /// its total, or an entry that applied nothing would be charged with its
+    /// neighbour's levels.
+    /// </para>
     /// </summary>
     public static CastPayload CastLoop(CastPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            var enchantment = weapon.Enchantments[i];
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
+            int before = AppliedLevels(payload);
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int added = AppliedLevels(payload) - before;
+            if (added > 0 && weapon.IsForged(i))
+                payload = payload with { ForgedLevels = payload.ForgedLevels + added };
         }
         return payload;
     }
@@ -708,6 +726,10 @@ public static class EnchantmentBehaviours
 
     private static bool Fired(ImmutableArray<string> fired, string id)
         => !fired.IsDefaultOrEmpty && fired.Contains(id);
+
+    /// <summary>The levels a cast has settled on its target so far — a staff's output, in the only units it has (§2.2): what <see cref="CastLoop"/> attributes entry by entry.</summary>
+    private static int AppliedLevels(CastPayload payload)
+        => payload.ApplyToTarget.IsDefaultOrEmpty ? 0 : payload.ApplyToTarget.Sum(s => s.Levels);
 
     private static ImmutableArray<T> OrEmpty<T>(ImmutableArray<T> array)
         => array.IsDefault ? ImmutableArray<T>.Empty : array;

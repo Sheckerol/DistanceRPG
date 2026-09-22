@@ -1467,12 +1467,12 @@ public sealed class TurnSystem
     /// status applications on the target, telling the target's typed feed
     /// (CharacterBuffed or EnemyBuffed, fixed when the roster was typed, never
     /// by asking the target its kind) and <see cref="ActorStatusApplied"/> of
-    /// each, credits the caster's proficiency with the levels they came to
-    /// (§2.2), then queues the one ManaSpent record of the cast: the cast's own
-    /// mana plus the triggers its enchantments paid, spent by that event's
-    /// applier and never past the pool (a fumble's doubled cost empties it, it
-    /// does not overdraw it). A cast whose parties are no longer both standing
-    /// lands on nothing.
+    /// each, credits the caster's proficiency with the levels the weapon's own
+    /// forged entries applied (§2.2), then queues the one ManaSpent record of
+    /// the cast: the cast's own mana plus the triggers its enchantments paid,
+    /// spent by that event's applier and never past the pool (a fumble's
+    /// doubled cost empties it, it does not overdraw it). A cast whose parties
+    /// are no longer both standing lands on nothing.
     /// </summary>
     private void ApplyCast(CastPayload settled, ActorState caster, ActorState target, EventTable table)
     {
@@ -1493,11 +1493,13 @@ public sealed class TurnSystem
         // A staff deals no damage, so what it teaches is the status levels it
         // landed — the staff's own output stated in the only units it has (§2.2)
         // — read off the applications the chain settled, which are what this
-        // applier just wrote. A wand lands none (content refuses a status
-        // applier on one), so its cast credits nothing and its hits credit
-        // themselves, each with its own share.
-        CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class,
-            settled.ApplyToTarget.IsDefaultOrEmpty ? 0 : settled.ApplyToTarget.Sum(s => s.Levels)));
+        // applier just wrote, and counting only the levels the staff's own
+        // forged entries applied: a status application is always an entry's
+        // doing, so the forged/acquired line a hit draws through ForgedShare is
+        // drawn here too, and a grafted applier levels nothing. A wand lands
+        // none (content refuses a status applier on one), so its cast credits
+        // nothing and its hits credit themselves, each with its own share.
+        CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.ForgedLevels));
 
         int wanted = settled.ManaCost + settled.ManaToSpend;
         table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, caster.Mana), settled.Weapon.Id), caster, target);
@@ -1551,13 +1553,27 @@ public sealed class TurnSystem
     /// unscaled, because the governing stat divides the threshold and never
     /// multiplies the gain.
     /// </para>
+    /// <para>
+    /// The two guards come before the quiet path, not after it, so neither is
+    /// unreachable: a negative figure — what a defender handler that absorbed
+    /// more than the weapon's share would settle — is refused here rather than
+    /// lost to a feed that drops it (<see cref="PartyMemberState.Credit"/>
+    /// states the same rule for the pools: XP is credited, never taken back),
+    /// and an earner this system does not know is named the moment it earns
+    /// anything at all, including nothing, rather than at whatever later credit
+    /// happens to be positive.
+    /// </para>
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The credit is negative: XP is credited, never taken back.</exception>
     /// <exception cref="InvalidOperationException"><paramref name="earner"/> is not on this system's roster.</exception>
     private void CreditXp(ActorState earner, XpCredit credit)
     {
-        if (credit.Amount <= 0) return;
+        if (credit.Amount < 0)
+            throw new ArgumentOutOfRangeException(nameof(credit), credit.Amount,
+                "XP is credited, never taken back: a refund is not a negative credit.");
         if (!_xpFeeds.TryGetValue(earner, out var feed))
             throw new InvalidOperationException("Credited XP to an actor that is not on this turn system's roster.");
+        if (credit.Amount == 0) return;
         feed(credit);
     }
 

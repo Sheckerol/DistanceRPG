@@ -391,6 +391,33 @@ public class XpCreditTests
         Assert.Equal(2, e.WeaponXp[WeaponClass.Staff]);
     }
 
+    [Fact]
+    public void StaffXp_CountsTheForgedApplication_NotAGraftedOne()
+    {
+        // The forged/acquired line a hit draws through ForgedShare is drawn on a
+        // cast too, and for a sharper reason: a staff applies nothing of itself —
+        // every application is an entry's doing — so without the line a Ward soul
+        // bolted onto a Renewal staff would level the staff five times over for
+        // work the staff never did. Both statuses land on the ally; only the
+        // staff's own entry teaches the ladder.
+        var grid = new int[20, 20];
+        var catalogue = GameContent.Current.Enchantments;
+        var grafted = new Weapon(GameContent.Current.Weapons["staff_of_renewal"],
+            [new Enchantment(catalogue["regeneration"], 1), new Enchantment(catalogue["ward"], 1)],
+            forgedCount: 1);
+        Assert.Equal((1, true, false), (grafted.ForgedEnchantmentCount, grafted.IsForged(0), grafted.IsForged(1)));
+
+        var caster = Char("A", 5, 5, grafted);
+        var ally = Char("B", 5, 6, "weakspot_stiletto");
+        var turns = new TurnSystem(grid, new[] { caster, ally }, new[] { Enemy(5, 7, Sword) }, () => 10);
+
+        Assert.True(turns.TryCast(caster, ally));
+
+        Assert.Equal(1, ally.StatusLevel(Regeneration));
+        Assert.Equal(5, ally.StatusLevel(Ward));                 // the ally felt the whole cast
+        Assert.Equal(1, caster.WeaponXp[WeaponClass.Staff]);     // and the staff learnt its own level of it, never 6
+    }
+
     // ── Health XP: what was actually restored ────────────────────────────────
 
     [Fact]
@@ -548,6 +575,49 @@ public class XpCreditTests
         Assert.True(healer.Mana < healer.MaxMana, "and paid for it out of its own pool");
         Assert.Empty(alsoCredited);
         Assert.Equal((0, 0, 0), (far.WeaponXp.Total, farOpening.HpGained(far), farOpening.ManaGained(far)));
+    }
+
+    // ── The credit site's two guards ─────────────────────────────────────────
+
+    [Fact]
+    public void AStrangerIsNamed_EvenByACreditOfNothing()
+    {
+        // "Nothing for nothing" answers what a credit is worth, not who earned
+        // it: an actor this system never rostered has no feed at all, and the
+        // credit site says so on the first credit it sees — including one of
+        // zero. Guarded the other way round the zero would pass quietly and the
+        // first symptom would be some later, positive credit throwing from
+        // somewhere unrelated to the actor that was never on the roster.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 5, "weakspot_stiletto");
+        var turns = new TurnSystem(grid, new[] { a }, new[] { Enemy(15, 15) }, () => 10);
+        var stranger = Char("Z", 9, 9, "weakspot_stiletto");   // built, never handed to the turn system
+
+        // A mana record that spends nothing and hands something back — Siphon's
+        // shape on a kill that cost nothing — credits zero, and still names it.
+        var ex = Assert.Throws<InvalidOperationException>(() => turns.Events.Raise(
+            GameEvent.ManaSpent, new ManaPayload(Wanted: 0, Spent: 0, "nowhere", Restored: 1), stranger, stranger));
+        Assert.Contains("not on this turn system's roster", ex.Message);
+    }
+
+    [Fact]
+    public void ANegativeCreditIsRefused_NotSwallowed()
+    {
+        // XP is credited, never taken back: a refund is not a negative credit.
+        // Block can never settle one — it leaves at least 1 of the weapon's
+        // share — but a defender handler that absorbs past it can, and the
+        // credit site refuses that figure rather than letting a feed drop it.
+        // The probe is the shape Xp_IsCreditedFromTheSettledPayload_NotTheRolledOne
+        // registers, at the same step, run past what any shipped rule would do.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 5, "weakspot_stiletto");
+        var blocker = Enemy(5, 6, Sword);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { blocker }, () => 10);
+        turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(5, 5), "over-absorb",
+            (p, _, _) => p with { Absorbed = p.WeaponShare + 1 });
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => turns.TryAttack(a, blocker));
+        Assert.Contains("never taken back", ex.Message);
     }
 
     // ── The typed event ──────────────────────────────────────────────────────

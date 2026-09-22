@@ -282,10 +282,21 @@ public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edg
 /// <see cref="DamagePayload.CastFired"/>: the cast pays once, the hits fire
 /// their halves of those entries at no further cost, and an entry the cast
 /// could not pay stays quiet on every hit.
+/// <para>
+/// <paramref name="ForgedLevels"/> is how much of <paramref name="ApplyToTarget"/>
+/// came from entries the weapon was forged with, counted in levels and
+/// attributed to each entry as the loop runs it — the cast side of
+/// <see cref="DamagePayload.ForgedShare"/>, and for the same reason. A staff
+/// applies nothing of itself: its whole output is an entry's doing, so what a
+/// cast teaches the staff is the levels its <em>own</em> entries landed and
+/// never the levels of something grafted on later (§2.2, §3.1). It is what the
+/// Cast applier credits, exactly as a hit credits
+/// <see cref="DamagePayload.WeaponDealt"/> with the forged share beside it.
+/// </para>
 /// </summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
     ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None,
-    ImmutableArray<string> Fired = default);
+    ImmutableArray<string> Fired = default, int ForgedLevels = 0);
 
 /// <summary>Whether a move was chosen: Brace fires on entry either way, Opportunist only on a voluntary exit (§1.2).</summary>
 public enum MoveKind { Voluntary, Forced }

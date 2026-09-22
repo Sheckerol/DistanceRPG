@@ -7,7 +7,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public enum XpPool
 {
-    /// <summary>Proficiency with a weapon class: fed by the weapon's own mitigated damage, or by a staff's status levels applied.</summary>
+    /// <summary>Proficiency with a weapon class: fed by the weapon's own mitigated damage, or by the status levels a staff's own forged entries applied.</summary>
     Weapon,
 
     /// <summary>Max HP: fed by HP actually restored — "constitution grows by getting hurt and then healed".</summary>
