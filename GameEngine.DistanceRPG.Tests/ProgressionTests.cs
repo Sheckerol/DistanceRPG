@@ -56,19 +56,51 @@ public class ProgressionTests
     {
         // The pool is its raw XP and nothing else: replaying the same number
         // twice gives the same struct, and feeding it in one lump agrees with
-        // feeding it a credit at a time. Nothing is cached, so a tuning swap
-        // cannot leave a stale maximum behind either.
-        for (int xp = 0; xp <= 200; xp++)
-            Assert.Equal(Progression.Pool(xp, 3), Progression.Pool(xp, 3));
+        // feeding it a credit at a time. Both halves are asserted against a
+        // hand-rolled replay rather than against Progression.Pool itself, since
+        // comparing the function with the function holds for any implementation,
+        // broken or not. The model spells the rule out: a point costs
+        // XpToNext(currentBar, stat) -- pinned by literals in
+        // XpToNext_IsTheBarOverTheStat -- the bar moves as the point lands, and
+        // whatever is left carries into the next.
+        static PoolProgress Consume(PoolProgress from, int credit, int stat)
+        {
+            int points = from.Points, max = from.Max, carried = from.XpIntoNext + credit;
+            int cost = Math.Max(1, Progression.XpToNext(max, stat));   // floored, because a free step is forbidden
+            while (carried >= cost)
+            {
+                carried -= cost;
+                points++;
+                max++;
+                cost = Math.Max(1, Progression.XpToNext(max, stat));
+            }
+            return new PoolProgress(points, max, carried, cost);
+        }
 
+        static PoolProgress Fresh(int stat) => Consume(new PoolProgress(0, StartingPool, 0, 0), 0, stat);
+
+        // One lump: every total to 200, replayed from nothing. Read ascending and
+        // then descending, so a cache a rising sequence had warmed would show up
+        // as a disagreement rather than as agreement with itself.
+        for (int xp = 0; xp <= 200; xp++)
+            Assert.Equal(Consume(Fresh(3), xp, 3), Progression.Pool(xp, 3));
+        for (int xp = 200; xp >= 0; xp--)
+            Assert.Equal(Consume(Fresh(3), xp, 3), Progression.Pool(xp, 3));
+
+        // In pieces: each credit consumed against the bar it found, carrying the
+        // remainder, lands exactly where the same total replayed from nothing does.
         int running = 0;
+        var pieces = Fresh(4);
         foreach (int credit in new[] { 3, 1, 7, 4, 12, 9, 40, 6 })
         {
             running += credit;
-            Assert.Equal(Progression.Pool(running, 4), Progression.Pool(running, 4));
+            pieces = Consume(pieces, credit, 4);
+            Assert.Equal(pieces, Progression.Pool(running, 4));
         }
+
+        // The model is itself pinned by a literal, so neither side can drift.
         Assert.Equal(82, running);
-        Assert.Equal(Progression.Pool(82, 4), Progression.Pool(running, 4));
+        Assert.Equal(new PoolProgress(Points: 11, Max: 36, XpIntoNext: 4, XpToNext: 9), Progression.Pool(running, 4));
     }
 
     [Fact]

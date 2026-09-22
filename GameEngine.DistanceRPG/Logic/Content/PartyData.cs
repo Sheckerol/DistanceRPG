@@ -5,8 +5,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// they open the game holding. A starting loadout is content, not a constant —
 /// which member gets which permutation is "a first guess" the doc expects to
 /// move after playing (§2.1), so it has to be a data edit rather than a code
-/// one. Phase 1 ships the compiled instance
-/// (<see cref="ContentDefaults.Party"/>); Phase 5 adds only deserialisation.
+/// one. Phase 2 ships the compiled instance
+/// (<see cref="ContentDefaults.Party"/>) — Phase 1's pattern, this phase's
+/// roster; Phase 5 adds only deserialisation.
 /// </summary>
 /// <param name="Id">The stable string id a save refers to the member by.</param>
 /// <param name="Name">The display name.</param>

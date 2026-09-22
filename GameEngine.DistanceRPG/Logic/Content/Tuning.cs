@@ -166,9 +166,11 @@ public sealed record Tuning
     public int FriendlyFireAllyPercent { get; init; } = 50;
 
     // ---- Progression (§2.1, §2.2) ----
-    // §5.3 files both of these under its Economy group. They are the two numbers
-    // a playtest would actually turn; the shape of a level's effect
-    // (Progression.DamagePerLevels and the rest) stays compiled.
+    // StartingPool is §5.3's own key, in its Economy group. WeaponXpPerLevel is
+    // named here, because §5.3 names the weapon ladder's 100 nowhere at all; the
+    // Economy group is where it lands when Phase 5 writes tuning.json. They are
+    // the two numbers a playtest would actually turn; the shape of a level's
+    // effect (Progression.DamagePerLevels and the rest) stays compiled.
 
     /// <summary>
     /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
