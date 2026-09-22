@@ -134,6 +134,38 @@ public static class EnchantmentBehaviours
     public static bool HealsTheWielder(EffectKind kind) => WielderHealers.Contains(kind);
 
     /// <summary>
+    /// The kinds whose behaviour lands the entry's own
+    /// <see cref="EnchantmentDef.Applies"/> status — a staff's cast, Serrated's
+    /// wound, a lingering element's burn — and so the kinds content must name
+    /// a status for: what the validator asks instead of listing kinds. A new
+    /// status-landing kind is a row here as its behaviour is a row in its
+    /// event's table.
+    /// </summary>
+    private static readonly IReadOnlySet<EffectKind> StatusAppliers = new HashSet<EffectKind>
+    {
+        EffectKind.ApplyStatus,
+        EffectKind.Serrated,
+        EffectKind.LingeringElement,
+    };
+
+    /// <summary>Whether <paramref name="kind"/>'s behaviour lands the entry's <see cref="EnchantmentDef.Applies"/> status (<see cref="StatusAppliers"/>).</summary>
+    public static bool AppliesStatus(EffectKind kind) => StatusAppliers.Contains(kind);
+
+    /// <summary>
+    /// The kinds whose behaviour reads an element entry on the same weapon —
+    /// the one carrying the entry's <see cref="EnchantmentDef.DamageType"/>
+    /// (<see cref="ElementFor"/>) — to say how deep it goes: the lingering
+    /// element. Content must name an element that exists for these.
+    /// </summary>
+    private static readonly IReadOnlySet<EffectKind> ElementLingerers = new HashSet<EffectKind>
+    {
+        EffectKind.LingeringElement,
+    };
+
+    /// <summary>Whether <paramref name="kind"/>'s behaviour lingers the element its entry names (<see cref="ElementLingerers"/>).</summary>
+    public static bool LingersAnElement(EffectKind kind) => ElementLingerers.Contains(kind);
+
+    /// <summary>
     /// Whether <paramref name="kind"/> has a behaviour in the loop's table for
     /// <paramref name="evt"/>: what content validation asks of an entry — does
     /// it convert healing above full, say — without naming the kind. False for
@@ -152,7 +184,7 @@ public static class EnchantmentBehaviours
     /// <summary>A type is whole or nothing: the one "level" an element's cast fires at, so its flat trigger is paid in full or not at all.</summary>
     private const int OneType = 1;
 
-    /// <summary>The one "level" a rule fires at: a shot carried on, a kill refunded, a life spared, a shove refused — whole or nothing, like a type.</summary>
+    /// <summary>The one "level" the rules that fire once fire at: a shot carried on, a kill refunded, a life spared, a shove refused — whole or nothing, like a type. (Overheal, a rule too, grants levels and scales them to what it could pay.)</summary>
     private const int Once = 1;
 
     /// <summary>Register the loops on <paramref name="table"/>, on each event they run on, expanded for printing into the actor's attached entries; and the defender's two souls at their steps.</summary>
@@ -451,12 +483,17 @@ public static class EnchantmentBehaviours
     /// Piercing fires on a hit and carries the shot to the next body in line
     /// beyond the one it struck, rolling the same hit again: settled here as
     /// <see cref="DamagePayload.Pierces"/>, for its flat trigger paid whole or
-    /// not at all, and performed by the applier, which knows the map. The body
-    /// the shot was carried to does not carry it on again.
+    /// not at all, and performed by the applier. Where the shot would go was
+    /// read off the map at impact (<see cref="DamagePayload.NextInLine"/>), so
+    /// the entry knows before it pays: a shot with nobody on its line — a lone
+    /// target, bodies off the line or past the weapon's reach — has nothing to
+    /// carry on to, and like any effect that scales to nothing it does not
+    /// fire and pays nothing. The body the shot was carried to does not carry
+    /// it on again.
     /// </summary>
     public static DamagePayload Piercing(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
     {
-        if (payload.FromPierce) return payload;
+        if (payload.FromPierce || payload.NextInLine is not { Alive: true }) return payload;
         var (fired, paid) = PartialFire(enchantment, weapon, Once, manaLeft);
         if (fired <= 0) return payload;
         return payload with { Pierces = true, ManaToSpend = payload.ManaToSpend + paid };

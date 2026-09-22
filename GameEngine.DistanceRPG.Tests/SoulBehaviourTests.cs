@@ -183,7 +183,8 @@ public class SoulBehaviourTests
         // The Stormcrow's shot does not stop at the first body: for 6 it continues to the next body on the
         // line beyond it — within a tile of the shot's ray, within range and sight — as a fresh hit on a
         // fresh roll, at that body's own distance. A body a row over is not in line; one past the bow's
-        // reach is not reached; and the body the shot was carried to does not carry it on again.
+        // reach is not reached; and the body the shot was carried to does not carry it on again. A shot
+        // with nobody on its line has nowhere to go, and pays nothing.
         var grid = new int[20, 20];
         var a = Char("A", 5, 2, "stormcrow");
         var first = Enemy(5, 6);       // four tiles: surface 100, the fourth tile pays Longshot's 3
@@ -227,6 +228,46 @@ public class SoulBehaviourTests
         Assert.True(dry.TryAttack(b, e1));
         Assert.Single(dryHits);
         Assert.Equal((5, 200), (b.Mana, e2.Hp));
+
+        // With nobody on the line — a lone target, the only other bodies a row over or past the bow's reach —
+        // the shot has nowhere to go: the line read at impact names nobody, Piercing does not fire, and
+        // nothing is paid, however full the pool.
+        var c = Char("C", 5, 2, "stormcrow");
+        var lone = Enemy(5, 6);
+        var offLine = Enemy(8, 6);
+        var farAway = Enemy(5, 14);
+        var clear = new TurnSystem(grid, new[] { c }, new[] { lone, offLine, farAway }, () => 10);
+        var clearHits = HitProbe(clear);
+        var clearSpent = ManaProbe(clear);
+        var clearDealt = new List<DamagePayload>();
+        clear.Events.On<DamagePayload>(GameEvent.DamageDealt, new HandlerPriority(9, 9), "probe", (p, _, _) =>
+        {
+            clearDealt.Add(p);
+            return p;
+        });
+        Assert.True(clear.TryAttack(c, lone));
+        Assert.Single(clearHits);
+        var dealt = Assert.Single(clearDealt);
+        Assert.Null(dealt.NextInLine);
+        Assert.Equal((false, 0), (dealt.Pierces, dealt.ManaToSpend));
+        Assert.Empty(clearSpent);
+        Assert.Equal((GameConstants.MaxMana, 200 - 8, 200, 200), (c.Mana, lone.Hp, offLine.Hp, farAway.Hp));
+
+        // The handler itself: a payload whose line names nobody, or a body already dead, settles nothing;
+        // one naming a living body settles the continuation for its 6.
+        var table = Compiled();
+        var shot = DamagePayload.Initial(c.EquippedWeapon!, 10, 100) with { WeaponShare = 8, Dealt = 8, Taken = 8 };
+        var corpse = Enemy(5, 10);
+        corpse.Alive = false;
+        Assert.Equal((false, 0), Settled(shot));
+        Assert.Equal((false, 0), Settled(shot with { NextInLine = corpse }));
+        Assert.Equal((true, 6), Settled(shot with { NextInLine = Enemy(5, 10) }));
+
+        (bool Pierces, int ManaToSpend) Settled(DamagePayload payload)
+        {
+            var settled = table.Raise(GameEvent.DamageDealt, payload, c, lone);
+            return (settled.Pierces, settled.ManaToSpend);
+        }
     }
 
     // ── Vampiric, Serrated, Bleeding ─────────────────────────────────────────
@@ -361,13 +402,15 @@ public class SoulBehaviourTests
     // ── Overheal ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Overheal_RenewalTickOnFullAlly_BecomesWard()
+    public void Overheal_RenewalTickOnFullWielder_BecomesWard_AllyNotYet()
     {
         // The Nameless Renewal's Overheal: a Regeneration tick landing on its wielder at full HP is banked
         // — the whole surplus into the hidden pool, for 8 less Resonant's tenth: 7 — and folded into Ward at
-        // five to one in the same chain. The soul answers the surplus of whoever holds it: an ally holding a
-        // plain staff overflows the same five and keeps nothing, since a tick carries no reference to
-        // whoever cast the Regeneration it came from.
+        // five to one in the same chain. The soul answers the surplus of whoever holds it. The Renewal home's
+        // ally half — a tick on a topped-up ally shielding that ally — is deferred to Phase 3 by ruling: a
+        // tick carries no reference to whoever cast the Regeneration it came from (no status remembers its
+        // applier), so an ally holding a plain staff overflows the same five and keeps nothing. Pinned here
+        // so the deferral is visible, not silent.
         var grid = new int[20, 20];
         var healer = Char("H", 5, 5, "staff_of_renewal_unique");
         var ally = Char("A", 5, 6, "staff_of_renewal");
@@ -489,12 +532,15 @@ public class SoulBehaviourTests
         Assert.Equal((10, 100), (ten.LevelsFor(100), ten.LevelsFor(1000)));
 
         // Level the Flaming and the Searing it leaves goes deeper with it: at tier 2 the burn is 3 levels off
-        // the 8 where tier 1 left 1. The statement never intensifies; the element does.
+        // the 8 where tier 1 left 1. The statement never intensifies; the element does. Tier is earned by
+        // casting (section 3.3), so a tier-2 Flaming is the weapon as play leaves it rather than as it drops:
+        // built here directly, past the content validator, which holds an arriving unique to one shape.
         var grid = new int[20, 20];
-        using (TestContent.Use(weapons: new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("flaming", 2), new EnchantmentRef("burning")] } : w).ToList())))
+        var nova = GameContent.Current.Weapons["wand_of_the_nova_unique"];
+        var levelled = new Weapon(nova with { Enchantments = [new EnchantmentRef("flaming", 2), new EnchantmentRef("burning")] },
+            [new Enchantment(flaming, 2), burning]);
         {
-            var a = Char("A", 5, 5, "wand_of_the_nova_unique");
+            var a = Holding("A", 5, 5, levelled);
             var target = Enemy(5, 6);
             var turns = new TurnSystem(grid, new[] { a }, new[] { target }, () => 10);
             Assert.True(turns.TryCastArea(a, (a.X, a.Y)));

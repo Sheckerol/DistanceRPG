@@ -1503,7 +1503,9 @@ public sealed class TurnSystem
     /// the follow-ups for the table to drain after it returns, in this order:
     /// Killed on a death, DamageDealt always, Crit on a crit. The order is a
     /// ruling of the decomposition (1b rule 5), pinned by DamagePipelineTests,
-    /// not an accident of this method. Death consequences are held for the
+    /// not an accident of this method. The DamageDealt it queues carries the
+    /// shot's line as it stood at impact (<see cref="DamagePayload.NextInLine"/>),
+    /// read before the blow moves anyone. Death consequences are held for the
     /// outermost raise. A queued hit whose parties are no longer both standing
     /// — a second brace on a mover the first one killed — lands on nothing: a
     /// corpse neither swings nor is struck.
@@ -1535,6 +1537,12 @@ public sealed class TurnSystem
         SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
         SpendMana(table, target.EquippedWeapon?.Id ?? settled.Weapon.Id, target, attacker, settled.DefenderManaToSpend);
 
+        // The shot's line is read at impact, before the blow shoves anyone or a
+        // counter moves the attacker: what DamageDealt's entries see when they
+        // ask whether the shot has anywhere to go. A shot already carried on
+        // is not carried again, so it reads no line.
+        var nextInLine = settled.FromPierce ? null : NextInLine(attacker, settled.Weapon, target);
+
         if (target.Hp <= 0)
         {
             target.Alive = false;
@@ -1551,7 +1559,7 @@ public sealed class TurnSystem
             if (settled.Displace is { Tiles: > 0 } shove)
                 ApplyDisplacement(target, shove);
         }
-        table.Enqueue(GameEvent.DamageDealt, settled.AsDealt(), attacker, target);
+        table.Enqueue(GameEvent.DamageDealt, settled.AsDealt() with { NextInLine = nextInLine }, attacker, target);
         if (settled.IsCrit)
             table.Enqueue(GameEvent.Crit, new CritPayload(settled.Weapon, settled.Roll), attacker, target);
     }
@@ -1563,9 +1571,9 @@ public sealed class TurnSystem
     /// payments are one mana record; the heal they settled (Vampiric's drink)
     /// is queued as a HealingReceived to the attacker, so a surplus reaches
     /// HealingAboveFull and whatever banks it; and a shot settled as carried
-    /// on (Piercing) is queued as a fresh DamageTaken on the next body in line,
-    /// on its own roll, at the distance it stands. A dead attacker — a counter
-    /// queued ahead of this took it — fires nothing.
+    /// on (Piercing) is queued as a fresh DamageTaken on the body the hit's
+    /// line named at impact, on its own roll, at the distance it stands. A
+    /// dead attacker — a counter queued ahead of this took it — fires nothing.
     /// </summary>
     private void ApplyDamageDealt(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
     {
@@ -1582,7 +1590,7 @@ public sealed class TurnSystem
         if (settled.HealToAttacker > 0)
             table.Enqueue(GameEvent.HealingReceived,
                 new HealPayload(settled.HealToAttacker, Applied: 0, Overflow: 0, settled.Weapon.Id), attacker, attacker);
-        if (settled.Pierces && PierceTarget(attacker, settled.Weapon, target) is { } next)
+        if (settled.Pierces && settled.NextInLine is { Alive: true } next)
             table.Enqueue(GameEvent.DamageTaken,
                 DamagePayload.Initial(settled.Weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(attacker, next),
                     settled.Type, castFired: settled.CastFired, fromPierce: true, onDefendersTurn: OnOwnTurn(next)),
@@ -1606,17 +1614,19 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// The next body on the shot line, for Piercing: among the living actors
-    /// on the far side, the nearest one further along the attacker-to-target
-    /// ray than <paramref name="first"/> whose centre lies within one tile of
-    /// that ray, and which the weapon reaches from where the attacker stands
-    /// — range and sight, like any hit. "In line" is a tile's width either
-    /// side of the ray, so a body a row over is not in line; "beyond" is
-    /// measured along the ray, so nothing behind the shooter or level with the
-    /// first body qualifies. Null when the line is clear.
+    /// The next body on the shot's line (<see cref="DamagePayload.NextInLine"/>):
+    /// among the living actors on the far side, the nearest one further along
+    /// the attacker-to-target ray than <paramref name="first"/> whose centre
+    /// lies within one tile of that ray, and which the weapon reaches from
+    /// where the attacker stands — range and sight, like any hit. "In line" is
+    /// a tile's width either side of the ray, so a body a row over is not in
+    /// line; "beyond" is measured along the ray, so nothing behind the shooter
+    /// or level with the first body qualifies. Null when the line is clear, or
+    /// for an attacker off the roster, which has no far side.
     /// </summary>
-    private ActorState? PierceTarget(ActorState attacker, Weapon weapon, ActorState first)
+    private ActorState? NextInLine(ActorState attacker, Weapon weapon, ActorState first)
     {
+        if (!_sides.TryGetValue(attacker, out var side)) return null;
         float dx = first.X - attacker.X, dy = first.Y - attacker.Y;
         float length = MathF.Sqrt(dx * dx + dy * dy);
         if (length <= 0f) return null;
@@ -1624,7 +1634,7 @@ public sealed class TurnSystem
 
         ActorState? next = null;
         float nearest = float.MaxValue;
-        foreach (var candidate in _rosters[(int)Opposite(_sides[attacker])])
+        foreach (var candidate in _rosters[(int)Opposite(side)])
         {
             if (candidate == first || !candidate.Alive) continue;
             float cx = candidate.X - attacker.X, cy = candidate.Y - attacker.Y;

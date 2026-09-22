@@ -80,9 +80,11 @@ public class UniqueContentTests
         // The whole table, walked: eleven uniques, every forged stack under MaxForged — x3 is the ceiling a
         // unique's raise reaches and nothing is forged past it — the raised modifier at exactly x3, and the
         // Light shape's signature at x2. Nothing acquired at instantiation.
-        var uniques = Catalogue.All.Where(w => w.Unique).ToList();
+        var uniques = Catalogue.Uniques;
         Assert.Equal(11, uniques.Count);
         Assert.Equal(Table.Select(t => t.Id), uniques.Select(u => u.Id));
+        Assert.Equal(Catalogue.All.Where(w => w.Unique), uniques);
+        Assert.All(Enum.GetValues<WeaponClass>(), c => Assert.DoesNotContain(Catalogue.ByClass(c), w => w.Unique));   // a class's variants are what a roll chooses among
 
         foreach (var (id, name, derivedFrom, raised, enchantments) in Table)
         {
@@ -310,7 +312,8 @@ public class UniqueContentTests
     public void Souls_CarryTheCatalogueNumbers_MagnitudesQuoteNoFlatTrigger()
     {
         // The §3.3 table as loaded: lock and trigger per soul, and Vampiric's catalogue row. A soul that is
-        // a rule quotes a flat trigger, paid whole or not at all; one that is a magnitude — Serrated's
+        // a rule quotes a flat trigger — whole or nothing for the ones that fire once, scaled for Overheal's
+        // grant — and one that is a magnitude — Serrated's
         // Bleeding, Burning's Searing — quotes none and applies a status instead, so its price rides the
         // ladder over the levels it lands, and names the source it takes its percentage of.
         var rules = new (string Id, EffectKind Kind, int Lock, int Trigger)[]
@@ -342,6 +345,55 @@ public class UniqueContentTests
         Assert.Equal(("serrated", ContentValidator.RuleTriggerXorApplies), (ex.EntryId, ex.Rule));
         ex = LoadEnchantmentEditing("burning", e => e with { DamageType = null });
         Assert.Equal(("burning", ContentValidator.RuleLingerNamesElement), (ex.EntryId, ex.Rule));
+    }
+
+    [Fact]
+    public void MartialUniques_CarryOneUniqueSoul_CasterUniques_TakeOneOfThreeShapes()
+    {
+        // A martial unique that raises one modifier to x3 carries exactly one enchantment, and one that
+        // exists nowhere else — "one modifier at x3, plus its unique enchantment": not none, not a catalogue
+        // entry however deep, not two souls. A second soul is what only the Light shape buys (above).
+        var ex = LoadEditing("the_bulwark", w => w with { Enchantments = [] });
+        Assert.Equal(("the_bulwark", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
+        ex = LoadWith(Martial("test_flaming_wall", "tower_guard", [(Block, 3), (Push, 1)], "flaming"));
+        Assert.Equal(("test_flaming_wall", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
+        Assert.Contains("'flaming' is a catalogue entry", ex.Message);
+        ex = LoadWith(Martial("test_deep_leech", "tower_guard", [(Block, 3), (Push, 1)], ("vampiric", 3)));
+        Assert.Equal(("test_deep_leech", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
+        ex = LoadWith(Martial("test_two_souls", "tower_guard", [(Block, 3), (Push, 1)], "sturdy", "siphon"));
+        Assert.Equal(("test_two_souls", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
+        Assert.Contains("2 enchantments", ex.Message);
+
+        // A caster unique raises nothing, so its artifact is one of three shapes on its innate: a unique
+        // enchantment beside it (the Nova's Burning, the Renewal's Overheal), the innate alone at tier 3
+        // (Rotwood's Poison), or two non-opposing catalogue entries at tier 1 (the Long Candle).
+        Assert.Equal(new[] { ("poison", 3) }, Catalogue["rotwood"].Enchantments.Select(r => (r.Id, r.Tier)));
+        Assert.Equal(new[] { ("shocking", 1), ("flaming", 1) }, Catalogue["the_long_candle"].Enchantments.Select(r => (r.Id, r.Tier)));
+        Assert.Equal(new[] { false, true }, Catalogue["wand_of_the_nova_unique"].Enchantments.Select(r => Enchantments[r.Id].Unique));
+        Assert.Equal(new[] { false, true }, Catalogue["staff_of_renewal_unique"].Enchantments.Select(r => Enchantments[r.Id].Unique));
+
+        // Refused: a wand fixing one plain element (an ordinary drop's), an innate deepened short of tier 3,
+        // a soul beside a deepened innate (two shapes at once), a third entry, and a staff starting from an
+        // innate its variant does not cast.
+        ex = LoadWith(Wand("test_plain_wand", "wand_of_the_blast", "flaming"));
+        Assert.Equal(("test_plain_wand", ContentValidator.RuleCasterUniqueShape), (ex.EntryId, ex.Rule));
+        ex = LoadEditing("rotwood", w => w with { Enchantments = [new EnchantmentRef("poison", 2)] });
+        Assert.Equal(("rotwood", ContentValidator.RuleCasterUniqueShape), (ex.EntryId, ex.Rule));
+        Assert.Contains("'poison' at tier 2", ex.Message);
+        ex = LoadEditing("staff_of_renewal_unique", w => w with { Enchantments = [new EnchantmentRef("regeneration", 3), new EnchantmentRef("overheal")] });
+        Assert.Equal(("staff_of_renewal_unique", ContentValidator.RuleCasterUniqueShape), (ex.EntryId, ex.Rule));
+        ex = LoadWith(Staff("test_three", "staff_of_renewal", "regeneration", "ward", "poison"));
+        Assert.Equal(("test_three", ContentValidator.RuleCasterUniqueShape), (ex.EntryId, ex.Rule));
+        ex = LoadEditing("rotwood", w => w with { Enchantments = [new EnchantmentRef("ward", 3)] });   // a Staff of Blight casts Poison
+        Assert.Equal(("rotwood", ContentValidator.RuleCasterUniqueShape), (ex.EntryId, ex.Rule));
+        Assert.Contains("'poison'", ex.Message);
+
+        // Legitimate: a wand fixing its element at tier 3, and a staff dropping with a second catalogue entry.
+        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons,
+            Wand("test_deep_ember", "wand_of_the_blast", "flaming") with { Enchantments = [new EnchantmentRef("flaming", 3)] },
+            Staff("test_mending_ward", "staff_of_renewal", "regeneration", "ward")]));
+        Assert.Equal(("flaming", 3), (TestWeapons.Get("test_deep_ember").Innate!.Id, TestWeapons.Get("test_deep_ember").Innate!.Tier));
+        Assert.Equal(new[] { "regeneration", "ward" }, TestWeapons.Get("test_mending_ward").Enchantments.Select(e => e.Id));
     }
 
     [Fact]
@@ -391,7 +443,7 @@ public class UniqueContentTests
         // The same walk the thirty-two get, over the eleven: every forged modifier is allowed beside the rest
         // of its spread on its kind of weapon, so no unique quietly gives someone two reactions or a
         // displacement pair.
-        foreach (var def in Catalogue.All.Where(w => w.Unique))
+        foreach (var def in Catalogue.Uniques)
         {
             var weapon = TestWeapons.Get(def.Id);
             foreach (var (t, n) in weapon.Forged.Entries)

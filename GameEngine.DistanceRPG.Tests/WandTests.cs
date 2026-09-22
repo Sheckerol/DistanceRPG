@@ -504,7 +504,7 @@ public class WandTests
         Assert.Equal(("test_frostfire_knife", ContentValidator.RuleEnchantmentsExcluded), (ex.EntryId, ex.Rule));
 
         // A wand fixed to one element cannot be instantiated as another, opposed or not.
-        using (TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, UniqueWand("test_ember", "flaming")])))
+        using (TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, UniqueWand("test_ember", ("flaming", 3))])))
         {
             Assert.Equal(Flaming, TestWeapons.Get("test_ember").Innate!.Def.DamageType);
             Assert.Equal(Flaming, TestWeapons.Get("test_ember", Flaming).Innate!.Def.DamageType);
@@ -550,8 +550,8 @@ public class WandTests
 
         // The rule is the wand's alone: a staff casts one as a matter of course, and a martial weapon may
         // carry one (the counter is transferable) — its Cast never runs.
-        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, Dagger("test_venom_knife", "poison")]));
-        Assert.Equal("poison", Assert.Single(TestWeapons.Get("test_venom_knife").Enchantments).Id);
+        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, Dagger("test_venom_knife", "poison", "acidic")]));
+        Assert.Equal(new[] { "poison", "acidic" }, TestWeapons.Get("test_venom_knife").Enchantments.Select(e => e.Id));
         Assert.Equal("regeneration", TestWeapons.Get("staff_of_renewal").Innate!.Id);
         Assert.Equal(32 + 11 + 1, GameContent.Current.Weapons.All.Count);
 
@@ -680,17 +680,25 @@ public class WandTests
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static WeaponDef UniqueWand(string id, params string[] enchantmentIds)
+        => UniqueWand(id, enchantmentIds.Select(e => (e, 1)).ToArray());
+
+    /// <summary>A test wand unique off the Wand of the Nova, its enchantments at the given tiers.</summary>
+    private static WeaponDef UniqueWand(string id, params (string Id, int Tier)[] enchantments)
         => new(id, id, WeaponClass.Wand, Role: null, Range: 160, Damage: 8, Cost: 45, ManaCost: 20,
             Forged: new Dictionary<ModifierType, int> { [Resonant] = 1 },
-            Enchantments: enchantmentIds.Select(e => new EnchantmentRef(e)).ToList(),
+            Enchantments: enchantments.Select(e => new EnchantmentRef(e.Id, e.Tier)).ToList(),
             Shape: AreaShape.Nova(96), Unique: true, DerivedFrom: "wand_of_the_nova");
 
-    /// <summary>A test unique derived from the Weakspot Stiletto the way the derivation rule asks (§1.5): its support modifier raised to x3, nothing else changed.</summary>
+    /// <summary>
+    /// A test unique derived from the Flensing Knife in the Light shape (§1.5): the Dagger signature raised
+    /// to x3 buys two souls, the first arriving at tier 3 — the one martial shape that carries catalogue
+    /// entries, since every other martial unique carries exactly one unique enchantment.
+    /// </summary>
     private static WeaponDef Dagger(string id, params string[] enchantmentIds)
         => new(id, id, WeaponClass.Dagger, Role: null, Range: 40, Damage: 15, Cost: 30, ManaCost: 0,
-            Forged: new Dictionary<ModifierType, int> { [CritWindow] = 1, [CritMultiplier] = 1, [CritSunder] = 3 },
-            Enchantments: enchantmentIds.Select(e => new EnchantmentRef(e)).ToList(),
-            Shape: null, Unique: true, DerivedFrom: "weakspot_stiletto");
+            Forged: new Dictionary<ModifierType, int> { [CritWindow] = 3, [CritMultiplier] = 1, [Light] = 1 },
+            Enchantments: enchantmentIds.Select((e, i) => new EnchantmentRef(e, i == 0 ? 3 : 1)).ToList(),
+            Shape: null, Unique: true, DerivedFrom: "flensing_knife");
 
     private static ContentException LoadWith(WeaponDef extra)
         => Assert.Throws<ContentException>(() => GameContent.Load(

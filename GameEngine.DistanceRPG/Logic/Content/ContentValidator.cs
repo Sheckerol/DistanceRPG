@@ -39,7 +39,9 @@ public static class ContentValidator
     public const string RuleUniqueStatline = "a unique keeps its variant's class, statline and shape";
     public const string RuleUniqueDerivation = "a unique is its variant with exactly one modifier it already carries raised to x3 and nothing else changed";
     public const string RuleLightUniqueShape = "a Light-forged unique carries its signature at x2 or x3 and nothing else changed, with 5 - n enchantments, one of them unique or at tier 3";
+    public const string RuleMartialUniqueOneSoul = "a martial unique that raises one modifier to x3 carries exactly one enchantment, and it is a unique one";
     public const string RuleCasterUniqueEnchantments = "a caster unique keeps its variant's spread and differs from it only in its enchantments";
+    public const string RuleCasterUniqueShape = "a caster unique is one shape on its innate: beside one unique enchantment, alone at tier 3, or beside one more catalogue enchantment, both at tier 1";
 
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
@@ -59,6 +61,9 @@ public static class ContentValidator
 
     /// <summary>The tier that makes a catalogue enchantment an artifact's: the only place a drop starts above tier 1.</summary>
     private const int ArtifactTier = 3;
+
+    /// <summary>The tier an ordinary drop's enchantment arrives at (§3.3): tier is earned by casting, from here.</summary>
+    private const int DropTier = 1;
 
     /// <summary>
     /// The currency group (§1.1): the two discounts, forge-limited to x1 and
@@ -206,9 +211,13 @@ public static class ContentValidator
     /// cost is zero (no enchantment fires free, ever), an entry quotes a flat
     /// trigger cost or applies a status and never both (a status applier prices
     /// off its level count, so a flat cost would decay into free), a status
-    /// applier — a staff's effect, Serrated's wound — names its status, an
-    /// elemental entry names its type, and a lingering element names the
-    /// element it lingers and the status it leaves. With the first rule, the
+    /// applier — a staff's effect, Serrated's wound, a lingering burn — names
+    /// its status, an elemental entry names its type, and a lingering element
+    /// names the element it lingers and the status it leaves. Which kinds
+    /// land a status and which linger an element is read off the behaviour
+    /// tables (<see cref="EnchantmentBehaviours.AppliesStatus"/>,
+    /// <see cref="EnchantmentBehaviours.LingersAnElement"/>), so a new kind
+    /// is a row there and never an edit here. With the first rule, the
     /// second makes every unique magnitude quote no flat trigger (S:239): it
     /// applies a status, so its price is the ladder over what it lands.
     /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
@@ -227,13 +236,13 @@ public static class ContentValidator
             if ((e.Trigger != null) == (e.Applies != null))
                 throw new ContentException(e.Id, RuleTriggerXorApplies,
                     e.Trigger != null ? "quotes a trigger and applies a status" : "quotes no trigger and applies nothing");
-            if (e.Effect is EffectKind.ApplyStatus or EffectKind.Serrated && e.Applies == null)
+            if (EnchantmentBehaviours.LingersAnElement(e.Effect) && (e.DamageType is null or DamageType.None || e.Applies == null))
+                throw new ContentException(e.Id, RuleLingerNamesElement,
+                    e.Applies == null ? "leaves no status" : "names no element");
+            if (EnchantmentBehaviours.AppliesStatus(e.Effect) && e.Applies == null)
                 throw new ContentException(e.Id, RuleApplierNamesStatus);
             if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
                 throw new ContentException(e.Id, RuleElementNamesType);
-            if (e.Effect == EffectKind.LingeringElement && (e.DamageType is null or DamageType.None || e.Applies == null))
-                throw new ContentException(e.Id, RuleLingerNamesElement,
-                    e.Applies == null ? "leaves no status" : "names no element");
         }
     }
 
@@ -291,7 +300,7 @@ public static class ContentValidator
 
         // A lingering element lingers an element somebody carries: Searing is nothing without its Flaming.
         foreach (var e in data.Enchantments)
-            if (e.Effect == EffectKind.LingeringElement && (e.DamageType is not { } lingered || !byType.ContainsKey(lingered)))
+            if (EnchantmentBehaviours.LingersAnElement(e.Effect) && (e.DamageType is not { } lingered || !byType.ContainsKey(lingered)))
                 throw new ContentException(e.Id, RuleLingerNamesElement, "no innate enchantment carries its element");
 
         var excludes = Closure(restricted.Excludes);
@@ -551,18 +560,21 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The derivation rule (§1.5, S:238), checked over the whole unique table
-    /// (K:179-182): a unique names the variant it derives from, and nothing
-    /// else does; it keeps that variant's class, statline and shape —
+    /// The derivation rule (§1.5, S:236-238), checked over the whole unique
+    /// table (K:179-182): a unique names the variant it derives from, and
+    /// nothing else does; it keeps that variant's class, statline and shape —
     /// "everything else is unchanged". A martial unique is the variant with
     /// exactly one modifier it already carries raised to x3 and nothing else
     /// changed — never a second x3, never a modifier the variant lacks, never
-    /// a freely-authored spread — unless the variant is Light-forged, in which
-    /// case the currency cannot be raised and the artifact's identity lives in
-    /// its souls: the signature at x2 or x3 and nothing else changed, with
-    /// 5 - n enchantments, one of them unique or at tier 3. A caster unique
-    /// raises nothing — Resonant is forge-limited to x1 — and differs from its
-    /// variant only in its enchantment list, which is the whole artifact.
+    /// a freely-authored spread — carrying exactly one enchantment, and one
+    /// that exists nowhere else: "one modifier at x3, plus its unique
+    /// enchantment". Unless the variant is Light-forged, in which case the
+    /// currency cannot be raised and the artifact's identity lives in its
+    /// souls: the signature at x2 or x3 and nothing else changed, with 5 - n
+    /// enchantments, one of them unique or at tier 3. A caster unique raises
+    /// nothing — Resonant is forge-limited to x1 — and differs from its
+    /// variant only in its enchantment list, which is the whole artifact and
+    /// takes one of three shapes (<see cref="ValidateCasterUniqueShape"/>).
     /// </summary>
     private static void ValidateUniques(WeaponsData data, EnchantmentCatalogue enchantments)
     {
@@ -594,6 +606,7 @@ public static class ContentValidator
                     throw new ContentException(def.Id, RuleCasterUniqueEnchantments, $"changes {string.Join(", ", changed)}");
                 if (def.Enchantments.SequenceEqual(variant.Enchantments))
                     throw new ContentException(def.Id, RuleCasterUniqueEnchantments, "its enchantments are the variant's own");
+                ValidateCasterUniqueShape(def, variant, enchantments);
                 continue;
             }
 
@@ -626,7 +639,46 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleUniqueDerivation, $"adds {raised}, which '{variant.Id}' lacks");
             if (now != UniqueRaise)
                 throw new ContentException(def.Id, RuleUniqueDerivation, now < was ? $"drops {raised}" : $"{raised} x{now}, not x{UniqueRaise}");
+
+            // And its soul: the one enchantment, which exists nowhere else — a
+            // catalogue entry is a good drop, not an artifact, and a second
+            // soul is what only the Light shape buys.
+            if (def.Enchantments.Count != 1)
+                throw new ContentException(def.Id, RuleMartialUniqueOneSoul, $"{def.Enchantments.Count} enchantments");
+            if (!enchantments[def.Enchantments[0].Id].Unique)
+                throw new ContentException(def.Id, RuleMartialUniqueOneSoul, $"'{def.Enchantments[0].Id}' is a catalogue entry, not a unique enchantment");
         }
+    }
+
+    /// <summary>
+    /// The caster half of the unique rule (§1.5): a caster raises nothing, so
+    /// its artifact is one of three shapes, each the one thing no ordinary
+    /// drop can do — a unique enchantment beside its innate (hold one at all),
+    /// its innate alone arriving at tier 3 (drop above tier 1), or two
+    /// non-opposing catalogue entries at tier 1 (drop with more than one; the
+    /// opposition is the relations' check, made on every weapon). Nothing else:
+    /// not an innate deepened short of tier 3, not a soul beside a deepened
+    /// innate, which would be two shapes at once, not a third entry. A staff's
+    /// innate is fixed by its variant (§1.3), so a staff unique starts from its
+    /// variant's; a wand's is rolled, so a wand unique fixes whichever element
+    /// it names first. A unique enchantment's tier is pinned whatever the
+    /// entry asks, so only a catalogue entry's tier is read.
+    /// </summary>
+    private static void ValidateCasterUniqueShape(WeaponDef def, WeaponDef variant, EnchantmentCatalogue enchantments)
+    {
+        var refs = def.Enchantments;
+        if (variant.Enchantments.Count > 0 && (refs.Count == 0 || refs[0].Id != variant.Enchantments[0].Id))
+            throw new ContentException(def.Id, RuleCasterUniqueShape, $"a {def.Class} unique starts from its variant's innate, '{variant.Enchantments[0].Id}'");
+
+        bool IsUnique(EnchantmentRef r) => enchantments[r.Id].Unique;
+        int uniques = refs.Count(IsUnique);
+        bool ordinaryTiers = refs.All(r => IsUnique(r) || r.Tier == DropTier);
+        bool uniqueSoul = refs.Count == 2 && uniques == 1 && ordinaryTiers;
+        bool highTier = refs.Count == 1 && uniques == 0 && refs[0].Tier >= ArtifactTier;
+        bool twoEntries = refs.Count == 2 && uniques == 0 && ordinaryTiers;
+        if (!(uniqueSoul || highTier || twoEntries))
+            throw new ContentException(def.Id, RuleCasterUniqueShape,
+                $"carries {string.Join(", ", refs.Select(r => IsUnique(r) ? $"'{r.Id}' (unique)" : $"'{r.Id}' at tier {r.Tier}"))}");
     }
 
     /// <summary>Whether an entry heals its wielder: a status applier whose status the table says restores HP (a Regeneration innate), or a kind whose behaviour drinks (<see cref="EnchantmentBehaviours.HealsTheWielder"/>).</summary>

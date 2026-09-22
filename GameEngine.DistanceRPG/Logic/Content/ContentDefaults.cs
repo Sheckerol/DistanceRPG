@@ -60,8 +60,11 @@ public static class ContentDefaults
     // price is the DoT ladder over the levels it applies. Potency is the levels
     // one cast grants at ApplyPercent 100 — provisional, re-priced in Phase 3.
     // An element's ApplyPercent is the burn it feeds; the tuning table overrides it.
-    // A soul is a rule (a flat trigger, whole or nothing) or a magnitude (a
-    // percentage of its source, priced on the ladder over what it lands).
+    // A soul is a rule or a magnitude. A rule quotes a flat trigger: the ones
+    // that fire once — a kill refunded, a life spared, a shove refused, a shot
+    // carried on — fire whole or not at all, while Overheal's grant scales to
+    // what it could pay, as Vampiric's drink does. A magnitude takes a
+    // percentage of its source and is priced on the ladder over what it lands.
 
     /// <summary>The §5.7 catalogue as <c>enchantments.json</c> would declare it.</summary>
     public static readonly EnchantmentsData Enchantments = new(
@@ -85,7 +88,7 @@ public static class ContentDefaults
         Magnitude("serrated", "Serrated", EffectKind.Serrated, TargetSide.Enemy, @lock: 20, applyPercent: 20, StatusEffectType.Bleeding, damageType: null),   // Bleeding at BleedPercent of the weapon's share; the tuning table overrides the percentage
         Rule("immovable", "Immovable", EffectKind.Immovable, TargetSide.Ally, @lock: 25, trigger: 10, potency: 0),   // a shove on the wielder is negated entirely
         Rule("piercing", "Piercing", EffectKind.Piercing, TargetSide.Enemy, @lock: 20, trigger: 6, potency: 0),     // the shot continues to the next body in line, re-rolled
-        Magnitude("burning", "Burning", EffectKind.LingeringElement, TargetSide.Enemy, @lock: 20, applyPercent: 100, StatusEffectType.Searing, DamageType.Flaming),   // Flaming lingers as Searing/Flaming at the element's percentage of its damage, paid once per cast
+        Magnitude("burning", "Burning", EffectKind.LingeringElement, TargetSide.Enemy, @lock: 20, applyPercent: 100, StatusEffectType.Searing, DamageType.Flaming),   // Flaming lingers as Searing/Flaming at the element's percentage of its damage, paid once per cast; lock 20 provisional — the §3.3 unique table does not price Burning, Phase 3 does
     ]);
 
     /// <summary>The enchantment ids the default relations may name: the catalogue's.</summary>
@@ -194,7 +197,7 @@ public static class ContentDefaults
     private static EnchantmentDef Catalogue(string id, string name, EffectKind kind, TargetSide targets, int @lock, int trigger, int potency)
         => new(id, name, kind, targets, @lock, trigger, potency, ApplyPercent: 100, Applies: null, DamageType: null, Unique: false);
 
-    /// <summary>A unique soul that is a rule: a flat trigger, paid whole or not at all, and no ladder.</summary>
+    /// <summary>A unique soul that is a rule: a flat trigger and no ladder — paid whole or not at all by the souls that fire once, scaled to what it could pay by one that grants levels (Overheal).</summary>
     private static EnchantmentDef Rule(string id, string name, EffectKind kind, TargetSide targets, int @lock, int trigger, int potency)
         => new(id, name, kind, targets, @lock, trigger, potency, ApplyPercent: 100, Applies: null, DamageType: null, Unique: true);
 

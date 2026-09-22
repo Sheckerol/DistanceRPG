@@ -40,10 +40,11 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="DefenderManaToSpend">The defender's trigger payments — its Sturdy at (6,1), its Immovable at (8,3) — accumulated apart from the attacker's and spent once by the applier, off the defender's own pool.</param>
 /// <param name="Spared">What Sturdy kept from reaching hit points — settled at (6,1) so that the wielder survives a lethal blow at the soul's potency in HP (one), taken off <see cref="Taken"/> by the (6,9) divider. <see cref="Dealt"/> is untouched: the blow was dealt, the wielder simply did not die of it.</param>
 /// <param name="HealToAttacker">HP the entries that fire on damage dealt restore to the attacker — Vampiric's flat drink per instance — queued once by the DamageDealt applier as a HealingReceived, so a surplus reaches HealingAboveFull like any other.</param>
-/// <param name="Pierces">Settled on DamageDealt by Piercing: the DamageDealt applier carries the shot to the next body on the line beyond this one, on a fresh roll.</param>
+/// <param name="Pierces">Settled on DamageDealt by Piercing: the DamageDealt applier carries the shot to <see cref="NextInLine"/>, on a fresh roll.</param>
 /// <param name="FromPierce">True on a hit the shot was carried to beyond its first body; it is not carried on again.</param>
 /// <param name="CastFired">For a hit an area cast fanned out to: the ids of the cast's entries whose trigger the cast paid, in attachment order — what the hit-side halves of those entries (an element's share, a lingering element's burn) read to fire on the hit at no further cost. Default for a swing.</param>
 /// <param name="OnDefendersTurn">True when the hit lands in the defender's own side's phase — a counter to its swing, a brace it walked into, a shot it drew by moving: the defender is acting, not holding a line. The souls that answer the opponent's phase (Immovable) stand aside. Set by the turn system from whose phase it is; false by default, the opponent's phase.</param>
+/// <param name="NextInLine">On DamageDealt: the next body on the shot's line beyond the defender that the weapon reaches — the nearest living actor of the far side further along the attacker-to-defender ray, within a tile of it, in range and sight — read off the map by the DamageTaken applier at impact, before anything the hit sets off has moved. What an entry that carries the shot on (Piercing) reads before it pays; null when the line is clear, on a hit that was itself carried there, and throughout DamageTaken.</param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int WardSpent,
@@ -61,7 +62,8 @@ public sealed record DamagePayload(
     bool Pierces = false,
     bool FromPierce = false,
     ImmutableArray<string> CastFired = default,
-    bool OnDefendersTurn = false)
+    bool OnDefendersTurn = false,
+    ActorState? NextInLine = null)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with

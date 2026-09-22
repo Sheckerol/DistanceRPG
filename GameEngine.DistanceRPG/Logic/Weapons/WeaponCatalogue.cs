@@ -22,6 +22,7 @@ public sealed class WeaponCatalogue
         foreach (var def in All)
             if (!_byId.TryAdd(def.Id, def))
                 throw new ContentException(def.Id, ContentValidator.RuleDuplicateId);
+        Uniques = All.Where(d => d.Unique).ToArray();
     }
 
     /// <summary>Every entry, in file order.</summary>
@@ -32,8 +33,15 @@ public sealed class WeaponCatalogue
 
     public bool TryGet(string id, out WeaponDef def) => _byId.TryGetValue(id, out def!);
 
-    /// <summary>Every entry of <paramref name="cls"/>, in file order — the variants and, once they exist, the uniques.</summary>
-    public IReadOnlyList<WeaponDef> ByClass(WeaponClass cls) => All.Where(d => d.Class == cls).ToArray();
+    /// <summary>
+    /// The variants of <paramref name="cls"/>, in file order: what a drop or a
+    /// placement chooses among. The class's uniques are not among them — each
+    /// is hand-placed, never rolled — and are listed apart (<see cref="Uniques"/>).
+    /// </summary>
+    public IReadOnlyList<WeaponDef> ByClass(WeaponClass cls) => All.Where(d => d.Class == cls && !d.Unique).ToArray();
+
+    /// <summary>The unique table (§1.5), in file order: every entry carrying the unique flag, each derived from a variant.</summary>
+    public IReadOnlyList<WeaponDef> Uniques { get; }
 
     /// <summary>The one martial variant of <paramref name="cls"/> in <paramref name="role"/>: what a placement roll decodes to.</summary>
     public WeaponDef Variant(WeaponClass cls, VariantRole role)
