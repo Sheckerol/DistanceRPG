@@ -8,7 +8,8 @@ namespace GameEngine.DistanceRPG;
 /// 3D stand-in for a training-dummy enemy, mirroring its logic-space position.
 /// Defeated dummies ease down to a flat floor remnant — they never blocked
 /// movement, but a full-size corpse read as if it did — and grow back on
-/// resurrection.
+/// resurrection. A shove or a drag slides it to where it landed rather than
+/// teleporting it there.
 /// </summary>
 public class EnemyObject : PrimitiveBoxObject
 {
@@ -16,12 +17,17 @@ public class EnemyObject : PrimitiveBoxObject
     private const float Height = 0.95f;
     private const float ScaleEaseRate = 8f;
 
+    /// <summary>How long a displacement takes to play out on screen: the logic moved the dummy in one step, the stand-in follows.</summary>
+    private const float SlideSeconds = 0.18f;
+
     /// <summary>Squashed remnant while defeated: clearly walkable, still marks the spot.</summary>
     private static readonly Vector3 DefeatedScale = new(0.55f, 0.16f, 0.55f);
 
     public EnemyState State { get; }
 
     private Vector3 _targetScale = Vector3.One;
+    private Vector3 _slideFrom;
+    private float _slideLeft;
 
     public EnemyObject(EnemyState state, Vector4 color)
         : base(Width, Height, Width, color)
@@ -34,21 +40,54 @@ public class EnemyObject : PrimitiveBoxObject
     public void SetDefeatedVisual(bool defeated)
         => _targetScale = defeated ? DefeatedScale : Vector3.One;
 
+    /// <summary>
+    /// Sync on displacement: the turn system shoved or dragged the dummy tile
+    /// by tile in one go, so ease from where it was last drawn to where it now
+    /// stands, and the blow reads as a shove. Only the drawing lags: reach,
+    /// sight, occupancy and fog read the logic position, which is already final.
+    /// </summary>
+    public void SlideToState()
+    {
+        _slideFrom = Position;
+        _slideLeft = SlideSeconds;
+        SyncTransform();
+    }
+
     public override void Update(float deltaTime)
     {
         base.Update(deltaTime);
 
+        bool moved = false;
+        if (_slideLeft > 0f)
+        {
+            _slideLeft = MathF.Max(0f, _slideLeft - deltaTime);
+            moved = true;
+        }
         if (Scale != _targetScale)
         {
             Scale = Vector3.Lerp(Scale, _targetScale, Math.Min(1f, ScaleEaseRate * deltaTime));
             if ((Scale - _targetScale).LengthSquared < 1e-6f)
                 Scale = _targetScale;
-            SyncTransform(); // keep the scaling box seated on the floor
+            moved = true; // keep the scaling box seated on the floor
         }
+        if (moved)
+            SyncTransform();
     }
 
+    /// <summary>
+    /// Mirror the logic position into the 3D transform, the box seated on the
+    /// floor at its current scale — mid-slide, the eased point on the way from
+    /// where the shove found it.
+    /// </summary>
     public void SyncTransform()
     {
-        Position = WorldSpace.FromLogic(State.X, State.Y, Height * Scale.Y / 2f);
+        var target = WorldSpace.FromLogic(State.X, State.Y, Height * Scale.Y / 2f);
+        if (_slideLeft > 0f)
+        {
+            float t = 1f - _slideLeft / SlideSeconds;
+            float eased = 1f - (1f - t) * (1f - t); // ease out: quick off the blow, settling on the tile
+            target = Vector3.Lerp(new Vector3(_slideFrom.X, target.Y, _slideFrom.Z), target, eased);
+        }
+        Position = target;
     }
 }
