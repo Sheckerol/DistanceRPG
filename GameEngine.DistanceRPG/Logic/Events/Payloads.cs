@@ -9,7 +9,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// Through the chain: <see cref="Amount"/> is the running weapon figure for
 /// steps 1–3 and is closed into <see cref="WeaponShare"/> after step 3 ("this
 /// is the WEAPON's damage, and only this"); step 4 fills
-/// <see cref="EnchantmentShare"/> beside it; step 5 sets <see cref="Absorbed"/>
+/// <see cref="EnchantmentShare"/> beside it, and <see cref="ForgedShare"/> with
+/// however much of that the weapon's own entries added; step 5 sets <see cref="Absorbed"/>
 /// — off the weapon's share only, never below 1 of it, skipped entirely on a
 /// crit — and fixes <see cref="Dealt"/> = WeaponShare + EnchantmentShare −
 /// Absorbed; step 6 sets <see cref="WardSpent"/> and fixes <see cref="Taken"/>
@@ -20,11 +21,20 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Amount">The running weapon figure through steps 1–3.</param>
 /// <param name="Type">The hit's damage type; <see cref="DamageType.None"/> for a martial swing.</param>
 /// <param name="IsCrit">The natural roll landed in the attacker's crit window.</param>
-/// <param name="Dealt">After mitigation, before absorption: what the attacker did. Weapon XP, Serrated and the clean-kill test read this.</param>
+/// <param name="Dealt">After mitigation, before absorption: what the attacker did, everything included. Serrated and the clean-kill test read this; weapon XP does not — it reads <see cref="WeaponDealt"/> + <see cref="ForgedShare"/>.</param>
 /// <param name="Absorbed">What Block prevented — never dealt.</param>
 /// <param name="Taken">What reached hit points. Death and Sturdy read this.</param>
-/// <param name="WeaponShare">The weapon's own damage after step 3 — the only part that teaches the weapon.</param>
+/// <param name="WeaponShare">The weapon's own damage after step 3 — the part that teaches the weapon, with <see cref="ForgedShare"/> beside it.</param>
 /// <param name="EnchantmentShare">What attached enchantments added at step 4, kept apart the whole way down.</param>
+/// <param name="ForgedShare">
+/// How much of <see cref="EnchantmentShare"/> came from entries the weapon was
+/// forged with — a wand's element, a soul it arrived carrying — attributed to
+/// each entry as step 4 runs it. A forged entry is part of what the weapon is
+/// (§3.1), so weapon XP is credited for it and never for what was grafted on
+/// later (§2.2): a wand's damage <em>is</em> its element, and a wizard's Arcane
+/// dagger still levels daggers on the knife alone. Block never touches it —
+/// Block comes off the weapon's share — so it rides down whole.
+/// </param>
 /// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP.</param>
 /// <param name="Roll">The natural d20, rolled before the chain so step 1 is pure.</param>
 /// <param name="Outcome">Crit, Weak (a natural 1) or Normal, decided at step 1.</param>
@@ -47,7 +57,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="NextInLine">On DamageDealt: the next body on the shot's line beyond the defender that the weapon reaches — the nearest living actor of the far side further along the attacker-to-defender ray, within a tile of it, in range and sight — read off the map by the DamageTaken applier at impact, before anything the hit sets off has moved. What an entry that carries the shot on (Piercing) reads before it pays; null when the line is clear, on a hit that was itself carried there, and throughout DamageTaken.</param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
-    int Taken, int WeaponShare, int EnchantmentShare, int WardSpent,
+    int Taken, int WeaponShare, int EnchantmentShare, int ForgedShare, int WardSpent,
     int Roll, RollOutcome Outcome, Weapon Weapon, int DistanceUnits,
     bool Blocked,
     ImmutableArray<StatusApplication> ApplyToDefender,
@@ -83,7 +93,7 @@ public sealed record DamagePayload(
         ArgumentNullException.ThrowIfNull(weapon);
         return new DamagePayload(
             Amount: 0, Type: type, IsCrit: false, Dealt: 0, Absorbed: 0,
-            Taken: 0, WeaponShare: 0, EnchantmentShare: 0, WardSpent: 0,
+            Taken: 0, WeaponShare: 0, EnchantmentShare: 0, ForgedShare: 0, WardSpent: 0,
             Roll: roll, Outcome: RollOutcome.Normal, Weapon: weapon, DistanceUnits: distanceUnits,
             Blocked: false,
             ApplyToDefender: ImmutableArray<StatusApplication>.Empty,
@@ -100,9 +110,11 @@ public sealed record DamagePayload(
     /// <summary>
     /// The weapon's share of <see cref="Dealt"/>: what Block, which comes off
     /// the weapon's share alone, left of the weapon's own damage. The number
-    /// that measures the blow itself — weapon XP reads it (§2.2), and so does
-    /// Serrated, since the wound is as deep as the blow that made it and not
-    /// as deep as whatever rode the same swing (§1.6).
+    /// that measures the blow itself — weapon XP reads it with
+    /// <see cref="ForgedShare"/> beside it, since for a caster the forged entry
+    /// <em>is</em> the blow (§2.2); Serrated reads it alone, since the wound is
+    /// as deep as the blow that made it and not as deep as whatever rode the
+    /// same swing (§1.6).
     /// </summary>
     public int WeaponDealt => WeaponShare - Absorbed;
 

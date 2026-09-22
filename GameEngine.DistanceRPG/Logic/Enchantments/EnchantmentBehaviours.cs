@@ -235,16 +235,31 @@ public static class EnchantmentBehaviours
     /// the weapon's share is closed by the time it runs, so what an entry adds
     /// is tracked apart from it the whole way down. With no kind in the table
     /// the hit passes through untouched.
+    /// <para>
+    /// Each entry's own contribution is attributed as it fires — the movement of
+    /// <see cref="DamagePayload.EnchantmentShare"/> across that one call — and a
+    /// forged entry's goes into <see cref="DamagePayload.ForgedShare"/> as well,
+    /// which is what weapon XP is credited for (§2.2). The difference is taken
+    /// inside the loop and never off its total, or an entry that added nothing
+    /// would be charged with its neighbour's share; and it is read off the
+    /// payload rather than asked of the behaviour, so a kind added to the table
+    /// is attributed without the loop knowing it exists.
+    /// </para>
     /// </summary>
     public static DamagePayload DamageTakenLoop(DamagePayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            var enchantment = weapon.Enchantments[i];
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int before = payload.EnchantmentShare;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int added = payload.EnchantmentShare - before;
+            if (added > 0 && weapon.IsForged(i))
+                payload = payload with { ForgedShare = payload.ForgedShare + added };
         }
         return payload;
     }
