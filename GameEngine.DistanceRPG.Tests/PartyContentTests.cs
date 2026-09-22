@@ -178,7 +178,7 @@ public class PartyContentTests
 
         // The two tuning keys the roster's pools are measured against, and the
         // loader's refusal of a bar there is no step off.
-        Assert.Equal(25, GameContent.Current.Tuning.StartingPool);
+        Assert.Equal(30, GameContent.Current.Tuning.StartingPool);
         Assert.Equal(100, GameContent.Current.Tuning.WeaponXpPerLevel);
 
         var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(new Tuning { StartingPool = 0 }));

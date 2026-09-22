@@ -15,10 +15,10 @@ public class ProgressionTests
     private static int StartingPool => GameContent.Current.Tuning.StartingPool;
 
     [Theory]
-    [InlineData(25, 4, 6)]     // the doc's worked value: 25 / 4 = 6.25 -> 6
-    [InlineData(25, 1, 25)]    // a whole bar for a point, which is what a flat 1 means
-    [InlineData(25, 2, 12)]
-    [InlineData(25, 3, 8)]
+    [InlineData(30, 4, 7)]     // the doc's worked value: 30 / 4 = 7.5 -> 7
+    [InlineData(30, 1, 30)]    // a whole bar for a point, which is what a flat 1 means
+    [InlineData(30, 2, 15)]
+    [InlineData(30, 3, 10)]
     [InlineData(100, 3, 33)]   // the weapon ladder's first step at stat 3
     [InlineData(100, 4, 25)]
     public void XpToNext_IsTheBarOverTheStat(int currentMax, int stat, int expected)
@@ -27,28 +27,28 @@ public class ProgressionTests
     [Fact]
     public void Pool_SelfSlows_EachPointCostingTheNewBar()
     {
-        // CON 4 from 25: 6, 6, 6, then 7, because the threshold is the *current*
+        // CON 4 from 30: 7, 7, then 8, because the threshold is the *current*
         // bar and the bar just moved. Growth is fast while you are fragile and
         // glacial once you are not; no pool runs away.
-        Assert.Equal(25, StartingPool);
+        Assert.Equal(30, StartingPool);
 
-        Assert.Equal(new PoolProgress(Points: 0, Max: 25, XpIntoNext: 0, XpToNext: 6), Progression.Pool(0, 4));
-        Assert.Equal(new PoolProgress(0, 25, 5, 6), Progression.Pool(5, 4));
-        Assert.Equal(new PoolProgress(1, 26, 0, 6), Progression.Pool(6, 4));
-        Assert.Equal(new PoolProgress(2, 27, 0, 6), Progression.Pool(12, 4));
-        Assert.Equal(new PoolProgress(3, 28, 0, 7), Progression.Pool(18, 4));   // 28 / 4 = 7: the fourth point costs more than the first three
-        Assert.Equal(new PoolProgress(4, 29, 0, 7), Progression.Pool(25, 4));
-        Assert.Equal(new PoolProgress(4, 29, 6, 7), Progression.Pool(31, 4));
+        Assert.Equal(new PoolProgress(Points: 0, Max: 30, XpIntoNext: 0, XpToNext: 7), Progression.Pool(0, 4));
+        Assert.Equal(new PoolProgress(0, 30, 5, 7), Progression.Pool(5, 4));
+        Assert.Equal(new PoolProgress(1, 31, 0, 7), Progression.Pool(7, 4));
+        Assert.Equal(new PoolProgress(2, 32, 0, 8), Progression.Pool(14, 4));   // 32 / 4 = 8: the third point costs more than the first two
+        Assert.Equal(new PoolProgress(3, 33, 0, 8), Progression.Pool(22, 4));
+        Assert.Equal(new PoolProgress(4, 34, 0, 8), Progression.Pool(30, 4));
+        Assert.Equal(new PoolProgress(4, 34, 6, 8), Progression.Pool(36, 4));
     }
 
     [Fact]
     public void Pool_AtStatOne_CostsAWholeBarAPoint()
     {
-        // 25, then 26: a thing with no nature needs the whole pool cashed for
+        // 30, then 31: a thing with no nature needs the whole pool cashed for
         // every step, which is why wear climbs an authored ladder rather than a curve.
-        Assert.Equal(new PoolProgress(0, 25, 24, 25), Progression.Pool(24, 1));
-        Assert.Equal(new PoolProgress(1, 26, 0, 26), Progression.Pool(25, 1));
-        Assert.Equal(new PoolProgress(2, 27, 0, 27), Progression.Pool(51, 1));
+        Assert.Equal(new PoolProgress(0, 30, 29, 30), Progression.Pool(29, 1));
+        Assert.Equal(new PoolProgress(1, 31, 0, 31), Progression.Pool(30, 1));
+        Assert.Equal(new PoolProgress(2, 32, 0, 32), Progression.Pool(61, 1));
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class ProgressionTests
 
         // The model is itself pinned by a literal, so neither side can drift.
         Assert.Equal(82, running);
-        Assert.Equal(new PoolProgress(Points: 11, Max: 36, XpIntoNext: 4, XpToNext: 9), Progression.Pool(running, 4));
+        Assert.Equal(new PoolProgress(Points: 10, Max: 40, XpIntoNext: 0, XpToNext: 10), Progression.Pool(running, 4));
     }
 
     [Fact]
@@ -109,18 +109,20 @@ public class ProgressionTests
         // The same hundred points of XP against CON 4 and CON 1. Nothing
         // multiplied the credit: both pools were fed the identical integer and
         // accounted for all of it — consumed plus carried equals what went in.
-        // The stat divided the *threshold*, and that is the whole fourfold gap.
+        // The stat divided the *threshold*, and that is the whole gap. The
+        // ratio of points opens at fourfold and eases as the faster pool's bar
+        // outgrows the slower one's: eleven points against three, here.
         const int xp = 100;
 
         var fast = Progression.Pool(xp, 4);
         var slow = Progression.Pool(xp, 1);
 
-        Assert.Equal(new PoolProgress(13, 38, 4, 9), fast);
-        Assert.Equal(new PoolProgress(3, 28, 22, 28), slow);
+        Assert.Equal(new PoolProgress(11, 41, 8, 10), fast);
+        Assert.Equal(new PoolProgress(3, 33, 7, 33), slow);
 
-        Assert.Equal(96, xp - fast.XpIntoNext);   // spent on points
-        Assert.Equal(78, xp - slow.XpIntoNext);
-        Assert.True(fast.Points >= slow.Points * 4, $"{fast.Points} is not four times {slow.Points}");
+        Assert.Equal(92, xp - fast.XpIntoNext);   // spent on points
+        Assert.Equal(93, xp - slow.XpIntoNext);
+        Assert.True(fast.Points >= slow.Points * 3, $"{fast.Points} is not three times {slow.Points}");
 
         // Max is StartingPool plus points, and nothing else: stats touch no maximum.
         Assert.Equal(StartingPool + fast.Points, fast.Max);
@@ -227,8 +229,8 @@ public class ProgressionTests
     {
         // The Phase 6a case: a weapon has no stats, so its wear capacity divides
         // by a flat 1 and needs a whole bar for every step. Same function.
-        Assert.Equal(25, Progression.XpToNext(25, 1));
-        Assert.Equal(new PoolProgress(1, 26, 0, 26), Progression.Pool(25, 1));
+        Assert.Equal(30, Progression.XpToNext(30, 1));
+        Assert.Equal(new PoolProgress(1, 31, 0, 31), Progression.Pool(30, 1));
     }
 
     [Fact]

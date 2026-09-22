@@ -192,7 +192,7 @@ public sealed record Tuning
     /// <see cref="GameConstants.MaxMana"/>, and is a different number.
     /// </para>
     /// </summary>
-    public int StartingPool { get; init; } = 25;
+    public int StartingPool { get; init; } = 30;
 
     /// <summary>
     /// The weapon ladder's bar per level (§2.2): the doc's

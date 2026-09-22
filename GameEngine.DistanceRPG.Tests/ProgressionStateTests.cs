@@ -32,13 +32,13 @@ public class ProgressionStateTests
     public void BothPoolsStartAtTheStartingPool_WhateverTheSpread()
     {
         // "Nobody starts with more of anything": A is DEX 4 / CON 2 and D is
-        // INT 4 / CON 1, and they open the game with the same 25 HP and the same
-        // 25 mana. The stat is a rate, so it shows up in what a point costs and
+        // INT 4 / CON 1, and they open the game with the same 30 HP and the same
+        // 30 mana. The stat is a rate, so it shows up in what a point costs and
         // never in what a pool holds.
         var a = TestPools.Fresh("A", Spread("A"));
         var d = TestPools.Fresh("D", Spread("D"));
 
-        Assert.Equal(25, StartingPool);
+        Assert.Equal(30, StartingPool);
         Assert.NotEqual(a.Stats, d.Stats);
         Assert.Equal((StartingPool, StartingPool), (a.MaxHp, a.MaxMana));
         Assert.Equal((StartingPool, StartingPool), (d.MaxHp, d.MaxMana));
@@ -47,16 +47,16 @@ public class ProgressionStateTests
         Assert.Equal((StartingPool, StartingPool), (a.Hp, a.Mana));
         Assert.Equal((StartingPool, StartingPool), (d.Hp, d.Mana));
 
-        // What differs is the price of the next point: 25 / 2 against 25 / 1 for
-        // health, 25 / 3 against 25 / 4 for mana.
-        Assert.Equal((12, 8), (a.HealthPool.XpToNext, a.ManaPool.XpToNext));
-        Assert.Equal((25, 6), (d.HealthPool.XpToNext, d.ManaPool.XpToNext));
+        // What differs is the price of the next point: 30 / 2 against 30 / 1 for
+        // health, 30 / 3 against 30 / 4 for mana.
+        Assert.Equal((15, 10), (a.HealthPool.XpToNext, a.ManaPool.XpToNext));
+        Assert.Equal((30, 7), (d.HealthPool.XpToNext, d.ManaPool.XpToNext));
     }
 
     [Fact]
     public void StartingPool_IsTheTuningKey_NotALiteral()
     {
-        // The 25 is one content key, read by both pools on every read, so a
+        // The 30 is one content key, read by both pools on every read, so a
         // tuning swap moves a member's maxima with no member rebuilt and nothing
         // invalidated.
         using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { StartingPool = 40 });
@@ -73,16 +73,16 @@ public class ProgressionStateTests
         // it. Neither gains anything for the XP below the bar, because the credit
         // is raw and only the threshold knows the stat.
         var fighter = TestPools.Fresh("B", Spread("B"));   // CON 4
-        Assert.Equal(0, Credit(fighter, XpPool.Health, 5));
-        Assert.Equal((StartingPool, 5), (fighter.MaxHp, fighter.HealthPool.XpIntoNext));
+        Assert.Equal(0, Credit(fighter, XpPool.Health, 6));
+        Assert.Equal((StartingPool, 6), (fighter.MaxHp, fighter.HealthPool.XpIntoNext));
         Assert.Equal(1, Credit(fighter, XpPool.Health, 1));
-        Assert.Equal((StartingPool + 1, 6), (fighter.MaxHp, fighter.HpXp));
+        Assert.Equal((StartingPool + 1, 7), (fighter.MaxHp, fighter.HpXp));
 
         var wizard = TestPools.Fresh("D", Spread("D"));    // CON 1
-        Assert.Equal(0, Credit(wizard, XpPool.Health, 24));
+        Assert.Equal(0, Credit(wizard, XpPool.Health, 29));
         Assert.Equal(StartingPool, wizard.MaxHp);
         Assert.Equal(1, Credit(wizard, XpPool.Health, 1));
-        Assert.Equal((StartingPool + 1, 25), (wizard.MaxHp, wizard.HpXp));
+        Assert.Equal((StartingPool + 1, 30), (wizard.MaxHp, wizard.HpXp));
     }
 
     [Fact]
@@ -91,11 +91,11 @@ public class ProgressionStateTests
         // The same arithmetic against INT: D's mana grows four times as fast as
         // C's, and C is the one holding an axe.
         var caster = TestPools.Fresh("D", Spread("D"));    // INT 4
-        Assert.Equal(1, Credit(caster, XpPool.Mana, 6));
+        Assert.Equal(1, Credit(caster, XpPool.Mana, 7));
         Assert.Equal(StartingPool + 1, caster.MaxMana);
 
         var axe = TestPools.Fresh("C", Spread("C"));       // INT 1
-        Assert.Equal(0, Credit(axe, XpPool.Mana, 24));
+        Assert.Equal(0, Credit(axe, XpPool.Mana, 29));
         Assert.Equal(1, Credit(axe, XpPool.Mana, 1));
         Assert.Equal(StartingPool + 1, axe.MaxMana);
         Assert.Equal(StartingPool, axe.MaxHp);             // and nothing else moved
@@ -105,12 +105,12 @@ public class ProgressionStateTests
     public void AFighterAndAWizardOpenTheSame_AndDivergeFourfold()
     {
         // Fed identical healing, B (CON 4) banks four points where D (CON 1)
-        // banks one -- 6 + 6 + 6 + 7 against a single 25. The XP is the same
+        // banks one -- 7 + 7 + 8 + 8 against a single 30. The XP is the same
         // number in both books: nothing multiplies a gain by a stat.
         var fighter = TestPools.Fresh("B", Spread("B"));
         var wizard = TestPools.Fresh("D", Spread("D"));
-        Assert.Equal(4, Credit(fighter, XpPool.Health, 25));
-        Assert.Equal(1, Credit(wizard, XpPool.Health, 25));
+        Assert.Equal(4, Credit(fighter, XpPool.Health, 30));
+        Assert.Equal(1, Credit(wizard, XpPool.Health, 30));
 
         Assert.Equal(fighter.HpXp, wizard.HpXp);
         Assert.Equal((StartingPool + 4, StartingPool + 1), (fighter.MaxHp, wizard.MaxHp));
@@ -232,12 +232,12 @@ public class ProgressionStateTests
         var fresh = TestPools.Fresh("B", Spread("B"));
         Assert.Equal(fresh.MaxHp, fresh.Hp);
 
-        Credit(fresh, XpPool.Health, 25);                 // CON 4: four points
+        Credit(fresh, XpPool.Health, 30);                 // CON 4: four points
         Assert.Equal((StartingPool + 4, StartingPool + 4), (fresh.MaxHp, fresh.Hp));
 
         var wounded = TestPools.Fresh("B", Spread("B"));
         wounded.Hp = 10;
-        wounded.HpXp = 25;                                 // written raw, not credited
+        wounded.HpXp = 30;                                 // written raw, not credited
         Assert.Equal((StartingPool + 4, 10), (wounded.MaxHp, wounded.Hp));
     }
 
@@ -252,12 +252,12 @@ public class ProgressionStateTests
         // the spend left it, to be refilled by unspent movement like any other.
         var hurt = TestPools.Fresh("B", Spread("B"));      // CON 4
         hurt.Hp = hurt.MaxHp - 10;
-        Assert.Equal(1, Credit(hurt, XpPool.Health, 6));
+        Assert.Equal(1, Credit(hurt, XpPool.Health, 7));
         Assert.Equal((StartingPool + 1, StartingPool - 10 + 1), (hurt.MaxHp, hurt.Hp));
 
         var caster = TestPools.Fresh("D", Spread("D"));    // INT 4
         caster.Mana = caster.MaxMana - 13;                 // what a Renewal cast leaves
-        Assert.Equal(2, Credit(caster, XpPool.Mana, 13));
+        Assert.Equal(2, Credit(caster, XpPool.Mana, 14));
         Assert.Equal(StartingPool + 2, caster.MaxMana);
         Assert.Equal(StartingPool - 13, caster.Mana);      // untouched: casting never pays for itself
 
@@ -265,7 +265,7 @@ public class ProgressionStateTests
         // that would break the rule for free: it reads as its own ceiling, so a
         // ceiling that rose unpinned would hand over a filled point.
         var unspent = TestPools.Fresh("D", Spread("D"));   // INT 4, mana never written
-        Assert.Equal(2, Credit(unspent, XpPool.Mana, 13));
+        Assert.Equal(2, Credit(unspent, XpPool.Mana, 14));
         Assert.Equal(StartingPool + 2, unspent.MaxMana);
         Assert.Equal(StartingPool, unspent.Mana);          // what the old bar held, not what the new one holds
     }

@@ -7,7 +7,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// pools are filled.
 /// <para>
 /// A member's maxima are earned now (§2.1): both pools open at
-/// <see cref="Tuning.StartingPool"/> — 25 — and rise a point at a time. Every
+/// <see cref="Tuning.StartingPool"/> — 30 — and rise a point at a time. Every
 /// scenario in this suite was written against the flat 100/100 a member used to
 /// carry, and a scenario is about the thing it names (a block, a cleave, a
 /// reaction), not about the size of the pool it runs in; so a fixture is
@@ -23,13 +23,13 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </para>
 /// <para>
 /// <strong>Every file's fixture comes through here</strong> — including the
-/// files that assert only enemy numbers. A member left at 25/25 changes what a
+/// files that assert only enemy numbers. A member left at 30/30 changes what a
 /// scenario does without failing any assertion that names a pool, so
 /// <c>ProgressionStateTests.EveryFixtureMemberIsGrown</c> reads the test
 /// assembly's IL and refuses a <see cref="PartyMemberState"/> built anywhere but
 /// here. A member who genuinely needs the real starting pool asks for
 /// <see cref="Fresh"/> and says so -- and because that is the one door back to
-/// 25/25, the same guard enumerates <see cref="Fresh"/>'s callers as well and
+/// 30/30, the same guard enumerates <see cref="Fresh"/>'s callers as well and
 /// allows only the progression tests, which are what it is for.
 /// </para>
 /// </summary>

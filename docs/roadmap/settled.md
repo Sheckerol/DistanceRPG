@@ -1105,13 +1105,13 @@
   the difference between members is entirely *which*. A 4 against a 1 is already
   a fourfold difference in growth rate, which is as wide as any progression
   system needs.
-- **Max HP, max mana and wear capacity all start at 25**, and all grow by
+- **Max HP, max mana and wear capacity all start at 30**, and all grow by
   `currentMax / governingStat` XP per point — CON, INT, and a flat 1 for
   weapons, which have no nature to divide by. The stat is a **rate, not a
   bonus**: everyone opens the game identical and diverges, which turns §2.1's
   thesis into arithmetic. It self-slows, because the threshold is the current
   bar.
-- **`WearCapacity` is an authored ladder: 25 → 30 → 40**, one step per full bar
+- **`WearCapacity` is an authored ladder: 30 → 40 → 55**, one step per full bar
   cashed, and **no fourth step until play asks for one**. Authored rather than
   computed precisely so a fourth can be appended.
 - **Grafting is 3% base when enchanting**, multiplied by
@@ -1264,3 +1264,18 @@ it.
   ships the two seams it needs and nothing else — `InnateStats` on the member,
   reachable wherever a wielder is, and `ActorState.WeaponLevel(weapon)` — so
   §3.3 adds a term rather than a plumbing pass.
+
+- **Every pool starts at 30 rather than 25**, because the pool *is* the
+  enchantment lock budget (§3.3: the sum of equipped locks may not exceed max
+  mana). At 25 a fresh caster could hold one elemental enchantment (lock 20) or
+  a single Regeneration (lock 15) and nothing else; 30 admits two Regeneration
+  locks, or exactly one Arcane, which is the starting breadth the design wants
+  to be reachable. Max HP and wear capacity move with it rather than splitting
+  the constant, since §2.1's thesis is that every pool opens identical and
+  diverges only through play. `Tuning.StartingPool` is the one key.
+- **The `WearCapacity` ladder shifts with the starting bar, to 30 → 40 → 55.**
+  The first rung *is* the shared starting pool, so leaving the ladder at
+  25 → 30 → 40 would have made a weapon's first service raise its capacity from
+  30 to 30 and buy nothing. The rungs keep widening, so reaching the third step
+  is now 70 hits on one weapon rather than 55 — a longer arc, deliberately, and
+  still three steps with no fourth until play asks for one.
