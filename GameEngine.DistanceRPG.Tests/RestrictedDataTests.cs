@@ -50,10 +50,11 @@ public class RestrictedDataTests
         Assert.Equal(new[] { "flaming", "cold" }, r.Excludes[5]);
         Assert.Equal(new[] { "shocking", "acidic" }, r.Excludes[6]);
 
-        Assert.Equal(3, r.Requires.Count);
+        Assert.Equal(4, r.Requires.Count);
         Assert.Equal(new[] { "Block" }, r.Requires["Riposte"]);
         Assert.Equal(new[] { "Block" }, r.Requires["BlockWeaken"]);
         Assert.Equal(new[] { "Cleave" }, r.Requires["Rout"]);
+        Assert.Equal(new[] { "flaming" }, r.Requires["burning"]);   // the one enchantment-keyed row: a lingering element needs its element
 
         Assert.Equal(3, r.Kind.Count);
         Assert.Equal("melee", r.Kind["Brace"]);
@@ -61,7 +62,9 @@ public class RestrictedDataTests
         Assert.Equal("ranged", r.Kind["Overwatch"]);
 
         Assert.Equal(new[] { "Charges" }, r.ForgedOnly);
-        Assert.Empty(r.NeverRolled);
+        Assert.Equal(
+            new[] { "siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning" },
+            r.NeverRolled);   // the unique souls, once they exist: never rolled, never copied
     }
 
     [Fact]
@@ -203,10 +206,12 @@ public class RestrictedDataTests
     [Fact]
     public void GameContent_Load_BuildsRulesFromTheData_WithoutBecomingCurrent()
     {
-        // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked against.
+        // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked
+        // against and the never-rolled list the default souls' unique flag is cross-checked with.
         var content = GameContent.Load(
             new Tuning { AcquiredHeadroom = 1 },
-            Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]]),
+            Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
+                 neverRolled: ContentDefaults.Restricted.NeverRolled),
             ContentDefaults.Enchantments, ContentDefaults.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);

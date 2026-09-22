@@ -511,7 +511,7 @@ public class WandTests
             Assert.Throws<ArgumentException>(() => TestWeapons.Get("test_ember", Cold));
             Assert.Throws<ArgumentException>(() => TestWeapons.Get("test_ember", Shocking));
         }
-        Assert.Equal(32, GameContent.Current.Weapons.All.Count);   // the defaults are untouched by any of it
+        Assert.Equal(32 + 11, GameContent.Current.Weapons.All.Count);   // the defaults are untouched by any of it
     }
 
     [Fact]
@@ -528,7 +528,7 @@ public class WandTests
         var knife = TestWeapons.Get("test_rime_knife");
         Assert.Equal(new[] { "cold", "acidic" }, knife.Enchantments.Select(e => e.Id));
         Assert.Null(knife.Innate);
-        Assert.Equal(34, GameContent.Current.Weapons.All.Count);
+        Assert.Equal(32 + 11 + 2, GameContent.Current.Weapons.All.Count);
     }
 
     [Fact]
@@ -553,7 +553,7 @@ public class WandTests
         using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, Dagger("test_venom_knife", "poison")]));
         Assert.Equal("poison", Assert.Single(TestWeapons.Get("test_venom_knife").Enchantments).Id);
         Assert.Equal("regeneration", TestWeapons.Get("staff_of_renewal").Innate!.Id);
-        Assert.Equal(33, GameContent.Current.Weapons.All.Count);
+        Assert.Equal(32 + 11 + 1, GameContent.Current.Weapons.All.Count);
 
         // And a wand's own cast lands nothing on the caster it names as its Target: the element types the
         // cast, ApplyToTarget stays empty, and no status event fires for the caster's own Nova.
@@ -685,9 +685,10 @@ public class WandTests
             Enchantments: enchantmentIds.Select(e => new EnchantmentRef(e)).ToList(),
             Shape: AreaShape.Nova(96), Unique: true, DerivedFrom: "wand_of_the_nova");
 
+    /// <summary>A test unique derived from the Weakspot Stiletto the way the derivation rule asks (§1.5): its support modifier raised to x3, nothing else changed.</summary>
     private static WeaponDef Dagger(string id, params string[] enchantmentIds)
         => new(id, id, WeaponClass.Dagger, Role: null, Range: 40, Damage: 15, Cost: 30, ManaCost: 0,
-            Forged: new Dictionary<ModifierType, int> { [CritWindow] = 1, [CritMultiplier] = 1 },
+            Forged: new Dictionary<ModifierType, int> { [CritWindow] = 1, [CritMultiplier] = 1, [CritSunder] = 3 },
             Enchantments: enchantmentIds.Select(e => new EnchantmentRef(e)).ToList(),
             Shape: null, Unique: true, DerivedFrom: "weakspot_stiletto");
 

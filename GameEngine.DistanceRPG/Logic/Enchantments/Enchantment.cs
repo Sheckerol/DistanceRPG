@@ -1,10 +1,14 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// What an enchantment does when it fires (§3.3). The two innate kinds are
-/// live in Phase 1: <see cref="ApplyStatus"/> is a staff's effect and
-/// <see cref="ElementalDamage"/> a wand's element. The rest are the souls the
-/// uniques carry; each is one handler in the enchantment behaviours.
+/// What an enchantment does when it fires (§3.3): the name an entry gives its
+/// behaviour, which stays code while the entry is data (§5.7). The two innate
+/// kinds are a staff's effect (<see cref="ApplyStatus"/>) and a wand's element
+/// (<see cref="ElementalDamage"/>); <see cref="Vampiric"/> is the catalogue
+/// entry the Efficiency dagger arrives with; the rest are the souls the
+/// uniques carry (§1.5). Each kind is an entry in the per-event tables of
+/// <see cref="EnchantmentBehaviours"/> — or, for the two a defender carries,
+/// a compiled step of the damage pipeline — never a branch in a loop.
 /// </summary>
 public enum EffectKind
 {
@@ -14,15 +18,34 @@ public enum EffectKind
     /// <summary>The hit carries <see cref="EnchantmentDef.DamageType"/> into the type chart: the wand innates.</summary>
     ElementalDamage,
 
+    /// <summary>On damage dealt, heal the wielder a flat potency per tier, per instance.</summary>
     Vampiric,
+
+    /// <summary>On damage dealt, leave <see cref="EnchantmentDef.Applies"/> (Bleeding) at the entry's percentage of the weapon's share of the hit.</summary>
     Serrated,
+
+    /// <summary>On healing above full, bank the surplus in the hidden pool, which folds it into Ward.</summary>
     Overheal,
+
+    /// <summary>On a shove at the wielder in its opponent's phase, negate it entirely (a defender's soul, compiled at (8,3)).</summary>
     Immovable,
+
+    /// <summary>On damage dealt, carry the shot to the next body in line on a fresh roll.</summary>
     Piercing,
+
+    /// <summary>The element named by <see cref="EnchantmentDef.DamageType"/> lingers as <see cref="EnchantmentDef.Applies"/> at the element's percentage of its damage, paid once per cast.</summary>
     LingeringElement,
+
+    /// <summary>On lethal damage to the wielder, leave it at 1 HP instead (a defender's soul, compiled at (6,1)).</summary>
     Sturdy,
+
+    /// <summary>On a kill, restore <see cref="EnchantmentDef.Potency"/> mana.</summary>
     Siphon,
+
+    /// <summary>Attacks cost less movement — declared, inert until the amount is fixed (§3.3).</summary>
     Weightless,
+
+    /// <summary>A kill refunds part of the swing's movement — declared, inert until the fraction is fixed (§3.3).</summary>
     Momentum,
 }
 
@@ -68,6 +91,26 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
 {
     /// <summary>Percentages are integers out of this.</summary>
     private const int Percent = 100;
+
+    /// <summary>The tier a unique enchantment is pinned at, whatever it was attached at (§3.3).</summary>
+    public const int UniqueTier = 1;
+
+    private readonly int _tier = Def.Unique ? UniqueTier : Tier;
+
+    /// <summary>
+    /// The tier attached at — and <see cref="UniqueTier"/> for a unique
+    /// whatever was asked (§3.3). The pin is applied where the tier is stored
+    /// and again where it is read, so no path lifts it: not a content row
+    /// asking for tier 3, not a <c>with</c> copy, not a later transfer or
+    /// service. It is one of the two doors the <see cref="Unique"/> flag
+    /// closes, and the only one on this type; the other is <c>neverRolled</c>,
+    /// beside the catalogue (<see cref="EnchantmentCatalogue.Rollable"/>).
+    /// </summary>
+    public int Tier
+    {
+        get => Def.Unique ? UniqueTier : _tier;
+        init => _tier = Def.Unique ? UniqueTier : value;
+    }
 
     public string Id => Def.Id;
 

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace GameEngine.DistanceRPG.Logic;
 
 public enum RollOutcome
@@ -143,10 +145,15 @@ public static class CombatRules
     /// marks a hit the swing fanned out to beyond its primary target;
     /// <paramref name="type"/> is the element a wand's cast settled for its
     /// hits (None for a swing); <paramref name="onAlly"/> marks an area cast's
-    /// hit on the attacker's own side.
+    /// hit on the attacker's own side; <paramref name="castFired"/> names the
+    /// entries the cast paid for, which their hit-side halves read;
+    /// <paramref name="fromPierce"/> marks a hit a shot was carried to;
+    /// <paramref name="onDefendersTurn"/> marks a hit landing in the
+    /// defender's own side's phase.
     /// </summary>
     public static AttackResolution Resolve(EventTable table, ActorState attacker, ActorState defender, Weapon weapon, int distanceUnits, Func<int> rollD20,
-        bool fromCleave = false, DamageType type = DamageType.None, bool onAlly = false)
+        bool fromCleave = false, DamageType type = DamageType.None, bool onAlly = false,
+        ImmutableArray<string> castFired = default, bool fromPierce = false, bool onDefendersTurn = false)
     {
         ArgumentNullException.ThrowIfNull(table);
         ArgumentNullException.ThrowIfNull(attacker);
@@ -154,7 +161,7 @@ public static class CombatRules
         ArgumentNullException.ThrowIfNull(weapon);
         ArgumentNullException.ThrowIfNull(rollD20);
 
-        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits, type, fromCleave, onAlly);
+        var initial = DamagePayload.Initial(weapon, rollD20(), distanceUnits, type, fromCleave, onAlly, castFired, fromPierce, onDefendersTurn);
         var settled = table.Raise(GameEvent.DamageTaken, initial, attacker, defender);
         return Project(settled);
     }

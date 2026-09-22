@@ -216,10 +216,16 @@ public static class StatusBehaviours
     /// <summary>
     /// (1,0) on HealingAboveFull: the rows that convert on surplus healing —
     /// the hidden overheal pool. Every <see cref="Tuning.OverhealPerWard"/>
-    /// surplus points it holds, banked or granted earlier in this chain,
-    /// become one Ward level, and the pool goes back to zero: it converts
-    /// rather than damaging and resets rather than decrementing, and the
-    /// remainder is lost. Without a pool the surplus is simply discarded.
+    /// surplus points it holds, banked or granted earlier in this chain (by
+    /// the Overheal soul in the enchantment loop at (0,0)), become one Ward
+    /// level, and the pool goes back to zero: it converts rather than
+    /// damaging and resets rather than decrementing, and the remainder is lost
+    /// ("reset, not remainder"). A grant short of one Ward is banked instead —
+    /// the remainder the pool exists to carry, since a tier-3 drink's three
+    /// points would otherwise vanish on every heal (§3.3) — and waits for the
+    /// next surplus, decaying a level a round meanwhile. A surplus nothing
+    /// granted converts what the pool holds or clears it. Without a pool the
+    /// surplus is simply discarded.
     /// </summary>
     public static HealPayload OverhealPool(HealPayload payload, ActorState self, ActorState other)
     {
@@ -237,6 +243,8 @@ public static class StatusBehaviours
             int banked = self.StatusLevel(type);
             int granted = ticks.Where(t => t.Type == type).Sum(t => t.LevelsDelta);
             if (banked + granted <= 0) continue;
+            if (granted > 0 && (banked + granted) * StatusRules.EffectPerLevel(type) < perWard)
+                continue;   // short of a Ward: the grant's ticks stand, and the applier banks them
 
             var builder = ticks.RemoveAll(t => t.Type == type).ToBuilder();
             if (banked > 0)

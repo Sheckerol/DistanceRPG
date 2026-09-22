@@ -222,6 +222,7 @@ public class EventTableTests
                 "DamageTaken (4,0) Enchantments",
                 "DamageTaken (5,0) Block",
                 "DamageTaken (6,0) Ward",
+                "DamageTaken (6,1) Sturdy",
                 "DamageTaken (6,9) FixTaken",
                 "DamageTaken (7,0) CritRiders",
                 "DamageTaken (7,1) BlockWeaken",
@@ -230,10 +231,11 @@ public class EventTableTests
                 "DamageTaken (8,0) Push",
                 "DamageTaken (8,1) Drag",
                 "DamageTaken (8,2) Rout",
+                "DamageTaken (8,3) Immovable",
             },
             chain.Select(h => h.ToString()));
         Assert.Equal(chain.OrderBy(h => h.Priority), chain);
-        Assert.Empty(table.HandlersFor(GameEvent.Killed));
+        Assert.Equal(new[] { "Killed (0,0) Enchantments" }, table.HandlersFor(GameEvent.Killed).Select(h => h.ToString()));   // the loop, for Siphon
 
         // With an actor the loop prints as what it will run for them: nothing attached (or no weapon)
         // leaves the list as it is; a weapon carrying entries lists them at step 4, one row per entry at
@@ -279,7 +281,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(18, chain.Count);
+        Assert.Equal(20, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);

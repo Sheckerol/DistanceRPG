@@ -121,7 +121,10 @@ public sealed record Tuning
     /// Per-enchantment percentage of the source number that becomes status
     /// levels, keyed by enchantment id; an entry here overrides the catalogue's.
     /// The four elements sit at different points of the 10–25% band so their
-    /// burns are not identically paced.
+    /// burns are not identically paced; an element's percentage is also the
+    /// burn its lingering unique feeds (§1.5). Serrated's row is the docs'
+    /// <c>BleedPercent</c>: the share of the weapon's own damage a hit leaves
+    /// as Bleeding levels — provisional, in the same band as the elements.
     /// </summary>
     public IReadOnlyDictionary<string, int> ApplyPercent { get; init; } = new Dictionary<string, int>(StringComparer.Ordinal)
     {
@@ -129,6 +132,7 @@ public sealed record Tuning
         ["cold"] = 15,
         ["shocking"] = 25,
         ["acidic"] = 15,
+        ["serrated"] = 20,
     };
 
     // ---- Economy (§1.2, §1.3) ----

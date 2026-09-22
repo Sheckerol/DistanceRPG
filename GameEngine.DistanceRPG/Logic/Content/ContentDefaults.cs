@@ -7,13 +7,24 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <summary>
 /// The compiled fallback for every content file (§5.4): the instances the
 /// game runs on when no file overrides them, and what Phase 5's loader falls
-/// back to. Tuning, the relations, the enchantment catalogue's innates and the
-/// thirty-two weapons — one line per entry, so the validator is the reviewer.
+/// back to. Tuning, the relations, the enchantment catalogue's innates and
+/// souls, the thirty-two weapons and the eleven uniques — one line per entry,
+/// so the validator is the reviewer.
 /// </summary>
 public static class ContentDefaults
 {
     /// <summary>The §5.3 scalars at their compiled values.</summary>
     public static readonly Tuning Tuning = new();
+
+    /// <summary>
+    /// The nine unique souls (§1.5, §3.3): the eight the §3.3 table keeps out
+    /// of the catalogue and the wand unique's lingering element. Never rolled
+    /// by a drop, never copied by the enchanter; each exists only on the
+    /// uniques that carry it. Vampiric is not among them: the Efficiency
+    /// dagger carries it at tier 3, and a unique is pinned at tier 1.
+    /// </summary>
+    private static readonly string[] UniqueSoulIds =
+        ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"];
 
     /// <summary>The §1.1 relations as <c>restricted.json</c> would declare them.</summary>
     public static readonly RestrictedData Restricted = new(
@@ -32,6 +43,7 @@ public static class ContentDefaults
             [nameof(Riposte)] = [nameof(Block)],       // nothing to counter off
             [nameof(BlockWeaken)] = [nameof(Block)],   // nothing to succeed at
             [nameof(Rout)] = [nameof(Cleave)],         // without a cleave it is just a worse Push
+            ["burning"] = ["flaming"],                 // a lingering element needs its element on the same weapon, ahead of it: Searing is nothing without Flaming to say how many levels
         },
         Kind: new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -41,13 +53,15 @@ public static class ContentDefaults
             // Resonant is deliberately absent: it discounts enchantment triggers too.
         },
         ForgedOnly: [nameof(Charges)],   // a cap, not a bonus: granted from zero it would make a bow worse
-        NeverRolled: []);                // the unique enchantments, once they exist
+        NeverRolled: UniqueSoulIds);     // the unique enchantments: cross-checked with the entries' flag on load
 
-    // ---- Enchantments (§5.7): the eight innates ----
+    // ---- Enchantments (§5.7): the eight innates, Vampiric, and the nine souls ----
     // Lock per the §3.3 catalogue. A status applier quotes no flat trigger: its
     // price is the DoT ladder over the levels it applies. Potency is the levels
     // one cast grants at ApplyPercent 100 — provisional, re-priced in Phase 3.
     // An element's ApplyPercent is the burn it feeds; the tuning table overrides it.
+    // A soul is a rule (a flat trigger, whole or nothing) or a magnitude (a
+    // percentage of its source, priced on the ladder over what it lands).
 
     /// <summary>The §5.7 catalogue as <c>enchantments.json</c> would declare it.</summary>
     public static readonly EnchantmentsData Enchantments = new(
@@ -60,13 +74,25 @@ public static class ContentDefaults
         Element("cold", "Cold", DamageType.Cold, applyPercent: 15),
         Element("shocking", "Shocking", DamageType.Shocking, applyPercent: 25),
         Element("acidic", "Acidic", DamageType.Acidic, applyPercent: 15),
+        // The catalogue entry the Efficiency dagger arrives with at tier 3: fires on damage dealt, heals a flat 1 per tier per instance, 2 a trigger.
+        Catalogue("vampiric", "Vampiric", EffectKind.Vampiric, TargetSide.Ally, @lock: 20, trigger: 2, potency: 1),
+        // The souls, in the §3.3 table's order; each bends a rule the rest of the game is built on.
+        Rule("siphon", "Siphon", EffectKind.Siphon, TargetSide.Ally, @lock: 20, trigger: 5, potency: 15),           // a kill restores 15: net +10
+        Rule("weightless", "Weightless", EffectKind.Weightless, TargetSide.Ally, @lock: 25, trigger: 5, potency: 0),   // attacks cost less movement — declared, inert until the amount is fixed
+        Rule("sturdy", "Sturdy", EffectKind.Sturdy, TargetSide.Ally, @lock: 30, trigger: 40, potency: 1),           // survive lethal damage at 1 HP
+        Rule("momentum", "Momentum", EffectKind.Momentum, TargetSide.Ally, @lock: 30, trigger: 10, potency: 0),     // a kill refunds part of the swing — declared, inert until the fraction is fixed
+        Rule("overheal", "Overheal", EffectKind.Overheal, TargetSide.Ally, @lock: 25, trigger: 8, potency: 0),      // healing above full banks into Ward at OverhealPerWard to 1
+        Magnitude("serrated", "Serrated", EffectKind.Serrated, TargetSide.Enemy, @lock: 20, applyPercent: 20, StatusEffectType.Bleeding, damageType: null),   // Bleeding at BleedPercent of the weapon's share; the tuning table overrides the percentage
+        Rule("immovable", "Immovable", EffectKind.Immovable, TargetSide.Ally, @lock: 25, trigger: 10, potency: 0),   // a shove on the wielder is negated entirely
+        Rule("piercing", "Piercing", EffectKind.Piercing, TargetSide.Enemy, @lock: 20, trigger: 6, potency: 0),     // the shot continues to the next body in line, re-rolled
+        Magnitude("burning", "Burning", EffectKind.LingeringElement, TargetSide.Enemy, @lock: 20, applyPercent: 100, StatusEffectType.Searing, DamageType.Flaming),   // Flaming lingers as Searing/Flaming at the element's percentage of its damage, paid once per cast
     ]);
 
     /// <summary>The enchantment ids the default relations may name: the catalogue's.</summary>
     public static readonly IReadOnlySet<string> EnchantmentIds =
         new HashSet<string>(Enchantments.Enchantments.Select(e => e.Id), StringComparer.Ordinal);
 
-    // ---- Weapons (§5.6): eight classes, four variants each ----
+    // ---- Weapons (§5.6): eight classes, four variants each, and the uniques ----
     // Statlines from §1.2/§1.3; a variant is its class baseline plus one added
     // modifier type. Cost columns are base costs: Light resolves an Efficiency
     // weapon down by 10% at instantiation, never here.
@@ -79,8 +105,8 @@ public static class ContentDefaults
     private static readonly (ModifierType, int)[] ThrowingBaseline = [(Charges, 1), (CritMultiplier, 1)];
     private static readonly (ModifierType, int)[] CasterBaseline = [(Resonant, 1)];
 
-    /// <summary>The §5.6 catalogue as <c>weapons.json</c> would declare it: the thirty-two, in class order.</summary>
-    public static readonly WeaponsData Weapons = new(
+    /// <summary>The thirty-two, in class order.</summary>
+    private static readonly WeaponDef[] Variants =
     [
         // Dagger (DEX): 19-20 to crit, x3 when it lands.
         MartialDef("flensing_knife", "Flensing Knife", Dagger, Efficiency, 40, 15, 30, DaggerBaseline, (Light, 1)),
@@ -122,7 +148,34 @@ public static class ContentDefaults
         WandDef("wand_of_the_cone", "Wand of the Cone", AreaShape.Cone(angleDegrees: 90, length: 128)),
         WandDef("wand_of_the_beam", "Wand of the Beam", AreaShape.Beam(width: 32, length: 224)),
         WandDef("wand_of_the_nova", "Wand of the Nova", AreaShape.Nova(radius: 96)),
-    ]);
+    ];
+
+    /// <summary>
+    /// The unique table (§1.5): each a variant with one modifier it already
+    /// carries raised to x3 — or, for a Light-forged one, the signature at x2
+    /// paid for in souls — and a soul no other weapon can have; a caster
+    /// unique raises nothing and puts the whole artifact in its enchantments.
+    /// Everything else is the variant's, copied from it, so the statline can
+    /// never drift. The three the docs leave unnamed carry provisional names.
+    /// </summary>
+    private static readonly WeaponDef[] Uniques =
+    [
+        Unique("the_bulwark", "The Bulwark", "tower_guard", Block, 3, Ref("sturdy")),                               // absorbs 9, shoves what it stops, and refuses to let you die
+        Unique("feathered_death", "Feathered Death", "bandolier", Charges, 3, Ref("weightless")),                    // four throws that barely cost anything to make
+        Unique("shieldbreaker", "Shieldbreaker", "reaver", Splitting, 3, Ref("momentum")),                          // ignores 9 Block across the swing
+        Unique("widowmaker", "Widowmaker", "assassins_fang", CritWindow, 3, Ref("siphon")),                         // finds the gap on 17+, and every kill funds the enchantments doing it
+        Unique("hoplites_wall", "Hoplite's Wall", "phalanx_spear", Brace, 3, Ref("immovable")),                     // three retaliations at full reach, from a line that cannot be moved
+        Unique("stormcrow", "Stormcrow", "longbow", Longshot, 3, Ref("piercing")),                                  // +3 a tile, and the shot does not stop at the first body
+        Unique("flensing_knife_unique", "Nameless Knife", "flensing_knife", CritWindow, 2,                          // stabs itself a shield: three souls in a line — the Light shape, x2 buying three
+            Ref("serrated"), Ref("vampiric", tier: 3), Ref("overheal")),
+        CasterUnique("rotwood", "Rotwood", "staff_of_blight", Ref("poison", tier: 3)),                              // a rot that starts where an ordinary staff's ends
+        CasterUnique("the_long_candle", "The Long Candle", "wand_of_the_beam", Ref("shocking"), Ref("flaming")),    // a beam of plasma: two elements, each answering the chart
+        CasterUnique("wand_of_the_nova_unique", "Nameless Nova", "wand_of_the_nova", Ref("flaming"), Ref("burning")),   // a circle that keeps burning after it lands
+        CasterUnique("staff_of_renewal_unique", "Nameless Renewal", "staff_of_renewal", Ref("regeneration"), Ref("overheal")),   // healing that stops being wasted on the healthy
+    ];
+
+    /// <summary>The §5.6 catalogue as <c>weapons.json</c> would declare it: the thirty-two in class order, then the uniques.</summary>
+    public static readonly WeaponsData Weapons = new([.. Variants, .. Uniques]);
 
     private const int StaffRange = 100;
     private const int StaffCost = 40;
@@ -137,6 +190,18 @@ public static class ContentDefaults
     private static EnchantmentDef Element(string id, string name, DamageType type, int applyPercent)
         => new(id, name, EffectKind.ElementalDamage, TargetSide.Enemy, Lock: 20, Trigger: 5, Potency: 0, applyPercent, Applies: null, type, Unique: false);
 
+    /// <summary>A catalogue entry with a flat trigger: what a drop may roll.</summary>
+    private static EnchantmentDef Catalogue(string id, string name, EffectKind kind, TargetSide targets, int @lock, int trigger, int potency)
+        => new(id, name, kind, targets, @lock, trigger, potency, ApplyPercent: 100, Applies: null, DamageType: null, Unique: false);
+
+    /// <summary>A unique soul that is a rule: a flat trigger, paid whole or not at all, and no ladder.</summary>
+    private static EnchantmentDef Rule(string id, string name, EffectKind kind, TargetSide targets, int @lock, int trigger, int potency)
+        => new(id, name, kind, targets, @lock, trigger, potency, ApplyPercent: 100, Applies: null, DamageType: null, Unique: true);
+
+    /// <summary>A unique soul that is a magnitude: a percentage of its source, the status it leaves, and no flat trigger — its price rides the ladder over what it lands.</summary>
+    private static EnchantmentDef Magnitude(string id, string name, EffectKind kind, TargetSide targets, int @lock, int applyPercent, StatusEffectType applies, DamageType? damageType)
+        => new(id, name, kind, targets, @lock, Trigger: null, Potency: 0, applyPercent, applies, damageType, Unique: true);
+
     private static WeaponDef MartialDef(string id, string name, WeaponClass cls, VariantRole role, int range, int damage, int cost,
         (ModifierType, int)[] baseline, params (ModifierType, int)[] adds)
         => new(id, name, cls, role, range, damage, cost, ManaCost: 0, Spread(baseline, adds), Enchantments: [], Shape: null, Unique: false, DerivedFrom: null);
@@ -148,6 +213,22 @@ public static class ContentDefaults
     private static WeaponDef WandDef(string id, string name, AreaShape shape)
         => new(id, name, WeaponClass.Wand, Role: null, WandRange, WandDamage, WandCost, WandManaCost, Spread(CasterBaseline),
             Enchantments: [], shape, Unique: false, DerivedFrom: null);
+
+    /// <summary>A martial unique: its variant with <paramref name="raised"/> taken to <paramref name="to"/> and nothing else changed, carrying <paramref name="souls"/>.</summary>
+    private static WeaponDef Unique(string id, string name, string derivedFrom, ModifierType raised, int to, params EnchantmentRef[] souls)
+    {
+        var variant = VariantById(derivedFrom);
+        var spread = new Dictionary<ModifierType, int>(variant.Forged) { [raised] = to };
+        return variant with { Id = id, Name = name, Role = null, Forged = spread, Enchantments = souls, Unique = true, DerivedFrom = derivedFrom };
+    }
+
+    /// <summary>A caster unique: its variant, spread and statline untouched, with the enchantment list that is the whole artifact.</summary>
+    private static WeaponDef CasterUnique(string id, string name, string derivedFrom, params EnchantmentRef[] enchantments)
+        => VariantById(derivedFrom) with { Id = id, Name = name, Enchantments = enchantments, Unique = true, DerivedFrom = derivedFrom };
+
+    private static WeaponDef VariantById(string id) => Variants.Single(v => v.Id == id);
+
+    private static EnchantmentRef Ref(string id, int tier = 1) => new(id, tier);
 
     /// <summary>A forged spread from its parts; a type named twice sums — the same modifier applied again.</summary>
     private static IReadOnlyDictionary<ModifierType, int> Spread(params (ModifierType Type, int Stacks)[][] parts)

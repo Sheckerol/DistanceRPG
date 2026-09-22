@@ -177,6 +177,8 @@ public sealed class TurnSystem
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
+        _events.Applies<DamagePayload>(GameEvent.DamageDealt, ApplyDamageDealt);
+        _events.Applies<KillPayload>(GameEvent.Killed, ApplyKilled);
         _events.Applies<TurnPayload>(GameEvent.TurnEnd, ApplyStatusTicks);
         _events.Applies<TurnPayload>(GameEvent.RoundEnd, ApplyStatusTicks);
         _events.Applies<HealPayload>(GameEvent.HealingReceived, ApplyHealing);
@@ -976,11 +978,23 @@ public sealed class TurnSystem
             if (_onReactionFired.TryGetValue(reaction.Source, out var fired))
                 fired(who);
             table.Enqueue(GameEvent.DamageTaken,
-                DamagePayload.Initial(reaction.Weapon, _rollD20(), settled.DistanceUnits), who, mover);
+                DamagePayload.Initial(reaction.Weapon, _rollD20(), settled.DistanceUnits, onDefendersTurn: OnOwnTurn(mover)), who, mover);
         }
     }
 
     private static Side Opposite(Side side) => side == Side.Party ? Side.Enemy : Side.Party;
+
+    /// <summary>The side whose phase it is: the party's in the player phase, the enemies' from the banner on.</summary>
+    private Side ActingSide => Phase == TurnPhase.Player ? Side.Party : Side.Enemy;
+
+    /// <summary>
+    /// Whether a hit on <paramref name="defender"/> lands in its own side's
+    /// phase — a counter to its swing, a brace it walked into — rather than in
+    /// its opponent's, where it stands and holds (<see cref="DamagePayload.OnDefendersTurn"/>).
+    /// False for an actor off the roster.
+    /// </summary>
+    private bool OnOwnTurn(ActorState defender)
+        => _sides.TryGetValue(defender, out var side) && side == ActingSide;
 
     private void BeginAttackPhase()
     {
@@ -1201,12 +1215,20 @@ public sealed class TurnSystem
         }
         ApplyTicks(settled.Ticks, self, table);
         if (settled.Overflow > 0)
-            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default }, self, other);
+            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default, ManaToSpend = 0 }, self, other);
     }
 
-    /// <summary>The HealingAboveFull applier: the status changes the chain settled — the hidden pool converting into Ward.</summary>
+    /// <summary>
+    /// The HealingAboveFull applier: the status changes the chain settled —
+    /// the levels Overheal granted the hidden pool, the pool converting into
+    /// Ward — and the one mana record of the triggers the healed actor's
+    /// entries paid for them.
+    /// </summary>
     private void ApplyHealingAboveFull(HealPayload settled, ActorState self, ActorState other, EventTable table)
-        => ApplyTicks(settled.Ticks, self, table);
+    {
+        ApplyTicks(settled.Ticks, self, table);
+        SpendMana(table, self.EquippedWeapon?.Id ?? settled.Source, self, other, settled.ManaToSpend);
+    }
 
     /// <summary>
     /// The MovementSpent applier: take what the chain settled as spent off the
@@ -1311,15 +1333,18 @@ public sealed class TurnSystem
     /// <paramref name="fromCleave"/> marks a hit a swing fanned out to beyond
     /// its primary target; <paramref name="type"/> is the element an area
     /// cast settled for its hits, <paramref name="roll"/> the one natural roll
-    /// that cast made and every hit shares (a swing rolls its own), and
-    /// <paramref name="onAlly"/> marks a hit on the attacker's own side.
+    /// that cast made and every hit shares (a swing rolls its own),
+    /// <paramref name="onAlly"/> marks a hit on the attacker's own side, and
+    /// <paramref name="castFired"/> names the entries the cast paid for, which
+    /// their hit-side halves fire on at no further cost.
     /// </summary>
     private void ResolveAttackOn(ActorState attacker, Weapon attackerWeapon, ActorState target, bool fromCleave = false,
-        DamageType type = DamageType.None, int? roll = null, bool onAlly = false)
+        DamageType type = DamageType.None, int? roll = null, bool onAlly = false, ImmutableArray<string> castFired = default)
     {
         Func<int> rollD20 = roll is int shared ? () => shared : _rollD20;
         CombatRules.Resolve(_events, attacker, target, attackerWeapon,
-            CombatRules.SurfaceDistanceUnits(attacker, target), rollD20, fromCleave, type, onAlly);
+            CombatRules.SurfaceDistanceUnits(attacker, target), rollD20, fromCleave, type, onAlly, castFired,
+            onDefendersTurn: OnOwnTurn(target));
         RunHeldDeaths();
     }
 
@@ -1403,7 +1428,7 @@ public sealed class TurnSystem
         foreach (var target in targets)
         {
             if (Phase == TurnPhase.GameOver || !caster.Alive) return;
-            ResolveAttackOn(caster, weapon, target, type: settled.Type, roll: roll.Roll, onAlly: _sides[target] == side);
+            ResolveAttackOn(caster, weapon, target, type: settled.Type, roll: roll.Roll, onAlly: _sides[target] == side, castFired: settled.Fired);
         }
     }
 
@@ -1441,12 +1466,28 @@ public sealed class TurnSystem
     /// <summary>
     /// The ManaSpent applier: take what the chain settled as spent off the
     /// actor's pool (every actor carries one, so no feed is needed), never
-    /// below zero, and nothing for a spend settled at zero.
+    /// below zero; then hand back what the record restores — Siphon's refund
+    /// — never past the pool. Nothing for a record settled at zero both ways.
     /// </summary>
     private void ApplyManaSpent(ManaPayload settled, ActorState self, ActorState other, EventTable table)
     {
-        if (settled.Spent <= 0) return;
-        self.Mana = Math.Max(0, self.Mana - settled.Spent);
+        if (settled.Spent <= 0 && settled.Restored <= 0) return;
+        int after = Math.Max(0, self.Mana - settled.Spent);
+        if (settled.Restored > 0)
+            after = Math.Min(self.MaxMana, after + settled.Restored);
+        self.Mana = after;
+    }
+
+    /// <summary>
+    /// One mana record for what an event's entries settled as their triggers:
+    /// what was wanted, what the pool could pay, and the weapon it was spent
+    /// through. Nothing for nothing. Queued, so it settles before anything the
+    /// same applier queues after it reads the pool.
+    /// </summary>
+    private static void SpendMana(EventTable table, string source, ActorState payer, ActorState other, int wanted)
+    {
+        if (wanted <= 0) return;
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, payer.Mana), source), payer, other);
     }
 
     /// <summary>
@@ -1488,6 +1529,12 @@ public sealed class TurnSystem
             throw new InvalidOperationException("Hit an actor that is not on this turn system's roster.");
         hitFeed(CombatRules.Project(settled));
 
+        // The triggers the chain settled — the attacker's entries at step 4,
+        // the defender's Sturdy and Immovable — are spent first, each side's
+        // as one record, so everything queued after sees the pools as they stand.
+        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        SpendMana(table, target.EquippedWeapon?.Id ?? settled.Weapon.Id, target, attacker, settled.DefenderManaToSpend);
+
         if (target.Hp <= 0)
         {
             target.Alive = false;
@@ -1504,9 +1551,92 @@ public sealed class TurnSystem
             if (settled.Displace is { Tiles: > 0 } shove)
                 ApplyDisplacement(target, shove);
         }
-        table.Enqueue(GameEvent.DamageDealt, settled, attacker, target);
+        table.Enqueue(GameEvent.DamageDealt, settled.AsDealt(), attacker, target);
         if (settled.IsCrit)
             table.Enqueue(GameEvent.Crit, new CritPayload(settled.Weapon, settled.Roll), attacker, target);
+    }
+
+    /// <summary>
+    /// The DamageDealt applier — the single world-write for what a landed hit
+    /// sets off in the attacker's enchantments: the statuses they settled
+    /// (Serrated's Bleeding on the defender) land on the living; their
+    /// payments are one mana record; the heal they settled (Vampiric's drink)
+    /// is queued as a HealingReceived to the attacker, so a surplus reaches
+    /// HealingAboveFull and whatever banks it; and a shot settled as carried
+    /// on (Piercing) is queued as a fresh DamageTaken on the next body in line,
+    /// on its own roll, at the distance it stands. A dead attacker — a counter
+    /// queued ahead of this took it — fires nothing.
+    /// </summary>
+    private void ApplyDamageDealt(DamagePayload settled, ActorState attacker, ActorState target, EventTable table)
+    {
+        if (!attacker.Alive) return;
+
+        if (!settled.ApplyToDefender.IsDefaultOrEmpty && target.Alive)
+            foreach (var status in settled.ApplyToDefender)
+                target.ApplyStatus(status.Type, status.Element, status.Levels);
+        if (!settled.ApplyToAttacker.IsDefaultOrEmpty)
+            foreach (var status in settled.ApplyToAttacker)
+                attacker.ApplyStatus(status.Type, status.Element, status.Levels);
+
+        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        if (settled.HealToAttacker > 0)
+            table.Enqueue(GameEvent.HealingReceived,
+                new HealPayload(settled.HealToAttacker, Applied: 0, Overflow: 0, settled.Weapon.Id), attacker, attacker);
+        if (settled.Pierces && PierceTarget(attacker, settled.Weapon, target) is { } next)
+            table.Enqueue(GameEvent.DamageTaken,
+                DamagePayload.Initial(settled.Weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(attacker, next),
+                    settled.Type, castFired: settled.CastFired, fromPierce: true, onDefendersTurn: OnOwnTurn(next)),
+                attacker, next);
+    }
+
+    /// <summary>
+    /// The Killed applier: the mana the killer's entries settled on the kill —
+    /// Siphon's trigger and its refund — as one record, spent then restored,
+    /// never past the pool. Nothing for a tick death, which names no weapon
+    /// and no wielder, or for a killer already down.
+    /// </summary>
+    private void ApplyKilled(KillPayload settled, ActorState killer, ActorState dead, EventTable table)
+    {
+        if (settled.ManaToSpend <= 0 && settled.ManaRestored <= 0) return;
+        if (!killer.Alive) return;
+        table.Enqueue(GameEvent.ManaSpent,
+            new ManaPayload(settled.ManaToSpend, Math.Min(settled.ManaToSpend, killer.Mana),
+                settled.Weapon?.Id ?? nameof(GameEvent.Killed), settled.ManaRestored),
+            killer, dead);
+    }
+
+    /// <summary>
+    /// The next body on the shot line, for Piercing: among the living actors
+    /// on the far side, the nearest one further along the attacker-to-target
+    /// ray than <paramref name="first"/> whose centre lies within one tile of
+    /// that ray, and which the weapon reaches from where the attacker stands
+    /// — range and sight, like any hit. "In line" is a tile's width either
+    /// side of the ray, so a body a row over is not in line; "beyond" is
+    /// measured along the ray, so nothing behind the shooter or level with the
+    /// first body qualifies. Null when the line is clear.
+    /// </summary>
+    private ActorState? PierceTarget(ActorState attacker, Weapon weapon, ActorState first)
+    {
+        float dx = first.X - attacker.X, dy = first.Y - attacker.Y;
+        float length = MathF.Sqrt(dx * dx + dy * dy);
+        if (length <= 0f) return null;
+        float ux = dx / length, uy = dy / length;
+
+        ActorState? next = null;
+        float nearest = float.MaxValue;
+        foreach (var candidate in _rosters[(int)Opposite(_sides[attacker])])
+        {
+            if (candidate == first || !candidate.Alive) continue;
+            float cx = candidate.X - attacker.X, cy = candidate.Y - attacker.Y;
+            float along = cx * ux + cy * uy;
+            if (along <= length || along >= nearest) continue;
+            float across = MathF.Abs(cx * uy - cy * ux);
+            if (across > GameConstants.LogicUnitsPerTile) continue;
+            if (!EnemyAi.CanHit(attacker, candidate, weapon, _grid)) continue;
+            next = candidate;
+            nearest = along;
+        }
+        return next;
     }
 
     /// <summary>
@@ -1529,7 +1659,8 @@ public sealed class TurnSystem
         _ripostes.Spend(defender, ModifierType.Riposte);
         RiposteTriggered?.Invoke(defender);
         table.Enqueue(GameEvent.DamageTaken,
-            DamagePayload.Initial(weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(defender, attacker)), defender, attacker);
+            DamagePayload.Initial(weapon, _rollD20(), CombatRules.SurfaceDistanceUnits(defender, attacker), onDefendersTurn: OnOwnTurn(attacker)),
+            defender, attacker);
     }
 
     /// <summary>

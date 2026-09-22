@@ -20,18 +20,21 @@ public class WeaponContentTests
 
     private static readonly DamageType[] Elements = [DamageType.Flaming, DamageType.Cold, DamageType.Shocking, DamageType.Acidic];
 
-    /// <summary>An instance of any catalogue entry: a wand gets an element so it can be built at all.</summary>
+    /// <summary>An instance of any catalogue entry: a wand variant gets an element so it can be built at all; a wand unique fixes its own.</summary>
     private static Weapon Any(WeaponDef def)
-        => TestWeapons.Get(def.Id, def.Class == WeaponClass.Wand ? DamageType.Flaming : null);
+        => TestWeapons.Get(def.Id, def.Class == WeaponClass.Wand && def.Enchantments.Count == 0 ? DamageType.Flaming : null);
 
     [Fact]
     public void DefaultContent_LoadsThirtyTwoWeapons_AndEightInnates()
     {
-        Assert.Equal(32, Catalogue.All.Count);
-        Assert.Equal(8, GameContent.Current.Enchantments.All.Count);
+        // The uniques and the souls load beside these (§1.5); UniqueContentTests counts them.
+        var innates = GameContent.Current.Enchantments.All
+            .Where(e => e.Effect is EffectKind.ApplyStatus or EffectKind.ElementalDamage).ToList();
+        Assert.Equal(32, Catalogue.All.Count(w => !w.Unique));
+        Assert.Equal(8, innates.Count);
         Assert.Equal(
             new[] { "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic" },
-            GameContent.Current.Enchantments.All.Select(e => e.Id));
+            innates.Select(e => e.Id));
         Assert.Equal(GameContent.Current.Enchantments.Ids, ContentDefaults.EnchantmentIds);
         Assert.Equal(Catalogue.All.Count, Catalogue.All.Select(w => w.Id).Distinct().Count());
     }
@@ -69,12 +72,14 @@ public class WeaponContentTests
                 // A caster's second axis is its innate enchantment, not a stack: Resonant x1 and nothing else forged.
                 Assert.Equal(1, types);
                 Assert.Equal(1, def.Forged[Resonant]);
-                Assert.Equal(def.Class == WeaponClass.Staff ? 1 : 0, def.Enchantments.Count);
+                if (!def.Unique)
+                    Assert.Equal(def.Class == WeaponClass.Staff ? 1 : 0, def.Enchantments.Count);   // a unique's enchantments are its artifact (§1.5)
             }
             else
             {
                 Assert.True(types >= 2, $"{def.Id} is forged on {types} modifier type(s)");
-                Assert.Empty(def.Enchantments);
+                if (!def.Unique)
+                    Assert.Empty(def.Enchantments);   // a unique carries its soul
             }
         }
     }
@@ -85,7 +90,7 @@ public class WeaponContentTests
         Assert.Equal(8, Enum.GetValues<WeaponClass>().Length);
         foreach (var cls in MartialClasses)
         {
-            var variants = Catalogue.ByClass(cls);
+            var variants = Catalogue.ByClass(cls).Where(v => !v.Unique).ToList();   // ByClass lists the uniques too, after the variants
             Assert.Equal(4, variants.Count);
             Assert.Equal(Enum.GetValues<VariantRole>(), variants.Select(v => v.Role!.Value));   // one per role, in role order
             Assert.All(variants, v => Assert.False(v.Unique));
@@ -94,8 +99,8 @@ public class WeaponContentTests
         }
 
         // Casters vary by effect and by shape rather than by role: four effects, four shapes.
-        var staves = Catalogue.ByClass(WeaponClass.Staff);
-        var wands = Catalogue.ByClass(WeaponClass.Wand);
+        var staves = Catalogue.ByClass(WeaponClass.Staff).Where(v => !v.Unique).ToList();
+        var wands = Catalogue.ByClass(WeaponClass.Wand).Where(v => !v.Unique).ToList();
         Assert.Equal(4, staves.Count);
         Assert.Equal(4, wands.Count);
         Assert.All(staves.Concat(wands), v => Assert.Null(v.Role));
@@ -118,7 +123,7 @@ public class WeaponContentTests
 
         foreach (var (cls, (signature, second)) in baselines)
         {
-            foreach (var def in Catalogue.ByClass(cls))
+            foreach (var def in Catalogue.ByClass(cls).Where(v => !v.Unique))   // a unique raises what it has instead (UniqueContentTests)
             {
                 var spread = TestWeapons.Get(def.Id).Forged;
                 Assert.True(spread.Stacks(signature) >= 1, $"{def.Id} lacks its signature {signature}");
@@ -153,7 +158,7 @@ public class WeaponContentTests
     [Fact]
     public void Casters_CarryExactlyOneInnate_StaffFixed_WandElementFromCaller()
     {
-        foreach (var def in Catalogue.ByClass(WeaponClass.Staff))
+        foreach (var def in Catalogue.ByClass(WeaponClass.Staff).Where(v => !v.Unique))
         {
             var staff = TestWeapons.Get(def.Id);
             var innate = Assert.Single(staff.Enchantments);
@@ -169,7 +174,7 @@ public class WeaponContentTests
         Assert.Equal(("poison", StatusEffectType.Poison, TargetSide.Enemy, 3), StaffInnate("staff_of_blight"));
         Assert.Equal(("mire", StatusEffectType.Mire, TargetSide.Enemy, 2), StaffInnate("staff_of_mire"));
 
-        foreach (var def in Catalogue.ByClass(WeaponClass.Wand))
+        foreach (var def in Catalogue.ByClass(WeaponClass.Wand).Where(v => !v.Unique))
         {
             Assert.Empty(def.Enchantments);   // the element is rolled with the drop, so the entry lists none
             Assert.Throws<ArgumentException>(() => TestWeapons.Get(def.Id));
@@ -386,8 +391,8 @@ public class WeaponContentTests
         Assert.Throws<KeyNotFoundException>(() => TestWeapons.Get("nope"));
         Assert.Equal("tower_guard", Catalogue.Variant(WeaponClass.Sword, VariantRole.Purity).Id);
         Assert.Equal(
-            new[] { "flensing_knife", "assassins_fang", "disarming_kris", "weakspot_stiletto" },
-            Catalogue.ByClass(WeaponClass.Dagger).Select(d => d.Id));
+            new[] { "flensing_knife", "assassins_fang", "disarming_kris", "weakspot_stiletto", "widowmaker", "flensing_knife_unique" },
+            Catalogue.ByClass(WeaponClass.Dagger).Select(d => d.Id));   // the variants in file order, then the class's uniques
         Assert.Throws<KeyNotFoundException>(() => Catalogue.Variant(WeaponClass.Staff, VariantRole.Purity));
 
         Assert.Equal("Regeneration", GameContent.Current.Enchantments["regeneration"].Name);
@@ -496,7 +501,7 @@ public class WeaponContentTests
         // Every abort names both the entry and the rule, and the defaults are untouched by any of it.
         Assert.Contains(ex.EntryId, ex.Message);
         Assert.Contains(ex.Rule, ex.Message);
-        Assert.Equal(32, Catalogue.All.Count);
+        Assert.Equal(32 + 11, Catalogue.All.Count);
     }
 
     [Fact]

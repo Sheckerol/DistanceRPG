@@ -34,9 +34,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="ApplyToDefender">Statuses to land on the defender (crit riders, Pin, Softening), applied once by the applier.</param>
 /// <param name="ApplyToAttacker">Statuses to land on the attacker (BlockWeaken).</param>
 /// <param name="Displace">Push, Drag or Rout settled here, applied once at step 8.</param>
-/// <param name="ManaToSpend">Enchantment trigger payments accumulated in list order, spent once by the applier.</param>
+/// <param name="ManaToSpend">The attacker's enchantment trigger payments accumulated in list order, spent once by the applier.</param>
 /// <param name="FromCleave">True on a hit a cleave fanned out to beyond its primary target; Rout is Push applied to everything the cleave caught, the primary included, so it shoves either way.</param>
 /// <param name="OnAlly">True on a hit that landed on the attacker's own side — an area cast catching an ally, which only happens while friendly fire is on — priced at <see cref="Tuning.FriendlyFireAllyPercent"/> at (1,2).</param>
+/// <param name="DefenderManaToSpend">The defender's trigger payments — its Sturdy at (6,1), its Immovable at (8,3) — accumulated apart from the attacker's and spent once by the applier, off the defender's own pool.</param>
+/// <param name="Spared">What Sturdy kept from reaching hit points — settled at (6,1) so that the wielder survives a lethal blow at the soul's potency in HP (one), taken off <see cref="Taken"/> by the (6,9) divider. <see cref="Dealt"/> is untouched: the blow was dealt, the wielder simply did not die of it.</param>
+/// <param name="HealToAttacker">HP the entries that fire on damage dealt restore to the attacker — Vampiric's flat drink per instance — queued once by the DamageDealt applier as a HealingReceived, so a surplus reaches HealingAboveFull like any other.</param>
+/// <param name="Pierces">Settled on DamageDealt by Piercing: the DamageDealt applier carries the shot to the next body on the line beyond this one, on a fresh roll.</param>
+/// <param name="FromPierce">True on a hit the shot was carried to beyond its first body; it is not carried on again.</param>
+/// <param name="CastFired">For a hit an area cast fanned out to: the ids of the cast's entries whose trigger the cast paid, in attachment order — what the hit-side halves of those entries (an element's share, a lingering element's burn) read to fire on the hit at no further cost. Default for a swing.</param>
+/// <param name="OnDefendersTurn">True when the hit lands in the defender's own side's phase — a counter to its swing, a brace it walked into, a shot it drew by moving: the defender is acting, not holding a line. The souls that answer the opponent's phase (Immovable) stand aside. Set by the turn system from whose phase it is; false by default, the opponent's phase.</param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int WardSpent,
@@ -47,7 +54,14 @@ public sealed record DamagePayload(
     Displacement? Displace,
     int ManaToSpend,
     bool FromCleave = false,
-    bool OnAlly = false)
+    bool OnAlly = false,
+    int DefenderManaToSpend = 0,
+    int Spared = 0,
+    int HealToAttacker = 0,
+    bool Pierces = false,
+    bool FromPierce = false,
+    ImmutableArray<string> CastFired = default,
+    bool OnDefendersTurn = false)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with
@@ -56,9 +70,13 @@ public sealed record DamagePayload(
     /// a wand's, settled by its cast — and None for a martial swing;
     /// <paramref name="fromCleave"/> marks a hit the swing fanned out to beyond
     /// its primary target; <paramref name="onAlly"/> a hit on the attacker's
-    /// own side.
+    /// own side; <paramref name="castFired"/> the entries the cast that fanned
+    /// this hit out paid for; <paramref name="fromPierce"/> a hit a shot was
+    /// carried to beyond its first body; <paramref name="onDefendersTurn"/> a
+    /// hit landing in the defender's own side's phase.
     /// </summary>
-    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None, bool fromCleave = false, bool onAlly = false)
+    public static DamagePayload Initial(Weapon weapon, int roll, int distanceUnits, DamageType type = DamageType.None, bool fromCleave = false, bool onAlly = false,
+        ImmutableArray<string> castFired = default, bool fromPierce = false, bool onDefendersTurn = false)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         return new DamagePayload(
@@ -71,8 +89,37 @@ public sealed record DamagePayload(
             Displace: null,
             ManaToSpend: 0,
             FromCleave: fromCleave,
-            OnAlly: onAlly);
+            OnAlly: onAlly,
+            CastFired: castFired.IsDefault ? ImmutableArray<string>.Empty : castFired,
+            FromPierce: fromPierce,
+            OnDefendersTurn: onDefendersTurn);
     }
+
+    /// <summary>
+    /// The weapon's share of <see cref="Dealt"/>: what Block, which comes off
+    /// the weapon's share alone, left of the weapon's own damage. The number
+    /// that measures the blow itself — weapon XP reads it (§2.2), and so does
+    /// Serrated, since the wound is as deep as the blow that made it and not
+    /// as deep as whatever rode the same swing (§1.6).
+    /// </summary>
+    public int WeaponDealt => WeaponShare - Absorbed;
+
+    /// <summary>
+    /// The hit as <see cref="GameEvent.DamageDealt"/> sees it: the settled
+    /// outputs, with what the hit's own applier already wrote — the statuses
+    /// it landed, the payments it took, the heal and the continuation nothing
+    /// has settled yet — cleared, so the entries that fire on damage dealt
+    /// accumulate their own and that event's applier writes them once.
+    /// </summary>
+    public DamagePayload AsDealt() => this with
+    {
+        ApplyToDefender = ImmutableArray<StatusApplication>.Empty,
+        ApplyToAttacker = ImmutableArray<StatusApplication>.Empty,
+        ManaToSpend = 0,
+        DefenderManaToSpend = 0,
+        HealToAttacker = 0,
+        Pierces = false,
+    };
 }
 
 /// <summary>A status to land on an actor once the chain settles: the type, its element (Searing keys on it) and the levels.</summary>
@@ -108,12 +155,21 @@ public sealed record AttackPayload(Weapon Weapon, ActorState Target, int Distanc
 /// was <paramref name="Applied"/> (never past full) and the
 /// <paramref name="Overflow"/>, which HealingAboveFull then carries.
 /// <paramref name="Ticks"/> holds the status changes the chain settled (the
-/// hidden pool's conversion), applied once by the event's applier.
+/// hidden pool's conversion, the levels Overheal grants it), applied once by
+/// the event's applier; <paramref name="ManaToSpend"/> the trigger payments
+/// the healed actor's entries accumulated on HealingAboveFull, spent once.
 /// </summary>
-public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source, ImmutableArray<StatusTick> Ticks = default);
+public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source, ImmutableArray<StatusTick> Ticks = default, int ManaToSpend = 0);
 
-/// <summary><see cref="GameEvent.Killed"/>: the weapon that did it — null when a status tick did — and the killing hit's two outputs.</summary>
-public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken);
+/// <summary>
+/// <see cref="GameEvent.Killed"/>: the weapon that did it — null when a status
+/// tick did, in which case <c>self</c> and <c>other</c> are both the corpse
+/// and there is no wielder to reward — and the killing hit's two outputs.
+/// <paramref name="ManaToSpend"/> and <paramref name="ManaRestored"/> are what
+/// the killer's entries settled on the kill (Siphon's trigger and its refund),
+/// written once by the applier as one mana record.
+/// </summary>
+public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken, int ManaToSpend = 0, int ManaRestored = 0);
 
 /// <summary><see cref="GameEvent.Crit"/>.</summary>
 public sealed record CritPayload(Weapon Weapon, int Roll);
@@ -126,8 +182,11 @@ public sealed record CritPayload(Weapon Weapon, int Roll);
 /// the spend asked for; <paramref name="Spent"/> never exceeds the pool, so a
 /// fumble's doubled cost empties it rather than overdrawing it. Enchantment XP
 /// (§3.3) is counted on <paramref name="Spent"/>: the discounted mana actually paid.
+/// <paramref name="Restored"/> is mana the same record hands back — Siphon's
+/// refund on a kill — taken after the spend and never past the pool, so one
+/// record says what a kill cost and what it returned.
 /// </summary>
-public sealed record ManaPayload(int Wanted, int Spent, string Source);
+public sealed record ManaPayload(int Wanted, int Spent, string Source, int Restored = 0);
 
 /// <summary><see cref="GameEvent.MovementSpent"/> — attack, cast and swap costs in Phase 1.</summary>
 public sealed record MovementPayload(int Wanted, int Spent, string Source);
@@ -193,9 +252,16 @@ public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edg
 /// place on a wand — its status would land on the caster — and the content
 /// validator refuses one (<see cref="ContentValidator.RuleWandNoStatusApplier"/>);
 /// what such an entry should mean on an area cast is Phase 3's to decide.
+/// <paramref name="Fired"/> lists the entries whose trigger this cast paid, in
+/// attachment order — an element typing the cast or adding its share, a
+/// lingering element — and travels into every hit the shape fans out to as
+/// <see cref="DamagePayload.CastFired"/>: the cast pays once, the hits fire
+/// their halves of those entries at no further cost, and an entry the cast
+/// could not pay stays quiet on every hit.
 /// </summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
-    ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None);
+    ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None,
+    ImmutableArray<string> Fired = default);
 
 /// <summary>Whether a move was chosen: Brace fires on entry either way, Opportunist only on a voluntary exit (§1.2).</summary>
 public enum MoveKind { Voluntary, Forced }

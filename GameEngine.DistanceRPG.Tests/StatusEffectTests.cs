@@ -638,7 +638,7 @@ public class StatusEffectTests
             new[] { "HealingReceived (1,0) CapToMissingHp" },
             table.HandlersFor(GameEvent.HealingReceived).Select(h => h.ToString()));
         Assert.Equal(
-            new[] { "HealingAboveFull (1,0) OverhealPool" },
+            new[] { "HealingAboveFull (0,0) Enchantments", "HealingAboveFull (1,0) OverhealPool" },   // Overheal grants the pool ahead of the pool's own fold
             table.HandlersFor(GameEvent.HealingAboveFull).Select(h => h.ToString()));
 
         // The tick handlers settle ticks on the payload and write nothing: the actor is untouched until the applier.

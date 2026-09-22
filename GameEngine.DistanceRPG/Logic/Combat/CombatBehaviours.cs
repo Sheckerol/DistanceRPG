@@ -215,11 +215,13 @@ public static class CombatBehaviours
 
     /// <summary>
     /// The divider after step 6 — "the amount reaching HP is fixed here".
-    /// Closes <see cref="DamagePayload.Taken"/> = Dealt − WardSpent; bookkeeping
-    /// at (6,9), so Ward at (6,0) and Sturdy at (6,1) slot in front of it.
+    /// Closes <see cref="DamagePayload.Taken"/> = Dealt − WardSpent − Spared;
+    /// bookkeeping at (6,9), so Ward at (6,0) and Sturdy at (6,1) — which
+    /// settles what it <see cref="DamagePayload.Spared"/> from a lethal blow —
+    /// slot in front of it.
     /// </summary>
     public static DamagePayload Step6_FixTaken(DamagePayload payload, ActorState self, ActorState other)
-        => payload with { Taken = payload.Dealt - payload.WardSpent };
+        => payload with { Taken = Math.Max(0, payload.Dealt - payload.WardSpent - payload.Spared) };
 
     /// <summary>
     /// Step 7.2: the attacker's <see cref="ModifierType.Pin"/> lands

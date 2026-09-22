@@ -267,14 +267,21 @@ public sealed class DungeonHud
         return parts.Count > 0 ? " " + string.Join("  ", parts) : "";
     }
 
-    /// <summary>The weapon's modifier stacks as <c>NAME xN</c> in table order, and a caster's innate effect after them.</summary>
+    /// <summary>
+    /// The weapon's modifier stacks as <c>NAME xN</c> in table order, then its
+    /// enchantments in attachment order — a caster's innate, a unique's souls
+    /// — with the tier after any above 1 (<c>VAMPIRIC T3</c>).
+    /// </summary>
     private static string ModifierReadout(Weapon weapon)
     {
         var parts = weapon.Modifiers.Entries
             .Select(e => $"{e.Type.ToString().ToUpperInvariant()} x{e.Stacks}")
             .ToList();
-        if (weapon.Innate is { } innate)
-            parts.Add(innate.Def.Name.ToUpperInvariant());
+        foreach (var enchantment in weapon.Enchantments)
+        {
+            string name = enchantment.Def.Name.ToUpperInvariant();
+            parts.Add(enchantment.Tier > 1 ? $"{name} T{enchantment.Tier}" : name);
+        }
         return parts.Count > 0 ? "  * " + string.Join("  ", parts) : "";
     }
 
