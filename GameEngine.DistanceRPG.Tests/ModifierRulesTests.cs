@@ -166,6 +166,30 @@ public class ModifierRulesTests
     }
 
     [Fact]
+    public void NeverStacked_MomentumAndOnHitPoison_AreRefusedEverywhere()
+    {
+        // Momentum is a refund and so an enchantment (the Shieldbreaker's soul); OnHitPoison is reserved with no
+        // behaviour. Neither is in the §1.1 table, so a stack of either would change nothing — the dead
+        // stack the table forbids — and the one predicate refuses both on every kind, beside anything, even
+        // beside a stack of itself: no forge, roll or graft reaches one.
+        Assert.Equal(new[] { OnHitPoison, Momentum }, ModifierRules.NeverStacked);
+        foreach (var t in ModifierRules.NeverStacked)
+            foreach (var kind in new[] { WeaponKind.Melee, WeaponKind.Ranged, WeaponKind.Caster })
+            {
+                Assert.False(Rules.Allowed(t, kind, ModifierSet.Empty));
+                Assert.False(Rules.Allowed(t, kind, ModifierSet.Of((t, 1))));
+            }
+
+        // Every other member is in the table: some kind of weapon, holding what it needs, may carry it.
+        foreach (var t in All.Except(ModifierRules.NeverStacked))
+        {
+            var present = ModifierSet.Of([(t, 1), .. Rules.Requires.GetValueOrDefault(t, []).Select(p => (p, 1))]);
+            Assert.True(new[] { WeaponKind.Melee, WeaponKind.Ranged, WeaponKind.Caster }.Any(kind => Rules.Allowed(t, kind, present)),
+                $"{t} is allowed on no weapon");
+        }
+    }
+
+    [Fact]
     public void Requires_IsOneWay()
     {
         Assert.DoesNotContain(Block, Rules.Requires);   // Block needs nothing

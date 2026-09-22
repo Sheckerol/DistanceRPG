@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
 
@@ -5,8 +6,9 @@ namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
 /// §1.2 Overwatch: bank the shot instead of firing, and whatever enters the
-/// bow's reach on the enemy turn is shot for free — a ranged mirror of Brace
-/// on the same threat-zone machinery.
+/// bow's reach on the enemy turn is shot for free — walked or shoved in, but
+/// on the enemy's turn, never the party's own — a ranged mirror of Brace on
+/// the same threat-zone machinery.
 /// </summary>
 public class OverwatchTests
 {
@@ -134,41 +136,35 @@ public class OverwatchTests
     [Fact]
     public void HeldShots_CountDownAsTheyFire_AndLapseWithASwap()
     {
-        // Overwatch x2 holds two shots. On the party's own turn B's sword
-        // shoves a dummy into the Crossbow's reach: one shot goes (2 to 1, and
-        // A cannot hold again while a shot is held); a second dummy shoved in
-        // takes the other (1 to 0, and A cannot hold again because this turn's
-        // pool is spent). The reading is the shots still held, not the shots
-        // armed.
-        var grid = new int[20, 20];
+        // Overwatch x2 holds two shots, and the reading is the shots still
+        // held, not the shots armed: while one is held A cannot hold again,
+        // and on the enemy turn each dummy walking into the Crossbow's reach
+        // takes one — 2 to 1, then 1 to 0, read as each fires. What is left
+        // lapses with the turn, and a new turn may hold anew.
+        var grid = new int[20, 30];
         var a = Char("A", 5, 2, "crossbow");
         a.EquippedWeapon!.Acquire(Overwatch, 1);
-        var b = Char("B", 5, 14, "tower_guard");
-        var e1 = Enemy(5, 13);   // eleven tiles from A: 352 less both radii is 324, just past the bow's 320
-        var e2 = Enemy(4, 13);
-        var turns = new TurnSystem(grid, new[] { a, b }, new[] { e1, e2 }, () => 10);
-        int shots = 0;
-        turns.OverwatchTriggered += _ => shots++;
-        Assert.False(EnemyAi.CanHit(a, e1, a.EquippedWeapon!, grid));
-        Assert.False(EnemyAi.CanHit(a, e2, a.EquippedWeapon!, grid));
+        var e1 = Approacher(a, 4);
+        var e2 = Approacher(a, 5);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { e1, e2 }, () => 10);
+        var held = new List<int>();
+        turns.OverwatchTriggered += reactor => held.Add(reactor.HeldShots);
 
         Assert.True(turns.TryOverwatch(a));
         Assert.Equal(2, a.HeldShots);
-
-        Assert.True(turns.TryAttack(b, e1));
-        Assert.Equal(At(5, 12), (e1.X, e1.Y));
-        Assert.Equal(1, shots);
-        Assert.Equal(1, a.HeldShots);
         Assert.False(turns.CanOverwatch(a));   // a shot is still held
-        Assert.Equal(200 - 7 - 9, e1.Hp);      // the sword's 10 and the bolt's 5 + 7 (Longshot x1 at the tenth tile), each into Block 3
 
-        b.DistLeft = GameConstants.MaxDistance;
-        Assert.True(turns.TryAttack(b, e2));
-        Assert.Equal(At(4, 12), (e2.X, e2.Y));
-        Assert.Equal(2, shots);
+        turns.NotifyEnemyVisible(e1, true);
+        turns.NotifyEnemyVisible(e2, true);
+        turns.EndTurn();
+        Advance(turns, 20f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        Assert.Equal(new[] { 1, 0 }, held);
+        Assert.Equal(GameConstants.DummyHp - 9, e1.Hp);   // 5 + 7 (Longshot x1 at the tenth tile) into Block 3
+        Assert.Equal(GameConstants.DummyHp - 9, e2.Hp);
         Assert.Equal(0, a.HeldShots);
-        Assert.False(turns.CanOverwatch(a));   // nothing held, but this turn's two shots are spent
-        Assert.Equal(200 - 7 - 9, e2.Hp);
+        Assert.True(turns.CanOverwatch(a));    // a new turn: nothing held, the pool restored
 
         // A swap lets a held shot lapse with the weapon that held it (the
         // movement it cost is not refunded), and a swap back may hold anew.
@@ -187,6 +183,72 @@ public class OverwatchTests
         (c.Inventory[0], c.Inventory[1]) = (c.Inventory[1], c.Inventory[0]);
         swap.NotifyWeaponChanged(c);
         Assert.True(swap.CanOverwatch(c));     // nothing fired, so the pool is untouched: it can be held again
+    }
+
+    [Fact]
+    public void PartyShove_IntoHeldReach_OnThePartysTurn_FiresNothing()
+    {
+        // A held shot is banked for the enemy turn (§1.2: "if an enemy enters
+        // line of sight during the enemy turn, it fires for free"). On the
+        // party's own turn B's sword shoves a dummy into the Crossbow's reach:
+        // a real entry, but not on the enemy's turn, so nothing fires and both
+        // shots stay held for the turn they were banked for.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 2, "crossbow");
+        a.EquippedWeapon!.Acquire(Overwatch, 1);
+        var b = Char("B", 5, 14, "tower_guard");
+        var enemy = Enemy(5, 13);   // eleven tiles from A: 352 less both radii is 324, just past the bow's 320
+        var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10);
+        int shots = 0;
+        turns.OverwatchTriggered += _ => shots++;
+        Assert.False(EnemyAi.CanHit(a, enemy, a.EquippedWeapon!, grid));
+
+        Assert.True(turns.TryOverwatch(a));
+        Assert.True(turns.TryAttack(b, enemy));
+        Assert.Equal(At(5, 12), (enemy.X, enemy.Y));
+        Assert.True(EnemyAi.CanHit(a, enemy, a.EquippedWeapon!, grid));   // shoved inside the reach
+        Assert.Equal(0, shots);
+        Assert.Equal(2, a.HeldShots);
+        Assert.Equal(200 - 7, enemy.Hp);   // the sword's 10 into Block 3, and no bolt
+
+        // The gate is whose phase it is, not how the body moved: the handler
+        // reads the flag the turn system sets, and the same forced entry on
+        // the enemy's turn earns the shot.
+        var entry = new ThreatPayload(enemy, MoveKind.Forced, ZoneEdge.Enter, ImmutableArray<Reaction>.Empty,
+            CombatRules.SurfaceDistanceUnits(a, enemy));
+        Assert.Equal(Overwatch, Assert.Single(ReactionBehaviours.Overwatch(entry, a, enemy).Reactions).Source);
+        Assert.True(ReactionBehaviours.Overwatch(entry with { OnReactorsTurn = true }, a, enemy).Reactions.IsDefaultOrEmpty);
+    }
+
+    [Fact]
+    public void ForcedEntry_OnTheEnemyTurn_FiresTheHeldShot()
+    {
+        // Forced movement triggers the zones (settled), and on the enemy turn
+        // a held shot answers a shove as it answers a walk. The dummy swings at
+        // R's Riposte Blade from just outside the Crossbow's reach; the block
+        // earns R's counter, whose shove carries the dummy a tile toward A —
+        // into the reach, on the enemy's turn — and the held shot goes.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 2, "crossbow");
+        var r = Char("R", 5, 16, "riposte_blade");
+        var enemy = Enemy(5, 13);   // eleven tiles from A, just past the bow's reach; three from R, inside the sword's
+        var turns = new TurnSystem(grid, new[] { a, r }, new[] { enemy }, () => 10);
+        var fired = new List<ActorState>();
+        turns.OverwatchTriggered += reactor => fired.Add(reactor);
+        int counters = 0;
+        turns.RiposteTriggered += _ => counters++;
+        Assert.False(EnemyAi.CanHit(a, enemy, a.EquippedWeapon!, grid));
+
+        Assert.True(turns.TryOverwatch(a));
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.EndTurn();
+        Advance(turns, 10f);
+
+        Assert.Equal(TurnPhase.Player, turns.Phase);
+        Assert.Equal(1, counters);
+        Assert.Equal(At(5, 12), (enemy.X, enemy.Y));   // the counter's shove: a tile away from R, into A's reach
+        Assert.Same(a, Assert.Single(fired));
+        Assert.Equal(200 - 7 - 9, enemy.Hp);           // the counter's 10 and the bolt's 5 + 7 (Longshot x1 at the tenth tile), each into Block 3
     }
 
     [Fact]

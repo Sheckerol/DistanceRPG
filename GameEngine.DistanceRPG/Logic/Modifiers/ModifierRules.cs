@@ -7,7 +7,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// (§5.5), so this is the loaded singleton §1.7 asks for, reached as
 /// <c>GameContent.Current.Modifiers</c>. Only the predicates stay compiled:
 /// <see cref="Allowed"/>, because it is the question rather than the data, and
-/// <see cref="Symmetric"/>, because a half-declared exclusion must be impossible.
+/// <see cref="Symmetric"/>, because a half-declared exclusion must be impossible;
+/// and <see cref="NeverStacked"/> beside them, because which members have any
+/// behaviour to stack is code.
 /// </summary>
 public sealed class ModifierRules
 {
@@ -28,6 +30,23 @@ public sealed class ModifierRules
 
     /// <summary>Resolve a content id to a modifier; false for enchantment ids and typos alike.</summary>
     public static bool TryParseId(string id, out ModifierType type) => ByName.TryGetValue(id, out type);
+
+    /// <summary>
+    /// The members §1.7's enum declares that are not in the §1.1 table, so no
+    /// weapon ever holds a stack of one: <see cref="ModifierType.Momentum"/>, a
+    /// refund and therefore an enchantment (§1.1, "See Phase 3" — its soul is
+    /// the <c>momentum</c> entry), and <see cref="ModifierType.OnHitPoison"/>,
+    /// reserved with no behaviour anywhere in Phase 1. A stack of either would
+    /// change nothing — the dead stack §1.1 forbids — so <see cref="Allowed"/>
+    /// refuses both on every kind of weapon beside anything, and every source
+    /// is refused through it: the forge (the content validator's walk over
+    /// each forged spread), acquisition (<see cref="Weapon.Acquire"/>), and
+    /// the rolls that gate their offers on it. Compiled, like the predicate:
+    /// which members have behaviour is code, and a member leaves this set in
+    /// the change that gives it some. Enum order.
+    /// </summary>
+    public static IReadOnlySet<ModifierType> NeverStacked { get; } =
+        new SortedSet<ModifierType> { ModifierType.OnHitPoison, ModifierType.Momentum };
 
     private readonly Tuning _tuning;
 
@@ -117,12 +136,16 @@ public sealed class ModifierRules
         => Offset(t) + PerStack(t) * stacks;
 
     /// <summary>
-    /// The one definition of "this weapon cannot hold that": kind, forged-only,
-    /// exclusion and prerequisites folded into one predicate every caller asks.
-    /// It gates offers rather than rejecting after the fact.
+    /// The one definition of "this weapon cannot hold that": a member outside
+    /// the table (<see cref="NeverStacked"/>), kind, forged-only, exclusion and
+    /// prerequisites folded into one predicate every caller asks. It gates
+    /// offers rather than rejecting after the fact; the one mutator,
+    /// <see cref="Weapon.Acquire"/>, asks it too, so a source that skipped
+    /// its gate is a bug that throws rather than a stack granted silently.
     /// </summary>
     public bool Allowed(ModifierType t, WeaponKind kind, ModifierSet present)
-        => RequiresKind.GetValueOrDefault(t, WeaponKind.Any).HasFlag(kind)
+        => !NeverStacked.Contains(t)
+        && RequiresKind.GetValueOrDefault(t, WeaponKind.Any).HasFlag(kind)
         && (!ForgedOnly.Contains(t) || present.Stacks(t) > 0)
         && !Excludes.GetValueOrDefault(t, []).Any(x => present.Stacks(x) > 0)
         &&  Requires.GetValueOrDefault(t, []).All(x => present.Stacks(x) > 0);

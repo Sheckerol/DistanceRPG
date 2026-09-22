@@ -91,10 +91,25 @@ public sealed class Weapon
     /// The one mutator: add <paramref name="n"/> acquired stacks of
     /// <paramref name="t"/>, clamped to forged plus the acquired headroom, and
     /// refresh the resolved costs. Farm depth, grafts and improvements are all
-    /// this call.
+    /// this call, and the relations bind every one of them alike (§1.1: "the
+    /// forge, a farm roll, a graft, and a boss theme"): a modifier
+    /// <see cref="ModifierRules.Allowed"/> refuses beside what this weapon
+    /// already holds — the wrong kind, an exclusion, a missing prerequisite, a
+    /// forged-only modifier from zero, a member outside the table — is refused
+    /// here too. A source gates its offers on the same predicate before it
+    /// rolls (§1.7: the graft roll filters its candidates first), so a refusal
+    /// here is a source that skipped its gate: a bug, thrown rather than a
+    /// stack granted silently. Deepening what the weapon holds passes while
+    /// nothing beside it excludes it, which is how a forged <c>Charges</c>
+    /// deepens and a bow without one never gains any.
     /// </summary>
+    /// <exception cref="InvalidOperationException">The relations refuse <paramref name="t"/> on this weapon beside its modifiers.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is negative: nothing is ever removed.</exception>
     public void Acquire(ModifierType t, int n)
     {
+        if (!GameContent.Current.Modifiers.Allowed(t, Kind, Modifiers))
+            throw new InvalidOperationException(
+                $"{Name} ({Id}) cannot hold {t} beside {Modifiers}: the relations bind every source, so an offer is gated on ModifierRules.Allowed before it is made.");
         Modifiers = Modifiers.With(t, n, Forged);
         Resolve();
     }

@@ -38,6 +38,7 @@ public static class ContentValidator
     public const string RuleUniqueDerivedFrom = "a unique names the variant it derives from, and nothing else does";
     public const string RuleUniqueStatline = "a unique keeps its variant's class, statline and shape";
     public const string RuleUniqueDerivation = "a unique is its variant with exactly one modifier it already carries raised to x3 and nothing else changed";
+    public const string RuleUniqueRaisedByRole = "a unique raises what its variant's role allows: a Purity variant the class signature, a Control or Support variant the signature or its own added modifier, never the second baseline modifier";
     public const string RuleLightUniqueShape = "a Light-forged unique carries its signature at x2 or x3 and nothing else changed, with 5 - n enchantments, one of them unique or at tier 3";
     public const string RuleMartialUniqueOneSoul = "a martial unique that raises one modifier to x3 carries exactly one enchantment, and it is a unique one";
     public const string RuleCasterUniqueEnchantments = "a caster unique keeps its variant's spread and differs from it only in its enchantments";
@@ -326,7 +327,10 @@ public static class ContentValidator
     /// from, asked of <see cref="ModifierRules.Allowed"/> with the whole spread
     /// present, because a from-zero build-up would refuse the forge's own
     /// <c>Charges</c>, and the forge is exactly what <c>forgedOnly</c> reserves
-    /// the first stack for; nothing is forged past <see cref="ModifierRules.MaxForged"/>;
+    /// the first stack for, and which refuses on every weapon a member outside
+    /// the §1.1 table (<see cref="ModifierRules.NeverStacked"/>: Momentum,
+    /// enchantment-only, and the reserved OnHitPoison), since a stack of one
+    /// would change nothing; nothing is forged past <see cref="ModifierRules.MaxForged"/>;
     /// a martial weapon is forged on at least two modifiers and a caster on
     /// <c>Resonant x1</c> alone beside its one innate enchantment (a staff's
     /// fixed status effect; a wand's element, supplied at instantiation); only
@@ -429,7 +433,9 @@ public static class ContentValidator
             foreach (var (t, n) in spread.Entries)
             {
                 if (!rules.Allowed(t, kind, spread))
-                    throw new ContentException(def.Id, RuleForgedNotAllowed, $"{t} x{n} on a {kind} weapon beside {spread}");
+                    throw new ContentException(def.Id, RuleForgedNotAllowed, ModifierRules.NeverStacked.Contains(t)
+                        ? $"{t} x{n}: not in the modifier table, so never a stack on any weapon"
+                        : $"{t} x{n} on a {kind} weapon beside {spread}");
                 if (n > rules.MaxForged(t))
                     throw new ContentException(def.Id, RuleMaxForged, $"{t} x{n}, MaxForged {rules.MaxForged(t)}");
             }
@@ -457,6 +463,7 @@ public static class ContentValidator
             }
         }
 
+        var baselines = new Dictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>>();
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
             if (Weapon.KindOf(cls) == WeaponKind.Caster)
@@ -464,10 +471,10 @@ public static class ContentValidator
             var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
             if (variants.Count == 0)
                 continue;   // a class the file leaves out is not malformed, only absent
-            ValidateVariants(cls, variants);
+            baselines[cls] = ValidateVariants(cls, variants);
         }
 
-        ValidateUniques(data, enchantments);
+        ValidateUniques(data, enchantments, baselines);
 
         foreach (var id in restricted.ForgedOnly)
             if (ModifierRules.TryParseId(id, out var t) && !data.Weapons.Any(w => w.Forged.GetValueOrDefault(t) > 0))
@@ -507,7 +514,14 @@ public static class ContentValidator
         }
     }
 
-    private static void ValidateVariants(WeaponClass cls, List<WeaponDef> variants)
+    /// <summary>
+    /// The per-class variant checks: four variants, one per role, on a
+    /// two-modifier baseline that holds the class signature, each adding
+    /// exactly one modifier type in the shape its role says. Returns the
+    /// baseline it checked, for the unique checks to read what each
+    /// variant added.
+    /// </summary>
+    private static IReadOnlyDictionary<ModifierType, int> ValidateVariants(WeaponClass cls, List<WeaponDef> variants)
     {
         foreach (var role in Enum.GetValues<VariantRole>())
         {
@@ -533,10 +547,7 @@ public static class ContentValidator
 
         foreach (var v in variants)
         {
-            var added = v.Forged
-                .Where(f => f.Value > baseline.GetValueOrDefault(f.Key))
-                .Select(f => f.Key)
-                .ToList();
+            var added = AddedTo(v, baseline);
             if (added.Count != 1)
                 throw new ContentException(v.Id, RuleVariantDelta, $"adds {added.Count} modifier types to the {cls} baseline");
 
@@ -557,7 +568,21 @@ public static class ContentValidator
                     break;
             }
         }
+        return baseline;
     }
+
+    /// <summary>
+    /// The modifier types <paramref name="variant"/> carries beyond its class
+    /// baseline, in enum order: its role's one addition once the variant
+    /// checks have passed — Light for Efficiency, the signature again for
+    /// Purity, the rider for Control and Support.
+    /// </summary>
+    private static List<ModifierType> AddedTo(WeaponDef variant, IReadOnlyDictionary<ModifierType, int> baseline)
+        => variant.Forged
+            .Where(f => f.Value > baseline.GetValueOrDefault(f.Key))
+            .Select(f => f.Key)
+            .OrderBy(t => t)
+            .ToList();
 
     /// <summary>
     /// The derivation rule (§1.5, S:236-238), checked over the whole unique
@@ -566,7 +591,11 @@ public static class ContentValidator
     /// "everything else is unchanged". A martial unique is the variant with
     /// exactly one modifier it already carries raised to x3 and nothing else
     /// changed — never a second x3, never a modifier the variant lacks, never
-    /// a freely-authored spread — carrying exactly one enchantment, and one
+    /// a freely-authored spread — and the modifier raised is one its
+    /// variant's role may raise (§1.5's four shapes, W:1137-1142): a Purity
+    /// variant's the class signature, a Control or Support variant's the
+    /// signature or its own rider, so no unique ever raises the class's
+    /// second baseline modifier; carrying exactly one enchantment, and one
     /// that exists nowhere else: "one modifier at x3, plus its unique
     /// enchantment". Unless the variant is Light-forged, in which case the
     /// currency cannot be raised and the artifact's identity lives in its
@@ -576,7 +605,8 @@ public static class ContentValidator
     /// variant only in its enchantment list, which is the whole artifact and
     /// takes one of three shapes (<see cref="ValidateCasterUniqueShape"/>).
     /// </summary>
-    private static void ValidateUniques(WeaponsData data, EnchantmentCatalogue enchantments)
+    private static void ValidateUniques(WeaponsData data, EnchantmentCatalogue enchantments,
+        IReadOnlyDictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>> baselines)
     {
         var byId = data.Weapons.ToDictionary(w => w.Id, StringComparer.Ordinal);
         foreach (var def in data.Weapons)
@@ -639,6 +669,19 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleUniqueDerivation, $"adds {raised}, which '{variant.Id}' lacks");
             if (now != UniqueRaise)
                 throw new ContentException(def.Id, RuleUniqueDerivation, now < was ? $"drops {raised}" : $"{raised} x{now}, not x{UniqueRaise}");
+
+            // And it is a modifier the variant's role may raise (§1.5's four
+            // shapes): the signature, or what the variant itself added — for
+            // a Purity variant the signature again, for Control and Support
+            // their rider. What neither names is the class's second baseline
+            // modifier, which no role's unique raises. (The variant checks
+            // above have passed, so the class has a baseline and the variant
+            // one addition.)
+            var added = AddedTo(variant, baselines[def.Class]).Single();
+            if (raised != signature && raised != added)
+                throw new ContentException(def.Id, RuleUniqueRaisedByRole, variant.Role == VariantRole.Purity
+                    ? $"raises {raised}: a unique of the Purity '{variant.Id}' deepens the {def.Class} signature {signature} alone"
+                    : $"raises {raised}, the {def.Class} baseline's second modifier: a unique of the {variant.Role} '{variant.Id}' raises the signature {signature} or its own {added}");
 
             // And its soul: the one enchantment, which exists nowhere else — a
             // catalogue entry is a good drop, not an artifact, and a second

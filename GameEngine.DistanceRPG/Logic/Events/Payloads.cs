@@ -230,7 +230,17 @@ public sealed record Reaction(ActorState Reactor, Weapon Weapon, ModifierType So
 /// in the zone or out the far side, and a distance-priced step (Longshot) must
 /// see where the mover was struck, not where it landed.
 /// </param>
-public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edge, ImmutableArray<Reaction> Reactions, int DistanceUnits);
+/// <param name="OnReactorsTurn">
+/// True when the crossing happens in the reactor's own side's phase — its
+/// side shoving a body into its reach on its own turn — rather than in its
+/// opponent's, where the other side is moving. The reactions that answer the
+/// opponent's phase (Overwatch: "during the enemy turn") stand aside; Brace
+/// and Opportunist answer either. Set by the turn system from whose phase it
+/// is, as <see cref="DamagePayload.OnDefendersTurn"/> is; false by default,
+/// the opponent's phase.
+/// </param>
+public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edge, ImmutableArray<Reaction> Reactions, int DistanceUnits,
+    bool OnReactorsTurn = false);
 
 /// <summary>
 /// <see cref="GameEvent.Cast"/>: a staff's hit (§1.3). <c>self</c> is the caster

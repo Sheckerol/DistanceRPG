@@ -356,17 +356,20 @@ public static class EnchantmentBehaviours
     /// The levels are the element's — its percentage of the element damage a
     /// hit of this cast carries, as the cast can foresee it: the wand's figure
     /// under the cast's roll when the element typed the cast, plus the
-    /// element's own share — and the price is this entry's ladder over them,
-    /// paid whole or not at all (<see cref="FireWhole"/>). Nothing lingers
-    /// without its element on the weapon ahead of it, or when the cast could
-    /// not pay the element: the burn is quiet and costs nothing.
+    /// element's own share — read off that damage alone
+    /// (<see cref="Enchantment.LevelsOffSource"/>): the element's tier reaches
+    /// the burn through the share it builds, never as a factor on the levels.
+    /// The price is this entry's ladder over them, paid whole or not at all
+    /// (<see cref="FireWhole"/>). Nothing lingers without its element on the
+    /// weapon ahead of it, or when the cast could not pay the element: the
+    /// burn is quiet and costs nothing.
     /// </summary>
     public static CastPayload LingerOnCast(CastPayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
     {
         var element = ElementFor(enchantment, weapon);
         if (element == null || !Fired(payload.Fired, element.Id)) return payload;
 
-        int levels = element.LevelsFor(ElementDamageOfCast(payload, element, weapon, self));
+        int levels = element.LevelsOffSource(ElementDamageOfCast(payload, element, weapon, self));
         var (fired, paid) = FireWhole(enchantment, weapon, levels, manaLeft);
         if (fired <= 0) return payload;
         return payload with
@@ -404,10 +407,13 @@ public static class EnchantmentBehaviours
     /// A lingering element's behaviour on a hit, at step 4: the burn lands.
     /// Its levels are the element's percentage of this hit's element damage —
     /// the weapon's share when the element typed the hit, plus the element's
-    /// own share, each already answered by the chart — and the status it
-    /// leaves is the entry's, keyed on the element when the status is (the
-    /// row's flag): Burning leaves Searing/Flaming. It pays nothing here: the
-    /// cast paid once, and a hit whose cast did not pay it lands no burn.
+    /// own share, each already answered by the chart — and nothing more
+    /// (<see cref="Enchantment.LevelsOffSource"/>): the element's tier deepens
+    /// the burn through the share it adds, never by multiplying the levels.
+    /// The status it leaves is the entry's, keyed on the element when the
+    /// status is (the row's flag): Burning leaves Searing/Flaming. It pays
+    /// nothing here: the cast paid once, and a hit whose cast did not pay it
+    /// lands no burn.
     /// </summary>
     public static DamagePayload LingerOnHit(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
     {
@@ -419,7 +425,7 @@ public static class EnchantmentBehaviours
         int share = element.LevelsFor(element.Def.Potency);
         int elementDamage = (payload.Type == type ? payload.WeaponShare : 0)
             + (share > 0 ? CombatBehaviours.AgainstAttunement(share, type, other.Attunement) : 0);
-        int levels = element.LevelsFor(elementDamage);
+        int levels = element.LevelsOffSource(elementDamage);
         if (levels <= 0) return payload;
 
         var status = enchantment.Def.Applies

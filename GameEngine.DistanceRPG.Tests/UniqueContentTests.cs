@@ -178,6 +178,22 @@ public class UniqueContentTests
         ex = LoadWith(Martial("test_same", "tower_guard", (Block, 2), (Push, 1)));
         Assert.Equal(("test_same", ContentValidator.RuleUniqueDerivation), (ex.EntryId, ex.Rule));
 
+        // And the modifier raised is one its variant's role may raise (the four shapes): a Purity variant
+        // deepens the signature alone, so a Tower Guard unique never raises its Push; a Control or Support
+        // variant raises the signature or its own rider, so a Halberd unique never raises the spear's second
+        // baseline modifier, Longshot, nor a Weakspot Stiletto unique the dagger's CritMultiplier. The
+        // Shieldbreaker, raising the Reaver's own Splitting, loads with the defaults, as does the Halberd
+        // braced three times (below).
+        ex = LoadWith(Martial("test_purity_rider", "tower_guard", [(Block, 2), (Push, 3)], "sturdy"));
+        Assert.Equal(("test_purity_rider", ContentValidator.RuleUniqueRaisedByRole), (ex.EntryId, ex.Rule));
+        Assert.Contains("deepens the Sword signature Block alone", ex.Message);
+        ex = LoadWith(Martial("test_long_halberd", "halberd", [(Brace, 1), (Longshot, 3), (Push, 1)], "immovable"));
+        Assert.Equal(("test_long_halberd", ContentValidator.RuleUniqueRaisedByRole), (ex.EntryId, ex.Rule));
+        Assert.Contains("raises the signature Brace or its own Push", ex.Message);
+        ex = LoadWith(Martial("test_heavy_stiletto", "weakspot_stiletto", [(CritWindow, 1), (CritMultiplier, 3), (CritSunder, 1)], "siphon"));
+        Assert.Equal(("test_heavy_stiletto", ContentValidator.RuleUniqueRaisedByRole), (ex.EntryId, ex.Rule));
+        Assert.Contains("raises the signature CritWindow or its own CritSunder", ex.Message);
+
         // The Light shape: the floor is x2; x3 buys two souls, x2 three; one of them unique or at tier 3;
         // and it is the signature that is raised, never the currency, never the second axis.
         ex = LoadWith(Martial("test_floor", "flensing_knife", [(CritWindow, 1), (CritMultiplier, 1), (Light, 1)], "serrated", "siphon", "sturdy"));

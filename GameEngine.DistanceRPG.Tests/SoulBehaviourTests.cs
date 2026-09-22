@@ -517,7 +517,7 @@ public class SoulBehaviourTests
     public void LingeringElement_IsTheElementsLadder_AndEveryRowIsData()
     {
         // How deep a burn goes is the element's ladder, not the soul's (section 1.5): levels are the element's
-        // ApplyPercent of the element damage, times its tier. At elementDamage 30, 10% is 3 levels (6 over 3
+        // ApplyPercent of the element damage, and nothing else. At elementDamage 30, 10% is 3 levels (6 over 3
         // turns), 25% is 7 (28 over 7), 50% is 15 (120 over 15, outlasting the fight); at 10%, a hit for 100
         // stacks 10 levels and one for 1000 stacks 100. The burn's price rides the same ladder, L(L+1)/2 over 3.
         var flaming = GameContent.Current.Enchantments["flaming"];
@@ -531,10 +531,19 @@ public class SoulBehaviourTests
         var ten = new Enchantment(flaming with { ApplyPercent = 10 }, 1);
         Assert.Equal((10, 100), (ten.LevelsFor(100), ten.LevelsFor(1000)));
 
-        // Level the Flaming and the Searing it leaves goes deeper with it: at tier 2 the burn is 3 levels off
-        // the 8 where tier 1 left 1. The statement never intensifies; the element does. Tier is earned by
-        // casting (section 3.3), so a tier-2 Flaming is the weapon as play leaves it rather than as it drops:
-        // built here directly, past the content validator, which holds an arriving unique to one shape.
+        // The doc's own case (section 1.5): a tier-6 Flaming on a wand dealing 30 applies 3 levels at 10% — 6
+        // damage over 3 turns, and a six-target Nova totals 36. The burn reads the element damage alone: the
+        // tier is already in the 30, never a second factor on the levels, which is what a catalogue entry's own
+        // application would make of it (18).
+        var sixth = new Enchantment(flaming with { ApplyPercent = 10 }, 6);
+        Assert.Equal((3, 18), (sixth.LevelsOffSource(30), sixth.LevelsFor(30)));
+
+        // Level the Flaming and the Searing it leaves goes deeper with it — through the element damage the tier
+        // builds, never by multiplying the levels. Phase 1 prices an element's own share at nothing (its potency
+        // is 0; the tier's contribution and INT scaling are section 3.3's), so a tier-2 Flaming still leaves 1
+        // level off the wand's 8, as tier 1 does. Tier is earned by casting (section 3.3), so a tier-2 Flaming
+        // is the weapon as play leaves it rather than as it drops: built here directly, past the content
+        // validator, which holds an arriving unique to one shape.
         var grid = new int[20, 20];
         var nova = GameContent.Current.Weapons["wand_of_the_nova_unique"];
         var levelled = new Weapon(nova with { Enchantments = [new EnchantmentRef("flaming", 2), new EnchantmentRef("burning")] },
@@ -544,7 +553,22 @@ public class SoulBehaviourTests
             var target = Enemy(5, 6);
             var turns = new TurnSystem(grid, new[] { a }, new[] { target }, () => 10);
             Assert.True(turns.TryCastArea(a, (a.X, a.Y)));
-            Assert.Equal((200 - 8, 3), (target.Hp, target.StatusLevel(Searing, Flaming)));
+            Assert.Equal((200 - 8, 1), (target.Hp, target.StatusLevel(Searing, Flaming)));
+        }
+
+        // Once the share is priced — a test Flaming whose 20% of potency 25 adds 5 a tier beside the wand's 8 —
+        // levelling it deepens the burn through that damage: 13 at tier 1 is 2 levels, 18 at tier 2 is 3,
+        // where a tier factor on the levels would have made tier 2 seven.
+        var priced = flaming with { Potency = 25 };
+        foreach (var (tier, dealt, levels) in new[] { (1, 13, 2), (2, 18, 3) })
+        {
+            var weapon = new Weapon(nova with { Enchantments = [new EnchantmentRef("flaming", tier), new EnchantmentRef("burning")] },
+                [new Enchantment(priced, tier), burning]);
+            var a = Holding("A", 5, 5, weapon);
+            var target = Enemy(5, 6);
+            var turns = new TurnSystem(grid, new[] { a }, new[] { target }, () => 10);
+            Assert.True(turns.TryCastArea(a, (a.X, a.Y)));
+            Assert.Equal((200 - dealt, levels), (target.Hp, target.StatusLevel(Searing, Flaming)));
         }
 
         // The lingering table's other rows are data, not code: a Shocking Nova unique leaves Mire, the staff's

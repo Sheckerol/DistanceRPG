@@ -9,10 +9,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// handler reads the edge and the kind of move and appends a
 /// <see cref="Reaction"/> — who fires, with what, on which modifier's
 /// per-turn budget — and the turn system's applier spends the use and queues
-/// the free attack. Brace fires on entry however the move came about, a held
-/// Overwatch shot on entry likewise, and Opportunist on a chosen exit only:
-/// forced movement is movement into a zone, never a disengagement out of one,
-/// so a Rout cannot detonate its wielder's own opportunity attacks.
+/// the free attack. Brace fires on entry however the move came about, in
+/// either side's phase; a held Overwatch shot on entry likewise, however the
+/// move came about, but in the reactor's opponent's phase only — it is banked
+/// for the other side's turn; and Opportunist on a chosen exit only: forced movement
+/// is movement into a zone, never a disengagement out of one, so a Rout
+/// cannot detonate its wielder's own opportunity attacks.
 /// </summary>
 public static class ReactionBehaviours
 {
@@ -38,12 +40,20 @@ public static class ReactionBehaviours
 
     /// <summary>
     /// (1,1): a mover entering the reach of a ranged reactor holding fire is
-    /// shot for free, up to the shots held. A ranged mirror of Brace, on the
-    /// same edge; without a shot held the reach is no zone at all.
+    /// shot for free, up to the shots held — in the reactor's opponent's
+    /// phase: "if an enemy enters line of sight during the enemy turn, it
+    /// fires for free" (§1.2). Walked or shoved alike, so a brace's or a
+    /// counter's shove on the enemy turn carries a body into the reach as
+    /// surely as its own feet (settled: forced movement triggers the zones);
+    /// but a body the reactor's own side shoves in on its own turn is not the
+    /// enemy turn, and the shot stays held for the turn it was banked for. A
+    /// ranged mirror of Brace, on the same edge; without a shot held the reach
+    /// is no zone at all.
     /// </summary>
     public static ThreatPayload Overwatch(ThreatPayload payload, ActorState self, ActorState other)
     {
-        if (payload.Edge != ZoneEdge.Enter || self.HeldShots <= 0 || self.Value(ModifierType.Overwatch) <= 0) return payload;
+        if (payload.Edge != ZoneEdge.Enter || payload.OnReactorsTurn) return payload;
+        if (self.HeldShots <= 0 || self.Value(ModifierType.Overwatch) <= 0) return payload;
         if (self.EquippedWeapon?.Kind != WeaponKind.Ranged) return payload;
         return Append(payload, self, ModifierType.Overwatch);
     }

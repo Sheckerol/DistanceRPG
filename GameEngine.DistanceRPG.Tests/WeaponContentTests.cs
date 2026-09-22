@@ -350,6 +350,38 @@ public class WeaponContentTests
         Assert.Equal(1, b.Stacks(Cleave));
     }
 
+    [Fact]
+    public void Acquire_RefusesWhatTheRelationsRefuse_WhateverTheSource()
+    {
+        // The relations bind every source alike (§1.1), and Acquire is the one path every acquired stack
+        // takes, so it asks the predicate a roll gates its offers on: a refused stack throws and the weapon is
+        // untouched. Nothing ever gives a bow its first Charges, a Brace, or a member outside the table.
+        var bow = TestWeapons.Get("longbow");
+        Assert.Throws<InvalidOperationException>(() => bow.Acquire(Charges, 1));       // forged only: deepened, never granted
+        Assert.Throws<InvalidOperationException>(() => bow.Acquire(Brace, 1));         // melee only
+        Assert.Throws<InvalidOperationException>(() => bow.Acquire(Momentum, 1));      // an enchantment, never a stack
+        Assert.Throws<InvalidOperationException>(() => bow.Acquire(OnHitPoison, 1));   // reserved: no behaviour
+        Assert.Equal(bow.Forged, bow.Modifiers);
+        Assert.Equal(30, bow.ResolvedCost);
+
+        // One displacement direction: a sword that pushes is never given a pull, nor a Rout (which wants a Cleave besides).
+        var guard = TestWeapons.Get("tower_guard");
+        Assert.Throws<InvalidOperationException>(() => guard.Acquire(Drag, 1));
+        Assert.Throws<InvalidOperationException>(() => guard.Acquire(Rout, 1));
+        Assert.Equal(guard.Forged, guard.Modifiers);
+
+        // Deepening what a weapon holds passes — the Bandolier's forged Charges — and a prerequisite, once
+        // grafted, opens what it gates: a dagger is never offered Riposte until it holds a Block.
+        var bandolier = TestWeapons.Get("bandolier");
+        bandolier.Acquire(Charges, 1);
+        Assert.Equal(3, bandolier.Stacks(Charges));
+        var fang = TestWeapons.Get("assassins_fang");
+        Assert.Throws<InvalidOperationException>(() => fang.Acquire(Riposte, 1));
+        fang.Acquire(Block, 1);
+        fang.Acquire(Riposte, 1);
+        Assert.Equal((1, 1), (fang.Stacks(Block), fang.Stacks(Riposte)));
+    }
+
     [Theory]
     [InlineData(0, 20)]
     [InlineData(1, 19)]
@@ -447,6 +479,14 @@ public class WeaponContentTests
         // Two reactions: a class baseline quietly giving someone Brace beside Opportunist.
         ex = LoadWith("routing_axe", w => w with { Forged = Spread((Cleave, 1), (Opportunist, 1), (Brace, 1)) });
         Assert.Equal(("routing_axe", ContentValidator.RuleForgedNotAllowed), (ex.EntryId, ex.Rule));
+
+        // A member outside the modifier table, on any weapon: the Shieldbreaker carries Momentum as its soul and
+        // never as a stack, and OnHitPoison is reserved. A stack of either would change nothing.
+        ex = LoadWith("shieldbreaker", w => w with { Forged = Spread((Cleave, 1), (Opportunist, 1), (Splitting, 3), (Momentum, 1)) });
+        Assert.Equal(("shieldbreaker", ContentValidator.RuleForgedNotAllowed), (ex.EntryId, ex.Rule));
+        Assert.Contains("Momentum x1: not in the modifier table", ex.Message);
+        ex = LoadWith("crossbow", w => w with { Forged = Spread((Longshot, 1), (CritWindow, 1), (Overwatch, 1), (OnHitPoison, 1)) });
+        Assert.Equal(("crossbow", ContentValidator.RuleForgedNotAllowed), (ex.EntryId, ex.Rule));
 
         // One forged axis.
         ex = LoadWith("hatchet", w => w with { Forged = Spread((Cleave, 3)) });

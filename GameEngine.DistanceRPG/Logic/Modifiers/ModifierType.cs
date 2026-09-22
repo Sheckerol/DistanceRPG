@@ -6,6 +6,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// what one stack is worth lives in <see cref="ModifierRules"/> alone.
 /// Member order is fixed by §1.7 and is the order <see cref="ModifierSet.Entries"/>
 /// enumerates in, so it is part of the deterministic surface (HUD, saves).
+/// Two members are declared but never stacks — the enchantment-only Momentum
+/// and the reserved OnHitPoison — and <see cref="ModifierRules.Allowed"/>
+/// refuses both everywhere (<see cref="ModifierRules.NeverStacked"/>).
 /// </summary>
 public enum ModifierType
 {

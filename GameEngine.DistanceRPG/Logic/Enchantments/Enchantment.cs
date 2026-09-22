@@ -121,11 +121,25 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// Levels one application grants from <paramref name="sourceNumber"/> —
     /// a staff's <see cref="EnchantmentDef.Potency"/>, a hit's damage, healing
     /// overflowed — as §3.5 prices it: <c>ApplyPercent x source x Tier</c>,
-    /// truncated; a unique reads its scale off the source alone.
+    /// truncated; a unique reads its scale off the source alone
+    /// (<see cref="LevelsOffSource"/>).
     /// </summary>
     public int LevelsFor(int sourceNumber) => Unique
-        ? Def.ApplyPercent * sourceNumber / Percent
+        ? LevelsOffSource(sourceNumber)
         : Def.ApplyPercent * sourceNumber * Tier / Percent;
+
+    /// <summary>
+    /// Levels off <paramref name="sourceNumber"/> at this entry's percentage
+    /// and nothing else — <c>ApplyPercent x source</c>, truncated, whatever
+    /// the tier: the unique path of <see cref="LevelsFor"/>, for a magnitude
+    /// that reads its scale off its source ("Serrated, and every element",
+    /// phase-3-loot.md:1258-1261). A lingering element's burn is one: its
+    /// levels are the element's percentage of the element damage, so the
+    /// element's tier deepens the burn only through the damage it builds,
+    /// never as a second factor on the levels — a tier-6 Flaming on a wand
+    /// dealing 30 applies 3 levels at 10%, 6 damage over 3 turns (§1.5).
+    /// </summary>
+    public int LevelsOffSource(int sourceNumber) => Def.ApplyPercent * sourceNumber / Percent;
 
     /// <summary>
     /// Mana one fire costs before the wielder's discount: the flat

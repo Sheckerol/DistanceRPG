@@ -500,9 +500,9 @@ public sealed class TurnSystem
     /// <summary>
     /// Can the member hold fire? Overwatch is ranged only — holding a shot is
     /// what a nocked arrow does — and the member needs Overwatch stacks, the
-    /// swing's movement to spare, no shot already held, and shots left in this
-    /// turn's pool: once the held shots have all fired, holding again would
-    /// buy nothing.
+    /// swing's movement to spare, no shot already held, and uses left in its
+    /// zone's pool this round, which every threat-zone reaction it holds
+    /// shares: shots the pool could not fire would buy nothing.
     /// </summary>
     public bool CanOverwatch(PartyMemberState c)
     {
@@ -940,10 +940,12 @@ public sealed class TurnSystem
             if (!crossed) continue;
 
             // The distance is read here, at the crossing: the reaction it earns
-            // may resolve only after the shove that caused it has finished.
+            // may resolve only after the shove that caused it has finished. So
+            // is whose phase it is, which the reactions that answer only the
+            // opponent's phase (Overwatch) read.
             _events.Enqueue(GameEvent.ThreatZoneEntered,
                 new ThreatPayload(mover, kind, edge, ImmutableArray<Reaction>.Empty,
-                    CombatRules.SurfaceDistanceUnits(reactor, mover)), reactor, mover);
+                    CombatRules.SurfaceDistanceUnits(reactor, mover), OnReactorsTurn: OnOwnTurn(reactor)), reactor, mover);
         }
     }
 
@@ -988,13 +990,16 @@ public sealed class TurnSystem
     private Side ActingSide => Phase == TurnPhase.Player ? Side.Party : Side.Enemy;
 
     /// <summary>
-    /// Whether a hit on <paramref name="defender"/> lands in its own side's
-    /// phase — a counter to its swing, a brace it walked into — rather than in
-    /// its opponent's, where it stands and holds (<see cref="DamagePayload.OnDefendersTurn"/>).
+    /// Whether it is <paramref name="actor"/>'s own side's phase: a hit on a
+    /// defender in its own phase — a counter to its swing, a brace it walked
+    /// into — rather than in its opponent's, where it stands and holds
+    /// (<see cref="DamagePayload.OnDefendersTurn"/>); a crossing of a
+    /// reactor's reach in its own phase — its side shoving a body in —
+    /// rather than while the other side moves (<see cref="ThreatPayload.OnReactorsTurn"/>).
     /// False for an actor off the roster.
     /// </summary>
-    private bool OnOwnTurn(ActorState defender)
-        => _sides.TryGetValue(defender, out var side) && side == ActingSide;
+    private bool OnOwnTurn(ActorState actor)
+        => _sides.TryGetValue(actor, out var side) && side == ActingSide;
 
     private void BeginAttackPhase()
     {
