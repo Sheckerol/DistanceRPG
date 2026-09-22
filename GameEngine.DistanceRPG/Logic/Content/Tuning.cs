@@ -135,6 +135,120 @@ public sealed record Tuning
         ["serrated"] = 20,
     };
 
+    /// <summary>
+    /// The odds a non-caster drop arrives carrying an enchantment (§3.1): a
+    /// staff's is fixed by its variant and a wand's is its element, so this is
+    /// the martial roll and nothing else. Rolled as
+    /// <c>NextInt(0, 999) &lt; DropEnchantChancePercent × 10</c>, an integer draw
+    /// for the reason <see cref="FarmLadder.UniqueChancePermille"/> gives.
+    /// <para>
+    /// <strong>Provisional.</strong> §3.1 says "an uncommon roll on the loot
+    /// stream" and names no number anywhere, so 10 is picked here to stop the
+    /// drop path blocking on it and is expected to move after play — one of the
+    /// two figures in Phase 3 that is a guess rather than a doc's.
+    /// </para>
+    /// </summary>
+    public int DropEnchantChancePercent { get; init; } = 10;
+
+    /// <summary>
+    /// Arcane's base potency: the untyped damage it adds to a hit, before its
+    /// tier multiplies it through <see cref="Enchantment.LevelsFor"/> (§3.3). At
+    /// <c>ApplyPercent</c> 100 a tier-1 Arcane adds 4 for a trigger of 8 and a
+    /// tier-6 adds 24 for a lock of 180.
+    /// <para>
+    /// <strong>Provisional.</strong> §3.3's starting-set table prices Arcane's
+    /// lock and trigger and gives no potency column at all, so this is the second
+    /// of Phase 3's two guessed figures. It sits here rather than in the
+    /// catalogue row so a playtest can turn it without a content edit.
+    /// </para>
+    /// </summary>
+    public int ArcanePotency { get; init; } = 4;
+
+    // ---- Farming (§3.2) ----
+    // The repeat-kill ladder's knobs. They are read through FarmLadder, which is
+    // the only place the arithmetic over them lives.
+
+    /// <summary>
+    /// Turns a dummy at <c>DefeatCount</c> 0 takes to resurrect:
+    /// <c>resurrectTurns(n) = max(ResurrectTurnsFloor, ResurrectTurnsBase − n)</c>
+    /// (§3.2). Replaces the compiled <c>DummyResurrectTurns</c>, which was this
+    /// same 10 with no ladder under it. settled.md keeps the front-loaded slope
+    /// as designed and records <c>10 − n/2</c> as the fallback if the front half
+    /// of a farm ever feels too samey.
+    /// </summary>
+    public int ResurrectTurnsBase { get; init; } = 10;
+
+    /// <summary>
+    /// The shortest a revival ever gets (§3.2). A floor rather than a curve
+    /// because "a two-turn revival is not a fight, it is a treadmill": at three
+    /// there is still room to reposition, swing at something else, or leave.
+    /// Coupled to <see cref="ResurrectTurnsBase"/> — lowering either makes deep
+    /// farming untenable long before the statline does.
+    /// <see cref="ContentValidator.ValidateTuning"/> refuses a value below 1, or
+    /// a dummy could revive the turn it died.
+    /// </summary>
+    public int ResurrectTurnsFloor { get; init; } = 3;
+
+    /// <summary>
+    /// The chance, as a percentage, that one farm cycle buys the drop a stack
+    /// (§3.2). Flat rather than decaying, which settled.md accepts as designed:
+    /// what ends a farm is the per-modifier <c>forged + 5</c> ceiling, so a
+    /// falling rate would only make the same ending slower to reach.
+    /// </summary>
+    public int DefeatStackChance { get; init; } = 50;
+
+    /// <summary>
+    /// What a clean kill — a killing blow dealing at least the target's max HP —
+    /// advances <c>DefeatCount</c> by (settled.md). It needs no counterweight
+    /// because <c>DefeatCount</c> is already both reward and threat: it buys two
+    /// cycles of drop quality <em>and</em> hands the dummy two cycles of statline.
+    /// </summary>
+    public int CleanKillBonus { get; init; } = 2;
+
+    /// <summary>
+    /// The percentage of its own current damage or max HP a dummy gains per
+    /// revival (§3.2; settled.md overrides the flat +5). Proportional, so a
+    /// dagger dummy and an axe dummy grow at the same relative rate, and
+    /// compounding, so the curve accelerates the longer a farm runs.
+    /// <para>
+    /// <strong>Provisional by the doc's own admission</strong> — "still a
+    /// placeholder pending play"; what carries over from the flat version is the
+    /// shape, not the number. At 15 an 18-damage axe dummy reaches 37 damage in
+    /// five Damage rolls: 18, 21, 24, 28, 32, 37.
+    /// </para>
+    /// </summary>
+    public int ReviveStepPercent { get; init; } = 15;
+
+    // ---- Uniques (§3.2) ----
+    // The logistic's three constants, all knobs: the ceiling sets how much
+    // grinding can ever be worth, the midpoint moves the hot zone, and K
+    // controls how sharply it arrives.
+
+    /// <summary>
+    /// The asymptote the unique chance climbs toward, as a percentage (§3.2). It
+    /// is what keeps the deep farm a gamble rather than a long safe purchase:
+    /// "no amount of grinding *guarantees* a unique". The asymptote does the work
+    /// a hard cap used to.
+    /// </summary>
+    public int UniqueChanceCeilingPercent { get; init; } = 50;
+
+    /// <summary>
+    /// The <c>DefeatCount</c> the curve is steepest at, where it passes half the
+    /// ceiling (§3.2). settled.md keeps it at 20 pending real numbers from
+    /// <see cref="ReviveStepPercent"/> play, and fixes the direction of the
+    /// coupling: if a twenty-times-revived dummy proves unsurvivable or trivial
+    /// the midpoint moves to match, never the other way round.
+    /// </summary>
+    public int UniqueChanceMidpoint { get; init; } = 20;
+
+    /// <summary>
+    /// How sharply the curve arrives, as a percentage: the doc's
+    /// <c>K = 0.26</c>, "tuned so DefeatCount 5 lands on ~1%". Percent-named
+    /// because §5.3 makes every rate an integer with its units in its name rather
+    /// than a bare float.
+    /// </summary>
+    public int UniqueChanceKPercent { get; init; } = 26;
+
     // ---- Economy (§1.2, §1.3) ----
 
     /// <summary>

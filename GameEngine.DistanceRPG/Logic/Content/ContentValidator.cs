@@ -51,9 +51,16 @@ public static class ContentValidator
     public const string RulePartyHasACaster = "a roster always includes a caster";
 
     public const string RulePoolBarIsPositive = "a pool's bar is at least one";
+    public const string RuleChanceIsAPercentage = "a chance is a percentage, 0 to 100";
+    public const string RuleRevivalTakesATurn = "a revival takes at least one turn";
+    public const string RuleCurveMidpointIsACount = "the unique curve's midpoint is a DefeatCount, never negative";
+    public const string RuleEnchantmentLockIsPositive = "an enchantment reserves at least one point of mana";
 
     /// <summary>The entry id a roster-wide failure is reported against: the file, since no one member broke it.</summary>
     private const string RosterId = "party";
+
+    /// <summary>The top of a percentage; the bottom is 0, since a chance of nothing is a legible way to switch a roll off.</summary>
+    private const int FullPercent = 100;
 
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
@@ -127,6 +134,15 @@ public static class ContentValidator
     /// the doc's line and carries no guard of its own, so a bar of 0 would make
     /// every step free and the replay loop endless. Refusing it here turns a
     /// mistyped number into a named startup failure instead of a hang.
+    /// <para>
+    /// The §3.2 knobs are checked for the same reason and nothing more: a chance
+    /// is a percentage, a revival takes a turn — a
+    /// <see cref="Tuning.ResurrectTurnsFloor"/> of 0 lets
+    /// <see cref="FarmLadder.ResurrectTurns"/> return 0 and a dummy revive the
+    /// turn it died — and the unique curve's midpoint is a <c>DefeatCount</c>,
+    /// which is a count. Nothing here has an opinion about whether a number is
+    /// well <em>tuned</em>; that is what playtesting is for.
+    /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
     {
@@ -136,6 +152,22 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.StartingPool), RulePoolBarIsPositive, $"{tuning.StartingPool}");
         if (tuning.WeaponXpPerLevel < 1)
             throw new ContentException(nameof(Tuning.WeaponXpPerLevel), RulePoolBarIsPositive, $"{tuning.WeaponXpPerLevel}");
+
+        RequirePercentage(tuning.DefeatStackChance, nameof(Tuning.DefeatStackChance));
+        RequirePercentage(tuning.DropEnchantChancePercent, nameof(Tuning.DropEnchantChancePercent));
+        RequirePercentage(tuning.UniqueChanceCeilingPercent, nameof(Tuning.UniqueChanceCeilingPercent));
+
+        if (tuning.ResurrectTurnsFloor < 1)
+            throw new ContentException(nameof(Tuning.ResurrectTurnsFloor), RuleRevivalTakesATurn, $"{tuning.ResurrectTurnsFloor}");
+        if (tuning.UniqueChanceMidpoint < 0)
+            throw new ContentException(nameof(Tuning.UniqueChanceMidpoint), RuleCurveMidpointIsACount, $"{tuning.UniqueChanceMidpoint}");
+    }
+
+    /// <summary>A knob rolled against a draw is a percentage, or the draw means nothing.</summary>
+    private static void RequirePercentage(int value, string key)
+    {
+        if (value < 0 || value > FullPercent)
+            throw new ContentException(key, RuleChanceIsAPercentage, $"{value}");
     }
 
     /// <summary>
@@ -306,6 +338,14 @@ public static class ContentValidator
     /// second makes every unique magnitude quote no flat trigger (S:239): it
     /// applies a status, so its price is the ladder over what it lands.
     /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
+    /// <para>
+    /// The lock joins them here because §3.3 makes it load-bearing twice: it
+    /// reserves mana while equipped <em>and</em> it is the bar the tier ladder
+    /// divides (<see cref="Enchantment.XpToNextTier"/>). A row with
+    /// <c>Lock: 0</c> would price every tier at nothing for every stat, so it is
+    /// refused at load exactly the way a <see cref="Tuning.StartingPool"/> of 0
+    /// already is, rather than guarded inside the replay.
+    /// </para>
     /// </summary>
     public static void ValidateEnchantments(EnchantmentsData data)
     {
@@ -316,6 +356,8 @@ public static class ContentValidator
         {
             if (!seen.Add(e.Id))
                 throw new ContentException(e.Id, RuleDuplicateId);
+            if (e.Lock < 1)
+                throw new ContentException(e.Id, RuleEnchantmentLockIsPositive, $"lock {e.Lock}");
             if (e.Trigger is <= 0)
                 throw new ContentException(e.Id, RuleZeroTrigger, $"trigger {e.Trigger}");
             if ((e.Trigger != null) == (e.Applies != null))
