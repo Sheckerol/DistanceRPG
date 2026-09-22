@@ -28,7 +28,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>ProgressionStateTests.EveryFixtureMemberIsGrown</c> reads the test
 /// assembly's IL and refuses a <see cref="PartyMemberState"/> built anywhere but
 /// here. A member who genuinely needs the real starting pool asks for
-/// <see cref="Fresh"/> and says so.
+/// <see cref="Fresh"/> and says so -- and because that is the one door back to
+/// 25/25, the same guard enumerates <see cref="Fresh"/>'s callers as well and
+/// allows only the progression tests, which are what it is for.
 /// </para>
 /// </summary>
 public static class TestPools
@@ -75,6 +77,11 @@ public static class TestPools
             member.Credit(new XpCredit(XpPool.Health, null, member.HealthPool.XpToNext));
         while (member.MaxMana < maxMana)
             member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+
+        // A gained mana point arrives empty on purpose -- crediting on a spend
+        // must not refund the cast -- so the pool a fixture spawns holding is
+        // filled here. HP needs no line: its points arrive filled.
+        member.Mana = member.MaxMana;
 
         return member;
     }

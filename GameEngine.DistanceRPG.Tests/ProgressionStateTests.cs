@@ -115,18 +115,21 @@ public class ProgressionStateTests
         Assert.Equal(fighter.HpXp, wizard.HpXp);
         Assert.Equal((StartingPool + 4, StartingPool + 1), (fighter.MaxHp, wizard.MaxHp));
 
-        // The mirror, on a ladder rather than a pool: D will never be the better
-        // knife-fighter however much damage their knife does. The same 100 damage
-        // leaves A (DEX 4) a level ahead of C (DEX 2), and both hold the same XP.
+        // The mirror, on a ladder rather than a pool, and against the member the
+        // claim actually names: D will never be the better knife-fighter however
+        // much damage their knife does. Fed the same 150 dagger XP as A (DEX 4),
+        // that same D is a level behind -- A has paid 25 + 50 + 75 exactly and
+        // wields at 4, D has paid 33 + 66 and is still on 3 with 51 carried --
+        // and both books hold the same number, because the stat is in the
+        // threshold and never in the credit.
         var thief = TestPools.Fresh("A", Spread("A"));
-        var brute = TestPools.Fresh("C", Spread("C"));
-        Credit(thief, WeaponClass.Dagger, 100);
-        Credit(brute, WeaponClass.Dagger, 100);
+        Credit(thief, WeaponClass.Dagger, 150);
+        Credit(wizard, WeaponClass.Dagger, 150);
 
-        Assert.Equal(thief.WeaponXp[WeaponClass.Dagger], brute.WeaponXp[WeaponClass.Dagger]);
+        Assert.Equal(thief.WeaponXp[WeaponClass.Dagger], wizard.WeaponXp[WeaponClass.Dagger]);
         var dagger = TestWeapons.Get("weakspot_stiletto");
-        Assert.Equal(3, thief.WeaponLevel(dagger));   // 25 + 50 spent, 25 carried
-        Assert.Equal(2, brute.WeaponLevel(dagger));   // 50 spent, 50 carried: half the bar of the next
+        Assert.Equal(4, thief.WeaponLevel(dagger));    // 150 paid, nothing carried into a 100 bar
+        Assert.Equal(3, wizard.WeaponLevel(dagger));   // 99 paid, 51 carried: half a bar short of A
     }
 
     [Fact]
@@ -257,6 +260,14 @@ public class ProgressionStateTests
         Assert.Equal(2, Credit(caster, XpPool.Mana, 13));
         Assert.Equal(StartingPool + 2, caster.MaxMana);
         Assert.Equal(StartingPool - 13, caster.Mana);      // untouched: casting never pays for itself
+
+        // And a pool nobody has written is no exception, though it is the one
+        // that would break the rule for free: it reads as its own ceiling, so a
+        // ceiling that rose unpinned would hand over a filled point.
+        var unspent = TestPools.Fresh("D", Spread("D"));   // INT 4, mana never written
+        Assert.Equal(2, Credit(unspent, XpPool.Mana, 13));
+        Assert.Equal(StartingPool + 2, unspent.MaxMana);
+        Assert.Equal(StartingPool, unspent.Mana);          // what the old bar held, not what the new one holds
     }
 
     [Fact]
@@ -276,11 +287,32 @@ public class ProgressionStateTests
             .ToArray();
         Assert.Equal([], offenders);
 
-        // And the scanner does find the one that is allowed, so the assertion
-        // above cannot pass by finding nothing at all.
+        // The factory has a second door, and it opens on exactly the state this
+        // guard exists to forbid: TestPools.Fresh hands back a member at the real
+        // 25/25, which is what a progression test wants and what a combat fixture
+        // must never hold. A file calling Fresh instead of Char satisfies the
+        // assertion above while dropping its members to a quarter of the pool
+        // every scenario was written against, so name those callers too.
+        static bool Allowed(Type? root) => root == typeof(TestPools) || root == typeof(ProgressionStateTests);
+
+        var freshCallers = Calls(typeof(TestPools).Assembly)
+            .Where(c => c.Target is MethodInfo { Name: nameof(TestPools.Fresh) } m && m.DeclaringType == typeof(TestPools))
+            .Where(c => !Allowed(Root(c.From.DeclaringType)))
+            .Select(Describe)
+            .Distinct()
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal([], freshCallers);
+
+        // And the scanner does find both of the calls that are allowed, so
+        // neither assertion above can pass by finding nothing at all.
         Assert.Contains(
             Calls(typeof(TestPools).Assembly),
             c => c.Op == OpCodes.Newobj && c.Target.DeclaringType == typeof(PartyMemberState));
+        Assert.Contains(
+            Calls(typeof(TestPools).Assembly),
+            c => c.Target is MethodInfo { Name: nameof(TestPools.Fresh) } m && m.DeclaringType == typeof(TestPools)
+                && Root(c.From.DeclaringType) == typeof(ProgressionStateTests));
     }
 
     [Fact]

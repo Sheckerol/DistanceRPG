@@ -79,8 +79,10 @@ public sealed class PartyMemberState : ActorState
     /// <em>spending</em>, so filling a gained point would hand back part of the
     /// cast that earned it — and mana has a filler that needs no second event
     /// (<see cref="ActorState.RegenManaFromUnusedMovement"/>), so an empty point
-    /// costs nothing but a turn's regen. A weapon level fills nothing: a ladder
-    /// has no pool to be full of.
+    /// costs nothing but a turn's regen. A pool nobody has written reads as its
+    /// own ceiling, so the mana branch pins what the pool held before the bar
+    /// moves and the rule holds whether or not anything has been spent yet. A
+    /// weapon level fills nothing: a ladder has no pool to be full of.
     /// </para>
     /// </summary>
     /// <returns>Points or levels gained, 0 for a credit that crossed no bar.</returns>
@@ -119,8 +121,12 @@ public sealed class PartyMemberState : ActorState
             {
                 RequireNoClass(credit);
                 int before = MaxMana;
+                int mana = Mana;           // read against the bar before it moves: a pool nobody has written reads as its ceiling, and would otherwise rise with it
                 ManaXp += credit.Amount;
-                return MaxMana - before;   // the ceiling rises; what is in the pool does not
+                int gained = MaxMana - before;
+                if (gained > 0)
+                    Mana = mana;           // the ceiling rises; what is in the pool does not
+                return gained;
             }
 
             default:
