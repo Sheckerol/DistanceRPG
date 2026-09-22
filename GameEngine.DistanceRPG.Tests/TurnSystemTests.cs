@@ -8,7 +8,7 @@ public class TurnSystemTests
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var c = TestPools.Char(id, x: x, y: y);
         c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
@@ -152,7 +152,7 @@ public class TurnSystemTests
 
         // Budget 100, scaled sword cost 100/160*50 = 31.25 â†’ 3 attacks of 10.
         Assert.Equal(3, hits);
-        Assert.Equal(GameConstants.PlayerHp - 30, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 30, a.Hp);
         Assert.Equal(TurnPhase.Player, turns.Phase);
     }
 
@@ -319,14 +319,14 @@ public class TurnSystemTests
         a.X += 10f;
         turns.NotifyCharacterMoved(a);
         Assert.Equal(0, enemyBraces);
-        Assert.Equal(GameConstants.PlayerHp, a.Hp);
+        Assert.Equal(TestPools.FixtureHp, a.Hp);
 
         // Walk into reach: one free spear poke (7, plus Longshot x1's +1 for
         // a hit at the fourth tile — surface 122 — and no block from a dagger).
         a.X = enemy.X - 150f;
         turns.NotifyCharacterMoved(a);
         Assert.Equal(1, enemyBraces);
-        Assert.Equal(GameConstants.PlayerHp - 8, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 8, a.Hp);
 
         // Deeper movement inside reach: no second trigger.
         a.X += 20f;
@@ -467,7 +467,7 @@ public class TurnSystemTests
 
         // Each enemy lands its 3 scaled sword attacks (budget 100, cost 31.25).
         Assert.Equal(6, hits);
-        Assert.Equal(GameConstants.PlayerHp - 60, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 60, a.Hp);
         Assert.Equal(TurnPhase.Player, turns.Phase);
     }
 

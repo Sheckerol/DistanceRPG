@@ -19,14 +19,14 @@ public class AttackShapeTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId);
         return ch;
     }
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0 };
+        var c = TestPools.Char(id);
         c.Inventory[0] = weapon;
         return c;
     }
@@ -305,8 +305,8 @@ public class AttackShapeTests
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(4, characterHits);
         Assert.Equal(new (ActorState, bool)[] { (a, false), (b, true), (a, false), (b, true) }, hits);
-        Assert.Equal(GameConstants.PlayerHp - 36, a.Hp);   // no shield on a dagger
-        Assert.Equal(GameConstants.PlayerHp - 36, b.Hp);
+        Assert.Equal(TestPools.FixtureHp - 36, a.Hp);   // no shield on a dagger
+        Assert.Equal(TestPools.FixtureHp - 36, b.Hp);
     }
 
     // ── Charges ──────────────────────────────────────────────────────────────
@@ -381,7 +381,7 @@ public class AttackShapeTests
 
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(2, hits);
-        Assert.Equal(GameConstants.PlayerHp - 18, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 18, a.Hp);
 
         // A Bandolier dummy: three.
         var b = Char("B", 5, 5, "weakspot_stiletto");
@@ -393,7 +393,7 @@ public class AttackShapeTests
         purity.EndTurn();
         Advance(purity, 8f);
         Assert.Equal(3, hits2);
-        Assert.Equal(GameConstants.PlayerHp - 27, b.Hp);
+        Assert.Equal(TestPools.FixtureHp - 27, b.Hp);
     }
 
     [Theory]
@@ -412,7 +412,7 @@ public class AttackShapeTests
         Assert.Equal(forged + acquired, knives.Stacks(Charges));
         var grid = new int[20, 20];
         var (x, y) = At(5, 5);
-        var a = new PartyMemberState { Id = "A", ColorIndex = 0, X = x, Y = y };
+        var a = TestPools.Char("A", x: x, y: y);
         a.Inventory[0] = knives;
         var enemy = new EnemyState { X = a.X + 96f, Y = a.Y, Weapon = TestWeapons.Make("Fists", 40, 1, 0), Hp = 1000 };   // no Block
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
@@ -576,7 +576,7 @@ public class AttackShapeTests
         c.X = lancer.X - 150f;
         enemyLine.NotifyCharacterMoved(c);
         Assert.Equal(1, c.StatusLevel(Mire));
-        Assert.Equal(GameConstants.PlayerHp - 8, c.Hp);   // 7 + 1 at the fourth tile, no shield on a dagger
+        Assert.Equal(TestPools.FixtureHp - 8, c.Hp);   // 7 + 1 at the fourth tile, no shield on a dagger
         Assert.Equal(GameConstants.MaxDistance * 90 / 100, StatusBehaviours.MiredBudget(c, GameConstants.MaxDistance));
     }
 }

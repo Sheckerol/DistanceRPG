@@ -32,12 +32,15 @@ public static class GameConstants
     /// <summary>Character collision radius, in logic units.</summary>
     public const float PlayerHalf = (32f - 4f) / 2f;
 
-    public const int PlayerHp = 100;
     public const int DummyHp = 50;
 
     /// <summary>
-    /// Mana pool per actor, for casts and for enchantment triggers; it comes
-    /// back only from unspent movement (<see cref="Tuning.MovementUnitsPerMana"/>).
+    /// Mana pool of an actor with no progression, for casts and for enchantment
+    /// triggers; it comes back only from unspent movement
+    /// (<see cref="Tuning.MovementUnitsPerMana"/>). A party member's pool is not
+    /// this: it is computed from <see cref="Tuning.StartingPool"/> and the points
+    /// their INT has earned (§2.1), so this is the number every enemy carries and
+    /// nobody else.
     /// </summary>
     public const int MaxMana = 100;
 

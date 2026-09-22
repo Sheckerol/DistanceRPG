@@ -63,6 +63,16 @@ public class DungeonScene : Scene
         Rgb(0xffdd44), // D
     };
 
+    /// <summary>
+    /// Party members this scene can spawn: one colour each, and the count
+    /// <see cref="SpawnParty"/> asks the map for spawn tiles for. The roster's
+    /// length is the rule (<see cref="GameConstants.PartySize"/>) and this is the
+    /// presentation's capacity for it; a test asserts the two are equal, because
+    /// a roster longer than this spawns a prefix and drops whoever came last
+    /// without a word.
+    /// </summary>
+    internal static int PartyColorCount => PartyColors.Length;
+
     private readonly Camera _camera;
     private readonly Game _game;
     private readonly DungeonHud _hud;

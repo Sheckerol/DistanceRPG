@@ -19,7 +19,7 @@ public class EventTableTests
     }
 
     private static PartyMemberState Member(string id = "A")
-        => new() { Id = id, ColorIndex = 0 };
+        => TestPools.Char(id);
 
     private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)
     {
@@ -435,7 +435,7 @@ public class EventTableTests
         Assert.Equal((15 * Tile, 15 * Tile), (passive.X, passive.Y));
         Assert.False(dead.Alive);
         Assert.False(fallen.Alive);
-        Assert.Equal(GameConstants.PlayerHp - 30, a.Hp);   // the acting enemy's three sword beats still landed on A
+        Assert.Equal(TestPools.FixtureHp - 30, a.Hp);   // the acting enemy's three sword beats still landed on A
     }
 
     private static string Snapshot(ActorState a)

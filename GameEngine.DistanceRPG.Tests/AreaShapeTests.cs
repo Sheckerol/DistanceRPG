@@ -15,7 +15,7 @@ public class AreaShapeTests
 
     private static PartyMemberState Caster(float x, float y)
     {
-        var c = new PartyMemberState { Id = "A", ColorIndex = 0, X = x, Y = y };
+        var c = TestPools.Char("A", x: x, y: y);
         c.Inventory[0] = TestWeapons.Get("wand_of_the_blast", DamageType.Flaming);
         return c;
     }
@@ -157,7 +157,7 @@ public class AreaShapeTests
     {
         var nova = Shape("wand_of_the_nova");
         var a = Caster(160f, 160f);
-        var ally = new PartyMemberState { Id = "B", ColorIndex = 0, X = 190f, Y = 160f };   // the geometry takes whoever it is given: sides are the caller's
+        var ally = TestPools.Char("B", x: 190f, y: 160f);   // the geometry takes whoever it is given: sides are the caller's
         var far = Dummy(160f, 250f);      // 90
         var mid = Dummy(224f, 160f);      // 64
         var dead = Dummy(192f, 160f);     // 32, but dead: a shape hits actors, not corpses

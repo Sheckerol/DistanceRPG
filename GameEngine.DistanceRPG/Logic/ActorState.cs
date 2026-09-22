@@ -13,8 +13,21 @@ public abstract class ActorState
     public float X { get; set; }
     public float Y { get; set; }
 
-    /// <summary>Current hit points; each kind of actor starts at its own full value.</summary>
-    public int Hp { get; set; }
+    /// <summary>
+    /// Current hit points; full at spawn — HP nobody has written reads as this
+    /// actor's own <see cref="MaxHp"/>, the same shape <see cref="Mana"/> has.
+    /// A kind whose maximum is computed from its own state (a party member's
+    /// earned points, §2.1) therefore spawns at whatever that computes to, with
+    /// no construction-order problem: the maximum is asked for when it is
+    /// wanted, not copied at the moment the actor is made.
+    /// </summary>
+    public int Hp
+    {
+        get => _hp ?? MaxHp;
+        set => _hp = value;
+    }
+
+    private int? _hp;
 
     /// <summary>Full hit points for this kind of actor.</summary>
     public abstract int MaxHp { get; }
@@ -42,6 +55,27 @@ public abstract class ActorState
     /// stacks resolve together, so a modifier's offset applies once.
     /// </summary>
     public int Value(ModifierType t) => GameContent.Current.Modifiers.Resolve(t, Stacks(t));
+
+    /// <summary>
+    /// The level this actor wields <paramref name="weapon"/> at: its proficiency
+    /// in that weapon's class (§2.2). Declared here, and virtual, so a rule that
+    /// reads a wielder's level — the damage bonus, the movement discount, and
+    /// Phase 3's Serrated, which bleeds for a percentage of "base damage plus
+    /// proficiency level" — asks whoever is holding the thing rather than asking
+    /// what kind of actor it is.
+    /// <para>
+    /// The base is <see cref="Progression.StartingLevel"/>, whatever is held:
+    /// proficiency is a party member's, and an actor with no pools wields
+    /// everything at the level a class nobody has trained is wielded at. Both
+    /// level effects are no-ops there, so an enemy swings for exactly its
+    /// weapon's own numbers.
+    /// </para>
+    /// </summary>
+    public virtual int WeaponLevel(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return Progression.StartingLevel;
+    }
 
     /// <summary>
     /// The damage type this actor is attuned to, or null: what a typed hit

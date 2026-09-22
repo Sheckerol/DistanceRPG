@@ -39,7 +39,7 @@ public class DamagePipelineTests
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0 };
+        var c = TestPools.Char(id);
         c.Inventory[0] = weapon;
         return c;
     }
@@ -78,7 +78,7 @@ public class DamagePipelineTests
         Assert.Equal(36, crit.Taken);
         Assert.False(crit.Blocked);       // a bypassed block never happened, which Riposte and BlockWeaken read
 
-        Assert.Equal(GameConstants.PlayerHp, bulwark.Hp);   // resolving writes nothing
+        Assert.Equal(TestPools.FixtureHp, bulwark.Hp);   // resolving writes nothing
     }
 
     [Fact]

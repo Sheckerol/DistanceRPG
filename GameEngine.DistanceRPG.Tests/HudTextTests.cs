@@ -16,7 +16,7 @@ public class HudTextTests
 {
     private static PartyMemberState Holding(string weaponId, DamageType? element = null)
     {
-        var member = new PartyMemberState { Id = "A", ColorIndex = 0 };
+        var member = TestPools.Char("A");
         member.Inventory[0] = TestWeapons.Get(weaponId, element);
         return member;
     }

@@ -15,7 +15,7 @@ public class CritRiderTests
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0 };
+        var c = TestPools.Char(id);
         c.Inventory[0] = weapon;
         return c;
     }
@@ -213,7 +213,7 @@ public class CritRiderTests
         Assert.Equal(RollOutcome.Crit, crit.Roll.Outcome);
         Assert.Equal(0, crit.Blocked);
         Assert.Equal(45, crit.Taken);
-        Assert.Equal(GameConstants.PlayerHp - 45, member.Hp);
+        Assert.Equal(TestPools.FixtureHp - 45, member.Hp);
         Assert.Equal(1, member.StatusLevel(Weakened));
         Assert.Equal(0, enemy.StatusLevel(Weakened));
         Assert.Equal(1, hits);

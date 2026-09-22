@@ -23,7 +23,7 @@ public class SoulBehaviourTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId);
         return ch;
     }
@@ -31,7 +31,7 @@ public class SoulBehaviourTests
     private static PartyMemberState Holding(string id, int r, int c, Weapon weapon)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = weapon;
         return ch;
     }
@@ -117,8 +117,8 @@ public class SoulBehaviourTests
         CombatRules.Resolve(turns.Events, sword, a, sword.Weapon, Distance(sword, a), () => 10);
 
         Assert.Equal(At(5, 5), (a.X, a.Y));
-        Assert.Equal(GameConstants.PlayerHp - 10, a.Hp);   // no shield on a spear: the sword's 10 in full
-        Assert.Equal(GameConstants.MaxMana - 10, a.Mana);
+        Assert.Equal(TestPools.FixtureHp - 10, a.Hp);   // no shield on a spear: the sword's 10 in full
+        Assert.Equal(TestPools.FixtureMana - 10, a.Mana);
         Assert.Equal(((ActorState)a, 10, 10, 0, "hoplites_wall"), Assert.Single(spent));
         var (_, hit) = Assert.Single(hits);
         Assert.Null(hit.Displace);
@@ -131,10 +131,10 @@ public class SoulBehaviourTests
         Assert.Single(spent);
 
         // A blow that kills moves nobody: there is no shove to refuse, and the corpse pays nothing.
-        a.Mana = GameConstants.MaxMana;
+        a.Mana = TestPools.FixtureMana;
         a.Hp = 10;
         CombatRules.Resolve(turns.Events, sword, a, sword.Weapon, Distance(sword, a), () => 10);
-        Assert.Equal((false, GameConstants.MaxMana, 0), (a.Alive, a.Mana, hits[^1].Hit.DefenderManaToSpend));
+        Assert.Equal((false, TestPools.FixtureMana, 0), (a.Alive, a.Mana, hits[^1].Hit.DefenderManaToSpend));
         Assert.Single(spent);
 
         // Same soul, other side: a dummy holding the Wall refuses the Tower Guard's shove and pays from its own pool.
@@ -157,7 +157,7 @@ public class SoulBehaviourTests
         Assert.Equal(TurnPhase.Player, charged.Phase);
         Assert.Equal(3, chargedHits.Count);
         Assert.All(chargedHits, h => Assert.Equal((false, null, 10), (h.Hit.OnDefendersTurn, h.Hit.Displace, h.Hit.DefenderManaToSpend)));
-        Assert.Equal((At(5, 5), GameConstants.PlayerHp - 30, GameConstants.MaxMana - 30), ((d.X, d.Y), d.Hp, d.Mana));
+        Assert.Equal((At(5, 5), TestPools.FixtureHp - 30, TestPools.FixtureMana - 30), ((d.X, d.Y), d.Hp, d.Mana));
 
         // In the wielder's own phase: the Riposte Blade answers the Wall's blocked thrust with a counter
         // that shoves it a tile, and nothing is paid — the turn system marks the counter as landing on the
@@ -171,7 +171,7 @@ public class SoulBehaviourTests
         Assert.Equal(2, ownHits.Count);
         Assert.Equal(((ActorState)blade, false, true), (ownHits[0].Target, ownHits[0].Hit.OnDefendersTurn, ownHits[0].Hit.Blocked));
         Assert.Equal(((ActorState)c, true, 1), (ownHits[1].Target, ownHits[1].Hit.OnDefendersTurn, ownHits[1].Hit.Displace!.Tiles));
-        Assert.Equal((At(5, 4), GameConstants.PlayerHp - 10, GameConstants.MaxMana), ((c.X, c.Y), c.Hp, c.Mana));
+        Assert.Equal((At(5, 4), TestPools.FixtureHp - 10, TestPools.FixtureMana), ((c.X, c.Y), c.Hp, c.Mana));
         Assert.Empty(ownSpent);
     }
 
@@ -215,7 +215,7 @@ public class SoulBehaviourTests
         Assert.Equal(200, beside.Hp);
         Assert.Equal(200, beyond.Hp);
         Assert.Equal(((ActorState)a, 6, 6, 0, "stormcrow"), Assert.Single(spent));
-        Assert.Equal(GameConstants.MaxMana - 6, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 6, a.Mana);
         Assert.Equal(1, turns.AttacksThisTurn(a));   // the continuation is the same shot
 
         // Unable to pay, the shot stops at the first body and nothing is spent.
@@ -251,7 +251,7 @@ public class SoulBehaviourTests
         Assert.Null(dealt.NextInLine);
         Assert.Equal((false, 0), (dealt.Pierces, dealt.ManaToSpend));
         Assert.Empty(clearSpent);
-        Assert.Equal((GameConstants.MaxMana, 200 - 8, 200, 200), (c.Mana, lone.Hp, offLine.Hp, farAway.Hp));
+        Assert.Equal((TestPools.FixtureMana, 200 - 8, 200, 200), (c.Mana, lone.Hp, offLine.Hp, farAway.Hp));
 
         // The handler itself: a payload whose line names nobody, or a body already dead, settles nothing;
         // one naming a living body settles the continuation for its 6.
@@ -291,7 +291,7 @@ public class SoulBehaviourTests
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(52, a.Hp);
         Assert.Equal(new[] { 1, 1 }, healed);
-        Assert.Equal(GameConstants.MaxMana - 4, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 4, a.Mana);
         Assert.Equal(2, spent.Count);
         Assert.All(spent, s => Assert.Equal(((ActorState)a, 2, 2, 0, "test_leech"), s));
         Assert.Equal(200 - 30, enemy.Hp);
@@ -302,7 +302,7 @@ public class SoulBehaviourTests
         warded.ApplyStatus(Ward, null, 50);   // the hit is dealt and swallowed whole: still an instance
         var deep = new TurnSystem(grid, new[] { b }, new[] { warded }, () => 10);
         Assert.True(deep.TryAttack(b, warded));
-        Assert.Equal((53, GameConstants.MaxMana - 2, 200, 35), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
+        Assert.Equal((53, TestPools.FixtureMana - 2, 200, 35), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
 
         b.Mana = 1;
         Assert.True(deep.TryAttack(b, warded));
@@ -368,7 +368,7 @@ public class SoulBehaviourTests
         Assert.True(lethal.TryAttack(c, frail));
         Assert.False(frail.Alive);
         Assert.Empty(lethalSpent);
-        Assert.Equal(GameConstants.MaxMana, c.Mana);
+        Assert.Equal(TestPools.FixtureMana, c.Mana);
     }
 
     [Fact]
@@ -427,11 +427,11 @@ public class SoulBehaviourTests
 
         turns.EndTurn();
 
-        Assert.Equal((GameConstants.PlayerHp, 1, 0, 4), (healer.Hp, healer.StatusLevel(Ward), healer.StatusLevel(OverhealPool), healer.StatusLevel(Regeneration)));
-        Assert.Equal(GameConstants.MaxMana - 7, healer.Mana);
+        Assert.Equal((TestPools.FixtureHp, 1, 0, 4), (healer.Hp, healer.StatusLevel(Ward), healer.StatusLevel(OverhealPool), healer.StatusLevel(Regeneration)));
+        Assert.Equal(TestPools.FixtureMana - 7, healer.Mana);
         Assert.Equal(((ActorState)healer, 7, 7, 0, "staff_of_renewal_unique"), Assert.Single(spent));
-        Assert.Equal((GameConstants.PlayerHp, 0, 0, 4), (ally.Hp, ally.StatusLevel(Ward), ally.StatusLevel(OverhealPool), ally.StatusLevel(Regeneration)));
-        Assert.Equal(GameConstants.MaxMana, ally.Mana);
+        Assert.Equal((TestPools.FixtureHp, 0, 0, 4), (ally.Hp, ally.StatusLevel(Ward), ally.StatusLevel(OverhealPool), ally.StatusLevel(Regeneration)));
+        Assert.Equal(TestPools.FixtureMana, ally.Mana);
         Assert.Equal(new[] { ((ActorState)healer, 5, 7), ((ActorState)ally, 5, 0) }, above);
 
         // The chain, printed for the healer: Overheal at attachment index 1 ahead of the pool's fold at (1,0).
@@ -467,7 +467,7 @@ public class SoulBehaviourTests
         Assert.All(hits, h => Assert.Equal(new[] { "flaming", "burning" }, h.Hit.CastFired));
         Assert.All(ring, e => Assert.Equal((200 - 8, 1), (e.Hp, e.StatusLevel(Searing, Flaming))));
         Assert.Equal(((ActorState)a, 18 + 5, 18 + 5, 0, "wand_of_the_nova_unique"), Assert.Single(spent));
-        Assert.Equal(GameConstants.MaxMana - 23, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 23, a.Mana);
 
         // With mana for the cast alone the element is a non-event, so the burn has nothing to linger.
         var b = Char("B", 5, 5, "wand_of_the_nova_unique");
@@ -487,7 +487,7 @@ public class SoulBehaviourTests
         var crit = new TurnSystem(grid, new[] { c }, new[] { seared }, () => 20);
         Assert.True(crit.TryCastArea(c, (c.X, c.Y)));
         Assert.Equal((200 - 16, 3), (seared.Hp, seared.StatusLevel(Searing, Flaming)));
-        Assert.Equal(GameConstants.MaxMana - 9 - 4 - 1, c.Mana);
+        Assert.Equal(TestPools.FixtureMana - 9 - 4 - 1, c.Mana);
 
         // The burn is a status like any other: it ticks at the victim's turn end, the element as its key.
         (seared.X, seared.Y) = At(15, 15);
@@ -510,7 +510,7 @@ public class SoulBehaviourTests
         var quiet = Enemy(5, 6);
         var transferred = new TurnSystem(grid, new[] { e }, new[] { quiet }, () => 10);
         Assert.True(transferred.TryCastArea(e, (e.X, e.Y)));
-        Assert.Equal((200 - 8, 0, GameConstants.MaxMana - 18), (quiet.Hp, quiet.StatusLevel(Searing), e.Mana));
+        Assert.Equal((200 - 8, 0, TestPools.FixtureMana - 18), (quiet.Hp, quiet.StatusLevel(Searing), e.Mana));
     }
 
     [Fact]
@@ -622,7 +622,7 @@ public class SoulBehaviourTests
         var full = Enemy(5, 6, hp: 5);
         var capped = new TurnSystem(grid, new[] { b }, new[] { full }, () => 10);
         Assert.True(capped.TryAttack(b, full));
-        Assert.Equal(GameConstants.MaxMana, b.Mana);
+        Assert.Equal(TestPools.FixtureMana, b.Mana);
 
         // Unable to pay the 5, it fires nothing and restores nothing.
         var c = Char("C", 5, 5, "widowmaker");
@@ -661,16 +661,16 @@ public class SoulBehaviourTests
 
         CombatRules.Resolve(turns.Events, maul, a, maul.Weapon, Distance(maul, a), () => 10);
         Assert.Equal((21, 9, 9), (hits[^1].Dealt, hits[^1].Taken, hits[^1].Blocked));   // 30 into Block 9 is 21 dealt; 9 reach HP, 12 are spared
-        Assert.Equal((1, true, GameConstants.MaxMana - 40), (a.Hp, a.Alive, a.Mana));
+        Assert.Equal((1, true, TestPools.FixtureMana - 40), (a.Hp, a.Alive, a.Mana));
         Assert.Equal(((ActorState)a, 40, 40, 0, "the_bulwark"), Assert.Single(spent));
 
         CombatRules.Resolve(turns.Events, maul, a, maul.Weapon, Distance(maul, a), () => 10);
         Assert.Equal((21, 0), (hits[^1].Dealt, hits[^1].Taken));
-        Assert.Equal((1, true, GameConstants.MaxMana - 80), (a.Hp, a.Alive, a.Mana));
+        Assert.Equal((1, true, TestPools.FixtureMana - 80), (a.Hp, a.Alive, a.Mana));
 
         CombatRules.Resolve(turns.Events, maul, a, maul.Weapon, Distance(maul, a), () => 10);   // 20 left: short of the 40
         Assert.Equal(21, hits[^1].Taken);
-        Assert.Equal((0, false, GameConstants.MaxMana - 80), (a.Hp, a.Alive, a.Mana));
+        Assert.Equal((0, false, TestPools.FixtureMana - 80), (a.Hp, a.Alive, a.Mana));
         Assert.Equal(2, spent.Count);
         Assert.Equal(0, died);   // a raw resolve holds the death for the turn system's next outermost raise
         turns.EndTurn();         // the wipe: the boundary raise runs the held death's consequences
@@ -681,7 +681,7 @@ public class SoulBehaviourTests
         var sword = Enemy(5, 6, TestWeapons.Get("arming_sword"));
         var calm = new TurnSystem(grid, new[] { b }, new[] { sword }, () => 10);
         CombatRules.Resolve(calm.Events, sword, b, sword.Weapon, Distance(sword, b), () => 10);
-        Assert.Equal((GameConstants.PlayerHp - 1, GameConstants.MaxMana), (b.Hp, b.Mana));   // 10 into Block 9
+        Assert.Equal((TestPools.FixtureHp - 1, TestPools.FixtureMana), (b.Hp, b.Mana));   // 10 into Block 9
     }
 
     // ── The placeholders ─────────────────────────────────────────────────────
@@ -703,7 +703,7 @@ public class SoulBehaviourTests
 
         Assert.True(turns.TryAttack(a, target));
         Assert.Equal(GameConstants.MaxDistance - 15, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana, a.Mana);
+        Assert.Equal(TestPools.FixtureMana, a.Mana);
         Assert.False(target.Alive);
 
         var victim = Enemy(5, 6, hp: 5);
@@ -711,7 +711,7 @@ public class SoulBehaviourTests
         Assert.True(axe.TryAttack(b, victim));
         Assert.False(victim.Alive);
         Assert.Equal(GameConstants.MaxDistance - 60, b.DistLeft);
-        Assert.Equal(GameConstants.MaxMana, b.Mana);
+        Assert.Equal(TestPools.FixtureMana, b.Mana);
         Assert.Empty(spent);
     }
 
@@ -799,8 +799,8 @@ public class SoulBehaviourTests
             "above 3 ticks OverhealPool+3 mana 8",
             "spent 8",
         }, log);
-        Assert.Equal((GameConstants.PlayerHp, 0, 3), (a.Hp, a.StatusLevel(Ward), a.StatusLevel(OverhealPool)));
-        Assert.Equal(GameConstants.MaxMana - 4 - 8, a.Mana);
+        Assert.Equal((TestPools.FixtureHp, 0, 3), (a.Hp, a.StatusLevel(Ward), a.StatusLevel(OverhealPool)));
+        Assert.Equal(TestPools.FixtureMana - 4 - 8, a.Mana);
         Assert.Equal((200 - 15, 3), (enemy.Hp, enemy.StatusLevel(Bleeding)));
 
         log.Clear();
@@ -814,8 +814,8 @@ public class SoulBehaviourTests
             "above 3 ticks OverhealPool-3,Ward+1 mana 8",
             "spent 8",
         }, log);
-        Assert.Equal((GameConstants.PlayerHp, 1, 0), (a.Hp, a.StatusLevel(Ward), a.StatusLevel(OverhealPool)));
-        Assert.Equal(GameConstants.MaxMana - 2 * (4 + 8), a.Mana);
+        Assert.Equal((TestPools.FixtureHp, 1, 0), (a.Hp, a.StatusLevel(Ward), a.StatusLevel(OverhealPool)));
+        Assert.Equal(TestPools.FixtureMana - 2 * (4 + 8), a.Mana);
         Assert.Equal((200 - 30, 6), (enemy.Hp, enemy.StatusLevel(Bleeding)));
 
         // Printed for the wielder, DamageDealt runs its three souls in attachment order.
