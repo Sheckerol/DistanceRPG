@@ -706,12 +706,16 @@ public static class EnchantmentBehaviours
     /// The element damage a hit of <paramref name="payload"/>'s cast carries,
     /// as the cast can foresee it before any target is known: the weapon's
     /// figure under the cast's roll when <paramref name="element"/> typed the
-    /// cast, plus the element's own share.
+    /// cast, plus the element's own share. The figure is the caster's, not the
+    /// item's — <see cref="CombatRules.BaseDamage"/>, proficiency bonus included
+    /// (§2.2) — because the hit's own share will carry that bonus too, and a
+    /// burn sized off an unbonused base would be paid for at one figure and land
+    /// at another from wand level 2 on.
     /// </summary>
     private static int ElementDamageOfCast(CastPayload payload, Enchantment element, Weapon weapon, ActorState caster)
     {
         int typed = payload.Type == element.Def.DamageType
-            ? CombatRules.RollToBase(payload.Roll, weapon.Damage, CombatRules.CritThreshold(caster), caster.Value(ModifierType.CritMultiplier)).Damage
+            ? CombatRules.RollToBase(payload.Roll, CombatRules.BaseDamage(caster, weapon), CombatRules.CritThreshold(caster), caster.Value(ModifierType.CritMultiplier)).Damage
             : 0;
         return typed + element.LevelsFor(element.Def.Potency);
     }

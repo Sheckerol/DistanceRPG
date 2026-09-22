@@ -306,8 +306,24 @@ public sealed class DungeonHud
             DrawRuns(left + 3 * GlyphAdvance * 2f, y + 18f, 1.3f, detail);
         }
 
+        // Under the slots: what every pool and every ladder is doing (§2.2).
+        // The statlines above price the items; these rows price the member.
+        float rowY = top + 70f + 3 * 46f;
+        _text.DrawText("PROGRESSION", left, rowY, 1.2f, Grey);
+        rowY += 16f;
+        foreach (string row in PoolRows(active))
+        {
+            _text.DrawText(row, left, rowY, 1.5f, White);
+            rowY += 14f;
+        }
+        foreach (string row in ProficiencyRows(active))
+        {
+            _text.DrawText(row, left, rowY, 1.5f, Cyan);
+            rowY += 14f;
+        }
+
         // A swap is free out of combat and costs movement in it (§1.2): say which before the key is pressed.
-        float swapY = top + 70f + 3 * 46f + 16f;
+        float swapY = rowY + 16f;
         int cost = turns.SwapCost;
         if (cost <= 0)
             DrawCentered(w, swapY, "OUT OF COMBAT - SWAPPING IS FREE", 1.5f, Grey);
@@ -436,6 +452,91 @@ public sealed class DungeonHud
             ? CombatRules.CastCritLevelMultiplier
             : c.Value(ModifierType.CritMultiplier);
         return $"CRIT {threshold}{(threshold < CombatRules.NaturalTwenty ? "+" : "")} x{multiplier}";
+    }
+
+    // ── Progression readouts ─────────────────────────────────────────────────
+
+    /// <summary>The space between two fields of a progression row, wide enough that the eye reads them as separate numbers at 5 px.</summary>
+    private const string Gap = "   ";
+
+    /// <summary>
+    /// The active member's two pools as the inventory panel prints them (§2.2):
+    /// the HP bar with the XP into its next point beside it, and mana's XP
+    /// alone — the mana pool itself belongs to the budget line at the top of
+    /// the screen, so no number is printed twice.
+    /// </summary>
+    internal static IReadOnlyList<string> PoolRows(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var health = member.HealthPool;
+        var mana = member.ManaPool;
+        return
+        [
+            $"HP {member.Hp}/{member.MaxHp}{Gap}XP {health.XpIntoNext}/{health.XpToNext}",
+            $"MANA XP {mana.XpIntoNext}/{mana.XpToNext}",
+        ];
+    }
+
+    /// <summary>
+    /// One row per weapon class the member is levelling or holding — XP earned
+    /// in it, or a weapon of it in a slot — in <see cref="WeaponClass"/> order:
+    /// the level, the XP into the next, and what the level pays,
+    /// <c>DAGGER 3   XP 45/300   DMG +1   COST -1</c>. The two effects appear
+    /// once they are something: both are zero at the level everyone starts at
+    /// (§2.2), and a row of zeroes says nothing.
+    /// <para>
+    /// Numbers rather than drawn bars: at the 5-px font a bar is a three-pixel
+    /// smear, and a string-returning readout is what the HUD's tests can hold
+    /// to, as <see cref="WeaponStats"/> and <see cref="ModifierReadout"/> are. A
+    /// bar, if one is ever wanted, draws beside the row.
+    /// </para>
+    /// The cost here is the <em>discount</em>, not a cost: the statline above
+    /// prints the item's own <see cref="Weapon.ResolvedCost"/> — the same number
+    /// in anyone's hands — and this row says what this wielder takes off it.
+    /// </summary>
+    internal static IReadOnlyList<string> ProficiencyRows(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var rows = new List<string>();
+        foreach (var cls in ProficiencyOrder)
+        {
+            if (member.WeaponXp[cls] <= 0 && !Holds(member, cls)) continue;
+            var ladder = member.Proficiency(cls);
+            string row = $"{ClassName(cls)} {ladder.Level}{Gap}XP {ladder.XpIntoNext}/{ladder.XpToNext}";
+            int damage = Progression.DamageBonus(ladder.Level);
+            if (damage > 0) row += $"{Gap}DMG +{damage}";
+            int discount = Progression.MovementDiscount(ladder.Level);
+            if (discount > 0) row += $"{Gap}COST -{discount}";
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    /// <summary>The order the rows are listed in, which is the order a save and the XP book both enumerate.</summary>
+    private static readonly WeaponClass[] ProficiencyOrder = Enum.GetValues<WeaponClass>();
+
+    /// <summary>True when a weapon of <paramref name="cls"/> sits in one of the member's slots: a class in hand or in the bag is listed before it has earned anything.</summary>
+    private static bool Holds(PartyMemberState member, WeaponClass cls)
+        => member.Inventory.Any(w => w?.Class == cls);
+
+    private static string ClassName(WeaponClass cls) => cls.ToString().ToUpperInvariant();
+
+    /// <summary>
+    /// What a credit that bought a point or a level says over the member who
+    /// earned it (§2.2): the class and the level now wielded at, or the pool and
+    /// the ceiling now carried. Every number is read back off the member, so the
+    /// beat states progression and decides none of it.
+    /// </summary>
+    internal static string LevelUpLabel(PartyMemberState member, XpCredit credit)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        return credit.Pool switch
+        {
+            XpPool.Weapon when credit.Class is { } cls => $"{ClassName(cls)} {member.Proficiency(cls).Level}!",
+            XpPool.Health => $"MAX HP {member.MaxHp}!",
+            XpPool.Mana => $"MAX MANA {member.MaxMana}!",
+            _ => "LEVEL UP!",
+        };
     }
 
     /// <summary>The weapon's enchantments in attachment order, the tier after any above 1 (<c>VAMPIRIC T3</c>). Empty for none.</summary>

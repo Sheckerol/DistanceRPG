@@ -54,6 +54,7 @@ public class DungeonScene : Scene
     private static readonly Vector4 RiderColor = Rgb(0xff77cc);    // a status a hit left riding on its target: SUNDERED!, WEAKENED!
     private static readonly Vector4 ReactionColor = Rgb(0x87ffff); // a reaction's callout, and a shot held for one
     private static readonly Vector4 CueColor = Rgb(0x9999a6);      // why a click or a key did nothing
+    private static readonly Vector4 LevelUpColor = Rgb(0x8cff6b);  // a pool or a ladder crossing a bar (§2.2)
 
     private static readonly Vector4[] PartyColors =
     {
@@ -506,6 +507,18 @@ public class DungeonScene : Scene
 
         _turns.CharacterBuffed += (c, effect) =>
             Log.Info($"[Combat] {c.Id} now carries {effect.Type} Lv{effect.Levels}");
+
+        // A credit that bought something says so over whoever earned it (§2.2).
+        // The beat is only a beat: what a credit was worth was settled by the
+        // applier that raised this, and the label states the member's own state
+        // -- no XP rule lives out here.
+        _turns.XpCredited += (member, credit, gained) =>
+        {
+            string label = DungeonHud.LevelUpLabel(member, credit);
+            Log.Info($"[Progress] {member.Id} {label} (+{gained})");
+            if (TryObjectFor(member, out var obj) && obj.IsActive)
+                _hud.AddFloatingText(obj.Position, label, LevelUpColor, -64f);
+        };
 
         _turns.CharacterHealed += (c, amount) =>
         {
@@ -1202,10 +1215,11 @@ public class DungeonScene : Scene
         return LineOfSight.HasLineOfSight(_map.Grid, from.X, from.Y, target.X, target.Y) ? null : "NO LINE OF SIGHT";
     }
 
-    /// <summary>What the member is short of for one use of <paramref name="weapon"/> — its resolved movement cost, a caster's resolved mana — or null when it has both.</summary>
+    /// <summary>What the member is short of for one use of <paramref name="weapon"/> — the movement it costs in this member's hands, proficiency discount included (§2.2), a caster's resolved mana — or null when it has both.</summary>
     private static string? Shortfall(PartyMemberState member, Weapon weapon)
     {
-        if (member.DistLeft < weapon.ResolvedCost) return $"NEED {weapon.ResolvedCost} MOVE";
+        int cost = member.MovementCost(weapon);
+        if (member.DistLeft < cost) return $"NEED {cost} MOVE";
         if (weapon.IsCaster && member.Mana < weapon.ResolvedManaCost) return $"NEED {weapon.ResolvedManaCost} MANA";
         return null;
     }
@@ -1218,7 +1232,8 @@ public class DungeonScene : Scene
             || member.Value(ModifierType.Overwatch) <= 0)
             return null;
         if (member.HeldShots > 0) return "ALREADY HOLDING";
-        return member.DistLeft < weapon.ResolvedCost ? $"NEED {weapon.ResolvedCost} MOVE" : "NO SHOTS LEFT";
+        int cost = member.MovementCost(weapon);
+        return member.DistLeft < cost ? $"NEED {cost} MOVE" : "NO SHOTS LEFT";
     }
 
     /// <summary>A click or key that did nothing says why, over <paramref name="obj"/>: only in the player phase, when the turn was the party's to spend.</summary>

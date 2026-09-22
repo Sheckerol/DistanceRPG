@@ -78,6 +78,25 @@ public abstract class ActorState
     }
 
     /// <summary>
+    /// The movement one swing or cast of <paramref name="weapon"/> costs this
+    /// actor: the weapon's own resolved cost — Light's discount already in it —
+    /// less the wielder's proficiency discount, never below
+    /// <see cref="Progression.MinimumMovementCost"/> (§2.2).
+    /// <para>
+    /// The discount is the wielder's and the cost is the weapon's, so the two
+    /// meet here and never on <see cref="Weapon.ResolvedCost"/>, which knows no
+    /// wielder and reads the same for an item in the bag as for one in hand.
+    /// Every gate and every charge in the turn system asks this, so what a swing
+    /// is refused for and what it is billed are one number.
+    /// </para>
+    /// </summary>
+    public int MovementCost(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return Progression.MovementCost(weapon.ResolvedCost, WeaponLevel(weapon));
+    }
+
+    /// <summary>
     /// The damage type this actor is attuned to, or null: what a typed hit
     /// resolves against on the chart (§1.4) — the same type halved, the
     /// opposed one x1.5, anything else unchanged. Attunement is the dungeon's,

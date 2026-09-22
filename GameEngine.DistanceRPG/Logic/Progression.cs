@@ -128,13 +128,22 @@ public static class Progression
     public static int DamageBonus(int level) => level / DamagePerLevels;
 
     /// <summary>
+    /// What a level-<paramref name="level"/> wielder takes off a weapon's own
+    /// cost: <c>floor(L / 3)</c> (§2.2), before the floor
+    /// <see cref="MovementCost"/> applies at the use site. Stated on its own
+    /// because the proficiency row names the discount rather than the cost, and
+    /// the number a readout prints is never arithmetic a readout does.
+    /// </summary>
+    public static int MovementDiscount(int level) => level / MovementDiscountPerLevels;
+
+    /// <summary>
     /// The movement a swing costs its wielder: the weapon's own resolved cost —
-    /// Light's discount already in it — less <c>floor(L / 3)</c>, never below
-    /// <see cref="MinimumMovementCost"/> (§2.2). The discount is the wielder's,
-    /// so it is taken at the use site and never cached on the weapon.
+    /// Light's discount already in it — less <see cref="MovementDiscount"/>,
+    /// never below <see cref="MinimumMovementCost"/> (§2.2). The discount is the
+    /// wielder's, so it is taken at the use site and never cached on the weapon.
     /// </summary>
     public static int MovementCost(int resolvedCost, int level)
-        => Math.Max(MinimumMovementCost, resolvedCost - level / MovementDiscountPerLevels);
+        => Math.Max(MinimumMovementCost, resolvedCost - MovementDiscount(level));
 
     /// <summary>
     /// The stats a weapon class levels on — the §1 class table. One stat each,

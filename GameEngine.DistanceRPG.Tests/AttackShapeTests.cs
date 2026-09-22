@@ -229,7 +229,13 @@ public class AttackShapeTests
         Assert.Equal(200, e4.Hp);
         Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);
 
-        // Worked to x5, the same swing takes five more: every dummy in reach here, the movement still paid once.
+        // Worked to x5, the same swing takes five more: every dummy in reach
+        // here, the movement still paid once. It also crosses the axe's first
+        // ladder step mid-swing (§2.2): the three bodies above and the first
+        // four of these five come to 105 XP, past the 100 a neutral spread pays
+        // for level 2, so the fifth body caught takes the +1 the level buys.
+        // Asserted rather than hidden -- the proficiency bonus is part of the
+        // weapon's own damage, so it feeds the very ladder that bought it.
         a.EquippedWeapon!.Acquire(Cleave, 3);
         Assert.Equal(5, a.Value(Cleave));
         var e5 = Enemy(4, 5);
@@ -239,11 +245,12 @@ public class AttackShapeTests
         Assert.True(crowd.TryAttack(a, e1));
         Assert.Equal(200 - 30, e1.Hp);
         Assert.Equal(200 - 30, e2.Hp);
-        Assert.Equal(200 - 30, e3.Hp);
+        Assert.Equal(200 - 31, e3.Hp);   // the fifth body caught: 18 + 1 into Block 3
         Assert.Equal(200, e4.Hp);
         Assert.Equal(200 - 15, e5.Hp);
         Assert.Equal(200 - 15, e6.Hp);
-        Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);
+        Assert.Equal(2, a.WeaponLevel(a.EquippedWeapon!));   // the swing that crossed the bar
+        Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);   // charged before it crossed, and floor(2 / 3) is nothing anyway
     }
 
     [Fact]

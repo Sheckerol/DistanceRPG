@@ -317,14 +317,16 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Can the member attack the enemy? A martial weapon in hand, the swing's
-    /// resolved movement to spare, an attack left under Charges, and the
-    /// enemy in reach and sight.
+    /// movement to spare — the weapon's resolved cost less this member's
+    /// proficiency discount (§2.2), the very number
+    /// <see cref="TryAttack"/> then charges — an attack left under Charges, and
+    /// the enemy in reach and sight.
     /// </summary>
     public bool CanAttack(PartyMemberState c, EnemyState enemy)
     {
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
-        if (w == null || w.IsCaster || c.DistLeft < w.ResolvedCost) return false; // a caster casts, it can't strike
+        if (w == null || w.IsCaster || c.DistLeft < c.MovementCost(w)) return false; // a caster casts, it can't strike
         if (!HasAttackLeft(c)) return false;                                      // Charges is a cap: the throws are spent whatever movement is left
         return EnemyAi.CanHit(c, enemy, w, _grid);
     }
@@ -339,7 +341,7 @@ public sealed class TurnSystem
         if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
+        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
         CountAttack(c);
         AttackWith(c, enemy);
         return true;
@@ -424,7 +426,7 @@ public sealed class TurnSystem
         ArgumentNullException.ThrowIfNull(target);
         if (Phase != TurnPhase.Player || !CanCastOn(caster, target)) return false;
         var w = caster.EquippedWeapon!;   // CanCastOn gated on it
-        return caster.DistLeft >= w.ResolvedCost && caster.Mana >= w.ResolvedManaCost;
+        return caster.DistLeft >= caster.MovementCost(w) && caster.Mana >= w.ResolvedManaCost;
     }
 
     /// <summary>
@@ -439,7 +441,7 @@ public sealed class TurnSystem
         if (!CanCast(caster, target)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
         CastWith(caster, target);
         return true;
     }
@@ -461,7 +463,7 @@ public sealed class TurnSystem
         if (Phase != TurnPhase.Player || !caster.Alive) return false;
         var w = caster.EquippedWeapon;
         if (w == null || !IsAreaCaster(w)) return false;
-        if (caster.DistLeft < w.ResolvedCost || caster.Mana < w.ResolvedManaCost) return false;
+        if (caster.DistLeft < caster.MovementCost(w) || caster.Mana < w.ResolvedManaCost) return false;
         return AreaTargets(caster, aim).Count > 0;
     }
 
@@ -509,7 +511,7 @@ public sealed class TurnSystem
         if (!CanCastArea(caster, aim)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
         CastAreaWith(caster, aim);
         return true;
     }
@@ -529,7 +531,7 @@ public sealed class TurnSystem
         int shots = c.Value(ModifierType.Overwatch);
         if (shots <= 0 || c.HeldShots > 0) return false;
         if (_partyZone.UsesThisTurn(c) >= shots) return false;
-        return c.DistLeft >= w.ResolvedCost;
+        return c.DistLeft >= c.MovementCost(w);
     }
 
     /// <summary>
@@ -544,7 +546,7 @@ public sealed class TurnSystem
         if (!CanOverwatch(c)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
+        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
         c.HeldShots = c.Value(ModifierType.Overwatch);
         return true;
     }
@@ -1036,7 +1038,10 @@ public sealed class TurnSystem
 
         // Attack cost scales the same way the prototype scaled it: the enemy's
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.ResolvedCost;
+        // The cost taken is the wielder's, which for an actor with no pools is
+        // the weapon's own (§2.2) -- the seam whichever phase gives enemies
+        // progression will need, and a no-op until it does.
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
         if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
@@ -1092,7 +1097,7 @@ public sealed class TurnSystem
     private void TryEnemyCastBeat(EnemyState caster)
     {
         var weapon = caster.Weapon;
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * weapon.ResolvedCost;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * caster.MovementCost(weapon);
         ActorState? target = caster.IsSupportCaster
             ? EnemyAi.SelectSupportTarget(caster, _enemies)
             : NearestHittable(caster);

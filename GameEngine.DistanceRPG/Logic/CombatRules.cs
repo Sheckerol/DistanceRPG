@@ -84,8 +84,34 @@ public static class CombatRules
     }
 
     /// <summary>
+    /// The base damage <paramref name="self"/> swings <paramref name="weapon"/>
+    /// for, before the roll multiplies it: the weapon's own damage, whatever the
+    /// distance has already added (<paramref name="longshotBonus"/>), and
+    /// <c>+floor(L / 2)</c> for the wielder's proficiency in the weapon's class
+    /// (§2.2). The one place a wielder's base is computed, because step 1 is
+    /// taken in three: the roll at (1,0), Longshot re-taking it at (1,1) over a
+    /// priced distance, and a wand's cast re-deriving it to size the burn its
+    /// element leaves. A bonus added at one of them alone would be silently
+    /// dropped at the others.
+    /// <para>
+    /// It enters here, ahead of the crit multiplier, because the proficiency
+    /// bonus is the weapon's own damage rather than a rider on it: a wielder who
+    /// has mastered a weapon hits harder, and a crit multiplies what they hit
+    /// for. The flat-after-the-multiplier convention belongs to the temporary
+    /// statuses (Sundered, Weakened), which must not compound with a crit.
+    /// </para>
+    /// </summary>
+    public static int BaseDamage(ActorState self, Weapon weapon, int longshotBonus = 0)
+    {
+        ArgumentNullException.ThrowIfNull(self);
+        ArgumentNullException.ThrowIfNull(weapon);
+        return weapon.Damage + longshotBonus + Progression.DamageBonus(self.WeaponLevel(weapon));
+    }
+
+    /// <summary>
     /// Roll an attack with <paramref name="weapon"/> alone — no wielder, so the
-    /// weapon's own CritWindow and CritMultiplier and nothing innate.
+    /// weapon's own CritWindow and CritMultiplier and nothing innate, and no
+    /// proficiency bonus either: that is the wielder's, and there is none here.
     /// </summary>
     /// <param name="rollD20">Returns a die roll in [1, 20]; injected for testability.</param>
     public static AttackRoll RollAttack(Weapon weapon, Func<int> rollD20)

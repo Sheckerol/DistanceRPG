@@ -58,11 +58,20 @@ public sealed class PartyMemberState : ActorState
     /// <summary>Max mana, the same arithmetic against INT. The pool an actor with no progression carries is <see cref="GameConstants.MaxMana"/>; a member's is this.</summary>
     public override int MaxMana => ManaPool.Max;
 
+    /// <summary>
+    /// Where this member's ladder in <paramref name="cls"/> stands: the level
+    /// they wield it at and how far into the next, replayed from the raw XP
+    /// against the class's governing stat (§2.2). The whole progression figure,
+    /// so a readout states it and computes nothing of its own.
+    /// </summary>
+    public LevelProgress Proficiency(WeaponClass cls)
+        => Progression.Ladder(WeaponXp[cls], Progression.GoverningStat(cls, Stats));
+
     /// <summary>The level this member wields <paramref name="weapon"/> at: their ladder in its class, replayed from the raw XP against the class's governing stat (§2.2).</summary>
     public override int WeaponLevel(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        return Progression.Ladder(WeaponXp[weapon.Class], Progression.GoverningStat(weapon.Class, Stats)).Level;
+        return Proficiency(weapon.Class).Level;
     }
 
     /// <summary>
