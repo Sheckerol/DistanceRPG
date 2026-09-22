@@ -87,6 +87,41 @@ public class EnchantmentLadderTests
     }
 
     [Fact]
+    public void TheBarAReadoutShowsIsTheXpTheClimbCharges()
+    {
+        // One tier, one price. XpToNextTier is the bar a readout prints and
+        // WithXp is what actually charges, and the replay walks the entry itself
+        // so the second is the first floored at 1 — nothing restates the
+        // arithmetic. For every shipped entry the floor never bites and the two
+        // are equal, so a future low-lock content row fails here rather than
+        // quietly displaying a bar of 0 while charging 1.
+        foreach (var def in GameContent.Current.Enchantments.All.Where(e => !e.Unique))
+            for (int tier = 1; tier <= 6; tier++)
+                for (int stat = InnateStats.Low; stat <= InnateStats.High; stat++)
+                {
+                    var entry = new Enchantment(def, tier);
+                    int bar = entry.XpToNextTier(stat);
+
+                    Assert.True(bar >= 1, $"{def.Id} at tier {tier}, INT {stat} prices a tier at {bar}.");
+                    Assert.Equal((tier, bar - 1), Tiered(entry.WithXp(bar - 1, stat)));
+                    Assert.Equal((tier + 1, 0), Tiered(entry.WithXp(bar, stat)));
+                }
+
+        // The one band where the two legitimately differ, stated rather than
+        // discovered: at a lock of 1 and INT 4 the bar reads 0 — XpToNextTier is
+        // the doc's line and carries no floor, which is what
+        // ALockOfZeroIsRefusedAtLoad pins — while the climb charges the floored 1
+        // it must, or the replay would never leave the tier. No shipped entry is
+        // in that band (the catalogue's smallest lock is 15) and the content rule
+        // only refuses 0, so the relationship is pinned here instead.
+        var thin = new Enchantment(Arcane with { Lock = 1 }, Tier: 1);
+        Assert.Equal(0, thin.XpToNextTier(4));
+        Assert.Equal((1, 0), Tiered(thin.WithXp(0, 4)));
+        Assert.Equal((2, 0), Tiered(thin.WithXp(1, 4)));
+        Assert.Equal((5, 0), Tiered(thin.WithXp(4, 4)));   // 1, 1, 1, 1: the floor, four times
+    }
+
+    [Fact]
     public void AUniqueBanksXpAndBuysNothing()
     {
         // "They still accrue mana spent, since every trigger still costs; it

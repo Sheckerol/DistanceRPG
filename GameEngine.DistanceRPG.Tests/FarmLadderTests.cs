@@ -17,15 +17,12 @@ public class FarmLadderTests
     private const long Seed = 2762136374;
 
     /// <summary>
-    /// <see cref="EnemyPlacer"/>'s splitter, which is private there. Restated so
-    /// this file can assert the revival stream is not the placer's.
-    /// </summary>
-    private const long PlacerSalt = 0x9E3779B9;
-
-    /// <summary>
-    /// The drop's splitter. S3 declares it on <c>LootTable</c> when the drop
-    /// lands; until then the value is stated here, because the claim under test
-    /// is that the two salts of §3.2 are distinct.
+    /// The drop's splitter, and the one value in this file still restated rather
+    /// than named: <c>LootTable</c> does not exist until S3. <strong>S3 replaces
+    /// it with <c>LootTable.LootSalt</c> and deletes this const</strong> — until
+    /// it does, the assertion below cannot catch a drop salt that collides with
+    /// the revival's, which is the whole of what it is for. The placer's salt is
+    /// named (<see cref="EnemyPlacer.SeedSalt"/>) for exactly that reason.
     /// </summary>
     private const long LootSalt = 0x5BF03635;
 
@@ -214,10 +211,13 @@ public class FarmLadderTests
         Assert.NotEqual(Draw(FarmLadder.ReviveStream(Seed, 3, 2)), Draw(FarmLadder.ReviveStream(Seed + 1, 3, 2)));
 
         // And it is nobody else's stream: new randomness gets its own salt,
-        // never a continuation of an existing one.
-        Assert.NotEqual(PlacerSalt, FarmLadder.ReviveSalt);
+        // never a continuation of an existing one. The placer's splitter is the
+        // constant itself rather than a copy of it, so moving the placer breaks
+        // this rather than sliding past it; the drop's is still a literal until
+        // S3 declares LootTable.LootSalt and this file can name that too.
+        Assert.NotEqual(EnemyPlacer.SeedSalt, FarmLadder.ReviveSalt);
         Assert.NotEqual(LootSalt, FarmLadder.ReviveSalt);
-        Assert.NotEqual(Draw(new Mulberry32(Seed ^ PlacerSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
+        Assert.NotEqual(Draw(new Mulberry32(Seed ^ EnemyPlacer.SeedSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
         Assert.NotEqual(Draw(new Mulberry32(Seed ^ LootSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
     }
 
@@ -268,6 +268,13 @@ public class FarmLadderTests
         // it died, so it is a named startup failure rather than a hang to find.
         Rejected(t => t with { ResurrectTurnsFloor = 0 },
             nameof(Tuning.ResurrectTurnsFloor), ContentValidator.RuleRevivalTakesATurn);
+
+        // DefeatAdvance returns this key verbatim, so a bonus of 0 makes a clean
+        // kill advance DefeatCount by nothing: a dummy put down only by clearing
+        // blows would never shorten its timer and never farm, which is strictly
+        // worse than the ordinary kill this is supposed to be worth double.
+        Rejected(t => t with { CleanKillBonus = 0 },
+            nameof(Tuning.CleanKillBonus), ContentValidator.RuleKillCountsForSomething);
 
         // A chance outside 0..100 makes the draw it is compared against
         // meaningless in one direction or the other.

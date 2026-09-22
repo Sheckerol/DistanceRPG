@@ -202,6 +202,10 @@ public sealed record Tuning
     /// advances <c>DefeatCount</c> by (settled.md). It needs no counterweight
     /// because <c>DefeatCount</c> is already both reward and threat: it buys two
     /// cycles of drop quality <em>and</em> hands the dummy two cycles of statline.
+    /// <see cref="ContentValidator.ValidateTuning"/> refuses a value below 1:
+    /// <see cref="FarmLadder.DefeatAdvance"/> returns this figure verbatim, so a 0
+    /// would leave a clean kill advancing nothing — strictly worse than the
+    /// ordinary kill it is supposed to be worth double.
     /// </summary>
     public int CleanKillBonus { get; init; } = 2;
 

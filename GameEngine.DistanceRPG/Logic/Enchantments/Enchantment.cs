@@ -160,6 +160,16 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// never multiplies a credit (§2.3: "there is no rate multiplier anywhere").
     /// A wizard therefore tiers an entry roughly four times as fast as a fighter,
     /// and the tier is what lifts lock and potency.
+    /// <para>
+    /// It carries no floor, exactly as <see cref="Progression.XpToNext"/> carries
+    /// none: the guard lives at the single call site a free step could hang,
+    /// <see cref="TierCost"/>, which is this member floored at 1 — so the bar a
+    /// readout prints and the XP <see cref="WithXp"/> charges are one expression
+    /// rather than two that can drift. They part company only where the floor
+    /// bites (<c>Lock x Tier</c> below the wielder's INT), which
+    /// <see cref="ContentValidator.ValidateEnchantments"/>' lock rule and a
+    /// catalogue whose smallest lock is 15 both keep out of reach.
+    /// </para>
     /// </summary>
     /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
     public int XpToNextTier(int stat) => Progression.XpToNext(EffectiveLock, stat);
@@ -193,27 +203,32 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
         if (Unique)
             return this with { Xp = Xp + manaSpent };
 
-        int tier = Tier;
+        var grown = this;
         int xp = Xp + manaSpent;
-        int cost = StepFor(tier, stat);
+        int cost = grown.TierCost(stat);
         while (xp >= cost)
         {
             xp -= cost;
-            tier++;
-            cost = StepFor(tier, stat);
+            grown = grown with { Tier = grown.Tier + 1 };
+            cost = grown.TierCost(stat);
         }
-        return this with { Tier = tier, Xp = xp };
+        return grown with { Xp = xp };
     }
 
     /// <summary>
-    /// The cost of leaving <paramref name="tier"/>, floored at 1. The floor lives
-    /// here and never inside <see cref="XpToNextTier"/>, which stays the doc's
-    /// line — the same split <see cref="Progression"/> already makes, for the same
-    /// reason: this loop is the only caller a free step could hang.
+    /// What leaving the tier this entry is on costs the replay:
+    /// <see cref="XpToNextTier"/>, floored at 1. The floor lives here and never
+    /// inside that member, which stays the doc's line — the same split
+    /// <see cref="Progression"/> already makes between <c>XpToNext</c> and its own
+    /// private step, for the same reason: <see cref="WithXp"/>'s loop is the only
+    /// caller a free step could hang. Going through the public member rather than
+    /// restating its arithmetic is what keeps a tier from having two prices — the
+    /// one a readout shows and the one the climb charges — since the replay walks
+    /// the entry itself and asks each tier its own bar.
     /// <see cref="ContentValidator.ValidateEnchantments"/> refuses a lock below 1
     /// at load, so the floor is a second door on a closed one.
     /// </summary>
-    private int StepFor(int tier, int stat) => Math.Max(1, Progression.XpToNext(Def.Lock * tier, stat));
+    private int TierCost(int stat) => Math.Max(1, XpToNextTier(stat));
 
     /// <summary>
     /// Levels one application grants from <paramref name="sourceNumber"/> —

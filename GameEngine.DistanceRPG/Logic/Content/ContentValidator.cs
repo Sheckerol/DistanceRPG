@@ -54,6 +54,7 @@ public static class ContentValidator
     public const string RuleChanceIsAPercentage = "a chance is a percentage, 0 to 100";
     public const string RuleRevivalTakesATurn = "a revival takes at least one turn";
     public const string RuleCurveMidpointIsACount = "the unique curve's midpoint is a DefeatCount, never negative";
+    public const string RuleKillCountsForSomething = "a kill always counts for at least one";
     public const string RuleEnchantmentLockIsPositive = "an enchantment reserves at least one point of mana";
 
     /// <summary>The entry id a roster-wide failure is reported against: the file, since no one member broke it.</summary>
@@ -139,9 +140,16 @@ public static class ContentValidator
     /// is a percentage, a revival takes a turn — a
     /// <see cref="Tuning.ResurrectTurnsFloor"/> of 0 lets
     /// <see cref="FarmLadder.ResurrectTurns"/> return 0 and a dummy revive the
-    /// turn it died — and the unique curve's midpoint is a <c>DefeatCount</c>,
-    /// which is a count. Nothing here has an opinion about whether a number is
-    /// well <em>tuned</em>; that is what playtesting is for.
+    /// turn it died — a kill counts for at least one, since
+    /// <see cref="FarmLadder.DefeatAdvance"/> hands back
+    /// <see cref="Tuning.CleanKillBonus"/> verbatim and a 0 there would make the
+    /// blow that clears a dummy's whole constitution advance nothing at all,
+    /// inverting the rule the key exists to state — and the unique curve's
+    /// midpoint is a <c>DefeatCount</c>, which is a count. Nothing here has an
+    /// opinion about whether a number is well <em>tuned</em>; that is what
+    /// playtesting is for, and it is why a <see cref="Tuning.ResurrectTurnsBase"/>
+    /// under the floor is left alone: every revival then simply lands on the
+    /// floor, which is a choice rather than a knob that cannot mean anything.
     /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
@@ -159,6 +167,8 @@ public static class ContentValidator
 
         if (tuning.ResurrectTurnsFloor < 1)
             throw new ContentException(nameof(Tuning.ResurrectTurnsFloor), RuleRevivalTakesATurn, $"{tuning.ResurrectTurnsFloor}");
+        if (tuning.CleanKillBonus < 1)
+            throw new ContentException(nameof(Tuning.CleanKillBonus), RuleKillCountsForSomething, $"{tuning.CleanKillBonus}");
         if (tuning.UniqueChanceMidpoint < 0)
             throw new ContentException(nameof(Tuning.UniqueChanceMidpoint), RuleCurveMidpointIsACount, $"{tuning.UniqueChanceMidpoint}");
     }
