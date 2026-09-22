@@ -199,11 +199,12 @@ public sealed class DungeonHud
             DrawRuns(SelectorX + (row.Length + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
         }
 
-        // Hovering a member's row spells out what each of its statuses does to it.
+        // Hovering a member's row spells out what each of its statuses does to
+        // it: Mire against the whole its turn start cuts, banked movement included.
         if (hasHover && scene.Party[hovered].State is { Alive: true } member)
         {
             float y = SelectorTop + scene.Party.Count * SelectorRowPitch + 4f;
-            foreach (var line in StatusLegend(member))
+            foreach (var line in StatusLegend(member, scene.BudgetBeforeMire(member)))
             {
                 _text.DrawText(line.Text, SelectorX, y, 1.3f, line.Color);
                 y += 13f;
@@ -243,7 +244,7 @@ public sealed class DungeonHud
                 DrawCenteredAt(px.X, y, cue.Label, 1.4f, cue.Ready ? White : Grey);
                 y += 14f;
             }
-            foreach (var line in StatusLegend(enemy))
+            foreach (var line in StatusLegend(enemy, GameConstants.EnemyMove))
             {
                 DrawCenteredAt(px.X, y, line.Text, 1.2f, line.Color);
                 y += 12f;
@@ -542,21 +543,22 @@ public sealed class DungeonHud
 
     /// <summary>
     /// What a status does, where its levels alone do not say it: Ward's
-    /// capacity, Mire's budget left, the flavour of the two crit riders (§1.6's
+    /// capacity, Mire's budget left out of the budget it cuts (the second
+    /// argument, the caller's to name), the flavour of the two crit riders (§1.6's
     /// table: getting crit opens you up, getting crit rattles your swing), the
     /// Block a Softened target has lost. A status that ticks at its turn's end
     /// is described by its row instead (<see cref="Describe"/>).
     /// </summary>
-    private static readonly IReadOnlyDictionary<StatusEffectType, Func<ActorState, StatusEffect, string>> Descriptions =
-        new Dictionary<StatusEffectType, Func<ActorState, StatusEffect, string>>
+    private static readonly IReadOnlyDictionary<StatusEffectType, Func<ActorState, float, StatusEffect, string>> Descriptions =
+        new Dictionary<StatusEffectType, Func<ActorState, float, StatusEffect, string>>
         {
-            [StatusEffectType.Ward] = (_, e) => $"ABSORBS THE NEXT {EffectOf(e)} DAMAGE",
-            [StatusEffectType.Mire] = (actor, _) => IsParalysed(actor)
+            [StatusEffectType.Ward] = (_, _, e) => $"ABSORBS THE NEXT {EffectOf(e)} DAMAGE",
+            [StatusEffectType.Mire] = (actor, budget, _) => IsParalysed(actor)
                 ? "PARALYSED - NO MOVEMENT UNTIL IT DECAYS"
-                : $"MOVEMENT {StatusBehaviours.MiredBudget(actor, BaseBudget(actor)):0} OF {BaseBudget(actor):0}",
-            [StatusEffectType.Sundered] = (_, e) => $"GETTING CRIT OPENS YOU UP - TAKES +{EffectOf(e)} A HIT",
-            [StatusEffectType.Weakened] = (_, e) => $"GETTING CRIT RATTLES YOUR SWING - DEALS -{EffectOf(e)} A HIT",
-            [StatusEffectType.Softened] = (_, e) => $"BLOCK -{EffectOf(e)} UNTIL THE ROUND ENDS",
+                : $"MOVEMENT {StatusBehaviours.MiredBudget(actor, budget):0} OF {budget:0}",
+            [StatusEffectType.Sundered] = (_, _, e) => $"GETTING CRIT OPENS YOU UP - TAKES +{EffectOf(e)} A HIT",
+            [StatusEffectType.Weakened] = (_, _, e) => $"GETTING CRIT RATTLES YOUR SWING - DEALS -{EffectOf(e)} A HIT",
+            [StatusEffectType.Softened] = (_, _, e) => $"BLOCK -{EffectOf(e)} UNTIL THE ROUND ENDS",
         };
 
     /// <summary>
@@ -580,16 +582,20 @@ public sealed class DungeonHud
     /// <summary>
     /// One line per status on the actor saying what it does to it right now,
     /// in its badge's colour: <c>SUNDERED 2: GETTING CRIT OPENS YOU UP - TAKES
-    /// +2 A HIT</c>, <c>BURNING 3: 3 DAMAGE AT TURN END</c>. Numbers are resolved
-    /// against the levels and the tuning. Empty when clean.
+    /// +2 A HIT</c>, <c>BURNING 3: 3 DAMAGE AT TURN END</c>, <c>MIRE 4: MOVEMENT
+    /// 60 OF 100</c>. Numbers are resolved against the levels and the tuning;
+    /// Mire's against <paramref name="budgetBeforeMire"/>, the movement budget
+    /// it cuts, which the caller names for the actor it draws — an enemy's turn
+    /// allowance, a party member's allowance plus what it banked — so the
+    /// legend never asks the actor its kind. Empty when clean.
     /// </summary>
-    internal static IReadOnlyList<Run> StatusLegend(ActorState actor)
+    internal static IReadOnlyList<Run> StatusLegend(ActorState actor, float budgetBeforeMire)
     {
         var lines = new List<Run>();
         foreach (var e in actor.StatusEffects)
         {
             if (HiddenStatuses.Contains(e.Type)) continue;
-            string what = Describe(actor, e);
+            string what = Describe(actor, budgetBeforeMire, e);
             string name = $"{StatusName(e.Type, e.Element)} {e.Levels}";
             lines.Add(new Run(what.Length > 0 ? $"{name}: {what}" : name, StatusColor(e)));
         }
@@ -624,10 +630,10 @@ public sealed class DungeonHud
         => StatusRules.KeysOnElement(type) && element is { } lit && ElementStatuses.TryGetValue(lit, out var named) ? named : null;
 
     /// <summary>What a status does, resolved: its entry in <see cref="Descriptions"/>, else what its row does at its turn's end — heal or harm by the effect of its levels.</summary>
-    private static string Describe(ActorState actor, StatusEffect e)
+    private static string Describe(ActorState actor, float budgetBeforeMire, StatusEffect e)
     {
         if (Descriptions.TryGetValue(e.Type, out var describe))
-            return describe(actor, e);
+            return describe(actor, budgetBeforeMire, e);
         var rule = StatusRules.Of(e.Type);
         if (rule.Trigger == StatusTrigger.TurnEnd && rule.OnTrigger == OnTrigger.TickAndDecrement)
             return rule.RestoresHp ? $"HEALS {EffectOf(e)} AT TURN END" : $"{EffectOf(e)} DAMAGE AT TURN END";
@@ -636,9 +642,6 @@ public sealed class DungeonHud
 
     /// <summary>The whole effect of a status's levels: levels times the tuned effect of one.</summary>
     private static int EffectOf(StatusEffect e) => e.Levels * StatusRules.EffectPerLevel(e.Type);
-
-    /// <summary>The movement budget Mire cuts for this kind of actor: an enemy's turn allowance, a party member's.</summary>
-    private static float BaseBudget(ActorState actor) => actor is EnemyState ? GameConstants.EnemyMove : GameConstants.MaxDistance;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 

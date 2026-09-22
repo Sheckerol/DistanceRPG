@@ -9,7 +9,8 @@ namespace GameEngine.DistanceRPG;
 /// Defeated dummies ease down to a flat floor remnant — they never blocked
 /// movement, but a full-size corpse read as if it did — and grow back on
 /// resurrection. A shove or a drag slides it to where it landed rather than
-/// teleporting it there.
+/// teleporting it there, while it is in sight; hidden in the fog, it is simply
+/// where the logic put it.
 /// </summary>
 public class EnemyObject : PrimitiveBoxObject
 {
@@ -45,12 +46,32 @@ public class EnemyObject : PrimitiveBoxObject
     /// by tile in one go, so ease from where it was last drawn to where it now
     /// stands, and the blow reads as a shove. Only the drawing lags: reach,
     /// sight, occupancy and fog read the logic position, which is already final.
+    /// A dummy hidden in the fog plays no slide — the engine does not update an
+    /// inactive object, so the slide could never run — and lands on its tile
+    /// at once.
     /// </summary>
     public void SlideToState()
     {
         _slideFrom = Position;
-        _slideLeft = SlideSeconds;
+        _slideLeft = IsActive ? SlideSeconds : 0f;
         SyncTransform();
+    }
+
+    /// <summary>
+    /// Show or hide the stand-in with the fog. Hiding ends a slide on the spot:
+    /// the engine stops updating an inactive object, so a slide left running
+    /// would stall at its start — every sync easing from where the shove found
+    /// the dummy, however far it then walks unseen — and play out from that
+    /// stale spot on the next reveal. It lands where the logic put it instead.
+    /// </summary>
+    public void SetVisible(bool visible)
+    {
+        IsActive = visible;
+        if (!visible && _slideLeft > 0f)
+        {
+            _slideLeft = 0f;
+            SyncTransform();
+        }
     }
 
     public override void Update(float deltaTime)

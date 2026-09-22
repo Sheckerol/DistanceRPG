@@ -98,7 +98,19 @@ public class HudTextTests
             "MIRE 4: MOVEMENT 60 OF 100",   // an enemy's 100 cut 10% a level: the budget left, never the percentage
             "POISON 3: 3 DAMAGE AT TURN END",
             "BURNING 2: 2 DAMAGE AT TURN END",
-        }, DungeonHud.StatusLegend(enemy).Select(r => r.Text));
+        }, DungeonHud.StatusLegend(enemy, GameConstants.EnemyMove).Select(r => r.Text));
+    }
+
+    [Fact]
+    public void MireLegend_ForAMember_MatchesTheCapItsTurnStartSet()
+    {
+        var member = Holding("tower_guard");
+        member.ApplyStatus(Mire, null, 4);
+        member.SavedMovement = 40;   // banked last turn: this turn's whole is 200, and Mire cuts all of it
+        member.StartTurn();
+        Assert.Equal(120f, member.EffectiveMax);   // the MOVE readout's cap
+        Assert.Equal("MIRE 4: MOVEMENT 120 OF 200",
+            DungeonHud.StatusLegend(member, GameConstants.MaxDistance + 40).Single().Text);
     }
 
     [Fact]

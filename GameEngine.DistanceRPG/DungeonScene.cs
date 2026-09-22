@@ -131,6 +131,21 @@ public class DungeonScene : Scene
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
 
+    // What each member banked at the last turn's end (TurnEnded): the bonus
+    // its turn start adds to the base allowance before Mire cuts the whole.
+    private readonly Dictionary<PartyMemberState, float> _banked = new();
+
+    /// <summary>
+    /// The movement budget <paramref name="member"/>'s Mire cuts: the base
+    /// allowance plus what it banked at the last turn's end — the whole its
+    /// turn start cuts (<see cref="PartyMemberState.StartTurn"/>). In the
+    /// player phase that is what this turn's cap was cut from, so a Mire
+    /// legend agrees with the MOVE readout at the same level; once the turn
+    /// has ended, it is the coming turn's.
+    /// </summary>
+    public float BudgetBeforeMire(PartyMemberState member)
+        => GameConstants.MaxDistance + _banked.GetValueOrDefault(member);
+
     // What the mouse is over and what a click there would do, refreshed each
     // frame through the same pick a click acts on (UpdateHover): the HUD's
     // hover cue, a wand's aim cue at the cursor, and the bodies its shape
@@ -147,6 +162,20 @@ public class DungeonScene : Scene
     private int _castRollCalledAt = -1;   // the roll count a cast was last called at: once per cast, however many statuses it lands
     private bool _watchCastRoll;
     private int? _castRoll;
+    private int _castRollAt;              // the roll count at the watched cast's own roll
+
+    /// <summary>
+    /// Statuses a hit can leave on its attacker rather than on its target:
+    /// BlockWeaken's Weakened, when the attacker's blow is blocked (§1.6). A
+    /// hit's resolution lists only its defender's riders, so these levels are
+    /// watched across each hit instead (<see cref="AnnounceAttackerRiders"/>).
+    /// </summary>
+    private static readonly StatusEffectType[] AttackerRiders = { StatusEffectType.Weakened };
+
+    // Every actor's AttackerRiders levels as they stood before the hit now
+    // resolving: taken at every roll — a hit rolls before its chain runs —
+    // and again after every hit's floating text.
+    private readonly Dictionary<(ActorState Actor, StatusEffectType Type), int> _riderLevels = new();
 
     /// <summary>
     /// True while the party marches freely. Marching is granted only at the
@@ -397,6 +426,8 @@ public class DungeonScene : Scene
         {
             Log.Info($"[Turns] End of turn — banked {saved} movement");
             LastBankedMovement = saved;
+            foreach (var member in _party)
+                _banked[member.State] = member.State.SavedMovement;
             if (InventoryOpen) ActiveMenu = GameMenu.None;
             ResetFogVisibility();
         };
@@ -482,7 +513,8 @@ public class DungeonScene : Scene
         // in between — so the last natural roll is the cast's: a crit, which
         // doubled the levels, leads the label with CRIT!, and the roll is
         // called over the caster once per cast (a crit halves the cast's
-        // mana, a fumble doubles it).
+        // mana, a fumble doubles it). A party member's cast that lands no
+        // status is called where it was made instead (CastStaff).
         _turns.ActorStatusApplied += (target, effect, source) =>
         {
             bool crit = CastRollOf(source, _lastRoll).IsCrit;
@@ -490,11 +522,7 @@ public class DungeonScene : Scene
             if (TryObjectFor(target, out var obj) && obj.IsActive)
                 _hud.AddFloatingText(obj.Position, $"{(crit ? "CRIT! " : "")}{DungeonHud.StatusName(effect.Type, effect.Element)} Lv{effect.Levels}",
                     crit ? CritColor : hostile ? TickColor : HealColor, -52f);
-            if (_castRollCalledAt != _rollCount)
-            {
-                _castRollCalledAt = _rollCount;
-                AnnounceCastRoll(source, _lastRoll);
-            }
+            CallCastRoll(source, _lastRoll, _rollCount);
         };
 
         _turns.EnemyHealed += (enemy, amount) =>
@@ -532,7 +560,7 @@ public class DungeonScene : Scene
                     break;
                 case EnemyObject enemy:
                     enemy.SlideToState(); // eases to where the blow left it rather than teleporting
-                    UpdateEnemyVisibility();
+                    UpdateEnemyVisibility(); // shoved into the fog, it hides and lands on its tile
                     break;
             }
             if (obj.IsActive)
@@ -891,7 +919,7 @@ public class DungeonScene : Scene
             // A click that does nothing says why, over the enemy.
             var target = enemy.State;
             bool acted = held?.AreaShape != null ? CastArea(caster, (target.X, target.Y))
-                : held?.IsCaster == true ? _turns.TryCast(caster, target)
+                : held?.IsCaster == true ? CastStaff(caster, target)
                 : _turns.TryAttack(caster, target);
             if (!acted)
                 SayRefusal(enemy, EnemyCue(caster, held, target));
@@ -909,7 +937,7 @@ public class DungeonScene : Scene
             var member = _party[memberIdx];
             if (!CastsOnAllies(held))
                 SetActiveCharacter(memberIdx);
-            else if (!_turns.TryCast(caster, member.State))
+            else if (!CastStaff(caster, member.State))
                 SayRefusal(member, AllyCue(caster, held, member.State));
             return;
         }
@@ -928,37 +956,75 @@ public class DungeonScene : Scene
     /// Cast the active wand at <paramref name="aim"/> (logic units) through the
     /// turn system, which prices it and refuses an empty shape. The first d20
     /// the cast draws is its own — every hit it fans out to shares it — so it
-    /// is caught on the way past (<see cref="RollD20"/>) and called over the
-    /// caster: a crit halves the cast's mana, a fumble doubles it; the hits
-    /// show their own CRIT! or WEAK. Returns whether the cast went off.
+    /// is watched (<see cref="WatchCast"/>) and called over the caster: a crit
+    /// halves the cast's mana, a fumble doubles it; the hits show their own
+    /// CRIT! or WEAK. Returns whether the cast went off.
     /// </summary>
     private bool CastArea(PartyMemberState caster, (float X, float Y) aim)
     {
         var wand = caster.EquippedWeapon;
-        _castRoll = null;
-        _watchCastRoll = true;
-        bool cast = _turns.TryCastArea(caster, aim);
-        _watchCastRoll = false;
+        bool cast = WatchCast(caster, () => _turns.TryCastArea(caster, aim));
         if (cast)
-        {
             Log.Info($"[Combat] {caster.Id} casts {wand?.Name}");
-            if (_castRoll is int roll)
-                AnnounceCastRoll(caster, roll);
-        }
         else
-        {
             Log.Info($"[Combat] {caster.Id} cannot cast {wand?.Name} there ({_turns.AreaTargets(caster, aim).Count} in the shape, movement {caster.DistLeft:0}, mana {caster.Mana})");
-        }
         return cast;
     }
 
     /// <summary>
+    /// Cast the active staff on <paramref name="target"/> through the turn
+    /// system, which prices it and refuses a target on the wrong side or out
+    /// of reach. The status a cast lands calls its roll
+    /// (<see cref="TurnSystem.ActorStatusApplied"/>), but a cast can land none
+    /// — the innate's trigger unpaid out of what the cast left, as when a
+    /// fumble's doubled cost takes the whole pool — and it still rolled and
+    /// still had its mana halved or doubled, so the roll is watched here too
+    /// (<see cref="WatchCast"/>) and called if no status did. Returns whether
+    /// the cast went off.
+    /// </summary>
+    private bool CastStaff(PartyMemberState caster, ActorState target)
+    {
+        bool cast = WatchCast(caster, () => _turns.TryCast(caster, target));
+        if (cast)
+            Log.Info($"[Combat] {caster.Id} casts {caster.EquippedWeapon?.Name}");
+        return cast;
+    }
+
+    /// <summary>
+    /// Run a party member's cast with its roll watched: the first d20 drawn
+    /// while it resolves is the cast's own (<see cref="RollD20"/>), and a cast
+    /// that went off has that roll called over its caster — once
+    /// (<see cref="CallCastRoll"/>), so a status the cast landed, which calls
+    /// it first, is not echoed.
+    /// </summary>
+    private bool WatchCast(PartyMemberState caster, Func<bool> cast)
+    {
+        _castRoll = null;
+        _watchCastRoll = true;
+        bool went = cast();
+        _watchCastRoll = false;
+        if (went && _castRoll is int roll)
+            CallCastRoll(caster, roll, _castRollAt);
+        return went;
+    }
+
+    /// <summary>A cast's natural <paramref name="roll"/> called over its caster once, whichever cue reaches it first: <paramref name="rollCount"/> is its place in the roll count, the mark a cast's statuses and its call site share.</summary>
+    private void CallCastRoll(ActorState caster, int roll, int rollCount)
+    {
+        if (_castRollCalledAt == rollCount) return;
+        _castRollCalledAt = rollCount;
+        AnnounceCastRoll(caster, roll);
+    }
+
+    /// <summary>
     /// The turn system's d20 — the same fair die its default rolls — drawn
-    /// here so the scene knows the natural rolls its cast cues read: the last
-    /// one, which is a staff cast's own when its status lands (the cast rolls
-    /// just before its Cast is raised, and nothing rolls in between), and,
-    /// while a wand cast resolves, the first, which is the cast's own before
-    /// anything its hits set off (a counter, a carried shot) rolls again.
+    /// here so the scene knows the natural rolls its cues read: the last one,
+    /// which is a staff cast's own when its status lands (the cast rolls just
+    /// before its Cast is raised, and nothing rolls in between), and, while a
+    /// party member's cast is watched (<see cref="WatchCast"/>), the first,
+    /// which is the cast's own before anything its hits set off (a counter, a
+    /// carried shot) rolls again. A hit rolls before its chain runs, so every
+    /// roll also takes the levels <see cref="AttackerRiders"/> stand at before it.
     /// </summary>
     private int RollD20()
     {
@@ -966,7 +1032,11 @@ public class DungeonScene : Scene
         _lastRoll = roll;
         _rollCount++;
         if (_watchCastRoll && _castRoll == null)
+        {
             _castRoll = roll;
+            _castRollAt = _rollCount;
+        }
+        TakeRiderLevels();
         return roll;
     }
 
@@ -1315,7 +1385,7 @@ public class DungeonScene : Scene
         {
             var (r, c) = LogicTile(enemy.State.X, enemy.State.Y);
             bool visible = _fog.Visible[r, c];
-            enemy.IsActive = visible;
+            enemy.SetVisible(visible); // hidden, a shove's slide ends where the logic put it
             _turns.NotifyEnemyVisible(enemy.State, visible);
         }
     }
@@ -1352,7 +1422,8 @@ public class DungeonScene : Scene
     /// it anyway — and on its right what Ward swallowed, dealt but never taken
     /// (Dealt = Taken + Ward, §1.6); then, above it and apart from the number,
     /// a beat per rider the hit left on its target — SUNDERED!, WEAKENED!, and
-    /// whatever else rode it (a Pin's MIRE!, a burn's BURNING!).
+    /// whatever else rode it (a Pin's MIRE!, a burn's BURNING!) — and over its
+    /// attacker the WEAKENED! a blocked blow earns (<see cref="AnnounceAttackerRiders"/>).
     /// </summary>
     private void SpawnAttackTexts(ActorState defender, Vector3 worldPos, AttackResolution res)
     {
@@ -1375,13 +1446,54 @@ public class DungeonScene : Scene
             row.Add(new DungeonHud.Run($"WARD {res.WardSpent}", BlockColor));
         _hud.AddFloatingRow(worldPos, 8f, row);
 
-        float y = -78f;
+        float y = RiderBeatTop;
         foreach (var rider in res.Riders)
         {
             _hud.AddFloatingText(worldPos, $"{DungeonHud.StatusName(rider.Type, rider.Element)}!", RiderColor, y);
-            y -= 16f;
+            y -= RiderBeatStep;
         }
+        AnnounceAttackerRiders(defender);
     }
+
+    // Where a hit's rider beats start above the actor they landed on, and how far apart they stack.
+    private const float RiderBeatTop = -78f;
+    private const float RiderBeatStep = 16f;
+
+    /// <summary>
+    /// The beats a hit's resolution cannot carry: its riders are its
+    /// defender's, but BlockWeaken weakens the attacker whose blow was
+    /// blocked. Any actor but the defender whose <see cref="AttackerRiders"/>
+    /// level rose since the hit rolled gets the beat a rider gets — WEAKENED!
+    /// over the attacker — and the levels are taken afresh for the next hit,
+    /// which may share this one's roll (an area cast's hits do).
+    /// </summary>
+    private void AnnounceAttackerRiders(ActorState defender)
+    {
+        foreach (var actor in Actors())
+        {
+            if (actor == defender || !TryObjectFor(actor, out var obj) || !obj.IsActive) continue;
+            float y = RiderBeatTop;
+            foreach (var type in AttackerRiders)
+            {
+                if (actor.StatusLevel(type) <= _riderLevels.GetValueOrDefault((actor, type))) continue;
+                _hud.AddFloatingText(obj.Position, $"{DungeonHud.StatusName(type, null)}!", RiderColor, y);
+                y -= RiderBeatStep;
+            }
+        }
+        TakeRiderLevels();
+    }
+
+    /// <summary>Take every actor's <see cref="AttackerRiders"/> levels as they stand: the mark the next hit's rises are read against.</summary>
+    private void TakeRiderLevels()
+    {
+        foreach (var actor in Actors())
+            foreach (var type in AttackerRiders)
+                _riderLevels[(actor, type)] = actor.StatusLevel(type);
+    }
+
+    /// <summary>Everyone on the map, the party then the enemies.</summary>
+    private IEnumerable<ActorState> Actors()
+        => _party.Select(p => (ActorState)p.State).Concat(_enemies.Select(e => e.State));
 
     private static (int R, int C) LogicTile(float x, float y)
         => ((int)MathF.Floor(y / GameConstants.Tile), (int)MathF.Floor(x / GameConstants.Tile));
