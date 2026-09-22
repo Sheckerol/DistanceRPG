@@ -17,8 +17,11 @@ public sealed class PartyMemberState : ActorState
 
     public override int MaxHp => GameConstants.PlayerHp;
 
+    /// <summary>Weapon slots a member carries. A roster entry's starting weapon and bag are checked against it at load, so a bag too deep to spawn aborts startup.</summary>
+    public const int InventorySlots = 3;
+
     /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
-    public Weapon?[] Inventory { get; } = new Weapon?[3];
+    public Weapon?[] Inventory { get; } = new Weapon?[InventorySlots];
 
     public override Weapon? EquippedWeapon => Inventory[0];
 

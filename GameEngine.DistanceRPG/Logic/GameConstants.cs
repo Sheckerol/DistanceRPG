@@ -57,6 +57,14 @@ public static class GameConstants
     public const double StaffHealerChance = 0.5;
 
     /// <summary>
+    /// Members the starting party has (§2.1's four): the roster's exact length,
+    /// checked against the roster at load and against the presentation's spawn
+    /// capacity by test, so a longer roster aborts startup rather than spawning
+    /// a prefix and silently dropping whoever came last.
+    /// </summary>
+    public const int PartySize = 4;
+
+    /// <summary>
     /// Starting weapon id per party member A–D: dagger, sword, axe, staff
     /// (§2.1 names the classes; <c>party.json</c> will decide the items, so
     /// these are Phase 1's provisional picks).

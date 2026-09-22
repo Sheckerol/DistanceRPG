@@ -44,6 +44,17 @@ public static class ContentValidator
     public const string RuleCasterUniqueEnchantments = "a caster unique keeps its variant's spread and differs from it only in its enchantments";
     public const string RuleCasterUniqueShape = "a caster unique is one shape on its innate: beside one unique enchantment, alone at tier 3, or beside one more catalogue enchantment, both at tier 1";
 
+    public const string RulePartySize = "a roster carries exactly one member per party slot";
+    public const string RulePartyStatPermutation = "every innate stat spread is a permutation of 1-4";
+    public const string RulePartyWeaponExists = "a party member's starting and bag weapons resolve in the weapon catalogue";
+    public const string RulePartyBagFits = "a party member's starting weapon and bag fit the inventory";
+    public const string RulePartyHasACaster = "a roster always includes a caster";
+
+    public const string RulePoolBarIsPositive = "a pool's bar is at least one";
+
+    /// <summary>The entry id a roster-wide failure is reported against: the file, since no one member broke it.</summary>
+    private const string RosterId = "party";
+
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
 
@@ -109,6 +120,79 @@ public static class ContentValidator
         [WeaponClass.Ranged] = ModifierType.Longshot,
         [WeaponClass.Throwing] = ModifierType.Charges,
     };
+
+    /// <summary>
+    /// The §5.3 checks on <c>tuning.json</c>, run first because tuning loads
+    /// first: a pool's bar is at least one. <see cref="Progression.XpToNext"/> is
+    /// the doc's line and carries no guard of its own, so a bar of 0 would make
+    /// every step free and the replay loop endless. Refusing it here turns a
+    /// mistyped number into a named startup failure instead of a hang.
+    /// </summary>
+    public static void ValidateTuning(Tuning tuning)
+    {
+        ArgumentNullException.ThrowIfNull(tuning);
+
+        if (tuning.StartingPool < 1)
+            throw new ContentException(nameof(Tuning.StartingPool), RulePoolBarIsPositive, $"{tuning.StartingPool}");
+        if (tuning.WeaponXpPerLevel < 1)
+            throw new ContentException(nameof(Tuning.WeaponXpPerLevel), RulePoolBarIsPositive, $"{tuning.WeaponXpPerLevel}");
+    }
+
+    /// <summary>
+    /// The §5.9 checks on <c>party.json</c>, run last because a member names
+    /// weapons: the roster is exactly <see cref="GameConstants.PartySize"/>
+    /// long, no id is declared twice, every spread is a permutation of 1–4
+    /// (§2.1, and §5.7's list — "free to check and silently wrong if it
+    /// drifts"), a member's weapons fit their inventory and resolve in the
+    /// catalogue, and somebody in the party is a caster.
+    /// <para>
+    /// The size check is the one that would otherwise fail silently: the scene
+    /// spawns over the tiles it found for its own colour capacity, so a fifth
+    /// member would simply never appear. It lives here, where the presentation
+    /// cannot forget it.
+    /// </para>
+    /// Ids are resolved against catalogue membership and never instantiated, so
+    /// <see cref="GameContent"/>'s own invariant — nothing here builds a
+    /// <see cref="Weapon"/> — survives. Party-wide stat properties ("each stat
+    /// is somebody's 4 exactly once") are deliberately <em>not</em> rules: the
+    /// doc fixes the permutation and says the assignment is a first guess, so
+    /// only the per-member rule is enforced and the roster's own arrangement is
+    /// pinned by test.
+    /// </summary>
+    public static void ValidateParty(PartyData data, WeaponCatalogue weapons)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(weapons);
+
+        if (data.Members.Count != GameConstants.PartySize)
+            throw new ContentException(RosterId, RulePartySize, $"{data.Members.Count} members, {GameConstants.PartySize} slots");
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var member in data.Members)
+        {
+            if (!seen.Add(member.Id))
+                throw new ContentException(member.Id, RuleDuplicateId);
+
+            if (!member.Stats.IsPermutation)
+                throw new ContentException(member.Id, RulePartyStatPermutation, member.Stats.ToString());
+
+            int carried = 1 + member.BagWeaponIds.Count;
+            if (carried > PartyMemberState.InventorySlots)
+                throw new ContentException(member.Id, RulePartyBagFits, $"{carried} weapons, {PartyMemberState.InventorySlots} slots");
+
+            // Equipped first, then the bag in slot order: the first failure
+            // reported is the same one every run.
+            foreach (var id in member.BagWeaponIds.Prepend(member.StartingWeaponId))
+                if (!weapons.TryGet(id, out _))
+                    throw new ContentException(member.Id, RulePartyWeaponExists, id);
+        }
+
+        // Whoever opens the game holding a staff or a wand is the party's
+        // caster; a bag staff would make the check vacuous, since every member
+        // carries one.
+        if (!data.Members.Any(m => Weapon.KindOf(weapons[m.StartingWeaponId].Class) == WeaponKind.Caster))
+            throw new ContentException(RosterId, RulePartyHasACaster, "no member starts with a staff or a wand");
+    }
 
     /// <summary>
     /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier

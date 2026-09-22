@@ -164,4 +164,28 @@ public sealed record Tuning
 
     /// <summary>Percentage of an area cast's damage an ally takes when friendly fire is on.</summary>
     public int FriendlyFireAllyPercent { get; init; } = 50;
+
+    // ---- Progression (§2.1, §2.2) ----
+    // §5.3 files both of these under its Economy group. They are the two numbers
+    // a playtest would actually turn; the shape of a level's effect
+    // (Progression.DamagePerLevels and the rest) stays compiled.
+
+    /// <summary>
+    /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
+    /// from Phase 6a — a weapon's wear capacity alike, so the 25 is never a bare
+    /// literal in three places. A point costs <c>currentMax / governingStat</c>
+    /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
+    /// diverge rather than starting apart. Below 1 there is no step to take, and
+    /// <see cref="ContentValidator.ValidateTuning"/> refuses it at load.
+    /// </summary>
+    public int StartingPool { get; init; } = 25;
+
+    /// <summary>
+    /// The weapon ladder's bar per level (§2.2): the doc's
+    /// <c>xpToNext(L) = 100 * L / governingStat</c> is
+    /// <c>XpToNext(WeaponXpPerLevel * L, stat)</c>, so the ladder and the pools
+    /// run on one function. Marked "tune later" where it is written and left
+    /// unnamed there; this is the name.
+    /// </summary>
+    public int WeaponXpPerLevel { get; init; } = 100;
 }
