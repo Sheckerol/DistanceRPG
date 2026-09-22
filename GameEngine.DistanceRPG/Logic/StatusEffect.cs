@@ -1,6 +1,6 @@
 namespace GameEngine.DistanceRPG.Logic;
 
-/// <summary>Kinds of ongoing status effect a party member can carry.</summary>
+/// <summary>Kinds of ongoing status effect an actor can carry.</summary>
 public enum StatusEffectType
 {
     /// <summary>

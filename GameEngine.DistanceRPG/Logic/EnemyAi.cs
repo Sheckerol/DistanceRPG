@@ -7,21 +7,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public static class EnemyAi
 {
-    /// <summary>Surface-to-surface range plus line-of-sight check.</summary>
-    public static bool CanHit(EnemyState enemy, PartyMemberState target, Weapon weapon, int[,] grid)
+    /// <summary>Surface-to-surface range plus line-of-sight check, from <paramref name="attacker"/> to <paramref name="target"/>; either side may attack.</summary>
+    public static bool CanHit(ActorState attacker, ActorState target, Weapon weapon, int[,] grid)
     {
-        if (!CombatRules.InAttackRange(enemy.X, enemy.Y, enemy.Radius, target.X, target.Y, target.Radius, weapon))
+        if (!CombatRules.InAttackRange(attacker.X, attacker.Y, attacker.Radius, target.X, target.Y, target.Radius, weapon))
             return false;
-        return LineOfSight.HasLineOfSight(grid, enemy.X, enemy.Y, target.X, target.Y);
-    }
-
-    /// <summary>Symmetric check for a party member attacking the enemy.</summary>
-    public static bool CharCanHit(PartyMemberState c, EnemyState enemy, Weapon? weapon, int[,] grid)
-    {
-        if (weapon == null) return false;
-        if (!CombatRules.InAttackRange(c.X, c.Y, c.Radius, enemy.X, enemy.Y, enemy.Radius, weapon))
-            return false;
-        return LineOfSight.HasLineOfSight(grid, c.X, c.Y, enemy.X, enemy.Y);
+        return LineOfSight.HasLineOfSight(grid, attacker.X, attacker.Y, target.X, target.Y);
     }
 
     /// <summary>
@@ -178,11 +169,6 @@ public static class EnemyAi
     /// <summary>True when the healer has at least one other living enemy to support.</summary>
     public static bool HasLivingAlly(EnemyState healer, IReadOnlyList<EnemyState> enemies)
         => enemies.Any(e => e != healer && e.Alive);
-
-    /// <summary>Can the healer cast on <paramref name="ally"/> right now (range + LOS)?</summary>
-    public static bool CanHealFrom(EnemyState healer, EnemyState ally, int[,] grid)
-        => CombatRules.InAttackRange(healer.X, healer.Y, healer.Radius, ally.X, ally.Y, ally.Radius, healer.Weapon)
-            && LineOfSight.HasLineOfSight(grid, healer.X, healer.Y, ally.X, ally.Y);
 
     /// <summary>
     /// Mask actor-occupied tiles as walls on a copy — the Pathfinder itself must
