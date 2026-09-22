@@ -1630,6 +1630,15 @@ public sealed class TurnSystem
         // what was grafted on later. Credited here, from the payload the chain
         // handed back, because the attacker cannot know what it did until the
         // defender's handlers have run: damage is a value that returns.
+        //
+        // Per body, so a fan that crosses a ladder step pays the new level to
+        // the bodies it has not reached yet: the level is re-read at step 1 of
+        // each hit and this credit lands between them, so one swing can deal 15
+        // to its first four targets and 16 to its fifth. Intended, and
+        // deterministic — target order is the reach's and no roll is re-taken.
+        // Pinned by ProficiencyEffectTests.ALevelCrossedMidSwingPaysTheLaterBodies
+        // and by AttackShapeTests.GreatAxe_TwoExtra, so a single body taking one
+        // extra point reads as a level-up rather than an arithmetic slip.
         CreditXp(attacker, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.WeaponDealt + settled.ForgedShare));
 
         // The triggers the chain settled — the attacker's entries at step 4,

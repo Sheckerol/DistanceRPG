@@ -196,6 +196,31 @@ public class ProficiencyEffectTests
         Assert.Equal(before + 16, a.WeaponXp[WeaponClass.Dagger]);    // credited what it dealt, bonus included
     }
 
+    [Fact]
+    public void ALevelCrossedMidSwingPaysTheLaterBodies()
+    {
+        // Each body credits as it is struck and each hit reads the level afresh
+        // at step 1, so a fan that crosses a ladder step mid-swing pays the new
+        // level to the bodies it has not reached yet. The axe below stands one
+        // body short of level 2, so the one it catches takes the +1 the one it
+        // aimed at bought. Deterministic — target order is the reach's, and no
+        // roll is re-taken — and pinned here so that a fixture's single extra
+        // point of damage reads as a level-up and not an arithmetic slip.
+        var grid = new int[20, 20];
+        var a = Char("A", 5, 5, "great_axe");                    // 18, Cleave x2
+        a.WeaponXp[WeaponClass.Axe] = XpForLevel(2) - 18;        // one body short of the bar
+        var aimed = Enemy(5, 6);
+        var fanned = Enemy(6, 6);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { aimed, fanned }, () => 10);
+        Assert.Equal(1, a.WeaponLevel(a.EquippedWeapon!));
+
+        Assert.True(turns.TryAttack(a, aimed));
+
+        Assert.Equal(200 - 18, aimed.Hp);                        // swung at level 1
+        Assert.Equal(200 - 19, fanned.Hp);                       // the aimed body's 18 bought level 2 mid-swing
+        Assert.Equal(2, a.WeaponLevel(a.EquippedWeapon!));
+    }
+
     // ── The movement discount ────────────────────────────────────────────────
 
     [Fact]

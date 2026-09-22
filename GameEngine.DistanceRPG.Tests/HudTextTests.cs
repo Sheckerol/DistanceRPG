@@ -10,7 +10,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// read as resolved values for the weapon in a wielder's hands, weapon plus
 /// innate; a lingering element's status is named by its element; Mire past
 /// the whole budget is paralysis; and the two crit riders carry their flavour
-/// (§1.6). The drawing itself is untested; these are its strings.
+/// (§1.6). The drawing itself is untested — bar the one arithmetic the
+/// inventory panel does, which decides whether what it draws fits the window
+/// it is drawn in (§2.2); these are its strings.
 /// </summary>
 public class HudTextTests
 {
@@ -214,5 +216,40 @@ public class HudTextTests
         Assert.Equal("DAGGER 2!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 100)));
         Assert.Equal("MAX HP 100!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Health, null, 100)));
         Assert.Equal("MAX MANA 100!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Mana, null, 100)));
+    }
+
+    [Fact]
+    public void InventoryLayout_KeepsTheSwapLineAndTheKeyHintOnScreen()
+    {
+        // The panel grows downward by a row per class a member is levelling or
+        // holding, so the lines a short window loses are the ones under the
+        // rows - what a swap costs, and which key equips. It opens where it
+        // always has while the whole of it fits, slides up when it does not,
+        // and only past that drops rows off the end of the list.
+        const int slots = 3;
+        const int most = 2 + 8;   // the two pools and every weapon class at once
+
+        var roomy = DungeonHud.LayoutInventory(720f, slots, most);
+        Assert.Equal(720f / 2f - 150f, roomy.Top);   // where the panel has always opened
+        Assert.Equal(most, roomy.Rows);
+
+        var tight = DungeonHud.LayoutInventory(520f, slots, most);
+        Assert.True(tight.Top < 520f / 2f - 150f);   // slid up to make the room
+        Assert.Equal(most, tight.Rows);              // and every row still printed
+
+        var cramped = DungeonHud.LayoutInventory(420f, slots, most);
+        Assert.True(cramped.Rows < most);            // the tail of the list goes before the key hint does
+
+        // The invariant, over every window the settings allow (320 x 240 up) and
+        // every row count a member can reach: what is drawn clears the help line
+        // at h - 24, or the panel has already dropped every row it could.
+        for (int h = 240; h <= 1600; h += 2)
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(h, slots, rows);
+                Assert.InRange(layout.Rows, 0, rows);
+                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
+                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
+            }
     }
 }

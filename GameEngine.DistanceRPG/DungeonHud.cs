@@ -279,10 +279,81 @@ public sealed class DungeonHud
         }
     }
 
+    // Inventory panel geometry. The panel was a fixed height until §2.2, so a
+    // top fixed at the middle of the window always had room under it. It grows
+    // now, by a row per class the member is levelling or holding, and what a
+    // short window loses first are the lines under the rows: what a swap costs
+    // and which key equips.
+
+    /// <summary>The first slot's line, under the title and the EQUIPPED label.</summary>
+    private const float InventorySlotsTop = 70f;
+
+    /// <summary>A slot: its name, and the statline under it.</summary>
+    private const float InventorySlotPitch = 46f;
+
+    /// <summary>The PROGRESSION label over the rows.</summary>
+    private const float InventoryLabelHeight = 16f;
+
+    /// <summary>One pool or proficiency row.</summary>
+    private const float InventoryRowPitch = 14f;
+
+    /// <summary>The swap line under the last row, and the key hint under that.</summary>
+    private const float InventorySwapGap = 16f;
+    private const float InventoryHintGap = 26f;
+
+    /// <summary>The last line's own glyphs, so a height covers what the panel draws and not just where it starts.</summary>
+    private const float InventoryLineHeight = 12f;
+
+    /// <summary>Half the panel's height as it has always been centred, while the window has room for it.</summary>
+    private const float InventoryCentredOffset = 150f;
+
+    /// <summary>Clearance kept under the panel for the help line at <c>h - 24</c>.</summary>
+    private const float InventoryBottomMargin = 32f;
+
+    /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under.</summary>
+    private const float InventoryTopMargin = 56f;
+
+    /// <summary>Where the inventory panel opens, how many of its progression rows there is room for, and the line past its last glyph.</summary>
+    internal readonly record struct InventoryLayout(float Top, int Rows, float Bottom);
+
+    /// <summary>
+    /// The panel's vertical fit in a window <paramref name="windowHeight"/>
+    /// pixels tall, for a member with <paramref name="slots"/> slots and
+    /// <paramref name="rowCount"/> progression rows to print (§2.2): it keeps
+    /// its centred place while the whole of it fits, slides up — never under
+    /// the top readouts — when it does not, and only past that drops rows it
+    /// has no room for, from the end of the list, rather than the lines that
+    /// name the swap cost and the equip keys. Below about 370 px of window even
+    /// a row-less panel is taller than the room under the readouts, and the
+    /// panel is then anchored as high as it goes and clipped: that is a window
+    /// smaller than the rest of the HUD is laid out for either.
+    /// </summary>
+    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount)
+    {
+        float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + InventoryLabelHeight
+            + InventorySwapGap + InventoryHintGap + InventoryLineHeight;
+        float floorLine = windowHeight - InventoryBottomMargin;
+        float top = MathF.Min(windowHeight / 2f - InventoryCentredOffset,
+                              floorLine - fixedHeight - rowCount * InventoryRowPitch);
+        top = MathF.Max(InventoryTopMargin, top);
+        int rows = Math.Clamp((int)MathF.Floor((floorLine - top - fixedHeight) / InventoryRowPitch), 0, rowCount);
+        return new InventoryLayout(top, rows, top + fixedHeight + rows * InventoryRowPitch);
+    }
+
     private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns)
     {
         float cx = w / 2f;
-        float top = h / 2f - 150f;
+
+        // Under the slots: what every pool and every ladder is doing (§2.2).
+        // The statlines above price the items; these rows price the member.
+        var rows = new List<Run>();
+        foreach (string row in PoolRows(active))
+            rows.Add(new Run(row, White));
+        foreach (string row in ProficiencyRows(active))
+            rows.Add(new Run(row, Cyan));
+
+        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count);
+        float top = layout.Top;
         float left = cx - 190f;
 
         DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", 3f, Cyan);
@@ -290,7 +361,7 @@ public sealed class DungeonHud
 
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
-            float y = top + 70f + slot * 46f;
+            float y = top + InventorySlotsTop + slot * InventorySlotPitch;
             var weapon = active.Inventory[slot];
             if (weapon == null)
             {
@@ -306,24 +377,17 @@ public sealed class DungeonHud
             DrawRuns(left + 3 * GlyphAdvance * 2f, y + 18f, 1.3f, detail);
         }
 
-        // Under the slots: what every pool and every ladder is doing (§2.2).
-        // The statlines above price the items; these rows price the member.
-        float rowY = top + 70f + 3 * 46f;
+        float rowY = top + InventorySlotsTop + active.Inventory.Length * InventorySlotPitch;
         _text.DrawText("PROGRESSION", left, rowY, 1.2f, Grey);
-        rowY += 16f;
-        foreach (string row in PoolRows(active))
+        rowY += InventoryLabelHeight;
+        for (int i = 0; i < layout.Rows; i++)
         {
-            _text.DrawText(row, left, rowY, 1.5f, White);
-            rowY += 14f;
-        }
-        foreach (string row in ProficiencyRows(active))
-        {
-            _text.DrawText(row, left, rowY, 1.5f, Cyan);
-            rowY += 14f;
+            _text.DrawText(rows[i].Text, left, rowY, 1.5f, rows[i].Color);
+            rowY += InventoryRowPitch;
         }
 
         // A swap is free out of combat and costs movement in it (§1.2): say which before the key is pressed.
-        float swapY = rowY + 16f;
+        float swapY = rowY + InventorySwapGap;
         int cost = turns.SwapCost;
         if (cost <= 0)
             DrawCentered(w, swapY, "OUT OF COMBAT - SWAPPING IS FREE", 1.5f, Grey);
@@ -332,7 +396,7 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
-        DrawCentered(w, swapY + 26f, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
+        DrawCentered(w, swapY + InventoryHintGap, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
     }
 
     private void DrawMenu(int w, int h)
