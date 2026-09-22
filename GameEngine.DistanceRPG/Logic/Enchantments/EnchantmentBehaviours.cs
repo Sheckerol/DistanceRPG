@@ -417,7 +417,12 @@ public static class EnchantmentBehaviours
     /// <summary>
     /// The wand innates' behaviour on a hit, at step 4: what the element adds
     /// beside the weapon's share — its potency's levels, which Phase 1 prices
-    /// at nothing (the tier's contribution and INT scaling are §3.3's) — goes
+    /// at nothing (the tier's contribution and INT scaling are §3.3's: "element
+    /// damage carries INT scaling" is a stat *multiplying* a magnitude, and
+    /// §2.1's rule is that a stat divides a threshold and never multiplies a
+    /// value, so the term lands with the tier that prices it — recorded under
+    /// settled.md's Phase 2 implementation pass, and the seam it will read,
+    /// <see cref="PartyMemberState.Stats"/>, is here already) — goes
     /// into <see cref="DamagePayload.EnchantmentShare"/>, tracked apart from
     /// the weapon's the whole way down, and resolved against the target's
     /// attunement by the element's <em>own</em> type: on a two-element wand
@@ -501,6 +506,14 @@ public static class EnchantmentBehaviours
     /// share already carries the item and the wielder — and its price rides
     /// the same ladder: the DoT cost over the levels it lands, scaled to what
     /// it could pay. A hit that killed leaves no one to bleed, and costs nothing.
+    /// <para>
+    /// The wielder's part of that share is literal since §2.2:
+    /// <see cref="Progression.DamageBonus"/> enters the weapon's own damage at
+    /// step 1, so "the share carries the wielder" is the same claim the earlier
+    /// <c>BleedPercent × (base damage + proficiency level)</c> made, read off
+    /// the blow instead of off the wielder. settled.md carried both; the Phase 2
+    /// implementation pass records which one is the rule, and it is this one.
+    /// </para>
     /// </summary>
     public static DamagePayload Serrated(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
     {

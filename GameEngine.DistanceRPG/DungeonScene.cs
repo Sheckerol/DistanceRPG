@@ -336,23 +336,25 @@ public class DungeonScene : Scene
         }
     }
 
+    /// <summary>
+    /// The party the roster describes, in file order (§2.1, §5.9): one member per
+    /// row, each built by <see cref="PartyMemberState.From"/> so the spread, the
+    /// equipped weapon and the bag all come off the same content the validator
+    /// checked. The scene supplies only what is the scene's — where they stand
+    /// and what colour they are.
+    /// </summary>
     private void SpawnParty()
     {
+        var roster = GameContent.Current.Party.All;
         var tiles = GridUtils.FindPartySpawnTiles(
-            _map.Grid, _map.PlayerStart.Row, _map.PlayerStart.Col, PartyColors.Length);
+            _map.Grid, _map.PlayerStart.Row, _map.PlayerStart.Col, GameConstants.PartySize);
 
         for (int i = 0; i < tiles.Count; i++)
         {
-            var state = new PartyMemberState
-            {
-                Id = GameConstants.CharIds[i],
-                ColorIndex = i,
-                X = tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
-                Y = tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f,
-            };
-            var catalogue = GameContent.Current.Weapons;
-            state.Inventory[0] = catalogue.Instantiate(GameConstants.CharStartingWeaponIds[i]);
-            state.Inventory[1] = catalogue.Instantiate(GameConstants.StartingBagWeaponIds[i]); // a staff for everyone
+            var state = PartyMemberState.From(
+                roster[i], i,
+                tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
+                tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f);
 
             var character = new CharacterObject(state, PartyColors[i]);
             _party.Add(character);

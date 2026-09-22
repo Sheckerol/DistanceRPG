@@ -59,10 +59,19 @@ public abstract class ActorState
     /// <summary>
     /// The level this actor wields <paramref name="weapon"/> at: its proficiency
     /// in that weapon's class (§2.2). Declared here, and virtual, so a rule that
-    /// reads a wielder's level — the damage bonus, the movement discount, and
-    /// Phase 3's Serrated, which bleeds for a percentage of "base damage plus
-    /// proficiency level" — asks whoever is holding the thing rather than asking
-    /// what kind of actor it is.
+    /// reads a wielder's level — the damage bonus and the movement discount —
+    /// asks whoever is holding the thing rather than asking what kind of actor
+    /// it is.
+    /// <para>
+    /// <strong>Serrated does not read this.</strong> settled.md carried two
+    /// formulas for its magnitude — an earlier
+    /// <c>BleedPercent × (base damage + proficiency level)</c> and a later
+    /// "Serrated reads the weapon's share too" — and the later one is the rule
+    /// (recorded under the Phase 2 implementation pass). It loses nothing by it:
+    /// the weapon's share of what was dealt already carries this level, because
+    /// the damage bonus is part of the weapon's own damage before anything else
+    /// touches it.
+    /// </para>
     /// <para>
     /// The base is <see cref="Progression.StartingLevel"/>, whatever is held:
     /// proficiency is a party member's, and an actor with no pools wields

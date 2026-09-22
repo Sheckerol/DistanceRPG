@@ -64,24 +64,16 @@ public static class GameConstants
     /// checked against the roster at load and against the presentation's spawn
     /// capacity by test, so a longer roster aborts startup rather than spawning
     /// a prefix and silently dropping whoever came last.
+    /// <para>
+    /// The slot count is all that is left here. Who the members are — their ids,
+    /// their innate spreads, what they start holding and what is in the bag — is
+    /// the roster (<see cref="ContentDefaults.Party"/>, <c>party.json</c> in
+    /// Phase 5), read through <see cref="GameContent.Party"/> and turned into
+    /// members by <see cref="PartyMemberState.From"/>. It was stated twice, once
+    /// here as three hand-kept arrays and once as content, and only the copy
+    /// here was spawned: a roster edit changed nothing the player saw. One
+    /// source, and this constant is the one number both ends check.
+    /// </para>
     /// </summary>
     public const int PartySize = 4;
-
-    /// <summary>
-    /// Starting weapon id per party member A–D: dagger, sword, axe, staff
-    /// (§2.1 names the classes; <c>party.json</c> will decide the items, so
-    /// these are Phase 1's provisional picks).
-    /// </summary>
-    public static readonly IReadOnlyList<string> CharStartingWeaponIds =
-        ["weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal"];
-
-    /// <summary>
-    /// Slot-1 weapon id per party member: the engine-side Staff of Renewal
-    /// for A–C, a healer option for anyone, as today; D, the caster, carries
-    /// the Staff of Mire beside its own.
-    /// </summary>
-    public static readonly IReadOnlyList<string> StartingBagWeaponIds =
-        ["staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire"];
-
-    public static readonly IReadOnlyList<string> CharIds = new[] { "A", "B", "C", "D" };
 }

@@ -304,14 +304,32 @@ public class ProgressionStateTests
             .ToArray();
         Assert.Equal([], freshCallers);
 
-        // And the scanner does find both of the calls that are allowed, so
-        // neither assertion above can pass by finding nothing at all.
+        // PartyMemberState.From is the third door, and it opens on the same
+        // state: the game's own construction hands back a member at the starting
+        // pool. It is the scene's to call, and a progression test's; a combat
+        // fixture reaching for it would drop its members to a quarter of the pool
+        // as silently as building one by hand would.
+        var fromCallers = Calls(typeof(TestPools).Assembly)
+            .Where(c => c.Target is MethodInfo { Name: nameof(PartyMemberState.From) } m && m.DeclaringType == typeof(PartyMemberState))
+            .Where(c => !Allowed(Root(c.From.DeclaringType)))
+            .Select(Describe)
+            .Distinct()
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal([], fromCallers);
+
+        // And the scanner does find each of the calls that are allowed, so no
+        // assertion above can pass by finding nothing at all.
         Assert.Contains(
             Calls(typeof(TestPools).Assembly),
             c => c.Op == OpCodes.Newobj && c.Target.DeclaringType == typeof(PartyMemberState));
         Assert.Contains(
             Calls(typeof(TestPools).Assembly),
             c => c.Target is MethodInfo { Name: nameof(TestPools.Fresh) } m && m.DeclaringType == typeof(TestPools)
+                && Root(c.From.DeclaringType) == typeof(ProgressionStateTests));
+        Assert.Contains(
+            Calls(typeof(TestPools).Assembly),
+            c => c.Target is MethodInfo { Name: nameof(PartyMemberState.From) } m && m.DeclaringType == typeof(PartyMemberState)
                 && Root(c.From.DeclaringType) == typeof(ProgressionStateTests));
     }
 
@@ -324,6 +342,137 @@ public class ProgressionStateTests
         // not PartySize; this is the other end of the same rule.
         Assert.Equal(GameConstants.PartySize, DungeonScene.PartyColorCount);
         Assert.Equal(GameConstants.PartySize, GameContent.Current.Party.All.Count);
+    }
+
+    [Fact]
+    public void From_BuildsAMemberFromItsRosterEntry()
+    {
+        // The scene's construction, moved into Logic so it can be asserted. Every
+        // field of a spawned member comes off the roster row: the id a save will
+        // name them by, the spread, the weapon in hand and the bag behind it, in
+        // file order. The scene supplies only where they stand.
+        var roster = GameContent.Current.Party.All;
+        var party = roster.Select((def, i) => PartyMemberState.From(def, i, i * 32f, 64f)).ToArray();
+
+        Assert.Equal(new[] { "A", "B", "C", "D" }, party.Select(m => m.Id));
+        Assert.Equal(new[] { 0, 1, 2, 3 }, party.Select(m => m.ColorIndex));
+        Assert.Equal(roster.Select(d => d.Stats), party.Select(m => m.Stats));
+        Assert.Equal(new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
+            party.Select(m => m.EquippedWeapon!.Id));
+        Assert.Equal(new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
+            party.Select(m => m.Inventory[1]!.Id));
+        Assert.All(party, m => Assert.Null(m.Inventory[2]));
+        Assert.Equal((0f, 64f), (party[0].X, party[0].Y));
+        Assert.Equal((96f, 64f), (party[3].X, party[3].Y));
+
+        // Two members never share a weapon instance, or one member's wear and
+        // grafts would be another's.
+        Assert.Equal(4, party.Select(m => m.Inventory[1]!).Distinct().Count());
+
+        // And the point of the whole exercise: the spread reaches the member, so
+        // the §2.1 table divides a real threshold. A spawned member used to carry
+        // InnateStats.None -- 1/1/1/1, not even a permutation -- and every pool
+        // and every ladder divided by 1, so the four grew at identical rates and
+        // the table might as well not have existed.
+        var (c, d) = (party[2], party[3]);
+        Assert.Equal(new InnateStats(4, 2, 3, 1), c.Stats);
+        Assert.Equal(new InnateStats(2, 3, 1, 4), d.Stats);
+        Assert.All(party, m => Assert.True(m.Stats.IsPermutation, $"{m.Id}: {m.Stats}"));
+
+        // D is always the better caster, and no amount of swinging a staff makes
+        // C one: the fourfold threshold difference is on the spawned members.
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Staff, d.Stats));
+        Assert.Equal(1, Progression.GoverningStat(WeaponClass.Staff, c.Stats));
+
+        // The mirror, and the class table resolving to something other than 1
+        // for once: C's axe against D's, and B's sword taking the better of
+        // STR 3 and DEX 1 rather than either in particular.
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Axe, c.Stats));
+        Assert.Equal(2, Progression.GoverningStat(WeaponClass.Axe, d.Stats));
+        Assert.Equal(3, Progression.GoverningStat(WeaponClass.Sword, party[1].Stats));
+
+        // They open the game identical and diverge only through growth: the same
+        // 25 mana, the same 25 HP, and then the same credit buying D four points
+        // where it buys C one.
+        Assert.Equal((StartingPool, StartingPool), (c.MaxMana, d.MaxMana));
+        Assert.Equal((StartingPool, StartingPool), (c.MaxHp, d.MaxHp));
+        Assert.Equal(1, Credit(c, XpPool.Mana, StartingPool));
+        Assert.Equal(4, Credit(d, XpPool.Mana, StartingPool));
+
+        // The staff ladder's first rung costs D 25 and C 100 -- the fourfold
+        // difference, read off members the scene built rather than off the data.
+        // The same 25 buys D the rung and leaves C exactly where it was.
+        Assert.Equal(25, d.Proficiency(WeaponClass.Staff).XpToNext);
+        Assert.Equal(100, c.Proficiency(WeaponClass.Staff).XpToNext);
+        Assert.Equal(0, Credit(c, WeaponClass.Staff, 25));
+        Assert.Equal(1, Credit(d, WeaponClass.Staff, 25));
+        Assert.Equal(Progression.StartingLevel, c.WeaponLevel(c.Inventory[1]!));
+        Assert.Equal(Progression.StartingLevel + 1, d.WeaponLevel(d.EquippedWeapon!));
+    }
+
+    [Fact]
+    public void SpearDummiesStillBraceAgainstTheParty()
+    {
+        // §2.1's tutorial lesson, re-asserted over the party the roster actually
+        // builds: nobody carries a spear any more, so Brace is taught from the
+        // receiving end -- walking into a spear dummy's reach still costs a free
+        // poke, through the same one move path Phase 1 shipped.
+        var catalogue = GameContent.Current.Weapons;
+        Assert.DoesNotContain(
+            WeaponClass.Spear,
+            GameContent.Current.Party.All
+                .SelectMany(m => m.BagWeaponIds.Prepend(m.StartingWeaponId))
+                .Select(id => catalogue[id].Class));
+
+        const float tile = GameConstants.Tile;
+        var grid = new int[20, 30];
+        var a = PartyMemberState.From(GameContent.Current.Party["A"], 0, 5 * tile + 16f, 5 * tile + 16f);
+        var enemy = new EnemyState { X = a.X + 200f, Y = a.Y, Weapon = TestWeapons.Get("skirmishers_pike") };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+
+        int braces = 0;
+        turns.EnemyBraceTriggered += _ => braces++;
+        turns.NotifyEnemyVisible(enemy, true);
+
+        // Outside the spear's reach (162 surface > 128): stepping around is safe.
+        a.X += 10f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(0, braces);
+        Assert.Equal(StartingPool, a.Hp);
+
+        // Into reach: the free poke, 7 plus Longshot x1's +1 at the fourth tile,
+        // and A's dagger blocks nothing. A roster member opens at the starting
+        // pool, so this is what the lesson costs a fresh party.
+        a.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(a);
+        Assert.Equal(1, braces);
+        Assert.Equal(StartingPool - 8, a.Hp);
+    }
+
+    [Fact]
+    public void From_RejectsARosterEntryThatNamesAMissingWeapon()
+    {
+        // From trusts its def, and the loader is what makes that safe: a typo in
+        // party.json is a ContentException naming the member and the rule, raised
+        // before anything spawns -- never a KeyNotFoundException halfway through
+        // building the party, with two members on the floor and two not.
+        var typo = new PartyData(ContentDefaults.Party.Members
+            .Select(m => m.Id == "C" ? m with { StartingWeaponId = "great_axe_of_typos" } : m)
+            .ToList());
+
+        var refused = Assert.Throws<ContentException>(() => TestContent.Use(party: typo));
+        Assert.Equal("C", refused.EntryId);
+        Assert.Equal(ContentValidator.RulePartyWeaponExists, refused.Rule);
+
+        // The refusal left the running roster alone, so the four members that do
+        // spawn are still the four the validator passed.
+        Assert.Equal(GameConstants.PartySize, GameContent.Current.Party.All.Count);
+        Assert.All(GameContent.Current.Party.All, def => PartyMemberState.From(def, 0, 0f, 0f));
+
+        // And the other end of the same rule: handed a def the loader never saw,
+        // From does throw, which is why the loader has to be the one to look.
+        Assert.Throws<KeyNotFoundException>(
+            () => PartyMemberState.From(typo.Members[2], 2, 0f, 0f));
     }
 
     // ---- reading IL: the two guards above are claims about code, not about state ----

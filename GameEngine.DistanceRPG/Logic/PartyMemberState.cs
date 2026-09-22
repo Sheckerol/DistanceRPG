@@ -18,6 +18,47 @@ public sealed class PartyMemberState : ActorState
     public required int ColorIndex { get; init; }
 
     /// <summary>
+    /// The member a roster entry describes (§2.1, §5.9), and the one place a
+    /// <see cref="PartyMemberDef"/> becomes one — so the scene that spawns the
+    /// party holds no construction rule of its own and an edit to the roster is
+    /// an edit to what the player picks up.
+    /// <para>
+    /// The spread comes off the def, which is the whole point: a member built
+    /// any other way carries <see cref="InnateStats.None"/> and divides every
+    /// threshold by 1, so the §2.1 table would exist and do nothing. The
+    /// starting weapon is slot 0 and the bag follows it in file order, each
+    /// instantiated fresh — two members carrying the same id carry two weapons.
+    /// </para>
+    /// <para>
+    /// The def is trusted here because <see cref="ContentValidator.ValidateParty"/>
+    /// has already refused an unknown weapon id, a bag deeper than
+    /// <see cref="InventorySlots"/> and a spread that is not a permutation: a
+    /// broken roster is a startup failure, never half a party.
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">A weapon id that never went through the validator.</exception>
+    public static PartyMemberState From(PartyMemberDef def, int colorIndex, float x, float y)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+
+        var member = new PartyMemberState
+        {
+            Id = def.Id,
+            ColorIndex = colorIndex,
+            Stats = def.Stats,
+            X = x,
+            Y = y,
+        };
+
+        var catalogue = GameContent.Current.Weapons;
+        member.Inventory[0] = catalogue.Instantiate(def.StartingWeaponId);
+        for (int i = 0; i < def.BagWeaponIds.Count; i++)
+            member.Inventory[i + 1] = catalogue.Instantiate(def.BagWeaponIds[i]);
+
+        return member;
+    }
+
+    /// <summary>
     /// The permanent spread (§2.1): a permutation of 1-4, fixed at creation from
     /// the roster entry and never raised — no mechanic in any phase writes it,
     /// which is why it is <c>init</c>-only rather than merely left alone. A

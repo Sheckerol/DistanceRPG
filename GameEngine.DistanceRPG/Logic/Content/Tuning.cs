@@ -179,6 +179,18 @@ public sealed record Tuning
     /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
     /// diverge rather than starting apart. Below 1 there is no step to take, and
     /// <see cref="ContentValidator.ValidateTuning"/> refuses it at load.
+    /// <para>
+    /// <strong>A caster's pool opens here too, on 25 and not on 160.</strong>
+    /// settled.md had both figures live; the 160 in §1.3's derivations is the
+    /// <em>movement</em> budget — <c>(160 - 40) / (8 + 3)</c> divides a staff's
+    /// 40-unit movement cost out of <see cref="GameConstants.MaxDistance"/>,
+    /// which is what <see cref="MovementUnitsPerMana"/> above is derived from —
+    /// so there is no second starting-mana key and this one number is every
+    /// pool's bar. Recorded under settled.md's Phase 2 implementation pass, with
+    /// the consequence it accepts: a fresh caster gets one cast from a full
+    /// pool. The pool an actor with no progression carries is
+    /// <see cref="GameConstants.MaxMana"/>, and is a different number.
+    /// </para>
     /// </summary>
     public int StartingPool { get; init; } = 25;
 
