@@ -100,6 +100,24 @@ public class HudTextTests
     }
 
     [Fact]
+    public void ManaReadout_NamesTheSpendableCeilingWhereTheLocksTookThePool()
+    {
+        // The budget line is where a lock would otherwise be invisible: with the
+        // Nameless Knife in hand the bar tops out at 20 forever, and a reader
+        // told only "/ 100" has no way to see why. So where anything is reserved
+        // the spendable ceiling is the figure and the earned pool follows it;
+        // where nothing is, the line is the one it has always been.
+        var plain = TestPools.Char("A");
+        Assert.Equal((0, 100, 100), (plain.PaidLocks, plain.UsableMaxMana, plain.Mana));
+        Assert.Equal("MANA: 100 / 100", DungeonHud.ManaReadout(plain));
+
+        var locked = TestPools.Char("B");
+        locked.Inventory[0] = TestWeapons.Get("flensing_knife_unique");
+        Assert.Equal((80, 20, 20), (locked.PaidLocks, locked.UsableMaxMana, locked.Mana));
+        Assert.Equal("MANA: 20 / 20 (100)", DungeonHud.ManaReadout(locked));
+    }
+
+    [Fact]
     public void StatusBadges_NameALingeringElementByItsElement_HideThePool_AndLeadWithParalysis()
     {
         var enemy = new EnemyState();

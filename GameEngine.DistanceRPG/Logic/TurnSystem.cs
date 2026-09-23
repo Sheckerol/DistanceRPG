@@ -346,6 +346,11 @@ public sealed class TurnSystem
     /// wielder taking up a locked weapon cannot go on holding mana the new
     /// reservation has taken. Putting one down returns the ceiling in full and
     /// refunds nothing, which is what the clamp not being a refill says.
+    /// <see cref="ActorState.Mana"/> already reads through that ceiling, so
+    /// this changes no spend; what it changes is that the clamp is
+    /// <em>stored</em> — the mana a swap put out of reach does not read again
+    /// when the weapon is put down, which is what makes an equip the one place
+    /// a reservation is taken rather than only held.
     /// </para>
     /// </summary>
     public void NotifyWeaponChanged(ActorState actor)

@@ -91,6 +91,18 @@ public class EnchantmentLockTests
 
     private static int Distance(ActorState a, ActorState b) => CombatRules.SurfaceDistanceUnits(a, b);
 
+    /// <summary>
+    /// The enchantment loop's rows of <paramref name="self"/>'s DamageTaken
+    /// chain. The loop owns its step, so these are exactly the entries the chain
+    /// says it will run for that actor -- which is what a dormant entry must not
+    /// be listed among.
+    /// </summary>
+    private static string[] Loop(TurnSystem turns, ActorState self)
+        => turns.Events.HandlersFor(GameEvent.DamageTaken, self)
+            .Where(h => h.Priority.Step == EnchantmentBehaviours.DamageTakenLoopPriority.Step)
+            .Select(h => h.ToString())
+            .ToArray();
+
     [Fact]
     public void AnEquippedEntryReservesItsLock()
     {
@@ -174,6 +186,12 @@ public class EnchantmentLockTests
         Assert.Equal((50, 25), (asleep.Hp, asleep.Mana));   // no drink, and the 25 it had is untouched
         Assert.Empty(spent);
 
+        // Nor is it a row in the chain: HandlersFor lists an expanding handler as
+        // what it will run for that actor, so printing a dormant entry there
+        // would over-report the one inspectable view of the firing order. What is
+        // left keeps its attachment index, because dormancy is always a tail.
+        Assert.Equal(new[] { "DamageTaken (4,0) mire@0" }, Loop(turns, asleep));
+
         // The identical weapon on a pool that covers both entries: the same entry
         // fires, so what was missing was the lock and nothing else.
         var awake = TestPools.Holding("B", Souled("Warded Leech", ("mire", 3), ("vampiric", 2)), x: asleep.X, y: asleep.Y);
@@ -186,6 +204,7 @@ public class EnchantmentLockTests
         Assert.True(paid.TryAttack(awake, other));
         Assert.Equal((52, TestPools.FixtureMana - 2), (awake.Hp, awake.Mana));   // 1 per tier, for the flat 2
         Assert.Equal(((ActorState)awake, 2, 2, "test_warded_leech"), Assert.Single(paidSpends));
+        Assert.Equal(new[] { "DamageTaken (4,0) mire@0", "DamageTaken (4,1) vampiric@1" }, Loop(paid, awake));
     }
 
     [Fact]
@@ -300,8 +319,27 @@ public class EnchantmentLockTests
         Assert.Equal(2, member.EquippedWeapon!.Enchantments[1].Tier);
         Assert.Equal(0, member.EquippedWeapon.Enchantments[1].Xp);
 
-        // Awake, it fires -- once there is anything to fire with.
-        member.Mana = 2;
+        // And the wake took the pool with it. The spendable ceiling is not
+        // monotonic in the earned one -- the point that finally covers a sleeping
+        // lock pays the whole of it at once -- so the 25 this member was holding
+        // is behind the reservation now and it has nothing to fire the entry it
+        // just woke. Read rather than written: what the wake left, not what a
+        // test set up. Awake and broke is the same non-event as asleep.
+        Assert.Equal(0, member.Mana);
+        Assert.True(turns.TryAttack(member, dummy));
+        Assert.Equal((50, 0), (member.Hp, spent.Count));
+
+        // It fires once there is anything to fire with, and getting there takes
+        // no assignment: two more points open two of spendable ceiling, and a
+        // gained mana point arrives empty (section 2.2), so the mana itself comes
+        // back the one way mana ever does -- out of movement left unspent.
+        member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+        member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+        Assert.Equal((117, 115, 2, 0), (member.MaxMana, member.PaidLocks, member.UsableMaxMana, member.Mana));
+
+        Assert.Equal(2, member.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        Assert.Equal(2, member.Mana);
+
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal((52, 0), (member.Hp, member.Mana));
         Assert.Equal(((ActorState)member, 2, 2, "test_warded_leech"), Assert.Single(spent));
@@ -347,6 +385,16 @@ public class EnchantmentLockTests
         // doc's own worked case: a tier-6 Arcane on a 200-pool wizard has 20 mana
         // left to fire with, which is two more triggers and then nothing -- the
         // enchantment has very nearly eaten the character that grew it.
+        //
+        // Read literally that is two and then nothing; what the shipped rule
+        // gives is two, a fraction, and then nothing, because a levelled entry
+        // partial-fires on what is left rather than refusing (section 3.1's
+        // PartialFire, not this sub-step's). The budget is spent to its last
+        // point either way, which is the claim. The entry below is a stand-in on
+        // the closest shipped kind, so when S7 lands the catalogue's Arcane
+        // (EffectKind.BonusDamage) this test re-points at it, confirms the third
+        // fire still partials, and the phase doc's open questions record that
+        // "and then nothing" means "and then a fraction, and then nothing".
         var grid = new int[20, 20];
         var (x, y) = At(5, 5);
         var wizard = TestPools.Char("A", x: x, y: y);

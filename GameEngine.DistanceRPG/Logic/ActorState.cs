@@ -145,10 +145,28 @@ public abstract class ActorState
     /// it could not spend, so the very first cast of a freshly spawned caster
     /// pays out of the same remainder every later one does.
     /// </para>
+    /// <para>
+    /// <strong>And the ceiling holds on read, not at one seam.</strong>
+    /// <see cref="UsableMaxMana"/> is not monotonic in <see cref="MaxMana"/>:
+    /// the point that finally covers a sleeping entry's lock wakes it and takes
+    /// the whole lock at once, so a pool that fitted a moment ago can be over
+    /// the ceiling with nothing written to it — an earned mana point, a tier
+    /// credited to an equipped entry, any later path that deepens a lock. The
+    /// clamp therefore lives here rather than at each of those seams, which is
+    /// what makes "nobody ever holds mana the locks reserved" an invariant
+    /// instead of a list of call sites. What the clamp hides the next write
+    /// settles — every writer here reads the pool and writes back what it read
+    /// (<see cref="PartyMemberState.Credit"/>, the ManaSpent applier,
+    /// <see cref="RegenManaFromUnusedMovement"/>), and
+    /// <see cref="TurnSystem.NotifyWeaponChanged"/> stores it outright on a swap
+    /// so putting a weapon down is never a refill (§3.3). Mana taken back by a
+    /// reservation comes back the one way mana ever does, out of movement left
+    /// unspent.
+    /// </para>
     /// </summary>
     public int Mana
     {
-        get => _mana ?? UsableMaxMana;
+        get => _mana is { } held ? Math.Min(held, UsableMaxMana) : UsableMaxMana;
         set => _mana = value;
     }
 
@@ -207,11 +225,29 @@ public abstract class ActorState
         if (weapon == null || (uint)index >= (uint)weapon.Enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(index), index,
                 $"The equipped weapon carries {weapon?.Enchantments.Count ?? 0} enchantments.");
-        return index >= Locks().Awake;
+        return index >= AwakeCount;
     }
 
     /// <summary>
-    /// The one walk both members read: pay each equipped entry's
+    /// How many of the equipped weapon's entries are awake, counted from the
+    /// front: <see cref="IsDormant"/> for the whole list in one walk. The awake
+    /// entries are always a prefix — locks are paid in attachment order and the
+    /// remainder after the first that does not fit sleeps — so a count says
+    /// everything a set would, and an awake entry's position here is its
+    /// attachment index still.
+    /// <para>
+    /// This is what a loop over the entries reads. <see cref="IsDormant"/>
+    /// redoes the walk on every call, so asking it once per index is quadratic
+    /// in the attached count, and the five enchantment loops run on every hit,
+    /// cast, kill and overheal; they take this at the loop head and compare
+    /// against it instead. <see cref="IsDormant"/> stays the single-index
+    /// convenience the HUD and the compiled defender handlers ask.
+    /// </para>
+    /// </summary>
+    public int AwakeCount => Locks().Awake;
+
+    /// <summary>
+    /// The one walk the two members above read: pay each equipped entry's
     /// <see cref="Enchantment.EffectiveLock"/> in attachment order while the
     /// earned pool covers it, and stop at the first that does not fit. Returns
     /// what was reserved and how many entries, from the front, are awake.

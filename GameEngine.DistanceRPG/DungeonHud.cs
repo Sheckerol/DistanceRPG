@@ -142,7 +142,7 @@ public sealed class DungeonHud
         var budget = new List<Run> { new($"[{active.Id}] MOVE: {MathF.Ceiling(active.DistLeft)} / {active.EffectiveMax:0}", White) };
         if (IsParalysed(active))
             budget.Add(new Run("PARALYSED", Red));
-        budget.Add(new Run($"  MANA: {active.Mana} / {active.MaxMana}", White));
+        budget.Add(new Run($"  {ManaReadout(active)}", White));
         DrawRunsCenteredAt(w / 2f, 14f, 2f, budget);
 
         var weapon = active.EquippedWeapon;
@@ -150,6 +150,24 @@ public sealed class DungeonHud
             DrawCentered(w, 42f, $"[{active.Id}] (NO WEAPON)", 1.5f, Yellow);
         else
             DrawRunsCenteredAt(w / 2f, 42f, 1.5f, WeaponRuns($"[{active.Id}] ", weapon, active, turns.AttacksThisTurn(active), Yellow));
+    }
+
+    /// <summary>
+    /// The budget line's mana: what is in the pool, over the ceiling a spend can
+    /// actually reach. Where nothing is reserved that ceiling is the earned pool
+    /// and the line reads as it always has. Where an equipped entry reserves
+    /// part of it (§3.3) the spendable ceiling is the figure and the earned pool
+    /// follows it — <c>MANA: 20 / 20 (100)</c> — because a bar that tops out at
+    /// 20 beside a printed 100 is the one place the locks are invisible to the
+    /// player; which entry took it is the <c>LOCK</c> the weapon line already
+    /// prints (<see cref="EnchantmentReadout"/>).
+    /// </summary>
+    internal static string ManaReadout(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        return actor.PaidLocks > 0
+            ? $"MANA: {actor.Mana} / {actor.UsableMaxMana} ({actor.MaxMana})"
+            : $"MANA: {actor.Mana} / {actor.MaxMana}";
     }
 
     // Party selector layout, shared between drawing and click hit-testing.

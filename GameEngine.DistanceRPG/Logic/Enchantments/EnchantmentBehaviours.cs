@@ -30,12 +30,15 @@ namespace GameEngine.DistanceRPG.Logic;
 /// compiled handler beside it on the step.
 /// <para>
 /// <strong>A dormant entry is skipped everywhere</strong> (§3.1): every loop
-/// asks <see cref="ActorState.IsDormant"/> before it looks a kind up, and the
-/// two compiled defender handlers ask it of the index
-/// <see cref="DefenderSoul"/> found. An entry whose lock went unpaid does not
-/// fire and pays nothing — the same non-event as a trigger the wielder cannot
-/// afford — so the skip sits ahead of the table lookup rather than inside any
-/// behaviour, and a kind added to a table inherits it.
+/// takes <see cref="ActorState.AwakeCount"/> at its head and skips the indices
+/// past it (<see cref="ActorState.IsDormant"/> for the whole list in one walk,
+/// since these loops run on every hit, cast, kill and overheal), the two
+/// compiled defender handlers ask <see cref="ActorState.IsDormant"/> of the
+/// index <see cref="DefenderSoul"/> found, and <see cref="Attached"/> leaves a
+/// dormant entry out of the printed chain. An entry whose lock went unpaid does
+/// not fire and pays nothing — the same non-event as a trigger the wielder
+/// cannot afford — so the skip sits ahead of the table lookup rather than
+/// inside any behaviour, and a kind added to a table inherits it.
 /// </para>
 /// </summary>
 public static class EnchantmentBehaviours
@@ -210,11 +213,26 @@ public static class EnchantmentBehaviours
         table.On<DamagePayload>(GameEvent.DamageTaken, ImmovablePriority, "Immovable", Immovable);
     }
 
-    /// <summary>The names the loop expands to for <paramref name="self"/>: its weapon's enchantments, in attachment order.</summary>
+    /// <summary>
+    /// The names the loop expands to for <paramref name="self"/>: the entries on
+    /// its weapon that it will actually run, in attachment order.
+    /// <para>
+    /// <strong>A dormant entry is not a row.</strong>
+    /// <see cref="EventTable.HandlersFor"/> lists an expanding handler as what
+    /// it will run for that actor, and the loops skip an entry whose lock went
+    /// unpaid (§3.1), so printing one would make the chain — the one
+    /// inspectable view of the firing order there is — over-report. Dormancy is
+    /// a tail, so what is left is a prefix and every row keeps its attachment
+    /// index: the index-is-priority contract still reads off the print. A
+    /// wielder whose whole list is asleep expands to nothing and prints as the
+    /// bare loop, the same row a wielder with nothing attached prints.
+    /// </para>
+    /// </summary>
     public static IEnumerable<string> Attached(ActorState self)
     {
         ArgumentNullException.ThrowIfNull(self);
-        return self.EquippedWeapon?.Enchantments.Select(e => e.Id) ?? [];
+        var entries = self.EquippedWeapon?.Enchantments;
+        return entries == null ? [] : entries.Take(self.AwakeCount).Select(e => e.Id);
     }
 
     // ── The loops ────────────────────────────────────────────────────────────
@@ -241,9 +259,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
-            if (self.IsDormant(i)) continue;
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
@@ -278,9 +297,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
-            if (self.IsDormant(i)) continue;
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
@@ -303,9 +323,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
-            if (self.IsDormant(i)) continue;
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnDamageDealt.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
@@ -319,9 +340,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
-            if (self.IsDormant(i)) continue;
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnKilled.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
@@ -335,9 +357,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
-            if (self.IsDormant(i)) continue;
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnHealingAboveFull.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
