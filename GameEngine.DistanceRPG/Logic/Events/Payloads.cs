@@ -140,6 +140,11 @@ public sealed record DamagePayload(
     /// <see cref="Payments"/> is cleared <em>with</em> <see cref="ManaToSpend"/>,
     /// since it is that total attributed: carrying the hit's attributions on
     /// would credit every step-4 entry a second time for mana it paid once.
+    /// <see cref="RiderDepth"/> goes with them for the same reason: a depth
+    /// settled at step 4 was consumed at (7,0) of this same chain, and a depth
+    /// already landed is not a depth the next event may read — an entry firing
+    /// on damage dealt that deepened something would otherwise be counting a
+    /// crit's depth twice.
     /// </summary>
     public DamagePayload AsDealt() => this with
     {
@@ -150,6 +155,7 @@ public sealed record DamagePayload(
         HealToAttacker = 0,
         Pierces = false,
         Payments = ImmutableArray<EnchantmentPayment>.Empty,
+        RiderDepth = 0,
     };
 }
 

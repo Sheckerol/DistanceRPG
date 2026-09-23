@@ -580,12 +580,27 @@ public static class EnchantmentBehaviours
     /// the loops use, so the applier credits the entry that paid (§3.3).
     /// </para>
     /// <para>
-    /// Every hit pays, which includes the bodies a cleave fans out to: §3.3
+    /// <strong>A cleave pays per body; a pierce is charged once.</strong> §3.3
     /// prices an element per <em>hit</em>, and the "once per cast, not once per
     /// target caught" rule is the cast's, settled for a shape that is one action
-    /// aimed at a point. A cleave is one swing landing several times, so a poor
+    /// aimed at a point. A cleave is one swing landing several times, so every
+    /// body it fans out to is its own hit and pays its own trigger: a poor
     /// wielder types the first body and swings plain through the rest — the same
-    /// running-out the whole list is built around.
+    /// running-out the whole list is built around. A shot carried on (Piercing)
+    /// is the other shape: the DamageDealt applier seeds the continuation with
+    /// the type the first hit settled, so the gate above stands aside and the
+    /// line stays typed for the one payment. One swing landing several times
+    /// pays several times; one hit continuing through a line pays once.
+    /// </para>
+    /// <para>
+    /// <strong>There is no <see cref="DamagePayload.OnAlly"/> gate, because no
+    /// swing can reach one.</strong> A cleave fans out over the far side's
+    /// roster alone, and the only hits marked <c>OnAlly</c> are an area cast's —
+    /// which this step already stands aside for twice over, the weapon being a
+    /// caster's and <see cref="DamagePayload.CastFired"/> non-empty. A gate here
+    /// would be a branch nothing can take. Whoever gives a martial weapon a way
+    /// to hit its own side decides then whether typing an ally's hit is worth a
+    /// trigger, with the friendly-fire scaling at (1,2) in front of them.
     /// </para>
     /// </summary>
     public static DamagePayload MartialElement(DamagePayload payload, ActorState self, ActorState other)

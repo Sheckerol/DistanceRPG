@@ -371,9 +371,11 @@ public static class ContentValidator
     /// from somewhere the row does not carry — an element's typing, a rule that
     /// fires once, a percentage of the blow — so none of them is asked. It is
     /// the row that is checked, not what a §5.3 dial may lay over it
-    /// (<see cref="Tuning.ArcanePotency"/> does for the bonus-damage kind): a
+    /// (<see cref="Tuning.ArcanePotency"/> does for the one id it names): a
     /// file has to state the magnitude it ships with, or content and tuning
-    /// disagree silently about what an entry is worth.
+    /// disagree silently about what an entry is worth. The dial being keyed by
+    /// id is what keeps this rule meaning something: every row it checks that no
+    /// dial names is a row the game reads the magnitude from.
     /// </para>
     /// </summary>
     public static void ValidateEnchantments(EnchantmentsData data)

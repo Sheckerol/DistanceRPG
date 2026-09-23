@@ -82,8 +82,9 @@ public static class ContentDefaults
         // The rest of the §3.3 starting set. Lock and trigger are the table's; the
         // potency column it has no row for is read back out of the same section:
         // Arcane's is Tuning.ArcanePotency (provisional, and laid over this row by
-        // the catalogue, so a playtest turns it in tuning.json without a content
-        // edit), and Shattering's 1 is "crit riders land one level deeper" at tier 1.
+        // the catalogue — keyed by this id, so a playtest turns it in tuning.json
+        // without a content edit and a second bonus-damage entry keeps its own),
+        // and Shattering's 1 is "crit riders land one level deeper" at tier 1.
         Catalogue("arcane", "Arcane", EffectKind.BonusDamage, TargetSide.Enemy, @lock: 30, trigger: 8, potency: 4),
         Catalogue("shattering", "Shattering", EffectKind.Shattering, TargetSide.Enemy, @lock: 25, trigger: 10, potency: 1),
         // The shielding entry settled.md asks for and never names: it absorbs one

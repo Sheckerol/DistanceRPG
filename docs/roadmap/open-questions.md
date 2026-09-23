@@ -87,3 +87,54 @@ martial weapon's one guaranteed enchantment can never be it. Whoever raises
 `AttackDeclared` — the movement rules around a swing are Phase 4's most likely
 owner — should settle both entries then, and should settle what a class feature
 "triggering once more" means in §1.1's terms rather than in the enchantment's.
+
+That filter is `DropOrder`'s own, and it is the only one of its kind in the
+tree: **`EnchantmentCatalogue.Rollable` is not a grantable pool.** Rollable is
+everything outside `neverRolled`, in file order, so both `echoing` and `aegis`
+sit in it — and `neverRolled` cannot absorb them, since
+`ContentValidator.ValidateNeverRolled` cross-checks that set against the
+`unique` flag and neither entry is a unique soul. §6.4's enchanter, specified as
+offering `CampaignState.SeenInOrder` filtered against `NeverRolled`, would
+therefore offer `Echoing` — declared inert, reserving a lock of 20, able to fire
+nothing — and would be the only thing in the game that could. **It must apply
+the same live-behaviour test `LootTable.DropOrder` applies** rather than
+`NeverRolled` alone. The other half of that filter is why **`aegis` has no
+source at all today**: it is kept out of every drop because its behaviour is a
+compiled step on the defender rather than a row in any loop, so until the
+enchanter exists nothing can put a shield on a weapon that did not ship with
+one. Both are filter gaps rather than content gaps, and both are resolved by
+whoever writes §6.4's offer.
+
+## What decides a `Serrated`/`Arcane` pair (§3.3)
+
+§3.3's worked example on attachment order reads: "A dagger that leads with
+`Serrated` and trails with `Arcane` bleeds reliably and adds damage when it can
+afford to; reverse them and it is a damage weapon that sometimes bleeds."
+**The shipped architecture cannot do that, and the passage is wrong about why.**
+
+The two entries fire on different events of the same swing: Arcane at step 4 of
+`DamageTaken`, Serrated on `DamageDealt` — and `TurnSystem.ApplyDamage` spends
+the hit's `ManaToSpend` as one mana record *before* it enqueues `DamageDealt`.
+So Arcane is served first in **both** orders, and what Serrated sees is whatever
+Arcane left of the pool either way: **event order decides that pair, and
+attachment order decides nothing about it.** Both orders read identically, and
+`CatalogueEntryTests.SerratedAndArcaneReadTheSameEitherWay_BecauseTheyFireOnDifferentEvents`
+pins that they do.
+
+The claim the passage is making is real; it is a claim about entries firing on
+the *same* event, which is the only place the loop reads attachment order at
+all. `CatalogueEntryTests.AttachmentOrderDecidesWhatFiresWhenThePoolIsShort` is
+that claim, pinned with an Arcane/Shattering pair on a pool that covers one of
+them. Whoever next edits §3.3 should change the example's pair rather than the
+paragraph around it.
+
+**The open question underneath it**: should an entry that fires on `DamageDealt`
+see the pool as it stood *before* the hit's step-4 payments? Deferring
+`ApplyDamage`'s spend until `DamageDealt` has settled would put both events on
+one budget spent in attachment order, and would make the passage true as
+written. It is a real choice with real costs — everything queued between the two
+events would read a pool that has not yet paid for what it is about to pay for,
+and `Spent`/`Wanted` scaling (§3.3's enchantment XP) would have to be taken
+across two events rather than one — so it wants deciding rather than
+discovering. Nothing is wrong in play today: the entries fire, they pay, and
+they are credited what they paid; only the doc's example is unbuildable.

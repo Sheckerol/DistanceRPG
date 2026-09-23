@@ -151,10 +151,22 @@ public sealed record Tuning
     public int DropEnchantChancePercent { get; init; } = 10;
 
     /// <summary>
+    /// The one entry <see cref="ArcanePotency"/> is the dial for. The overlay is
+    /// keyed by this <em>id</em> and never by <see cref="EffectKind.BonusDamage"/>,
+    /// which is the rule <see cref="ApplyPercent"/> already follows: a dial names
+    /// an entry, while which entries carry a kind is content's to say. A second
+    /// bonus-damage row — a greater Arcane, a soul that adds untyped damage —
+    /// therefore keeps the magnitude its content row authored, exactly as an
+    /// element this file's percentage table does not name keeps its own.
+    /// </summary>
+    public const string ArcaneId = "arcane";
+
+    /// <summary>
     /// Arcane's base potency: the untyped damage it adds to a hit, before its
     /// tier multiplies it through <see cref="Enchantment.LevelsFor"/> (§3.3). At
     /// <c>ApplyPercent</c> 100 a tier-1 Arcane adds 4 for a trigger of 8 and a
-    /// tier-6 adds 24 for a lock of 180.
+    /// tier-6 adds 24 for a lock of 180. It lays over the row of
+    /// <see cref="ArcaneId"/> and no other.
     /// <para>
     /// <strong>Provisional.</strong> §3.3's starting-set table prices Arcane's
     /// lock and trigger and gives no potency column at all, so this is the second

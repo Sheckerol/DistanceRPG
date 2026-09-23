@@ -345,17 +345,21 @@ public class EnchantmentXpTests
         // pinned at tier 1 by design (below), and an entry outside the loops has
         // no payment to ride.
         //
-        // Every swing here is a natural 20, because an entry in the step-4 table
-        // may carry a condition and the only one any of them carries is the crit
-        // (§3.3's Shattering, which deepens the riders a crit lands). A crit is
-        // the swing that satisfies every case rather than only some, and the cast
-        // cases are untouched by it: Fire raises its own payload for those.
+        // The roll is the case's and not a blanket one. An entry in the step-4
+        // table may carry a condition, and the only condition any of them carries
+        // is the crit (§3.3's Shattering, which deepens the riders a crit lands),
+        // so that one case swings a natural 20 and every other case swings an
+        // ordinary hit. A blanket crit would pass just as green while narrowing
+        // the theory invisibly: a crit skips Block, and the ordinary-hit climb --
+        // Vampiric's and Arcane's, which nothing else covers -- would stop being
+        // tested here with no assertion moving to say so.
         var grid = new int[20, 20];
         var def = GameContent.Current.Enchantments[id];
+        int roll = def.Effect == EffectKind.Shattering ? 20 : 10;
         var weapon = Carrying("Proving " + id, new Enchantment(def, Tier: 1));
         var member = Wielding("A", weapon);
         var dummy = Enemy(5, 6);
-        var turns = new TurnSystem(grid, new[] { member }, new[] { dummy }, () => 20);
+        var turns = new TurnSystem(grid, new[] { member }, new[] { dummy }, () => roll);
         var spent = ManaProbe(turns);
         member.Hp = 1;                                    // a drink has somewhere to land
 

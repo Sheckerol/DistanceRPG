@@ -23,14 +23,21 @@ public class CatalogueEntryTests
 
     /// <summary>An ad-hoc dagger-class weapon with a forged spread and catalogue entries at the given tiers, all of them forged.</summary>
     private static Weapon Carrying(string name, (ModifierType Type, int Stacks)[] forged, params (string Id, int Tier)[] entries)
+        => Built(name, WeaponClass.Dagger, range: 40, forged, entries);
+
+    /// <summary>The same with a reach: a shot that carries on needs a second body still inside the weapon's range.</summary>
+    private static Weapon Reaching(string name, int range, params (string Id, int Tier)[] entries)
+        => Built(name, WeaponClass.Ranged, range, [], entries);
+
+    private static Weapon Built(string name, WeaponClass cls, int range, (ModifierType Type, int Stacks)[] forged, (string Id, int Tier)[] entries)
     {
         var catalogue = GameContent.Current.Enchantments;
         var spread = new Dictionary<ModifierType, int>();
         foreach (var (type, stacks) in forged)
             spread[type] = spread.GetValueOrDefault(type) + stacks;
         var def = new WeaponDef(
-            Id: "test_" + name.ToLowerInvariant().Replace(' ', '_'), Name: name, Class: WeaponClass.Dagger, Role: null,
-            Range: 40, Damage: 15, Cost: 30, ManaCost: 0,
+            Id: "test_" + name.ToLowerInvariant().Replace(' ', '_'), Name: name, Class: cls, Role: null,
+            Range: range, Damage: 15, Cost: 30, ManaCost: 0,
             Forged: spread, Enchantments: entries.Select(e => new EnchantmentRef(e.Id, e.Tier)).ToList(),
             Shape: null, Unique: false, DerivedFrom: null);
         return new Weapon(def, entries.Select(e => new Enchantment(catalogue[e.Id], e.Tier)).ToList());
@@ -169,12 +176,21 @@ public class CatalogueEntryTests
         var turns = new TurnSystem(grid, new[] { a }, new[] { dummy }, () => 20);
         var hits = HitProbe(turns);
         var spent = ManaProbe(turns);
+        var dealt = new List<DamagePayload>();
+        turns.Events.On<DamagePayload>(GameEvent.DamageDealt, new HandlerPriority(9, 9), "probe",
+            (p, _, _) => { dealt.Add(p); return p; });
 
         Assert.True(turns.TryAttack(a, dummy));
         Assert.True(hits[^1].IsCrit);
         Assert.Equal(1, hits[^1].RiderDepth);
         Assert.Equal(2, dummy.StatusLevel(StatusEffectType.Weakened));
         Assert.Equal(((ActorState)a, 10, 10), Assert.Single(spent));
+
+        // And the depth is consumed where it was settled: (7,0) of this chain
+        // landed it, so it is cleared with the hit's other writes on the way to
+        // DamageDealt and an entry firing there cannot read the same crit's
+        // depth a second time.
+        Assert.Equal(0, Assert.Single(dealt).RiderDepth);
 
         // The same crit without it: one level, the stack's own.
         var plain = Carrying("Plain Kris", [(CritWeaken, 1)]);
@@ -370,6 +386,77 @@ public class CatalogueEntryTests
         var record = Assert.Single(spent);
         int trigger = wand.Innate!.ResolvedTriggerCost(wand, 1);
         Assert.Equal(wand.ResolvedManaCost + trigger, record.Wanted);   // one cast, one trigger, however many bodies
+    }
+
+    [Fact]
+    public void ACleavePaysForEveryBodyItTypes()
+    {
+        // §3.3 prices an element per hit, and a cleave is one swing landing
+        // several times: each body it fans out to is its own hit, so each one
+        // pays the trigger again. The "once per shape, not once per body" rule
+        // belongs to the cast, which is one action aimed at a point.
+        var grid = new int[20, 20];
+        var cleaver = Carrying("Flaming Cleaver", [(Cleave, 1)], ("flaming", 1));
+        var a = Holding("A", 5, 5, cleaver);
+        var aimed = Enemy(5, 6, attunement: DamageType.Cold);
+        var caught = Enemy(5, 7, attunement: DamageType.Cold);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { aimed, caught }, () => 10);
+        var hits = HitProbe(turns);
+        var spent = ManaProbe(turns);
+
+        Assert.True(turns.TryAttack(a, aimed));
+
+        Assert.Equal(2, hits.Count);
+        Assert.All(hits, h => Assert.Equal(DamageType.Flaming, h.Type));
+        Assert.All(spent, s => Assert.Same(a, s.Self));
+        Assert.Equal(new[] { (5, 5), (5, 5) }, spent.Select(s => (s.Wanted, s.Spent)).ToArray());
+        Assert.Equal(10, cleaver.Enchantments[0].Xp);               // two hits, two payments, both the entry's
+
+        // And a wielder with one trigger left types the body it aimed at and
+        // swings plain through the rest: the ordinary running-out, per body.
+        var poorCleaver = Carrying("Flaming Cleaver", [(Cleave, 1)], ("flaming", 1));
+        var b = Holding("B", 5, 5, poorCleaver);
+        var first = Enemy(5, 6, attunement: DamageType.Cold);
+        var second = Enemy(5, 7, attunement: DamageType.Cold);
+        var poor = new TurnSystem(grid, new[] { b }, new[] { first, second }, () => 10);
+        var poorHits = HitProbe(poor);
+        var once = ManaProbe(poor);
+        b.Mana = 5;
+
+        Assert.True(poor.TryAttack(b, first));
+        Assert.Equal(new[] { DamageType.Flaming, DamageType.None }, poorHits.Select(h => h.Type).ToArray());
+        Assert.Equal(((ActorState)b, 5, 5), Assert.Single(once));
+        Assert.Equal(0, b.Mana);
+    }
+
+    [Fact]
+    public void APierceKeepsTheTypeDownTheLine_ForOnePayment()
+    {
+        // The other multi-body shape, and the other answer: a shot carried on is
+        // one hit continuing rather than a second swing. The DamageDealt applier
+        // seeds the continuation with the type the first hit settled, so the step
+        // finds it already typed and stands aside, and the whole line is typed
+        // for one payment of the element's trigger.
+        var grid = new int[20, 20];
+        var bow = Reaching("Flaming Bow", range: 320, ("flaming", 1), ("piercing", 1));
+        var a = Holding("A", 5, 2, bow);
+        var first = Enemy(5, 6, attunement: DamageType.Cold);
+        var second = Enemy(5, 10, attunement: DamageType.Cold);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { first, second }, () => 10);
+        var hits = HitProbe(turns);
+        var spent = ManaProbe(turns);
+
+        Assert.True(turns.TryAttack(a, first));
+
+        Assert.Equal(2, hits.Count);
+        Assert.Equal(new[] { false, true }, hits.Select(h => h.FromPierce).ToArray());
+        Assert.All(hits, h => Assert.Equal(DamageType.Flaming, h.Type));
+
+        // The element's 5 on the hit, then the shot's own 6 to carry on, and
+        // nothing more: the second body is typed for free.
+        Assert.All(spent, s => Assert.Same(a, s.Self));
+        Assert.Equal(new[] { (5, 5), (6, 6) }, spent.Select(s => (s.Wanted, s.Spent)).ToArray());
+        Assert.Equal(5, bow.Enchantments[0].Xp);
     }
 
     [Fact]
