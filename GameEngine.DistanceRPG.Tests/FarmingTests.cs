@@ -27,7 +27,7 @@ public class FarmingTests
     /// <summary>A map seed whose first five cycles at spawn index 0 roll Damage, Both, Health, Health, Both — all three outcomes, and both axes compounding.</summary>
     private const long Mixed = 1;
 
-    /// <summary>The prototype's own map seed, for the one test that also places enemies.</summary>
+    /// <summary>The prototype's own map seed, for the test that pins which stream the turn loop's revival rolls come off.</summary>
     private const long PlacementSeed = 2762136374;
 
     // ── Fixtures ─────────────────────────────────────────────────────────────
@@ -377,10 +377,13 @@ public class FarmingTests
     public void TheRevivalRollDoesNotConsumeThePlacementStream()
     {
         // The revival roll fires from inside the turn loop, which is where a
-        // stream mix-up is easiest and least visible. Placement is identical
-        // either side of a hundred revivals on the same seed.
-        var before = EnemyPlacer.PlaceEnemies(MapGenerator.Generate(new Mulberry32(PlacementSeed)), PlacementSeed);
-
+        // stream mix-up is easiest and least visible. Re-running the placer
+        // around the farm would prove nothing about it: PlaceEnemies is a pure
+        // function of (map, seed) and reproduces whatever the loop drew on, and
+        // its own determinism is EnemyPlacerTests' to hold. What has teeth is
+        // the statline: the hundred cycles the loop resolved are the ones this
+        // dummy's OWN salted stream predicts, and are not the ones a
+        // continuation of the placer's stream would have produced.
         var farm = Build(mapSeed: PlacementSeed);
         Kill(farm);
         farm.Enemy.DefeatCount = 100;    // a hundred cycles fall due at once, and resolve in order
@@ -394,8 +397,35 @@ public class FarmingTests
         Assert.True(farm.Enemy.MaxHp > 20 * GameConstants.DummyHp, $"max HP after a hundred revivals: {farm.Enemy.MaxHp}");
         Assert.True(farm.Enemy.BonusDamage > 20 * farm.Enemy.Weapon.Damage, $"bonus damage after a hundred revivals: {farm.Enemy.BonusDamage}");
 
-        var after = EnemyPlacer.PlaceEnemies(MapGenerator.Generate(new Mulberry32(PlacementSeed)), PlacementSeed);
-        Assert.Equal(before, after);
+        // Cycle n came off ReviveStream(mapSeed, spawnIndex, n), replayed here
+        // from FarmLadder alone — the accumulated statline is the only evidence
+        // left of which stream the loop read, and it agrees to the point.
+        (int Damage, int MaxHp) ladder = (farm.Enemy.RevivalDamage, farm.Enemy.RevivalMaxHp);
+        Assert.Equal(LadderOf(cycle => FarmLadder.ReviveStream(PlacementSeed, farm.Enemy.SpawnIndex, cycle)), ladder);
+
+        // And it is not the placer's. One long Mulberry32 off
+        // `mapSeed ^ EnemyPlacer.SeedSalt` is the literal continuation the
+        // standing rule forbids, and a hundred cycles off it land somewhere
+        // else entirely — which is what gives the assertion above its power:
+        // move the roll onto that stream and it stops passing.
+        var placers = new Mulberry32(PlacementSeed ^ EnemyPlacer.SeedSalt);
+        Assert.NotEqual(LadderOf(_ => placers), ladder);
+
+        // The ladder a given sequence of revival streams produces: the same
+        // arithmetic the turn loop runs, off whichever stream it is handed.
+        (int Damage, int MaxHp) LadderOf(Func<int, Mulberry32> streamAt)
+        {
+            int damage = 0, maxHp = 0;
+            for (int cycle = 0; cycle < 100; cycle++)
+            {
+                var gain = FarmLadder.RollRevival(streamAt(cycle));
+                if (gain is RevivalGain.Damage or RevivalGain.Both)
+                    damage += FarmLadder.Step(farm.Enemy.Weapon.Damage + damage);
+                if (gain is RevivalGain.Health or RevivalGain.Both)
+                    maxHp += FarmLadder.Step(GameConstants.DummyHp + maxHp);
+            }
+            return (damage, maxHp);
+        }
     }
 
     [Fact]
