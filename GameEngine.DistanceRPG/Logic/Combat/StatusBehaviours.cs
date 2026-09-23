@@ -94,17 +94,29 @@ public static class StatusBehaviours
 
     /// <summary>
     /// Step 6: the defender's Ward takes what was dealt, one point a level, up
-    /// to its levels — temporary hit points, not armour, so a crit does not
-    /// skip it and it may take a hit all the way to zero. What it swallowed
-    /// was dealt; only the rest reaches HP, which the (6,9) divider closes.
-    /// The applier spends the levels.
+    /// to its levels and never the whole hit — temporary hit points, not armour,
+    /// so a crit does not skip it, but <strong>1 damage still gets through</strong>
+    /// (§3.3), which is <c>Block</c>'s floor (§1.1) applied once at the end of
+    /// the pipeline rather than a second rule. A 20-damage hit into 20 Ward
+    /// therefore leaves 1 through and 1 level standing — 19 absorbed, 19 spent —
+    /// and that last level decays at the end of the round like any other.
+    /// <para>
+    /// The floor is what keeps the pool from being immortality: a deep Ward buys
+    /// a long fight, not an unlosable one, which is the same reason
+    /// <c>Block</c> never reduces a hit to nothing and Weakened never divides a
+    /// swing below 1. Nothing in this game has a zero.
+    /// </para>
+    /// What it swallowed was dealt; only the rest reaches HP, which the (6,9)
+    /// divider closes. The applier spends the levels.
     /// </summary>
     public static DamagePayload Ward(DamagePayload payload, ActorState self, ActorState other)
     {
         int levels = other.StatusLevel(StatusEffectType.Ward);
         if (levels <= 0 || payload.Dealt <= 0) return payload;
         int capacity = levels * StatusRules.EffectPerLevel(StatusEffectType.Ward);
-        return payload with { WardSpent = Math.Min(capacity, payload.Dealt) };
+        // Dealt is at least 1 by the guard above, so the floor's subtraction
+        // never goes negative: what it can absorb is one short of the hit.
+        return payload with { WardSpent = Math.Min(capacity, payload.Dealt - 1) };
     }
 
     /// <summary>

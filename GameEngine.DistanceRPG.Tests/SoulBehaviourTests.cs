@@ -295,10 +295,10 @@ public class SoulBehaviourTests
         var b = Holding("B", 5, 5, Souled("Deep Leech", 40, 15, 30, ("vampiric", 3)));
         b.Hp = 50;
         var warded = Enemy(5, 6);
-        warded.ApplyStatus(Ward, null, 50);   // the hit is dealt and swallowed whole: still an instance
+        warded.ApplyStatus(Ward, null, 50);   // the hit is dealt and all but the floor swallowed: still an instance
         var deep = new TurnSystem(grid, new[] { b }, new[] { warded }, () => 10);
         Assert.True(deep.TryAttack(b, warded));
-        Assert.Equal((53, TestPools.FixtureMana - 2, 200, 35), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
+        Assert.Equal((53, TestPools.FixtureMana - 2, 199, 36), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
 
         b.Mana = 1;
         Assert.True(deep.TryAttack(b, warded));
@@ -343,9 +343,10 @@ public class SoulBehaviourTests
         Assert.Equal(2, enemy.StatusLevel(Bleeding));
 
         // It reads Dealt — after Block, before Ward — and of that the blade's part: 15 into Block 3 is 12
-        // of the weapon's, two levels for one, however much of it Ward then swallowed.
+        // of the weapon's, two levels for one, however much of it Ward then swallowed (11 of the 12:
+        // the floor never lets it take the last point).
         var warded = table.Raise(GameEvent.DamageDealt,
-            DamagePayload.Initial(serrated.EquippedWeapon!, 10, 32) with { WeaponShare = 15, Absorbed = 3, Dealt = 12, WardSpent = 12, Taken = 0 },
+            DamagePayload.Initial(serrated.EquippedWeapon!, 10, 32) with { WeaponShare = 15, Absorbed = 3, Dealt = 12, WardSpent = 11, Taken = 1 },
             serrated, victim);
         Assert.Equal((12, new StatusApplication(Bleeding, null, 2), 1), (warded.WeaponDealt, Assert.Single(warded.ApplyToDefender), warded.ManaToSpend));
         var b = Holding("B", 5, 5, Souled("Saw", 40, 15, 30, ("serrated", 1)));

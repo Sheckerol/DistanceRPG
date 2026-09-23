@@ -23,17 +23,14 @@ public class EnchantmentXpTests
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
     /// <summary>
-    /// The section 3.3 Arcane row stood up as a def, as the ladder and lock
-    /// files already do: lock 30, trigger 8, <see cref="Tuning.ArcanePotency"/>
-    /// at <c>ApplyPercent</c> 100. The entry itself is a later sub-step's; its
-    /// kind is the closest shipped shape that fires on a landed hit and pays a
-    /// flat trigger, which is what lets the budget be watched running out.
+    /// The section 3.3 Arcane row as the catalogue ships it, as the ladder and
+    /// lock files also read it: lock 30, trigger 8,
+    /// <see cref="Tuning.ArcanePotency"/> laid over its potency at
+    /// <c>ApplyPercent</c> 100. It fires on a landed hit for a flat trigger,
+    /// which is what lets the budget be watched running out, and its damage
+    /// lands in the hit's enchantment share.
     /// </summary>
-    private static EnchantmentDef Arcane => new(
-        Id: "arcane", Name: "Arcane", Effect: EffectKind.Vampiric, Targets: TargetSide.Enemy,
-        Lock: 30, Trigger: 8,
-        Potency: GameContent.Current.Tuning.ArcanePotency, ApplyPercent: 100,
-        Applies: null, DamageType: null, Unique: false);
+    private static EnchantmentDef Arcane => GameContent.Current.Enchantments["arcane"];
 
     /// <summary>A dummy with enough HP that nothing here kills it by accident, unless the scenario is a kill.</summary>
     private static EnemyState Enemy(int r, int c, Weapon? weapon = null, int hp = 100_000)
@@ -80,6 +77,18 @@ public class EnchantmentXpTests
         return spent;
     }
 
+    /// <summary>Record every DamageTaken payload as the chain settled it, after every compiled handler.</summary>
+    private static List<DamagePayload> HitProbe(TurnSystem turns)
+    {
+        var hits = new List<DamagePayload>();
+        turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 9), "probe", (p, _, _) =>
+        {
+            hits.Add(p);
+            return p;
+        });
+        return hits;
+    }
+
     private static (int Tier, int Xp) Entry(Weapon weapon, int index) => (weapon.Enchantments[index].Tier, weapon.Enchantments[index].Xp);
 
     private static int[] Xps(Weapon weapon) => weapon.Enchantments.Select(e => e.Xp).ToArray();
@@ -97,17 +106,15 @@ public class EnchantmentXpTests
         var dummy = Enemy(5, 6);
         var turns = new TurnSystem(grid, new[] { member }, new[] { dummy }, () => 10);
         var spent = ManaProbe(turns);
-        var healed = new List<int>();
-        turns.CharacterHealed += (_, amount) => healed.Add(amount);
+        var hits = HitProbe(turns);
 
-        member.Hp = 1;                                   // room for the drink to land whole
         Assert.Equal(8, knife.Enchantments[0].ResolvedTriggerCost(knife, knife.Enchantments[0].LevelsFor(Arcane.Potency)));
         Assert.Equal((1, 0), Entry(knife, 0));
 
         // Whole: the pool covers the eight it wants, and eight is what it banks.
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal((1, 8), Entry(knife, 0));
-        Assert.Equal(new[] { 4 }, healed);               // potency 4 at tier 1
+        Assert.Equal(new[] { 4 }, hits.Select(h => h.EnchantmentShare));   // potency 4 at tier 1
 
         // Partial: five left of the trigger's eight buys five eighths of the
         // effect for five mana, and five is the credit. The bar it is climbing
@@ -115,7 +122,7 @@ public class EnchantmentXpTests
         member.Mana = 5;
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal((1, 13), Entry(knife, 0));
-        Assert.Equal(new[] { 4, 2 }, healed);            // 4 x 5 / 8
+        Assert.Equal(new[] { 4, 2 }, hits.Select(h => h.EnchantmentShare));   // 4 x 5 / 8
         Assert.Equal(30, knife.Enchantments[0].XpToNextTier(InnateStats.Low));
         Assert.Equal(new[] { 8, 5 }, spent.Select(s => s.Spent).ToArray());
 
@@ -125,7 +132,7 @@ public class EnchantmentXpTests
         member.Mana = 1;
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal((1, 13), Entry(knife, 0));
-        Assert.Equal(new[] { 4, 2 }, healed);
+        Assert.Equal(new[] { 4, 2, 0 }, hits.Select(h => h.EnchantmentShare));
         Assert.Equal(2, spent.Count);
     }
 

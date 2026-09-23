@@ -65,17 +65,13 @@ public class EnchantmentLockTests
     }
 
     /// <summary>
-    /// The §3.3 Arcane row, stood up as a def because the entry itself is a later
-    /// sub-step's: lock 30, trigger 8, <see cref="Tuning.ArcanePotency"/> at
-    /// <c>ApplyPercent</c> 100. Its kind is the closest shipped shape that fires
-    /// on a landed hit and pays a flat trigger, so the budget can be watched
-    /// running out.
+    /// The §3.3 Arcane row as the catalogue ships it: lock 30, trigger 8,
+    /// <see cref="Tuning.ArcanePotency"/> laid over its potency at
+    /// <c>ApplyPercent</c> 100. It fires on a landed hit and pays a flat
+    /// trigger, so the budget can be watched running out against the entry the
+    /// doc's worked case is actually about.
     /// </summary>
-    private static EnchantmentDef Arcane => new(
-        Id: "arcane", Name: "Arcane", Effect: EffectKind.Vampiric, Targets: TargetSide.Enemy,
-        Lock: 30, Trigger: 8,
-        Potency: GameContent.Current.Tuning.ArcanePotency, ApplyPercent: 100,
-        Applies: null, DamageType: null, Unique: false);
+    private static EnchantmentDef Arcane => GameContent.Current.Enchantments["arcane"];
 
     /// <summary>Record every ManaSpent the table settles: who paid, what was wanted and paid, and through what.</summary>
     private static List<(ActorState Self, int Wanted, int Spent, string Source)> ManaProbe(TurnSystem turns)
@@ -87,6 +83,18 @@ public class EnchantmentLockTests
             return p;
         });
         return spent;
+    }
+
+    /// <summary>Record every DamageTaken payload as the chain settled it, after every compiled handler.</summary>
+    private static List<DamagePayload> HitProbe(TurnSystem turns)
+    {
+        var hits = new List<DamagePayload>();
+        turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 9), "probe", (p, _, _) =>
+        {
+            hits.Add(p);
+            return p;
+        });
+        return hits;
     }
 
     private static int Distance(ActorState a, ActorState b) => CombatRules.SurfaceDistanceUnits(a, b);
@@ -390,42 +398,39 @@ public class EnchantmentLockTests
         // gives is two, a fraction, and then nothing, because a levelled entry
         // partial-fires on what is left rather than refusing (section 3.1's
         // PartialFire, not this sub-step's). The budget is spent to its last
-        // point either way, which is the claim. The entry below is a stand-in on
-        // the closest shipped kind, so when S7 lands the catalogue's Arcane
-        // (EffectKind.BonusDamage) this test re-points at it, confirms the third
-        // fire still partials, and the phase doc's open questions record that
-        // "and then nothing" means "and then a fraction, and then nothing".
+        // point either way, which is the claim -- and the departure from the
+        // doc's figure is recorded in docs/roadmap/open-questions.md rather than
+        // only here. The entry is the catalogue's own Arcane, so what the fires
+        // are watched through is the enchantment share they add.
         var grid = new int[20, 20];
         var (x, y) = At(5, 5);
         var wizard = TestPools.Char("A", x: x, y: y);
         wizard.Inventory[0] = Carrying("Arcane Knife", new Enchantment(Arcane, Tier: 6));
         wizard.Grown(maxMana: 200);
-        wizard.Hp = 1;                                   // room for every drink to land whole
 
         Assert.Equal((200, 180, 20, 20), (wizard.MaxMana, wizard.PaidLocks, wizard.UsableMaxMana, wizard.Mana));
         Assert.False(wizard.IsDormant(0));
 
-        var dummy = Enemy(5, 6);
+        var dummy = Enemy(5, 6, hp: 500);                // room for four swings and three discharges
         var turns = new TurnSystem(grid, new[] { wizard }, new[] { dummy }, () => 10);
         var spent = ManaProbe(turns);
-        var healed = new List<int>();
-        turns.CharacterHealed += (_, amount) => healed.Add(amount);
+        var hits = HitProbe(turns);
 
         Assert.True(turns.TryAttack(wizard, dummy));     // 8 of the 20
         Assert.True(turns.TryAttack(wizard, dummy));     // 8 of the 12
         Assert.Equal(new[] { 8, 8 }, spent.Select(s => s.Spent));
-        Assert.Equal(new[] { 24, 24 }, healed);          // potency 4 at tier 6
+        Assert.Equal(new[] { 24, 24 }, hits.Select(h => h.EnchantmentShare));   // potency 4 at tier 6
         Assert.Equal(4, wizard.Mana);
 
         // The scraps buy a fraction of a fire, and then the budget is the cap.
         Assert.True(turns.TryAttack(wizard, dummy));
         Assert.Equal(new[] { 8, 8, 4 }, spent.Select(s => s.Spent));
-        Assert.Equal(new[] { 24, 24, 12 }, healed);
+        Assert.Equal(new[] { 24, 24, 12 }, hits.Select(h => h.EnchantmentShare));
         Assert.Equal(0, wizard.Mana);
 
         Assert.True(turns.TryAttack(wizard, dummy));
         Assert.Equal(3, spent.Count);
-        Assert.Equal(3, healed.Count);
+        Assert.Equal(new[] { 24, 24, 12, 0 }, hits.Select(h => h.EnchantmentShare));
 
         // No cap is needed anywhere in this system because the budget is the cap:
         // nothing clamps the tier, the lock or the pool.

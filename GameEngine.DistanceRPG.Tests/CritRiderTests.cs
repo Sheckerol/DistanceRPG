@@ -102,12 +102,12 @@ public class CritRiderTests
     [InlineData(1)]
     [InlineData(6)]
     [InlineData(8)]
-    public void Crit_AppliesRiderStacks_EvenWhenWardSwallowsAll(int stacks)
+    public void Crit_AppliesRiderStacks_EvenWhenWardSwallowsAllButTheFloor(int stacks)
     {
         // A kris with CritWeaken xN lands N Weakened levels on a crit, and a stiletto with
         // CritSunder xN lands N Sundered: no stack is inert at any depth. The defender's
-        // Ward swallows the whole hit and the riders land anyway — and they change nothing
-        // about the hit that applied them.
+        // Ward swallows the hit down to the floor's one point and the riders land anyway —
+        // and they change nothing about the hit that applied them.
         var kris = TestWeapons.Make("Kris", 40, 15, 30, (CritWeaken, stacks));
         var (turns, a, enemy) = Duel(kris, "arming_sword", () => 20);
         enemy.ApplyStatus(Ward, null, 500);
@@ -117,13 +117,13 @@ public class CritRiderTests
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(stacks, enemy.StatusLevel(Weakened));
         Assert.Equal(0, enemy.StatusLevel(Sundered));
-        Assert.Equal(1000, enemy.Hp);   // the Ward took all of it
+        Assert.Equal(1000 - 1, enemy.Hp);   // the Ward took all of it but the point that always gets through
 
         var res = hit!.Value;
         Assert.Equal(30, res.Dealt);    // 15 x2, Block skipped: the riders did not touch the applying hit
-        Assert.Equal(0, res.Taken);
-        Assert.Equal(30, res.WardSpent);
-        Assert.Equal(500 - 30, enemy.StatusLevel(Ward));
+        Assert.Equal(1, res.Taken);
+        Assert.Equal(29, res.WardSpent);
+        Assert.Equal(500 - 29, enemy.StatusLevel(Ward));
         var rider = Assert.Single(res.Riders);
         Assert.Equal((Weakened, stacks), (rider.Type, rider.Levels));
 

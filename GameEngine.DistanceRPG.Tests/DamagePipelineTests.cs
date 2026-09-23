@@ -295,12 +295,14 @@ public class DamagePipelineTests
     }
 
     [Fact]
-    public void FullyWardedHit_CreditsDealt_TakesNothing_AndDoesNotKill()
+    public void DeeplyWardedHit_CreditsDealt_LetsOneThrough_AndDoesNotKill()
     {
-        // Block lets one through; Ward may take a hit all the way to zero. The hit was still
-        // dealt — weapon XP, Serrated and the clean-kill test read that — and nothing died.
+        // Ward lets one through exactly as Block does — the pipeline's one floor, applied
+        // once at the end — so a pool deep enough to swallow the hit still costs a point of
+        // HP. The whole hit was dealt all the same, which is what weapon XP, Serrated and
+        // the clean-kill test read, and 1 of 10 is not a death at 5 HP.
         var (turns, a, enemy) = Duel(Club, Fists, () => 10);
-        enemy.Hp = 1;
+        enemy.Hp = 5;
         enemy.ApplyStatus(Ward, null, 20);
         var log = new List<string>();
         turns.Events.On<DamagePayload>(GameEvent.DamageDealt, new HandlerPriority(9, 9), "probe",
@@ -311,11 +313,36 @@ public class DamagePipelineTests
         turns.EnemyDefeated += _ => defeated++;
 
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(new[] { "dealt 10 taken 0" }, log);
-        Assert.Equal(1, enemy.Hp);
+        Assert.Equal(new[] { "dealt 10 taken 1" }, log);
+        Assert.Equal(4, enemy.Hp);
         Assert.True(enemy.Alive);
         Assert.Equal(0, defeated);
-        Assert.Equal(10, enemy.StatusLevel(Ward));
+        Assert.Equal(20 - 9, enemy.StatusLevel(Ward));   // nine spent, not ten: the floor never reaches the pool
+    }
+
+    [Fact]
+    public void TwentyIntoTwentyWard_LeavesOneThroughAndOneLevel()
+    {
+        // §3.3's own worked example, in its own numbers: "a 20-damage hit into 20 Ward
+        // leaves 1 damage through and 1 level remaining — 19 absorbed, 19 spent". The
+        // floor is why a party that stacks Ward is beatable at all: a big pool buys a
+        // long fight, never an unlosable one.
+        var (turns, a, enemy) = Duel(TestWeapons.Make("Maul", 40, 20, 30), Fists, () => 10);
+        enemy.ApplyStatus(Ward, null, 20);
+        AttackResolution? hit = null;
+        turns.EnemyHit += (_, r) => hit = r;
+
+        Assert.True(turns.TryAttack(a, enemy));
+        var res = hit!.Value;
+        Assert.Equal((20, 19, 1), (res.Dealt, res.WardSpent, res.Taken));
+        Assert.Equal(200 - 1, enemy.Hp);
+        Assert.Equal(1, enemy.StatusLevel(Ward));
+
+        // And that last level is one level, not a pool: the next hit spends it and the
+        // floor takes the rest of what it could not stop.
+        Assert.True(turns.TryAttack(a, enemy));
+        Assert.Equal((20, 1, 19), (hit!.Value.Dealt, hit!.Value.WardSpent, hit!.Value.Taken));
+        Assert.Equal(0, enemy.StatusLevel(Ward));
     }
 
     [Fact]
@@ -323,7 +350,8 @@ public class DamagePipelineTests
     {
         // Spear 7 on a natural 1: halved to 3 (step 1); the attacker's Weakened 1 -> 2 (step 2);
         // the defender's Sundered 2 -> 4 (step 3); Block x1 absorbs 3 -> Dealt 1 (step 5);
-        // Ward 1 swallows it -> Taken 0 (step 6); not a crit, so the CritSunder stacks do not land (step 7).
+        // Ward swallows nothing of a hit already down to the floor -> Taken 1, and the level
+        // stands (step 6); not a crit, so the CritSunder stacks do not land (step 7).
         var attacker = Member(TestWeapons.Make("Pike", 128, 7, 55, (CritSunder, 2)));
         attacker.ApplyStatus(Weakened, null, 1);
         var defender = new EnemyState();   // the arming sword: Block x1
@@ -335,8 +363,8 @@ public class DamagePipelineTests
         Assert.Equal(4, weak.WeaponShare);
         Assert.Equal(3, weak.Absorbed);
         Assert.Equal(1, weak.Dealt);
-        Assert.Equal(1, weak.WardSpent);
-        Assert.Equal(0, weak.Taken);
+        Assert.Equal(0, weak.WardSpent);
+        Assert.Equal(1, weak.Taken);
         Assert.True(weak.Blocked);
         Assert.Empty(weak.ApplyToDefender);
     }

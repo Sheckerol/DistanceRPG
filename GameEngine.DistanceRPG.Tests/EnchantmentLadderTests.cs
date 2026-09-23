@@ -13,18 +13,14 @@ namespace GameEngine.DistanceRPG.Tests;
 public class EnchantmentLadderTests
 {
     /// <summary>
-    /// The §3.3 Arcane row's numbers: lock 30, trigger 8, and
-    /// <see cref="Tuning.ArcanePotency"/> at <c>ApplyPercent</c> 100, so a
-    /// tier-3 locks 90 and a tier-6 locks 180 exactly as the doc says. Stood up
-    /// as a def rather than read from the catalogue because the entry itself is
-    /// a later sub-step's; its <see cref="EffectKind"/> is the closest shipped
-    /// shape (a flat-trigger catalogue entry) and nothing here reads it.
+    /// The §3.3 Arcane row as the catalogue ships it: lock 30, trigger 8, and
+    /// <see cref="Tuning.ArcanePotency"/> laid over its potency at
+    /// <c>ApplyPercent</c> 100, so a tier-3 locks 90 and a tier-6 locks 180
+    /// exactly as the doc says. Read from the catalogue, not stood up: the
+    /// ladder's arithmetic is only worth pinning against the numbers the game
+    /// actually charges.
     /// </summary>
-    private static EnchantmentDef Arcane => new(
-        Id: "arcane", Name: "Arcane", Effect: EffectKind.Vampiric, Targets: TargetSide.Enemy,
-        Lock: 30, Trigger: 8,
-        Potency: GameContent.Current.Tuning.ArcanePotency, ApplyPercent: 100,
-        Applies: null, DamageType: null, Unique: false);
+    private static EnchantmentDef Arcane => GameContent.Current.Enchantments["arcane"];
 
     /// <summary>Serrated: shipped, unique, and therefore pinned at tier 1 whatever it is credited.</summary>
     private static EnchantmentDef Serrated => GameContent.Current.Enchantments["serrated"];

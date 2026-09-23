@@ -21,7 +21,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Amount">The running weapon figure through steps 1–3.</param>
 /// <param name="Type">The hit's damage type; <see cref="DamageType.None"/> for a martial swing.</param>
 /// <param name="IsCrit">The natural roll landed in the attacker's crit window.</param>
-/// <param name="Dealt">After mitigation, before absorption: what the attacker did, everything included. Serrated and the clean-kill test read this; weapon XP does not — it reads <see cref="WeaponDealt"/> + <see cref="ForgedShare"/>.</param>
+/// <param name="Dealt">After mitigation, before absorption: what the attacker did, everything included. The clean-kill test reads this — and only it: Serrated reads <see cref="WeaponDealt"/>, the weapon's own share, because an Arcane discharge riding the same swing did not cut anyone deeper; weapon XP reads <see cref="WeaponDealt"/> + <see cref="ForgedShare"/>.</param>
 /// <param name="Absorbed">What Block prevented — never dealt.</param>
 /// <param name="Taken">What reached hit points. Death and Sturdy read this.</param>
 /// <param name="WeaponShare">The weapon's own damage after step 3 — the part that teaches the weapon, with <see cref="ForgedShare"/> beside it.</param>
@@ -35,7 +35,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// dagger still levels daggers on the knife alone. Block never touches it —
 /// Block comes off the weapon's share — so it rides down whole.
 /// </param>
-/// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP.</param>
+/// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP. Never the whole hit — 1 always gets through, the same floor Block is held to.</param>
 /// <param name="Roll">The natural d20, rolled before the chain so step 1 is pure.</param>
 /// <param name="Outcome">Crit, Weak (a natural 1) or Normal, decided at step 1.</param>
 /// <param name="Weapon">The attacker's weapon.</param>

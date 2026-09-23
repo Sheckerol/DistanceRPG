@@ -304,13 +304,13 @@ public sealed record Tuning
 
     /// <summary>
     /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
-    /// from Phase 6a — a weapon's wear capacity alike, so the 25 is never a bare
+    /// from Phase 6a — a weapon's wear capacity alike, so the 30 is never a bare
     /// literal in three places. A point costs <c>currentMax / governingStat</c>
     /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
     /// diverge rather than starting apart. Below 1 there is no step to take, and
     /// <see cref="ContentValidator.ValidateTuning"/> refuses it at load.
     /// <para>
-    /// <strong>A caster's pool opens here too, on 25 and not on 160.</strong>
+    /// <strong>A caster's pool opens here too, on 30 and not on 160.</strong>
     /// settled.md had both figures live; the 160 in §1.3's derivations is the
     /// <em>movement</em> budget — <c>(160 - 40) / (8 + 3)</c> divides a staff's
     /// 40-unit movement cost out of <see cref="GameConstants.MaxDistance"/>,

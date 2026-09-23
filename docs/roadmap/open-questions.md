@@ -138,3 +138,28 @@ and `Spent`/`Wanted` scaling (§3.3's enchantment XP) would have to be taken
 across two events rather than one — so it wants deciding rather than
 discovering. Nothing is wrong in play today: the entries fire, they pay, and
 they are credited what they paid; only the doc's example is unbuildable.
+
+## What "and then nothing" means for a locked-out pool (§3.3)
+
+§3.3's worked case for the enchantment ladder's brake reads: "A tier-6 `Arcane`
+on a 200-pool wizard has 20 mana left to fire with, which is two more triggers
+and then nothing — the enchantment has very nearly eaten the character that grew
+it." The arithmetic is right — 180 of the 200 is locked, 20 is left, the trigger
+is 8 — but **what the shipped rule gives is two whole fires, a partial fire on
+the 4 that remain, and then nothing.**
+
+Nothing is wrong in play; two settled rules simply meet here. §3.1's
+`PartialFire` is what an entry does when the pool cannot cover its trigger: it
+fires at the fraction it could pay rather than refusing, so 4 of a trigger of 8
+buys half the effect — 12 of `Arcane`'s damage where a whole fire adds 24 — and
+is credited the 4 it actually paid (§3.3's enchantment XP). The doc's sentence is
+a claim about the brake, and the brake is exactly as tight either way: the budget
+is spent to its last point, and the swing after that adds nothing at all.
+
+`EnchantmentLockTests.LockingCompetesWithFiring` pins the shipped reading in the
+doc's own numbers — 200 earned, 180 locked, 20 spendable; spends of 8, 8 and 4;
+enchantment shares of 24, 24 and 12; then a swing that pays nothing and adds
+nothing. Whoever next edits §3.3 should write "two more triggers, a fraction of a
+third, and then nothing" rather than move the code toward the shorter sentence:
+an entry that refused to fire at all below its trigger would be a new rule, and
+it would contradict the one §3.1 already settled.
