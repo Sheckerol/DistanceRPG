@@ -89,12 +89,12 @@ public class EnchantmentLadderTests
     [Fact]
     public void TheBarAReadoutShowsIsTheXpTheClimbCharges()
     {
-        // One tier, one price. XpToNextTier is the bar a readout prints and
-        // WithXp is what actually charges, and the replay walks the entry itself
-        // so the second is the first floored at 1 — nothing restates the
-        // arithmetic. For every shipped entry the floor never bites and the two
-        // are equal, so a future low-lock content row fails here rather than
-        // quietly displaying a bar of 0 while charging 1.
+        // One tier, one price. XpToNextTier is the doc's line, TierCost is what
+        // the climb charges and what a readout prints, and the replay walks the
+        // entry itself so the second is the first floored at 1 — nothing
+        // restates the arithmetic. For every shipped entry the floor never bites
+        // and the two are equal, so a future low-lock content row fails here
+        // rather than quietly pricing a tier at 0.
         foreach (var def in GameContent.Current.Enchantments.All.Where(e => !e.Unique))
             for (int tier = 1; tier <= 6; tier++)
                 for (int stat = InnateStats.Low; stat <= InnateStats.High; stat++)
@@ -108,14 +108,17 @@ public class EnchantmentLadderTests
                 }
 
         // The one band where the two legitimately differ, stated rather than
-        // discovered: at a lock of 1 and INT 4 the bar reads 0 — XpToNextTier is
-        // the doc's line and carries no floor, which is what
-        // ALockOfZeroIsRefusedAtLoad pins — while the climb charges the floored 1
-        // it must, or the replay would never leave the tier. No shipped entry is
-        // in that band (the catalogue's smallest lock is 15) and the content rule
-        // only refuses 0, so the relationship is pinned here instead.
+        // discovered: at a lock of 1 and INT 4 the unfloored line reads 0 —
+        // XpToNextTier is the doc's line and carries no floor, which is what
+        // ALockOfZeroIsRefusedAtLoad pins — while TierCost, what the climb
+        // charges and the readout shows, is the floored 1 it must be, or the
+        // replay would never leave the tier and the HUD would print a price
+        // nothing charges. No shipped entry is in that band (the catalogue's
+        // smallest lock is 15) and the content rule only refuses 0, so the
+        // relationship is pinned here instead.
         var thin = new Enchantment(Arcane with { Lock = 1 }, Tier: 1);
         Assert.Equal(0, thin.XpToNextTier(4));
+        Assert.Equal(1, thin.TierCost(4));
         Assert.Equal((1, 0), Tiered(thin.WithXp(0, 4)));
         Assert.Equal((2, 0), Tiered(thin.WithXp(1, 4)));
         Assert.Equal((5, 0), Tiered(thin.WithXp(4, 4)));   // 1, 1, 1, 1: the floor, four times

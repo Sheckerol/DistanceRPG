@@ -81,13 +81,13 @@ public class HudTextTests
         member.Inventory[0] = knife;
 
         Assert.Equal((80, 20), (member.PaidLocks, member.UsableMaxMana));
-        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25 (ASLEEP)",
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25 (ASLEEP)",
             DungeonHud.EnchantmentReadout(knife, member));
 
         // Grown past all three, nothing is asleep and the locks still read.
         while (member.IsDormant(2))
             member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
-        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25",
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25",
             DungeonHud.EnchantmentReadout(knife, member));
 
         // A lock is a reservation out of a pool, so it reads only where there is
@@ -103,18 +103,22 @@ public class HudTextTests
     public void EnchantmentReadout_ShowsTheTierAndItsProgress()
     {
         // Tier is earned by use (section 3.3), and the bar is the only thing
-        // that says a swing is buying anything: an entry with mana in the tier
-        // it is on reads XP n/m beside its lock, where m is that tier's own cost
-        // over the wielder's INT -- the same number XpToNextTier prints and the
-        // climb charges. Nothing spent, nothing printed: the row stays the line
-        // it has always been.
+        // that says a swing is buying anything: an equipped entry reads XP n/m
+        // beside its lock, where m is that tier's own cost over the wielder's INT
+        // -- the same number the climb charges, TierCost, so the row and the
+        // ladder cannot state two prices.
         var knife = TestWeapons.Get("flensing_knife_unique");
         var member = TestPools.Char("A");
         member.Inventory[0] = knife;
         while (member.IsDormant(2))
             member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
 
-        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25",
+        // Nothing spent yet, and the bar still reads: XP 0/60 is what says this
+        // circle can be deepened at all, and an entry that crosses its bar
+        // exactly lands back here rather than losing the row at the moment it has
+        // just earned a tier. A unique has no next tier, so it prints no bar --
+        // and with nothing banked, nothing at all.
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25",
             DungeonHud.EnchantmentReadout(knife, member));
 
         // One swing's worth of triggers: Serrated and Overheal are uniques, so

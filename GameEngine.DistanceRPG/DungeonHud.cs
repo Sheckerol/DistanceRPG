@@ -692,14 +692,20 @@ public sealed class DungeonHud
     /// between a weapon in hand and a weapon in the bag.
     /// </para>
     /// <para>
-    /// An entry with mana in the tier it is on also shows how far that has got it
-    /// — <c>XP 9/20</c> — because tier is earned by use (§3.3) and the bar is the
-    /// only thing that says a swing is buying anything. The bar is
-    /// <see cref="Enchantment.XpToNextTier"/> at the <em>wielder's</em> INT, so
-    /// like the lock it reads only where there is a wielder; a unique prints the
-    /// banked figure with no bar, since it is pinned at tier 1 and the mana buys
-    /// nothing. An entry that has spent nothing prints neither: there is no
-    /// progress to state, and the row stays the line it has always been.
+    /// An equipped entry also shows how far the mana in the tier it is on has got
+    /// it — <c>XP 9/20</c> — because tier is earned by use (§3.3) and the bar is
+    /// the only thing that says a swing is buying anything. <strong>It prints
+    /// from zero</strong>: <c>XP 0/20</c> is what says a weapon just taken up can
+    /// be deepened at all, and an entry that crosses its bar exactly would
+    /// otherwise lose the row at the one moment it has most to say. The bar is
+    /// <see cref="Enchantment.TierCost"/> at the <em>wielder's</em> INT — the
+    /// price the climb charges rather than the unfloored
+    /// <see cref="Enchantment.XpToNextTier"/>, so the readout and the ladder can
+    /// never state two figures — and like the lock it reads only where there is a
+    /// wielder. A unique prints what it has banked and no bar, since it is pinned
+    /// at tier 1 and the mana buys nothing; with nothing banked it prints
+    /// neither, there being no progress to state and no next tier to be partway
+    /// to.
     /// </para>
     /// </summary>
     internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
@@ -716,8 +722,10 @@ public sealed class DungeonHud
             if (equipped)
             {
                 text += $" LOCK {entry.EffectiveLock}";
-                if (entry.Xp > 0)
-                    text += entry.Unique ? $" XP {entry.Xp}" : $" XP {entry.Xp}/{entry.XpToNextTier(stat)}";
+                if (!entry.Unique)
+                    text += $" XP {entry.Xp}/{entry.TierCost(stat)}";
+                else if (entry.Xp > 0)
+                    text += $" XP {entry.Xp}";
                 if (wielder!.IsDormant(i)) text += " (ASLEEP)";
             }
             parts.Add(text);

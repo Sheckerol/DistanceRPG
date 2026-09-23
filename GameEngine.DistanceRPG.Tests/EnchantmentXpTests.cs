@@ -163,6 +163,82 @@ public class EnchantmentXpTests
     }
 
     [Fact]
+    public void AStaffsInnateClimbsThroughTryCastAndItsTierTakesItsLockAtOnce()
+    {
+        // The whole cast path, from the entry point in: TryCast's guards, its
+        // ResolvedManaCost and a fumble's doubling are the arithmetic the
+        // Spent/Wanted scaling was written against, and EveryCatalogueEntryCanClimb
+        // drives its cast cases with a raw Raise, so one credit is pinned here
+        // through the real door instead. A Staff of Renewal, cast until its innate
+        // leaves tier 1.
+        var grid = new int[20, 20];
+        int roll = 10;
+        var staff = TestWeapons.Get("staff_of_renewal");
+        var caster = Wielding("A", staff, 5, 5);
+        var (bx, by) = At(5, 6);
+        var ally = TestPools.Char("B", x: bx, y: by);
+        var turns = new TurnSystem(grid, new[] { caster, ally }, Array.Empty<EnemyState>(), () => roll);
+        var spent = ManaProbe(turns);
+        var tiered = new List<(ActorState Wielder, string Id, int Tier)>();
+        turns.EnchantmentTiered += (wielder, _, entry) => tiered.Add((wielder, entry.Id, entry.Tier));
+        int manaXp = caster.ManaXp;
+
+        Assert.Equal(13, staff.ResolvedManaCost);
+        Assert.Equal(15, staff.Enchantments[0].TierCost(InnateStats.Low));
+        for (int cast = 0; cast < 14; cast++)
+        {
+            caster.Mana = caster.UsableMaxMana;
+            caster.DistLeft = GameConstants.MaxDistance;
+            Assert.True(turns.TryCast(caster, ally));
+        }
+        Assert.Equal((1, 14), Entry(staff, 0));           // a point short of the bar
+
+        // The fifteenth crosses it. The ceiling as it stands going in is what the
+        // clamp below is read against, because the same record's mana credit
+        // grows the earned pool a point on its way past.
+        caster.Mana = caster.UsableMaxMana;
+        caster.DistLeft = GameConstants.MaxDistance;
+        int ceiling = caster.UsableMaxMana;
+        Assert.True(turns.TryCast(caster, ally));
+
+        // Fifteen records of fourteen -- thirteen of cast and the innate's one --
+        // every point of which grew the pool, and the innate credited the one it
+        // paid each time: fifteen, which is the bar it has just crossed.
+        Assert.Equal(15, spent.Count);
+        Assert.All(spent, s => Assert.Equal((14, 14), (s.Wanted, s.Spent)));
+        Assert.Equal(15 * 14, caster.ManaXp - manaXp);
+        Assert.Equal((2, 0), Entry(staff, 0));
+        Assert.Equal(((ActorState)caster, "regeneration", 2), Assert.Single(tiered));
+
+        // And the tier it just bought reserves its own pool at once: the lock is
+        // the tier's, so the ceiling falls by fifteen as the bar is crossed and
+        // the mana above it is clamped away where an equip would clamp it, rather
+        // than staying spendable until the wielder next swaps a weapon. The
+        // record is queued, so the reservation is taken first and the cast comes
+        // out of what it leaves.
+        Assert.Equal(30, staff.Enchantments[0].EffectiveLock);
+        Assert.Equal(30, caster.PaidLocks);
+        Assert.Equal(caster.MaxMana - 30, caster.UsableMaxMana);
+        Assert.Equal(ceiling - 15 - 14, caster.Mana);
+
+        // A fumble doubles the cast's own mana after CanCast has checked the
+        // undoubled price, so the record wants twenty-six of a pool holding
+        // thirteen. The loop offers the innate what the cast leaves, which is
+        // nothing, so it neither fires nor is credited -- and the record settles
+        // at what the pool could pay rather than overdrawing it.
+        roll = 1;
+        caster.Mana = staff.ResolvedManaCost;
+        caster.DistLeft = GameConstants.MaxDistance;
+
+        Assert.True(turns.TryCast(caster, ally));
+
+        Assert.Equal((26, 13), (spent[^1].Wanted, spent[^1].Spent));
+        Assert.Equal((2, 0), Entry(staff, 0));
+        Assert.Equal(0, caster.Mana);
+        Assert.Equal(15 * 14 + 13, caster.ManaXp - manaXp);
+    }
+
+    [Fact]
     public void AnOverdrawnSpendCreditsBothLaddersTheSameNumber()
     {
         // ManaPayload's own doc comment says enchantment XP is counted on Spent,
@@ -199,6 +275,12 @@ public class EnchantmentXpTests
         // claim the pool falls short of is made here by a handler after the
         // loop, which is exactly the shape a cast's mana has: part of the record
         // that belongs to no entry.
+        //
+        // So the scaling branch is covered synthetically here and nowhere in
+        // play: today nothing but this handler writes ManaToSpend outside a loop.
+        // Section 7's MartialElement at (0,5) is the first that will -- it pays
+        // ahead of the step-4 loop, which makes a hit's record genuinely shared --
+        // and this claimant is re-pointed at it when it lands.
         var second = TestWeapons.Get("flensing_knife_unique");
         var b = Wielding("B", second);
         var other = Enemy(5, 6);
@@ -317,7 +399,7 @@ public class EnchantmentXpTests
         var walk = new Enchantment(entry.Def, Tier: 1);
         while (walk.Tier < entry.Tier)
         {
-            total += Math.Max(1, walk.XpToNextTier(stat));
+            total += walk.TierCost(stat);
             walk = walk with { Tier = walk.Tier + 1 };
         }
         return total;

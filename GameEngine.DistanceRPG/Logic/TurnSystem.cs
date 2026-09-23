@@ -1694,6 +1694,22 @@ public sealed class TurnSystem
     /// spend, and an actor with no nature — an enemy healer, a dummy — divides by
     /// <see cref="InnateStats.Low"/>, which is what its spend buys.
     /// </para>
+    /// <para>
+    /// <strong>A tier bought here takes its own reservation at once.</strong> A
+    /// deepened circle locks more of the pool —
+    /// <see cref="Enchantment.EffectiveLock"/> is the tier's — so
+    /// <see cref="ActorState.UsableMaxMana"/> falls the moment an entry crosses
+    /// its bar, and §3.3's rule that the spendable pool is what every spend and
+    /// every regen reads holds only if the pool is clamped to it. So it is, with
+    /// the same clamp <see cref="NotifyWeaponChanged"/> takes when the equipped
+    /// set changes: a reservation the wielder's own use just bought is taken
+    /// where it was bought, rather than at whatever later swap happens to notice
+    /// it — which is what would otherwise leave mana above the ceiling spendable
+    /// while <see cref="ActorState.RegenManaFromUnusedMovement"/>, capped at the
+    /// ceiling, could never put it back. The record this event settled is
+    /// <em>queued</em>, so the reservation is taken first and the spend comes out
+    /// of what it leaves.
+    /// </para>
     /// </summary>
     private void CreditEnchantments(ActorState payer, ImmutableArray<EnchantmentPayment> payments, int wanted, int spent)
     {
@@ -1712,6 +1728,7 @@ public sealed class TurnSystem
         // last entry that paid, instead of being lost a payment at a time.
         int share = paid * spent / wanted;
         int credited = 0;
+        bool tiered = false;
         for (int i = 0; i < payments.Length; i++)
         {
             int credit = i == payments.Length - 1 ? share - credited : payments[i].Paid * spent / wanted;
@@ -1723,8 +1740,17 @@ public sealed class TurnSystem
             weapon.CreditEnchantment(index, credit, stat);
             var entry = weapon.Enchantments[index];
             if (entry.Tier > before)
+            {
+                tiered = true;
                 EnchantmentTiered?.Invoke(payer, weapon, entry);
+            }
         }
+
+        // A tier just raised a lock, so the ceiling is now under the pool the
+        // wielder is holding: clamp to it, exactly as taking up a locked weapon
+        // does. Nothing to do when nothing tiered, which is every other credit.
+        if (tiered)
+            payer.Mana = Math.Min(payer.Mana, payer.UsableMaxMana);
     }
 
     /// <summary>

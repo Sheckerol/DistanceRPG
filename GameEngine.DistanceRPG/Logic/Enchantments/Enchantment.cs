@@ -162,13 +162,15 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// and the tier is what lifts lock and potency.
     /// <para>
     /// It carries no floor, exactly as <see cref="Progression.XpToNext"/> carries
-    /// none: the guard lives at the single call site a free step could hang,
-    /// <see cref="TierCost"/>, which is this member floored at 1 — so the bar a
-    /// readout prints and the XP <see cref="WithXp"/> charges are one expression
-    /// rather than two that can drift. They part company only where the floor
-    /// bites (<c>Lock x Tier</c> below the wielder's INT), which
-    /// <see cref="ContentValidator.ValidateEnchantments"/>' lock rule and a
-    /// catalogue whose smallest lock is 15 both keep out of reach.
+    /// none: the guard lives in <see cref="TierCost"/>, which is this member
+    /// floored at 1 and is what the climb charges <em>and</em> what a readout
+    /// prints — one expression, so a tier can never be shown at one price and
+    /// charged at another. This member is the doc's line and what a caller asking
+    /// the unfloored arithmetic (the farm's grant of one tier's bar) reads; the
+    /// two part company only where the floor bites (<c>Lock x Tier</c> below the
+    /// wielder's INT), which <see cref="ContentValidator.ValidateEnchantments"/>'
+    /// lock rule and a catalogue whose smallest lock is 15 both keep out of
+    /// reach.
     /// </para>
     /// </summary>
     /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
@@ -216,19 +218,20 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     }
 
     /// <summary>
-    /// What leaving the tier this entry is on costs the replay:
+    /// What leaving the tier this entry is on actually costs:
     /// <see cref="XpToNextTier"/>, floored at 1. The floor lives here and never
     /// inside that member, which stays the doc's line — the same split
     /// <see cref="Progression"/> already makes between <c>XpToNext</c> and its own
-    /// private step, for the same reason: <see cref="WithXp"/>'s loop is the only
-    /// caller a free step could hang. Going through the public member rather than
-    /// restating its arithmetic is what keeps a tier from having two prices — the
-    /// one a readout shows and the one the climb charges — since the replay walks
-    /// the entry itself and asks each tier its own bar.
+    /// private step, for the same reason: <see cref="WithXp"/>'s loop is the one
+    /// caller a free step could hang. It is public because the price a readout
+    /// prints is the price the climb charges (§3.3: a bar is what it costs to
+    /// leave the tier), and a HUD restating <c>Math.Max(1, …)</c> for itself
+    /// would be the second expression this split exists to avoid.
     /// <see cref="ContentValidator.ValidateEnchantments"/> refuses a lock below 1
     /// at load, so the floor is a second door on a closed one.
     /// </summary>
-    private int TierCost(int stat) => Math.Max(1, XpToNextTier(stat));
+    /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
+    public int TierCost(int stat) => Math.Max(1, XpToNextTier(stat));
 
     /// <summary>
     /// Levels one application grants from <paramref name="sourceNumber"/> —
