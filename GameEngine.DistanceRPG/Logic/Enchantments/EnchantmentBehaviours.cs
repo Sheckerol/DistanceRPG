@@ -28,6 +28,15 @@ namespace GameEngine.DistanceRPG.Logic;
 /// attached entry at (step, attachment index), so attachment order reads as
 /// the priority it is, and <see cref="EventTable.On{TPayload}"/> refuses a
 /// compiled handler beside it on the step.
+/// <para>
+/// <strong>A dormant entry is skipped everywhere</strong> (§3.1): every loop
+/// asks <see cref="ActorState.IsDormant"/> before it looks a kind up, and the
+/// two compiled defender handlers ask it of the index
+/// <see cref="DefenderSoul"/> found. An entry whose lock went unpaid does not
+/// fire and pays nothing — the same non-event as a trigger the wielder cannot
+/// afford — so the skip sits ahead of the table lookup rather than inside any
+/// behaviour, and a kind added to a table inherits it.
+/// </para>
 /// </summary>
 public static class EnchantmentBehaviours
 {
@@ -234,6 +243,7 @@ public static class EnchantmentBehaviours
         if (weapon == null) return payload;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (self.IsDormant(i)) continue;
             var enchantment = weapon.Enchantments[i];
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
@@ -270,6 +280,7 @@ public static class EnchantmentBehaviours
         if (weapon == null) return payload;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (self.IsDormant(i)) continue;
             var enchantment = weapon.Enchantments[i];
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
@@ -292,8 +303,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (self.IsDormant(i)) continue;
+            var enchantment = weapon.Enchantments[i];
             if (!OnDamageDealt.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
@@ -306,8 +319,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (self.IsDormant(i)) continue;
+            var enchantment = weapon.Enchantments[i];
             if (!OnKilled.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
@@ -320,8 +335,10 @@ public static class EnchantmentBehaviours
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (self.IsDormant(i)) continue;
+            var enchantment = weapon.Enchantments[i];
             if (!OnHealingAboveFull.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
@@ -620,8 +637,8 @@ public static class EnchantmentBehaviours
     public static DamagePayload Sturdy(DamagePayload payload, ActorState self, ActorState other)
     {
         if (!other.Alive) return payload;
-        var (entry, weapon) = DefenderSoul(other, EffectKind.Sturdy);
-        if (entry == null || weapon == null) return payload;
+        var (entry, weapon, index) = DefenderSoul(other, EffectKind.Sturdy);
+        if (entry == null || weapon == null || other.IsDormant(index)) return payload;
 
         int survivesAt = Math.Max(1, entry.LevelsFor(entry.Def.Potency));
         int wouldTake = payload.Dealt - payload.WardSpent - payload.Spared;
@@ -648,8 +665,8 @@ public static class EnchantmentBehaviours
     {
         if (payload.Displace is not { Tiles: > 0 } || payload.OnDefendersTurn) return payload;
         if (!other.Alive || other.Hp <= payload.Taken) return payload;
-        var (entry, weapon) = DefenderSoul(other, EffectKind.Immovable);
-        if (entry == null || weapon == null) return payload;
+        var (entry, weapon, index) = DefenderSoul(other, EffectKind.Immovable);
+        if (entry == null || weapon == null || other.IsDormant(index)) return payload;
 
         var (fired, paid) = PartialFire(entry, weapon, Once, Math.Max(0, other.Mana - payload.DefenderManaToSpend));
         if (fired <= 0) return payload;
@@ -733,12 +750,26 @@ public static class EnchantmentBehaviours
         return typed + element.LevelsFor(element.Def.Potency);
     }
 
-    /// <summary>The soul of <paramref name="kind"/> the defender carries, and the weapon carrying it; nulls when it holds none.</summary>
-    private static (Enchantment? Entry, Weapon? Weapon) DefenderSoul(ActorState defender, EffectKind kind)
+    /// <summary>
+    /// The soul of <paramref name="kind"/> the defender carries, the weapon
+    /// carrying it, and its position in that weapon's attachment order; nulls
+    /// and -1 when it holds none.
+    /// <para>
+    /// The index is what the handlers that are <em>not</em> in a loop need to
+    /// obey dormancy (§3.1): these are exactly the entries with the largest
+    /// locks, so a dormant Sturdy sparing a life would break "a lock you cannot
+    /// afford leaves the enchantment dormant" where it matters most. The walk
+    /// was here already; it now says where it stopped.
+    /// </para>
+    /// </summary>
+    private static (Enchantment? Entry, Weapon? Weapon, int Index) DefenderSoul(ActorState defender, EffectKind kind)
     {
         var weapon = defender.EquippedWeapon;
-        var entry = weapon?.Enchantments.FirstOrDefault(e => e.Def.Effect == kind);
-        return (entry, weapon);
+        if (weapon == null) return (null, null, -1);
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
+            if (weapon.Enchantments[i].Def.Effect == kind)
+                return (weapon.Enchantments[i], weapon, i);
+        return (null, weapon, -1);
     }
 
     private static bool Fired(ImmutableArray<string> fired, string id)

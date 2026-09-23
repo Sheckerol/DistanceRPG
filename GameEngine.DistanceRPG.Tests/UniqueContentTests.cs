@@ -41,18 +41,12 @@ public class UniqueContentTests
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
-    {
-        var c = TestPools.Char(id);
-        c.Inventory[0] = weapon;
-        return c;
-    }
+        => TestPools.Holding(id, weapon);
 
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     private static EnemyState Enemy(int r, int c, string weaponId = "arming_sword", int hp = 200)

@@ -482,7 +482,7 @@ public sealed class DungeonHud
         string modifiers = ModifierReadout(weapon, wielder, attacksThisTurn);
         if (modifiers.Length > 0)
             runs.Add(new Run($"* {modifiers}", White));
-        string enchantments = EnchantmentReadout(weapon);
+        string enchantments = EnchantmentReadout(weapon, wielder);
         if (enchantments.Length > 0)
             runs.Add(new Run($"* {enchantments}", Cyan));
         return runs;
@@ -660,10 +660,39 @@ public sealed class DungeonHud
         };
     }
 
-    /// <summary>The weapon's enchantments in attachment order, the tier after any above 1 (<c>VAMPIRIC T3</c>). Empty for none.</summary>
-    internal static string EnchantmentReadout(Weapon weapon)
-        => string.Join("  ", weapon.Enchantments.Select(e =>
-            e.Tier > 1 ? $"{e.Def.Name.ToUpperInvariant()} T{e.Tier}" : e.Def.Name.ToUpperInvariant()));
+    /// <summary>
+    /// The weapon's enchantments in attachment order, the tier after any above
+    /// 1 (<c>VAMPIRIC T3</c>). Empty for none.
+    /// <para>
+    /// In <paramref name="wielder"/>'s hands each entry also names what it takes
+    /// out of that wielder's pool — <c>LOCK 60</c> — and an entry whose lock
+    /// went unpaid is marked <c>(ASLEEP)</c>, since a dormant entry is a
+    /// non-event the player has otherwise no way to see (§3.1). A lock is a
+    /// reservation out of a <em>pool</em>, so it reads only where there is one:
+    /// an item in the bag, or one asked about with no wielder, prints its
+    /// entries alone — the same split <see cref="ModifierReadout"/> makes
+    /// between a weapon in hand and a weapon in the bag.
+    /// </para>
+    /// </summary>
+    internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
+        var parts = new List<string>();
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
+        {
+            var entry = weapon.Enchantments[i];
+            string text = entry.Def.Name.ToUpperInvariant();
+            if (entry.Tier > 1) text += $" T{entry.Tier}";
+            if (equipped)
+            {
+                text += $" LOCK {entry.EffectiveLock}";
+                if (wielder!.IsDormant(i)) text += " (ASLEEP)";
+            }
+            parts.Add(text);
+        }
+        return string.Join("  ", parts);
+    }
 
     private static string ShapeName(AreaShape shape) => shape.Kind.ToString().ToUpperInvariant();
 

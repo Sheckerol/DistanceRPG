@@ -14,11 +14,7 @@ public class CritRiderTests
     private const float Tile = GameConstants.Tile;
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
-    {
-        var c = TestPools.Char(id);
-        c.Inventory[0] = weapon;
-        return c;
-    }
+        => TestPools.Holding(id, weapon);
 
     /// <summary>The settled payload through a fresh compiled chain with no applier: the numbers alone, nothing written.</summary>
     private static DamagePayload Settle(ActorState attacker, ActorState defender, int roll)

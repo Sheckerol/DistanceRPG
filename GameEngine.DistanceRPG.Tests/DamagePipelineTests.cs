@@ -38,11 +38,7 @@ public class DamagePipelineTests
     private static readonly Weapon Spear = TestWeapons.Get("skirmishers_pike");     // dmg 7, Brace x1
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
-    {
-        var c = TestPools.Char(id);
-        c.Inventory[0] = weapon;
-        return c;
-    }
+        => TestPools.Holding(id, weapon);
 
     /// <summary>The HUD-facing resolution through the compiled chain, writing nothing.</summary>
     private static AttackResolution Resolve(ActorState attacker, ActorState defender, int roll)

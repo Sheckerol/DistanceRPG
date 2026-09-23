@@ -47,8 +47,7 @@ public class DropCollectionTests
     /// </summary>
     private static Farm Build(string dummyWeaponId = "hatchet", int defeatCount = 0, int spawnIndex = 0, long mapSeed = Seed)
     {
-        var a = TestPools.Char("A", x: 5 * Tile + 16, y: 5 * Tile + 16);
-        a.Inventory[0] = Chisel();
+        var a = TestPools.Holding("A", Chisel(), x: 5 * Tile + 16, y: 5 * Tile + 16);
         var enemy = new EnemyState
         {
             X = 5 * Tile + 16 + 40f,

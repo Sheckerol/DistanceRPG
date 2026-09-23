@@ -51,8 +51,7 @@ public class FarmingTests
     private static Farm Build(Weapon? held = null, string dummyWeaponId = "hatchet",
         Func<int>? roll = null, long mapSeed = 0)
     {
-        var a = TestPools.Char("A", x: 5 * Tile + 16, y: 5 * Tile + 16);
-        a.Inventory[0] = held ?? Chisel();
+        var a = TestPools.Holding("A", held ?? Chisel(), x: 5 * Tile + 16, y: 5 * Tile + 16);
         var enemy = Dummy(dummyWeaponId, 5 * Tile + 16 + 40f, 5 * Tile + 16);
         var turns = new TurnSystem(new int[20, 20], new[] { a }, new[] { enemy }, roll ?? (() => 10), mapSeed);
         return new Farm(turns, a, enemy);
@@ -344,8 +343,7 @@ public class FarmingTests
 
         static (int, int, int, int) TwoDummies(bool nearestFirst)
         {
-            var a = TestPools.Char("A", x: 5 * Tile + 16, y: 5 * Tile + 16);
-            a.Inventory[0] = Chisel();
+            var a = TestPools.Holding("A", Chisel(), x: 5 * Tile + 16, y: 5 * Tile + 16);
             var first = Dummy("hatchet", 5 * Tile + 16 + 40f, 5 * Tile + 16, spawnIndex: 0);
             var second = Dummy("hatchet", 5 * Tile + 16, 5 * Tile + 16 + 40f, spawnIndex: 1);
             var turns = new TurnSystem(new int[20, 20], new[] { a }, new[] { first, second }, () => 10, Mixed);

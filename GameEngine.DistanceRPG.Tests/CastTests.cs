@@ -17,11 +17,7 @@ public class CastTests
     private const float Tile = GameConstants.Tile;
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
-    {
-        var c = TestPools.Char(id, x: x, y: y);
-        c.Inventory[0] = TestWeapons.Get(weaponId);
-        return c;
-    }
+        => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
 
     private static EnemyState Enemy(float x, float y, string weaponId = "arming_sword")
         => new() { X = x, Y = y, Weapon = TestWeapons.Get(weaponId) };
@@ -385,7 +381,7 @@ public class CastTests
         Assert.Equal(12, near.StatusLevel(Poison));
         Assert.Empty(far.StatusEffects);
         Assert.Equal(TestPools.FixtureHp, near.Hp);   // it ticks at the member's own turn end
-        Assert.Equal(GameConstants.MaxMana - 4 * 19, caster.Mana);
+        Assert.Equal(caster.UsableMaxMana - 4 * 19, caster.Mana);   // its Poison reserves 20 of the flat 100 while equipped
         Assert.Equal(new[] { 3, 6, 9, 12 }, applied.Select(x => x.Effect.Levels));
         Assert.All(applied, x => { Assert.Same(near, x.Target); Assert.Same(caster, x.Source); });
         Assert.Equal(new[] { near, near, near, near }, buffed);
@@ -419,7 +415,7 @@ public class CastTests
         Assert.Equal(new[] { (ally, 1), (ally, 2), (ally, 3), (ally, 4) }, buffed);
         Assert.Equal(14, ally.Hp);
         Assert.Equal(3, ally.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 4 * 14, healer.Mana);   // its budget is spent: nothing left to bank
+        Assert.Equal(healer.UsableMaxMana - 4 * 14, healer.Mana);   // its budget is spent: nothing left to bank, out of the 85 a Renewal staff's lock leaves
     }
 
     [Fact]

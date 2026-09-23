@@ -17,11 +17,7 @@ namespace GameEngine.DistanceRPG.Tests;
 public class HudTextTests
 {
     private static PartyMemberState Holding(string weaponId, DamageType? element = null)
-    {
-        var member = TestPools.Char("A");
-        member.Inventory[0] = TestWeapons.Get(weaponId, element);
-        return member;
-    }
+        => TestPools.Holding("A", TestWeapons.Get(weaponId, element));
 
     private static string[] Badges(ActorState actor) => DungeonHud.StatusBadgeRuns(actor).Select(r => r.Text).ToArray();
 
@@ -71,6 +67,37 @@ public class HudTextTests
     [Fact]
     public void EnchantmentReadout_KeepsAttachmentOrder_AndShowsTiersAboveOne()
         => Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(TestWeapons.Get("flensing_knife_unique")));
+
+    [Fact]
+    public void EnchantmentReadout_MarksTheLockAndWhatIsAsleep()
+    {
+        // In a wielder's hands each entry names what it takes out of that
+        // wielder's pool, and one whose lock went unpaid says so: a dormant
+        // entry is a non-event the player has otherwise no way to see (section
+        // 3.1). The Nameless Knife is the case that bites -- 20 + 60 + 25 wanted
+        // of a hundred-point pool, so the last of the three sleeps.
+        var knife = TestWeapons.Get("flensing_knife_unique");
+        var member = TestPools.Char("A");
+        member.Inventory[0] = knife;
+
+        Assert.Equal((80, 20), (member.PaidLocks, member.UsableMaxMana));
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25 (ASLEEP)",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // Grown past all three, nothing is asleep and the locks still read.
+        while (member.IsDormant(2))
+            member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // A lock is a reservation out of a pool, so it reads only where there is
+        // one: the same item in the bag, or asked about with no wielder at all,
+        // prints its entries alone.
+        var bagged = TestPools.Char("B");
+        bagged.Inventory[1] = knife;
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife, bagged));
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife));
+    }
 
     [Fact]
     public void StatusBadges_NameALingeringElementByItsElement_HideThePool_AndLeadWithParalysis()

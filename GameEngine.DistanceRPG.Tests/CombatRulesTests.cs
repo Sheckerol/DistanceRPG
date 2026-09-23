@@ -15,10 +15,8 @@ public class CombatRulesTests
     /// <summary>Resolve through the compiled chain with a party member holding each weapon (null: unarmed).</summary>
     private static AttackResolution Resolve(Weapon attackerWeapon, Weapon? defenderWeapon, int roll)
     {
-        var attacker = TestPools.Char("A");
-        attacker.Inventory[0] = attackerWeapon;
-        var defender = TestPools.Char("B");
-        defender.Inventory[0] = defenderWeapon;
+        var attacker = TestPools.Holding("A", attackerWeapon);
+        var defender = TestPools.Holding("B", defenderWeapon);
         return CombatRules.ResolveAttack(attacker, defender, attackerWeapon, distanceUnits: 0, () => roll);
     }
 

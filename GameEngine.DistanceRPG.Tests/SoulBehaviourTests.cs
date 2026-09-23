@@ -23,17 +23,13 @@ public class SoulBehaviourTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     private static PartyMemberState Holding(string id, int r, int c, Weapon weapon)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = weapon;
-        return ch;
+        return TestPools.Holding(id, weapon, x: x, y: y);
     }
 
     /// <summary>A dummy on a tile's centre with no Block (fists) unless told otherwise, and enough HP that nothing here kills it by accident.</summary>
@@ -143,7 +139,7 @@ public class SoulBehaviourTests
         var enemies = new TurnSystem(grid, new[] { b }, new[] { wall }, () => 10);
         Assert.True(enemies.TryAttack(b, wall));
         Assert.Equal(At(5, 6), (wall.X, wall.Y));
-        Assert.Equal(GameConstants.MaxMana - 10, wall.Mana);
+        Assert.Equal(wall.UsableMaxMana - 10, wall.Mana);   // the Wall's Immovable reserves 25 of the dummy's flat 100
         Assert.Equal(200 - 10, wall.Hp);
 
         // Through a real enemy phase: the dummy's three swings each shove at the line, and the line holds

@@ -340,6 +340,13 @@ public sealed class TurnSystem
     /// back, one now outside a shorter reach is released so a real entry
     /// counts again. A held shot lapses with the weapon that held it; the
     /// movement it cost is not refunded. Nothing fires: nobody moved.
+    /// <para>
+    /// The equipped set is also what prices the enchantment locks (§3.3), so
+    /// the pool is clamped to <see cref="ActorState.UsableMaxMana"/> here: a
+    /// wielder taking up a locked weapon cannot go on holding mana the new
+    /// reservation has taken. Putting one down returns the ceiling in full and
+    /// refunds nothing, which is what the clamp not being a refill says.
+    /// </para>
     /// </summary>
     public void NotifyWeaponChanged(ActorState actor)
     {
@@ -347,6 +354,7 @@ public sealed class TurnSystem
         if (!_sides.ContainsKey(actor))
             throw new InvalidOperationException("Changed the weapon of an actor that is not on this turn system's roster.");
 
+        actor.Mana = Math.Min(actor.Mana, actor.UsableMaxMana);
         actor.HeldShots = 0;
         if (actor.Alive)
             RefreshZoneOf(actor);
@@ -1607,16 +1615,18 @@ public sealed class TurnSystem
     /// The ManaSpent applier: take what the chain settled as spent off the
     /// actor's pool (every actor carries one, so no feed is needed), never
     /// below zero; then hand back what the record restores — Siphon's refund
-    /// — never past the pool; then credit what was spent to the payer's mana
-    /// pool (§2.2), the refund left out of it. Nothing for a record settled at
-    /// zero both ways.
+    /// — never past the pool, which is the <em>spendable</em> one
+    /// (<see cref="ActorState.UsableMaxMana"/>, §3.3): a refund fills what a
+    /// spend can empty and never the part the equipped locks have reserved.
+    /// Then credit what was spent to the payer's mana pool (§2.2), the refund
+    /// left out of it. Nothing for a record settled at zero both ways.
     /// </summary>
     private void ApplyManaSpent(ManaPayload settled, ActorState self, ActorState other, EventTable table)
     {
         if (settled.Spent <= 0 && settled.Restored <= 0) return;
         int after = Math.Max(0, self.Mana - settled.Spent);
         if (settled.Restored > 0)
-            after = Math.Min(self.MaxMana, after + settled.Restored);
+            after = Math.Min(self.UsableMaxMana, after + settled.Restored);
         self.Mana = after;
 
         // Mana actually spent (§2.2): what the pool paid, never what the spend

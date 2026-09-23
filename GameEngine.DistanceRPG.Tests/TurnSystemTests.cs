@@ -7,11 +7,7 @@ public class TurnSystemTests
     private const float Tile = GameConstants.Tile;
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
-    {
-        var c = TestPools.Char(id, x: x, y: y);
-        c.Inventory[0] = TestWeapons.Get(weaponId);
-        return c;
-    }
+        => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
 
     /// <summary>Advance the state machine in small steps.</summary>
     private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)

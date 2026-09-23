@@ -19,9 +19,7 @@ public class OverwatchTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     /// <summary>A sword dummy on A's row, 60 units outside the Crossbow's reach: its 100-unit approach crosses in.</summary>

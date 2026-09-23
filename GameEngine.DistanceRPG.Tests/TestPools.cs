@@ -50,6 +50,42 @@ public static class TestPools
         => Fresh(id, InnateStats.None, colorIndex, x, y).Grown();
 
     /// <summary>
+    /// A fixture member with <paramref name="weapon"/> already in hand, grown
+    /// until its <em>spendable</em> pool is <see cref="FixtureMana"/>: what
+    /// every per-file <c>Char(id, r, c, weaponId)</c> helper builds.
+    /// <para>
+    /// <strong>Equipped first, then grown, and grown against
+    /// <see cref="ActorState.UsableMaxMana"/>.</strong> An enchantment reserves
+    /// max mana while it is equipped (§3.3), so a member handed the suite's 100
+    /// and then a Nameless Knife would have 100 earned and 0 spendable, and
+    /// every shipped trigger number in the file holding it would have to be
+    /// re-derived against a pool the scenario was never about. Growing past the
+    /// locks keeps <see cref="FixtureMana"/> meaning what it has always meant:
+    /// the mana this fixture can actually spend.
+    /// </para>
+    /// <para>
+    /// The extra points are credited exactly as <see cref="Grown"/> credits the
+    /// first hundred — one threshold at a time, through
+    /// <see cref="PartyMemberState.Credit"/> — so the member stays in a state
+    /// play could reach. The loop reads the spendable pool afresh each turn
+    /// because it is not monotonic in the earned one: the point that finally
+    /// covers a sleeping entry's lock wakes it and takes the whole lock at once.
+    /// </para>
+    /// </summary>
+    public static PartyMemberState Holding(string id, Weapon? weapon, int colorIndex = 0, float x = 0f, float y = 0f)
+    {
+        var member = Fresh(id, InnateStats.None, colorIndex, x, y);
+        member.Inventory[0] = weapon;
+        member.Grown();
+
+        while (member.UsableMaxMana < FixtureMana)
+            member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+        member.Mana = member.UsableMaxMana;
+
+        return member;
+    }
+
+    /// <summary>
     /// A member as the game makes one: a spread and nothing earned, so both
     /// pools read <see cref="Tuning.StartingPool"/>. For tests that are about
     /// progression itself; a combat fixture wants <see cref="Char"/>.
@@ -80,8 +116,10 @@ public static class TestPools
 
         // A gained mana point arrives empty on purpose -- crediting on a spend
         // must not refund the cast -- so the pool a fixture spawns holding is
-        // filled here. HP needs no line: its points arrive filled.
-        member.Mana = member.MaxMana;
+        // filled here, to the spendable ceiling rather than the earned one
+        // (section 3.3: nobody ever holds mana the equipped locks reserved).
+        // HP needs no line: its points arrive filled.
+        member.Mana = member.UsableMaxMana;
 
         return member;
     }

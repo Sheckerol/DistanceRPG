@@ -63,8 +63,7 @@ public class CampaignStateTests
         var roster = GameContent.Current.Party.All;
         foreach (var def in roster)
         {
-            var carrier = TestPools.Char(def.Id);
-            carrier.Inventory[0] = TestWeapons.Get(def.StartingWeaponId);
+            var carrier = TestPools.Holding(def.Id, TestWeapons.Get(def.StartingWeaponId));
             for (int i = 0; i < def.BagWeaponIds.Count; i++)
                 carrier.Inventory[i + 1] = TestWeapons.Get(def.BagWeaponIds[i]);
             campaign.See(carrier);

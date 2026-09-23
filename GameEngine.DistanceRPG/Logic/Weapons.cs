@@ -130,6 +130,29 @@ public sealed class Weapon
     public Enchantment? Innate => IsCaster && Enchantments.Count > 0 ? Enchantments[0] : null;
 
     /// <summary>
+    /// What this item would reserve of a wielder's pool if every entry fitted:
+    /// the sum of the attached entries' <see cref="Enchantment.EffectiveLock"/>
+    /// (§3.3). It is the item's own figure and knows no wielder, exactly as
+    /// <see cref="ResolvedCost"/> does; what is actually taken out of a pool is
+    /// <see cref="ActorState.PaidLocks"/>, which stops at the first entry that
+    /// does not fit and leaves the rest dormant.
+    /// <para>
+    /// Derived rather than cached, because a tier is: <see cref="CreditEnchantment"/>
+    /// replaces an entry and the deeper lock has to show through the same read.
+    /// </para>
+    /// </summary>
+    public int TotalLock
+    {
+        get
+        {
+            int total = 0;
+            foreach (var entry in _enchantments)
+                total += entry.EffectiveLock;
+            return total;
+        }
+    }
+
+    /// <summary>
     /// The movement a swing or cast costs after Light's discount:
     /// <c>Cost * (100 - Modifiers.Value(Light)) / 100</c>, truncated. Computed
     /// once and cached, so the HUD and the movement gate agree on one number.
