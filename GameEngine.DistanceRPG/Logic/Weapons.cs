@@ -203,6 +203,13 @@ public sealed class Weapon
     /// (§3.3), and the farm's grant is another — "a plain XP grant instead of a
     /// special case" (§3.5) — so the farm has no path of its own into a tier.
     /// </para>
+    /// <para>
+    /// The trigger's callers are the five appliers that write a mana record: the
+    /// Cast, DamageTaken, DamageDealt, Killed and HealingAboveFull events each
+    /// credit the entries their loop attributed a payment to
+    /// (<see cref="EnchantmentPayment"/>). A handler never calls this — a handler
+    /// never writes — and neither does a behaviour, which has no index.
+    /// </para>
     /// </summary>
     /// <param name="index">The entry's position in <see cref="Enchantments"/>.</param>
     /// <param name="xp">Mana that entry paid; never negative.</param>

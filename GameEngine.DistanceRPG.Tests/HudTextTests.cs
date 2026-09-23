@@ -100,6 +100,47 @@ public class HudTextTests
     }
 
     [Fact]
+    public void EnchantmentReadout_ShowsTheTierAndItsProgress()
+    {
+        // Tier is earned by use (section 3.3), and the bar is the only thing
+        // that says a swing is buying anything: an entry with mana in the tier
+        // it is on reads XP n/m beside its lock, where m is that tier's own cost
+        // over the wielder's INT -- the same number XpToNextTier prints and the
+        // climb charges. Nothing spent, nothing printed: the row stays the line
+        // it has always been.
+        var knife = TestWeapons.Get("flensing_knife_unique");
+        var member = TestPools.Char("A");
+        member.Inventory[0] = knife;
+        while (member.IsDormant(2))
+            member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60  OVERHEAL LOCK 25",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // One swing's worth of triggers: Serrated and Overheal are uniques, so
+        // they bank a figure and print no bar -- there is no next tier to be
+        // partway to -- while Vampiric is climbing its tier-3 bar of sixty.
+        knife.CreditEnchantment(0, 2, InnateStats.Low);
+        knife.CreditEnchantment(1, 2, InnateStats.Low);
+        knife.CreditEnchantment(2, 8, InnateStats.Low);
+        Assert.Equal("SERRATED LOCK 20 XP 2  VAMPIRIC T3 LOCK 60 XP 2/60  OVERHEAL LOCK 25 XP 8",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // The bar is the wielder's INT dividing the tier's cost, so it is the
+        // wielder's number: a wizard holding the same knife is a quarter of the
+        // way where a member with no nature is a thirtieth.
+        var wizard = TestPools.Char("B", stats: new InnateStats(STR: 1, DEX: 2, CON: 3, INT: 4));
+        wizard.Inventory[0] = knife;
+        while (wizard.IsDormant(2))
+            wizard.Credit(new XpCredit(XpPool.Mana, null, wizard.ManaPool.XpToNext));
+        Assert.Contains("VAMPIRIC T3 LOCK 60 XP 2/15", DungeonHud.EnchantmentReadout(knife, wizard));
+
+        // Like the lock, progress reads only where there is a wielder: in the
+        // bag or asked about with none, the row is the entry's name and tier.
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife));
+    }
+
+    [Fact]
     public void ManaReadout_NamesTheSpendableCeilingWhereTheLocksTookThePool()
     {
         // The budget line is where a lock would otherwise be invisible: with the

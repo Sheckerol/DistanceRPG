@@ -40,6 +40,20 @@ namespace GameEngine.DistanceRPG.Logic;
 /// cannot afford — so the skip sits ahead of the table lookup rather than
 /// inside any behaviour, and a kind added to a table inherits it.
 /// </para>
+/// <para>
+/// <strong>What an entry pays is attributed to it as it fires</strong> (§3.3:
+/// mana spent is an enchantment's experience): every loop reads the movement of
+/// its payload's <c>ManaToSpend</c> across the one call and appends an
+/// <see cref="EnchantmentPayment"/> naming that entry's index, which the event's
+/// applier credits. The behaviours are untouched by it — <see cref="PartialFire"/>
+/// and <see cref="FireWhole"/> compute what is paid and have no index; the loop
+/// has the index and never computes a payment.
+/// <strong>The two souls a defender carries are deliberately outside this.</strong>
+/// They pay out of <c>DefenderManaToSpend</c>, which is the defender's record and
+/// not the attacker's <c>Payments</c>; both are unique souls, pinned at tier 1, so
+/// a credit would buy nothing, and a second defender-side payments list would be
+/// machinery with one implementer. They fire, they pay mana, and they do not tier.
+/// </para>
 /// </summary>
 public static class EnchantmentBehaviours
 {
@@ -254,6 +268,16 @@ public static class EnchantmentBehaviours
     /// its total, or an entry that applied nothing would be charged with its
     /// neighbour's levels.
     /// </para>
+    /// <para>
+    /// Its <em>payment</em> is attributed the same way and in the same place
+    /// (§3.3): the movement of <see cref="CastPayload.ManaToSpend"/> across the
+    /// one call becomes an <see cref="EnchantmentPayment"/> naming the entry's
+    /// index, which is how the applier knows whose experience the mana was. The
+    /// loop never computes what an entry pays — that is
+    /// <see cref="PartialFire"/>'s and <see cref="FireWhole"/>'s, inside the
+    /// behaviour, which has no index — it only reads the difference off the
+    /// payload.
+    /// </para>
     /// </summary>
     public static CastPayload CastLoop(CastPayload payload, ActorState self, ActorState other)
     {
@@ -267,10 +291,14 @@ public static class EnchantmentBehaviours
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
             int before = AppliedLevels(payload);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
             int added = AppliedLevels(payload) - before;
             if (added > 0 && weapon.IsForged(i))
                 payload = payload with { ForgedLevels = payload.ForgedLevels + added };
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
@@ -292,6 +320,15 @@ public static class EnchantmentBehaviours
     /// payload rather than asked of the behaviour, so a kind added to the table
     /// is attributed without the loop knowing it exists.
     /// </para>
+    /// <para>
+    /// The same three lines attribute its payment (§3.3): the movement of
+    /// <see cref="DamagePayload.ManaToSpend"/> across the one call becomes an
+    /// <see cref="EnchantmentPayment"/> naming the entry's index, which is what
+    /// the applier credits the entry's own ladder with. No kind in this table
+    /// pays here today — an element's trigger is the cast's — so the list is
+    /// empty on every shipped hit; the attribution is the loop's all the same,
+    /// so a kind that does pay at step 4 needs no edit here.
+    /// </para>
     /// </summary>
     public static DamagePayload DamageTakenLoop(DamagePayload payload, ActorState self, ActorState other)
     {
@@ -305,10 +342,14 @@ public static class EnchantmentBehaviours
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
             int before = payload.EnchantmentShare;
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
             int added = payload.EnchantmentShare - before;
             if (added > 0 && weapon.IsForged(i))
                 payload = payload with { ForgedShare = payload.ForgedShare + added };
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
@@ -317,7 +358,9 @@ public static class EnchantmentBehaviours
     /// The loop on DamageDealt: <c>self</c> is the attacker whose hit landed,
     /// <c>other</c> the defender it landed on. The hit's own payments were
     /// taken before this event was drained, so each entry sees the pool as it
-    /// stands less what the entries before it settled here.
+    /// stands less what the entries before it settled here — and each one's
+    /// payment is attributed to it as it fires (§3.3), the delta off the
+    /// payload, exactly as <see cref="DamageTakenLoop"/> attributes a share.
     /// </summary>
     public static DamagePayload DamageDealtLoop(DamagePayload payload, ActorState self, ActorState other)
     {
@@ -330,12 +373,16 @@ public static class EnchantmentBehaviours
             var enchantment = weapon.Enchantments[i];
             if (!OnDamageDealt.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
 
-    /// <summary>The loop on Killed: <c>self</c> is the killer, <c>other</c> the dead — or both the corpse, for a tick death, which the entries read off the null weapon.</summary>
+    /// <summary>The loop on Killed: <c>self</c> is the killer, <c>other</c> the dead — or both the corpse, for a tick death, which the entries read off the null weapon. Each entry's payment is attributed to it as it fires (§3.3).</summary>
     public static KillPayload KilledLoop(KillPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
@@ -347,12 +394,16 @@ public static class EnchantmentBehaviours
             var enchantment = weapon.Enchantments[i];
             if (!OnKilled.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
 
-    /// <summary>The loop on HealingAboveFull: <c>self</c> is the actor healed past full, whose weapon's entries react to its surplus; <c>other</c> the source.</summary>
+    /// <summary>The loop on HealingAboveFull: <c>self</c> is the actor healed past full, whose weapon's entries react to its surplus; <c>other</c> the source. Each entry's payment is attributed to it as it fires (§3.3), and the applier credits them against <c>self</c>'s own weapon, since the payload names none.</summary>
     public static HealPayload HealingAboveFullLoop(HealPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
@@ -364,7 +415,11 @@ public static class EnchantmentBehaviours
             var enchantment = weapon.Enchantments[i];
             if (!OnHealingAboveFull.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }

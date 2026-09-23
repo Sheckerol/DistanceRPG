@@ -42,12 +42,18 @@ public static class TestPools
     public const int FixtureMana = 100;
 
     /// <summary>
-    /// A fixture member: no innate nature, both pools grown to the suite's
-    /// numbers, nothing equipped. The caller fills the inventory and whatever
-    /// else its scenario needs.
+    /// A fixture member: no innate nature unless <paramref name="stats"/> names
+    /// one, both pools grown to the suite's numbers, nothing equipped. The caller
+    /// fills the inventory and whatever else its scenario needs.
+    /// <para>
+    /// A spread is worth asking for only where the scenario is about the divisor
+    /// — the enchantment ladder's INT, say — and it changes no maximum here: a
+    /// member is grown to <see cref="FixtureHp"/>/<see cref="FixtureMana"/> either
+    /// way, a wizard simply reaching them for less XP.
+    /// </para>
     /// </summary>
-    public static PartyMemberState Char(string id, int colorIndex = 0, float x = 0f, float y = 0f)
-        => Fresh(id, InnateStats.None, colorIndex, x, y).Grown();
+    public static PartyMemberState Char(string id, int colorIndex = 0, float x = 0f, float y = 0f, InnateStats? stats = null)
+        => Fresh(id, stats ?? InnateStats.None, colorIndex, x, y).Grown();
 
     /// <summary>
     /// A fixture member with <paramref name="weapon"/> already in hand, grown
@@ -72,9 +78,9 @@ public static class TestPools
     /// covers a sleeping entry's lock wakes it and takes the whole lock at once.
     /// </para>
     /// </summary>
-    public static PartyMemberState Holding(string id, Weapon? weapon, int colorIndex = 0, float x = 0f, float y = 0f)
+    public static PartyMemberState Holding(string id, Weapon? weapon, int colorIndex = 0, float x = 0f, float y = 0f, InnateStats? stats = null)
     {
-        var member = Fresh(id, InnateStats.None, colorIndex, x, y);
+        var member = Fresh(id, stats ?? InnateStats.None, colorIndex, x, y);
         member.Inventory[0] = weapon;
         member.Grown();
 

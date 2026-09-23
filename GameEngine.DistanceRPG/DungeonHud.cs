@@ -691,11 +691,22 @@ public sealed class DungeonHud
     /// entries alone — the same split <see cref="ModifierReadout"/> makes
     /// between a weapon in hand and a weapon in the bag.
     /// </para>
+    /// <para>
+    /// An entry with mana in the tier it is on also shows how far that has got it
+    /// — <c>XP 9/20</c> — because tier is earned by use (§3.3) and the bar is the
+    /// only thing that says a swing is buying anything. The bar is
+    /// <see cref="Enchantment.XpToNextTier"/> at the <em>wielder's</em> INT, so
+    /// like the lock it reads only where there is a wielder; a unique prints the
+    /// banked figure with no bar, since it is pinned at tier 1 and the mana buys
+    /// nothing. An entry that has spent nothing prints neither: there is no
+    /// progress to state, and the row stays the line it has always been.
+    /// </para>
     /// </summary>
     internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
+        int stat = (wielder as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
         var parts = new List<string>();
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
@@ -705,6 +716,8 @@ public sealed class DungeonHud
             if (equipped)
             {
                 text += $" LOCK {entry.EffectiveLock}";
+                if (entry.Xp > 0)
+                    text += entry.Unique ? $" XP {entry.Xp}" : $" XP {entry.Xp}/{entry.XpToNextTier(stat)}";
                 if (wielder!.IsDormant(i)) text += " (ASLEEP)";
             }
             parts.Add(text);

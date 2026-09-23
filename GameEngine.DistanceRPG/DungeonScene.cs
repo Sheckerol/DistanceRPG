@@ -589,6 +589,19 @@ public class DungeonScene : Scene
                 _hud.AddFloatingText(obj.Position, label, LevelUpColor, -64f);
         };
 
+        // The mana an entry spent burned the circle a step deeper (§3.3). The
+        // same beat as a level-up and for the same reason: the applier settled
+        // it, and the label only states what the entry now reads. It is the
+        // wielder's beat whichever side is wielding -- an enemy healer's staff
+        // levels by casting too -- so a dummy's tier-up simply finds no object
+        // to float over.
+        _turns.EnchantmentTiered += (wielder, weapon, entry) =>
+        {
+            Log.Info($"[Progress] {weapon.Name}: {entry.Def.Name} reaches tier {entry.Tier}");
+            if (TryObjectFor(wielder, out var obj) && obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"{entry.Def.Name.ToUpperInvariant()} T{entry.Tier}!", LevelUpColor, -64f);
+        };
+
         _turns.CharacterHealed += (c, amount) =>
         {
             Log.Info($"[Combat] {c.Id} regenerates {amount} — HP {c.Hp}");

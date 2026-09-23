@@ -97,6 +97,7 @@ public sealed class TurnSystem
     public event Action<ActorState>? OverwatchTriggered;                    // a held shot fired at a target entering reach
     public event Action<ActorState>? RiposteTriggered;                      // a successful block answered with a counter-swing
     public event Action<PartyMemberState, XpCredit, int>? XpCredited;       // a credit bought a member points or levels: the credit and how many (§2.2), for the level-up beat
+    public event Action<ActorState, Weapon, Enchantment>? EnchantmentTiered;   // mana an entry spent bought it a tier (§3.3): the wielder, the weapon the circle is cut into, and the entry as it now reads
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -1356,19 +1357,23 @@ public sealed class TurnSystem
         }
         ApplyTicks(settled.Ticks, self, table);
         if (settled.Overflow > 0)
-            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default, ManaToSpend = 0 }, self, other);
+            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default, ManaToSpend = 0, Payments = default }, self, other);
     }
 
     /// <summary>
     /// The HealingAboveFull applier: the status changes the chain settled —
     /// the levels Overheal granted the hidden pool, the pool converting into
     /// Ward — and the one mana record of the triggers the healed actor's
-    /// entries paid for them.
+    /// entries paid for them, each credited what it paid (§3.3). The payload
+    /// carries no weapon, only a source string, so the credit goes against the
+    /// healed actor's own equipped weapon: whose entries the loop ran, and
+    /// therefore what the payments' indices mean.
     /// </summary>
     private void ApplyHealingAboveFull(HealPayload settled, ActorState self, ActorState other, EventTable table)
     {
         ApplyTicks(settled.Ticks, self, table);
-        SpendMana(table, self.EquippedWeapon?.Id ?? settled.Source, self, other, settled.ManaToSpend);
+        int spent = SpendMana(table, self.EquippedWeapon?.Id ?? settled.Source, self, other, settled.ManaToSpend);
+        CreditEnchantments(self, settled.Payments, settled.ManaToSpend, spent);
     }
 
     /// <summary>
@@ -1612,8 +1617,13 @@ public sealed class TurnSystem
         // nothing and its hits credit themselves, each with its own share.
         CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.ForgedLevels));
 
+        // One record for the cast and the triggers its entries paid, and one
+        // credit per entry out of the same record (§3.3): the cast's own mana is
+        // nobody's experience, so it is in the record and not in the payments.
         int wanted = settled.ManaCost + settled.ManaToSpend;
-        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, caster.Mana), settled.Weapon.Id), caster, target);
+        int spent = Math.Min(wanted, caster.Mana);
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, spent, settled.Weapon.Id), caster, target);
+        CreditEnchantments(caster, settled.Payments, wanted, spent);
     }
 
     /// <summary>
@@ -1648,10 +1658,73 @@ public sealed class TurnSystem
     /// through. Nothing for nothing. Queued, so it settles before anything the
     /// same applier queues after it reads the pool.
     /// </summary>
-    private static void SpendMana(EventTable table, string source, ActorState payer, ActorState other, int wanted)
+    /// <returns>What the pool can actually pay of <paramref name="wanted"/> — the record's <see cref="ManaPayload.Spent"/>, which is also what the enchantment credits are scaled by (§3.3).</returns>
+    private static int SpendMana(EventTable table, string source, ActorState payer, ActorState other, int wanted)
     {
-        if (wanted <= 0) return;
-        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, payer.Mana), source), payer, other);
+        if (wanted <= 0) return 0;
+        int spent = Math.Min(wanted, payer.Mana);
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, spent, source), payer, other);
+        return spent;
+    }
+
+    /// <summary>
+    /// Credit the entries that paid for an event, out of the one mana record it
+    /// settled (§3.3: "mana is an enchantment's experience"). Each payment names
+    /// an index in the weapon the loop walked — <paramref name="payer"/>'s
+    /// equipped one, which is what every loop reads and therefore what every
+    /// index means, the healing appliers included, whose payload names no weapon
+    /// at all — and the credit is the mana that entry actually paid, at the INT
+    /// that was spending it. Nothing credits an entry that did not fire, which is
+    /// true by construction: the credit rides the payment.
+    /// <para>
+    /// <strong>Scaled by <c>spent / wanted</c>.</strong> The entries settled their
+    /// triggers against the pool as it stood, and the record never overdraws it,
+    /// so a record that came up short has to be shared rather than charged in
+    /// full: the same spend feeds max mana and the entries, and this is what keeps
+    /// the two figures one number (the rule <see cref="ManaPayload"/>'s own doc
+    /// comment states). Integer, with the rounding remainder going to the last
+    /// entry that paid, so the credits sum to the entries' share of
+    /// <paramref name="spent"/> exactly — and to the whole of it on the four
+    /// events where the record <em>is</em> the entries' payments. A cast's own
+    /// mana belongs to no entry and keeps its share.
+    /// </para>
+    /// <para>
+    /// The wielder's INT is the divisor and never a multiplier (§2.1, §3.3): a
+    /// wizard tiers an entry roughly four times as fast as a fighter off the same
+    /// spend, and an actor with no nature — an enemy healer, a dummy — divides by
+    /// <see cref="InnateStats.Low"/>, which is what its spend buys.
+    /// </para>
+    /// </summary>
+    private void CreditEnchantments(ActorState payer, ImmutableArray<EnchantmentPayment> payments, int wanted, int spent)
+    {
+        if (payments.IsDefaultOrEmpty || wanted <= 0 || spent <= 0) return;
+        var weapon = payer.EquippedWeapon;
+        if (weapon == null) return;
+
+        int stat = (payer as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
+        int paid = 0;
+        foreach (var payment in payments)
+            paid += payment.Paid;
+
+        // What the pool actually paid on the entries' behalf, and what their
+        // credits must add up to. Taken off the total rather than summed from the
+        // parts, so the truncation each part takes is handed back once, to the
+        // last entry that paid, instead of being lost a payment at a time.
+        int share = paid * spent / wanted;
+        int credited = 0;
+        for (int i = 0; i < payments.Length; i++)
+        {
+            int credit = i == payments.Length - 1 ? share - credited : payments[i].Paid * spent / wanted;
+            credited += credit;
+            if (credit <= 0) continue;
+
+            int index = payments[i].Index;
+            int before = weapon.Enchantments[index].Tier;
+            weapon.CreditEnchantment(index, credit, stat);
+            var entry = weapon.Enchantments[index];
+            if (entry.Tier > before)
+                EnchantmentTiered?.Invoke(payer, weapon, entry);
+        }
     }
 
     /// <summary>
@@ -1752,8 +1825,13 @@ public sealed class TurnSystem
         // The triggers the chain settled — the attacker's entries at step 4,
         // the defender's Sturdy and Immovable — are spent first, each side's
         // as one record, so everything queued after sees the pools as they stand.
-        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        // Then the attacker's entries are credited what they each paid of theirs
+        // (§3.3). The defender's two souls get no credit and that is deliberate:
+        // they pay out of their own record, are pinned at tier 1, and a credit
+        // would buy nothing.
+        int spent = SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
         SpendMana(table, target.EquippedWeapon?.Id ?? settled.Weapon.Id, target, attacker, settled.DefenderManaToSpend);
+        CreditEnchantments(attacker, settled.Payments, settled.ManaToSpend, spent);
 
         // The shot's line is read at impact, before the blow shoves anyone or a
         // counter moves the attacker: what DamageDealt's entries see when they
@@ -1804,7 +1882,8 @@ public sealed class TurnSystem
             foreach (var status in settled.ApplyToAttacker)
                 attacker.ApplyStatus(status.Type, status.Element, status.Levels);
 
-        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        int spent = SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        CreditEnchantments(attacker, settled.Payments, settled.ManaToSpend, spent);
         if (settled.HealToAttacker > 0)
             table.Enqueue(GameEvent.HealingReceived,
                 new HealPayload(settled.HealToAttacker, Applied: 0, Overflow: 0, settled.Weapon.Id), attacker, attacker);
@@ -1840,10 +1919,12 @@ public sealed class TurnSystem
 
         if (settled.ManaToSpend <= 0 && settled.ManaRestored <= 0) return;
         if (!killer.Alive) return;
+        int spent = Math.Min(settled.ManaToSpend, killer.Mana);
         table.Enqueue(GameEvent.ManaSpent,
-            new ManaPayload(settled.ManaToSpend, Math.Min(settled.ManaToSpend, killer.Mana),
+            new ManaPayload(settled.ManaToSpend, spent,
                 settled.Weapon?.Id ?? nameof(GameEvent.Killed), settled.ManaRestored),
             killer, dead);
+        CreditEnchantments(killer, settled.Payments, settled.ManaToSpend, spent);
     }
 
     /// <summary>
