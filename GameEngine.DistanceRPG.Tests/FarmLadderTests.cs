@@ -16,16 +16,6 @@ public class FarmLadderTests
     /// <summary>The prototype's own map seed; it overflows int32, which is the interesting case for a stream mix.</summary>
     private const long Seed = 2762136374;
 
-    /// <summary>
-    /// The drop's splitter, and the one value in this file still restated rather
-    /// than named: <c>LootTable</c> does not exist until S3. <strong>S3 replaces
-    /// it with <c>LootTable.LootSalt</c> and deletes this const</strong> — until
-    /// it does, the assertion below cannot catch a drop salt that collides with
-    /// the revival's, which is the whole of what it is for. The placer's salt is
-    /// named (<see cref="EnemyPlacer.SeedSalt"/>) for exactly that reason.
-    /// </summary>
-    private const long LootSalt = 0x5BF03635;
-
     private static Tuning Tuning => GameContent.Current.Tuning;
 
     [Theory]
@@ -211,14 +201,13 @@ public class FarmLadderTests
         Assert.NotEqual(Draw(FarmLadder.ReviveStream(Seed, 3, 2)), Draw(FarmLadder.ReviveStream(Seed + 1, 3, 2)));
 
         // And it is nobody else's stream: new randomness gets its own salt,
-        // never a continuation of an existing one. The placer's splitter is the
-        // constant itself rather than a copy of it, so moving the placer breaks
-        // this rather than sliding past it; the drop's is still a literal until
-        // S3 declares LootTable.LootSalt and this file can name that too.
+        // never a continuation of an existing one. Both neighbours are named
+        // rather than restated, so moving either one breaks this rather than
+        // sliding past it — which is the whole of what the assertion is for.
         Assert.NotEqual(EnemyPlacer.SeedSalt, FarmLadder.ReviveSalt);
-        Assert.NotEqual(LootSalt, FarmLadder.ReviveSalt);
+        Assert.NotEqual(LootTable.LootSalt, FarmLadder.ReviveSalt);
         Assert.NotEqual(Draw(new Mulberry32(Seed ^ EnemyPlacer.SeedSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
-        Assert.NotEqual(Draw(new Mulberry32(Seed ^ LootSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
+        Assert.NotEqual(Draw(new Mulberry32(Seed ^ LootTable.LootSalt)), Draw(FarmLadder.ReviveStream(Seed, 0, 0)));
     }
 
     [Fact]

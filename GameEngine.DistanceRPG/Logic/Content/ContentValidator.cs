@@ -27,6 +27,7 @@ public static class ContentValidator
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
     public const string RuleLingerNamesElement = "a lingering element names an element that exists and the status it leaves";
     public const string RuleUniqueNeverRolled = "unique entries appear in neverRolled, and neverRolled names only unique entries";
+    public const string RuleDropPoolResolves = "every id the drop pool names resolves in the catalogue";
 
     public const string RuleEnchantmentsExcluded = "a weapon's enchantments never include two that exclude each other";
     public const string RuleEnchantmentDependency = "an enchantment with a dependency appears only after its prerequisites on the same weapon";
@@ -381,6 +382,15 @@ public static class ContentValidator
             if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
                 throw new ContentException(e.Id, RuleElementNamesType);
         }
+
+        // The drop pool is an ordered id list held in code (§3.1), so that
+        // appending a catalogue entry cannot silently re-index what an
+        // already-saved dummy drops. The cost of holding it there is that it can
+        // name something the file does not: refused here, the way every other
+        // dangling reference is, rather than throwing at the first drop rolled.
+        foreach (var id in LootTable.DropPool)
+            if (!seen.Contains(id))
+                throw new ContentException(id, RuleDropPoolResolves);
     }
 
     /// <summary>

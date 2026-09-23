@@ -43,6 +43,25 @@ public sealed class WeaponCatalogue
     /// <summary>The unique table (§1.5), in file order: every entry carrying the unique flag, each derived from a variant.</summary>
     public IReadOnlyList<WeaponDef> Uniques { get; }
 
+    /// <summary>
+    /// The unique authored from <paramref name="variantId"/>, or null where
+    /// nobody wrote one: the first half of §3.2's unique roll, which prefers the
+    /// unique of the variant the drop has already rolled.
+    /// </summary>
+    public WeaponDef? UniqueDerivedFrom(string variantId)
+        => Uniques.FirstOrDefault(d => string.Equals(d.DerivedFrom, variantId, StringComparison.Ordinal));
+
+    /// <summary>
+    /// The uniques of <paramref name="cls"/>, in file order: the other half of
+    /// that roll. Eleven uniques cover thirty-two variants, so two thirds of
+    /// variants have none of their own — a won roll re-steers over this list
+    /// rather than handing back an ordinary weapon, which would leave those farms
+    /// at an effective 0% however deep they ran, against §3.2's "it keeps
+    /// climbing either way". File order, so a draw over it means the same thing
+    /// on every run.
+    /// </summary>
+    public IReadOnlyList<WeaponDef> UniquesOf(WeaponClass cls) => Uniques.Where(d => d.Class == cls).ToArray();
+
     /// <summary>The one martial variant of <paramref name="cls"/> in <paramref name="role"/>: what a placement roll decodes to.</summary>
     public WeaponDef Variant(WeaponClass cls, VariantRole role)
     {
@@ -64,14 +83,25 @@ public sealed class WeaponCatalogue
     /// def's list being counted again there: only what is grafted on afterwards
     /// is acquired (<see cref="Weapon.ForgedEnchantmentCount"/>).
     /// </para>
+    /// <para>
+    /// <paramref name="rolled"/> is the same door for a martial drop's rare
+    /// entry (§3.1, <see cref="LootTable"/>): it is forged like everything else
+    /// attached here — which is what makes it farmable (§3.2) and what counts
+    /// toward service time (§6.2) — and it goes on here rather than in the loot
+    /// table so that this stays "the one place a <see cref="Weapon"/> is made
+    /// from" a def. It arrives at tier 1, always, whatever it is.
+    /// </para>
     /// </summary>
+    /// <param name="id">The catalogue row to stamp from.</param>
+    /// <param name="element">A wand's element, rolled by the drop; null for everything else.</param>
+    /// <param name="rolled">An entry the drop rolled onto this item, attached last and forged; null for a weapon that rolled none.</param>
     /// <exception cref="KeyNotFoundException">No such weapon, or an enchantment it names is unknown.</exception>
     /// <exception cref="ArgumentException">A wand with no element, or an element on anything else.</exception>
-    public Weapon Instantiate(string id, DamageType? element = null)
+    public Weapon Instantiate(string id, DamageType? element = null, EnchantmentDef? rolled = null)
     {
         var def = this[id];
         var listed = def.Enchantments.Select(r => _enchantments[r.Id]).ToList();
-        var attached = new List<Enchantment>(listed.Count + 1);
+        var attached = new List<Enchantment>(listed.Count + 2);
 
         if (def.Class == WeaponClass.Wand)
         {
@@ -97,6 +127,9 @@ public sealed class WeaponCatalogue
             var entry = listed[i];
             attached.Add(new Enchantment(entry, entry.Unique ? 1 : Math.Max(1, def.Enchantments[i].Tier)));
         }
+
+        if (rolled != null)
+            attached.Add(new Enchantment(rolled, Tier: 1));   // always exactly one, always tier 1 (§3.1)
 
         return new Weapon(def, attached, forgedCount: attached.Count);
     }
