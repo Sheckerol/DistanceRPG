@@ -158,9 +158,13 @@ public class DropCollectionTests
         var (corpse, drop) = Assert.Single(farm.Dropped);
         Assert.Same(farm.Enemy, corpse);
 
-        // The killing blow is a defeat like every other, so the quality the drop
-        // is stamped with is the one the dummy's own plate now reads: what the
-        // player was looking at is what they are handed.
+        // The killing blow is a defeat like every other and counts as one, so the
+        // extraction kill is itself a cycle: three farmed cycles plus the one that
+        // collected them is a drop at four. That is the settled reading of "kill it
+        // N times" - the count the drop is stamped with includes the kill that
+        // extracted it, and it is therefore one higher than the last plate the
+        // player read over the dummy while it was still standing (a dead dummy
+        // draws no plate at all).
         Assert.Equal(4, farm.Enemy.DefeatCount);
         Assert.Equal(farm.Enemy.DefeatCount, drop.DefeatCount);
 
@@ -275,11 +279,19 @@ public class DropCollectionTests
         // identical weapon on the identical tile - never a re-roll (a different
         // weapon) and never a shrug (a lost one).
         var farm = Build(defeatCount: 11, spawnIndex: 4);
+
+        // Where the fixture stood it, named rather than recomputed: everything
+        // below compares against this tile, so "the same tile" is a claim about
+        // the floor rather than the arithmetic of two copies of the same float.
+        var stood = TileOf(farm.Enemy);
+        Assert.Equal((5, 6), stood);
+        Assert.NotEqual(stood, TileOf(farm.A));   // and it is the corpse's tile, not the collector's
+
         farm.Turns.ResurrectionActive = false;
         Kill(farm);
 
         var dropped = Assert.Single(farm.Dropped).Drop;
-        var tile = TileOf(farm.Enemy);
+        Assert.Equal(stood, TileOf(farm.Enemy));   // dying moved nothing: the corpse is the item's position
 
         // Before the reload: the same item is still being offered by the corpse
         // it fell from, because the offer is derived rather than remembered.
@@ -307,11 +319,18 @@ public class DropCollectionTests
         var reDerived = reloaded.GroundItemOf(loaded);
         Assert.NotNull(reDerived);
         Assert.Equal(Describe(dropped), Describe(reDerived));
-        Assert.Equal(tile, TileOf(loaded));
 
-        // Picked up, it is retired. The flag on the row is the only thing that
-        // stops the floor offering the same weapon on every entry forever.
-        loaded.DropTaken = true;
+        // The position rides on the row a save stores, which is why the reload
+        // can lay the item back on the tile the dummy fell on without having
+        // stored a ground item anywhere.
+        Assert.Equal(stood, TileOf(loaded));
+
+        // Picked up, it is retired - and the pickup is what does that, rather
+        // than a flag a caller remembers to set (Pickup.Take).
+        var collector = TestPools.Char("B");
+        var campaign = new CampaignState();
+        Assert.Equal(0, Pickup.Take(campaign, loaded, reDerived, collector));
+        Assert.True(loaded.DropTaken);
         Assert.Null(reloaded.GroundItemOf(loaded));
 
         // And a corpse in a dungeon that still resurrects offers nothing at all,
@@ -319,5 +338,80 @@ public class DropCollectionTests
         loaded.DropTaken = false;
         reloaded.ResurrectionActive = true;
         Assert.Null(reloaded.GroundItemOf(loaded));
+    }
+
+    // ── Taking it off the floor ──────────────────────────────────────────────
+    //
+    // Which slot it lands in, what a full bag does, and what the campaign has met
+    // are decidable without a window, so they are Pickup's rather than the
+    // scene's and are decided here. What is left in DungeonScene.PickUp is the
+    // marker it removes, the reach it refreshes and the cue it prints.
+
+    [Fact]
+    public void TakingItFillsTheFirstEmptySlot_AndMeetsWhatTheWeaponCarries()
+    {
+        // A Blight staff's drop carries the staff's own effect, so this is also
+        // the pairing 3.3 asks for: the weapon enters the bag and the campaign
+        // has met its entry in one act, because one method does both and neither
+        // half can be forgotten at a call site.
+        var farm = Build(dummyWeaponId: "staff_of_blight", defeatCount: 2);
+        farm.Turns.ResurrectionActive = false;
+        Kill(farm);
+
+        var (corpse, drop) = Assert.Single(farm.Dropped);
+        var carried = drop.Weapon.Enchantments.Select(e => e.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        Assert.NotEmpty(carried);
+
+        var campaign = new CampaignState();
+        var member = TestPools.Char("B");
+        member.Inventory[0] = TestWeapons.Get("tower_guard");   // a hand that is not empty
+
+        Assert.Equal(1, Pickup.FirstEmptySlot(member.Inventory));
+        Assert.Equal(1, Pickup.Take(campaign, corpse, drop, member));
+
+        // The first EMPTY slot, so what is held stays held: taking a weapon off
+        // the floor never disarms the member who bent down for it.
+        Assert.Same(drop.Weapon, member.Inventory[1]);
+        Assert.Equal("tower_guard", member.EquippedWeapon!.Id);
+        Assert.Equal(carried, campaign.SeenInOrder);
+
+        // And the offer is retired by the pickup itself, so the floor the party
+        // walks back through is not still holding it out.
+        Assert.True(corpse.DropTaken);
+        Assert.Null(farm.Turns.GroundItemOf(corpse));
+    }
+
+    [Fact]
+    public void AFullBagRefuses_AndTakesNothingAtAll()
+    {
+        var farm = Build(defeatCount: 1);
+        farm.Turns.ResurrectionActive = false;
+        Kill(farm);
+
+        var (corpse, drop) = Assert.Single(farm.Dropped);
+        var campaign = new CampaignState();
+        var member = TestPools.Char("B");
+        for (int slot = 0; slot < PartyMemberState.InventorySlots; slot++)
+            member.Inventory[slot] = TestWeapons.Get("tower_guard");
+        var before = member.Inventory.ToArray();
+
+        Assert.Equal(Pickup.BagFull, Pickup.FirstEmptySlot(member.Inventory));
+        Assert.Equal(Pickup.BagFull, Pickup.Take(campaign, corpse, drop, member));
+
+        // A carry limit, not a fault (4.4's 24 party-wide slots replace these
+        // three), and a refusal is the whole act refused: the bag is what it was,
+        // the campaign has met nothing, and the weapon is still lying there for
+        // whoever has room for it.
+        Assert.Equal(before, member.Inventory);
+        Assert.False(corpse.DropTaken);
+        Assert.Empty(campaign.SeenInOrder);
+        Assert.NotNull(farm.Turns.GroundItemOf(corpse));
+
+        // Room made, the same offer is taken, and it lands in the slot that was
+        // freed rather than anywhere else.
+        member.Inventory[2] = null;
+        Assert.Equal(2, Pickup.Take(campaign, corpse, drop, member));
+        Assert.Same(drop.Weapon, member.Inventory[2]);
+        Assert.True(corpse.DropTaken);
     }
 }

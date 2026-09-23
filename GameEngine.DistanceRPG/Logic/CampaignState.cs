@@ -62,4 +62,26 @@ public sealed class CampaignState
         foreach (var entry in weapon.Enchantments)
             _seen.Add(entry.Id);
     }
+
+    /// <summary>
+    /// Everything <paramref name="member"/> is carrying, met at once — the same
+    /// trigger as a pickup, read honestly.
+    /// <para>
+    /// A party does not find its first weapons on the floor: it is handed them by
+    /// <see cref="PartyMemberState.From"/> off the roster. Without this the only
+    /// entries the campaign would ever meet are the ones taken off a corpse, and a
+    /// party starting with <c>staff_of_renewal</c>, <c>wand_of_the_nova</c> or the
+    /// Efficiency dagger would reach §6.4's enchanter to be told it cannot offer
+    /// <c>regeneration</c>, an element or <c>vampiric</c> — entries it has been
+    /// carrying since turn 0. They are in a bag; how they got there is not this
+    /// set's question.
+    /// </para>
+    /// </summary>
+    public void See(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        foreach (var weapon in member.Inventory)
+            if (weapon is not null)
+                See(weapon);
+    }
 }

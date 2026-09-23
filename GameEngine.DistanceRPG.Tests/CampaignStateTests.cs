@@ -45,6 +45,52 @@ public class CampaignStateTests
     }
 
     [Fact]
+    public void TheStartingLoadoutIsMetToo_NotOnlyWhatCameOffTheFloor()
+    {
+        // "Whenever a weapon carrying one enters your inventory" is a rule about
+        // the bag, not about the floor. A party does not find its first weapons:
+        // it is handed them off the roster. Meeting only what was picked up would
+        // leave a party that starts with a Renewal staff facing an enchanter
+        // (6.4) that will not offer regeneration - an entry it has carried since
+        // turn 0.
+        //
+        // The bags below are the roster's own loadout, filled the way
+        // PartyMemberState.From fills one - the starting weapon in slot 0 and the
+        // bag behind it. From itself is the scene's to call and a progression
+        // test's (ProgressionStateTests.EveryFixtureMemberIsGrown enforces that),
+        // so this mirrors it rather than calling it.
+        var campaign = new CampaignState();
+        var roster = GameContent.Current.Party.All;
+        foreach (var def in roster)
+        {
+            var carrier = TestPools.Char(def.Id);
+            carrier.Inventory[0] = TestWeapons.Get(def.StartingWeaponId);
+            for (int i = 0; i < def.BagWeaponIds.Count; i++)
+                carrier.Inventory[i + 1] = TestWeapons.Get(def.BagWeaponIds[i]);
+            campaign.See(carrier);
+        }
+
+        var carried = roster
+            .SelectMany(def => def.BagWeaponIds.Prepend(def.StartingWeaponId))
+            .SelectMany(id => TestWeapons.Get(id).Enchantments.Select(e => e.Id))
+            .Distinct()
+            .OrderBy(id => id, StringComparer.Ordinal);
+        Assert.Equal(carried, campaign.SeenInOrder);
+        Assert.True(campaign.HasSeen("regeneration"), "the Renewal staff every member carries was never met");
+
+        // The bag is read whole - the starting weapon and everything behind it -
+        // and an empty slot is not an entry with no id.
+        var member = TestPools.Char("E");
+        var seen = new CampaignState();
+        seen.See(member);
+        Assert.Empty(seen.SeenInOrder);
+
+        member.Inventory[2] = TestWeapons.Get("staff_of_mire");
+        seen.See(member);
+        Assert.Equal(new[] { "mire" }, seen.SeenInOrder);
+    }
+
+    [Fact]
     public void SeenKeepsUniqueSouls_AndTheOfferFilterIsNeverRolled()
     {
         // The Nameless Knife's three souls, two of which no roll and no service

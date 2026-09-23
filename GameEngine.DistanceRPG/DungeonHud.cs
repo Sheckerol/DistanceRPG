@@ -273,11 +273,21 @@ public sealed class DungeonHud
     /// <summary>
     /// A weapon on the floor: its name — a unique's in the gold every other
     /// readout gives it — and, beside it, <c>xN</c>, the farm's depth it was
-    /// collected at. That is the same number, in the same shape, the plate of the
-    /// dummy that was carrying it wore (<see cref="NameplateRuns"/>), which is
-    /// the point: what the player was farming for and what they are being handed
-    /// read as one thing (§3.2). A drop at zero shows no quality, because there is
-    /// none — it is simply the weapon the dummy had.
+    /// collected at, in the same shape a dummy's plate wears it
+    /// (<see cref="NameplateRuns"/>), so what the player was farming for and what
+    /// they are being handed read as one thing (§3.2). A drop at zero shows no
+    /// quality, because there is none — it is simply the weapon the dummy had.
+    /// <para>
+    /// <strong>The number is one higher than the last plate the player saw, and
+    /// that is a decided reading rather than an accident of order.</strong> The
+    /// extraction kill is a defeat like every other: it advances
+    /// <see cref="EnemyState.DefeatCount"/> (the Killed applier, §3.2) before the
+    /// drop is rolled off it, so "kill it forty times" hands over a drop at 40 and
+    /// the unique roll resolves at 40. There is no plate on screen for it to
+    /// contradict — <see cref="DrawEnemyLabels"/> draws none for the dead — so
+    /// what the player last read over the living dummy was <c>x39</c>, and the
+    /// swing that put it down for good is the fortieth cycle.
+    /// </para>
     /// </summary>
     internal static IReadOnlyList<Run> GroundItemRuns(Drop drop)
     {

@@ -33,3 +33,27 @@ rungs or the top rung repeats for the fourth and fifth.
 readings is a pacing question that a spreadsheet answers worse than an evening
 with the game. Phase 6a must not resolve it by accident: whoever builds the
 enchanter should surface the choice rather than pick a passage.
+
+## Where `CampaignState` lives (§3.3, §4.1, §5.1, §6.4)
+
+`Logic/CampaignState.cs` holds what the campaign has *met* — the enchantment ids
+a weapon has brought into the party's hands — and Phase 3 shipped it as a field
+of `DungeonScene`, seeded from the starting loadout in `SpawnParty` and added to
+at every pickup. **One scene is one floor, so as written the set starts empty on
+every floor**, which is exactly not what "campaign" means.
+
+Nothing reads it before §6.4, so nothing is wrong in play today. But it is a seam
+with no owner yet, and it wants one before the enchanter can be built on it:
+
+- **Phase 4 (§4.1)** decides what survives a floor transition. The seen set is
+  campaign-wide, not per-floor: it must outlive the scene, and §4.1's "reset when
+  you leave the dungeon" does **not** apply to it — §6.4's enchanter is the
+  permanent half of the game, and an entry met on floor 2 is still met after the
+  party walks out.
+- **Phase 5 (§5.1)** saves it as `SeenInOrder`, the ordinal-sorted view, never the
+  `HashSet` (a set's enumeration order is not stable across launches).
+
+Recorded here rather than left in a commit message so that whoever lifts the
+party out of `DungeonScene` lifts this with it, instead of a Phase 6a implementer
+discovering that the enchanter will not offer what the party carried in on
+floor 1.

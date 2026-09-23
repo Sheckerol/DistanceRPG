@@ -10,7 +10,14 @@ namespace GameEngine.DistanceRPG.Logic;
 /// what the item is.
 /// </summary>
 /// <param name="Weapon">The item, built through <see cref="WeaponCatalogue.Instantiate"/> like every other.</param>
-/// <param name="DefeatCount">The farm's depth at the moment it was collected: what bought the stacks and set the odds.</param>
+/// <param name="DefeatCount">
+/// The farm's depth at the moment it was collected: what bought the stacks and
+/// set the odds. <strong>The extraction kill is itself one of those cycles</strong>
+/// — the Killed applier advances <see cref="EnemyState.DefeatCount"/> before the
+/// drop is rolled off it — so a dummy put down for the fortieth time yields a drop
+/// at 40 whose unique roll resolved at 40, one higher than the plate the player
+/// last read over it while it was still standing.
+/// </param>
 /// <param name="WasUniqueRoll">Whether the unique roll won — the extraction beat Phase 4 pays off.</param>
 public sealed record Drop(Weapon Weapon, int DefeatCount, bool WasUniqueRoll);
 

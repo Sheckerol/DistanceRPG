@@ -24,7 +24,17 @@ public readonly record struct ClickCue(string Label, bool Ready);
 
 /// <summary>
 /// A weapon lying where its carrier fell (§3.5): the corpse whose row fixes it,
-/// the drop itself, and the marker drawn on its tile.
+/// the drop itself, the marker drawn on its tile, and that tile.
+/// <para>
+/// <strong>The tile is on the record rather than read back off the corpse.</strong>
+/// The marker is fixed where the body lay when the item was laid down; a target
+/// test that re-read <c>Corpse.X/Y</c> every frame would agree with it only
+/// because nothing currently moves a corpse — an invariant held by two unrelated
+/// facts (displacement applies to the living, and the resurrection relocation
+/// cannot run while resurrection is stopped) rather than by the data. One source
+/// for the item's position means the cue the HUD draws and the tile <c>G</c>
+/// collects on cannot part company.
+/// </para>
 /// <para>
 /// Nothing here is saved. The drop is a pure function of the enemy row and the
 /// floor's seed, so a load re-derives it (<see cref="TurnSystem.GroundItemOf"/>)
@@ -33,7 +43,7 @@ public readonly record struct ClickCue(string Label, bool Ready);
 /// retires the offer.
 /// </para>
 /// </summary>
-public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker);
+public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker, (int R, int C) Tile);
 
 /// <summary>
 /// The main gameplay scene: a procedurally generated dungeon explored by a
@@ -123,8 +133,14 @@ public class DungeonScene : Scene
 
     // What the permanent kills have left on the floor, and what the campaign has
     // met (§3.3, §3.5). Neither is stored by the floor: the ground items are
-    // re-derived from the enemy rows on entry, and the seen set is campaign-wide
-    // save data that only ever grows.
+    // re-derived from the enemy rows on entry, and the seen set only ever grows —
+    // seeded from the starting loadout in SpawnParty and added to at every pickup.
+    //
+    // The seen set is campaign-wide by right and scene-wide in fact: one scene is
+    // one floor, so as written it starts empty on every floor. Nothing reads it
+    // before §6.4, so nothing is wrong today, but whoever builds §4.1's floor
+    // persistence owns lifting it out of the scene (and §5.1 owns saving it) —
+    // recorded in docs/roadmap/open-questions.md so the seam belongs to someone.
     private readonly List<GroundItem> _groundItems = new();
     private readonly CampaignState _campaign = new();
 
@@ -379,6 +395,12 @@ public class DungeonScene : Scene
                 roster[i], i,
                 tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
                 tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f);
+
+            // The loadout is met the moment it is handed over (§3.3): "whenever a
+            // weapon carrying one enters your inventory" is a rule about the bag,
+            // not about the floor, and a party that starts with a Renewal staff
+            // has met regeneration however it came by it.
+            _campaign.See(state);
 
             var character = new CharacterObject(state, PartyColors[i]);
             _party.Add(character);
@@ -1360,7 +1382,7 @@ public class DungeonScene : Scene
         {
             if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return null;
             var tile = LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y);
-            return _groundItems.FirstOrDefault(item => LogicTile(item.Corpse.X, item.Corpse.Y) == tile);
+            return _groundItems.FirstOrDefault(item => item.Tile == tile);
         }
     }
 
@@ -1369,6 +1391,11 @@ public class DungeonScene : Scene
     /// itself was rolled by the turn system off the floor's seed (§3.5); the
     /// scene supplies only what is the scene's — a marker on the tile, and the
     /// log line.
+    /// <para>
+    /// Where it lands is decided once, here: the marker's position and the item's
+    /// tile are taken off the corpse in the same breath, so the cue and the key
+    /// read one fact rather than two that have to keep agreeing.
+    /// </para>
     /// </summary>
     private void DropOnFloor(EnemyState corpse, Drop drop)
     {
@@ -1378,7 +1405,7 @@ public class DungeonScene : Scene
             Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
         };
         AddGameObject(marker);
-        _groundItems.Add(new GroundItem(corpse, drop, marker));
+        _groundItems.Add(new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y)));
         UpdateGroundItemVisibility();
     }
 
@@ -1405,27 +1432,25 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Take what the active member is standing on into the first empty slot, or
-    /// refuse when all of them are full — a carry limit, not a fault, and the
-    /// three slots here are Phase 3's: §4.4's 24 party-wide slots replace them.
-    /// The weapon entering the bag is what the campaign has met (§3.3), and the
-    /// corpse's row is marked so the floor stops offering it.
+    /// Take what the active member is standing on: the bag, the retired offer and
+    /// the met entries are <see cref="Pickup.Take"/>'s, which decides them without
+    /// a window and is tested that way; what is left here is the scene's — the
+    /// marker that goes, the reach that changed, the cue that says why a full bag
+    /// took nothing (a carry limit, not a fault: §4.4's 24 party-wide slots
+    /// replace Phase 3's three).
     /// </summary>
     private void PickUp()
     {
         if (PickupTarget is not { } item) return;
 
         var member = ActiveCharacter.State;
-        int slot = Array.IndexOf(member.Inventory, null);
-        if (slot < 0)
+        int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member);
+        if (slot == Pickup.BagFull)
         {
             SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {PartyMemberState.InventorySlots} CARRIED", false));
             return;
         }
 
-        member.Inventory[slot] = item.Drop.Weapon;
-        item.Corpse.DropTaken = true;      // the offer is retired: a re-entry re-derives nothing here
-        _campaign.See(item.Drop.Weapon);   // "added to whenever a weapon carrying one enters your inventory"
         _groundItems.Remove(item);
         RemoveGameObject(item.Marker);
         if (slot == 0)
@@ -1458,7 +1483,7 @@ public class DungeonScene : Scene
     {
         foreach (var item in _groundItems)
         {
-            var (r, c) = LogicTile(item.Corpse.X, item.Corpse.Y);
+            var (r, c) = item.Tile;
             item.Marker.IsActive = _fog.Visible[r, c];
         }
     }

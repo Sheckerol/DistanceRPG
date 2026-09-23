@@ -1939,6 +1939,17 @@ public sealed class TurnSystem
     /// applier deliberately: this is the post-cascade side-consequence site
     /// (<see cref="RunHeldDeaths"/>), so a tick death deep inside a chain drops
     /// its weapon with the world settled, exactly as an ordinary kill does.
+    /// <para>
+    /// It therefore runs <em>after</em> <see cref="ApplyKilled"/> has advanced the
+    /// count, and the drop is rolled off the advanced figure: <strong>the
+    /// extraction kill is itself a cycle</strong>. A dummy farmed to 39 and then
+    /// put down for good yields a drop at 40, and its unique roll resolves at 40
+    /// — "kill it forty times" reads as a drop at forty, which is the reading this
+    /// phase decided on rather than a by-product of applier order. The cost of it
+    /// is that the number beside the item is one higher than the last plate the
+    /// player read over the living dummy, which the ground-item label carries the
+    /// note for (<c>DungeonHud.GroundItemRuns</c>).
+    /// </para>
     /// </summary>
     private void OnEnemyDefeated(EnemyState target)
     {

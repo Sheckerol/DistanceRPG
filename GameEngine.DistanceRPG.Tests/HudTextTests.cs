@@ -112,9 +112,11 @@ public class HudTextTests
     public void AGroundItemNamesTheWeaponAndItsQuality()
     {
         // A weapon lying where its carrier fell says which weapon it is and the
-        // farm's depth it was collected at - the same xN, in the same shape, the
-        // plate of the dummy carrying it wore, so what the player farmed for and
-        // what they are being handed read as one thing (3.2, 3.5).
+        // farm's depth it was collected at - xN, in the shape a dummy's plate
+        // wears it, so what the player farmed for and what they are being handed
+        // read as one thing (3.2, 3.5). The count includes the kill that
+        // extracted it, so it is one higher than the last plate the player read
+        // over the living dummy; a dead one draws no plate to disagree with.
         var plain = new Drop(TestWeapons.Get("arming_sword"), DefeatCount: 0, WasUniqueRoll: false);
         Assert.Equal(new[] { "Arming Sword" }, Item(plain));   // nothing farmed it: no quality to print
 
