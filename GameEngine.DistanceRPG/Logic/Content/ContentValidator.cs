@@ -111,6 +111,9 @@ public static class ContentValidator
     public const string RuleEfficiencyAddsLight = "an Efficiency variant adds Light x1";
     public const string RulePurityDeepensBaseline = "a Purity variant deepens the class signature";
     public const string RuleForgedOnlyUnused = "every forgedOnly id is forged on at least one weapon";
+    public const string RuleCasterVariantPool = "a caster class holds every variant a drop rolls between";
+    public const string RuleClassCarriesAUnique = "a class a drop can roll carries at least one unique";
+    public const string RuleMartialVariantNoEnchantment = "a martial variant arrives carrying no enchantment of its own";
 
     /// <summary>
     /// The "class feature" column of the §1.2 table (phase-1-modifiers.md:16-25):
@@ -497,6 +500,16 @@ public static class ContentValidator
     /// the combo platform — while a unique enchantment arrives only on a
     /// unique, and nothing arrives carrying more than three enchantments.
     /// Unique derivation is checked with the uniques.
+    /// <para>
+    /// And three the drop leans on (§3.1, §3.2), each refusing at load what
+    /// would otherwise surface as a wrong weapon or an exception one collection
+    /// deep: a class with variants carries at least one unique, for a won roll
+    /// to land on; a caster class holds every variant
+    /// <see cref="LootTable.CasterVariants"/> names, since the drop's draw
+    /// indexes that rather than the file's order; and a martial variant carries
+    /// no enchantment of its own, so the one entry a drop attaches is the one it
+    /// rolled.
+    /// </para>
     /// </summary>
     public static void ValidateWeapons(WeaponsData data, ModifierRules rules, RestrictedData restricted, EnchantmentCatalogue enchantments)
     {
@@ -606,17 +619,55 @@ public static class ContentValidator
                     throw new ContentException(def.Id, RuleRoleOnMartialOnly, "a martial variant carries no role");
                 if (def.Unique && def.Role != null)
                     throw new ContentException(def.Id, RuleRoleOnMartialOnly, $"a unique carries the role {def.Role}");
+
+                // A martial drop carries the entry it rolled and nothing else
+                // (§3.1's "always exactly one"), and the farm banks its tiers
+                // through the first one attached — which is the rolled entry
+                // only because the variant lists none, since Instantiate appends
+                // what the drop rolled after whatever the def carries. A variant
+                // authored with an entry of its own would make a rolled drop
+                // carry two and land the farm's tiers on the wrong one, both
+                // silently. A unique is hand-placed rather than rolled and
+                // carries its souls; a caster's single innate is its identity
+                // and is RuleCasterInnate's.
+                if (!def.Unique && def.Enchantments.Count > 0)
+                    throw new ContentException(def.Id, RuleMartialVariantNoEnchantment,
+                        $"'{def.Enchantments[0].Id}' on a {def.Class} variant");
             }
         }
 
         var baselines = new Dictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>>();
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
-            if (Weapon.KindOf(cls) == WeaponKind.Caster)
-                continue;   // casters vary by effect and shape, not by role
             var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
             if (variants.Count == 0)
                 continue;   // a class the file leaves out is not malformed, only absent
+
+            // A class with variants is a class a drop can roll (§3.1), and §3.2's
+            // unique roll is a ruling: a won draw always yields a unique of the
+            // dummy's class, re-steering over the class's own where the variant
+            // has none. A class carrying no unique at all would make that draw
+            // win and hand over nothing — reported as a lost roll rather than as
+            // broken content — so it is refused here instead.
+            if (!data.Weapons.Any(w => w.Unique && w.Class == cls))
+                throw new ContentException(cls.ToString(), RuleClassCarriesAUnique, $"{variants.Count} variants, no unique");
+
+            if (Weapon.KindOf(cls) == WeaponKind.Caster)
+            {
+                // Casters vary by effect and shape, not by role, so a drop's
+                // code-fixed draw indexes LootTable.CasterVariants rather than
+                // the file's order. Every id it names has to be here, or the
+                // draw lands on a row that does not exist: refused at load, the
+                // way the drop pool's ids already are, rather than throwing on
+                // one drop in four deep inside a collection.
+                if (!LootTable.CasterVariants.TryGetValue(cls, out var order))
+                    throw new ContentException(cls.ToString(), RuleCasterVariantPool, "the drop order names no variants for this class");
+                foreach (var id in order)
+                    if (!variants.Any(v => v.Id == id))
+                        throw new ContentException(id, RuleCasterVariantPool, $"named by the {cls} drop order");
+                continue;
+            }
+
             baselines[cls] = ValidateVariants(cls, variants);
         }
 

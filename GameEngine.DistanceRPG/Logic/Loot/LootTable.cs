@@ -68,6 +68,16 @@ public static class LootTable
     /// A drop carries at most one enchantment and it is always the first thing
     /// attached (§3.1: "always exactly one"), so the farm's enchantment entry is
     /// this index whenever the weapon has one at all.
+    /// <para>
+    /// The index is an assumption about content, so content is held to it:
+    /// <see cref="WeaponCatalogue.Instantiate"/> appends the rolled entry
+    /// <em>after</em> whatever the def lists, and
+    /// <see cref="ContentValidator.RuleMartialVariantNoEnchantment"/> refuses a
+    /// martial variant that lists one — without that rule a dagger variant
+    /// authored with, say, <c>vampiric</c> would drop carrying two entries and
+    /// the farm would bank its tiers onto the listed one. A caster's single
+    /// innate is its identity and is <see cref="ContentValidator.RuleCasterInnate"/>'s.
+    /// </para>
     /// </summary>
     private const int InnateIndex = 0;
 
@@ -124,6 +134,37 @@ public static class LootTable
         "vampiric",                                  // the one ordinary catalogue entry Phase 1 shipped
         "regeneration", "ward", "poison", "mire",    // the staff effects: a cast and nothing else, so no martial drop keeps them
     ];
+
+    /// <summary>
+    /// The variants a caster class's drop rolls between, in a fixed order held
+    /// here in code — the caster half of the rule <see cref="DropPool"/> follows
+    /// for the enchantment draw.
+    /// <para>
+    /// <strong>A caster's variants carry no role</strong> — they vary by effect
+    /// and shape (§3.1), which is what
+    /// <see cref="ContentValidator.RuleRoleOnMartialOnly"/> says — so the draw
+    /// cannot decode to a <see cref="VariantRole"/> the way a martial one does,
+    /// and the only list left to index would be
+    /// <see cref="WeaponCatalogue.ByClass"/>, which is <em>file</em> order.
+    /// Swapping two rows of <c>weapons.json</c> would then silently re-roll
+    /// every saved, not-yet-collected caster dummy's drop — half of exactly what
+    /// §3.5's rule forbids, the other half being the append
+    /// <see cref="Roles"/> already covers. Naming them here makes the draw's
+    /// meaning code's, so a content reorder moves nothing and an append re-rolls
+    /// nobody.
+    /// </para>
+    /// <see cref="ContentValidator.ValidateWeapons"/> refuses a caster class
+    /// that does not hold every variant named here, which is also what keeps the
+    /// draw in range: a file with three staves is refused at load, the way every
+    /// other dangling reference is, rather than throwing on roughly one drop in
+    /// four deep inside a collection.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<WeaponClass, IReadOnlyList<string>> CasterVariants =
+        new Dictionary<WeaponClass, IReadOnlyList<string>>
+        {
+            [WeaponClass.Staff] = ["staff_of_renewal", "staff_of_warding", "staff_of_blight", "staff_of_mire"],
+            [WeaponClass.Wand] = ["wand_of_the_blast", "wand_of_the_cone", "wand_of_the_beam", "wand_of_the_nova"],
+        };
 
     /// <summary>
     /// The stream the dummy at <paramref name="spawnIndex"/> rolls its drop on:
@@ -274,11 +315,16 @@ public static class LootTable
         // (4) The unique. The draw is taken either way, so the stream stands in
         // the same place whichever branch runs.
         bool won = rng.NextInt(0, Permille - 1) < FarmLadder.UniqueChancePermille(defeatCount);
-        if (won && UniqueFor(catalogue, cls, variant.Id, rng) is { } unique)
+        if (won)
         {
+            // A won draw always yields a unique of the dummy's class (§3.2): it
+            // is never reported as a lost roll, so there is no branch here that
+            // hands back the ordinary drop.
+            //
             // A unique's spread is forged, so winning lands on a deeper base with
             // the acquired budget untouched (§3.2) — which means the farm's
             // stacks and banked tiers are discarded rather than carried over.
+            var unique = UniqueFor(catalogue, cls, variant.Id, rng);
             weapon = catalogue.Instantiate(unique.Id, NeedsAnElement(unique) ? element : null);
             return new Drop(weapon, defeatCount, WasUniqueRoll: true);
         }
@@ -291,19 +337,22 @@ public static class LootTable
     /// class decodes it as a <see cref="VariantRole"/>, which is how
     /// <see cref="EnemyPlacer"/> already reads its own draw; a caster's variants
     /// carry no role — they vary by effect and shape (§3.1) — so the same
-    /// code-fixed draw indexes the class's variants in file order. Either way the
-    /// <em>count</em> is fixed here rather than by the catalogue's length, so
-    /// appending a weapon re-rolls nobody.
+    /// code-fixed draw indexes <see cref="CasterVariants"/>, an ordered id list
+    /// held in code. Either way both the <em>count</em> and the <em>order</em>
+    /// are fixed here rather than by the catalogue's, so appending a weapon
+    /// re-rolls nobody and reordering the file moves nobody.
     /// </summary>
     private static WeaponDef VariantOf(WeaponCatalogue catalogue, WeaponClass cls, int index)
     {
         if (Weapon.KindOf(cls) != WeaponKind.Caster)
             return catalogue.Variant(cls, (VariantRole)index);
 
-        var variants = catalogue.ByClass(cls);
-        return index < variants.Count
-            ? variants[index]
-            : throw new KeyNotFoundException($"{cls} holds {variants.Count} variants; a drop rolls one of {Roles}.");
+        var order = CasterVariants.TryGetValue(cls, out var named)
+            ? named
+            : throw new KeyNotFoundException($"{cls} is a caster class that {nameof(CasterVariants)} does not name; a drop rolls one of {Roles} variants.");
+        return order.Count == Roles
+            ? catalogue[order[index]]   // resolvable at load: ContentValidator.RuleCasterVariantPool
+            : throw new InvalidOperationException($"{cls}'s drop order names {order.Count} variants; a drop rolls one of {Roles}.");
     }
 
     /// <summary>
@@ -345,16 +394,27 @@ public static class LootTable
     /// The unique a won roll hands over: the one authored from
     /// <paramref name="variantId"/>, or — where nobody wrote one, which is true
     /// of two thirds of the variants — one of the class's own, drawn uniformly
-    /// in catalogue order. Null only for a class with no unique at all, which no
-    /// shipped class is.
+    /// in catalogue order.
+    /// <para>
+    /// It never hands back nothing. "A won draw yields a unique of the dummy's
+    /// class" is §3.2's ruling against the draft where a variant with no
+    /// authored unique yielded the ordinary drop, and a class with no unique at
+    /// all would reopen it one content edit later — silently, since the drop
+    /// would report <c>WasUniqueRoll: false</c> for a draw that in fact won.
+    /// <see cref="ContentValidator.RuleClassCarriesAUnique"/> refuses that at
+    /// load; the throw below is what makes the unreachable case loud rather than
+    /// quiet.
+    /// </para>
     /// </summary>
-    private static WeaponDef? UniqueFor(WeaponCatalogue catalogue, WeaponClass cls, string variantId, Mulberry32 rng)
+    private static WeaponDef UniqueFor(WeaponCatalogue catalogue, WeaponClass cls, string variantId, Mulberry32 rng)
     {
         if (catalogue.UniqueDerivedFrom(variantId) is { } own)
             return own;
 
         var uniques = catalogue.UniquesOf(cls);
-        return uniques.Count > 0 ? uniques[rng.NextInt(0, uniques.Count - 1)] : null;
+        return uniques.Count > 0
+            ? uniques[rng.NextInt(0, uniques.Count - 1)]
+            : throw new InvalidOperationException($"{cls} carries no unique for a won roll to land on; {nameof(ContentValidator)}.{nameof(ContentValidator.RuleClassCarriesAUnique)} refuses that at load.");
     }
 
     /// <summary>

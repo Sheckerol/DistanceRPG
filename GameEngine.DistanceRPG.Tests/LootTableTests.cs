@@ -97,6 +97,36 @@ public class LootTableTests
         Assert.Equal(martialBefore, Sweep("assassins_fang", defeatCount: 6, spawns: 16).Select(Describe).ToList());
     }
 
+    [Fact]
+    public void ReorderingTheCasterVariantsLeavesAnExistingSeedsDropUnchanged()
+    {
+        // The other half of the same rule, and the half a content-ordered draw
+        // would fail: appending is not the only edit weapons.json takes.
+        // A martial variant is found by its role, which is code; a caster's
+        // carries none, so the draw indexes LootTable.CasterVariants — an
+        // ordered id list held in code — rather than ByClass, which is file
+        // order. Swapping two staff rows would otherwise silently re-roll every
+        // saved, not-yet-collected caster dummy's drop.
+        var staves = Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList();
+        var wands = Sweep("wand_of_the_blast", defeatCount: 6, spawns: 16, element: DamageType.Cold).Select(Describe).ToList();
+        var order = GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id).ToList();
+
+        // The same file with each caster class's variants reversed where they sit.
+        var casters = ContentDefaults.Weapons.Weapons
+            .Where(w => !w.Unique && Weapon.KindOf(w.Class) == WeaponKind.Caster)
+            .GroupBy(w => w.Class)
+            .ToDictionary(g => g.Key, g => new Queue<WeaponDef>(g.Reverse()));
+        var permuted = ContentDefaults.Weapons.Weapons
+            .Select(w => !w.Unique && casters.TryGetValue(w.Class, out var queue) ? queue.Dequeue() : w)
+            .ToList();
+
+        using var _ = TestContent.Use(weapons: new WeaponsData(permuted));
+
+        Assert.Equal(order.AsEnumerable().Reverse(), GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id));
+        Assert.Equal(staves, Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList());
+        Assert.Equal(wands, Sweep("wand_of_the_blast", defeatCount: 6, spawns: 16, element: DamageType.Cold).Select(Describe).ToList());
+    }
+
     // ── The enchantment it arrives with ──────────────────────────────────────
 
     [Fact]
@@ -437,9 +467,12 @@ public class LootTableTests
     {
         // The draw is a uniform index into the eligible list, so the list's order
         // is gameplay: the forged modifiers first, in ModifierType order, and the
-        // enchantment entry appended last. Two seeds, each pinned to a known
-        // index, because reversing the list would simply swap what they produce
-        // and nothing else in the suite would notice.
+        // enchantment entry appended last. Seeds pinned to a known index,
+        // because reordering the list would simply swap what they produce and
+        // nothing else in the suite would notice.
+        //
+        // The Staff of Blight pins the entry's place: it carries exactly one
+        // forged modifier, so index 0 is the modifier and index 1 the entry.
         var onTheModifier = LootTable.Roll(Dummy("staff_of_blight", defeatCount: 1), 4);
         Assert.Equal(2, onTheModifier.Weapon.Stacks(ModifierType.Resonant));   // index 0: the one forged modifier
         Assert.Equal(1, onTheModifier.Weapon.Enchantments[0].Tier);
@@ -447,6 +480,30 @@ public class LootTableTests
         var onTheEnchantment = LootTable.Roll(Dummy("staff_of_blight", defeatCount: 1), 3);
         Assert.Equal(1, onTheEnchantment.Weapon.Stacks(ModifierType.Resonant));   // index 1: the entry, appended last
         Assert.Equal(2, onTheEnchantment.Weapon.Enchantments[0].Tier);
+
+        // And the Disarming Kris pins the modifiers' own order, which one
+        // forged modifier cannot: it carries three — CritWindow, CritMultiplier
+        // and CritWeaken, which ModifierSet.Entries yields in ModifierType enum
+        // order — and each seed below lands its single stack on a different
+        // index. Index 0 is the lowest ModifierType and not merely "a modifier",
+        // so reversing the list swaps CritWindow for CritWeaken and this goes
+        // red. None of the three rolled an enchantment, so the eligible list is
+        // exactly the three modifiers.
+        var byIndex = new (long Seed, ModifierType Landed)[]
+        {
+            (63, ModifierType.CritWindow),       // index 0
+            (39, ModifierType.CritMultiplier),   // index 1
+            (10, ModifierType.CritWeaken),       // index 2
+        };
+
+        foreach (var (seed, landed) in byIndex)
+        {
+            var drop = LootTable.Roll(Dummy("disarming_kris", defeatCount: 1), seed);
+            Assert.Equal("disarming_kris", drop.Weapon.Id);
+            Assert.Empty(drop.Weapon.Enchantments);
+            foreach (var type in new[] { ModifierType.CritWindow, ModifierType.CritMultiplier, ModifierType.CritWeaken })
+                Assert.Equal(type == landed ? 2 : 1, drop.Weapon.Stacks(type));
+        }
     }
 
     // ── The unique ───────────────────────────────────────────────────────────
@@ -574,6 +631,86 @@ public class LootTableTests
 
         Assert.Equal(("vampiric", ContentValidator.RuleDropPoolResolves), (ex.EntryId, ex.Rule));
         Assert.Same(before, GameContent.Current);
+    }
+
+    [Fact]
+    public void TheCasterVariantPoolNamesOnePerRoleAndResolves()
+    {
+        // The caster half of the same trade: the count and the order are code's,
+        // so the pool holds exactly as many variants as a drop rolls between —
+        // a fifth would never be drawn and a fourth missing would put the draw
+        // out of range — and every id it names is a variant of its own class.
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            bool caster = Weapon.KindOf(cls) == WeaponKind.Caster;
+            Assert.Equal(caster, LootTable.CasterVariants.ContainsKey(cls));
+            if (!caster) continue;
+
+            var order = LootTable.CasterVariants[cls];
+            Assert.Equal(Enum.GetValues<VariantRole>().Length, order.Count);
+            Assert.Equal(order.Distinct(StringComparer.Ordinal), order);
+            Assert.All(order, id => Assert.Contains(GameContent.Current.Weapons[id], GameContent.Current.Weapons.ByClass(cls)));
+        }
+    }
+
+    [Fact]
+    public void ACasterClassShortOfAVariantIsRefusedAtLoad()
+    {
+        // The draw is code-fixed at four, so a file with three staves would put
+        // roughly one drop in four out of range — an exception deep inside a
+        // collection rather than at load. Refused here instead, the way the drop
+        // pool's own dangling ids are.
+        var before = GameContent.Current;
+        var threeStaves = new WeaponsData(ContentDefaults.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList());
+        var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: threeStaves));
+
+        Assert.Equal(("staff_of_mire", ContentValidator.RuleCasterVariantPool), (ex.EntryId, ex.Rule));
+        Assert.Contains("Staff drop order", ex.Message);
+        Assert.Same(before, GameContent.Current);
+    }
+
+    [Fact]
+    public void AClassWithNoUniqueIsRefusedAtLoad()
+    {
+        // A won draw always yields a unique of the dummy's class (§3.2's ruling
+        // against the draft where a variant with no authored unique handed back
+        // the ordinary drop). A class carrying none at all would make that draw
+        // win and hand over nothing — reported as a lost roll, so nobody would
+        // ever see it — which is a content failure and is refused as one.
+        var before = GameContent.Current;
+        var noDaggerUnique = new WeaponsData(ContentDefaults.Weapons.Weapons
+            .Where(w => !(w.Unique && w.Class == WeaponClass.Dagger)).ToList());
+        var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: noDaggerUnique));
+
+        Assert.Equal((nameof(WeaponClass.Dagger), ContentValidator.RuleClassCarriesAUnique), (ex.EntryId, ex.Rule));
+        Assert.Same(before, GameContent.Current);
+    }
+
+    [Fact]
+    public void AMartialVariantCarryingAnEnchantmentIsRefusedAtLoad()
+    {
+        // The drop attaches exactly one entry and the farm banks its tiers
+        // through the first one attached — which is the rolled entry only
+        // because the variant lists none, since Instantiate appends what the
+        // drop rolled after whatever the def carries. A dagger variant authored
+        // with vampiric would drop carrying two and bank its five tiers onto the
+        // listed one, both silently, so the assumption is enforced where it is
+        // made rather than assumed.
+        var before = GameContent.Current;
+        var venomous = new WeaponsData(ContentDefaults.Weapons.Weapons
+            .Select(w => w.Id == "assassins_fang" ? w with { Enchantments = [new EnchantmentRef("vampiric")] } : w).ToList());
+        var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: venomous));
+
+        Assert.Equal(("assassins_fang", ContentValidator.RuleMartialVariantNoEnchantment), (ex.EntryId, ex.Rule));
+        Assert.Contains("'vampiric' on a Dagger variant", ex.Message);
+        Assert.Same(before, GameContent.Current);
+
+        // The rule is the variant's alone: a unique carries its souls, and a
+        // caster's innate is its identity.
+        Assert.All(GameContent.Current.Weapons.All.Where(w => !w.Unique && Weapon.KindOf(w.Class) != WeaponKind.Caster),
+            w => Assert.Empty(w.Enchantments));
+        Assert.NotEmpty(GameContent.Current.Weapons["widowmaker"].Enchantments);
+        Assert.NotEmpty(GameContent.Current.Weapons["staff_of_blight"].Enchantments);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
