@@ -121,8 +121,9 @@ public class TurnSystemTests
         Assert.False(enemy.Alive);
         Assert.Equal(0, enemy.DefeatedAtTurn);
 
-        // The configured number of end-turn cycles later, the dummy comes back.
-        for (int i = 0; i < GameConstants.DummyResurrectTurns; i++)
+        // The ladder's number of end-turn cycles later, the dummy comes back: one
+        // defeat already shortens the wait from ten turns to nine (3.2).
+        for (int i = 0; i < FarmLadder.ResurrectTurns(enemy.DefeatCount); i++)
         {
             Assert.False(resurrected);
             turns.EndTurn();
@@ -485,7 +486,7 @@ public class TurnSystemTests
         // Park the character exactly on the remnant, then wait out the timer.
         a.X = enemy.X;
         a.Y = enemy.Y;
-        for (int i = 0; i < GameConstants.DummyResurrectTurns; i++)
+        for (int i = 0; i < FarmLadder.ResurrectTurns(enemy.DefeatCount); i++)
         {
             turns.EndTurn();
             Advance(turns, 3f);

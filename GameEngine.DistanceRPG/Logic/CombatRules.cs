@@ -88,7 +88,9 @@ public static class CombatRules
     /// for, before the roll multiplies it: the weapon's own damage, whatever the
     /// distance has already added (<paramref name="longshotBonus"/>), and
     /// <c>+floor(L / 2)</c> for the wielder's proficiency in the weapon's class
-    /// (§2.2). The one place a wielder's base is computed, because step 1 is
+    /// (§2.2), plus whatever the wielder itself adds to anything it holds
+    /// (<see cref="ActorState.BonusDamage"/> — a farmed dummy's revival ladder,
+    /// §3.2). The one place a wielder's base is computed, because step 1 is
     /// taken in three: the roll at (1,0), Longshot re-taking it at (1,1) over a
     /// priced distance, and a wand's cast re-deriving it to size the burn its
     /// element leaves. A bonus added at one of them alone would be silently
@@ -105,7 +107,7 @@ public static class CombatRules
     {
         ArgumentNullException.ThrowIfNull(self);
         ArgumentNullException.ThrowIfNull(weapon);
-        return weapon.Damage + longshotBonus + Progression.DamageBonus(self.WeaponLevel(weapon));
+        return weapon.Damage + longshotBonus + Progression.DamageBonus(self.WeaponLevel(weapon)) + self.BonusDamage;
     }
 
     /// <summary>

@@ -368,12 +368,25 @@ public class DungeonScene : Scene
     /// First-entry enemy population: EnemyPlacer decides positions from the
     /// map seed on its own RNG stream. When save games arrive, a loaded
     /// entry skips this and restores saved enemy states instead.
+    /// <para>
+    /// Each dummy keeps the index it was placed at (§3.2's
+    /// <see cref="EnemyState.SpawnIndex"/>): the revival ladder is seeded from
+    /// the map seed and that index, so it is the dummy's own rather than the
+    /// floor's, and a save restores it beside the accumulated values.
+    /// </para>
     /// </summary>
     private void SpawnEnemies()
     {
+        int spawnIndex = 0;
         foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            var state = new EnemyState { X = x, Y = y, Weapon = GameContent.Current.Weapons.Instantiate(weaponId) };
+            var state = new EnemyState
+            {
+                X = x,
+                Y = y,
+                Weapon = GameContent.Current.Weapons.Instantiate(weaponId),
+                SpawnIndex = spawnIndex++,
+            };
             var enemy = new EnemyObject(state, EnemyColor);
             _enemies.Add(enemy);
             AddGameObject(enemy);
@@ -432,8 +445,11 @@ public class DungeonScene : Scene
 
     private void WireTurnSystem()
     {
+        // The floor's own generation seed goes in with the roster: the revival
+        // ladder (§3.2) is drawn off mapSeed ^ ReviveSalt, per enemy and per
+        // cycle, so a farm replays identically from a save that restored it.
         _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(),
-            _enemies.Select(e => e.State).ToList(), RollD20);
+            _enemies.Select(e => e.State).ToList(), RollD20, MapSeed);
 
         _turns.TurnEnded += saved =>
         {

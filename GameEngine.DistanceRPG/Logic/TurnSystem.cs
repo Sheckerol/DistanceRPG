@@ -160,6 +160,14 @@ public sealed class TurnSystem
     // enemies gain progression is the day this line changes and nothing else.
     private readonly Dictionary<ActorState, Action<XpCredit>> _xpFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for a defeat (§3.2): the Killed applier hands the blow's unclamped
+    // figure to the feed the roster fixed for whatever died, and a dummy's
+    // advances its DefeatCount by FarmLadder.DefeatAdvance. A party member's is
+    // a no-op, exactly as its XP feed is — nothing here asks an actor its kind,
+    // and the day a party member starts recording its own deaths is the day
+    // this one line changes.
+    private readonly Dictionary<ActorState, Action<int>> _defeatFeeds = new(ReferenceEqualityComparer.Instance);
+
     // ── Turn economy ─────────────────────────────────────────────────────────
     // Attacks each actor has chosen to make since its side's turn began — a
     // brace, a held shot, a counter or an opportunity attack is a reaction and
@@ -177,13 +185,28 @@ public sealed class TurnSystem
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
+    // The floor's own generation seed — the value MapGenerator.Generate was
+    // given, which DungeonScene holds and hands over. The revival ladder (§3.2)
+    // is drawn on mapSeed ^ FarmLadder.ReviveSalt, per enemy and per cycle, so
+    // this is the one thing that makes a farm replay identically after a reload.
+    // It is NOT allowed to fall back to Random.Shared the way _rollD20 does: a
+    // die roll nobody saved may differ between a session and its reload, and a
+    // dummy's statline may not. A fixture that never revives anything can leave
+    // it at 0, which is a seed like any other.
+    private readonly long _mapSeed;
+
+    /// <param name="mapSeed">
+    /// The floor's generation seed, for the streams a save replays from (§3.2).
+    /// Defaults to 0 for fixtures that roll nothing off it.
+    /// </param>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
-        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null)
+        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0)
     {
         _grid = grid;
         _party = party;
         _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
+        _mapSeed = mapSeed;
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
@@ -215,6 +238,7 @@ public sealed class TurnSystem
                 if (gained > 0)
                     XpCredited?.Invoke(member, credit, gained);
             };
+            _defeatFeeds[member] = static _ => { };                       // a member's defeats are not a ladder anyone farms
             _sides[member] = Side.Party;
             _mayReact[member] = static () => true;                       // the party's zones are always armed
         }
@@ -227,6 +251,9 @@ public sealed class TurnSystem
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
             _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
             _xpFeeds[enemy] = static _ => { };                           // an enemy carries no pools: the roster says so, never a type test
+            // The n-th defeat of this dummy deepens what it is carrying, and the
+            // bar is its own constitution: dealt >= MaxHp counts twice (§3.2).
+            _defeatFeeds[enemy] = dealt => enemy.DefeatCount += FarmLadder.DefeatAdvance(dealt, enemy.MaxHp);
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
@@ -1138,8 +1165,14 @@ public sealed class TurnSystem
 
         foreach (var enemy in _enemies)
         {
-            if (!enemy.Alive && TurnCount - enemy.DefeatedAtTurn >= GameConstants.DummyResurrectTurns)
+            if (!enemy.Alive && TurnCount - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount))
             {
+                // What comes back is stronger than what died (§3.2), and it is
+                // rolled here, BEFORE the HP is restored: a Health roll lifts the
+                // maximum this line then fills, so rolling after it would restore
+                // the old full and silently lose the cycle.
+                ApplyRevivalGains(enemy);
+
                 enemy.Hp = enemy.MaxHp;
                 enemy.Alive = true;
                 enemy.TurnsSinceSeen = 2;
@@ -1178,6 +1211,38 @@ public sealed class TurnSystem
 
         Phase = TurnPhase.Player;
         PlayerTurnStarted?.Invoke();
+    }
+
+    /// <summary>
+    /// Every revival cycle this dummy has earned and not yet been paid, resolved
+    /// one at a time and <strong>in order</strong> (§3.2): a clean kill leaves
+    /// two owing, and the second must read the statline the first produced
+    /// rather than the pre-kill one, or a Health roll's new maximum is invisible
+    /// to the Damage roll that follows it.
+    /// <para>
+    /// Each cycle is its own seeded draw — <c>ReviveStream(mapSeed, spawnIndex,
+    /// cycle)</c> — rather than a position in one running stream, which is what
+    /// lets a save store the accumulated values alone (§5.1) and what makes the
+    /// order the party kills two dummies in irrelevant to either one's ladder.
+    /// </para>
+    /// <para>
+    /// The step is a percentage of the dummy's <em>whole</em> current number —
+    /// its weapon's damage plus what it has already accumulated, or its current
+    /// maximum HP — never of the accumulated bonus alone, which would start at
+    /// zero, floor at 1 forever and never compound: the one shape §3.2 rules out.
+    /// </para>
+    /// </summary>
+    private void ApplyRevivalGains(EnemyState enemy)
+    {
+        while (enemy.RevivalsRolled < enemy.DefeatCount)
+        {
+            var gain = FarmLadder.RollRevival(FarmLadder.ReviveStream(_mapSeed, enemy.SpawnIndex, enemy.RevivalsRolled));
+            if (gain is RevivalGain.Damage or RevivalGain.Both)
+                enemy.RevivalDamage += FarmLadder.Step(enemy.Weapon.Damage + enemy.BonusDamage);
+            if (gain is RevivalGain.Health or RevivalGain.Both)
+                enemy.RevivalMaxHp += FarmLadder.Step(enemy.MaxHp);
+            enemy.RevivalsRolled++;
+        }
     }
 
     // ── Status ticks and healing ─────────────────────────────────────────────
@@ -1708,13 +1773,28 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// The Killed applier: the mana the killer's entries settled on the kill —
-    /// Siphon's trigger and its refund — as one record, spent then restored,
-    /// never past the pool. Nothing for a tick death, which names no weapon
-    /// and no wielder, or for a killer already down.
+    /// The Killed applier, the one world-write of a defeat: what the death is
+    /// worth to whatever died — a dummy's <see cref="EnemyState.DefeatCount"/>,
+    /// §3.2 — and then the mana the killer's entries settled on the kill
+    /// (Siphon's trigger and its refund) as one record, spent then restored,
+    /// never past the pool. Nothing of the mana for a tick death, which names no
+    /// weapon and no wielder, or for a killer already down.
+    /// <para>
+    /// <strong>The count advances ahead of both of those guards</strong>, or an
+    /// ordinary kill — which settles no mana at all — would never count. It
+    /// reads <see cref="KillPayload.Dealt"/>, which is documented as never
+    /// clamped to remaining HP precisely because this comparison needs the
+    /// unclamped figure: a 40-damage crit into a 24-HP dummy has to read as 40.
+    /// A tick death carries the tick's own damage and no weapon, and counts the
+    /// same way — the dummy died, and nothing in §3.2 says by what.
+    /// </para>
     /// </summary>
     private void ApplyKilled(KillPayload settled, ActorState killer, ActorState dead, EventTable table)
     {
+        if (!_defeatFeeds.TryGetValue(dead, out var defeatFeed))
+            throw new InvalidOperationException("Killed an actor that is not on this turn system's roster.");
+        defeatFeed(settled.Dealt);
+
         if (settled.ManaToSpend <= 0 && settled.ManaRestored <= 0) return;
         if (!killer.Alive) return;
         table.Enqueue(GameEvent.ManaSpent,

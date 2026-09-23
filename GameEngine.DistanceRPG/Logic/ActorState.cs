@@ -87,6 +87,24 @@ public abstract class ActorState
     }
 
     /// <summary>
+    /// Damage this actor adds to whatever it is holding, however it came by it:
+    /// a farmed dummy's accumulated revival bonus (§3.2). Zero for an actor with
+    /// no such history, which is everyone else.
+    /// <para>
+    /// <strong>It lands on the actor and never on the weapon</strong> — "a dummy
+    /// hitting for +15 does not drop a weapon with +15 on it; drop quality comes
+    /// from the ladder above and nothing else" (§3.2). Otherwise farming would
+    /// pay twice for one investment, and the bonus would leak into a modifier
+    /// system with no place to put it. Declared here and read in exactly one
+    /// place, <see cref="CombatRules.BaseDamage"/>, which is the one place a
+    /// wielder's base damage is computed: a bonus added at a swing's step 1
+    /// alone would be silently dropped by Longshot's retake and by a wand's
+    /// cast, both of which re-derive the base through that same call.
+    /// </para>
+    /// </summary>
+    public virtual int BonusDamage => 0;
+
+    /// <summary>
     /// The movement one swing or cast of <paramref name="weapon"/> costs this
     /// actor: the weapon's own resolved cost — Light's discount already in it —
     /// less the wielder's proficiency discount, never below

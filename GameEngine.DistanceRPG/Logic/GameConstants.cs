@@ -50,8 +50,11 @@ public static class GameConstants
     /// <summary>Enemy movement animation speed, logic units per second.</summary>
     public const float EnemySpeed = 150f;
 
-    /// <summary>Turns after defeat before a dummy resurrects.</summary>
-    public const int DummyResurrectTurns = 10;
+    // Turns after defeat before a dummy resurrects lived here as a constant. It
+    // is a ladder now rather than a number — max(ResurrectTurnsFloor,
+    // ResurrectTurnsBase - DefeatCount), §3.2 — so the base is
+    // Tuning.ResurrectTurnsBase (still 10) and FarmLadder.ResurrectTurns is the
+    // one place the wait is computed. Nothing reads a compiled 10 any more.
 
     /// <summary>A room needs at least this many enemies to roll a staff healer.</summary>
     public const int MinEnemiesForStaffHealer = 3;

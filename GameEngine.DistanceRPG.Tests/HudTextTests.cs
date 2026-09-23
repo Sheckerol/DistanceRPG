@@ -25,6 +25,8 @@ public class HudTextTests
 
     private static string[] Badges(ActorState actor) => DungeonHud.StatusBadgeRuns(actor).Select(r => r.Text).ToArray();
 
+    private static string[] Plate(EnemyState enemy) => DungeonHud.NameplateRuns(enemy).Select(r => r.Text).ToArray();
+
     [Fact]
     public void WeaponStats_ShowTheResolvedCosts_NeverAPercentage()
     {
@@ -82,6 +84,26 @@ public class HudTextTests
         enemy.ApplyStatus(Mire, null, 10);   // ten levels at 10% each: no budget left at all
         Assert.True(DungeonHud.IsParalysed(enemy));
         Assert.Equal(new[] { "PARA", "BURN 3", "FRST 2", "+4", "MIRE 10" }, Badges(enemy));
+    }
+
+    [Fact]
+    public void Nameplate_ReadsAsAThreatAndARewardAtOnce()
+    {
+        // A dummy nobody has put down yet reads as it always did.
+        Assert.Equal(new[] { "50/50" }, Plate(new EnemyState()));
+
+        // A farmed one carries its DefeatCount, and that one number is honest
+        // about being two things: the depth of the drop it is holding and how
+        // much harder it hits than the dummy beside it (3.2). The maximum it is
+        // read against is its own, revivals included.
+        var farmed = new EnemyState { DefeatCount = 4, RevivalMaxHp = 17, RevivalDamage = 6 };
+        Assert.Equal(new[] { "67/67", "x4" }, Plate(farmed));
+
+        // It sits between the pool and the badges, so what is left of it and how
+        // many times this has happened are adjacent.
+        farmed.Hp = 12;
+        farmed.ApplyStatus(Sundered, null, 2);
+        Assert.Equal(new[] { "12/67", "x4", "SUND 2" }, Plate(farmed));
     }
 
     [Fact]

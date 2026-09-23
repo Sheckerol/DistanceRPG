@@ -230,10 +230,7 @@ public sealed class DungeonHud
             else
                 DrawCenteredAt(px.X, px.Y - 18f, label, 1.5f, enemy.Weapon.IsCaster ? Cyan : Orange);
 
-            // Riders land on enemies too, so the nameplate carries the same effect badges as a party row.
-            var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
-            plate.AddRange(StatusBadgeRuns(enemy));
-            DrawRunsCenteredAt(px.X, px.Y, 1.5f, plate);
+            DrawRunsCenteredAt(px.X, px.Y, 1.5f, NameplateRuns(enemy));
 
             if (obj != scene.HoveredEnemy) continue;
 
@@ -725,6 +722,35 @@ public sealed class DungeonHud
             [StatusEffectType.Weakened] = (_, _, e) => $"GETTING CRIT RATTLES YOUR SWING - DEALS -{EffectOf(e)} A HIT",
             [StatusEffectType.Softened] = (_, _, e) => $"BLOCK -{EffectOf(e)} UNTIL THE ROUND ENDS",
         };
+
+    /// <summary>
+    /// A dummy's plate: its hit points out of a maximum its revivals may have
+    /// raised, <c>xN</c> once it has been put down at least once, then the same
+    /// effect badges a party row carries — riders land on enemies too.
+    /// <para>
+    /// The count has to read as a threat level and a reward tier at once (§3.2),
+    /// "which is honest, because that is exactly what it is": one number saying
+    /// both how deep the drop it is carrying has grown and how much harder it
+    /// hits than the one beside it. It sits between the pool and the badges so
+    /// the two things a player reads before deciding to swing — what is left of
+    /// it, and how many times they have done this — are adjacent.
+    /// </para>
+    /// <para>
+    /// <c>xN</c> with an ASCII x, the <c>CRIT 19+ x3</c> convention this HUD
+    /// already uses: the 5x7 font carries no multiplication sign, and
+    /// <see cref="TextRenderer"/> skips a glyph it does not have, so a typographic
+    /// one would silently draw the bare number.
+    /// </para>
+    /// </summary>
+    internal static IReadOnlyList<Run> NameplateRuns(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
+        if (enemy.DefeatCount > 0)
+            plate.Add(new Run($"x{enemy.DefeatCount}", Orange));
+        plate.AddRange(StatusBadgeRuns(enemy));
+        return plate;
+    }
 
     /// <summary>
     /// The actor's statuses as coloured badges in the order they landed —
