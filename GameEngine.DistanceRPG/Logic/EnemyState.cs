@@ -101,4 +101,19 @@ public sealed class EnemyState : ActorState
 
     /// <summary>Maximum HP the revival ladder has accumulated, on the same terms.</summary>
     public int RevivalMaxHp { get; set; }
+
+    /// <summary>
+    /// Whether the weapon this dummy was carrying has been taken off the floor
+    /// (§3.5). A permanent kill leaves a ground item that nothing stores: the row
+    /// above already fixes it, so a floor entry re-derives it through
+    /// <see cref="LootTable.Roll"/> and gets the identical weapon back
+    /// (<see cref="TurnSystem.GroundItemOf"/>).
+    /// <para>
+    /// This one flag is what retires the offer. Without it a save taken after a
+    /// pickup would hand the same weapon over again on the next load, and a save
+    /// taken before one would have to choose between storing the item (a second
+    /// source of truth) and losing it.
+    /// </para>
+    /// </summary>
+    public bool DropTaken { get; set; }
 }

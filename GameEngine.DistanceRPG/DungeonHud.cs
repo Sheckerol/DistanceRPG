@@ -103,6 +103,7 @@ public sealed class DungeonHud
         DrawTopReadouts(w, active, turns);
         DrawPartySelector(scene);
         DrawEnemyLabels(camera, scene, w, h);
+        DrawGroundItems(camera, scene, w, h);
         DrawAllyCue(camera, scene, w, h);
         DrawFloatingTexts(camera, w, h);
         DrawAimCue(scene);
@@ -118,7 +119,7 @@ public sealed class DungeonHud
             DrawInventory(w, h, active, turns);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h);
+            DrawMenu(w, h, turns.ResurrectionActive);
 
         if (turns.Phase == TurnPhase.GameOver)
         {
@@ -247,6 +248,44 @@ public sealed class DungeonHud
                 y += 12f;
             }
         }
+    }
+
+    /// <summary>
+    /// What is lying on the floor: over each ground item in sight, the weapon it
+    /// is and the farm's depth it was collected at, and — on the one the active
+    /// member is standing on — the key that takes it. Nothing is drawn for an
+    /// item on a fogged tile: it is exactly as visible as the corpse it came off.
+    /// </summary>
+    private void DrawGroundItems(Camera camera, DungeonScene scene, int w, int h)
+    {
+        var target = scene.PickupTarget;
+        foreach (var item in scene.GroundItems)
+        {
+            if (!item.Marker.IsActive) continue;
+            if (!WorldToScreen(camera, item.Marker.Position + Vector3.UnitY * 0.5f, w, h, out var px)) continue;
+
+            DrawRunsCenteredAt(px.X, px.Y - 14f, 1.5f, GroundItemRuns(item.Drop));
+            if (item == target)
+                DrawCenteredAt(px.X, px.Y + 2f, DungeonScene.PickupHint, 1.4f, White);
+        }
+    }
+
+    /// <summary>
+    /// A weapon on the floor: its name — a unique's in the gold every other
+    /// readout gives it — and, beside it, <c>xN</c>, the farm's depth it was
+    /// collected at. That is the same number, in the same shape, the plate of the
+    /// dummy that was carrying it wore (<see cref="NameplateRuns"/>), which is
+    /// the point: what the player was farming for and what they are being handed
+    /// read as one thing (§3.2). A drop at zero shows no quality, because there is
+    /// none — it is simply the weapon the dummy had.
+    /// </summary>
+    internal static IReadOnlyList<Run> GroundItemRuns(Drop drop)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        var runs = new List<Run> { new(drop.Weapon.Name, drop.Weapon.Unique ? Orange : White) };
+        if (drop.DefeatCount > 0)
+            runs.Add(new Run($"x{drop.DefeatCount}", Orange));
+        return runs;
     }
 
     /// <summary>A support staff's cue over the ally under the mouse: the cast a click would make, or why it would not.</summary>
@@ -396,13 +435,24 @@ public sealed class DungeonHud
         DrawCentered(w, swapY + InventoryHintGap, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
     }
 
-    private void DrawMenu(int w, int h)
+    /// <summary>
+    /// The pause menu, and one entry that is scaffolding: stopping resurrection
+    /// is Phase 4's boss's doing (§4.3), and until that boss exists there is no
+    /// way to reach the drop path in play at all. It is one-way, as the boss kill
+    /// it stands in for is, and it goes when the boss arrives — the line it
+    /// leaves behind says what the dungeon has become.
+    /// </summary>
+    private void DrawMenu(int w, int h, bool resurrectionActive)
     {
         float top = h / 2f - 90f;
         DrawCentered(w, top, "PAUSED", 4f, Cyan);
         DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
         DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
-        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
+        if (resurrectionActive)
+            DrawCentered(w, top + 146f, "3  STOP RESURRECTION", 2f, White);
+        else
+            DrawCentered(w, top + 146f, "RESURRECTION STOPPED - DEFEATS ARE PERMANENT", 1.5f, Orange);
+        DrawCentered(w, top + 196f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────

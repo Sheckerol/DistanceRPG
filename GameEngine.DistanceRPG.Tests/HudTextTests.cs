@@ -27,6 +27,8 @@ public class HudTextTests
 
     private static string[] Plate(EnemyState enemy) => DungeonHud.NameplateRuns(enemy).Select(r => r.Text).ToArray();
 
+    private static string[] Item(Drop drop) => DungeonHud.GroundItemRuns(drop).Select(r => r.Text).ToArray();
+
     [Fact]
     public void WeaponStats_ShowTheResolvedCosts_NeverAPercentage()
     {
@@ -104,6 +106,26 @@ public class HudTextTests
         farmed.Hp = 12;
         farmed.ApplyStatus(Sundered, null, 2);
         Assert.Equal(new[] { "12/67", "x4", "SUND 2" }, Plate(farmed));
+    }
+
+    [Fact]
+    public void AGroundItemNamesTheWeaponAndItsQuality()
+    {
+        // A weapon lying where its carrier fell says which weapon it is and the
+        // farm's depth it was collected at - the same xN, in the same shape, the
+        // plate of the dummy carrying it wore, so what the player farmed for and
+        // what they are being handed read as one thing (3.2, 3.5).
+        var plain = new Drop(TestWeapons.Get("arming_sword"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Arming Sword" }, Item(plain));   // nothing farmed it: no quality to print
+
+        var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));
+
+        // A unique is named in the gold every other readout gives it, rather than
+        // by a word the label would have to find room for.
+        var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
+        Assert.Equal(new[] { "Widowmaker", "x22" }, Item(won));
+        Assert.NotEqual(DungeonHud.GroundItemRuns(farmed)[0].Color, DungeonHud.GroundItemRuns(won)[0].Color);
     }
 
     [Fact]

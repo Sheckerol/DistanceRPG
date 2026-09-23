@@ -47,6 +47,27 @@ public sealed class TurnSystem
     /// <summary>Completed turn count; increments when a new player turn starts.</summary>
     public int TurnCount { get; private set; }
 
+    /// <summary>
+    /// Whether a defeated dummy comes back (§3.2, §4.3). True for the whole of a
+    /// visit today: the dungeon is an infinite farm, the timer runs, and a defeat
+    /// writes nothing but <see cref="EnemyState.DefeatCount"/> — "nothing is
+    /// handed over at the time". Set false and the dungeon is finite: nothing
+    /// revives, and every defeat is the permanent kill that collects what the
+    /// dummy was carrying (<see cref="EnemyDropped"/>, <see cref="GroundItemOf"/>).
+    /// <para>
+    /// This is the seam Phase 4's boss takes over — killing the boss is what
+    /// stops resurrection (§4.3) — and nothing in the logic flips it on its own.
+    /// Until that boss exists the scene's pause menu carries a dev switch, so the
+    /// drop path can be played rather than only tested.
+    /// </para>
+    /// <para>
+    /// Stopping resurrection ends the ladder and refunds none of it: a floor
+    /// farmed deep is still standing there, stronger for every cycle, which is
+    /// exactly what makes the climb out the price of having farmed (§3.2).
+    /// </para>
+    /// </summary>
+    public bool ResurrectionActive { get; set; } = true;
+
     /// <summary>Enemies a party member has laid eyes on this turn (cleared each player turn).</summary>
     private readonly HashSet<EnemyState> _seenThisTurn = new();
 
@@ -60,6 +81,7 @@ public sealed class TurnSystem
     public event Action<PartyMemberState>? CharacterDied;
     public event Action<EnemyState, AttackResolution>? EnemyHit;
     public event Action<EnemyState>? EnemyDefeated;
+    public event Action<EnemyState, Drop>? EnemyDropped;                    // a permanent kill handed over what the dummy was carrying (§3.5): the corpse, and the weapon now lying on it
     public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action<EnemyState>? EnemyBraceTriggered;
@@ -1163,9 +1185,15 @@ public sealed class TurnSystem
         _seenThisTurn.Clear();
         TurnCount++;
 
+        // The resurrections, while the dungeon still runs them. Once the boss
+        // has stopped them (§4.3) a corpse stays a corpse and the timer is not
+        // consulted at all: what it was carrying is lying on it instead
+        // (GroundItemOf), and the floor the party farmed is the gauntlet it now
+        // walks back through — still stronger, just no longer replenishing.
         foreach (var enemy in _enemies)
         {
-            if (!enemy.Alive && TurnCount - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount))
+            if (ResurrectionActive && !enemy.Alive
+                && TurnCount - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount))
             {
                 // What comes back is stronger than what died (§3.2), and it is
                 // rolled here, BEFORE the HP is restored: a Health roll lifts the
@@ -1903,11 +1931,46 @@ public sealed class TurnSystem
         }
     }
 
-    /// <summary>What an enemy's death means, however it came: the defeat turn the resurrection timer counts from, and the scene is told.</summary>
+    /// <summary>
+    /// What an enemy's death means, however it came: the defeat turn the
+    /// resurrection timer counts from, the scene is told, and — once the dungeon
+    /// has stopped resurrecting — the weapon it was carrying is handed over
+    /// (§3.2, §3.5). The drop is raised from here rather than from the Killed
+    /// applier deliberately: this is the post-cascade side-consequence site
+    /// (<see cref="RunHeldDeaths"/>), so a tick death deep inside a chain drops
+    /// its weapon with the world settled, exactly as an ordinary kill does.
+    /// </summary>
     private void OnEnemyDefeated(EnemyState target)
     {
         target.DefeatedAtTurn = TurnCount;
         EnemyDefeated?.Invoke(target);
+        if (GroundItemOf(target) is { } drop)
+            EnemyDropped?.Invoke(target, drop);
+    }
+
+    /// <summary>
+    /// The weapon lying on <paramref name="enemy"/> right now, or null when there
+    /// is none: while the dungeon still resurrects its dummies (§3.2) a defeat
+    /// hands nothing over, a dummy still standing is carrying rather than
+    /// offering, and a drop already picked up
+    /// (<see cref="EnemyState.DropTaken"/>) is not offered twice.
+    /// <para>
+    /// <strong>It is derived, never stored</strong>, which is the whole of §3.5's
+    /// answer to a save taken between the permanent kill and the pickup:
+    /// <see cref="LootTable.Roll"/> reads the enemy row and this system's map
+    /// seed and nothing else, so a floor re-entry re-derives the identical
+    /// weapon — same variant, same stacks, same tiers, same unique outcome —
+    /// rather than either re-rolling it (a different weapon) or forgetting it (a
+    /// lost one). Both the defeat above and the scene's floor entry read this one
+    /// method, so there is one rule rather than two that have to agree.
+    /// </para>
+    /// </summary>
+    /// <param name="enemy">The dummy, alive or dead; it need not be on this system's roster, since the answer is a function of its row.</param>
+    public Drop? GroundItemOf(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        if (ResurrectionActive || enemy.Alive || enemy.DropTaken) return null;
+        return LootTable.Roll(enemy, _mapSeed);
     }
 
     private static float Dist2(ActorState a, ActorState b)
