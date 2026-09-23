@@ -711,6 +711,34 @@ public class SoulBehaviourTests
         Assert.Empty(spent);
     }
 
+    [Fact]
+    public void Echoing_IsTheThirdPlaceholder_AndHoldsNoTableRowAtAll()
+    {
+        // §3.3's Echoing is declared with no behaviour for the same reason as those two — "the weapon's class
+        // feature triggers once more" has no meaning for six of the eight classes — with one difference worth
+        // reading off the tables. Weightless and Momentum hold real rows, inert ones, so FiresOn answers true
+        // for both; Echoing holds no row on any event, and the event it names (AttackDeclared) has no chain
+        // because nothing raises it. Both halves are in open-questions.md rather than guessed at here.
+        //
+        // It still prints in the loops' chains like any attached entry: the chain lists what the loop will
+        // walk for this wielder, which is attachment order, and whether a walked entry does anything is the
+        // table's answer and not the chain's.
+        var grid = new int[20, 20];
+        var a = Holding("A", 5, 5, Souled("Echoing Knife", 40, 15, 30, ("echoing", 1)));
+        var target = Enemy(5, 6);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { target }, () => 10);
+        var spent = ManaProbe(turns);
+
+        foreach (var evt in Enum.GetValues<GameEvent>())
+            Assert.False(EnchantmentBehaviours.FiresOn(evt, EffectKind.Echoing), $"{evt} runs it");
+        Assert.Equal(new[] { "DamageDealt (0,0) echoing@0" }, turns.Events.HandlersFor(GameEvent.DamageDealt, a).Select(h => h.ToString()));
+        Assert.Empty(turns.Events.HandlersFor(GameEvent.AttackDeclared));
+
+        Assert.True(turns.TryAttack(a, target));
+        Assert.Equal(TestPools.FixtureMana, a.Mana);
+        Assert.Empty(spent);
+    }
+
     // ── Handlers never write ─────────────────────────────────────────────────
 
     [Fact]

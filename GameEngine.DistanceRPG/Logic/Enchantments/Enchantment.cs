@@ -7,8 +7,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// (<see cref="ElementalDamage"/>); <see cref="Vampiric"/> is the catalogue
 /// entry the Efficiency dagger arrives with; the rest are the souls the
 /// uniques carry (§1.5). Each kind is an entry in the per-event tables of
-/// <see cref="EnchantmentBehaviours"/> — or, for the two a defender carries,
-/// a compiled step of the damage pipeline — never a branch in a loop.
+/// <see cref="EnchantmentBehaviours"/> — or, for the three a defender carries
+/// and for the element a martial swing types itself with, a compiled step of
+/// the damage pipeline — never a branch in a loop.
 /// </summary>
 public enum EffectKind
 {
@@ -47,6 +48,24 @@ public enum EffectKind
 
     /// <summary>A kill refunds part of the swing's movement — declared, inert until the fraction is fixed (§3.3).</summary>
     Momentum,
+
+    /// <summary>
+    /// On a hit, add <see cref="Enchantment.LevelsFor"/>(<see cref="EnchantmentDef.Potency"/>)
+    /// damage beside the weapon's share, untyped: Arcane. Untyped is the whole of
+    /// its pitch (§3.3) — "raw magical damage, no element, and therefore nothing
+    /// the type chart can resist or amplify" — which makes it the safe damage
+    /// entry and the four elements the situational ones.
+    /// </summary>
+    BonusDamage,
+
+    /// <summary>On a crit, the riders §1.6 lands (Weakened, Sundered) land that many levels deeper.</summary>
+    Shattering,
+
+    /// <summary>On a hit at the wielder, absorb a point of the attacker's <em>enchantment</em> damage per level — the second armour, beside Block, for the second damage source (a defender's soul, compiled at (5,1)).</summary>
+    Shielding,
+
+    /// <summary>The weapon's class feature triggers once more — declared, inert: the phrase has no definition for six of the eight classes, and <see cref="GameEvent.AttackDeclared"/>, the event it fires on, is raised nowhere (<c>docs/roadmap/open-questions.md</c>).</summary>
+    Echoing,
 }
 
 /// <summary>Who an enchantment's effect may land on.</summary>

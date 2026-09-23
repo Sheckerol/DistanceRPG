@@ -57,3 +57,33 @@ Recorded here rather than left in a commit message so that whoever lifts the
 party out of `DungeonScene` lifts this with it, instead of a Phase 6a implementer
 discovering that the enchanter will not offer what the party carried in on
 floor 1.
+
+## What `Echoing` does, and who raises `AttackDeclared` (§3.3, §1.7)
+
+`Echoing` is in §3.3's starting set — lock 20, trigger 15, fires on Attack — with
+one line of definition: "the weapon's class feature triggers once more." Phase 3
+shipped the entry and no behaviour, the `Weightless`/`Momentum` shape, because
+two separate things are missing and neither is Phase 3's to invent:
+
+- **The effect has no meaning for six of the eight classes.** A dagger's feature
+  is `CritWindow`, a bow's is `Longshot`, a throwing weapon's is `Charges`:
+  "triggers once more" reads on `Brace`, `Opportunist` and `Overwatch` — a
+  reaction budget, which a second use is obviously a second of — and reads on
+  nothing else. A crit window does not trigger; a per-tile damage curve does not
+  trigger. Inventing a meaning per class would be eight design decisions taken to
+  make one enchantment work, and they would be taken here rather than in §1.1,
+  where the class features live.
+- **Nothing raises the event it fires on.** `GameEvent.AttackDeclared` is on the
+  enum and is raised nowhere: the only place a swing is declared is
+  `TurnSystem.ResolveAttackOn`, and every condition the enchantments actually use
+  — hit, crit, kill, being hit, cast — is a later event on the same path, which
+  is why Phase 1 never needed it. `Weightless` ("attacks cost less movement") is
+  blocked on exactly the same thing, so a phase that raises it unblocks two
+  entries at once.
+
+Nothing is wrong in play: the entry validates, attaches, reserves its lock and
+fires nothing, and `LootTable.DropOrder` keeps it out of the drop pool so a
+martial weapon's one guaranteed enchantment can never be it. Whoever raises
+`AttackDeclared` — the movement rules around a swing are Phase 4's most likely
+owner — should settle both entries then, and should settle what a class feature
+"triggering once more" means in §1.1's terms rather than in the enchantment's.

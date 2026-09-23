@@ -117,6 +117,7 @@ public static class LootTable
     {
         EffectKind.Weightless,
         EffectKind.Momentum,
+        EffectKind.Echoing,   // the first of them that is not a unique soul: without this filter a martial drop could win it
     };
 
     /// <summary>
@@ -132,6 +133,15 @@ public static class LootTable
     /// entry is a deliberate one-line edit at the end of this list, and until it
     /// is made the entry simply never drops.
     /// </para>
+    /// <para>
+    /// §3.3's four remaining entries were appended here when they shipped, which
+    /// is that edit being made: Arcane and Shattering join the martial pool, and
+    /// the last two are named and then filtered out by <see cref="DropOrder"/> —
+    /// Aegis because its behaviour is a compiled step on the defender rather than
+    /// a row in any loop, Echoing because it is declared and inert. Naming them
+    /// and letting the filters answer is the point: a later change that gives
+    /// either a live loop behaviour makes it rollable without a second edit here.
+    /// </para>
     /// <see cref="ContentValidator.ValidateEnchantments"/> refuses content that
     /// does not carry every id named here.
     /// </summary>
@@ -140,6 +150,8 @@ public static class LootTable
         "flaming", "cold", "shocking", "acidic",     // the four elements, in DamageType order
         "vampiric",                                  // the one ordinary catalogue entry Phase 1 shipped
         "regeneration", "ward", "poison", "mire",    // the staff effects: a cast and nothing else, so no martial drop keeps them
+        "arcane", "shattering",                      // §3.3's damage entry and its crit entry: both fire at step 4 of any hit
+        "aegis", "echoing",                          // filtered out below — a compiled defender step, and a declared-inert kind
     ];
 
     /// <summary>

@@ -56,6 +56,15 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="OnDefendersTurn">True when the hit lands in the defender's own side's phase — a counter to its swing, a brace it walked into, a shot it drew by moving: the defender is acting, not holding a line. The souls that answer the opponent's phase (Immovable) stand aside. Set by the turn system from whose phase it is; false by default, the opponent's phase.</param>
 /// <param name="NextInLine">On DamageDealt: the next body on the shot's line beyond the defender that the weapon reaches — the nearest living actor of the far side further along the attacker-to-defender ray, within a tile of it, in range and sight — read off the map by the DamageTaken applier at impact, before anything the hit sets off has moved. What an entry that carries the shot on (Piercing) reads before it pays; null when the line is clear, on a hit that was itself carried there, and throughout DamageTaken.</param>
 /// <param name="Payments">Which of the attacker's entries paid what of <see cref="ManaToSpend"/> (§3.3), appended by the loop as each entry fires. The defender's souls have none: they pay out of <see cref="DefenderManaToSpend"/>, which is the defender's record and not this list.</param>
+/// <param name="RiderDepth">
+/// Extra levels every crit rider this hit lands carries, settled at step 4 by
+/// the entries that deepen them (Shattering, §3.3) and read at (7,0), where the
+/// riders themselves are settled. It is a depth and not a rider of its own: an
+/// attacker forged with neither <c>CritWeaken</c> nor <c>CritSunder</c> lands
+/// nothing however deep this goes, because a rider that is not there cannot
+/// land deeper. It is why the entry fires at step 4 rather than on
+/// <see cref="GameEvent.Crit"/>, which arrives after the riders have landed.
+/// </param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int ForgedShare, int WardSpent,
@@ -75,7 +84,8 @@ public sealed record DamagePayload(
     ImmutableArray<string> CastFired = default,
     bool OnDefendersTurn = false,
     ActorState? NextInLine = null,
-    ImmutableArray<EnchantmentPayment> Payments = default)
+    ImmutableArray<EnchantmentPayment> Payments = default,
+    int RiderDepth = 0)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with

@@ -79,6 +79,25 @@ public static class ContentDefaults
         Element("acidic", "Acidic", DamageType.Acidic, applyPercent: 15),
         // The catalogue entry the Efficiency dagger arrives with at tier 3: fires on damage dealt, heals a flat 1 per tier per instance, 2 a trigger.
         Catalogue("vampiric", "Vampiric", EffectKind.Vampiric, TargetSide.Ally, @lock: 20, trigger: 2, potency: 1),
+        // The rest of the §3.3 starting set. Lock and trigger are the table's; the
+        // potency column it has no row for is read back out of the same section:
+        // Arcane's is Tuning.ArcanePotency (provisional, and laid over this row by
+        // the catalogue, so a playtest turns it in tuning.json without a content
+        // edit), and Shattering's 1 is "crit riders land one level deeper" at tier 1.
+        Catalogue("arcane", "Arcane", EffectKind.BonusDamage, TargetSide.Enemy, @lock: 30, trigger: 8, potency: 4),
+        Catalogue("shattering", "Shattering", EffectKind.Shattering, TargetSide.Enemy, @lock: 25, trigger: 10, potency: 1),
+        // The shielding entry settled.md asks for and never names: it absorbs one
+        // point of enchantment damage per level, which is the EffectPerLevel row it
+        // is described by, read as a potency. The id is provisional — the docs name
+        // none, and content needs something to refer to it by. Lock and trigger are
+        // Vampiric's mirrored: the same one-point-per-tier magnitude on every hit,
+        // from the other side of it; the §3.3 table prices neither.
+        Catalogue("aegis", "Aegis", EffectKind.Shielding, TargetSide.Ally, @lock: 20, trigger: 2, potency: 1),
+        // Declared and inert, the Weightless/Momentum shape: "the weapon's class
+        // feature triggers once more" has no definition for six of the eight
+        // classes, and AttackDeclared, the event it fires on, is raised nowhere.
+        // Both go to docs/roadmap/open-questions.md rather than being invented here.
+        Catalogue("echoing", "Echoing", EffectKind.Echoing, TargetSide.Ally, @lock: 20, trigger: 15, potency: 0),
         // The souls, in the §3.3 table's order; each bends a rule the rest of the game is built on.
         Rule("siphon", "Siphon", EffectKind.Siphon, TargetSide.Ally, @lock: 20, trigger: 5, potency: 15),           // a kill restores 15: net +10
         Rule("weightless", "Weightless", EffectKind.Weightless, TargetSide.Ally, @lock: 25, trigger: 5, potency: 0),   // attacks cost less movement — declared, inert until the amount is fixed

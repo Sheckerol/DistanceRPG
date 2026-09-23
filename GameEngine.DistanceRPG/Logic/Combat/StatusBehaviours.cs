@@ -112,15 +112,22 @@ public static class StatusBehaviours
     /// CritSunder stacks land as Weakened and Sundered levels on the defender,
     /// one per stack, whatever Ward swallowed. The riders ride: they change
     /// nothing about the hit that applied them.
+    /// <para>
+    /// Each lands <see cref="DamagePayload.RiderDepth"/> levels deeper than its
+    /// stacks — what an entry that deepens riders settled earlier in this chain
+    /// (§3.3's Shattering, at step 4). Depth deepens a rider; it never conjures
+    /// one, so an attacker carrying neither stack still lands nothing.
+    /// </para>
     /// </summary>
     public static DamagePayload CritRiders(DamagePayload payload, ActorState self, ActorState other)
     {
         if (!payload.IsCrit) return payload;
         var riders = OrEmpty(payload.ApplyToDefender);
+        int deeper = Math.Max(0, payload.RiderDepth);
         int weaken = self.Value(ModifierType.CritWeaken);
-        if (weaken > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Weakened, null, weaken));
+        if (weaken > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Weakened, null, weaken + deeper));
         int sunder = self.Value(ModifierType.CritSunder);
-        if (sunder > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Sundered, null, sunder));
+        if (sunder > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Sundered, null, sunder + deeper));
         return payload with { ApplyToDefender = riders };
     }
 

@@ -146,7 +146,7 @@ public class LootTableTests
 
         using var _ = TestContent.Use(enchantments: new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, appended]));
 
-        Assert.Equal(10, GameContent.Current.Enchantments.Rollable.Count);   // the content-ordered list did grow
+        Assert.Equal(14, GameContent.Current.Enchantments.Rollable.Count);   // the content-ordered list did grow
         Assert.Equal(dagger, LootTable.DropOrder(WeaponClass.Dagger));       // the code-ordered one did not
         Assert.Equal(before, Sweep("assassins_fang", defeatCount: 4, spawns: 64).Select(Describe).ToList());
     }
@@ -235,7 +235,35 @@ public class LootTableTests
 
         Assert.All(entries, def => Assert.NotEqual(EffectKind.ApplyStatus, def.Effect));
         Assert.All(entries, def => Assert.False(GameContent.Current.Enchantments.NeverRolled.Contains(def.Id)));
-        Assert.Equal(["flaming", "cold", "shocking", "acidic", "vampiric"], LootTable.DropOrder(WeaponClass.Dagger));
+        Assert.Equal(["flaming", "cold", "shocking", "acidic", "vampiric", "arcane", "shattering"],
+            LootTable.DropOrder(WeaponClass.Dagger));
+    }
+
+    [Fact]
+    public void AnInertEntryIsNeverRolled()
+    {
+        // Echoing is an ordinary catalogue entry — not a unique soul, so nothing
+        // in neverRolled keeps it out — and it is declared with no behaviour at
+        // all. A drop carries exactly one enchantment, so winning it would spend
+        // the rare roll and reserve a lock of 20 for something that can never
+        // fire: the one guaranteed entry a martial weapon ever gets, wasted. The
+        // filters in DropOrder are what keep it out, so the pool can name it and
+        // a later change that gives it a behaviour makes it rollable with no
+        // second edit. Aegis is the same shape for a different reason: its
+        // behaviour is a compiled step on the defender rather than a row in a
+        // loop, so no event a weapon raises finds it.
+        Assert.Contains("echoing", LootTable.DropPool);
+        Assert.Contains("aegis", LootTable.DropPool);
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            Assert.DoesNotContain("echoing", LootTable.DropOrder(cls));
+            Assert.DoesNotContain("aegis", LootTable.DropOrder(cls));
+        }
+
+        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 100 });
+        foreach (var (weaponId, element) in EveryClass())
+            Assert.All(Sweep(weaponId, defeatCount: 0, spawns: 64, element: element).Where(d => !d.WasUniqueRoll),
+                d => Assert.All(d.Weapon.Enchantments, e => Assert.NotEqual("echoing", e.Id)));
     }
 
     [Fact]

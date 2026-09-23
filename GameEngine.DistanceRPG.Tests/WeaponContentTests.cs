@@ -558,6 +558,23 @@ public class WeaponContentTests
         ex = LoadWithEnchantment("flaming", e => e with { Trigger = null });
         Assert.Equal(("flaming", ContentValidator.RuleTriggerXorApplies), (ex.EntryId, ex.Rule));
 
+        // An entry whose whole magnitude is its potency names one: Arcane's
+        // damage, Shattering's depth, the shielding entry's absorption. At zero
+        // it would reserve a lock and the slot it sits in for something that can
+        // never scale to anything, the one shape §3.3 refuses everywhere else.
+        // The kinds that read their magnitude from elsewhere — an element's
+        // typing, a rule that fires once — are not asked, and it is the row that
+        // is checked rather than what a §5.3 dial lays over it.
+        ex = LoadWithEnchantment("arcane", e => e with { Potency = 0 });
+        Assert.Equal(("arcane", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
+        ex = LoadWithEnchantment("shattering", e => e with { Potency = 0 });
+        Assert.Equal(("shattering", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
+        ex = LoadWithEnchantment("aegis", e => e with { Potency = 0 });
+        Assert.Equal(("aegis", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
+        GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted,
+            new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Select(e =>
+                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ContentDefaults.Weapons);   // a declared-inert kind is not asked
+
         // The chart: two elements carrying one type, or an element nobody opposes.
         ex = LoadWithEnchantment("cold", e => e with { DamageType = DamageType.Flaming });
         Assert.Equal(("cold", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));

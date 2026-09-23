@@ -263,12 +263,13 @@ public class UniqueContentTests
         // The unique flag gates two things and nothing else: the tier is pinned at 1, and no roll grants
         // the entry — the latter in restricted.json, cross-checked on load. Vampiric is the catalogue
         // entry the dagger arrives with at tier 3: not unique, rollable, its tier its own. The catalogue
-        // in file order: the eight innates, Vampiric, then the nine souls in the §3.3 table's order.
+        // in file order: the eight innates, then the ordinary entries of §3.3's starting set — Vampiric,
+        // Arcane, Shattering, the shielding entry and Echoing — then the nine souls in the table's order.
         Assert.Equal(
             new[]
             {
                 "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic",
-                "vampiric",
+                "vampiric", "arcane", "shattering", "aegis", "echoing",
                 "siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning",
             },
             Enchantments.All.Select(e => e.Id));
@@ -283,7 +284,7 @@ public class UniqueContentTests
             Assert.Equal(1, (new Enchantment(soul, 1) with { Tier = 3 }).Tier);   // no path lifts the pin, a copy included
         }
         Assert.Equal(Souls.Length, Enchantments.NeverRolled.Count);
-        Assert.Equal(8 + 1, Enchantments.Rollable.Count);
+        Assert.Equal(8 + 5, Enchantments.Rollable.Count);   // the eight innates and the starting set's five ordinary entries
         Assert.False(Enchantments["vampiric"].Unique);
         Assert.Contains(Enchantments.Rollable, e => e.Id == "vampiric");
         Assert.Equal(3, new Enchantment(Enchantments["vampiric"], 3).Tier);

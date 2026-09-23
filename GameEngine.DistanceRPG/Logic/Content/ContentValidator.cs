@@ -26,6 +26,7 @@ public static class ContentValidator
     public const string RuleElementNamesType = "an elemental entry names the damage type it carries";
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
     public const string RuleLingerNamesElement = "a lingering element names an element that exists and the status it leaves";
+    public const string RuleMagnitudeNamesAPotency = "an enchantment whose effect is its potency names one of at least one";
     public const string RuleUniqueNeverRolled = "unique entries appear in neverRolled, and neverRolled names only unique entries";
     public const string RuleDropPoolResolves = "every id the drop pool names resolves in the catalogue";
 
@@ -360,6 +361,20 @@ public static class ContentValidator
     /// refused at load exactly the way a <see cref="Tuning.StartingPool"/> of 0
     /// already is, rather than guarded inside the replay.
     /// </para>
+    /// <para>
+    /// The potency rule is the same idea one column over, for the kinds whose
+    /// whole magnitude <em>is</em> their potency
+    /// (<see cref="EnchantmentBehaviours.SizedByPotency"/>: Arcane's damage,
+    /// Shattering's depth, Aegis's absorption). At zero such a row fires for
+    /// nothing while still reserving its lock and the slot it sits in — the one
+    /// shape §3.3 refuses everywhere else. Every other kind reads its magnitude
+    /// from somewhere the row does not carry — an element's typing, a rule that
+    /// fires once, a percentage of the blow — so none of them is asked. It is
+    /// the row that is checked, not what a §5.3 dial may lay over it
+    /// (<see cref="Tuning.ArcanePotency"/> does for the bonus-damage kind): a
+    /// file has to state the magnitude it ships with, or content and tuning
+    /// disagree silently about what an entry is worth.
+    /// </para>
     /// </summary>
     public static void ValidateEnchantments(EnchantmentsData data)
     {
@@ -384,6 +399,8 @@ public static class ContentValidator
                 throw new ContentException(e.Id, RuleApplierNamesStatus);
             if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
                 throw new ContentException(e.Id, RuleElementNamesType);
+            if (EnchantmentBehaviours.SizedByPotency(e.Effect) && e.Potency < 1)
+                throw new ContentException(e.Id, RuleMagnitudeNamesAPotency, $"potency {e.Potency}");
         }
 
         // The drop pool is an ordered id list held in code (§3.1), so that

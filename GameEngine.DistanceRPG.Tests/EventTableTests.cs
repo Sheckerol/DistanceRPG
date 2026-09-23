@@ -212,6 +212,7 @@ public class EventTableTests
         Assert.Equal(
             new[]
             {
+                "DamageTaken (0,5) MartialElement",
                 "DamageTaken (1,0) RollToBase",
                 "DamageTaken (1,1) Longshot",
                 "DamageTaken (1,2) FriendlyFire",
@@ -221,6 +222,7 @@ public class EventTableTests
                 "DamageTaken (3,9) FixWeaponShare",
                 "DamageTaken (4,0) Enchantments",
                 "DamageTaken (5,0) Block",
+                "DamageTaken (5,1) Aegis",
                 "DamageTaken (6,0) Ward",
                 "DamageTaken (6,1) Sturdy",
                 "DamageTaken (6,9) FixTaken",
@@ -244,9 +246,34 @@ public class EventTableTests
         var enchanted = Member();
         enchanted.Inventory[0] = TestWeapons.Enchanted("Charged Knife", 32, 10, 30, "shocking", "flaming");
         var rows = table.HandlersFor(GameEvent.DamageTaken, enchanted).Select(h => h.ToString()).ToList();
-        Assert.Equal(chain.Take(7).Select(h => h.ToString()), rows.Take(7));
-        Assert.Equal(new[] { "DamageTaken (4,0) shocking@0", "DamageTaken (4,1) flaming@1" }, rows.Skip(7).Take(2));
-        Assert.Equal(chain.Skip(8).Select(h => h.ToString()), rows.Skip(9));
+        Assert.Equal(chain.Take(8).Select(h => h.ToString()), rows.Take(8));
+        Assert.Equal(new[] { "DamageTaken (4,0) shocking@0", "DamageTaken (4,1) flaming@1" }, rows.Skip(8).Take(2));
+        Assert.Equal(chain.Skip(9).Select(h => h.ToString()), rows.Skip(10));
+    }
+
+    [Fact]
+    public void TheDamageTakenChainPrintsMartialElementAtZeroFive_AndAegisAtFiveOne()
+    {
+        // Section 3.3's last two compiled steps are two listed rows, and where
+        // they sit is the whole of what they are: an element on a martial weapon
+        // has to type the swing before the chart reads the type at (3,1), and the
+        // shield has to absorb after Block has fixed what was dealt at (5,0).
+        var table = new EventTable();
+        Behaviours.RegisterAll(table);
+        var order = table.HandlersFor(GameEvent.DamageTaken).Select(h => h.ToString()).ToList();
+
+        Assert.Equal(new HandlerPriority(0, 5), EnchantmentBehaviours.MartialElementPriority);
+        Assert.Equal(new HandlerPriority(5, 1), EnchantmentBehaviours.AegisPriority);
+        Assert.True(order.IndexOf("DamageTaken (0,5) MartialElement") < order.IndexOf("DamageTaken (3,1) TypeChart"));
+        Assert.True(order.IndexOf("DamageTaken (5,0) Block") < order.IndexOf("DamageTaken (5,1) Aegis"));
+        Assert.True(order.IndexOf("DamageTaken (5,1) Aegis") < order.IndexOf("DamageTaken (6,0) Ward"));
+
+        // Neither could have been a row on step 4: that step belongs to the
+        // enchantment loop, which prints its entries at (4, attachment index),
+        // and On refuses a compiled handler beside it.
+        var ex = Assert.Throws<InvalidOperationException>(() => table.On<DamagePayload>(
+            GameEvent.DamageTaken, new HandlerPriority(4, 1), "AegisTooEarly", EnchantmentBehaviours.Aegis));
+        Assert.Contains("step 4 belongs to 'Enchantments'", ex.Message);
     }
 
     [Fact]
@@ -281,7 +308,7 @@ public class EventTableTests
 
         var payload = DamagePayload.Initial(Dagger, roll: 20, distanceUnits: 22);
         var chain = table.Chain<DamagePayload>(GameEvent.DamageTaken);
-        Assert.Equal(20, chain.Count);
+        Assert.Equal(22, chain.Count);
         foreach (var (info, handler) in chain)
         {
             string before = Snapshot(attacker) + " | " + Snapshot(defender);

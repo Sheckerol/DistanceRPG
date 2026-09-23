@@ -3,15 +3,17 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <summary>
 /// The loaded enchantment entries (§5.7), keyed by stable string id and kept in
 /// file order, with <see cref="Tuning.ApplyPercent"/> laid over each entry's
-/// own percentage, and the attunement chart (§1.4) read off the relations the
+/// own percentage and <see cref="Tuning.ArcanePotency"/> over the bonus-damage
+/// kind's magnitude, and the attunement chart (§1.4) read off the relations the
 /// elements sit in: four types in two opposed pairs, never a matrix. Beside
 /// the entries it holds the two relations the file keeps for enchantments
 /// (§5.5): <see cref="NeverRolled"/>, the ids no roll grants — the unique
 /// souls, cross-checked against the <c>unique</c> flag on load — and the
 /// enchantment-keyed <c>requires</c> rows (<see cref="Prerequisites"/>), a
-/// lingering element's element. Phase 1 ships the eight innates — the four
+/// lingering element's element. Phase 1 shipped the eight innates — the four
 /// staff effects and the four wand elements — Vampiric, and the nine unique
-/// souls; Phase 3 fills the rest of the catalogue.
+/// souls; Phase 3 completed §3.3's starting set with Arcane, Shattering, the
+/// shielding entry and Echoing, the last declared with its behaviour open.
 /// </summary>
 public sealed class EnchantmentCatalogue
 {
@@ -33,8 +35,17 @@ public sealed class EnchantmentCatalogue
         var all = new List<EnchantmentDef>(data.Enchantments.Count);
         foreach (var entry in data.Enchantments)
         {
-            // The tuning table wins per id; an id it does not name keeps the catalogue's percentage.
-            var def = entry with { ApplyPercent = tuning.Lookup(x => x.ApplyPercent, entry.Id, entry.ApplyPercent) };
+            // The tuning table wins per id; an id it does not name keeps the
+            // catalogue's percentage. Arcane's magnitude is laid over the same
+            // way and for the same reason (§5.3: a number a playtest turns lives
+            // in tuning.json rather than in a content row), keyed by the kind
+            // because what the dial prices is bonus damage on a hit, while which
+            // entry carries that kind is content's to say.
+            var def = entry with
+            {
+                ApplyPercent = tuning.Lookup(x => x.ApplyPercent, entry.Id, entry.ApplyPercent),
+                Potency = entry.Effect == EffectKind.BonusDamage ? tuning.ArcanePotency : entry.Potency,
+            };
             all.Add(def);
             _byId[def.Id] = def;
             if (def.Effect == EffectKind.ElementalDamage && def.DamageType is { } type && type != DamageType.None)

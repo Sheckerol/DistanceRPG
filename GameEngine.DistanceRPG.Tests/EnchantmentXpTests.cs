@@ -344,12 +344,18 @@ public class EnchantmentXpTests
         // fire through one of the five loops and are not unique -- a unique is
         // pinned at tier 1 by design (below), and an entry outside the loops has
         // no payment to ride.
+        //
+        // Every swing here is a natural 20, because an entry in the step-4 table
+        // may carry a condition and the only one any of them carries is the crit
+        // (§3.3's Shattering, which deepens the riders a crit lands). A crit is
+        // the swing that satisfies every case rather than only some, and the cast
+        // cases are untouched by it: Fire raises its own payload for those.
         var grid = new int[20, 20];
         var def = GameContent.Current.Enchantments[id];
         var weapon = Carrying("Proving " + id, new Enchantment(def, Tier: 1));
         var member = Wielding("A", weapon);
         var dummy = Enemy(5, 6);
-        var turns = new TurnSystem(grid, new[] { member }, new[] { dummy }, () => 10);
+        var turns = new TurnSystem(grid, new[] { member }, new[] { dummy }, () => 20);
         var spent = ManaProbe(turns);
         member.Hp = 1;                                    // a drink has somewhere to land
 
