@@ -87,10 +87,10 @@ public sealed class CampaignState
     // The run's-end records (§4.5, §6.7), keyed by dungeon id: the run each
     // cleared dungeon is locked until, the dungeons cleared at least once, and
     // the dungeons retired for good. Lookups only; the sorted views are what
-    // anyone iterates or saves. Only a run's end writes them, and RunCounter:
-    // there is no restore path yet. Phase 5's load (§5.1) adds one of its own,
-    // an internal restore constructor or factory taking the counter and the
-    // three sorted views, never a public setter or a public Retire.
+    // anyone iterates or saves. Only a run's end writes them, and RunCounter —
+    // and a load, which brings back what a run's end wrote through its own
+    // internal door (Restore, Phase 5.4), never a public setter or a public
+    // Retire.
     private readonly Dictionary<string, int> _lockedUntilRun = new(StringComparer.Ordinal);
     private readonly HashSet<string> _cleared = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);
@@ -107,9 +107,10 @@ public sealed class CampaignState
 
     /// <summary>
     /// A campaign holding <paramref name="party"/>, in roster order: what a test
-    /// builds around its fixture members, and what Phase 5's load restores. It
-    /// meets nothing on its own — a loaded campaign's seen set is the saved one;
-    /// <see cref="Start"/> is where a new campaign meets its loadout.
+    /// builds around its fixture members, and what a load builds its campaign on
+    /// (<see cref="Restore"/>). It meets nothing on its own — a loaded campaign's
+    /// seen set is the saved one; <see cref="Start"/> is where a new campaign
+    /// meets its loadout.
     /// </summary>
     /// <exception cref="ArgumentException">The party names a null member.</exception>
     public CampaignState(IReadOnlyList<PartyMemberState> party)
@@ -154,6 +155,54 @@ public sealed class CampaignState
         var campaign = new CampaignState(members);
         foreach (var member in members)
             campaign.See(member);
+        return campaign;
+    }
+
+    /// <summary>
+    /// A campaign between runs as a save describes it (§5.1, §6.7): the party as
+    /// the load rebuilt it, what it has met, the run counter, every lock a clear
+    /// wrote — an early offer's rewrite as it stands — the dungeons cleared and
+    /// retired, and how the last run ended. The one door the run's-end records
+    /// come back through: internal, so there is still no public setter on the
+    /// counter and no public <c>Retire</c> (a run's end is the only other writer).
+    /// Nothing is re-derived and nothing is met: a loaded campaign has met what it
+    /// had met, which is not what its bags hold now.
+    /// <para>
+    /// The ids are the load's to have checked against the content
+    /// (<see cref="SaveGame.Restore"/>): this takes them as they are, and refuses
+    /// only what no campaign can hold — a negative counter or lock, and a dungeon
+    /// locked twice.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException">The party names a null member, an id is null, or a dungeon is locked twice.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The counter or a lock is negative.</exception>
+    internal static CampaignState Restore(IReadOnlyList<PartyMemberState> party, IReadOnlyList<string> seen, int runCounter,
+        IReadOnlyList<(string DungeonId, int LockedUntilRun)> locks, IReadOnlyList<string> cleared, IReadOnlyList<string> retired,
+        RunResult? lastResult)
+    {
+        ArgumentNullException.ThrowIfNull(seen);
+        ArgumentNullException.ThrowIfNull(locks);
+        ArgumentNullException.ThrowIfNull(cleared);
+        ArgumentNullException.ThrowIfNull(retired);
+        ArgumentOutOfRangeException.ThrowIfNegative(runCounter);
+        if (seen.Concat(cleared).Concat(retired).Any(id => id is null))
+            throw new ArgumentException("A campaign's records name their entries by id, and one is null.");
+
+        var campaign = new CampaignState(party)
+        {
+            RunCounter = runCounter,
+            LastResult = lastResult,
+        };
+        campaign._seen.UnionWith(seen);
+        foreach (var (dungeonId, until) in locks)
+        {
+            ArgumentNullException.ThrowIfNull(dungeonId, nameof(locks));
+            ArgumentOutOfRangeException.ThrowIfNegative(until, nameof(locks));
+            if (!campaign._lockedUntilRun.TryAdd(dungeonId, until))
+                throw new ArgumentException($"'{dungeonId}' is locked twice: a dungeon has one lock, the last a clear wrote.", nameof(locks));
+        }
+        campaign._cleared.UnionWith(cleared);
+        campaign._retired.UnionWith(retired);
         return campaign;
     }
 

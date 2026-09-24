@@ -10,7 +10,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// construction and never written, and exists only to compute the ceiling;
 /// <see cref="Modifiers"/> is forged plus acquired, and is what every
 /// resolution site reads. Made by <see cref="WeaponCatalogue.Instantiate"/>,
-/// one instance per item.
+/// one instance per item, and brought back by a load with both spreads as they
+/// were saved (§5.1).
 /// </summary>
 public sealed class Weapon
 {
@@ -57,6 +58,64 @@ public sealed class Weapon
     /// source that skipped its gate: thrown rather than forged silently.
     /// </exception>
     public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments, int? forgedCount = null, ModifierType? forgedGraft = null)
+        : this(def, enchantments)
+    {
+        Forged = Forge(def, forgedGraft);
+        Modifiers = Forged;
+        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, _enchantments.Length);
+        if (forged < 0 || forged > _enchantments.Length)
+            throw new ArgumentOutOfRangeException(nameof(forgedCount), forgedCount,
+                $"'{def.Id}' was handed {_enchantments.Length} entries; the forged ones are a prefix of them.");
+        ForgedEnchantmentCount = forged;
+        Resolve();
+    }
+
+    /// <summary>
+    /// The item a save describes (§5.1), coming back: the statline, class and
+    /// shape off <paramref name="def"/> — its id is all a save keeps of them, so
+    /// an edit to the row reaches every saved copy — and what is the item's own
+    /// as it was saved: <strong>both</strong> its forged and its live spreads, and
+    /// its entries in attachment order with how many of them are forged. The
+    /// forged spread is the one the item was made with (a boss drop's graft
+    /// included), never re-read off the row, so its ceiling is where it was.
+    /// Internal: a load's door, never a second way to make a weapon.
+    /// <para>
+    /// Nothing is re-asked of the relations or the forge limit: the item was
+    /// legal when it was made, and a restore brings it back rather than making
+    /// it again. Two things are refused, because no play can reach them: a live
+    /// spread below the forged one — acquired stacks are only ever added — and a
+    /// forged count that is not a prefix of the entries.
+    /// </para>
+    /// </summary>
+    /// <param name="def">The catalogue row, by the saved id.</param>
+    /// <param name="forged">The identity spread the item was made with.</param>
+    /// <param name="modifiers">The live total: forged plus acquired.</param>
+    /// <param name="enchantments">The attached entries, in attachment order, each at its tier with its XP.</param>
+    /// <param name="forgedEnchantmentCount">How many of <paramref name="enchantments"/>, from the front, are forged.</param>
+    /// <exception cref="ArgumentException"><paramref name="modifiers"/> holds fewer stacks of some modifier than <paramref name="forged"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="forgedEnchantmentCount"/> is not a count of <paramref name="enchantments"/>.</exception>
+    internal Weapon(WeaponDef def, ModifierSet forged, ModifierSet modifiers, IReadOnlyList<Enchantment> enchantments, int forgedEnchantmentCount)
+        : this(def, enchantments)
+    {
+        ArgumentNullException.ThrowIfNull(forged);
+        ArgumentNullException.ThrowIfNull(modifiers);
+        foreach (var (type, stacks) in forged.Entries)
+            if (modifiers.Stacks(type) < stacks)
+                throw new ArgumentException(
+                    $"'{def.Id}' forges {type} x{stacks} and holds {modifiers.Stacks(type)} live: the live spread is the forged one plus what was acquired, never less.",
+                    nameof(modifiers));
+        if (forgedEnchantmentCount < 0 || forgedEnchantmentCount > _enchantments.Length)
+            throw new ArgumentOutOfRangeException(nameof(forgedEnchantmentCount), forgedEnchantmentCount,
+                $"'{def.Id}' carries {_enchantments.Length} entries; the forged ones are a prefix of them.");
+
+        Forged = forged;
+        Modifiers = modifiers;
+        ForgedEnchantmentCount = forgedEnchantmentCount;
+        Resolve();
+    }
+
+    /// <summary>What every construction shares: the row's statline and identity, and the entries in attachment order. The spreads and the forged count are each constructor's own.</summary>
+    private Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(enchantments);
@@ -69,18 +128,12 @@ public sealed class Weapon
         Damage = def.Damage;
         Cost = def.Cost;
         ManaCost = def.ManaCost;
-        Forged = Forge(def, forgedGraft);
-        Modifiers = Forged;
+        Forged = ModifierSet.Empty;
+        Modifiers = ModifierSet.Empty;
         _enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
         Enchantments = Array.AsReadOnly(_enchantments);   // a live view: a credited entry shows through, a write does not get in
-        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, _enchantments.Length);
-        if (forged < 0 || forged > _enchantments.Length)
-            throw new ArgumentOutOfRangeException(nameof(forgedCount), forgedCount,
-                $"'{def.Id}' was handed {_enchantments.Length} entries; the forged ones are a prefix of them.");
-        ForgedEnchantmentCount = forged;
         AreaShape = def.Shape;
         Unique = def.Unique;
-        Resolve();
     }
 
     public string Id { get; }

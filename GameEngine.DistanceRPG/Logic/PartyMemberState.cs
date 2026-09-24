@@ -59,6 +59,38 @@ public sealed class PartyMemberState : ActorState
     }
 
     /// <summary>
+    /// A member as a save describes it (§5.1): its id, its colour, the spread it
+    /// was built with and the bag it was built with — <paramref name="slots"/>
+    /// of them, whatever the current tuning's carry would give a member built
+    /// now, since a member keeps the count it was built with and a changed
+    /// <c>tuning.json</c> never resizes a bag. Everything else — the XP, the body,
+    /// what the bag holds, the turn's movement — the load writes back after, as
+    /// plain state. The one construction a load makes, beside
+    /// <see cref="From"/>'s for a new campaign; internal, so a restore is never a
+    /// public way to set a spread.
+    /// <para>
+    /// The spread is taken as saved and never asked the §2.1 permutation rule,
+    /// which is the roster file's: a member's spread is fixed at creation, and
+    /// this is the same member coming back.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slots"/> is not a count a member can carry: at least the hand, at most <see cref="GameConstants.MaxInventorySlots"/>.</exception>
+    internal static PartyMemberState Restore(string id, int colorIndex, InnateStats stats, int slots)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slots, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(slots, GameConstants.MaxInventorySlots);
+
+        return new PartyMemberState
+        {
+            Id = id,
+            ColorIndex = colorIndex,
+            Stats = stats,
+            Inventory = new Weapon?[slots],
+        };
+    }
+
+    /// <summary>
     /// The permanent spread (§2.1): a permutation of 1-4, fixed at creation from
     /// the roster entry and never raised — no mechanic in any phase writes it,
     /// which is why it is <c>init</c>-only rather than merely left alone. A
@@ -222,8 +254,13 @@ public sealed class PartyMemberState : ActorState
         return tuning.PartyCarrySlots / GameConstants.PartySize;
     }
 
-    /// <summary>The member's <see cref="InventorySlots"/> slots, six under the shipped tuning; slot 0 is the equipped weapon.</summary>
-    public Weapon?[] Inventory { get; } = new Weapon?[InventorySlots];
+    /// <summary>
+    /// The member's <see cref="InventorySlots"/> slots, six under the shipped
+    /// tuning; slot 0 is the equipped weapon. The array is the member's for good:
+    /// only construction sizes it — a restore (<see cref="Restore"/>) to the count
+    /// the saved member was built with — and every write after is to a slot.
+    /// </summary>
+    public Weapon?[] Inventory { get; private init; } = new Weapon?[InventorySlots];
 
     public override Weapon? EquippedWeapon => Inventory[0];
 
@@ -243,18 +280,31 @@ public sealed class PartyMemberState : ActorState
     /// <summary>Banked at end of turn (half the unspent budget, capped).</summary>
     public float SavedMovement { get; set; }
 
+    /// <summary>
+    /// The whole this turn's cap was cut from: the base budget plus the bank
+    /// <see cref="StartTurn"/> cashed in, before Mire took its share — the budget
+    /// alone after a <see cref="Rest"/>, and for a member no turn has started for.
+    /// What a Mire legend states beside the MOVE readout's cap (§1.5: 10% a level
+    /// <em>of this</em>). Kept on the member and not beside it, because the bank
+    /// it holds is spent by the time anyone reads it, and a save carries it
+    /// (§5.1) so a reload reads the same whole.
+    /// </summary>
+    public float BudgetBeforeMire { get; set; } = Budget;
+
     public override float Radius => GameConstants.PlayerHalf;
 
     /// <summary>
     /// Start-of-turn reset: cash in the saved movement bonus, refill the budget,
     /// then take Mire's cut off the whole of it — 10% a level, and at ten
-    /// levels the budget is gone, which is all paralysis is (§1.5).
+    /// levels the budget is gone, which is all paralysis is (§1.5). The whole it
+    /// cut from is kept (<see cref="BudgetBeforeMire"/>).
     /// </summary>
     public void StartTurn()
     {
         float bonus = SavedMovement;
         SavedMovement = 0;
-        EffectiveMax = StatusBehaviours.MiredBudget(this, Budget + bonus);
+        BudgetBeforeMire = Budget + bonus;
+        EffectiveMax = StatusBehaviours.MiredBudget(this, BudgetBeforeMire);
         DistLeft = EffectiveMax;
     }
 
@@ -298,6 +348,7 @@ public sealed class PartyMemberState : ActorState
         Mana = UsableMaxMana;
         HeldShots = 0;
         SavedMovement = 0;
+        BudgetBeforeMire = Budget;
         EffectiveMax = Budget;
         DistLeft = Budget;
     }
