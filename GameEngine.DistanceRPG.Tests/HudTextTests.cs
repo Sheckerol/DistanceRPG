@@ -949,14 +949,16 @@ public class HudTextTests
         // The way out's question previews the answer (4.4), since the answer ends
         // the run: with the boss down, a clear - what you carry goes home, and the
         // dungeon closes for good or locks for its floor in runs; with it standing,
-        // a retreat - the XP kept, the depth re-rolled, and whether the party got
-        // deep enough for the run to count (6.3's mercy) - a rule, never the depth.
-        // And either way the whole visit goes.
+        // a retreat - the XP kept, the depth re-rolled where it can be, and whether
+        // the party got deep enough for the run to count (6.3's mercy) - a rule,
+        // never the depth. And either way the whole visit goes. The tutorial is two
+        // floors deep on every visit (PHASE4-077), so its retreat re-rolls nothing
+        // and says nothing of a new depth.
         const string reset = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
         var party = Party();
         var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
         tutorial.OpenTurns(party, () => 10);
-        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS", "TOO SHALLOW TO COUNT AS A RUN", reset },
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", reset },
             DungeonHud.LeavePreview(tutorial));
         GoDown(tutorial, party);
         Assert.Equal("TOO SHALLOW TO COUNT AS A RUN", DungeonHud.LeavePreview(tutorial)[1]);   // its two floors never reach the bar
@@ -1041,19 +1043,50 @@ public class HudTextTests
         }, Lines(died));
         Assert.Equal("DEFEATED", DungeonHud.DefeatHeadline);
 
-        // Dead shallow, the boss standing: nothing counted, and the rule for why -
-        // and nothing clawed back, the run having gained nothing (or the share being 0).
+        // Dead in the tutorial, the golem standing: nothing counted, and nothing
+        // clawed back, the run having gained nothing (or the share being 0). Its two
+        // floors never reach the mercy floor and never change, so the summary points
+        // at no floor 3 it does not have and promises no new depth.
         var shallow = new RunResult("tutorial", RunOutcome.Death, false, 2, null, false, false, 0, null, false, [], [], []);
         Assert.Equal(new[]
         {
             "DEFEATED",
             "THE TUTORIAL - DEEPEST FLOOR 2",
-            "THE STONE GOLEM STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "THE STONE GOLEM STILL STANDS",
             "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
             "XP KEPT - NOTHING CLAWED BACK",
-            "RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 0 RUNS SO FAR",
+            "RUN NOT COUNTED - 0 RUNS SO FAR",
             "ENTER TO CONTINUE",
         }, Lines(shallow));
+
+        // Walked out past the golem it found: its floor named, and still no re-roll.
+        var waited = new RunResult("tutorial", RunOutcome.Retreat, false, 2, 2, false, false, 0, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM WAITED ON FLOOR 2",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN NOT COUNTED - 0 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(waited));
+
+        // A dungeon that rolls its depth says both: the re-roll, and the rule a
+        // shallow failure missed - or, from its boss floor, the floor it found.
+        var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 2, null, false, false, 4, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE SPEAR HALL - DEEPEST FLOOR 2",
+            "THE SPEAR WARDEN STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 4 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(turnedBack));
+        var faced = new RunResult("spear_hall", RunOutcome.Retreat, false, 7, 7, true, true, 5, null, false, [], [], []);
+        Assert.Equal("THE SPEAR WARDEN WAITED ON FLOOR 7 - THE DEPTH RE-ROLLS NEXT TIME", Lines(faced)[2]);
 
         // A long haul wraps rather than running off the panel, every name once.
         var haul = Enumerable.Range(0, 12).Select(_ => TestWeapons.Get("weakspot_stiletto")).Append(bulwark).ToArray();
@@ -1065,7 +1098,7 @@ public class HudTextTests
         Assert.Single(spoils, l => l.Contains("THE BULWARK"));
 
         // ENTER is the one way on, on every ending: never ESC, never a quit.
-        foreach (var result in new[] { cleared, retreat, died, shallow })
+        foreach (var result in new[] { cleared, retreat, died, shallow, waited, turnedBack, faced })
         {
             var lines = Lines(result);
             Assert.StartsWith(DungeonHud.ContinueHint, lines[^1], StringComparison.Ordinal);

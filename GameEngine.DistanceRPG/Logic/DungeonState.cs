@@ -986,12 +986,26 @@ public sealed class DungeonState
     /// the table's numbers, and 0 at the tutorial's floor 2. The most any boss
     /// pays is <c>BossFloorMax − BossStackOffset</c>, six, deliberately short of
     /// the ten a two-modifier farm can bank: the farm stays the only route to a
-    /// finished weapon. Read at <see cref="Enter"/> and fixed there
-    /// (<see cref="PromisedStacks"/>).
+    /// finished weapon, and a load refuses a tuning or a dungeon that would pay
+    /// that much (<see cref="ContentValidator.RuleBossPaysLessThanTheFarm"/>).
+    /// Read at <see cref="Enter"/> and fixed there (<see cref="PromisedStacks"/>).
     /// </summary>
     /// <param name="bossFloor">The boss floor, a 1-based floor number.</param>
     public static int PromisedStacksFor(int bossFloor)
-        => Math.Max(0, bossFloor - GameContent.Current.Tuning.BossStackOffset);
+        => PromisedStacksFor(bossFloor, GameContent.Current.Tuning);
+
+    /// <summary>
+    /// <see cref="PromisedStacksFor(int)"/> under <paramref name="tuning"/> rather
+    /// than the current content's: what a load checks a boss floor range against
+    /// while the tuning it is loading is not current yet.
+    /// </summary>
+    /// <param name="bossFloor">The boss floor, a 1-based floor number.</param>
+    /// <param name="tuning">The tuning whose <see cref="Tuning.BossStackOffset"/> prices the floor.</param>
+    public static int PromisedStacksFor(int bossFloor, Tuning tuning)
+    {
+        ArgumentNullException.ThrowIfNull(tuning);
+        return Math.Max(0, bossFloor - tuning.BossStackOffset);
+    }
 
     /// <summary>
     /// The redraw bound on the boss's class draw (<see cref="RollBoss"/>): past

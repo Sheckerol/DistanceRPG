@@ -159,13 +159,16 @@ public sealed class BetweenRunsHud : IDisposable
             new Run($"{dungeon} - DEEPEST FLOOR {result.DeepestFloor}", DungeonHud.Grey),
         };
 
-        // The boss, and the depth only where the party stood on it (§4.3).
+        // The boss, and the depth only where the party stood on it (§4.3) — and
+        // the re-roll only where there is one: the tutorial is two floors deep on
+        // every visit, so its standing golem promises no new depth next time.
+        string reroll = def is not null && content.Dungeons.HasFixedDepth(def) ? "" : " - THE DEPTH RE-ROLLS NEXT TIME";
         if (result.BossDefeated)
             lines.Add(new Run(result.BossFloorRevealed is { } fell ? $"THE {boss} FELL ON FLOOR {fell}" : $"THE {boss} FELL", DungeonHud.Green));
         else if (result.BossFloorRevealed is { } waited)
-            lines.Add(new Run($"THE {boss} WAITED ON FLOOR {waited} - THE DEPTH RE-ROLLS NEXT TIME", DungeonHud.Grey));
+            lines.Add(new Run($"THE {boss} WAITED ON FLOOR {waited}{reroll}", DungeonHud.Grey));
         else
-            lines.Add(new Run($"THE {boss} STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME", DungeonHud.Grey));
+            lines.Add(new Run($"THE {boss} STILL STANDS{reroll}", DungeonHud.Grey));
 
         // What was carried home, or lost with the party.
         if (result.SpoilsKept.Count > 0)
@@ -187,10 +190,15 @@ public sealed class BetweenRunsHud : IDisposable
                 lines.AddRange(Wrapped($"{member.Key}:", member.Select(c => $"{c.Pool.ToUpperInvariant()} -{c.Before - c.After}"), DungeonHud.Red));
         }
 
-        // Whether the run counted (§6.3), and where the counter stands.
+        // Whether the run counted (§6.3), and where the counter stands. The rule
+        // for why not is said only where going deeper could have met it: in a
+        // dungeon that never reaches the mercy floor — the tutorial's two floors
+        // against its 3 — a failed run never counts, and pointing at a floor 3 it
+        // does not have would send the player looking for one.
+        bool mercyReachable = def is null || content.Dungeons.BossFloorRange(def).Max >= content.Tuning.MercyFloor;
         string counted = result.ServiceTick
             ? result.MercyTick ? "RUN COUNTED - A MERCY FOR FAILING DEEP" : "RUN COUNTED"
-            : $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}";
+            : mercyReachable ? $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}" : "RUN NOT COUNTED";
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
         // What the clear did to the dungeon.

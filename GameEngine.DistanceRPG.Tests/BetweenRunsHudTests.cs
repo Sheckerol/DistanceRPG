@@ -151,6 +151,8 @@ public class BetweenRunsHudTests
         var campaign = CampaignRuns.Campaign();
         Assert.Null(campaign.LastResult);
 
+        // The tutorial is two floors deep on every visit, so the summary promises
+        // no new depth and points at no floor 3 it does not have.
         var retreat = CampaignRuns.ShallowRetreat(campaign, "tutorial");
         Assert.Same(retreat, campaign.LastResult);
         var lines = BetweenRunsHud.SummaryLines(campaign.LastResult!);
@@ -158,10 +160,10 @@ public class BetweenRunsHudTests
         {
             "RETREATED",
             "THE TUTORIAL - DEEPEST FLOOR 1",
-            "THE STONE GOLEM STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "THE STONE GOLEM STILL STANDS",
             "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
             "XP KEPT",
-            "RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 0 RUNS SO FAR",
+            "RUN NOT COUNTED - 0 RUNS SO FAR",
         }, Texts(lines));
 
         // The same lines, in the same colours, as the dungeon's own summary, whose

@@ -163,6 +163,46 @@ public class DungeonSeedTests
     }
 
     [Fact]
+    public void PastTwentyOneFloors_TwoDummiesMayShareARevivalRoll()
+    {
+        // How deep the check above stays clean. Over the same domain — drops to
+        // spawn 128, revivals to spawn and cycle 64 — plus every floor's boss
+        // drop, the finalized families collide nowhere on the first 21 floors
+        // (indices 0 to 20), past twice the ten a shipped dungeon goes. The 22nd
+        // meets the 20th: floor index 21 / spawn 5 / cycle 39 revives on floor
+        // index 19 / spawn 34 / cycle 54's roll. That is accepted, not refused
+        // (settled.md's Phase 4 pass): two dummies on different floors sharing one
+        // revival roll crash nothing and exploit nothing, and a floor term in the
+        // mixes would renumber every Phase 3 drop. Pinned so the record stays true.
+        const int CleanFloors = 21;
+        foreach (long seed in new[] { GoldenSeed, 0L })
+        {
+            var finalized = new Dictionary<ulong, string>();
+            void Finalized(Mulberry32 stream, string name)
+            {
+                ulong print = Fingerprint(stream);
+                if (!finalized.TryAdd(print, name))
+                    Assert.Fail($"{name} is the same stream as {finalized[print]}");
+            }
+            for (int n = 0; n < CleanFloors; n++)
+            {
+                long floorSeed = DungeonState.FloorSeed(seed, n);
+                for (int spawn = 0; spawn <= 128; spawn++)
+                    Finalized(LootTable.StreamFor(floorSeed, spawn), $"drop: floor {n}, spawn {spawn}");
+                for (int spawn = 0; spawn <= 64; spawn++)
+                    for (int cycle = 0; cycle <= 64; cycle++)
+                        Finalized(FarmLadder.ReviveStream(floorSeed, spawn, cycle), $"revival: floor {n}, spawn {spawn}, cycle {cycle}");
+                Finalized(BossLoot.StreamFor(floorSeed), $"boss drop: floor {n}");
+            }
+            Assert.Equal(CleanFloors * (129 + 65 * 65 + 1), finalized.Count);
+
+            Assert.Equal(
+                Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 21), 5, 39)),
+                Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 19), 34, 54)));
+        }
+    }
+
+    [Fact]
     public void BossFloorIsTheDocsFormulaVerbatim()
     {
         // PHASE4-020: bossFloor = 5 + new Mulberry32(mapSeed ^ BossSalt).NextInt(0, 5),

@@ -356,10 +356,12 @@ public sealed class DungeonHud
     /// is allowed to warn you about); any other dungeon locks for
     /// <see cref="DungeonState.LockRuns"/> — as many runs as its floor, at the
     /// shipped tuning — while leaving without the fight re-rolls the depth for
-    /// next time (PHASE4-026). The number is the visit's, never worked out here:
-    /// the lock a clear writes is <c>RunCounter + LockRuns</c>, the same rule, so
-    /// the promise cannot drift from what is applied. The depth is the party's to
-    /// know by now: they are standing on it.
+    /// next time (PHASE4-026), said only where the dungeon's range spans more
+    /// than one floor (<see cref="DungeonCatalogue.HasFixedDepth"/>), so it never
+    /// promises a re-roll that cannot happen. The number is the visit's, never
+    /// worked out here: the lock a clear writes is <c>RunCounter + LockRuns</c>,
+    /// the same rule, so the promise cannot drift from what is applied. The depth
+    /// is the party's to know by now: they are standing on it.
     /// <para>
     /// Empty everywhere else — above the bottom, where saying so would disclose
     /// how deep the dungeon goes (PHASE4-024), and on the bottom once the boss is
@@ -377,8 +379,10 @@ public sealed class DungeonHud
         if (visit.Def.RetiresOnClear)
             return [waits, $"BEATING IT CLOSES {dungeon} FOR GOOD"];
 
-        int runs = visit.LockRuns;
-        return [waits, $"BEATING IT LOCKS {dungeon} FOR {runs} {(runs == 1 ? "RUN" : "RUNS")}", "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS"];
+        string locks = $"BEATING IT LOCKS {dungeon} FOR {Runs(visit.LockRuns)}";
+        return GameContent.Current.Dungeons.HasFixedDepth(visit.Def)
+            ? [waits, locks]   // as deep on every visit: leaving re-rolls nothing
+            : [waits, locks, "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS"];
     }
 
     /// <summary>
@@ -549,9 +553,12 @@ public sealed class DungeonHud
     /// dungeon closes for good (the tutorial) or locks for as many runs as its
     /// floor (<see cref="DungeonState.LockRuns"/>, the number the clear will
     /// write). With it standing it is a retreat: <c>NO BOSS - A RETREAT: XP KEPT,
-    /// THE DEPTH RE-ROLLS</c>, and whether the party got deep enough for the run
-    /// to count (§6.3's mercy, from <see cref="Tuning.MercyFloor"/>) — a rule, never
-    /// the depth. And either way, the whole visit (<see cref="ResetLine"/>), last.
+    /// THE DEPTH RE-ROLLS</c> — the re-roll said only where there is one, so the
+    /// tutorial, two floors on every visit, says <c>NO BOSS - A RETREAT: XP
+    /// KEPT</c> (<see cref="DungeonCatalogue.HasFixedDepth"/>) — and whether the
+    /// party got deep enough for the run to count (§6.3's mercy, from
+    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. And either
+    /// way, the whole visit (<see cref="ResetLine"/>), last.
     /// </summary>
     internal static IReadOnlyList<string> LeavePreview(DungeonState visit)
     {
@@ -565,10 +572,14 @@ public sealed class DungeonHud
             return ["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear, ResetLine];
         }
 
-        bool counts = visit.DeepestFloorIndex + 1 >= GameContent.Current.Tuning.MercyFloor;
+        var content = GameContent.Current;
+        string retreat = content.Dungeons.HasFixedDepth(visit.Def)
+            ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
+            : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
+        bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
         return
         [
-            "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS",
+            retreat,
             counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN",
             ResetLine,
         ];

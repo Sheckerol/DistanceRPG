@@ -356,7 +356,11 @@ public sealed record Tuning
     /// The floors a boss's drop pays nothing for: its guaranteed stacks are
     /// <c>max(0, BossFloor − BossStackOffset)</c> — 1 at floor 5, 6 at floor 10
     /// (§4.3's table). The tutorial's floor 2 pays 0 of these; the one stack the
-    /// doc prices it at is the forged graft itself.
+    /// doc prices it at is the forged graft itself. The deepest boss must stay
+    /// short of what a well-farmed two-modifier weapon banks (twice
+    /// <see cref="AcquiredHeadroom"/>, ten): a load refuses an offset, a depth or
+    /// a headroom that would bring it level
+    /// (<see cref="ContentValidator.RuleBossPaysLessThanTheFarm"/>).
     /// </summary>
     public int BossStackOffset { get; init; } = 4;
 

@@ -224,3 +224,30 @@ fields, so the Long Gallery drops neither a bow nor its unique until enemies
 can use one; or let the boss hold any class in its table, so one draw serves
 both, which waits on the kiting AI and wand placement that the `EnemyPlacer`
 entry waits on. settled.md's Phase 4 implementation pass records the ruling.
+
+## What the golem holds, and the Block it stands behind (§4.3)
+
+§4.3 gives the golem `Block ×3` innately, 9 absorbed, "whatever it happens to be
+holding", and has resolution read weapon plus innate. It then works the lesson
+through as though the weapon added nothing: the sword's 10 lands for 1, the
+dagger's 15 for 6, the axe's 18 for 9. But the golem holds a class an enemy
+fields, drawn like any boss's, and one of those five is the sword, whose every
+variant forges `Block`. So about one tutorial in five the golem stands behind
+more than 9: 12 behind an Arming Sword, a Riposte Blade or a Warden's Shield
+(hits of 1, 3 and 6), 15 behind a Tower Guard (1, 1 and 3).
+
+**Shipped provisionally: weapon plus innate is literal.** The golem adds its
+sword's Block, its plate shows the Block it stands behind, and the dagger's crit
+still lands 45. The lesson holds either way (small hits are terrible against
+flat Block, large ones are fine, a crit ignores it), but the numbers are §4.3's
+only when the golem holds no sword.
+
+**This bends §4.3's worked numbers in those runs, so it is the user's to
+decide.** The alternatives: keep it; or keep the golem's hands off any class
+that already forges its theme, so it always stands behind 9. That cannot be the
+rule for every boss as things stand: the Quiver Pits' boss can hold only
+throwing weapons, and every one of them forges `Charges`, which would leave it
+nothing to hold. So it would be the tutorial's rule alone, or a preference that
+falls back to the whole table where nothing else remains. Either way the
+tutorial's boss rolls change, and the seeds its tests pin move with them.
+settled.md's Phase 4 implementation pass records the ruling.

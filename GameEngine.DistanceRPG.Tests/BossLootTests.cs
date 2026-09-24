@@ -494,11 +494,14 @@ public class BossLootTests
         // PHASE4-045: the most a boss pays is six, deliberately short of the ten
         // a well-farmed two-modifier weapon banks: entering a dungeon is a choice
         // and farming is not, so certainty does not also get to be the largest
-        // reward. On the compiled values, never a refusal at load.
+        // reward. Six on the compiled values; a tuning or a dungeon that would
+        // bring it level with the farm is refused at load
+        // (DungeonContentTests.ABossThatWouldPayAsMuchAsTheFarmIsRefused).
         var tuning = GameContent.Current.Tuning;
         Assert.Equal(6, tuning.BossFloorMax - tuning.BossStackOffset);
         Assert.Equal(6, DungeonState.PromisedStacksFor(tuning.BossFloorMax));
         Assert.Equal(10, 2 * tuning.AcquiredHeadroom);
+        Assert.Equal(2 * tuning.AcquiredHeadroom, ContentValidator.FarmBanks(tuning.AcquiredHeadroom));
         Assert.True(tuning.BossFloorMax - tuning.BossStackOffset < 2 * tuning.AcquiredHeadroom);
     }
 

@@ -929,4 +929,56 @@ public class BossTests
             }, DungeonHud.BossFloorBanner(visit));
         }
     }
+
+    [Fact]
+    public void ADungeonAsDeepOnEveryVisitPromisesNoReRoll()
+    {
+        // Leaving without the boss re-rolls the depth because the next entry rolls
+        // a fresh seed over the dungeon's range (PHASE4-026) - so only where that
+        // range spans more than one floor. The tutorial pins its two (PHASE4-077),
+        // and every other shipped dungeon rolls 5 to 10.
+        Assert.True(Dungeons.HasFixedDepth(Tutorial));
+        Assert.All(Dungeons.All.Where(d => !d.RetiresOnClear), d => Assert.False(Dungeons.HasFixedDepth(d), d.Id));
+
+        // A dungeon that stays open and pins its floor promises its lock and no
+        // re-roll: on the boss floor's banner, in the way out's question, and in
+        // the run's summary. Five floors still reach the mercy floor, so a shallow
+        // failure there still names the rule it missed.
+        var pinned = new DungeonsData(ContentDefaults.Dungeons.Dungeons
+            .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 5, BossFloorMax = 5 } : d).ToList());
+        using (TestContent.Use(dungeons: pinned))
+        {
+            var hall = Dungeons["spear_hall"];
+            Assert.True(Dungeons.HasFixedDepth(hall));
+            var party = Party();
+            var visit = DungeonState.Enter(hall, GoldenSeed, party);
+            Assert.Equal(5, visit.BossFloor);
+            visit.OpenTurns(party, Ten);
+            while (visit.Current.DownStairs is not null)
+                Down(visit, party);
+            Assert.Equal(new[] { "THE SPEAR WARDEN WAITS ON THIS FLOOR", "BEATING IT LOCKS THE SPEAR HALL FOR 5 RUNS" },
+                DungeonHud.BossFloorBanner(visit));
+            Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "DEEP ENOUGH TO COUNT AS A RUN" }, DungeonHud.LeavePreview(visit).Take(2));
+
+            var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 2, null, false, false, 0, null, false, [], [], []);
+            var lines = BetweenRunsHud.SummaryLines(turnedBack).Select(r => r.Text).ToArray();
+            Assert.Equal("THE SPEAR WARDEN STILL STANDS", lines[2]);
+            Assert.Equal("RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 0 RUNS SO FAR", lines[^1]);
+        }
+
+        // The two questions are apart: a range of 1 to 2 re-rolls the depth, and
+        // never reaches the mercy floor, so its failures never count.
+        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 1, BossFloorMax = 2 }))
+        {
+            Assert.False(Dungeons.HasFixedDepth(Dungeons["spear_hall"]));
+            var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 1, null, false, false, 0, null, false, [], [], []);
+            var lines = BetweenRunsHud.SummaryLines(turnedBack).Select(r => r.Text).ToArray();
+            Assert.Equal("THE SPEAR WARDEN STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME", lines[2]);
+            Assert.Equal("RUN NOT COUNTED - 0 RUNS SO FAR", lines[^1]);
+        }
+
+        // And a range the tuning fixes leaves every dungeon as deep on every visit.
+        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 7, BossFloorMax = 7 }))
+            Assert.All(Dungeons.All, d => Assert.True(Dungeons.HasFixedDepth(d), d.Id));
+    }
 }

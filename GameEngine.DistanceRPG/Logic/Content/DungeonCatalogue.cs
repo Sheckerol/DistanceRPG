@@ -134,6 +134,30 @@ public sealed class DungeonCatalogue
         return (def.BossFloorMin ?? _tuning.BossFloorMin, def.BossFloorMax ?? _tuning.BossFloorMax);
     }
 
+    /// <summary>
+    /// Whether <paramref name="def"/> is as deep on every entry: its boss floor
+    /// range (<see cref="BossFloorRange"/>) is a single floor, as the tutorial's
+    /// 2–2 is. A fresh entry re-rolls the depth only where the range spans more
+    /// than one floor, so a retreat from a fixed-depth dungeon re-rolls nothing,
+    /// and nothing on screen should promise that it does. A fact about content,
+    /// never about a visit's rolled floor, so asking it discloses no depth.
+    /// </summary>
+    public bool HasFixedDepth(DungeonDef def)
+    {
+        var (min, max) = BossFloorRange(def);
+        return min == max;
+    }
+
+    /// <summary>
+    /// The most <paramref name="def"/>'s boss can pay (§4.3): the guaranteed
+    /// stacks its drop carries from the deepest floor of its range
+    /// (<see cref="DungeonState.PromisedStacksFor(int, Tuning)"/>), under the
+    /// tuning this catalogue was loaded with — six for every unpinned dungeon at
+    /// the shipped 5–10 and offset 4, none for the tutorial's floor 2.
+    /// </summary>
+    public int MostStacksPaid(DungeonDef def)
+        => DungeonState.PromisedStacksFor(BossFloorRange(def).Max, _tuning);
+
     /// <summary>The classes whose every drop variant takes <paramref name="theme"/> as a forged graft, in <see cref="WeaponClass"/> order.</summary>
     private static WeaponClass[] Graftable(ModifierType theme, ModifierRules modifiers, WeaponCatalogue weapons)
     {

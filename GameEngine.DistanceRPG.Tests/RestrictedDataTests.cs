@@ -207,9 +207,11 @@ public class RestrictedDataTests
     public void GameContent_Load_BuildsRulesFromTheData_WithoutBecomingCurrent()
     {
         // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked
-        // against and the never-rolled list the default souls' unique flag is cross-checked with.
+        // against and the never-rolled list the default souls' unique flag is cross-checked with. A
+        // headroom of one banks two stacks on a two-modifier weapon, so this tuning's bosses pay one at
+        // most: a boss never pays as much as the farm (PHASE4-045), and a load refuses one that would.
         var content = GameContent.Load(
-            new Tuning { AcquiredHeadroom = 1 },
+            new Tuning { AcquiredHeadroom = 1, BossStackOffset = 9 },
             Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
                  neverRolled: ContentDefaults.Restricted.NeverRolled),
             ContentDefaults.Enchantments, ContentDefaults.Weapons);

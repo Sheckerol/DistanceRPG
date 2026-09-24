@@ -1285,8 +1285,8 @@ it.
 Rulings the Phase 4 branch made where the phase doc was silent, or where two
 passages met and one had to be read in the light of the other. Each is written
 down here so the next reader meets the ruling rather than the code that assumes
-it. Three of them bend a rule above or a line of the phase doc rather than fill
-a silence; those three are marked **pending the user's ruling** and ship
+it. Four of them bend a rule above or a line of the phase doc rather than fill
+a silence; those four are marked **pending the user's ruling** and ship
 provisionally, and open-questions.md sets out the alternatives to each.
 
 - **The campaign lives outside the dungeon, and holds the visit.**
@@ -1327,6 +1327,16 @@ provisionally, and open-questions.md sets out the alternatives to each.
   for the one enemy whose table bends to the guarantee. Both class draws redraw
   over a compiled list rather than step to the next legal class, so the drop is
   uniform over its table and no class is favoured by the gaps.
+- **The golem stands behind its own Block ×3 plus whatever its weapon forges —
+  pending the user's ruling.** Resolution reads weapon plus innate (§4.3), and
+  the golem holds a class an enemy fields, drawn like any boss's. Four of the
+  five forge no Block, and against those it stands behind 9 and teaches §4.3's
+  numbers exactly: the sword's 10 lands for 1, the dagger's 15 for 6, the axe's
+  18 for 9. About one tutorial in five its hands draw a sword, and every sword
+  forges Block: 12 behind an Arming Sword, a Riposte Blade or a Warden's Shield
+  (hits of 1, 3 and 6), 15 behind a Tower Guard (1, 1 and 3). The crit still
+  lands 45, and the golem's plate shows the Block it stands behind. That bends
+  §4.3's worked numbers in those runs rather than filling a silence.
 - **A boss drop becomes its class's unique only at ×3.** The graft makes the drop
   the unique when it takes the theme to its forge limit (×3) and the forged
   spread then equals the unique's. The ×3 is load-bearing: a Flensing Knife
@@ -1350,7 +1360,21 @@ provisionally, and open-questions.md sets out the alternatives to each.
   `max(0, BossFloor − 4)` guaranteed acquired stacks — 1 at floor 5, 6 at floor
   10 — so the tutorial's floor 2 adds none, and the one stack §4.3 prices it at
   is the forged Block. The count is fixed at entry, with the depth, so a tuning
-  change during the visit moves neither.
+  change during the visit moves neither. "Never raise the boss cap to 10" is
+  held at load: a tuning, or a dungeon pinning a deeper range of its own, whose
+  deepest boss would pay as many stacks as a well-farmed two-modifier weapon
+  banks (twice `AcquiredHeadroom`) is refused.
+- **Two dummies far enough apart may share a roll, and that is accepted.** Every
+  floor's drop and revival streams are Phase 3's, keyed by that floor's seed —
+  §4.2's `mapSeed ^ (FloorSalt × n)` verbatim, so floor 1 of a seed is that
+  seed's dungeon. Those mixes combine by XOR, so their terms can cancel: over
+  every spawn index and revival cycle to 64, no two streams meet on the first
+  21 floors, more than twice the deepest a shipped dungeon goes; but floor 22
+  meets floor 20, and floors 4 and 10 meet once spawn indices and cycles pass
+  64. A meeting is two dummies on different floors rolling the same revival:
+  nothing breaks and nothing can be exploited, so depth is not capped for it,
+  and no floor term is added to the mixes, which would renumber every Phase 3
+  drop.
 - **The lock is written after the clearing run's tick.** A clear ticks the run
   counter first, then locks the dungeon until
   `RunCounter + BossFloor × CooldownRunsPerFloor`. A floor-5 clear is back after

@@ -571,6 +571,39 @@ public class DungeonContentTests
     }
 
     [Fact]
+    public void ABossThatWouldPayAsMuchAsTheFarmIsRefused()
+    {
+        // PHASE4-045: the most a boss pays is six, deliberately short of the ten a
+        // well-farmed two-modifier weapon banks - "never raise the boss cap to 10".
+        // A boss that paid as much would leave the farm no longer the only route to
+        // a finished weapon, so a load holds every tuning and every dungeon to it.
+        int farm = ContentValidator.FarmBanks(GameContent.Current.Tuning.AcquiredHeadroom);
+        Assert.Equal(10, farm);
+        Assert.Equal(6, Dungeons.MostStacksPaid(Dungeons["spear_hall"]));
+        Assert.Equal(0, Dungeons.MostStacksPaid(Dungeons.Tutorial));
+        Assert.All(Dungeons.All, d => Assert.True(Dungeons.MostStacksPaid(d) < farm, d.Id));
+
+        // Deeper floors, a smaller offset or a shallower farm: each brings the
+        // deepest boss level with the farm, and each is refused at the key that
+        // prices a floor.
+        Rejected(t => t with { BossFloorMax = 14 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
+        Rejected(t => t with { BossFloorMax = 16 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
+        Rejected(t => t with { BossStackOffset = 0 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
+        Rejected(t => t with { AcquiredHeadroom = 3 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
+
+        // One short of the farm is a choice, not an error: nine stacks against ten,
+        // and a deeper dungeon that moves its offset with it.
+        ContentValidator.ValidateTuning(ContentDefaults.Tuning with { BossFloorMax = 13 });
+        ContentValidator.ValidateTuning(ContentDefaults.Tuning with { BossStackOffset = 1 });
+        ContentValidator.ValidateTuning(ContentDefaults.Tuning with { BossFloorMax = 16, BossStackOffset = 7 });
+
+        // A dungeon that pins a deeper range of its own is held to it the same way.
+        Refused(With("spear_hall", d => d with { BossFloorMax = 14 }), "spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm);
+        var deep = Load(With("spear_hall", d => d with { BossFloorMax = 13 }));
+        Assert.Equal(9, deep.Dungeons.MostStacksPaid(deep.Dungeons["spear_hall"]));
+    }
+
+    [Fact]
     public void CanGraftIsTheRelationsPlusTheForgeLimit()
     {
         // A forged Light graft past x1 is refused; the same graft acquired is not

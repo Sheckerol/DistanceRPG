@@ -61,6 +61,7 @@ public static class ContentValidator
     public const string RuleKillCountsForSomething = "a kill always counts for at least one";
     public const string RuleEnchantmentLockIsPositive = "an enchantment reserves at least one point of mana";
     public const string RuleBossFloorRange = "a boss floor range starts at floor 1 and is never inverted";
+    public const string RuleBossPaysLessThanTheFarm = "a boss never pays as many stacks as a well-farmed two-modifier weapon banks";
     public const string RuleCountIsNeverNegative = "a count is never negative";
     public const string RuleFloorNumberStartsAtOne = "a floor number starts at 1";
     public const string RuleShareIsAPercentage = "a share is a percentage, 0 to 100";
@@ -88,6 +89,24 @@ public static class ContentValidator
 
     /// <summary>The top of a percentage; the bottom is 0, since a chance of nothing is a legible way to switch a roll off.</summary>
     private const int FullPercent = 100;
+
+    /// <summary>
+    /// The fewest entries a farm banks acquired stacks on (§3.2): a martial
+    /// weapon is forged with two modifiers at least (<see cref="RuleTwoForgedAxes"/>),
+    /// and a caster with <c>Resonant</c> beside the enchantment it carries. Each
+    /// banks up to <see cref="Tuning.AcquiredHeadroom"/> above its forging, so a
+    /// well-farmed weapon holds at least <see cref="FarmBanks"/> — §4.3's "ten",
+    /// the number no boss is allowed to match.
+    /// </summary>
+    internal const int FewestFarmedEntries = 2;
+
+    /// <summary>
+    /// What a well-farmed two-modifier weapon banks above its forging under a
+    /// headroom of <paramref name="acquiredHeadroom"/> — ten at the shipped five.
+    /// A boss's guaranteed stacks stay short of it (PHASE4-045): "the farm stays
+    /// the only route to a finished weapon" (§4.3).
+    /// </summary>
+    internal static int FarmBanks(int acquiredHeadroom) => FewestFarmedEntries * acquiredHeadroom;
 
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
@@ -204,16 +223,22 @@ public static class ContentValidator
     /// <para>
     /// The §4.3/§4.4 knobs are held to the same standard. The boss floor range
     /// starts at floor 1 and is never inverted, or the roll's span is negative;
-    /// the stack offset and the cooldown per floor are counts; the mercy floor
-    /// is a floor number, which starts at 1; the death clawback is a share of a
-    /// gain; the carry divides evenly among the members with a slot each, or
+    /// the stack offset and the cooldown per floor are counts; the deepest boss
+    /// pays fewer guaranteed stacks than a well-farmed two-modifier weapon banks
+    /// (<see cref="FarmBanks"/>: six against ten at the shipped numbers), since
+    /// §4.3 makes that one absolute — "never raise the boss cap to 10" — and a
+    /// boss that paid as much would leave the farm no longer the only route to a
+    /// finished weapon, inverting the rule the offset exists to state; the mercy
+    /// floor is a floor number, which starts at 1; the death clawback is a share
+    /// of a gain; the carry divides evenly among the members with a slot each, or
     /// somebody has no hand to hold a weapon in and the party's 24 is not what
     /// the members carry, and shares out no deeper than the number keys equip
     /// (<see cref="GameConstants.MaxInventorySlots"/>, nine a member), or loot
     /// lands in a slot no key can reach; and the stairs gather from at least a
     /// tile away.
-    /// "Six stacks is short of ten" and every other judgement between these
-    /// numbers is a test on the compiled values, never a refusal here.
+    /// How far short of the farm a boss should stop, and every other judgement
+    /// between these numbers, is a test on the compiled values, never a refusal
+    /// here.
     /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
@@ -241,6 +266,8 @@ public static class ContentValidator
         if (tuning.BossFloorMax < tuning.BossFloorMin)
             throw new ContentException(nameof(Tuning.BossFloorMax), RuleBossFloorRange, $"{tuning.BossFloorMax}, shallower than {nameof(Tuning.BossFloorMin)} {tuning.BossFloorMin}");
         RequireCount(tuning.BossStackOffset, nameof(Tuning.BossStackOffset));
+        RequireBossPaysLessThanTheFarm(tuning.BossFloorMax, DungeonState.PromisedStacksFor(tuning.BossFloorMax, tuning),
+            tuning.AcquiredHeadroom, nameof(Tuning.BossStackOffset));
         RequireCount(tuning.CooldownRunsPerFloor, nameof(Tuning.CooldownRunsPerFloor));
         if (tuning.MercyFloor < 1)
             throw new ContentException(nameof(Tuning.MercyFloor), RuleFloorNumberStartsAtOne, $"{tuning.MercyFloor}");
@@ -261,6 +288,20 @@ public static class ContentValidator
     {
         if (value < 0)
             throw new ContentException(key, RuleCountIsNeverNegative, $"{value}");
+    }
+
+    /// <summary>
+    /// The boss on <paramref name="floor"/>, the deepest a range reaches, pays
+    /// <paramref name="pays"/> guaranteed stacks; the farm stays ahead of it
+    /// (PHASE4-045). Reported against <paramref name="entry"/>: the tuning's
+    /// offset, the key that prices a floor, or the dungeon that pins its own range.
+    /// </summary>
+    private static void RequireBossPaysLessThanTheFarm(int floor, int pays, int acquiredHeadroom, string entry)
+    {
+        int banks = FarmBanks(acquiredHeadroom);
+        if (pays >= banks)
+            throw new ContentException(entry, RuleBossPaysLessThanTheFarm,
+                $"a floor-{floor} boss pays {pays} stacks, and a well-farmed two-modifier weapon banks {banks}");
     }
 
     /// <summary>A knob rolled against a draw is a percentage, or the draw means nothing.</summary>
@@ -372,7 +413,11 @@ public static class ContentValidator
     /// class an enemy fields.</item>
     /// <item><strong>The boss floor range</strong>, pinned or the tuning's,
     /// starts at floor 1 and is not inverted, and a retiring dungeon pins it —
-    /// the tutorial's two floors are the enchanter's mana budget, not a roll.</item>
+    /// the tutorial's two floors are the enchanter's mana budget, not a roll —
+    /// and <strong>its deepest floor pays less than the farm banks</strong>
+    /// (<see cref="RuleBossPaysLessThanTheFarm"/>): the tuning's own range is
+    /// held to that before any dungeon loads, so only a dungeon that pins a
+    /// deeper range of its own can break it here.</item>
     /// <item><strong>The boss has a statline</strong> — a hit point and a unit
     /// of movement — <strong>its innate modifiers are stackable</strong> (no
     /// member <see cref="ModifierRules.NeverStacked"/>, at least one stack
@@ -439,6 +484,7 @@ public static class ContentValidator
             if (def.RetiresOnClear && (def.BossFloorMin is null || def.BossFloorMin != def.BossFloorMax))
                 throw new ContentException(def.Id, RuleRetiringDungeonPinsItsFloor,
                     $"floors {def.BossFloorMin?.ToString() ?? "unpinned"} to {def.BossFloorMax?.ToString() ?? "unpinned"}");
+            RequireBossPaysLessThanTheFarm(max, tables.MostStacksPaid(def), modifiers.AcquiredHeadroom, def.Id);
 
             ValidateBoss(def);
 
