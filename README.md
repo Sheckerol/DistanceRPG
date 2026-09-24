@@ -80,8 +80,9 @@ its own and resumes where you left off.
   `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
   names the full path of every save written or read.
 - **When**: at a run's end (the summary is saved with it), when NEW CAMPAIGN is
-  confirmed, and on quitting between runs — Esc on the screen between runs, or
-  the window's close button. **A run in progress is not saved yet**: quitting
+  confirmed or `--new-campaign` begins one, and on quitting between runs — Esc
+  on the screen between runs, or the window's close button. **A run in progress
+  is not saved yet**: quitting
   mid-run (the pause menu's `2  QUIT - THIS RUN IS NOT SAVED`, or closing the
   window) keeps the campaign as it was before the run began.
 - **Resuming**: every launch resumes the campaign on the screen between runs,
@@ -101,16 +102,24 @@ its own and resumes where you left off.
   save while a resume is in flight; a launch that finds it knows the last resume
   never finished). It is renamed `campaign.unreadable-N.json` (or
   `campaign.crashed-N.json`), the backup is tried, and failing that a new
-  campaign begins. The screen says so under the title, naming the file's full
-  path — three rows at most, so a long one ends `+1 MORE - SEE THE LOG`, and the
-  log has every word. **Rename it back to `campaign.json` to try it again.**
-  Nothing ever writes over a file set aside.
+  campaign begins. The screen says so under the title, whole: what became of
+  the campaign, `THE NUMBERS HAVE CHANGED ...` when they have, and each file set
+  aside by its full path (drawn with forward slashes, since the game's font has
+  no backslash; Windows reads it either way). Only what the data files raised
+  after that is cut to three rows (`+N MORE - SEE THE LOG`); the log has every
+  word. **Rename it back to `campaign.json` to try it again.** Nothing ever
+  writes over a file set aside.
 - **Starting over**: N, then N, on the screen between runs replaces the saved
   campaign with a new one (the old one stays in `campaign.bak.json` until the
   next save). `DistanceRPG --new-campaign` — `dotnet run --project
   GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --new-campaign` — sets
-  the save aside as `campaign.abandoned-N.json` and starts fresh. Deleting
-  `campaign.json` by hand resumes the backup instead, if there is one.
+  the save and its backup aside as `campaign.abandoned-N.json` (the backup first,
+  so the higher number is the later save) and starts fresh, saving the new
+  campaign at once: quit before its first run ends and the next launch resumes
+  the new campaign, never the old one. If another program holds either file open
+  so it cannot be moved, it stops there, nothing is saved that session, and the
+  next launch resumes the old campaign. Deleting `campaign.json` by hand resumes
+  the backup instead, if there is one.
 - **The dev overrides play apart**: a launch with `DISTANCERPG_DUNGEON` (a
   dungeon's id: straight into it) or `DISTANCERPG_SEED` (the first run's map
   seed) plays a fresh campaign in `saves\override\`, emptied at every such

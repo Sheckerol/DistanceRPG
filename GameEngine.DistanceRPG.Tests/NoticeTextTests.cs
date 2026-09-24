@@ -46,6 +46,44 @@ public class NoticeTextTests
     }
 
     [Fact]
+    public void TheSavesWordIsShownWhole_AndWhatFollowsIsCapped()
+    {
+        // S5's review: the screen between runs leads with the save's word on the
+        // campaign, which names a set-aside file's full path and how to try it
+        // again, and it is shown whole; the cap of three rows is for what follows
+        // it, the data files' notices.
+        string setAside = "campaign.json could not be read ($: 'n' is an invalid start of a value) - set aside as "
+            + @"C:\Users\someone\AppData\Local\DistanceRPG\saves\campaign.unreadable-1.json - RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN";
+        var five = Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1").ToList();
+        List<string> notices = ["CAMPAIGN RESUMED FROM ITS BACKUP, ONE SAVE OLDER", setAside, .. five];
+
+        var whole = NoticeText.Wrap(notices[0]).Concat(NoticeText.Wrap(setAside)).ToList();
+        Assert.True(whole.Count > NoticeText.MaxRows);   // more than the cap alone would show
+        Assert.Equal([.. whole, .. NoticeText.Rows(five)], NoticeText.Rows(notices, whole: 2));
+        Assert.Equal("+2 MORE - SEE THE LOG", NoticeText.Rows(notices, whole: 2)[^1]);
+
+        // Shown whole, nothing of it is lost: the path is cut where a row ends, never
+        // dropped, and drawn with slashes, since the HUD's font has no backslash.
+        Assert.Equal(setAside.ToUpperInvariant().Replace('\\', '/').Replace(" ", ""), string.Concat(NoticeText.Wrap(setAside)).Replace(" ", ""));
+        Assert.Contains(NoticeText.Wrap(setAside), row => row.Contains("C:/USERS/SOMEONE/APPDATA/LOCAL/DISTANCERPG/SAVES/", StringComparison.Ordinal));
+        Assert.DoesNotContain(NoticeText.Wrap(setAside), row => row.Contains('\\'));
+
+        // None shown whole is the cap as ever; more than there are is all of them,
+        // uncapped; fewer than none is refused.
+        Assert.Equal(NoticeText.Rows(notices), NoticeText.Rows(notices, whole: 0));
+        Assert.Equal(notices.SelectMany(NoticeText.Wrap), NoticeText.Rows(notices, whole: notices.Count + 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => NoticeText.Rows(notices, whole: -1));
+
+        // Even the save's word has a ceiling, for a save folder with a path of
+        // unusual length: past it the rows are cut as ever, and counted.
+        string longest = string.Join(" ", Enumerable.Repeat(setAside, 6));
+        var ceiling = NoticeText.Rows([longest, "tuning.json: Key 0 is below 1 - using 1"], whole: 1);
+        Assert.Equal(NoticeText.MaxWholeRows + 1, ceiling.Count);
+        Assert.Equal(NoticeText.Wrap(longest).Take(NoticeText.MaxWholeRows), ceiling.Take(NoticeText.MaxWholeRows));
+        Assert.Equal(NoticeText.More(2), ceiling[^1]);
+    }
+
+    [Fact]
     public void ABadTuningValueIsSaidOnScreenAsTheFileSaysIt()
     {
         // The playtest's line (1i): a MovementUnitsPerMana of 0 runs the game and

@@ -21,8 +21,9 @@ internal sealed record BootRequest(string? DungeonId = null, long? Seed = null, 
 /// The campaign a launch plays, and what to say about it (1f): the campaign —
 /// resumed, or new — and the view its save carried; for a dev-override launch,
 /// the dungeon to boot straight into and the first run's seed; and the notices
-/// the first screen shows: that the campaign resumed, that a save was set aside
-/// and where, that the numbers changed since it was saved.
+/// the first screen shows, in this order and whole: that the campaign resumed or
+/// a new one begins, that the numbers changed since it was saved, and that a save
+/// was set aside, where, and how to try it again.
 /// </summary>
 internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto? View, string? StraightInto, long? FirstSeed,
     IReadOnlyList<string> Notices);
@@ -83,8 +84,9 @@ internal static class CampaignBoot
     /// be one) and plays a fresh campaign — straight into the dungeon it names,
     /// its first run on the seed it names. The campaign's own save is never
     /// opened.</item>
-    /// <item><c>--new-campaign</c> sets the save aside as <c>abandoned</c> before
-    /// anything is read, and starts fresh.</item>
+    /// <item><c>--new-campaign</c> sets the backup and the save aside as
+    /// <c>abandoned</c> before anything is read, and starts fresh
+    /// (<see cref="Abandon"/>).</item>
     /// <item>A resume marker left behind means the last resume crashed the game:
     /// the save it guarded — the save, or the backup when there was no save — is
     /// set aside as <c>crashed</c>.</item>
@@ -121,17 +123,10 @@ internal static class CampaignBoot
 
         if (request.DevOverride)
             return BootOverride(store, content, request, report);
+        if (request.NewCampaign)
+            return Abandon(store, content, report);
 
         var setAside = new List<string>();
-        if (request.NewCampaign)
-        {
-            if (store.HasSave)
-                SetAside(store, backup: false, "abandoned", $"was left for a new campaign ({Program.NewCampaignOption})", setAside, report);
-            Unmark(store, report);
-            report?.Invoke($"[Save] {Program.NewCampaignOption}: a new campaign begins in {store.Folder}");
-            return New(content, [NewCampaignBegins, .. setAside]);
-        }
-
         if (store.WasResuming)
         {
             // The save it guarded is the one a resume reads first: the save when
@@ -153,12 +148,13 @@ internal static class CampaignBoot
             Mark(store, report);   // before the restore, so even a restore that takes the process down is caught next launch
             if (TryResume(store, backup, content, report, out var loaded, out string why))
             {
-                // What plays first, then what became of any save set aside on the
-                // way, then the numbers: the order the screen can show them in.
+                // What plays first, then the numbers it plays under — PHASE5-084
+                // wants that on the screen, whatever else there is to say — then
+                // what became of any save set aside on the way.
                 var notices = new List<string> { backup ? ResumedFromBackup : BetweenRunsHud.Resumed };
-                notices.AddRange(setAside);
                 if (loaded.TuningChanged)
                     notices.Add(TuningChanged);
+                notices.AddRange(setAside);
                 return new BootResult(loaded.Campaign, Resumed: true, loaded.View, StraightInto: null, FirstSeed: null, notices);
             }
             if (!SetAside(store, backup, "unreadable", $"could not be read ({why})", setAside, report))
@@ -194,6 +190,37 @@ internal static class CampaignBoot
             + (request.Seed is { } seed ? $", its first run on seed {seed}" : "")
             + " - the campaign's own save is not read or written");
         return new BootResult(CampaignState.Start(content), Resumed: false, View: null, request.DungeonId, request.Seed, [OverrideNotice]);
+    }
+
+    /// <summary>
+    /// <c>--new-campaign</c>: the campaign's backup and then its save are set
+    /// aside as <c>abandoned</c> — never deleted — and a new campaign begins, which
+    /// the game saves at once (<c>DistanceRpgGame.BootCampaign</c>). Both go. A
+    /// backup left behind would be resumed as though it were the new campaign's
+    /// own the first time no save stood beside it: after a quit mid-run before the
+    /// new campaign was ever saved, or a crash, or a first save that cannot be
+    /// played. The backup goes first, so the later save takes the later number. A
+    /// file that will not move stops it there: the store refuses every write this
+    /// session (<see cref="SetAside"/>), and what is left of the old campaign —
+    /// its save, when that is still in place — is what the next launch resumes.
+    /// </summary>
+    private static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report)
+    {
+        string what = $"was left for a new campaign ({Program.NewCampaignOption})";
+        var setAside = new List<string>();
+        foreach (bool backup in new[] { true, false })
+        {
+            if (!(backup ? store.HasBackup : store.HasSave))
+                continue;
+            if (!SetAside(store, backup, "abandoned", what, setAside, report))
+            {
+                report?.Invoke($"[Save] {Program.NewCampaignOption} stops there: nothing more is set aside and nothing is saved this session, so the next launch resumes the campaign still in {store.Folder}");
+                break;
+            }
+        }
+        Unmark(store, report);   // nothing is being resumed
+        report?.Invoke($"[Save] {Program.NewCampaignOption}: a new campaign begins in {store.Folder}");
+        return New(content, [NewCampaignBegins, .. setAside]);
     }
 
     /// <summary>A campaign from the roster, saying <paramref name="notices"/>.</summary>

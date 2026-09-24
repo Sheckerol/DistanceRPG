@@ -13,38 +13,72 @@ namespace GameEngine.DistanceRPG;
 /// under it; and the whole is capped at <see cref="MaxRows"/> rows plus one
 /// saying how many notices did not fit, so a file with fifty mistakes never
 /// pushes the dungeon list off the screen. The log has every one of them.
+/// <para>
+/// <strong>The save's word is shown whole</strong> (S5's review: 1f meets 1h).
+/// The screen between runs leads with what became of the campaign — that it
+/// resumed, the numbers changed since it was saved (PHASE5-084), a save set
+/// aside, by its full path, and how to try it again — and a notice cut off
+/// there would hide the one thing the player has to act on. Those notices are
+/// few by construction (a launch sets at most two files aside), so the screen
+/// hands their count in (<see cref="Rows"/>'s <c>whole</c>) and they are shown
+/// in full, up to <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/>
+/// is for what follows them, the data files' notices, which a broken file can
+/// make as many of as it likes.
+/// </para>
 /// </summary>
 internal static class NoticeText
 {
     /// <summary>The most characters a row runs to: the between-runs summary's width, a little over half the shipped window at its scale.</summary>
     public const int LineChars = 64;
 
-    /// <summary>The most rows of notices shown; past them, one more row says how many are in the log.</summary>
+    /// <summary>The most rows of notices shown after any shown whole; past them, one more row says how many are in the log.</summary>
     public const int MaxRows = 3;
+
+    /// <summary>
+    /// The most rows the notices shown whole take (<see cref="Rows"/>): the save's
+    /// word on the campaign. Its longest case — a new campaign after the save and
+    /// its backup were both set aside, each notice naming its file's full path —
+    /// takes about ten rows in the player's own save folder, so this is a ceiling
+    /// only a save folder with an unusually long path reaches; past it the rows
+    /// are cut like any others, and with <see cref="MaxRows"/> after them and the
+    /// row that counts the rest, the dungeon list still clears a 720-pixel window.
+    /// </summary>
+    public const int MaxWholeRows = 14;
 
     /// <summary>How a notice's continuation rows start, so a wrapped notice reads as one.</summary>
     private const string Indent = "  ";
 
     /// <summary>
     /// The rows <paramref name="notices"/> are drawn as, in order: each wrapped
-    /// under <see cref="LineChars"/>, at most <see cref="MaxRows"/> of them, then
-    /// <c>+N MORE - SEE THE LOG</c> for the notices not shown whole. None for none.
+    /// under <see cref="LineChars"/>. The first <paramref name="whole"/> of them
+    /// are shown in full, up to <see cref="MaxWholeRows"/> rows; the rest take at
+    /// most <see cref="MaxRows"/> rows after them. Then <c>+N MORE - SEE THE LOG</c>
+    /// for the notices not shown whole. None for none.
     /// </summary>
-    public static IReadOnlyList<string> Rows(IReadOnlyList<string> notices)
+    /// <param name="notices">The notices, in the order they are shown.</param>
+    /// <param name="whole">How many of <paramref name="notices"/>, from the first, are shown whole: the save's word on the campaign, which the screen between runs leads with. None by default: every notice is capped.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="whole"/> is negative.</exception>
+    public static IReadOnlyList<string> Rows(IReadOnlyList<string> notices, int whole = 0)
     {
         ArgumentNullException.ThrowIfNull(notices);
+        ArgumentOutOfRangeException.ThrowIfNegative(whole);
         var rows = new List<string>();
+        int wholeRows = 0;   // the rows the notices shown whole took: the cap counts from there
         for (int i = 0; i < notices.Count; i++)
         {
+            bool shownWhole = i < whole;
+            int ceiling = shownWhole ? MaxWholeRows : wholeRows + MaxRows;
             foreach (string row in Wrap(notices[i] ?? ""))
             {
-                if (rows.Count == MaxRows)
+                if (rows.Count == ceiling)
                 {
                     rows.Add(More(notices.Count - i));
                     return rows;
                 }
                 rows.Add(row);
             }
+            if (shownWhole)
+                wholeRows = rows.Count;
         }
         return rows;
     }
@@ -57,13 +91,16 @@ internal static class NoticeText
     /// upper-cased, each under <see cref="LineChars"/>: words kept whole where
     /// they fit, a word longer than a row cut, every row after the first
     /// indented. Uncapped: <see cref="Rows"/> is what caps a list of notices.
+    /// The HUD's font is capitals and has no backslash — it would draw a gap — so
+    /// a backslash is drawn as a slash: a Windows path, such as a set-aside
+    /// save's, still reads as one, and Windows reads it the same.
     /// </summary>
     internal static IReadOnlyList<string> Wrap(string notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
         var rows = new List<string>();
         var row = new StringBuilder();
-        foreach (string word in notice.Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string word in notice.Trim().ToUpperInvariant().Replace('\\', '/').Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
             string rest = word;
             while (rest.Length > 0)

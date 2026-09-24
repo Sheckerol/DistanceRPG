@@ -61,8 +61,10 @@ public interface IBetweenRunsHost
 /// <para>
 /// A screen is handed what the game has to say under its title — the startup's
 /// notices on the first one: the save's word on the campaign, then what the data
-/// files raised — and, after a save that could not be written, that. The log
-/// keeps them all.
+/// files raised — and, after a save that could not be written, that. The save's
+/// word is shown whole — a set-aside notice's full path and how to try the file
+/// again, the numbers changed since the save — and what the data files raised is
+/// capped after it (<see cref="NoticeText.Rows"/>). The log keeps them all.
 /// </para>
 /// </summary>
 public sealed class BetweenRunsScene : Scene
@@ -100,9 +102,10 @@ public sealed class BetweenRunsScene : Scene
     /// <param name="game">The game window: its size and its shaders, for the text.</param>
     /// <param name="campaign">The campaign between its runs: no visit is in progress.</param>
     /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>), or that a new campaign was confirmed.</param>
+    /// <param name="shownWhole">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign, shown whole (<see cref="StartupNotices.Leading"/>).</param>
     /// <param name="notices">What the game has to say under the title — the save's word and the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">A visit is in progress: its run has to end before the screen between runs can show.</exception>
-    public BetweenRunsScene(Game game, CampaignState campaign, IBetweenRunsHost host, IReadOnlyList<string>? notices = null) : base("BetweenRunsScene")
+    public BetweenRunsScene(Game game, CampaignState campaign, IBetweenRunsHost host, int shownWhole, IReadOnlyList<string>? notices = null) : base("BetweenRunsScene")
     {
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(campaign);
@@ -112,10 +115,10 @@ public sealed class BetweenRunsScene : Scene
         _campaign = campaign;
         _host = host;
         _hud = new BetweenRunsHud(game);
-        NoticeRows = NoticeText.Rows(notices ?? []);
+        NoticeRows = NoticeText.Rows(notices ?? [], shownWhole);
     }
 
-    /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, capped, or none.</summary>
+    /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, the save's word whole and the rest capped, or none.</summary>
     internal IReadOnlyList<string> NoticeRows { get; }
 
     /// <summary>The dungeon list, as the campaign gave it when the screen opened.</summary>

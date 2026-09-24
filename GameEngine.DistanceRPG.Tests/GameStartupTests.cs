@@ -90,6 +90,36 @@ public class GameStartupTests
         Assert.Equal(["DungeonHud.Render"], Callers(drawNotices));
     }
 
+    [Fact]
+    public void TheScreenBetweenRunsIsToldWhichNoticesAreTheSavesWord()
+    {
+        // S5's review: the save's word on the campaign — resumed or begun, the
+        // numbers changed, a file set aside and how to try it again — leads the
+        // notices, and the screen between runs shows it whole, capping only what
+        // the data files raised after it. The holder counts what was led; the one
+        // screen that shows it whole reads that count, and only there, before the
+        // take that hands the notices over.
+        var notices = new StartupNotices();
+        notices.Hold(["data one", "data two"]);
+        notices.Lead(["a save that failed"]);
+        notices.Lead(["resumed", "the numbers changed"]);
+        Assert.Equal(3, notices.Leading);
+        Assert.Equal(["resumed", "the numbers changed", "a save that failed", "data one", "data two"], notices.Take());
+        Assert.Equal(0, notices.Leading);
+        Assert.Empty(notices.Take());
+
+        // Held after a lead, the data files' notices still follow it.
+        notices.Lead(["resumed"]);
+        notices.Hold(["data"]);
+        Assert.Equal(1, notices.Leading);
+        Assert.Equal(["resumed", "data"], notices.Take());
+
+        var leading = typeof(StartupNotices).GetProperty(nameof(StartupNotices.Leading))!.GetMethod!;
+        Assert.Equal(["DistanceRpgGame.ShowBetweenRuns"], Callers(leading));
+        var built = typeof(BetweenRunsScene).GetConstructors().Single();
+        Assert.Equal(["game", "campaign", "host", "shownWhole", "notices"], built.GetParameters().Select(p => p.Name));
+    }
+
     /// <summary>
     /// The constructor that <c>DistanceRpgGame.<paramref name="method"/></c> calls
     /// with what <paramref name="take"/> returns. That is the constructor called by
@@ -223,14 +253,15 @@ public class GameStartupTests
     {
         // 1f: a save is written at the end of the frame a run's end asked for it
         // in — never inside the turn system's raise that ended the run — when NEW
-        // CAMPAIGN is confirmed, and on quitting, which every close arrives at
-        // (OnClosing). The campaign a launch plays is decided at load, once. Read
-        // off the IL, so a save added anywhere else fails here.
+        // CAMPAIGN is confirmed, or --new-campaign begins a campaign at launch
+        // (BootCampaign, S5's review), and on quitting, which every close arrives
+        // at (OnClosing). The campaign a launch plays is decided at load, once.
+        // Read off the IL, so a save added anywhere else fails here.
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
         Assert.Equal(["DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
-        Assert.Equal(["DistanceRpgGame.NewCampaign", "DistanceRpgGame.SaveOnQuit", "DistanceRpgGame.WriteRequestedSave"],
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.NewCampaign", "DistanceRpgGame.SaveOnQuit", "DistanceRpgGame.WriteRequestedSave"],
             Callers(Method(typeof(DistanceRpgGame), "Save")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
         Assert.Equal(["DistanceRpgGame.OnClosing"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));

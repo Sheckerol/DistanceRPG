@@ -57,9 +57,10 @@ namespace GameEngine.DistanceRPG;
 /// (§5.1, 1f; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>). One campaign,
 /// one slot, in the player's save folder (<c>DISTANCERPG_SAVE_DIR</c> moves it).
 /// It is written at a run's end, once the frame the run ended in is over, so no
-/// write runs inside a turn system's raise; when NEW CAMPAIGN is confirmed; and
-/// on quitting — ESC on the screen between runs, or the window's close button,
-/// both of which arrive at <see cref="OnClosing"/>. A run in progress is not saved
+/// write runs inside a turn system's raise; when NEW CAMPAIGN is confirmed, or
+/// <c>--new-campaign</c> begins a campaign at launch; and on quitting — ESC on
+/// the screen between runs, or the window's close button, both of which arrive
+/// at <see cref="OnClosing"/>. A run in progress is not saved
 /// yet (Phase 5.8 saves it): quitting mid-run keeps the campaign as it stood when
 /// the run began, and the pause menu says so. A launch resumes the campaign on
 /// the screen between runs, with <c>CAMPAIGN RESUMED</c> under the title; a save
@@ -235,8 +236,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// The campaign this launch plays (<see cref="CampaignBoot.Boot"/>): the save
     /// folder read from the environment — <c>DISTANCERPG_SAVE_DIR</c>, else the
     /// player's own data folder — and this launch's slot in it; the campaign
-    /// resumed or begun, and held; what the boot has to say, ahead of the data
-    /// files' notices; and whether a resume marker waits to be cleared.
+    /// resumed or begun, and held; a campaign <c>--new-campaign</c> began, saved
+    /// at once; what the boot has to say, ahead of the data files' notices; and
+    /// whether a resume marker waits to be cleared.
     /// </summary>
     private BootResult BootCampaign(GameContent content, BootRequest request)
     {
@@ -252,6 +254,20 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         Adopt(boot.Campaign);
         foreach (string notice in boot.Notices)
             Log.Info($"[Save] {notice}");
+
+        // --new-campaign set the old campaign aside, its backup with it; the new
+        // one is saved at once, as NEW CAMPAIGN on the screen between runs saves
+        // it, so the folder holds it from the start — a quit mid-run before its
+        // first run ends resumes it, not nothing. A store that refuses writes has
+        // said why already (a file that would not move), so it is only logged. A
+        // write that fails leads the notices here, and the boot's word leads it.
+        if (request.NewCampaign && !request.DevOverride)
+        {
+            if (store.WritesRefused is { } refused)
+                Log.Info($"[Save] The new campaign is not saved this session: {refused}");
+            else
+                Save(boot.Campaign, store, $"at once, as {Program.NewCampaignOption} began it");
+        }
         _notices.Lead(boot.Notices);
         _resuming = boot.Resumed;
         _bootSeed = boot.FirstSeed;
@@ -368,7 +384,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         }
 
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, _notices.Take()));
+        // How many of the notices are the save's word, which the screen shows
+        // whole, is read before the take that hands them over and empties the holder.
+        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, _notices.Leading, _notices.Take()));
     }
 
     /// <summary>

@@ -11,9 +11,10 @@ namespace GameEngine.DistanceRPG;
 /// the hub's dungeon list under it, and the keys that choose from it, or the NEW
 /// CAMPAIGN prompt asking again — and, under the title, the notices the game
 /// hands it (<see cref="NoticeText"/>): on the first one the game opens on, the
-/// save's word on the campaign (<see cref="Resumed"/>, a save set aside, the
-/// numbers changed since it was saved) and then what the data files raised at
-/// startup; on a later one, a save that could not be written.
+/// save's word on the campaign, shown whole (<see cref="Resumed"/>, the numbers
+/// changed since it was saved, a save set aside and where), and then what the
+/// data files raised at startup, capped; on a later one, a save that could not
+/// be written.
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before

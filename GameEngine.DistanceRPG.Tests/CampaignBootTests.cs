@@ -9,7 +9,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// so; one that cannot be read, or whose resume crashed the game, is set aside —
 /// never deleted, never written over — with a notice naming its full path, and
 /// the backup is tried, then a new campaign; <c>--new-campaign</c> sets the save
-/// aside before anything is read; a dev-override launch plays a fresh campaign
+/// and its backup aside before anything is read, so neither can come back as the
+/// new campaign's; the save's word is shown whole, the numbers ahead of any file
+/// set aside; a dev-override launch plays a fresh campaign
 /// in a slot of its own and never touches the campaign; a tuning changed since
 /// the save is said on screen; and a write that fails is a notice, never an
 /// exception, and never costs the save before it. Every case runs on a temporary
@@ -289,15 +291,18 @@ public class CampaignBootTests
                 Assert.Equal("THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED - IT PLAYS ON UNDER THE NEW ONES", CampaignBoot.TuningChanged);
                 Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.TuningChanged], boot.Notices);
 
-                // On screen whole, under the resumed line, even ahead of what the data
-                // files raised: the save's word leads, and the file's notice waits in the log.
+                // On screen whole, under the resumed line and ahead of what the data
+                // files raised: the save's word leads, shown in full, and the file's
+                // notice follows it.
                 var held = new StartupNotices();
                 held.Hold(["tuning.json: MovementBudget 20000 is above 10000 - using 10000"]);
                 held.Lead(boot.Notices);
-                var rows = NoticeText.Rows(held.Take());
+                int whole = held.Leading;
+                var rows = NoticeText.Rows(held.Take(), whole);
+                Assert.Equal(2, whole);
                 Assert.Equal("CAMPAIGN RESUMED", rows[0]);
                 Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", rows.Skip(1).Take(2).Select(row => row.Trim())));
-                Assert.Equal(NoticeText.More(1), rows[^1]);
+                Assert.Equal(["TUNING.JSON: MOVEMENTBUDGET 20000 IS ABOVE 10000 - USING 10000"], rows.Skip(3));
                 Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(rows[1]));
 
                 // The log names both hashes; the campaign is the one saved, playing on.
@@ -316,6 +321,60 @@ public class CampaignBootTests
             // Back under the shipped numbers, they have changed again, and it says so again.
             Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.TuningChanged], Boot(store).Notices);
             store.ClearResuming();
+        });
+    }
+
+    [Fact]
+    public void TheSavesWordIsOnScreenWhole_TheNumbersAheadOfWhatWasSetAside()
+    {
+        InTempFolder(folder =>
+        {
+            // The busiest resume there is: the save cannot be read and is set aside,
+            // the backup resumes, and the numbers have changed since it was saved.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            Saved(store, campaign);
+            CampaignRuns.DeepRetreat(campaign, "spear_hall");
+            Saved(store, campaign);
+            File.WriteAllText(store.SavePath, "not a save");
+
+            using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200 }))
+            {
+                var boot = Boot(store);
+                Assert.True(boot.Resumed);
+                string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
+
+                // What plays, then the numbers it plays under — PHASE5-084 wants that
+                // on screen, whatever else there is to say — then the file set aside.
+                Assert.Collection(boot.Notices,
+                    notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                    notice => Assert.Equal(CampaignBoot.TuningChanged, notice),
+                    notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", store)})", aside));
+                store.ClearResuming();
+
+                // The screen between runs shows the save's word whole — the set-aside
+                // file's full path and how to try it again among it — and what the
+                // data files raised after it, capped as ever.
+                var held = new StartupNotices();
+                held.Hold(["tuning.json: MovementBudget 200 differs from the built-in 160"]);
+                held.Lead(boot.Notices);
+                int whole = held.Leading;
+                var rows = NoticeText.Rows(held.Take(), whole);
+                Assert.Equal(3, whole);
+                var saysWhole = boot.Notices.SelectMany(NoticeText.Wrap).ToList();   // every word of every notice, the path and TRY AGAIN among them
+                Assert.InRange(saysWhole.Count, 6, NoticeText.MaxWholeRows);           // more than the cap of three alone would show
+                Assert.Equal([.. saysWhole, "TUNING.JSON: MOVEMENTBUDGET 200 DIFFERS FROM THE BUILT-IN 160"], rows);
+                Assert.Equal(CampaignBoot.ResumedFromBackup, rows[0]);
+                Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", rows.Skip(1).Take(2).Select(row => row.Trim())));
+                Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(rows[0]));
+                Assert.All(rows.Skip(1), row => Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(row)));
+
+                // The cap alone — every notice capped, as the other screens cap theirs
+                // — would have shown the resumed line and the numbers, and nothing of
+                // the file set aside but how many more are in the log.
+                Assert.Equal([.. saysWhole.Take(3), NoticeText.More(2)], NoticeText.Rows([.. boot.Notices, "tuning.json: MovementBudget 200 differs from the built-in 160"]));
+            }
         });
     }
 
@@ -394,8 +453,10 @@ public class CampaignBootTests
     {
         InTempFolder(folder =>
         {
-            // DistanceRPG --new-campaign: the save is set aside as abandoned before
-            // anything is read — never deleted — and a fresh campaign begins.
+            // DistanceRPG --new-campaign: the save and its backup are set aside as
+            // abandoned before anything is read — never deleted — and a fresh
+            // campaign begins. The backup goes first, so the later save takes the
+            // later number.
             var store = new SaveStore(folder);
             var campaign = NewCampaign();
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
@@ -408,27 +469,145 @@ public class CampaignBootTests
             var boot = Boot(store, new BootRequest(NewCampaign: true));
             Assert.False(boot.Resumed);
             StateAssert.Equivalent(NewCampaign(), boot.Campaign, "campaign");
-            string aside = Path.Combine(store.Folder, "campaign.abandoned-1.json");
+            string backupAside = Path.Combine(store.Folder, "campaign.abandoned-1.json");
+            string aside = Path.Combine(store.Folder, "campaign.abandoned-2.json");
+            Assert.Equal(backup, File.ReadAllBytes(backupAside));
             Assert.Equal(saved, File.ReadAllBytes(aside));
-            Assert.False(store.HasSave);
-            Assert.Equal(backup, File.ReadAllBytes(store.BackupPath));   // --new-campaign sets the save aside, and nothing else
+            Assert.Equal((false, false), (store.HasSave, store.HasBackup));   // nothing of the old campaign's is left to resume
             Assert.Collection(boot.Notices,
                 notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.bak.json", "was left for a new campaign (--new-campaign)", backupAside),
                 notice => SaysSetAside(notice, "campaign.json", "was left for a new campaign (--new-campaign)", aside));
             Assert.False(store.WasResuming);
 
-            // Its saves go where the old one was, and the one set aside stays whole.
-            Saved(store, boot.Campaign);
-            Assert.Equal(saved, File.ReadAllBytes(aside));
+            // All three on the screen between runs, whole — the save's word is — for
+            // all that the two set-aside notices name full paths.
+            var rows = NoticeText.Rows(boot.Notices, whole: boot.Notices.Count);
+            Assert.Equal(boot.Notices.SelectMany(NoticeText.Wrap), rows);
+            Assert.InRange(rows.Count, 1, NoticeText.MaxWholeRows);
 
-            // Again: the next number, and the first untouched.
+            // Its saves go where the old one was — the game saves it at once — and
+            // the files set aside stay whole.
+            void BothStillWhole()
+            {
+                Assert.Equal(backup, File.ReadAllBytes(backupAside));
+                Assert.Equal(saved, File.ReadAllBytes(aside));
+            }
+            Saved(store, boot.Campaign);
+            Assert.Equal(["campaign.abandoned-1.json", "campaign.abandoned-2.json", SaveStore.FileName], Files(folder));
+            BothStillWhole();
+
+            // Again: the next number, and the first two untouched. The new
+            // campaign's first save had no backup to keep, so there is none to set aside.
             var again = Boot(store, new BootRequest(NewCampaign: true));
-            Assert.Equal(Text(boot.Campaign), File.ReadAllText(Path.Combine(store.Folder, "campaign.abandoned-2.json")));
-            Assert.Equal(saved, File.ReadAllBytes(aside));
+            Assert.Equal(Text(boot.Campaign), File.ReadAllText(Path.Combine(store.Folder, "campaign.abandoned-3.json")));
+            BothStillWhole();
             Assert.Equal(2, again.Notices.Count);
 
-            // With no save there is nothing to set aside, and a new campaign all the same.
+            // With neither there is nothing to set aside, and a new campaign all the same.
             Assert.Equal([CampaignBoot.NewCampaignBegins], Boot(store, new BootRequest(NewCampaign: true)).Notices);
+
+            // A backup alone — its save deleted by hand — is set aside the same way.
+            File.Copy(backupAside, store.BackupPath);
+            var alone = Boot(store, new BootRequest(NewCampaign: true));
+            string fourth = Path.Combine(store.Folder, "campaign.abandoned-4.json");
+            Assert.Equal(backup, File.ReadAllBytes(fourth));
+            Assert.Collection(alone.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.bak.json", "was left for a new campaign (--new-campaign)", fourth));
+            Assert.Equal((false, false), (store.HasSave, store.HasBackup));
+        });
+    }
+
+    [Fact]
+    public void NewCampaignAtLaunchNeverBringsTheOldCampaignBack()
+    {
+        InTempFolder(folder =>
+        {
+            // A campaign two saves in: the save and its backup both the old campaign's.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            Saved(store, campaign);
+            CampaignRuns.DeepRetreat(campaign, "spear_hall");
+            Saved(store, campaign);
+
+            // --new-campaign, and nothing saved before the game goes down: the new
+            // campaign's first run quit from the pause menu, which saves nothing
+            // mid-run, or a crash. The next launch is a new campaign, not the old
+            // one's backup brought back as though it were the new one's.
+            var abandoned = Boot(store, new BootRequest(NewCampaign: true));
+            Assert.False(abandoned.Resumed);
+            abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);   // its first run begun, then quit: nothing saved mid-run
+            var next = Boot(store);
+            Assert.False(next.Resumed);
+            Assert.Empty(next.Notices);
+            StateAssert.Equivalent(NewCampaign(), next.Campaign, "campaign");
+            Assert.Equal(0, next.Campaign.RunCounter);
+            Assert.Empty(next.Campaign.ClearedInOrder);
+
+            // The game saves the new campaign at once (DistanceRpgGame.BootCampaign),
+            // so after the same quit the next launch resumes that campaign — the new
+            // one, as it stood when its run began.
+            var fresh = Boot(store, new BootRequest(NewCampaign: true));
+            Saved(store, fresh.Campaign);
+            fresh.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+            var resumed = Boot(store);
+            Assert.True(resumed.Resumed);
+            Assert.Equal([BetweenRunsHud.Resumed], resumed.Notices);
+            StateAssert.Equivalent(NewCampaign(), resumed.Campaign, "campaign");
+            Assert.False(store.HasBackup);
+            store.ClearResuming();
+
+            // And a first save that cannot be played has no backup of the old
+            // campaign's to fall back on: it is set aside, and a campaign begins anew.
+            File.WriteAllText(store.SavePath, "not a save");
+            var fallback = Boot(store);
+            Assert.False(fallback.Resumed);
+            StateAssert.Equivalent(NewCampaign(), fallback.Campaign, "campaign");
+            Assert.Equal(CampaignBoot.NewCampaignBegins, fallback.Notices[0]);
+            Assert.Equal(2, fallback.Notices.Count);
+        });
+    }
+
+    [Fact]
+    public void NewCampaignAtLaunchStopsAtAFileThatWillNotMove_AndTheOldCampaignStays()
+    {
+        // Windows only: another program holding the backup open without sharing it
+        // makes it unmovable. --new-campaign stops there: the save is not touched,
+        // nothing is saved this session, and the next launch resumes the campaign
+        // as it stands — never its backup in place of its save.
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        InTempFolder(folder =>
+        {
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            Saved(store, campaign);
+            CampaignRuns.DeepRetreat(campaign, "spear_hall");
+            Saved(store, campaign);
+            string saved = store.Read()!;
+
+            BootResult boot;
+            using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                boot = Boot(store, new BootRequest(NewCampaign: true));
+
+            Assert.False(boot.Resumed);
+            Assert.Collection(boot.Notices,
+                line => Assert.Equal(CampaignBoot.NewCampaignBegins, line),
+                line => Assert.Equal(CampaignBoot.StuckNotice("campaign.bak.json", "was left for a new campaign (--new-campaign)", "another program has it open"), line));
+            Assert.NotNull(store.WritesRefused);
+            Assert.NotNull(CampaignBoot.Save(store, boot.Campaign));
+            Assert.Equal(saved, store.Read());
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(folder));
+
+            var next = Boot(new SaveStore(folder));
+            Assert.True(next.Resumed);
+            Assert.Equal([BetweenRunsHud.Resumed], next.Notices);
+            Assert.Equal(2, next.Campaign.RunCounter);
+            new SaveStore(folder).ClearResuming();
         });
     }
 

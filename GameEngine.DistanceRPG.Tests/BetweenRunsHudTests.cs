@@ -288,6 +288,40 @@ public class BetweenRunsHudTests
     }
 
     [Fact]
+    public void TheSavesWordShownWholeStillLeavesTheListOnA720Window()
+    {
+        // S5's review: the save's word leads the notices and is shown whole, up to
+        // its ceiling, and the data files' notices take their three rows after it,
+        // then the row that counts the rest — the most rows of notices the screen
+        // between runs can be handed. Under all of them the list is still never
+        // pushed off the shipped 1280 x 720: the summary gives way, as ever.
+        const float h = 720f;
+        int most = NoticeText.MaxWholeRows + NoticeText.MaxRows + 1;
+        var saysWhole = Enumerable.Range(1, NoticeText.MaxWholeRows).Select(i => $"the save's word, row {i}");
+        var data = Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1");
+        var rows = NoticeText.Rows([.. saysWhole, .. data], whole: NoticeText.MaxWholeRows);
+        Assert.Equal(most, rows.Count);
+        Assert.Equal(NoticeText.More(2), rows[^1]);
+
+        foreach (bool cleared in new[] { false, true })
+        {
+            var campaign = CampaignRuns.Campaign();
+            if (cleared)
+                CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch) + 20f;   // and room for the lock rule
+
+            foreach (int summaryLines in new[] { 0, 7, 40 })
+            {
+                var layout = BetweenRunsHud.Layout(h, summaryLines, listHeight, rows.Count);
+                Assert.True(BetweenRunsHud.NoticeTop + rows.Count * BetweenRunsHud.NoticePitch <= layout.ListTop,
+                    $"the notices run into the list ({summaryLines} summary lines, tutorial cleared: {cleared})");
+                Assert.True(layout.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin,
+                    $"the list is pushed off the window ({summaryLines} summary lines, tutorial cleared: {cleared})");
+            }
+        }
+    }
+
+    [Fact]
     public void TheKeysNameTheNewCampaign_AndItAsksTwice()
     {
         // 1f: the campaign is saved, so the screen between runs names the two

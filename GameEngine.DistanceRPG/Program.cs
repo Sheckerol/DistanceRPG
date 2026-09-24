@@ -27,10 +27,11 @@ internal class Program
     internal const string WriteDataOption = "--write-data";
 
     /// <summary>
-    /// <c>DistanceRPG --new-campaign</c> sets the campaign's save aside as
-    /// <c>campaign.abandoned-N.json</c> — never deleted — and starts a fresh
-    /// campaign (1f): the way out of a campaign a playtester wants gone without
-    /// finishing its run, beside NEW CAMPAIGN on the screen between runs.
+    /// <c>DistanceRPG --new-campaign</c> sets the campaign's backup and its save
+    /// aside as <c>campaign.abandoned-N.json</c> — never deleted — and starts a
+    /// fresh campaign, saved at once (1f): the way out of a campaign a playtester
+    /// wants gone without finishing its run, beside NEW CAMPAIGN on the screen
+    /// between runs. Neither file is left to come back as the new campaign's own.
     /// </summary>
     internal const string NewCampaignOption = "--new-campaign";
 

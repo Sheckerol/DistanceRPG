@@ -99,7 +99,7 @@ public class RunBootTests
 
         // Whichever folder it is, a launch plays in it — or, with a dev override
         // set (a dungeon, a seed, or both), in its override slot. --new-campaign
-        // alone is no override: it sets the campaign's own save aside.
+        // alone is no override: it sets the campaign's own save and backup aside.
         foreach (string saves in new[] { mine, moved })
         {
             string slot = Path.Combine(saves, SaveStore.OverrideSlot);
