@@ -828,21 +828,28 @@ public class DungeonScene : Scene
 
         // A defeat with resurrection stopped is the permanent kill (§3.2): the
         // weapon the dummy was carrying is on the floor where it fell, and the
-        // turn system has already rolled it off the floor's own seed.
-        _turns.EnemyDropped += DropOnFloor;
+        // turn system has already rolled it off the floor's own seed — the boss's
+        // off its own table, forged with its dungeon's theme (§4.3). A unique says
+        // so the moment it lands, whichever way it came.
+        _turns.EnemyDropped += (corpse, drop) =>
+        {
+            DropOnFloor(corpse, drop);
+            AnnounceDrop(corpse, drop);
+        };
 
         // The boss is down (§4.3). The visit heard first — its handler was on this
         // system before this scene's — so resurrection has stopped here and on every
-        // floor opened from now on, and the boss's own weapon is already on the
+        // floor opened from now on, and the boss's own drop is already on the
         // floor (EnemyDropped fired before this). Whatever else is down is a
         // corpse that stays down now, and a corpse that stays down is lying on
         // what it was carrying: the rule every arrival reads, applied the moment it
-        // starts being true. Then the banner says what it means.
+        // starts being true. Then the banner says what it means, and what the
+        // boss left behind.
         _turns.BossDefeated += boss =>
         {
             Log.Info($"[Run] {boss.Title ?? "The boss"} falls at turn {_visit.BossDefeatedAtTurn}: nothing revives for the rest of the visit, and every corpse is lying on its weapon");
             RederiveGroundItems();
-            _hud.ShowBossFall(boss);
+            _hud.ShowBossFall(boss, _groundItems.FirstOrDefault(item => item.Corpse == boss)?.Drop);
         };
 
         _turns.EnemyResurrected += enemy =>
@@ -1939,7 +1946,9 @@ public class DungeonScene : Scene
         // comes, as a guard.
         if (_groundItems.Any(item => item.Corpse == corpse)) return;
 
-        Log.Info($"[Loot] Dropped {drop.Weapon.Name} (x{drop.DefeatCount}{(drop.WasUniqueRoll ? ", UNIQUE" : "")})");
+        Log.Info($"[Loot] Dropped {drop.Weapon.Name} [{drop.Weapon.Modifiers}] (x{drop.DefeatCount}"
+            + $"{(drop.Weapon.Unique ? drop.WasUniqueRoll ? ", UNIQUE ROLL" : ", UNIQUE BY ARITHMETIC" : "")}"
+            + $"{(corpse == _floor.Boss ? $", the boss's own, forged with {corpse.Theme}" : "")})");
         var marker = new PrimitiveBoxObject(GroundItemWidth, GroundItemHeight, GroundItemWidth, LootColor)
         {
             Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
@@ -1948,6 +1957,27 @@ public class DungeonScene : Scene
         _groundItems.Add(new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y)));
         UpdateGroundItemVisibility();
     }
+
+    /// <summary>
+    /// The beat a drop earns as it lands, over the corpse it came off: a unique
+    /// by name, in gold — <c>UNIQUE: THE BULWARK!</c> (<see cref="DungeonHud.UniqueBeat"/>)
+    /// — whether the farm's lottery paid out or the boss's graft took its
+    /// theme's Purity variant to ×3 (§4.3). Only as it lands, never on a floor's
+    /// re-derivation: an item the party has already seen fall is not announced
+    /// again. In sight only, like every beat; a unique that fell in the fog is
+    /// still named in gold when its tile is lit.
+    /// </summary>
+    private void AnnounceDrop(EnemyState corpse, Drop drop)
+    {
+        if (DungeonHud.UniqueBeat(drop) is not { } beat) return;
+        Log.Info($"[Loot] {beat}");
+        var obj = EnemyObjectFor(corpse);
+        if (obj.IsActive)
+            _hud.AddFloatingText(obj.Position, beat, LootColor, UniqueBeatOffset);
+    }
+
+    /// <summary>Where a unique's beat hangs over its corpse: above the DEFEATED! the same death floats, so the two read in order.</summary>
+    private const float UniqueBeatOffset = -84f;
 
     /// <summary>
     /// Every weapon this floor is holding that is not already on it (§3.5): a

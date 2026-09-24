@@ -571,12 +571,17 @@ public class BossTests
 
         // Everything down is lying on what it carried now — the floor's own table's
         // answer off each row, re-derived and never handed over.
-        foreach (var corpse in new[] { earlier, hatchet, golem })
+        // Each dummy's is its class's drop; the golem's is its own (Phase 4.6),
+        // the boss's table forged with Block, never its class's ordinary drop.
+        foreach (var corpse in new[] { earlier, hatchet })
         {
             var item = turns.GroundItemOf(corpse);
             Assert.NotNull(item);
             Assert.Equal(Describe(LootTable.Roll(corpse, floor.Seed)), Describe(item));
         }
+        var golemsItem = turns.GroundItemOf(golem);
+        Assert.NotNull(golemsItem);
+        Assert.Equal(Describe(BossLoot.Roll(golem, floor.Seed)), Describe(golemsItem));
 
         // A kill after it is permanent at once.
         var later = Row(floor, 19, "pinning_lance");

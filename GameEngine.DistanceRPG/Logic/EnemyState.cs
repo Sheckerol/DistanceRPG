@@ -56,6 +56,37 @@ public sealed class EnemyState : ActorState
     public string? Title { get; set; }
 
     /// <summary>
+    /// The dungeon's theme (§4.3, <see cref="DungeonDef.Theme"/>), on every enemy
+    /// the dungeon spawns — the boss's and every dummy's alike — and null on a
+    /// row no dungeon placed (a fixture). It is what every drop in the dungeon
+    /// <em>rolls for</em>: the theme joins the farm's roll pool as one more entry
+    /// (<see cref="LootTable.Roll"/>), weighting it rather than handing it over, so
+    /// an ordinary drop may grow it acquired and never forged. The boss's own drop
+    /// is forged with it instead (<see cref="BossLoot.Roll"/>).
+    /// <para>
+    /// The dungeon's and never the individual's, like <see cref="ActorState.Attunement"/>:
+    /// a save need not store it, since it re-derives from the dungeon (§5.1).
+    /// </para>
+    /// </summary>
+    public ModifierType? Theme { get; set; }
+
+    /// <summary>
+    /// The guaranteed stacks this enemy's drop carries (§4.3: one per floor past
+    /// four) — set on the boss row alone, by generation, from
+    /// <see cref="DungeonState.PromisedStacks"/>, and null on every other row. It
+    /// is how the boss floor "survives into the drop resolution": the count is
+    /// on the row, so a drop re-derived later in the visit, or after a load that
+    /// restored the row, pays exactly the stacks the visit promised at entry.
+    /// <para>
+    /// It is read by the boss's drop and decides nothing on its own: which table a
+    /// corpse is rolled on is the roster's to say (<see cref="TurnSystem"/>'s
+    /// drop feed for the actor it names as the boss), so a dummy handed a promise
+    /// by hand still rolls the ordinary drop.
+    /// </para>
+    /// </summary>
+    public int? PromisedStacks { get; set; }
+
+    /// <summary>
     /// What this dummy adds to whatever it is holding: its accumulated revival
     /// damage, on the actor and never on the weapon (§3.2). Read by
     /// <see cref="CombatRules.BaseDamage"/> like anyone else's.
@@ -140,8 +171,9 @@ public sealed class EnemyState : ActorState
     /// <summary>
     /// Whether the weapon this dummy was carrying has been taken off the floor
     /// (§3.5). A permanent kill leaves a ground item that nothing stores: the row
-    /// above already fixes it, so a floor entry re-derives it through
-    /// <see cref="LootTable.Roll"/> and gets the identical weapon back
+    /// above already fixes it, so a floor entry re-derives it through the table
+    /// the roster fixed for it — <see cref="LootTable.Roll"/>, or the boss's
+    /// <see cref="BossLoot.Roll"/> — and gets the identical weapon back
     /// (<see cref="TurnSystem.GroundItemOf"/>).
     /// <para>
     /// This one flag is what retires the offer. Without it a save taken after a

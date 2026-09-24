@@ -452,6 +452,35 @@ public class HudTextTests
     }
 
     [Fact]
+    public void AUniqueDropIsCalledOut_AndTheBossesDropNamesItsTheme()
+    {
+        // 4.3's presentation: a unique's name lands with a beat - whether the
+        // farm's lottery paid out or the boss's graft took its theme's Purity
+        // variant to x3 - and the boss's fall says what it left, forged with its
+        // dungeon's theme, of whatever class it came as.
+        var bulwark = new Drop(TestWeapons.Get("the_bulwark"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal("UNIQUE: THE BULWARK!", DungeonHud.UniqueBeat(bulwark));
+        Assert.Equal("UNIQUE: WIDOWMAKER!", DungeonHud.UniqueBeat(new Drop(TestWeapons.Get("widowmaker"), 40, WasUniqueRoll: true)));
+        Assert.Null(DungeonHud.UniqueBeat(new Drop(TestWeapons.Get("tower_guard"), 7, WasUniqueRoll: false)));
+
+        var bow = new Drop(GameContent.Current.Weapons.Instantiate("hunting_bow", forgedGraft: Block), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal("DROPPED: HUNTING BOW - FORGED WITH BLOCK", DungeonHud.BossDropLine(bow, Block));
+        Assert.Equal("DROPPED: THE BULWARK - UNIQUE", DungeonHud.BossDropLine(bulwark, Block));
+        var knife = new Drop(GameContent.Current.Weapons.Instantiate("flensing_knife", forgedGraft: CritWindow), 0, false);
+        Assert.Equal("DROPPED: FLENSING KNIFE - FORGED WITH CRIT WINDOW", DungeonHud.BossDropLine(knife, CritWindow));
+        Assert.Equal("DROPPED: FLENSING KNIFE", DungeonHud.BossDropLine(knife, null));
+
+        // Every name the HUD gives a theme is the modifier's own words, in capitals.
+        Assert.Equal(new[] { "BLOCK", "BRACE", "LONGSHOT", "CRIT WINDOW", "CHARGES" },
+            new[] { Block, Brace, Longshot, CritWindow, Charges }.Select(DungeonHud.ModifierName));
+
+        // On the floor, the boss's drop is a weapon like any other: its name - a
+        // unique's in gold - and no count, since nobody farmed it.
+        Assert.Equal(new[] { "Hunting Bow" }, Item(bow));
+        Assert.Equal(new[] { "The Bulwark" }, Item(bulwark));
+    }
+
+    [Fact]
     public void AGroundItemNamesTheWeaponAndItsQuality()
     {
         // A weapon lying where its carrier fell says which weapon it is and the

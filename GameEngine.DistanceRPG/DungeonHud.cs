@@ -105,13 +105,17 @@ public sealed class DungeonHud
     /// <summary>
     /// The boss is down (§4.3): the banner says who fell and what that means —
     /// nothing revives, and the way out is back up through everything farmed
-    /// (<see cref="BossFalls"/>).
+    /// (<see cref="BossFalls"/>) — and what it left lying there, forged with its
+    /// dungeon's theme (<see cref="BossDropLine"/>), when its drop is down.
     /// </summary>
-    public void ShowBossFall(EnemyState boss)
+    /// <param name="boss">The boss that fell.</param>
+    /// <param name="drop">What it left on the floor, or null when there is nothing to name.</param>
+    public void ShowBossFall(EnemyState boss, Drop? drop = null)
     {
         ArgumentNullException.ThrowIfNull(boss);
         var (headline, aftermath) = BossFalls(boss);
-        _banner = new Banner("", headline, [aftermath], WarningBannerSeconds);
+        IReadOnlyList<string> under = drop is null ? [aftermath] : [aftermath, BossDropLine(drop, boss.Theme)];
+        _banner = new Banner("", headline, under, WarningBannerSeconds);
         _bannerAge = 0f;
     }
 
@@ -343,6 +347,50 @@ public sealed class DungeonHud
     {
         ArgumentNullException.ThrowIfNull(boss);
         return ($"THE {BossName(boss)} FALLS", $"{NothingRevives} - FIGHT YOUR WAY OUT");
+    }
+
+    /// <summary>
+    /// What the boss left on the floor, as its fall states it (§4.3): the weapon,
+    /// and what makes it the boss's — <c>DROPPED: HUNTING BOW - FORGED WITH
+    /// BLOCK</c>, the theme forged onto whatever class it came as. When the graft
+    /// made it its class's unique the line says that instead — <c>DROPPED: THE
+    /// BULWARK - UNIQUE</c> — the unique being the theme at its deepest.
+    /// </summary>
+    /// <param name="drop">The boss's drop.</param>
+    /// <param name="theme">The boss's dungeon's theme; null names the weapon alone.</param>
+    internal static string BossDropLine(Drop drop, ModifierType? theme)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        string name = drop.Weapon.Name.ToUpperInvariant();
+        if (drop.Weapon.Unique) return $"DROPPED: {name} - UNIQUE";
+        return theme is { } t ? $"DROPPED: {name} - FORGED WITH {ModifierName(t)}" : $"DROPPED: {name}";
+    }
+
+    /// <summary>
+    /// The beat a unique drop earns the moment it lands (§1.5): its name, called
+    /// out — <c>UNIQUE: THE BULWARK!</c> — however it came: the farm's lottery on
+    /// a permanent kill, or the boss's graft taking the Purity variant of its
+    /// theme's own class to ×3. Null for every other drop, which its gold-less
+    /// name on the floor says enough about.
+    /// </summary>
+    internal static string? UniqueBeat(Drop drop)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        return drop.Weapon.Unique ? $"UNIQUE: {drop.Weapon.Name.ToUpperInvariant()}!" : null;
+    }
+
+    /// <summary>A modifier by name in the HUD's capitals, its words apart: <c>BLOCK</c>, <c>CRIT WINDOW</c>, <c>LONGSHOT</c>.</summary>
+    internal static string ModifierName(ModifierType type)
+    {
+        string raw = type.ToString();
+        var name = new System.Text.StringBuilder(raw.Length + 2);
+        for (int i = 0; i < raw.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(raw[i]))
+                name.Append(' ');
+            name.Append(char.ToUpperInvariant(raw[i]));
+        }
+        return name.ToString();
     }
 
     /// <summary>The arrival banner's line: <c>FLOOR 2</c>, the floor number reached and nothing about how many there are (§4.3).</summary>

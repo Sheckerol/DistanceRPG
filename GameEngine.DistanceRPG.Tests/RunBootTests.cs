@@ -35,4 +35,21 @@ public class RunBootTests
         Assert.Equal(tutorial, DistanceRpgGame.BootDungeonId("The Spear Hall", dungeons));
         Assert.Equal(tutorial, DistanceRpgGame.BootDungeonId("SPEAR_HALL", dungeons));
     }
+
+    [Fact]
+    public void TheBootSeedIsTheOverridesWhenItIsAMapSeed()
+    {
+        // The DISTANCERPG_SEED override plays a seed a log or a test names - 7
+        // is a tutorial whose golem drops The Bulwark (BossLootTests) - and it
+        // takes exactly the values a run's seed is rolled from: 0 to 2^32 - 1.
+        // Anything else rolls a seed, as an unset override does.
+        Assert.Equal("DISTANCERPG_SEED", DistanceRpgGame.SeedOverrideVariable);
+        Assert.Equal(7L, DistanceRpgGame.BootSeed("7"));
+        Assert.Equal(2762136374L, DistanceRpgGame.BootSeed("  2762136374\n"));
+        Assert.Equal(0L, DistanceRpgGame.BootSeed("0"));
+        Assert.Equal((long)uint.MaxValue, DistanceRpgGame.BootSeed("4294967295"));
+
+        foreach (string? notASeed in new[] { null, "", "   ", "-1", "4294967296", "7.0", "+7", "seven", "0x7" })
+            Assert.Null(DistanceRpgGame.BootSeed(notASeed));
+    }
 }

@@ -15,7 +15,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// ground item a permanent kill left (<see cref="TurnSystem.GroundItemOf"/>).
 /// So a floor left and returned to is a pointer move, never a rebuild. The
 /// boss's row is a row like the rest — where it stands, what it holds, whether
-/// it has fallen — and only its statline is content's to re-derive.
+/// it has fallen — and only its statline and its theme are content's to
+/// re-derive; the stacks its drop is promised are the visit's
+/// (<see cref="DungeonState.PromisedStacks"/>).
 /// </para>
 /// <para>
 /// <strong>Floor 0 is the golden dungeon, by arithmetic.</strong>
@@ -114,11 +116,13 @@ public sealed class Floor
     /// <summary>
     /// Build floor <paramref name="index"/> of the dungeon seeded
     /// <paramref name="mapSeed"/>: the map from <see cref="DungeonState.FloorSeed"/>,
-    /// its fog boxes, its enemy rows — placed off the same floor seed and attuned
-    /// to <paramref name="def"/>'s <see cref="DungeonDef.Attunement"/> — and its
-    /// stairs, each on its own stream, none continuing another and none reading
-    /// another's result: a row may stand on the far tile (<see cref="StairPlacer.Place"/>).
-    /// The bottom floor adds its boss after them (<see cref="Boss"/>).
+    /// its fog boxes, its enemy rows — placed off the same floor seed, attuned to
+    /// <paramref name="def"/>'s <see cref="DungeonDef.Attunement"/> and carrying
+    /// its <see cref="DungeonDef.Theme"/> — and its stairs, each on its own
+    /// stream, none continuing another and none reading another's result: a row
+    /// may stand on the far tile (<see cref="StairPlacer.Place"/>). The bottom
+    /// floor adds its boss after them (<see cref="Boss"/>), carrying the stacks
+    /// its drop was promised.
     /// </summary>
     /// <param name="mapSeed">The dungeon's seed, rolled once per entry.</param>
     /// <param name="index">The 0-based floor index.</param>
@@ -129,8 +133,17 @@ public sealed class Floor
     /// and the stair tile are the same either way; the boss rolls on its own
     /// stream (<see cref="DungeonState.RollBoss"/>).
     /// </param>
-    /// <param name="def">The dungeon, whose attunement every enemy it spawns carries, and whose boss the bottom holds.</param>
-    internal static Floor Generate(long mapSeed, int index, bool bottom, DungeonDef def)
+    /// <param name="def">The dungeon, whose attunement and theme every enemy it spawns carries, and whose boss the bottom holds.</param>
+    /// <param name="promisedStacks">
+    /// The guaranteed stacks the boss's drop carries (§4.3), written on the boss
+    /// row: <see cref="DungeonState.Enter"/> hands over the
+    /// <see cref="DungeonState.PromisedStacks"/> it fixed for the visit, and a load
+    /// would hand over the saved one. Null reads
+    /// <see cref="DungeonState.PromisedStacksFor"/> the floor this is — the bottom
+    /// floor's number is the boss floor, <paramref name="index"/> plus one.
+    /// Nothing reads it above the bottom, which holds no boss.
+    /// </param>
+    internal static Floor Generate(long mapSeed, int index, bool bottom, DungeonDef def, int? promisedStacks = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentNullException.ThrowIfNull(def);
@@ -145,7 +158,8 @@ public sealed class Floor
         EnemyState? boss = null;
         if (bottom)
         {
-            boss = PlaceBoss(map, stairs.Far, rows, mapSeed, def);
+            int promised = promisedStacks ?? DungeonState.PromisedStacksFor(index + 1);
+            boss = PlaceBoss(map, stairs.Far, rows, mapSeed, def, promised);
             enemies = [.. rows, boss];
         }
         return new Floor(index, seed, map, fogBoxes, enemies, stairs, bottom, boss);
@@ -156,8 +170,10 @@ public sealed class Floor
     /// stand and what they hold off the floor's seed, on its own stream; each row
     /// keeps the index it was placed at (§3.2's <see cref="EnemyState.SpawnIndex"/>),
     /// which seeds its drop and its revival ladder, and carries the dungeon's
-    /// attunement — the dungeon's and never the individual's (§1.4, §4.3). A
-    /// save restores these rows instead of placing them again (§5.1).
+    /// attunement — the dungeon's and never the individual's (§1.4, §4.3) — and
+    /// its theme, which every drop in the dungeon rolls for (§4.3). Neither moves
+    /// a draw: they are stamped on rows already placed. A save restores these
+    /// rows instead of placing them again (§5.1).
     /// </summary>
     private static EnemyState[] PlaceEnemies(MapData map, long floorSeed, DungeonDef def)
     {
@@ -172,6 +188,7 @@ public sealed class Floor
                 Weapon = weapons.Instantiate(weaponId),
                 SpawnIndex = rows.Count,
                 Attunement = def.Attunement,
+                Theme = def.Theme,
             });
         }
         return rows.ToArray();
@@ -181,19 +198,20 @@ public sealed class Floor
     /// The boss row (§4.3): what it holds rolled off the visit's boss stream
     /// (<see cref="DungeonState.RollBoss"/> — a class its dungeon's theme can be
     /// forged onto and an enemy can field, and the variant), built to the
-    /// dungeon's statline (<see cref="DungeonState.BossRow"/>), and appended after
-    /// every placed row, so its <see cref="EnemyState.SpawnIndex"/> follows theirs
-    /// and no dummy's stream moves. It waits in the lair — or, when a placed dummy
-    /// already stands there (the lair is drawn without reading the rows), on the
-    /// nearest free floor tile to it (<see cref="GridUtils.NearestFreeTile"/>): the
-    /// rule an arrival follows, never on top of the dummy, and never by moving the
-    /// dummy or the lair.
+    /// dungeon's statline (<see cref="DungeonState.BossRow"/>) with the stacks its
+    /// drop was promised, and appended after every placed row, so its
+    /// <see cref="EnemyState.SpawnIndex"/> follows theirs and no dummy's stream
+    /// moves. It waits in the lair — or, when a placed dummy already stands there
+    /// (the lair is drawn without reading the rows), on the nearest free floor
+    /// tile to it (<see cref="GridUtils.NearestFreeTile"/>): the rule an arrival
+    /// follows, never on top of the dummy, and never by moving the dummy or the lair.
     /// </summary>
-    private static EnemyState PlaceBoss(MapData map, (int R, int C) lair, IReadOnlyList<EnemyState> rows, long mapSeed, DungeonDef def)
+    private static EnemyState PlaceBoss(MapData map, (int R, int C) lair, IReadOnlyList<EnemyState> rows, long mapSeed, DungeonDef def,
+        int promisedStacks)
     {
         var roll = DungeonState.RollBoss(mapSeed, def);
         var weapons = GameContent.Current.Weapons;
-        var boss = DungeonState.BossRow(def, weapons.Instantiate(weapons.Variant(roll.Class, roll.Role).Id));
+        var boss = DungeonState.BossRow(def, weapons.Instantiate(weapons.Variant(roll.Class, roll.Role).Id), promisedStacks);
 
         var held = new HashSet<(int R, int C)>();
         foreach (var row in rows)
@@ -326,11 +344,12 @@ public sealed class DungeonState
     // until the next transit replaces it.
     private TurnCarry? _carry;
 
-    private DungeonState(DungeonDef def, long mapSeed, int bossFloor, Floor[] floors)
+    private DungeonState(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, Floor[] floors)
     {
         Def = def;
         MapSeed = mapSeed;
         BossFloor = bossFloor;
+        PromisedStacks = promisedStacks;
         Floors = floors;
     }
 
@@ -367,6 +386,26 @@ public sealed class DungeonState
     /// </para>
     /// </summary>
     public int LockRuns => BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor;
+
+    /// <summary>
+    /// The guaranteed stacks the boss's drop carries (§4.3: "one acquired stack
+    /// per floor past 4"): <see cref="PromisedStacksFor"/> the
+    /// <see cref="BossFloor"/> — 1 at floor 5 and 6 at floor 10, and none for the
+    /// tutorial's floor 2, whose "one stack" is the forged graft itself.
+    /// Guaranteed rather than rolled for: the count is the floor's, and only where
+    /// the stacks land is random (<see cref="BossLoot.Roll"/>).
+    /// <para>
+    /// <strong>Fixed once, at <see cref="Enter"/></strong>, under the tuning
+    /// current then, and written on the boss row at generation
+    /// (<see cref="EnemyState.PromisedStacks"/>): that is how <see cref="BossFloor"/>
+    /// "survives into the drop resolution" (§4.5). The drop reads the row, so a
+    /// drop re-derived later in the visit pays the same stacks whatever the
+    /// tuning has become since, and a save stores this number beside
+    /// <see cref="BossFloor"/> rather than re-deriving either through a
+    /// <c>tuning.json</c> that may have changed (§5.1).
+    /// </para>
+    /// </summary>
+    public int PromisedStacks { get; }
 
     /// <summary>
     /// Every floor of the visit, index 0 first — the first floor, whose up-stairs
@@ -424,11 +463,13 @@ public sealed class DungeonState
 
     /// <summary>
     /// Enter <paramref name="def"/> on <paramref name="mapSeed"/> (§4.5): roll the
-    /// boss floor (<see cref="RollBossFloor(long, DungeonDef)"/>), build every
+    /// boss floor (<see cref="RollBossFloor(long, DungeonDef)"/>), fix the stacks
+    /// its boss's drop is promised (<see cref="PromisedStacks"/>), build every
     /// floor down to it — each <see cref="Floor.Generate"/>, a pure function of
-    /// the seed, its index and the dungeon, the last one the bottom — and stand
-    /// the party at the first floor's arrival tile, each member on its own tile
-    /// in roster order, as the scene has always spawned them.
+    /// the seed, its index and the dungeon, the last one the bottom, its boss
+    /// carrying the promise — and stand the party at the first floor's arrival
+    /// tile, each member on its own tile in roster order, as the scene has always
+    /// spawned them.
     /// <para>
     /// Rolls nothing it is not handed: the seed is the caller's, drawn per entry
     /// — which is what re-rolls a failed dungeon's depth — so the same seed is
@@ -445,11 +486,12 @@ public sealed class DungeonState
         RequireParty(party);
 
         int bossFloor = RollBossFloor(mapSeed, def);
+        int promised = PromisedStacksFor(bossFloor);   // once, under the tuning current now
         var floors = new Floor[bossFloor];
         for (int n = 0; n < bossFloor; n++)
-            floors[n] = Floor.Generate(mapSeed, n, bottom: n == bossFloor - 1, def);
+            floors[n] = Floor.Generate(mapSeed, n, bottom: n == bossFloor - 1, def, promised);
 
-        var visit = new DungeonState(def, mapSeed, bossFloor, floors);
+        var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors);
         visit.Arrive(party, floors[0].UpStairs);
         return visit;
     }
@@ -773,6 +815,20 @@ public sealed class DungeonState
     }
 
     /// <summary>
+    /// The guaranteed stacks a boss on floor <paramref name="bossFloor"/> pays
+    /// with its drop (§4.3): <c>max(0, bossFloor − BossStackOffset)</c> — one per
+    /// floor past four at the shipped offset, so 1 at floor 5 and 6 at floor 10,
+    /// the table's numbers, and 0 at the tutorial's floor 2. The most any boss
+    /// pays is <c>BossFloorMax − BossStackOffset</c>, six, deliberately short of
+    /// the ten a two-modifier farm can bank: the farm stays the only route to a
+    /// finished weapon. Read at <see cref="Enter"/> and fixed there
+    /// (<see cref="PromisedStacks"/>).
+    /// </summary>
+    /// <param name="bossFloor">The boss floor, a 1-based floor number.</param>
+    public static int PromisedStacksFor(int bossFloor)
+        => Math.Max(0, bossFloor - GameContent.Current.Tuning.BossStackOffset);
+
+    /// <summary>
     /// The redraw bound on the boss's class draw (<see cref="RollBoss"/>): past
     /// this many draws on classes its dungeon cannot put in its hands, the first
     /// class it can is taken. It guarantees termination and nothing else — at one
@@ -855,17 +911,21 @@ public sealed class DungeonState
     /// (<see cref="EnemyState.MoveBudget"/>) — its name on the plate, and its
     /// innate modifiers, the theme among them, carried on the actor whatever it
     /// holds (<see cref="ActorState.Innate"/>): weapon plus innate at resolution,
-    /// and never a weapon's ceiling, its own included. It is attuned as
-    /// everything the dungeon spawns is, and wields <paramref name="weapon"/>
-    /// exactly as a dummy wields its own. Unplaced: generation stands it in the
-    /// lair and gives it the spawn index after every dummy's.
+    /// and never a weapon's ceiling, its own included. It is attuned and themed as
+    /// everything the dungeon spawns is, carries the stacks its drop is promised
+    /// (<see cref="EnemyState.PromisedStacks"/>), and wields
+    /// <paramref name="weapon"/> exactly as a dummy wields its own. Unplaced:
+    /// generation stands it in the lair and gives it the spawn index after every
+    /// dummy's.
     /// </summary>
     /// <param name="def">The dungeon whose boss this is.</param>
     /// <param name="weapon">What it holds: the variant <see cref="RollBoss"/> rolled, in play.</param>
-    public static EnemyState BossRow(DungeonDef def, Weapon weapon)
+    /// <param name="promisedStacks">The guaranteed stacks its drop carries: the visit's <see cref="PromisedStacks"/>; 0, the tutorial's, when a caller has none to give.</param>
+    public static EnemyState BossRow(DungeonDef def, Weapon weapon, int promisedStacks = 0)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(weapon);
+        ArgumentOutOfRangeException.ThrowIfNegative(promisedStacks);
 
         var boss = def.Boss;
         return new EnemyState
@@ -876,6 +936,8 @@ public sealed class DungeonState
             Innate = ModifierSet.Of(boss.Innate.Select(kv => (kv.Key, kv.Value)).ToArray()),
             Title = boss.Name,
             Attunement = def.Attunement,
+            Theme = def.Theme,
+            PromisedStacks = promisedStacks,
         };
     }
 }

@@ -91,13 +91,22 @@ public sealed class WeaponCatalogue
     /// table so that this stays "the one place a <see cref="Weapon"/> is made
     /// from" a def. It arrives at tier 1, always, whatever it is.
     /// </para>
+    /// <para>
+    /// <paramref name="forgedGraft"/> is the same door for the boss's theme
+    /// (§4.3, <see cref="BossLoot"/>): one stack of it forged onto the row's
+    /// spread at construction, because a weapon's forged spread is fixed there and
+    /// nowhere else — which keeps this the one place a weapon is made, grafted or
+    /// not. The weapon asks <see cref="ModifierRules.CanGraft"/> of it and refuses
+    /// what the relations or the forge limit refuse.
+    /// </para>
     /// </summary>
     /// <param name="id">The catalogue row to stamp from.</param>
     /// <param name="element">A wand's element, rolled by the drop; null for everything else.</param>
     /// <param name="rolled">An entry the drop rolled onto this item, attached last and forged; null for a weapon that rolled none.</param>
+    /// <param name="forgedGraft">A modifier forged onto the row's spread, one stack of it — the boss's theme on the boss's drop; null for none.</param>
     /// <exception cref="KeyNotFoundException">No such weapon, or an enchantment it names is unknown.</exception>
-    /// <exception cref="ArgumentException">A wand with no element, or an element on anything else.</exception>
-    public Weapon Instantiate(string id, DamageType? element = null, EnchantmentDef? rolled = null)
+    /// <exception cref="ArgumentException">A wand with no element, an element on anything else, or a graft <see cref="ModifierRules.CanGraft"/> refuses as forged.</exception>
+    public Weapon Instantiate(string id, DamageType? element = null, EnchantmentDef? rolled = null, ModifierType? forgedGraft = null)
     {
         var def = this[id];
         var listed = def.Enchantments.Select(r => _enchantments[r.Id]).ToList();
@@ -131,6 +140,6 @@ public sealed class WeaponCatalogue
         if (rolled != null)
             attached.Add(new Enchantment(rolled, Tier: 1));   // always exactly one, always tier 1 (§3.1)
 
-        return new Weapon(def, attached, forgedCount: attached.Count);
+        return new Weapon(def, attached, forgedCount: attached.Count, forgedGraft: forgedGraft);
     }
 }

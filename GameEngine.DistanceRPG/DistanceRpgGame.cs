@@ -39,7 +39,22 @@ public class DistanceRpgGame : Game, IRunHost
     /// </summary>
     internal const string DungeonOverrideVariable = "DISTANCERPG_DUNGEON";
 
+    /// <summary>
+    /// A dev override: set to a map seed — a whole number from 0 to 4294967295,
+    /// the range a run's seed is rolled in — the boot run enters its dungeon on
+    /// that seed instead of a rolled one, so a seed a log or a test names can be
+    /// played: <c>DISTANCERPG_SEED=7</c> boots a tutorial whose golem drops The
+    /// Bulwark. The boot run's alone — every run after it rolls its own, as every
+    /// entry must (a failed dungeon's depth re-rolls). Anything that is not such a
+    /// number is ignored, with a warning.
+    /// </summary>
+    internal const string SeedOverrideVariable = "DISTANCERPG_SEED";
+
     private CampaignState? _campaign;
+
+    // The boot run's seed when the override named one, spent by the first
+    // BeginRun that actually enters a dungeon.
+    private long? _bootSeed;
 
     // The dungeon the current run is in, for RunOver to begin again; and a run
     // asked for while the engine was mid-transition, begun once it is not.
@@ -68,8 +83,25 @@ public class DistanceRpgGame : Game, IRunHost
         if (!string.IsNullOrWhiteSpace(requested) && boot != requested.Trim())
             Log.Warn($"[Run] {DungeonOverrideVariable}='{requested}' names no dungeon (there are: "
                 + string.Join(", ", content.Dungeons.All.Select(d => d.Id)) + $") - booting {boot}");
+
+        string? seedText = Environment.GetEnvironmentVariable(SeedOverrideVariable);
+        _bootSeed = BootSeed(seedText);
+        if (!string.IsNullOrWhiteSpace(seedText) && _bootSeed is null)
+            Log.Warn($"[Run] {SeedOverrideVariable}='{seedText}' is not a map seed (a whole number from 0 to {uint.MaxValue}) - rolling one");
         BeginRun(boot);
     }
+
+    /// <summary>
+    /// The boot run's map seed: <paramref name="requested"/> — the
+    /// <see cref="SeedOverrideVariable"/> override, surrounding whitespace ignored —
+    /// when it is a whole number a run's seed can be (0 to 4294967295, the range
+    /// <see cref="BeginRun"/> rolls in), and null otherwise, which rolls one.
+    /// </summary>
+    internal static long? BootSeed(string? requested)
+        => uint.TryParse(requested?.Trim(), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out uint seed)
+            ? seed
+            : null;
 
     /// <summary>
     /// The dungeon the game boots into: <paramref name="requested"/> — the
@@ -117,7 +149,8 @@ public class DistanceRpgGame : Game, IRunHost
         }
 
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        long mapSeed = (uint)Random.Shared.NextInt64();
+        long mapSeed = _bootSeed ?? (uint)Random.Shared.NextInt64();
+        _bootSeed = null;   // the override is the boot run's alone
         var visit = campaign.Enter(dungeonId, mapSeed);
         _runDungeonId = visit.Def.Id;
         Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed}");

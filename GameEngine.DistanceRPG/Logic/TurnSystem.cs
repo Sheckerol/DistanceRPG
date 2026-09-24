@@ -212,6 +212,14 @@ public sealed class TurnSystem
     // recording its own deaths is the day this one line changes.
     private readonly Dictionary<ActorState, Action<int>> _defeatFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for what a permanent kill leaves on the floor (§3.5, §4.3): the table
+    // the roster fixed for each enemy rolls it — every dummy's drop is
+    // LootTable.Roll off its row, the boss's is BossLoot.Roll, forged with its
+    // dungeon's theme. Chosen once, here, so nothing asks a corpse its kind when
+    // it is collected any more than when it died: GroundItemOf calls the feed,
+    // and the loot table has no boss branch to take.
+    private readonly Dictionary<EnemyState, Func<Drop>> _dropFeeds = new(ReferenceEqualityComparer.Instance);
+
     // ── Turn economy ─────────────────────────────────────────────────────────
     // Attacks each actor has chosen to make since its side's turn began — a
     // brace, a held shot, a counter or an opportunity attack is a reaction and
@@ -262,10 +270,14 @@ public sealed class TurnSystem
     /// that has none (§4.3). Its death is a defeat like any enemy's and one thing
     /// more: it stops resurrection first, then runs the defeat, so its own drop
     /// is down before anyone hears of it, then raises <see cref="BossDefeated"/>;
-    /// and the defeat counts once in its <see cref="EnemyState.DefeatCount"/>,
-    /// however clean the blow, since nobody farms it. Both are fixed here, as the
-    /// roster's death and defeat feeds for that actor, like every other
-    /// consequence of a death: nothing asks an actor its kind when it dies.
+    /// the defeat counts once in its <see cref="EnemyState.DefeatCount"/>,
+    /// however clean the blow, since nobody farms it; and what it drops is the
+    /// boss's own drop (<see cref="BossLoot.Roll"/>), forged with its dungeon's
+    /// theme. All three are fixed here, as the roster's death, defeat and drop
+    /// feeds for that actor, like every other consequence of a death: nothing
+    /// asks an actor its kind when it dies or when it is collected — a row that
+    /// merely carries a promise (<see cref="EnemyState.PromisedStacks"/>) but is
+    /// not named here drops as any dummy does.
     /// </param>
     /// <exception cref="ArgumentException"><paramref name="boss"/> is not one of <paramref name="enemies"/>.</exception>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -329,6 +341,9 @@ public sealed class TurnSystem
             // The n-th defeat of this dummy deepens what it is carrying, and the
             // bar is its own constitution: dealt >= MaxHp counts twice (§3.2).
             _defeatFeeds[enemy] = dealt => enemy.DefeatCount += FarmLadder.DefeatAdvance(dealt, enemy.MaxHp);
+            // What it is lying on once it stays down: its own class's drop, off
+            // its row and this floor's seed, the dungeon's theme in its roll pool.
+            _dropFeeds[enemy] = () => LootTable.Roll(enemy, _mapSeed);
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
@@ -337,12 +352,16 @@ public sealed class TurnSystem
         // as the one death it is. Nobody farms a boss, so a clean kill's bonus —
         // the farm's reward on a ladder the boss never climbs — is not its to
         // earn, and the blow's size goes unasked: however clean the kill, the
-        // count advances by one (and the drop it hands over reads that count).
+        // count advances by one. What it drops is its own table's (§4.3): a
+        // variant of any class its dungeon's theme can be forged onto, forged
+        // with the theme and carrying the stacks its floor promised — never its
+        // own class's ordinary drop, and never read off what it was holding.
         // Its hits, heals, movement and reactions are any enemy's.
         if (boss is not null)
         {
             _deathFeeds[boss] = () => OnBossDefeated(boss);
             _defeatFeeds[boss] = _ => boss.DefeatCount += 1;
+            _dropFeeds[boss] = () => BossLoot.Roll(boss, _mapSeed);
         }
         _rosters = [party.ToArray<ActorState>(), enemies.ToArray<ActorState>()];
         _zones = [_partyZone, _enemyZone];
@@ -2230,7 +2249,10 @@ public sealed class TurnSystem
     /// <list type="number">
     /// <item><see cref="ResurrectionActive"/> goes false <em>first</em>, because
     /// the drop is derived off it: the boss's own kill is the first permanent
-    /// one, and its weapon is lying on it (<see cref="GroundItemOf"/>).</item>
+    /// one, and its drop is lying on it (<see cref="GroundItemOf"/>) — the boss's
+    /// own, through the drop feed the roster fixed for it
+    /// (<see cref="BossLoot.Roll"/>): any class its dungeon's theme can be forged
+    /// onto, forged with the theme.</item>
     /// <item>Then the defeat every enemy's death is (<see cref="OnEnemyDefeated"/>):
     /// the defeat turn, <see cref="EnemyDefeated"/>, and <see cref="EnemyDropped"/>
     /// with that weapon, exactly as any permanent kill hands one over.</item>
@@ -2243,8 +2265,8 @@ public sealed class TurnSystem
     /// <see cref="EnemyState.DefeatCount"/> advanced by exactly one at this death,
     /// however clean the blow: the defeat feed the roster fixed for it counts the
     /// one death it is, where a dummy's pays a clean kill the farm's bonus. The
-    /// drop it hands over is read off the row like any corpse's
-    /// (<see cref="GroundItemOf"/>), that count included, so no overkill deepens
+    /// drop it hands over reads no count at all: its depth is the stacks its floor
+    /// promised (<see cref="EnemyState.PromisedStacks"/>), so no overkill deepens
     /// it. The run goes on: the party turns round and fights its way out (§4.4).
     /// </summary>
     private void OnBossDefeated(EnemyState boss)
@@ -2262,21 +2284,31 @@ public sealed class TurnSystem
     /// (<see cref="EnemyState.DropTaken"/>) is not offered twice.
     /// <para>
     /// <strong>It is derived, never stored</strong>, which is the whole of §3.5's
-    /// answer to a save taken between the permanent kill and the pickup:
-    /// <see cref="LootTable.Roll"/> reads the enemy row and this system's map
-    /// seed and nothing else, so a floor re-entry re-derives the identical
-    /// weapon — same variant, same stacks, same tiers, same unique outcome —
-    /// rather than either re-rolling it (a different weapon) or forgetting it (a
-    /// lost one). Both the defeat above and the scene's floor entry read this one
-    /// method, so there is one rule rather than two that have to agree.
+    /// answer to a save taken between the permanent kill and the pickup: the
+    /// table reads the enemy row and this system's map seed and nothing else, so
+    /// a floor re-entry re-derives the identical weapon — same variant, same
+    /// stacks, same tiers, same unique outcome — rather than either re-rolling it
+    /// (a different weapon) or forgetting it (a lost one). Both the defeat above
+    /// and the scene's floor entry read this one method, so there is one rule
+    /// rather than two that have to agree.
+    /// </para>
+    /// <para>
+    /// <strong>Which table is the roster's to say</strong>: the drop feed the
+    /// constructor fixed for the enemy — <see cref="LootTable.Roll"/> for every
+    /// dummy, <see cref="BossLoot.Roll"/> for the one named as the boss (§4.3).
+    /// Nothing here asks the corpse what it is, so a row that is not this floor's
+    /// has no answer here: it is another floor's, rolled off another seed.
     /// </para>
     /// </summary>
-    /// <param name="enemy">The dummy, alive or dead; it need not be on this system's roster, since the answer is a function of its row.</param>
+    /// <param name="enemy">An enemy of this system's roster, alive or dead.</param>
+    /// <exception cref="InvalidOperationException"><paramref name="enemy"/> is not on this system's roster: its drop is its own floor's to derive.</exception>
     public Drop? GroundItemOf(EnemyState enemy)
     {
         ArgumentNullException.ThrowIfNull(enemy);
+        if (!_dropFeeds.TryGetValue(enemy, out var drop))
+            throw new InvalidOperationException("Asked what an enemy that is not on this turn system's roster is lying on: its drop is its own floor's to derive.");
         if (ResurrectionActive || enemy.Alive || enemy.DropTaken) return null;
-        return LootTable.Roll(enemy, _mapSeed);
+        return drop();
     }
 
     private static float Dist2(ActorState a, ActorState b)

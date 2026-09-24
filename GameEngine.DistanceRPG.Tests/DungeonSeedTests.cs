@@ -128,7 +128,9 @@ public class DungeonSeedTests
         // cancel. Grow the spawn and cycle bounds together and the first
         // coincidence arrives at 78; it is pinned below, so widening the bound
         // that far makes this test fail, as it should.
-        // BossLoot's drop stream joins these families when it lands (Phase 4.6).
+        // BossLoot's drop stream (Phase 4.6) is checked against these same
+        // families, over the same domain, in BossLootTests'
+        // TheBossDropComesOffItsOwnStream_AndReDerivesAfterAReload.
         int floors = GameContent.Current.Tuning.BossFloorMax;
         Assert.Equal(10, floors);
         foreach (long seed in new[] { GoldenSeed, 0L })
