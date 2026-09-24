@@ -38,7 +38,8 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// <list type="bullet">
 /// <item><strong>Loading is resuming</strong> (1f, USER DECISION 2): a launch
 /// resumes <see cref="SaveStore.FileName"/>, and says so. A save that cannot be
-/// read — malformed, written by a newer build, naming content that is gone — is
+/// read — malformed, written by a newer build, naming content that is gone, or
+/// holding a run in progress, which this build cannot resume yet — is
 /// set aside, never deleted or written over, and the backup is tried, then a
 /// new campaign. A save whose resume crashed the game last time — the resume
 /// marker left behind — is set aside the same way. Every set-aside notice names
@@ -101,7 +102,9 @@ internal static class CampaignBoot
     /// </list>
     /// A restore that throws anything — a <see cref="SaveFormatException"/> or a
     /// fault — is logged whole and treated as unreadable, so a player is never
-    /// stuck on a crash at launch. A file that could not be read and cannot be
+    /// stuck on a crash at launch. So is a save holding a run in progress, until
+    /// Phase 5.8 resumes one in the dungeon (<see cref="TryResume"/>): a resumed
+    /// campaign is always between runs. A file that could not be read and cannot be
     /// moved either is left where it is, and the store refuses every write this
     /// session (<see cref="SaveStore.RefuseWrites"/>), so nothing takes its place.
     /// </summary>
@@ -231,6 +234,17 @@ internal static class CampaignBoot
     /// Read and restore the save, or the backup: true with the campaign, or false
     /// with why not in a few words (<see cref="WhyUnreadable"/>) — the whole error
     /// in the log. A tuning that changed since is logged with both hashes.
+    /// <para>
+    /// A save holding a run in progress is refused as one that cannot be read,
+    /// until Phase 5.8 resumes a run in the dungeon. <c>Logic/</c> restores a
+    /// visit from Phase 5.6, but the game resumes a campaign only on the screen
+    /// between runs, and that screen cannot show a run in progress
+    /// (<see cref="BetweenRunsScene"/> refuses one), so resuming it would crash the
+    /// launch. This build never writes such a save (<see cref="Save"/> refuses a
+    /// visit), so only a file edited by hand or written by a later build gets
+    /// here. It is set aside whole, the run in it kept, and the backup is tried.
+    /// Phase 5.8 removes this refusal when it resumes the visit in the dungeon.
+    /// </para>
     /// </summary>
     private static bool TryResume(SaveStore store, bool backup, GameContent content, Action<string>? report,
         [NotNullWhen(true)] out LoadedCampaign? loaded, out string why)
@@ -241,6 +255,9 @@ internal static class CampaignBoot
             string text = (backup ? store.ReadBackup() : store.Read()) ?? throw new FileNotFoundException("The file went missing while it was being read.", path);
             var file = SaveCodec.Read(text);
             loaded = SaveGame.Restore(file, content);
+            if (loaded.Campaign.Visit is not null)
+                throw new SaveFormatException("campaign.visit",
+                    "a run in progress, which this build cannot resume yet. It resumes a campaign between runs only, so the file is set aside whole, the run in it kept");
             report?.Invoke($"[Save] Resumed {path}: run counter {loaded.Campaign.RunCounter}"
                 + (loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet"));
             if (loaded.TuningChanged)

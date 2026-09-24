@@ -267,6 +267,64 @@ public class CampaignBootTests
     }
 
     [Fact]
+    public void ARunInProgressIsSetAside_UntilTheGameCanResumeIt()
+    {
+        InTempFolder(folder =>
+        {
+            // Logic/ saves a visit at any safe point from Phase 5.6, but until 5.8 the
+            // game resumes a campaign only on the screen between runs, and that screen
+            // refuses a run in progress. So a campaign.json holding one — edited by
+            // hand, or written by a later build — is set aside like any save this
+            // build cannot resume, the run in it kept whole, and the backup is tried:
+            // never a crash at launch. (5.8 resumes it in the dungeon, and this test
+            // becomes that one.)
+            const string runInProgress = "campaign.visit: a run in progress, which this build cannot resume yet";
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            Saved(store, campaign);
+            campaign.Enter("spear_hall", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+            Assert.True(SaveGame.IsSafePoint(campaign));
+            string midRun = Text(campaign);
+            Assert.NotNull(JsonNode.Parse(midRun)!["campaign"]!["visit"]);
+            Assert.NotNull(CampaignBoot.Save(store, campaign));   // the game itself never writes one yet
+            store.Write(midRun);                                  // as a later build's autosave would: the save before it the backup
+
+            var log = new List<string>();
+            var boot = Boot(store, log: log);
+            Assert.True(boot.Resumed);
+            Assert.Null(boot.Campaign.Visit);   // between runs, as the screen it opens on needs
+            Assert.Equal(1, boot.Campaign.RunCounter);   // the backup: the campaign as the run began
+            Assert.Equal(["tutorial"], boot.Campaign.RetiredInOrder);
+            string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
+            Assert.Equal(midRun, File.ReadAllText(aside));
+            Assert.Collection(boot.Notices,
+                notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({runInProgress})", aside));
+            Assert.DoesNotContain(log, line => line.StartsWith($"[Save] Resumed {store.SavePath}", StringComparison.Ordinal));
+            Assert.Contains(log, line => line.StartsWith($"[Save] {store.SavePath} could not be resumed", StringComparison.Ordinal)
+                && line.Contains("a run in progress", StringComparison.Ordinal));
+            store.ClearResuming();
+
+            // A later build autosaves at every turn's start, so its backup holds a run
+            // too: both are set aside, each whole, and a new campaign begins.
+            File.WriteAllText(store.SavePath, midRun);
+            File.WriteAllText(store.BackupPath, midRun);
+            var fresh = Boot(store);
+            Assert.False(fresh.Resumed);
+            StateAssert.Equivalent(NewCampaign(), fresh.Campaign, "campaign");
+            string second = Path.Combine(store.Folder, "campaign.unreadable-2.json");
+            string third = Path.Combine(store.Folder, "campaign.unreadable-3.json");
+            Assert.Collection(fresh.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({runInProgress})", second),
+                notice => SaysSetAside(notice, "campaign.bak.json", $"could not be read ({runInProgress})", third));
+            Assert.Equal((midRun, midRun), (File.ReadAllText(second), File.ReadAllText(third)));
+            Assert.Equal((false, false, false), (store.HasSave, store.HasBackup, store.WasResuming));
+        });
+    }
+
+    [Fact]
     public void AChangedTuningIsANotice()
     {
         InTempFolder(folder =>

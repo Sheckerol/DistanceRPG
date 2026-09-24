@@ -97,7 +97,9 @@ its own and resumes where you left off.
   no rights — costs nothing: the game says `THE CAMPAIGN COULD NOT BE SAVED`, the
   log says why, and the save on the disk is the last good one.
 - **A save that cannot be played is set aside, never deleted**: one that is not
-  a save, one a newer build wrote, one naming content that is gone, or one that
+  a save, one a newer build wrote, one naming content that is gone, one holding
+  a run in progress (this build resumes only a campaign between runs, so a
+  mid-run save written by a later build or by hand is kept aside), or one that
   crashed the game as it resumed (a `campaign.resuming` marker sits beside the
   save while a resume is in flight; a launch that finds it knows the last resume
   never finished). It is renamed `campaign.unreadable-N.json` (or
