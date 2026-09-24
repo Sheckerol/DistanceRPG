@@ -388,4 +388,60 @@ public class HudTextTests
                 Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
             }
     }
+
+    [Fact]
+    public void InventoryLayout_SixSlotsFitA720Window()
+    {
+        // 4.4's six slots a member (PHASE4-141) in the shipped 1280 x 720 window:
+        // the panel slides up to make room for the three extra slots, and still
+        // prints every progression row the layout keeps, with the swap line and
+        // the key hint clear of the help line at h - 24.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal(6, slots);
+        Assert.Equal(slots, TestPools.Char("A").Inventory.Length);
+        const int most = 2 + 8;   // the two pools and every weapon class at once
+
+        for (int rows = 0; rows <= most; rows++)
+        {
+            var layout = DungeonHud.LayoutInventory(720f, slots, rows);
+            Assert.Equal(rows, layout.Rows);                          // every row printed
+            Assert.True(layout.Top >= 56f, $"rows={rows}: over the top readouts");
+            Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows}: past the help line");
+        }
+
+        var full = DungeonHud.LayoutInventory(720f, slots, most);
+        Assert.True(full.Top < 720f / 2f - 150f);   // slid up from where the three-slot panel opened
+
+        // And past 720 the invariant the three-slot panel keeps holds for six too:
+        // what is drawn clears the help line, or every row it could drop has gone.
+        for (int h = 240; h <= 1600; h += 2)
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(h, slots, rows);
+                Assert.InRange(layout.Rows, 0, rows);
+                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
+                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
+            }
+    }
+
+    [Fact]
+    public void TheEquipHintNamesEveryBagSlot()
+    {
+        // The panel numbers slots from 1 -- the hand is 1 -- and a number key equips
+        // the bag slot printed with it, so six slots are equipped with 2-6 (PHASE4-143).
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(PartyMemberState.InventorySlots));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(TestPools.Char("A").Inventory.Length));
+
+        // It is read off the slots, so a carry tuned differently reads differently:
+        // Phase 3's three, a bag of one, and no bag at all.
+        Assert.Equal("PRESS 2-3 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(3));
+        Assert.Equal("PRESS 2 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(2));
+        Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1));
+
+        // It never names a key the scene does not bind: past the last number key,
+        // it names the keys there are.
+        Assert.Equal(9, DungeonScene.HighestSlotKey);
+        Assert.Equal("PRESS 2-8 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(8));
+        Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(12));
+    }
 }

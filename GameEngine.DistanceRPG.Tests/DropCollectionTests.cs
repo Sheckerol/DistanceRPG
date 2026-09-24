@@ -397,8 +397,8 @@ public class DropCollectionTests
         Assert.Equal(Pickup.BagFull, Pickup.FirstEmptySlot(member.Inventory));
         Assert.Equal(Pickup.BagFull, Pickup.Take(campaign, corpse, drop, member));
 
-        // A carry limit, not a fault (4.4's 24 party-wide slots replace these
-        // three), and a refusal is the whole act refused: the bag is what it was,
+        // A carry limit, not a fault (4.4's 24 party-wide slots, six a member,
+        // all full here), and a refusal is the whole act refused: the bag is what it was,
         // the campaign has met nothing, and the weapon is still lying there for
         // whoever has room for it.
         Assert.Equal(before, member.Inventory);

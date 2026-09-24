@@ -2,9 +2,11 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The well-formedness checks content must pass before anything reads it
-/// (§5.4–§5.7). The relations are validated first because they are the
+/// (§5.4–§5.9). The relations are validated first because they are the
 /// predicates everything after them is checked against; the enchantments next,
-/// because the weapons name them; the weapons last. Every failure throws a
+/// because the weapons name them; then the weapons; then the dungeons, whose
+/// themes name modifiers and whose drop tables are computed over the weapons;
+/// the roster last, because it names specific weapons. Every failure throws a
 /// <see cref="ContentException"/> naming the entry and the rule; the first
 /// failure aborts, in a fixed check order, so the report is deterministic.
 /// </summary>
@@ -58,9 +60,30 @@ public static class ContentValidator
     public const string RuleCurveMidpointIsACount = "the unique curve's midpoint is a DefeatCount, never negative";
     public const string RuleKillCountsForSomething = "a kill always counts for at least one";
     public const string RuleEnchantmentLockIsPositive = "an enchantment reserves at least one point of mana";
+    public const string RuleBossFloorRange = "a boss floor range starts at floor 1 and is never inverted";
+    public const string RuleCountIsNeverNegative = "a count is never negative";
+    public const string RuleFloorNumberStartsAtOne = "a floor number starts at 1";
+    public const string RuleShareIsAPercentage = "a share is a percentage, 0 to 100";
+    public const string RuleCarryFillsTheParty = "the party's carry divides evenly among its members, at least one slot each";
+    public const string RuleGatherTakesATile = "the stairs gather the party from at least a tile away";
+
+    public const string RuleThemeIsClassSignature = "a dungeon's theme is a class signature";
+    public const string RuleThemeHasAUnique = "a theme's own class has a Purity variant whose unique raises the theme to x3";
+    public const string RuleThemeReachesAClass = "at least one class can carry a dungeon's theme";
+    public const string RuleThemeReachesItsOwnClass = "a theme's own class can carry it, so its unique can drop";
+    public const string RuleBossWieldsAClass = "a dungeon's boss can wield at least one class that carries its theme";
+    public const string RuleRetiringDungeonPinsItsFloor = "a dungeon that retires on clear pins its boss floor";
+    public const string RuleOneRetiringDungeon = "exactly one dungeon retires on clear";
+    public const string RuleBossCarriesTheTheme = "a dungeon's boss carries its theme innately";
+    public const string RuleBossStatline = "a boss has at least one hit point and one unit of movement";
+    public const string RuleBossInnateStackable = "a boss's innate modifiers are stackable members, at least one stack each";
+    public const string RuleAttunementIsAnElement = "an attunement is a damage type or none";
 
     /// <summary>The entry id a roster-wide failure is reported against: the file, since no one member broke it.</summary>
     private const string RosterId = "party";
+
+    /// <summary>The entry id a file-wide dungeon failure is reported against: the file, since no one dungeon broke it.</summary>
+    private const string DungeonsId = "dungeons";
 
     /// <summary>The top of a percentage; the bottom is 0, since a chance of nothing is a legible way to switch a roll off.</summary>
     private const int FullPercent = 100;
@@ -123,8 +146,15 @@ public static class ContentValidator
     /// because a class is code and so is what it is for. Casters are absent:
     /// they vary by effect and shape rather than by role and are never checked
     /// as variants.
+    /// <para>
+    /// It is also the set a dungeon's theme is drawn from (§4.3: "themes are
+    /// drawn from class signatures"), because only a signature has a Purity
+    /// variant that forges it at x2, which a boss's graft can take to x3 — the
+    /// dungeon's one unique. Internal so the dungeon checks and their tests read
+    /// the one table rather than restating it.
+    /// </para>
     /// </summary>
-    private static readonly IReadOnlyDictionary<WeaponClass, ModifierType> Signature = new Dictionary<WeaponClass, ModifierType>
+    internal static readonly IReadOnlyDictionary<WeaponClass, ModifierType> Signature = new Dictionary<WeaponClass, ModifierType>
     {
         [WeaponClass.Dagger] = ModifierType.CritWindow,
         [WeaponClass.Sword] = ModifierType.Block,
@@ -133,6 +163,20 @@ public static class ContentValidator
         [WeaponClass.Ranged] = ModifierType.Longshot,
         [WeaponClass.Throwing] = ModifierType.Charges,
     };
+
+    /// <summary>
+    /// The class whose signature <paramref name="theme"/> is — a theme's "own
+    /// class" (§1.5, §4.3), the one its unique comes from — or null when it is
+    /// no class's signature. Asked in <see cref="WeaponClass"/> order rather than
+    /// by walking the dictionary, so the answer never depends on its layout.
+    /// </summary>
+    internal static WeaponClass? ClassSignedBy(ModifierType theme)
+    {
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+            if (Signature.TryGetValue(cls, out var signature) && signature == theme)
+                return cls;
+        return null;
+    }
 
     /// <summary>
     /// The §5.3 checks on <c>tuning.json</c>, run first because tuning loads
@@ -156,6 +200,17 @@ public static class ContentValidator
     /// under the floor is left alone: every revival then simply lands on the
     /// floor, which is a choice rather than a knob that cannot mean anything.
     /// </para>
+    /// <para>
+    /// The §4.3/§4.4 knobs are held to the same standard. The boss floor range
+    /// starts at floor 1 and is never inverted, or the roll's span is negative;
+    /// the stack offset and the cooldown per floor are counts; the mercy floor
+    /// is a floor number, which starts at 1; the death clawback is a share of a
+    /// gain; the carry divides evenly among the members with a slot each, or
+    /// somebody has no hand to hold a weapon in and the party's 24 is not what
+    /// the members carry; and the stairs gather from at least a tile away.
+    /// "Six stacks is short of ten" and every other judgement between these
+    /// numbers is a test on the compiled values, never a refusal here.
+    /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
     {
@@ -176,6 +231,29 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.CleanKillBonus), RuleKillCountsForSomething, $"{tuning.CleanKillBonus}");
         if (tuning.UniqueChanceMidpoint < 0)
             throw new ContentException(nameof(Tuning.UniqueChanceMidpoint), RuleCurveMidpointIsACount, $"{tuning.UniqueChanceMidpoint}");
+
+        if (tuning.BossFloorMin < 1)
+            throw new ContentException(nameof(Tuning.BossFloorMin), RuleBossFloorRange, $"{tuning.BossFloorMin}");
+        if (tuning.BossFloorMax < tuning.BossFloorMin)
+            throw new ContentException(nameof(Tuning.BossFloorMax), RuleBossFloorRange, $"{tuning.BossFloorMax}, shallower than {nameof(Tuning.BossFloorMin)} {tuning.BossFloorMin}");
+        RequireCount(tuning.BossStackOffset, nameof(Tuning.BossStackOffset));
+        RequireCount(tuning.CooldownRunsPerFloor, nameof(Tuning.CooldownRunsPerFloor));
+        if (tuning.MercyFloor < 1)
+            throw new ContentException(nameof(Tuning.MercyFloor), RuleFloorNumberStartsAtOne, $"{tuning.MercyFloor}");
+        if (tuning.DeathXpLossPercent < 0 || tuning.DeathXpLossPercent > FullPercent)
+            throw new ContentException(nameof(Tuning.DeathXpLossPercent), RuleShareIsAPercentage, $"{tuning.DeathXpLossPercent}");
+        if (tuning.PartyCarrySlots < GameConstants.PartySize || tuning.PartyCarrySlots % GameConstants.PartySize != 0)
+            throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleCarryFillsTheParty,
+                $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members");
+        if (tuning.StairGatherTiles < 1)
+            throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
+    }
+
+    /// <summary>A knob that counts something is never negative; zero is a choice (nothing locks, nothing is offset).</summary>
+    private static void RequireCount(int value, string key)
+    {
+        if (value < 0)
+            throw new ContentException(key, RuleCountIsNeverNegative, $"{value}");
     }
 
     /// <summary>A knob rolled against a draw is a percentage, or the draw means nothing.</summary>
@@ -206,10 +284,18 @@ public static class ContentValidator
     /// only the per-member rule is enforced and the roster's own arrangement is
     /// pinned by test.
     /// </summary>
-    public static void ValidateParty(PartyData data, WeaponCatalogue weapons)
+    /// <param name="tuning">
+    /// The tuning whose carry the bags are measured against
+    /// (<see cref="PartyMemberState.SlotsFor"/>): <see cref="GameContent.Load"/>
+    /// passes the one it is loading, whose content is not current yet. Null
+    /// measures against the current content's slots, which is what a direct
+    /// check of a roster outside a load means.
+    /// </param>
+    public static void ValidateParty(PartyData data, WeaponCatalogue weapons, Tuning? tuning = null)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(weapons);
+        int slots = tuning is null ? PartyMemberState.InventorySlots : PartyMemberState.SlotsFor(tuning);
 
         if (data.Members.Count != GameConstants.PartySize)
             throw new ContentException(RosterId, RulePartySize, $"{data.Members.Count} members, {GameConstants.PartySize} slots");
@@ -224,8 +310,8 @@ public static class ContentValidator
                 throw new ContentException(member.Id, RulePartyStatPermutation, member.Stats.ToString());
 
             int carried = 1 + member.BagWeaponIds.Count;
-            if (carried > PartyMemberState.InventorySlots)
-                throw new ContentException(member.Id, RulePartyBagFits, $"{carried} weapons, {PartyMemberState.InventorySlots} slots");
+            if (carried > slots)
+                throw new ContentException(member.Id, RulePartyBagFits, $"{carried} weapons, {slots} slots");
 
             // Equipped first, then the bag in slot order: the first failure
             // reported is the same one every run.
@@ -239,6 +325,129 @@ public static class ContentValidator
         // carries one.
         if (!data.Members.Any(m => Weapon.KindOf(weapons[m.StartingWeaponId].Class) == WeaponKind.Caster))
             throw new ContentException(RosterId, RulePartyHasACaster, "no member starts with a staff or a wand");
+    }
+
+    /// <summary>
+    /// The §5.8 checks on <c>dungeons.json</c> (S:315-324), run after the weapons
+    /// and against the tables <paramref name="tables"/> computed from them —
+    /// <see cref="DungeonCatalogue"/> calls this from its constructor, the way
+    /// <see cref="EnchantmentCatalogue"/> validates what it builds. In a fixed
+    /// order, so the first failure reported is the same one every run: ids are
+    /// unique; then, per dungeon in file order, the theme, the floors, the boss
+    /// and the attunement; then the file-wide count of retiring dungeons.
+    /// <list type="bullet">
+    /// <item><strong>The theme is a class signature</strong> (§4.3's list, as
+    /// the compiled <see cref="Signature"/> table holds it), and its own class's
+    /// Purity variant has a unique raising it to x3 — the dungeon's one unique,
+    /// the Purity coincidence §5.8 exists to protect. A theme that is not a
+    /// signature "still works — it just quietly means that dungeon can never
+    /// produce its unique, and nothing else in the game announces the
+    /// difference". <c>Pin</c> and <c>Light</c> are refused here, and so are
+    /// <c>CritMultiplier</c> — a second baseline modifier no Purity variant
+    /// doubles — and <c>Resonant</c>, forge-limited to x1; <c>Cleave</c> is a
+    /// signature with no unique on its Purity variant until one is authored.</item>
+    /// <item><strong>The drop table is not empty</strong>, or "the boss drops
+    /// nothing at all", <strong>and holds the theme's own class</strong>: a
+    /// relations edit that pushed the theme's own class out of its table would
+    /// pass every other check here and quietly make the unique unobtainable —
+    /// the failure §5.8 says "will get broken by accident". The weapon checks
+    /// cannot see it, since the Purity variant's own forged spread may still be
+    /// legal while the graft on top of it is not.</item>
+    /// <item><strong>The boss can wield something</strong>: its drop table has a
+    /// class an enemy fields.</item>
+    /// <item><strong>The boss floor range</strong>, pinned or the tuning's,
+    /// starts at floor 1 and is not inverted, and a retiring dungeon pins it —
+    /// the tutorial's two floors are the enchanter's mana budget, not a roll.</item>
+    /// <item><strong>The boss has a statline</strong> — a hit point and a unit
+    /// of movement — <strong>its innate modifiers are stackable</strong> (no
+    /// member <see cref="ModifierRules.NeverStacked"/>, at least one stack
+    /// each: innate stacks are content, bounded by nothing a weapon's forge
+    /// bounds) <strong>and include the theme</strong>, which it carries
+    /// "regardless of what it wields".</item>
+    /// <item><strong>An attunement is a damage type or none.</strong></item>
+    /// <item><strong>Exactly one dungeon retires on clear</strong>: two
+    /// un-repeatable dungeons "is a content decision nobody has made", and none
+    /// would leave the hub nothing to open behind.</item>
+    /// </list>
+    /// </summary>
+    public static void ValidateDungeons(DungeonsData data, DungeonCatalogue tables, WeaponCatalogue weapons)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(tables);
+        ArgumentNullException.ThrowIfNull(weapons);
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var def in data.Dungeons)
+            if (!seen.Add(def.Id))
+                throw new ContentException(def.Id, RuleDuplicateId);
+
+        foreach (var def in data.Dungeons)
+        {
+            var theme = def.Theme;
+            if (ClassSignedBy(theme) is not { } own)
+                throw new ContentException(def.Id, RuleThemeIsClassSignature, $"{theme} is no class's signature");
+
+            // The Purity variant forges its class's signature at x2; the unique
+            // derived from it is the one the boss's graft reaches by arithmetic.
+            var purity = weapons.ByClass(own).Count > 0 ? weapons.Variant(own, VariantRole.Purity) : null;
+            var unique = purity is null ? null : weapons.UniqueDerivedFrom(purity.Id);
+            if (unique is null || unique.Forged.GetValueOrDefault(theme) != UniqueRaise)
+                throw new ContentException(def.Id, RuleThemeHasAUnique, purity is null
+                    ? $"the weapons carry no {own} Purity variant"
+                    : unique is null
+                        ? $"'{purity.Id}' has no unique derived from it"
+                        : $"'{unique.Id}' carries {theme} x{unique.Forged.GetValueOrDefault(theme)}, not x{UniqueRaise}");
+
+            var table = tables.ThemeClasses(theme);
+            if (table.Count == 0)
+                throw new ContentException(def.Id, RuleThemeReachesAClass, $"no class takes {theme} as a forged graft");
+            if (!table.Contains(own))
+                throw new ContentException(def.Id, RuleThemeReachesItsOwnClass,
+                    $"{theme}'s own class {own} is not among {string.Join(", ", table)}");
+            if (tables.WieldClasses(def).Count == 0)
+                throw new ContentException(def.Id, RuleBossWieldsAClass,
+                    $"{string.Join(", ", table)} carry {theme}, and no enemy fields any of them");
+
+            var (min, max) = tables.BossFloorRange(def);
+            if (min < 1 || max < min)
+                throw new ContentException(def.Id, RuleBossFloorRange, $"floors {min} to {max}");
+            if (def.RetiresOnClear && (def.BossFloorMin is null || def.BossFloorMin != def.BossFloorMax))
+                throw new ContentException(def.Id, RuleRetiringDungeonPinsItsFloor,
+                    $"floors {def.BossFloorMin?.ToString() ?? "unpinned"} to {def.BossFloorMax?.ToString() ?? "unpinned"}");
+
+            ValidateBoss(def);
+
+            if (def.Attunement is { } element && (element == DamageType.None || !Enum.IsDefined(element)))
+                throw new ContentException(def.Id, RuleAttunementIsAnElement, $"{element}");
+        }
+
+        var retiring = data.Dungeons.Where(d => d.RetiresOnClear).ToList();
+        if (retiring.Count != 1)
+            throw new ContentException(retiring.Count == 0 ? DungeonsId : retiring[1].Id, RuleOneRetiringDungeon,
+                $"{retiring.Count} dungeons retire on clear");
+    }
+
+    /// <summary>
+    /// A dungeon's boss: a statline (a hit point, a unit of movement), innate
+    /// modifiers that each stack — walked in <see cref="ModifierType"/> order so
+    /// the one reported is the same every run — and the theme among them.
+    /// Reported against the dungeon, the entry that names the boss.
+    /// </summary>
+    private static void ValidateBoss(DungeonDef def)
+    {
+        var boss = def.Boss;
+        if (boss is null)
+            throw new ContentException(def.Id, RuleBossStatline, "names no boss");
+        if (boss.MaxHp < 1 || boss.MovementBudget < 1)
+            throw new ContentException(def.Id, RuleBossStatline, $"'{boss.Id}': {boss.MaxHp} HP, movement {boss.MovementBudget}");
+
+        var innate = boss.Innate ?? new Dictionary<ModifierType, int>();
+        foreach (var (t, n) in innate.OrderBy(kv => kv.Key))
+            if (ModifierRules.NeverStacked.Contains(t) || !Enum.IsDefined(t) || n < 1)
+                throw new ContentException(def.Id, RuleBossInnateStackable, $"'{boss.Id}': {t} x{n}");
+
+        if (innate.GetValueOrDefault(def.Theme) < 1)
+            throw new ContentException(def.Id, RuleBossCarriesTheTheme, $"'{boss.Id}' carries no {def.Theme}");
     }
 
     /// <summary>

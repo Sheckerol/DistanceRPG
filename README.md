@@ -39,7 +39,7 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 | 1–4 / Tab / click | Switch party member (click their box or the party list) |
 | Left-click enemy | Attack with the equipped weapon |
 | Space / Enter | End turn (banks half your unspent movement) |
-| I / B | Inventory (2/3 swaps a bag slot with the equipped slot) |
+| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
 | Scroll wheel | Zoom |
 | Esc | Close inventory, otherwise open/close the pause menu |
 

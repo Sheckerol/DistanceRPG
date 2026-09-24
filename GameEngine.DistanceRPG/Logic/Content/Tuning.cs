@@ -332,4 +332,74 @@ public sealed record Tuning
     /// unnamed there; this is the name.
     /// </summary>
     public int WeaponXpPerLevel { get; init; } = 100;
+
+    // ---- Dungeon (§4.3, §4.4) ----
+    // §5.3's Dungeon group, plus the stairs' gathering radius, which §5.3 does
+    // not list and which lands in the same group. Floors here are floor
+    // NUMBERS, 1-based, the way prose and the HUD count them; a floor's seed
+    // index is its number less one. None of these decides dungeon layout —
+    // the stream salts that do are compiled constants, the golden set's
+    // neighbours, and never keys here.
+
+    /// <summary>
+    /// The shallowest floor a dungeon's boss is rolled onto (§4.3: "between 5
+    /// and 10 on entry"). A dungeon that pins its own range in content
+    /// (<see cref="DungeonDef.BossFloorMin"/>) ignores this, as the tutorial's
+    /// floor 2 does; every other dungeon reads it at entry.
+    /// </summary>
+    public int BossFloorMin { get; init; } = 5;
+
+    /// <summary>The deepest floor a dungeon's boss is rolled onto; the roll's one draw spans <c>BossFloorMax − BossFloorMin</c>.</summary>
+    public int BossFloorMax { get; init; } = 10;
+
+    /// <summary>
+    /// The floors a boss's drop pays nothing for: its guaranteed stacks are
+    /// <c>max(0, BossFloor − BossStackOffset)</c> — 1 at floor 5, 6 at floor 10
+    /// (§4.3's table). The tutorial's floor 2 pays 0 of these; the one stack the
+    /// doc prices it at is the forged graft itself.
+    /// </summary>
+    public int BossStackOffset { get; init; } = 4;
+
+    /// <summary>Runs a clear locks its dungeon for, per floor its boss was beaten on: the lock is <c>BossFloor × CooldownRunsPerFloor</c> (§4.3), counted on the campaign's run counter.</summary>
+    public int CooldownRunsPerFloor { get; init; } = 1;
+
+    /// <summary>
+    /// The floor NUMBER a failed run must have reached to earn the mercy tick
+    /// (§6.3: "failing at floor 3 or deeper"). A number, not an index: the
+    /// tutorial's two floors never reach it, with no exception written.
+    /// </summary>
+    public int MercyFloor { get; init; } = 3;
+
+    /// <summary>
+    /// The percentage of this run's gain in each XP pool a wipe claws back
+    /// (§4.4). 100 erases the run's progress, 0 makes death a pure loot
+    /// forfeiture; it ships as data and never as a hardcoded 100%.
+    /// <para>
+    /// <strong>Provisional.</strong> settled.md fixes the mechanism and leaves the
+    /// number open ("nobody can pick this number on paper"), so 50 is picked
+    /// here to stop the run's end blocking on it and is expected to move after
+    /// play.
+    /// </para>
+    /// </summary>
+    public int DeathXpLossPercent { get; init; } = 50;
+
+    /// <summary>
+    /// How near the stairs, in whole tiles, every living member must stand for
+    /// the party to use them. Tiles, as the name says: whoever measures it in
+    /// logic units multiplies by <see cref="GameConstants.LogicUnitsPerTile"/>.
+    /// Three admits a marching line of three ranks behind whoever is on the stair.
+    /// </summary>
+    public int StairGatherTiles { get; init; } = 3;
+
+    // ---- Inventory (§4.4) ----
+
+    /// <summary>
+    /// The party's whole carry, in weapon slots: 6 a member, 24 party-wide
+    /// (§4.4, settled.md), shared evenly by <see cref="GameConstants.PartySize"/>
+    /// members into <see cref="PartyMemberState.InventorySlots"/>. Loot and
+    /// weapons share it — there is no haul bag — and slot 0 of each member's
+    /// share is the weapon in hand. "Exact number is a tuning target; the
+    /// structure is the decision."
+    /// </summary>
+    public int PartyCarrySlots { get; init; } = 24;
 }

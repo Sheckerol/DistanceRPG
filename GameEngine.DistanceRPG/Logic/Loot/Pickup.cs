@@ -6,15 +6,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// and what the campaign has now met.
 /// <para>
 /// <strong>It lives here rather than in the scene because every word of it is
-/// decidable</strong> — three slots, first empty one wins, a full bag refuses —
-/// and a rule that can be decided without a window should be testable without
-/// one. <c>DungeonScene.PickUp</c> keeps what is genuinely the scene's: the
-/// marker it removes, the reach readout it refreshes, and the cue it prints.
+/// decidable</strong> — the member's slots, first empty one wins, a full bag
+/// refuses — and a rule that can be decided without a window should be testable
+/// without one. <c>DungeonScene.PickUp</c> keeps what is genuinely the scene's:
+/// the marker it removes, the reach readout it refreshes, and the cue it prints.
 /// </para>
 /// <para>
-/// The three slots are Phase 3's: §4.4 replaces them with 24 party-wide ones, so
-/// the refusal below reads as a carry limit rather than a fault, and the count it
-/// names is <see cref="PartyMemberState.InventorySlots"/> rather than a literal.
+/// The slots are §4.4's: 24 party-wide, six a member
+/// (<see cref="PartyMemberState.InventorySlots"/>), where Phase 3 had three.
+/// Loot lands in the same slots the weapons are carried in — there is no haul
+/// bag — so the refusal below reads as a carry limit rather than a fault.
 /// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>.
 /// </summary>

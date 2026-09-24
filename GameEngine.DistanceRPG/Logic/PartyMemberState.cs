@@ -191,10 +191,36 @@ public sealed class PartyMemberState : ActorState
             throw new ArgumentException($"{credit.Pool} is the member's own pool and levels no class; it named {credit.Class}.", nameof(credit));
     }
 
-    /// <summary>Weapon slots a member carries. A roster entry's starting weapon and bag are checked against it at load, so a bag too deep to spawn aborts startup.</summary>
-    public const int InventorySlots = 3;
+    /// <summary>
+    /// Weapon slots a member carries: the party's carry
+    /// (<see cref="Tuning.PartyCarrySlots"/>, §4.4's 24) shared evenly among its
+    /// <see cref="GameConstants.PartySize"/> members — six each, replacing the
+    /// three that were a testing remnant. Slot 0 is the weapon in hand; the rest
+    /// are the bag, and loot and weapons share them — there is no haul bag, so
+    /// every drop carried out is a weapon that could have been swung.
+    /// <para>
+    /// Read from the current content when a member is built, so a member keeps
+    /// the count it was built with. A roster entry's starting weapon and bag are
+    /// checked against the same number at load, so a bag too deep to spawn
+    /// aborts startup.
+    /// </para>
+    /// </summary>
+    public static int InventorySlots => SlotsFor(GameContent.Current.Tuning);
 
-    /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
+    /// <summary>
+    /// The slots a member carries under <paramref name="tuning"/>: its carry over
+    /// the party's size. <see cref="ContentValidator.ValidateTuning"/> refuses a
+    /// carry that does not divide evenly, a slot or more each, so nothing is lost
+    /// to the division. Content being loaded passes its own tuning, since the
+    /// content <see cref="InventorySlots"/> reads is not current yet.
+    /// </summary>
+    internal static int SlotsFor(Tuning tuning)
+    {
+        ArgumentNullException.ThrowIfNull(tuning);
+        return tuning.PartyCarrySlots / GameConstants.PartySize;
+    }
+
+    /// <summary>The member's <see cref="InventorySlots"/> slots, six under the shipped tuning; slot 0 is the equipped weapon.</summary>
     public Weapon?[] Inventory { get; } = new Weapon?[InventorySlots];
 
     public override Weapon? EquippedWeapon => Inventory[0];

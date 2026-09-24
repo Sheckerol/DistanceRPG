@@ -704,27 +704,14 @@ public class DungeonScene : Scene
         // auto-repeat to KeyRepeated), so one-shot actions like Tab-cycling
         // never machine-gun while held.
         //
-        // Number keys select party members, equip inventory slots while the
-        // bag is open (2/3 swap that slot with the equipped slot), or pick a
-        // pause-menu option (1 close, 2 exit).
-        input.SubscribeToKeyPressed(_ =>
+        // Number keys, 1 to HighestSlotKey, all through one routed handler
+        // (NumberKey): they equip bag slots while the bag is open, pick a
+        // pause-menu option while it is, and select party members otherwise.
+        for (int digit = 1; digit <= HighestSlotKey; digit++)
         {
-            if (PauseMenuOpen) ActiveMenu = GameMenu.None;
-            else if (!AnyMenuOpen) SetActiveCharacter(0);
-        }, Keys.D1);
-        input.SubscribeToKeyPressed(_ =>
-        {
-            if (PauseMenuOpen) _game.Close();
-            else if (InventoryOpen) EquipSlot(1);
-            else SetActiveCharacter(1);
-        }, Keys.D2);
-        input.SubscribeToKeyPressed(_ =>
-        {
-            if (PauseMenuOpen) StopResurrection();
-            else if (InventoryOpen) EquipSlot(2);
-            else SetActiveCharacter(2);
-        }, Keys.D3);
-        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) SetActiveCharacter(3); }, Keys.D4);
+            int pressed = digit;
+            input.SubscribeToKeyPressed(_ => NumberKey(pressed), Keys.D0 + pressed);
+        }
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) CycleActiveCharacter(); }, Keys.Tab);
 
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
@@ -771,6 +758,45 @@ public class DungeonScene : Scene
     }
 
     // ── Party control ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The highest number key the scene binds. With the bag open a key equips
+    /// the bag slot printed with its number — the panel numbers slots from 1,
+    /// the weapon in hand being 1 — so keys 2 up reach every bag slot a member
+    /// carries: 2-6 for the six of §4.4's carry, and up to eight bag slots if
+    /// the carry is tuned that deep. The inventory panel's key hint reads its
+    /// range off the same number (<see cref="DungeonHud.EquipHint"/>), so the
+    /// hint and the bindings cannot drift apart.
+    /// </summary>
+    internal const int HighestSlotKey = 9;
+
+    /// <summary>
+    /// A number key, routed by the menu that is open (§4.4: the swap keys
+    /// generalise to every slot): with the bag open, 2 and up swap the bag slot
+    /// printed with that number into the hand — 1 is the hand itself; on the
+    /// pause menu, 1 closes it, 2 exits and 3 is the dev stop; with no menu
+    /// open, 1-4 select a party member. Behind any other menu a number key does
+    /// nothing at all — it never selects a member behind a prompt.
+    /// </summary>
+    private void NumberKey(int digit)
+    {
+        if (PauseMenuOpen)
+        {
+            if (digit == 1) ActiveMenu = GameMenu.None;
+            else if (digit == 2) _game.Close();
+            else if (digit == 3) StopResurrection();
+        }
+        else if (InventoryOpen)
+        {
+            int slot = digit - 1;   // the printed number is the slot plus one
+            if (slot > 0 && slot < ActiveCharacter.State.Inventory.Length)
+                EquipSlot(slot);
+        }
+        else if (!AnyMenuOpen)
+        {
+            SetActiveCharacter(digit - 1);   // a number past the party selects nobody
+        }
+    }
 
     private void SetActiveCharacter(int idx, bool force = false)
     {
@@ -1449,8 +1475,8 @@ public class DungeonScene : Scene
     /// the met entries are <see cref="Pickup.Take"/>'s, which decides them without
     /// a window and is tested that way; what is left here is the scene's — the
     /// marker that goes, the reach that changed, the cue that says why a full bag
-    /// took nothing (a carry limit, not a fault: §4.4's 24 party-wide slots
-    /// replace Phase 3's three).
+    /// took nothing (a carry limit, not a fault: §4.4's six slots a member, 24
+    /// party-wide, which loot shares with the weapons being carried).
     /// </summary>
     private void PickUp()
     {
@@ -1460,7 +1486,7 @@ public class DungeonScene : Scene
         int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member);
         if (slot == Pickup.BagFull)
         {
-            SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {PartyMemberState.InventorySlots} CARRIED", false));
+            SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {member.Inventory.Length} CARRIED", false));
             return;
         }
 

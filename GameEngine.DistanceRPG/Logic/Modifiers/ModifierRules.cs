@@ -151,6 +151,35 @@ public sealed class ModifierRules
         &&  Requires.GetValueOrDefault(t, []).All(x => present.Stacks(x) > 0);
 
     /// <summary>
+    /// The one question every graft asks (§4.3, §6.4): may a stack of
+    /// <paramref name="t"/> be grafted onto a weapon of <paramref name="kind"/>
+    /// carrying <paramref name="present"/>? The relations answer it
+    /// (<see cref="Allowed"/>), and a <em>forged</em> graft must also stay
+    /// within the forge limit — <paramref name="forged"/>'s stacks of it plus
+    /// the one grafted, never past <see cref="MaxForged"/> — because the
+    /// forged spread is fixed at construction and is what every later ceiling
+    /// is measured from. An acquired graft is bounded by the acquisition cap at
+    /// <see cref="ModifierSet.With"/> instead, and asks the relations alone.
+    /// <para>
+    /// "Same operation, different source": a boss's theme is a graft asked
+    /// <paramref name="asForged"/> true — chosen, forged, a stack deeper — and
+    /// the enchanter's is the same question asked false. Nothing about which
+    /// modifier is grafted is decided here; the source chooses it.
+    /// </para>
+    /// </summary>
+    /// <param name="t">The modifier to graft.</param>
+    /// <param name="kind">The sort of weapon it would land on.</param>
+    /// <param name="present">Everything the weapon carries now, forged and acquired: what the relations are asked beside.</param>
+    /// <param name="forged">The weapon's forged spread: what the forge limit counts.</param>
+    /// <param name="asForged">True for a graft that becomes part of the forged spread; false for an acquired one.</param>
+    public bool CanGraft(ModifierType t, WeaponKind kind, ModifierSet present, ModifierSet forged, bool asForged)
+    {
+        ArgumentNullException.ThrowIfNull(present);
+        ArgumentNullException.ThrowIfNull(forged);
+        return Allowed(t, kind, present) && (!asForged || forged.Stacks(t) + 1 <= MaxForged(t));
+    }
+
+    /// <summary>
     /// Close exclusion groups into directed pairs: every member of a group
     /// excludes every other member, both ways. A group is declared once as an
     /// array, so it can never be half-declared. Keys and arrays are in enum order.

@@ -59,7 +59,7 @@ public static class TestContent
 
     /// <summary>Load content with the given parts (the compiled defaults for the rest) and make it current until disposed.</summary>
     public static IDisposable Use(RestrictedData? restricted = null, WeaponsData? weapons = null,
-        EnchantmentsData? enchantments = null, Tuning? tuning = null, PartyData? party = null)
+        EnchantmentsData? enchantments = null, Tuning? tuning = null, PartyData? party = null, DungeonsData? dungeons = null)
     {
         var previous = GameContent.Current;
         GameContent.Use(GameContent.Load(
@@ -67,7 +67,8 @@ public static class TestContent
             restricted ?? ContentDefaults.Restricted,
             enchantments ?? ContentDefaults.Enchantments,
             weapons ?? ContentDefaults.Weapons,
-            party ?? ContentDefaults.Party));
+            party ?? ContentDefaults.Party,
+            dungeons ?? ContentDefaults.Dungeons));
         return new Restore(previous);
     }
 

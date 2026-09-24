@@ -387,10 +387,14 @@ public sealed class DungeonHud
     /// its centred place while the whole of it fits, slides up — never under
     /// the top readouts — when it does not, and only past that drops rows it
     /// has no room for, from the end of the list, rather than the lines that
-    /// name the swap cost and the equip keys. Below about 370 px of window even
-    /// a row-less panel is taller than the room under the readouts, and the
-    /// panel is then anchored as high as it goes and clipped: that is a window
-    /// smaller than the rest of the HUD is laid out for either.
+    /// name the swap cost and the equip keys. A row-less panel needs
+    /// <c>228 + 46 × slots</c> px of window (the top margin, the panel's fixed
+    /// lines, its slots and the help line's clearance) — about 370 at Phase 3's
+    /// three slots, about 500 at §4.4's six; the shipped 1280 x 720 window holds
+    /// six with every row printed. Below that even a row-less panel is taller
+    /// than the room under the readouts, and the panel is then anchored as high
+    /// as it goes and clipped: that is a window smaller than the rest of the
+    /// HUD is laid out for either.
     /// </summary>
     internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount)
     {
@@ -460,7 +464,27 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
-        DrawCentered(w, swapY + InventoryHintGap, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
+        DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
+    }
+
+    /// <summary>
+    /// The inventory panel's key hint: the number keys that equip a bag slot —
+    /// each the number the panel prints beside that slot, so the hand is 1 and
+    /// the bag runs from 2 — then the key that closes the bag. For §4.4's six
+    /// slots, <c>PRESS 2-6 TO EQUIP - I TO CLOSE</c>. The range is read off the
+    /// member's slots and the scene's own highest binding
+    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names every slot a key
+    /// reaches and no key that does nothing.
+    /// </summary>
+    internal static string EquipHint(int slots)
+    {
+        int last = Math.Min(slots, DungeonScene.HighestSlotKey);
+        return last switch
+        {
+            < 2 => "I TO CLOSE",                             // a hand and no bag: nothing to swap in
+            2 => "PRESS 2 TO EQUIP - I TO CLOSE",
+            _ => $"PRESS 2-{last} TO EQUIP - I TO CLOSE",
+        };
     }
 
     /// <summary>
