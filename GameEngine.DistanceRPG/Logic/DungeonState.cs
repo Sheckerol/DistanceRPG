@@ -2,9 +2,10 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// One floor of a dungeon (§4.5): one <see cref="MapGenerator"/> map, the rows
-/// <see cref="EnemyPlacer"/> put on it, its explored fog, and its stairs — each a
-/// pure function of <c>(mapSeed, index, def)</c>, so the same arguments build the
-/// same floor on every run and every machine.
+/// <see cref="EnemyPlacer"/> put on it, its explored fog, and its stairs — and,
+/// on the bottom floor, the dungeon's boss — each a pure function of
+/// <c>(mapSeed, index, def)</c>, so the same arguments build the same floor on
+/// every run and every machine.
 /// <para>
 /// <strong>Stored versus derived.</strong> What a visit changes lives here and
 /// is what a save would store (§5.1): the enemy rows — position, HP,
@@ -12,7 +13,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// Everything else re-derives bit-identically from the seed: the map, the fog
 /// boxes, the stairs (their own stream, <see cref="StairPlacer"/>), and every
 /// ground item a permanent kill left (<see cref="TurnSystem.GroundItemOf"/>).
-/// So a floor left and returned to is a pointer move, never a rebuild.
+/// So a floor left and returned to is a pointer move, never a rebuild. The
+/// boss's row is a row like the rest — where it stands, what it holds, whether
+/// it has fallen — and only its statline is content's to re-derive.
 /// </para>
 /// <para>
 /// <strong>Floor 0 is the golden dungeon, by arithmetic.</strong>
@@ -26,7 +29,7 @@ namespace GameEngine.DistanceRPG.Logic;
 public sealed class Floor
 {
     private Floor(int index, long seed, MapData map, FogBoxSet fogBoxes, IReadOnlyList<EnemyState> enemies,
-        StairTiles stairs, bool bottom)
+        StairTiles stairs, bool bottom, EnemyState? boss)
     {
         Index = index;
         Seed = seed;
@@ -37,6 +40,7 @@ public sealed class Floor
         UpStairs = stairs.Up;
         DownStairs = bottom ? null : stairs.Far;
         Lair = bottom ? stairs.Far : null;
+        Boss = boss;
     }
 
     /// <summary>The 0-based floor index: what every seed reads. The floor <em>number</em> a player reads is <c>Index + 1</c>.</summary>
@@ -67,10 +71,21 @@ public sealed class Floor
     /// <summary>
     /// The floor's actors other than the party: <see cref="EnemyPlacer"/>'s rows
     /// in spawn order, each with its <see cref="EnemyState.SpawnIndex"/> and the
-    /// dungeon's <see cref="DungeonDef.Attunement"/>. The rows are the floor's
-    /// stored state — whatever happens to them is what a return finds.
+    /// dungeon's <see cref="DungeonDef.Attunement"/>, and on the bottom floor the
+    /// <see cref="Boss"/> last of all. The rows are the floor's stored state —
+    /// whatever happens to them is what a return finds.
     /// </summary>
     public IReadOnlyList<EnemyState> Enemies { get; }
+
+    /// <summary>
+    /// The dungeon's one boss (§4.3), on the bottom floor and nowhere else: the
+    /// last of <see cref="Enemies"/>, its spawn index after every dummy's, waiting
+    /// in the <see cref="Lair"/> — or on the nearest free tile to it, when a dummy
+    /// was placed there first. Null on every other floor. Its death stops
+    /// resurrection for the rest of the visit (<see cref="DungeonState.OpenTurns"/>
+    /// hands it to the floor's turn system as the boss).
+    /// </summary>
+    public EnemyState? Boss { get; }
 
     /// <summary>The arrival tile, <see cref="MapData.PlayerStart"/> (§4.2). On the first floor it is the way out.</summary>
     public (int R, int C) UpStairs { get; }
@@ -87,8 +102,9 @@ public sealed class Floor
     /// <summary>
     /// On the boss floor, the tile its furthest room holds instead of a way down:
     /// where the boss waits. Null on every other floor. Drawn like the
-    /// down-stairs, so a dummy may already stand on it; the boss must then take
-    /// the nearest free tile from it, never the dummy's.
+    /// down-stairs, so a dummy may already stand on it; the boss then takes the
+    /// nearest free tile from it (<see cref="GridUtils.NearestFreeTile"/>), never
+    /// the dummy's.
     /// </summary>
     public (int R, int C)? Lair { get; }
 
@@ -102,15 +118,18 @@ public sealed class Floor
     /// to <paramref name="def"/>'s <see cref="DungeonDef.Attunement"/> — and its
     /// stairs, each on its own stream, none continuing another and none reading
     /// another's result: a row may stand on the far tile (<see cref="StairPlacer.Place"/>).
+    /// The bottom floor adds its boss after them (<see cref="Boss"/>).
     /// </summary>
     /// <param name="mapSeed">The dungeon's seed, rolled once per entry.</param>
     /// <param name="index">The 0-based floor index.</param>
     /// <param name="bottom">
     /// Whether this is the boss floor, the dungeon's bottom: its far tile is then
-    /// the <see cref="Lair"/> and there is no <see cref="DownStairs"/>. It changes
-    /// no draw — the map, the rows and the stair tile are the same either way.
+    /// the <see cref="Lair"/>, there is no <see cref="DownStairs"/>, and the boss
+    /// is appended to the rows. It moves no other draw — the map, the placed rows
+    /// and the stair tile are the same either way; the boss rolls on its own
+    /// stream (<see cref="DungeonState.RollBoss"/>).
     /// </param>
-    /// <param name="def">The dungeon, whose attunement every enemy it spawns carries.</param>
+    /// <param name="def">The dungeon, whose attunement every enemy it spawns carries, and whose boss the bottom holds.</param>
     internal static Floor Generate(long mapSeed, int index, bool bottom, DungeonDef def)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
@@ -119,9 +138,17 @@ public sealed class Floor
         long seed = DungeonState.FloorSeed(mapSeed, index);
         var map = MapGenerator.Generate(new Mulberry32(seed));
         var fogBoxes = FogBoxBuilder.Build(map);   // expands map.Corridors in place, exactly as the scene always has
-        var enemies = PlaceEnemies(map, seed, def);
+        var rows = PlaceEnemies(map, seed, def);
         var stairs = StairPlacer.Place(map, mapSeed, index);
-        return new Floor(index, seed, map, fogBoxes, enemies, stairs, bottom);
+
+        EnemyState[] enemies = rows;
+        EnemyState? boss = null;
+        if (bottom)
+        {
+            boss = PlaceBoss(map, stairs.Far, rows, mapSeed, def);
+            enemies = [.. rows, boss];
+        }
+        return new Floor(index, seed, map, fogBoxes, enemies, stairs, bottom, boss);
     }
 
     /// <summary>
@@ -149,7 +176,45 @@ public sealed class Floor
         }
         return rows.ToArray();
     }
+
+    /// <summary>
+    /// The boss row (§4.3): what it holds rolled off the visit's boss stream
+    /// (<see cref="DungeonState.RollBoss"/> — a class its dungeon's theme can be
+    /// forged onto and an enemy can field, and the variant), built to the
+    /// dungeon's statline (<see cref="DungeonState.BossRow"/>), and appended after
+    /// every placed row, so its <see cref="EnemyState.SpawnIndex"/> follows theirs
+    /// and no dummy's stream moves. It waits in the lair — or, when a placed dummy
+    /// already stands there (the lair is drawn without reading the rows), on the
+    /// nearest free floor tile to it (<see cref="GridUtils.NearestFreeTile"/>): the
+    /// rule an arrival follows, never on top of the dummy, and never by moving the
+    /// dummy or the lair.
+    /// </summary>
+    private static EnemyState PlaceBoss(MapData map, (int R, int C) lair, IReadOnlyList<EnemyState> rows, long mapSeed, DungeonDef def)
+    {
+        var roll = DungeonState.RollBoss(mapSeed, def);
+        var weapons = GameContent.Current.Weapons;
+        var boss = DungeonState.BossRow(def, weapons.Instantiate(weapons.Variant(roll.Class, roll.Role).Id));
+
+        var held = new HashSet<(int R, int C)>();
+        foreach (var row in rows)
+            held.Add(Displacer.TileOf(row));   // every placed row: all of them stand at generation
+        var (r, c) = GridUtils.NearestFreeTile(map.Grid, lair, held.Contains);
+        (boss.X, boss.Y) = Displacer.CentreOf(r, c);
+        boss.SpawnIndex = rows.Count;
+        return boss;
+    }
 }
+
+/// <summary>
+/// What the boss stream rolls at entry (§4.3, <see cref="DungeonState.RollBoss"/>),
+/// in the order it draws them: the boss's floor, then the class of the weapon it
+/// <em>wields</em> and that weapon's variant role. What it drops is another draw
+/// on another stream, over its dungeon's whole drop table.
+/// </summary>
+/// <param name="Floor">The boss floor, a 1-based floor number: <see cref="DungeonState.RollBossFloor(long, DungeonDef)"/>.</param>
+/// <param name="Class">The class it holds, one its dungeon allows in its hands (<see cref="DungeonCatalogue.WieldClasses"/>).</param>
+/// <param name="Role">The variant of that class it holds.</param>
+public sealed record BossRoll(int Floor, WeaponClass Class, VariantRole Role);
 
 /// <summary>What using a stair does: the three kinds a floor can hold (§4.2).</summary>
 public enum Stair
@@ -198,10 +263,11 @@ public enum StairRefusal
 /// <summary>
 /// A visit to a dungeon (§4.5): every floor of it, built at entry and held for
 /// as long as the party is inside, the party moving between them by stairs on
-/// the visit's one clock, and the boss floor rolled at entry. §5.1's Run group
-/// and its per-floor group are this object; <see cref="CampaignState"/> holds
-/// it, and leaving drops it whole (§4.1: "leaving the dungeon discards all of
-/// it").
+/// the visit's one clock, and the boss floor rolled at entry — the boss waiting
+/// on it, whose death stops resurrection on every floor for the rest of the
+/// visit (<see cref="BossDefeated"/>). §5.1's Run group and its per-floor group
+/// are this object; <see cref="CampaignState"/> holds it, and leaving drops it
+/// whole (§4.1: "leaving the dungeon discards all of it").
 /// <para>
 /// <strong>A floor left is a floor kept.</strong> Every floor is built once, at
 /// <see cref="Enter"/> — a pure function of the map seed, its index and the
@@ -373,16 +439,20 @@ public sealed class DungeonState
     /// <para>
     /// It opens at <see cref="Turn"/> in the player phase, with this turn's
     /// counters from the floors already stood on in it (<see cref="TurnCarry"/>),
-    /// the floor's own seed for its drops and revivals, and resurrection off once
-    /// the boss is dead. Then every dummy here whose wait ran out while the party
-    /// was elsewhere gets up (<see cref="TurnSystem.CatchUpRevivals"/>) — as of
-    /// now, or as of the turn the boss fell once it has — and the zones are
-    /// re-read around them. So the system comes back finished: whoever plays the
-    /// floor builds it from the rows afterwards and learns of those revivals from
-    /// the rows, never from <see cref="TurnSystem.EnemyResurrected"/>, which had no
-    /// subscriber when it fired. Called once per arrival, after the party is
-    /// placed (<see cref="Enter"/>, <see cref="Descend"/>, <see cref="Ascend"/>
-    /// place it), so nothing wakes inside a member.
+    /// the floor's own seed for its drops and revivals, the floor's
+    /// <see cref="Floor.Boss"/> — if it has one — rostered as the boss, and
+    /// resurrection off once the boss is dead. The visit hears the boss's death
+    /// on that system before anyone else does and records it
+    /// (<see cref="RecordBossDefeated"/>): in Logic, whatever is watching. Then
+    /// every dummy here whose wait ran out while the party was elsewhere gets up
+    /// (<see cref="TurnSystem.CatchUpRevivals"/>) — as of now, or as of the turn
+    /// the boss fell once it has — and the zones are re-read around them. So the
+    /// system comes back finished: whoever plays the floor builds it from the rows
+    /// afterwards and learns of those revivals from the rows, never from
+    /// <see cref="TurnSystem.EnemyResurrected"/>, which had no subscriber when it
+    /// fired. Called once per arrival, after the party is placed
+    /// (<see cref="Enter"/>, <see cref="Descend"/>, <see cref="Ascend"/> place
+    /// it), so nothing wakes inside a member.
     /// </para>
     /// </summary>
     /// <param name="party">The members, in roster order — the same list every call of the visit is handed.</param>
@@ -396,10 +466,12 @@ public sealed class DungeonState
                 $"Floor {Current.Index + 1}'s turn system is already open: a floor is opened once per arrival, and only the stairs close it.");
 
         var floor = Current;
-        var turns = new TurnSystem(floor.Map.Grid, party, floor.Enemies, rollD20, floor.Seed, firstTurn: _turn, carry: _carry)
+        var turns = new TurnSystem(floor.Map.Grid, party, floor.Enemies, rollD20, floor.Seed,
+            firstTurn: _turn, carry: _carry, boss: floor.Boss)
         {
             ResurrectionActive = !BossDefeated,
         };
+        turns.BossDefeated += _ => RecordBossDefeated();
         turns.CatchUpRevivals(BossDefeated ? BossDefeatedAtTurn : _turn);
         Turns = turns;
         return turns;
@@ -532,8 +604,8 @@ public sealed class DungeonState
     /// afterwards opens with it stopped; and a floor caught up afterwards is
     /// caught up only to this turn, so a return that fell due before the boss
     /// fell still happens and none after it does. One-way, and a second call
-    /// moves nothing. The boss's death calls this; so, until the boss exists,
-    /// does the scene's dev switch.
+    /// moves nothing. The boss's death calls this, through the subscription
+    /// <see cref="OpenTurns"/> makes on the system of every floor it opens.
     /// </summary>
     public void RecordBossDefeated()
     {
@@ -677,5 +749,112 @@ public sealed class DungeonState
 
         var (min, max) = GameContent.Current.Dungeons.BossFloorRange(def);
         return min + bossStream.NextInt(0, max - min);
+    }
+
+    /// <summary>
+    /// The redraw bound on the boss's class draw (<see cref="RollBoss"/>): past
+    /// this many draws on classes its dungeon cannot put in its hands, the first
+    /// class it can is taken. It guarantees termination and nothing else — at one
+    /// wieldable class in five, 64 misses running is about one visit in two
+    /// million — and it is compiled, like the salts: it decides what the boss holds.
+    /// </summary>
+    internal const int MaxBossClassDraws = 64;
+
+    /// <summary>The roles a boss's weapon rolls between, counted off the code-fixed enum: a draw's range never depends on content.</summary>
+    private static readonly VariantRole[] BossRoles = Enum.GetValues<VariantRole>();
+
+    /// <summary>
+    /// The boss, rolled at entry off the boss stream (§4.3,
+    /// <c>new Mulberry32(mapSeed ^ BossSalt)</c>), in three draws:
+    /// <list type="number">
+    /// <item>the floor — <see cref="RollBossFloor(long, DungeonDef)"/>, the
+    /// stream's first draw, so nothing drawn after it can move it;</item>
+    /// <item>the class it <em>wields</em> — <c>NextInt(0, PlacedClasses.Count − 1)</c>
+    /// over the compiled <see cref="EnemyPlacer.PlacedClasses"/>, drawn again
+    /// while the class is not one its dungeon allows in its hands
+    /// (<see cref="DungeonCatalogue.WieldClasses"/>: a class its theme can be
+    /// forged onto that an enemy can field), up to
+    /// <see cref="MaxBossClassDraws"/> draws, then the first allowed class in that
+    /// order;</item>
+    /// <item>the variant role of what it holds — <c>NextInt(0, 3)</c>.</item>
+    /// </list>
+    /// <para>
+    /// <strong>Redrawn, never re-steered.</strong> Stepping on from a refused
+    /// class to the next allowed one would weight whichever class follows a gap in
+    /// the list — a Spear Hall boss would hold a dagger three times in five —
+    /// where a redraw keeps the allowed classes equally likely. And no draw's
+    /// range depends on content: both index compiled lists, and content (the
+    /// relations, through the table) decides only whether a class draw is kept.
+    /// So a relations edit moves a boss only when one of its class draws landed
+    /// on a class whose legality the edit changed; a seed whose first class draw
+    /// is allowed before and after keeps its class and its role.
+    /// </para>
+    /// <para>
+    /// What the boss holds is this; what it drops is its own draw on its own
+    /// stream, over its dungeon's whole drop table (§4.3) — the Long Gallery's
+    /// boss swings no bow and may still drop one.
+    /// </para>
+    /// </summary>
+    /// <param name="mapSeed">The dungeon's seed, rolled fresh per entry.</param>
+    /// <param name="def">The dungeon whose boss is rolled.</param>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="def"/>'s theme leaves its boss nothing to hold — refused at
+    /// load (<see cref="ContentValidator.RuleBossWieldsAClass"/>), so only a dungeon
+    /// the loaded content never validated can get here.
+    /// </exception>
+    public static BossRoll RollBoss(long mapSeed, DungeonDef def)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        var wieldable = GameContent.Current.Dungeons.WieldClasses(def);
+        if (wieldable.Count == 0)
+            throw new InvalidOperationException(
+                $"'{def.Id}': no class an enemy fields carries {def.Theme}, so its boss has nothing to hold ({ContentValidator.RuleBossWieldsAClass}).");
+
+        var stream = BossStream(mapSeed);
+        int floor = RollBossFloor(stream, def);
+
+        var placed = EnemyPlacer.PlacedClasses;
+        WeaponClass? held = null;
+        for (int draw = 0; draw < MaxBossClassDraws && held is null; draw++)
+        {
+            var drawn = placed[stream.NextInt(0, placed.Count - 1)];
+            if (wieldable.Contains(drawn))
+                held = drawn;
+        }
+        held ??= placed.First(cls => wieldable.Contains(cls));
+
+        var role = BossRoles[stream.NextInt(0, BossRoles.Length - 1)];
+        return new BossRoll(floor, held.Value, role);
+    }
+
+    /// <summary>
+    /// A boss as its dungeon makes it (§4.3, §5.8): an enemy row with
+    /// <paramref name="def"/>'s boss statline — its hit points
+    /// (<see cref="EnemyState.BaseMaxHp"/>) and its movement
+    /// (<see cref="EnemyState.MoveBudget"/>) — its name on the plate, and its
+    /// innate modifiers, the theme among them, carried on the actor whatever it
+    /// holds (<see cref="ActorState.Innate"/>): weapon plus innate at resolution,
+    /// and never a weapon's ceiling, its own included. It is attuned as
+    /// everything the dungeon spawns is, and wields <paramref name="weapon"/>
+    /// exactly as a dummy wields its own. Unplaced: generation stands it in the
+    /// lair and gives it the spawn index after every dummy's.
+    /// </summary>
+    /// <param name="def">The dungeon whose boss this is.</param>
+    /// <param name="weapon">What it holds: the variant <see cref="RollBoss"/> rolled, in play.</param>
+    public static EnemyState BossRow(DungeonDef def, Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        ArgumentNullException.ThrowIfNull(weapon);
+
+        var boss = def.Boss;
+        return new EnemyState
+        {
+            Weapon = weapon,
+            BaseMaxHp = boss.MaxHp,
+            MoveBudget = boss.MovementBudget,
+            Innate = ModifierSet.Of(boss.Innate.Select(kv => (kv.Key, kv.Value)).ToArray()),
+            Title = boss.Name,
+            Attunement = def.Attunement,
+        };
     }
 }

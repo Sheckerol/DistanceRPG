@@ -65,6 +65,32 @@ public class GridUtilsTests
     }
 
     [Fact]
+    public void NearestFreeTile_IsTheStartWhenFree_ElseTheFirstFreeUpDownLeftRight()
+    {
+        // "Stand here, or as near as you can": what a revival wakes on and where a
+        // boss waits when a dummy holds its lair. The start when it is free; else
+        // breadth-first, up, down, left, right, across floor only — a fixed order,
+        // so a tie is settled the same way every time and never by a set.
+        var grid = new int[5, 5];
+        grid[1, 2] = 1;   // a wall above the middle
+        var start = (R: 2, C: 2);
+
+        Assert.Equal(start, GridUtils.NearestFreeTile(grid, start, _ => false));
+        Assert.Equal((3, 2), GridUtils.NearestFreeTile(grid, start, t => t == start));                 // up is a wall: down
+        Assert.Equal((2, 1), GridUtils.NearestFreeTile(grid, start, t => t == start || t == (3, 2)));  // then left
+        Assert.Equal((2, 3), GridUtils.NearestFreeTile(grid, start, t => t is (2, 2) or (3, 2) or (2, 1)));
+
+        // Floor only: the search never crosses a wall to reach the tile behind it,
+        // and with everything it can reach taken it stays put.
+        var walled = new int[3, 5];
+        for (int c = 0; c < 5; c++)
+            walled[0, c] = walled[2, c] = 1;
+        walled[1, 2] = 1;
+        Assert.Equal((1, 0), GridUtils.NearestFreeTile(walled, (1, 1), t => t == (1, 1)));
+        Assert.Equal((1, 1), GridUtils.NearestFreeTile(walled, (1, 1), t => t.C < 2));   // (1, 3) is behind the wall
+    }
+
+    [Fact]
     public void LineOfSight_BlockedByWallBetween()
     {
         // Corridor with a wall tile in the middle of row 1

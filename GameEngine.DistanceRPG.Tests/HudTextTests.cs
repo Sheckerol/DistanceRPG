@@ -215,15 +215,240 @@ public class HudTextTests
         // A farmed one carries its DefeatCount, and that one number is honest
         // about being two things: the depth of the drop it is holding and how
         // much harder it hits than the dummy beside it (3.2). The maximum it is
-        // read against is its own, revivals included.
+        // read against is its own, revivals included, and the damage its revivals
+        // added stands beside the count: the earned statline (4.5, PHASE4-137).
         var farmed = new EnemyState { DefeatCount = 4, RevivalMaxHp = 17, RevivalDamage = 6 };
-        Assert.Equal(new[] { "67/67", "x4" }, Plate(farmed));
+        Assert.Equal(new[] { "67/67", "x4", "+6 DMG" }, Plate(farmed));
 
         // It sits between the pool and the badges, so what is left of it and how
         // many times this has happened are adjacent.
         farmed.Hp = 12;
         farmed.ApplyStatus(Sundered, null, 2);
-        Assert.Equal(new[] { "12/67", "x4", "SUND 2" }, Plate(farmed));
+        Assert.Equal(new[] { "12/67", "x4", "+6 DMG", "SUND 2" }, Plate(farmed));
+    }
+
+    [Fact]
+    public void ABossPlateNamesItAndWhatItCarries()
+    {
+        // The golem's plate names it and what it is holding — it wields a weapon
+        // like a dummy does (§4.3) — and reads its HP and the Block it carries on
+        // itself, as a hit meets it: weapon plus innate.
+        var tutorial = GameContent.Current.Dungeons.Tutorial;
+        var golem = DungeonState.BossRow(tutorial, TestWeapons.Get("hatchet"));
+        Assert.Equal("STONE GOLEM [Hatchet]", DungeonHud.EnemyTitle(golem));
+        Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(golem));
+        Assert.Equal("BLOCK 9", DungeonHud.InnateReadout(golem));
+
+        golem.Hp = 62;
+        Assert.Equal(new[] { "62/80", "BLOCK 9" }, Plate(golem));
+
+        // The Block its blows meet, a sword's included: never its own stacks alone.
+        Assert.Equal(new[] { "80/80", "BLOCK 12" }, Plate(DungeonState.BossRow(tutorial, TestWeapons.Get("arming_sword"))));
+        Assert.Equal(new[] { "80/80", "BLOCK 15" }, Plate(DungeonState.BossRow(tutorial, TestWeapons.Get("tower_guard"))));
+
+        // Another dungeon's boss reads its own theme in the readout's own words:
+        // the Knife Mother's CritWindow x3 on a Weakspot Stiletto's x1 is 16+.
+        var warrens = GameContent.Current.Dungeons["knife_warrens"];
+        var mother = DungeonState.BossRow(warrens, TestWeapons.Get("weakspot_stiletto"));
+        Assert.Equal("KNIFE MOTHER [Weakspot Stiletto]", DungeonHud.EnemyTitle(mother));
+        Assert.Equal("CRIT 16+ x3", DungeonHud.InnateReadout(mother));
+
+        // The golem the shipped seed's tutorial generates.
+        var bottom = Floor.Generate(2762136374, 1, bottom: true, tutorial);
+        Assert.Equal("STONE GOLEM [Pinning Lance]", DungeonHud.EnemyTitle(bottom.Boss!));
+        Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(bottom.Boss!));
+
+        // Rank and file are named by what they hold, as they always were, and
+        // carry nothing on themselves to print.
+        Assert.Equal("DUMMY [Arming Sword]", DungeonHud.EnemyTitle(new EnemyState()));
+        Assert.Equal("HEALER [Staff of Renewal]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_renewal") }));
+        Assert.Equal("CASTER [Staff of Mire]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_mire") }));
+        Assert.Equal("", DungeonHud.InnateReadout(new EnemyState()));
+    }
+
+    [Fact]
+    public void AFarmedPlateShowsTheStatlineItEarned()
+    {
+        // PHASE4-119, -137: the count is on the plate so the choice of which dummy
+        // to go back for is informed, and it reads as a threat as well as a reward:
+        // the earned statline stands next to it. Farmed three cycles through the
+        // turn system itself — on a seed whose first rolls are Damage, then Both —
+        // the HP its revivals added is in the maximum it is read against, and the
+        // damage they added follows the count.
+        var member = TestPools.Holding("A", TestWeapons.Make("Chisel", range: 60, damage: 25, cost: 20),
+            x: 5 * GameConstants.Tile + 16, y: 5 * GameConstants.Tile + 16);
+        var dummy = new EnemyState
+        {
+            X = 5 * GameConstants.Tile + 16 + 40f,
+            Y = 5 * GameConstants.Tile + 16,
+            Weapon = TestWeapons.Get("hatchet"),
+        };
+        var turns = new TurnSystem(new int[20, 20], new[] { member }, new[] { dummy }, () => 10, mapSeed: 1);
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            while (dummy.Alive)
+                Assert.True(turns.TryAttack(member, dummy));
+            while (!dummy.Alive)
+            {
+                turns.EndTurn();
+                for (float t = 0f; t < 3f; t += 1f / 30f)
+                    turns.Update(1f / 30f);
+            }
+        }
+
+        Assert.Equal(3, dummy.DefeatCount);
+        Assert.True(dummy.RevivalDamage > 0 && dummy.RevivalMaxHp > 0);
+        Assert.Equal(GameConstants.DummyHp + dummy.RevivalMaxHp, dummy.MaxHp);
+        Assert.Equal(new[] { $"{dummy.MaxHp}/{dummy.MaxHp}", "x3", $"+{dummy.RevivalDamage} DMG" }, Plate(dummy));
+        Assert.Equal(dummy.RevivalDamage, dummy.BonusDamage);   // what the plate says it adds is what its swings add
+
+        // Hurt, the pool comes first; the count, what it hits for, then its badges.
+        dummy.Hp = 9;
+        dummy.ApplyStatus(Sundered, null, 1);
+        Assert.Equal(new[] { $"9/{dummy.MaxHp}", "x3", $"+{dummy.RevivalDamage} DMG", "SUND 1" }, Plate(dummy));
+
+        // A dummy whose revivals have added no damage prints none: the HP half is its maximum.
+        Assert.Equal(new[] { "58/58", "x1" }, Plate(new EnemyState { DefeatCount = 1, RevivalMaxHp = 8 }));
+    }
+
+    [Fact]
+    public void TheCountReddensAsItClimbs_WithNoDenominator()
+    {
+        // PHASE4-139: the count is unbounded, so it never renders as n/5 or any
+        // fraction; "further is worse" is made legible by colour instead. The count
+        // is a bare xN at every depth, and its colour only ever reddens — never
+        // less red one cycle deeper — until the farm's unique midpoint, where it is
+        // as red as it gets and stays there.
+        var previous = DungeonHud.ThreatColor(1);
+        for (int n = 1; n <= 60; n++)
+        {
+            var count = DungeonHud.NameplateRuns(new EnemyState { DefeatCount = n })[1];
+            Assert.Equal($"x{n}", count.Text);
+            Assert.DoesNotContain("/", count.Text);
+            Assert.Equal(DungeonHud.ThreatColor(n), count.Color);
+
+            var color = DungeonHud.ThreatColor(n);
+            Assert.True(color.Y <= previous.Y && color.X >= previous.X, $"x{n} is less red than x{n - 1}");
+            previous = color;
+        }
+
+        int hot = GameContent.Current.Tuning.UniqueChanceMidpoint;
+        Assert.True(DungeonHud.ThreatColor(hot).Y < DungeonHud.ThreatColor(1).Y);
+        Assert.True(DungeonHud.ThreatColor(hot / 2).Y < DungeonHud.ThreatColor(1).Y);
+        Assert.True(DungeonHud.ThreatColor(hot).Y < DungeonHud.ThreatColor(hot / 2).Y);
+        Assert.Equal(DungeonHud.ThreatColor(hot), DungeonHud.ThreatColor(hot + 40));
+
+        // Nothing on a plate reads as a fraction but the pool's own HP.
+        var farmed = new EnemyState { DefeatCount = 12, RevivalDamage = 9, RevivalMaxHp = 24 };
+        Assert.Single(Plate(farmed), run => run.Contains('/'));
+    }
+
+    [Fact]
+    public void ARevivalSaysWhatItGained()
+    {
+        // PHASE4-138: a beat when a revival rolls its bonus, so the player
+        // connects the count going up with the dummy getting stronger.
+        Assert.Equal("STRONGER +3 DMG +8 HP", DungeonHud.RevivalBeat(3, 8));
+        Assert.Equal("STRONGER +3 DMG", DungeonHud.RevivalBeat(3, 0));
+        Assert.Equal("STRONGER +8 HP", DungeonHud.RevivalBeat(0, 8));
+        Assert.Null(DungeonHud.RevivalBeat(0, 0));
+
+        // Through a real revival: what the row gained between going down and
+        // getting up — a clean kill's two cycles, on a seed whose first two roll
+        // Damage then Both — is what the beat says.
+        var member = TestPools.Holding("A", TestWeapons.Make("Maul", range: 60, damage: 50, cost: 30),
+            x: 5 * GameConstants.Tile + 16, y: 5 * GameConstants.Tile + 16);
+        var dummy = new EnemyState
+        {
+            X = 5 * GameConstants.Tile + 16 + 40f,
+            Y = 5 * GameConstants.Tile + 16,
+            Weapon = TestWeapons.Get("hatchet"),
+        };
+        var turns = new TurnSystem(new int[20, 20], new[] { member }, new[] { dummy }, () => 10, mapSeed: 1);
+        string? beat = null;
+        var before = (dummy.RevivalDamage, dummy.RevivalMaxHp);
+        turns.EnemyResurrected += e => beat = DungeonHud.RevivalBeat(e.RevivalDamage - before.RevivalDamage, e.RevivalMaxHp - before.RevivalMaxHp);
+        Assert.True(turns.TryAttack(member, dummy));
+        Assert.Equal((false, 2), (dummy.Alive, dummy.DefeatCount));
+        while (!dummy.Alive)
+        {
+            turns.EndTurn();
+            for (float t = 0f; t < 3f; t += 1f / 30f)
+                turns.Update(1f / 30f);
+        }
+
+        Assert.True(dummy.RevivalDamage > 0 && dummy.RevivalMaxHp > 0);
+        Assert.Equal($"STRONGER +{dummy.RevivalDamage} DMG +{dummy.RevivalMaxHp} HP", beat);
+    }
+
+    [Fact]
+    public void TheBossFloorBannerStatesTheTradeBeforeTheFight()
+    {
+        // Settled's backlog: surface the boss floor's trade in the encounter
+        // before a player commits (§4.3). Arriving on the boss floor with the boss
+        // standing, the banner says who waits there and what beating it costs —
+        // the tutorial closes for good; anywhere else the dungeon locks for as many
+        // runs as its floor, and leaving without the fight re-rolls the depth.
+        // Above the bottom it says nothing, which would disclose the depth; and
+        // once the boss is down there is no trade left to state.
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Empty(DungeonHud.BossFloorBanner(tutorial));
+        GoDown(tutorial, party);
+        Assert.Equal(new[] { "THE STONE GOLEM WAITS ON THIS FLOOR", "BEATING IT CLOSES THE TUTORIAL FOR GOOD" },
+            DungeonHud.BossFloorBanner(tutorial));
+        tutorial.RecordBossDefeated();
+        Assert.Empty(DungeonHud.BossFloorBanner(tutorial));
+
+        // The Spear Hall on a seed it rolls seven floors on: nothing on the way
+        // down, then the lock — seven runs, the floor times the tuning's runs a
+        // floor — and the re-roll.
+        var spearHall = GameContent.Current.Dungeons["spear_hall"];
+        var hall = DungeonState.Enter(spearHall, 7, party);
+        Assert.Equal(7, hall.BossFloor);
+        hall.OpenTurns(party, () => 10);
+        while (hall.Current.DownStairs is not null)
+        {
+            Assert.Empty(DungeonHud.BossFloorBanner(hall));
+            GoDown(hall, party);
+        }
+        Assert.Equal(7, hall.BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor);
+        Assert.Equal(new[]
+        {
+            "THE SPEAR WARDEN WAITS ON THIS FLOOR",
+            "BEATING IT LOCKS THE SPEAR HALL FOR 7 RUNS",
+            "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS",
+        }, DungeonHud.BossFloorBanner(hall));
+    }
+
+    [Fact]
+    public void WhenTheBossFallsNothingRevives_AndTheFloorLineSaysSo()
+    {
+        // The boss's fall says who fell and what it means, and from then on the
+        // floor line says what the dungeon has become — on every floor, up to the
+        // way out — and still never how deep it goes.
+        var tutorial = GameContent.Current.Dungeons.Tutorial;
+        var golem = DungeonState.BossRow(tutorial, TestWeapons.Get("hatchet"));
+        Assert.Equal(("THE STONE GOLEM FALLS", "NOTHING REVIVES - FIGHT YOUR WAY OUT"), DungeonHud.BossFalls(golem));
+
+        var party = Party();
+        var visit = DungeonState.Enter(tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        GoDown(visit, party);
+        Assert.Equal("THE TUTORIAL - FLOOR 2", DungeonHud.FloorLine(visit));
+
+        visit.RecordBossDefeated();
+        Assert.Equal("THE TUTORIAL - FLOOR 2 - NOTHING REVIVES", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 2", DungeonHud.ArrivalBanner(visit));
+
+        Gather(visit, party, visit.Current.UpStairs, party.Length);
+        visit.Ascend(party);
+        visit.OpenTurns(party, () => 10);
+        string line = DungeonHud.FloorLine(visit);
+        Assert.Equal("THE TUTORIAL - FLOOR 1 - NOTHING REVIVES", line);
+        Assert.DoesNotContain("/", line);
+        Assert.DoesNotContain("OF", line.Split(' '));
     }
 
     [Fact]

@@ -103,6 +103,16 @@ public class DungeonScene : Scene
     private static readonly Vector4 CueColor = Rgb(0x9999a6);      // why a click or a key did nothing
     private static readonly Vector4 LevelUpColor = Rgb(0x8cff6b);  // a pool or a ladder crossing a bar (§2.2)
     private static readonly Vector4 LootColor = Rgb(0xffcf5a);     // a weapon on the floor, and the beat when it is taken (§3.5)
+    private static readonly Vector4 StrongerColor = Rgb(0xff6a3d); // a dummy getting up stronger than it went down (§3.2): the threat half of its count
+
+    /// <summary>
+    /// The boss's stand-in (§4.3): stone-grey where every dummy is orange — the
+    /// golem is carved, not trained — and a size larger, so the one thing on the
+    /// floor that is not a dummy reads as such across a room. Grey again, and
+    /// darker, once it falls, as every corpse is.
+    /// </summary>
+    private static readonly Vector4 BossColor = Rgb(0xa9a595);
+    private const float BossSize = 1.4f;
 
     /// <summary>
     /// Each stair's colour, on its slab and on its label (§4.2): down violet, up
@@ -504,6 +514,9 @@ public class DungeonScene : Scene
         _fog = _floor.Fog;
         Log.Info($"[Map] {_visit.Def.Name}, floor {_floor.Index + 1}: " + string.Join(", ",
             DungeonState.StairsOf(_floor).Select(s => $"{s.Kind} at {s.Tile}"))
+            + (_floor.Boss is { } boss
+                ? $"; {boss.Title} ({(boss.Alive ? "standing" : "fallen")}) holding {boss.Weapon.Name} at {Displacer.TileOf(boss)}, lair {_floor.Lair}"
+                : "")
             + $"; turn {turns.TurnCount}");
 
         BuildFloorObjects();
@@ -679,17 +692,19 @@ public class DungeonScene : Scene
     /// positions and weapons off the floor's seed on its own stream, each keeps
     /// the index it was placed at (§3.2's <see cref="EnemyState.SpawnIndex"/>),
     /// and whatever happened to them while the party was here — or, for a dummy
-    /// whose wait ran out, while it was elsewhere — is on them. A row that is
-    /// down is built as the corpse it is: grey and already lying on the floor,
-    /// not a full-size box with no plate that nothing can click and anyone can
-    /// walk through. The scene supplies only what is the scene's — the box and
-    /// its colour.
+    /// whose wait ran out, while it was elsewhere — is on them. The bottom
+    /// floor's boss is the last row (<see cref="Floor.Boss"/>) and stands in its
+    /// lair, larger and stone-grey. A row that is down is built as the corpse it
+    /// is — the boss's included, on a floor the party returns to after it fell:
+    /// grey and already lying on the floor, not a full-size box with no plate that
+    /// nothing can click and anyone can walk through. The scene supplies only
+    /// what is the scene's — the box, its size and its colour.
     /// </summary>
     private void SpawnEnemies()
     {
         foreach (var state in _floor.Enemies)
         {
-            var enemy = new EnemyObject(state, state.Alive ? EnemyColor : DeadColor);
+            var enemy = new EnemyObject(state, state.Alive ? LiveColor(state) : DeadColor, state == _floor.Boss ? BossSize : 1f);
             if (!state.Alive)
                 enemy.SetDefeatedVisual(true, snap: true);
             _enemies.Add(enemy);
@@ -697,6 +712,9 @@ public class DungeonScene : Scene
         }
         Log.Info($"[Map] {_enemies.Count(e => e.State.Alive)} of {_enemies.Count} enemies standing across {_map.DebugRooms.Count} rooms");
     }
+
+    /// <summary>The colour an enemy's stand-in stands in: the boss's stone, every dummy's orange.</summary>
+    private Vector4 LiveColor(EnemyState state) => state == _floor.Boss ? BossColor : EnemyColor;
 
     private void BuildFogOverlay()
     {
@@ -813,14 +831,38 @@ public class DungeonScene : Scene
         // turn system has already rolled it off the floor's own seed.
         _turns.EnemyDropped += DropOnFloor;
 
+        // The boss is down (§4.3). The visit heard first — its handler was on this
+        // system before this scene's — so resurrection has stopped here and on every
+        // floor opened from now on, and the boss's own weapon is already on the
+        // floor (EnemyDropped fired before this). Whatever else is down is a
+        // corpse that stays down now, and a corpse that stays down is lying on
+        // what it was carrying: the rule every arrival reads, applied the moment it
+        // starts being true. Then the banner says what it means.
+        _turns.BossDefeated += boss =>
+        {
+            Log.Info($"[Run] {boss.Title ?? "The boss"} falls at turn {_visit.BossDefeatedAtTurn}: nothing revives for the rest of the visit, and every corpse is lying on its weapon");
+            RederiveGroundItems();
+            _hud.ShowBossFall(boss);
+        };
+
         _turns.EnemyResurrected += enemy =>
         {
             Log.Info("[Combat] Enemy resurrected!");
             var obj = EnemyObjectFor(enemy);
-            SetColor(obj, EnemyColor);
+            SetColor(obj, LiveColor(enemy));
             obj.SetDefeatedVisual(false);
             obj.SyncTransform(); // resurrection may have relocated it off an occupied tile
             UpdateEnemyVisibility();
+
+            // The beat that ties the count to the statline (§4.5): what this
+            // revival's rolls added, over the dummy, if it got up in sight.
+            var (damage, health) = obj.TakeRevivalGains();
+            if (DungeonHud.RevivalBeat(damage, health) is { } beat)
+            {
+                Log.Info($"[Combat] Revived x{enemy.DefeatCount}: {beat}");
+                if (obj.IsActive)
+                    _hud.AddFloatingText(obj.Position, beat, StrongerColor, -64f);
+            }
         };
 
         _turns.BraceTriggered += c =>
@@ -1047,10 +1089,11 @@ public class DungeonScene : Scene
     /// A number key, routed by the menu that is open (§4.4: the swap keys
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
     /// printed with that number into the hand — 1 is the hand itself; on the
-    /// pause menu, 1 closes it, 2 exits and 3 is the dev stop; with no menu
-    /// open, 1-4 select a party member. Behind any other menu — the way out's
-    /// "leave the dungeon?" among them — a number key does nothing at all: it
-    /// never selects a member behind a prompt. Nor during a stair's fade.
+    /// pause menu, 1 closes it and 2 exits, and every other number does nothing
+    /// (never a member selected behind the menu); with no menu open, 1-4 select a
+    /// party member. Behind any other menu — the way out's "leave the dungeon?"
+    /// among them — a number key does nothing at all: it never selects a member
+    /// behind a prompt. Nor during a stair's fade.
     /// </summary>
     private void NumberKey(int digit)
     {
@@ -1059,7 +1102,6 @@ public class DungeonScene : Scene
         {
             if (digit == 1) ActiveMenu = GameMenu.None;
             else if (digit == 2) _game.Close();
-            else if (digit == 3) StopResurrection();
         }
         else if (InventoryOpen)
         {
@@ -1833,7 +1875,8 @@ public class DungeonScene : Scene
         foreach (var candidate in _enemies)
         {
             if (!candidate.State.Alive || !candidate.IsActive) continue;
-            if (RayHitsSphere(origin, dir, candidate.Position, 0.65f, out float t) && t < bestT)
+            // A boss's larger box is a larger target: the sphere grows with the stand-in.
+            if (RayHitsSphere(origin, dir, candidate.Position, 0.65f * candidate.Size, out float t) && t < bestT)
             {
                 bestT = t;
                 enemy = candidate;
@@ -1890,6 +1933,12 @@ public class DungeonScene : Scene
     /// </summary>
     private void DropOnFloor(EnemyState corpse, Drop drop)
     {
+        // One item a corpse. The boss's own drop is laid by its EnemyDropped before
+        // BossDefeated re-derives the floor, and the re-derivation skips a corpse
+        // that already has one; this refuses a second lay whichever way round it
+        // comes, as a guard.
+        if (_groundItems.Any(item => item.Corpse == corpse)) return;
+
         Log.Info($"[Loot] Dropped {drop.Weapon.Name} (x{drop.DefeatCount}{(drop.WasUniqueRoll ? ", UNIQUE" : "")})");
         var marker = new PrimitiveBoxObject(GroundItemWidth, GroundItemHeight, GroundItemWidth, LootColor)
         {
@@ -1951,30 +2000,6 @@ public class DungeonScene : Scene
 
         Log.Info($"[Loot] {member.Id} picks up {item.Drop.Weapon.Name} into slot {slot + 1}");
         _hud.AddFloatingText(ActiveCharacter.Position, $"TOOK {item.Drop.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
-    }
-
-    /// <summary>
-    /// Scaffolding (§3.5), and labelled as such where it is drawn: killing the
-    /// boss is what stops resurrection (§4.3), and until the boss exists this is
-    /// the only way to reach the drop path in play. It goes through the seam the
-    /// boss's death will call — the visit records the boss as fallen
-    /// (<see cref="DungeonState.RecordBossDefeated"/>) — so it holds on every
-    /// floor for the rest of the visit, rather than lapsing with the floor's
-    /// turn system at the next stairs, where a floor reopened with resurrection
-    /// on would take back the drops it had just laid and its catch-up would
-    /// raise their corpses. One-way, like the boss kill it stands in for, and it
-    /// goes when the boss arrives.
-    /// </summary>
-    private void StopResurrection()
-    {
-        if (_visit.BossDefeated) return;
-        _visit.RecordBossDefeated();
-        ActiveMenu = GameMenu.None;
-        // Whatever was already down is now a corpse that stays down, and a corpse
-        // that stays down is carrying its weapon on the floor: the same rule every
-        // arrival reads, applied the moment it starts being true.
-        RederiveGroundItems();
-        Log.Info($"[Dev] Resurrection stopped for the rest of the visit, as if the boss fell at turn {_visit.BossDefeatedAtTurn}: every defeat from here is permanent and hands over what the dummy was carrying");
     }
 
     /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>

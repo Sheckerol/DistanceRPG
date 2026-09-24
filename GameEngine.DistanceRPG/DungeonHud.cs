@@ -8,16 +8,17 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// Screen-space HUD for the dungeon scene, drawn with the engine's bitmap
 /// <see cref="TextRenderer"/>: movement/weapon readouts, the floor line, the
-/// party selector, the enemy nameplates and their effect badges, the stairs'
-/// labels and the cue at the one underfoot, the click and aim cues, floating
-/// combat text, the end-of-turn banner, the inventory panel, the pause menu and
-/// the way out's prompt, the stairs' fade and the arrival banner over it, and
-/// the game-over screen. Every number it shows is a resolved one — a swing's
-/// cost after Light, a cast's mana after Resonant, a Block as the points it
-/// absorbs, a crit window as the roll it needs, Mire as the budget it leaves —
-/// never a percentage, a stack count or a base with a discount (§1.1, §1.7);
-/// and nothing it shows names how deep the dungeon goes before the party has
-/// reached the bottom (§4.3).
+/// party selector, the enemy nameplates — a boss's among them — and their effect
+/// badges, the stairs' labels and the cue at the one underfoot, the click and aim
+/// cues, floating combat text, the end-of-turn banner, the inventory panel, the
+/// pause menu and the way out's prompt, the stairs' fade and the banner over it
+/// (the floor reached, the trade on the boss floor, the boss's fall), and the
+/// game-over screen. Every number it shows is a resolved one — a swing's cost
+/// after Light, a cast's mana after Resonant, a Block as the points it absorbs,
+/// a crit window as the roll it needs, Mire as the budget it leaves — never a
+/// percentage, a stack count or a base with a discount (§1.1, §1.7); and nothing
+/// it shows names how deep the dungeon goes before the party has reached the
+/// bottom (§4.3).
 /// </summary>
 public sealed class DungeonHud
 {
@@ -27,6 +28,9 @@ public sealed class DungeonHud
     /// <summary>How long the arrival banner stays up, and the last stretch of it over which it fades.</summary>
     private const float BannerSeconds = 2.4f;
     private const float BannerFadeSeconds = 0.8f;
+
+    /// <summary>How long a banner with lines under it stays up — the boss floor's trade, the boss's fall: long enough to read them.</summary>
+    private const float WarningBannerSeconds = 5f;
 
     /// <summary>Pixels a character advances at scale 1: the 5-px glyph and its 1-px gap.</summary>
     private const float GlyphAdvance = 6f;
@@ -43,6 +47,12 @@ public sealed class DungeonHud
     private static readonly Vector4 Cyan = new(0.31f, 0.76f, 0.97f, 1f);
     private static readonly Vector4 Green = new(0.27f, 0.87f, 0.47f, 1f);
 
+    /// <summary>Where a farmed count's colour ends up (<see cref="ThreatColor"/>): a red past the hit colour's, the deepest farm on the floor.</summary>
+    private static readonly Vector4 DeepRed = new(1f, 0.12f, 0.1f, 1f);
+
+    /// <summary>A boss's name over its plate: the pale of the stone its golem is cut from, and no other enemy's colour.</summary>
+    private static readonly Vector4 Stone = new(0.87f, 0.85f, 0.77f, 1f);
+
     private readonly Game _game;
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
@@ -58,10 +68,16 @@ public sealed class DungeonHud
 
     private readonly List<FloatingText> _floatingTexts = new();
 
-    // The arrival banner (ShowArrival): the floor reached and the dungeon it is
-    // in, and how long it has been up — taken down early (HideArrival) the
-    // moment the party starts off the floor it names.
-    private (string Floor, string Dungeon)? _banner;
+    /// <summary>
+    /// A banner across the upper third of the screen: a small line over it, the
+    /// line itself, any lines of warning under it, and how long it stays up.
+    /// </summary>
+    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds);
+
+    // The banner up now (ShowArrival, ShowBossFall), and how long it has been up —
+    // taken down early (HideArrival) the moment the party starts off the floor it
+    // speaks of.
+    private Banner? _banner;
     private float _bannerAge;
 
     public DungeonHud(Game game)
@@ -73,23 +89,40 @@ public sealed class DungeonHud
     /// Put the arrival banner up for the floor <paramref name="visit"/> now
     /// stands on — <c>FLOOR 2</c>, the dungeon's name over it — for
     /// <see cref="BannerSeconds"/>. Drawn over the stairs' fade, so it is there
-    /// at black and the floor comes up under it.
+    /// at black and the floor comes up under it. On the boss floor, with the boss
+    /// still standing, the trade is stated under it before the fight
+    /// (<see cref="BossFloorBanner"/>), and it stays up long enough to read.
     /// </summary>
     public void ShowArrival(DungeonState visit)
     {
         ArgumentNullException.ThrowIfNull(visit);
-        _banner = (ArrivalBanner(visit), visit.Def.Name.ToUpperInvariant());
+        var trade = BossFloorBanner(visit);
+        _banner = new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
+            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds);
         _bannerAge = 0f;
     }
 
     /// <summary>
-    /// Take the arrival banner down before its time: the party is starting off
-    /// the floor it names, down or up the stairs or out by the way out. The
-    /// banner is drawn over the stairs' fade, which is what puts the next
-    /// floor's up at black; left up, the floor being left would go on naming
-    /// itself on that black — until the swap on the stairs, and through the whole
-    /// fade to the next visit on the way out. The next <see cref="ShowArrival"/>
-    /// puts one up as ever.
+    /// The boss is down (§4.3): the banner says who fell and what that means —
+    /// nothing revives, and the way out is back up through everything farmed
+    /// (<see cref="BossFalls"/>).
+    /// </summary>
+    public void ShowBossFall(EnemyState boss)
+    {
+        ArgumentNullException.ThrowIfNull(boss);
+        var (headline, aftermath) = BossFalls(boss);
+        _banner = new Banner("", headline, [aftermath], WarningBannerSeconds);
+        _bannerAge = 0f;
+    }
+
+    /// <summary>
+    /// Take the banner down before its time — the arrival's, or the boss's fall:
+    /// the party is starting off the floor it speaks of, down or up the stairs or
+    /// out by the way out. The banner is drawn over the stairs' fade, which is
+    /// what puts the next floor's up at black; left up, the floor being left would
+    /// go on naming itself on that black — until the swap on the stairs, and
+    /// through the whole fade to the next visit on the way out. The next
+    /// <see cref="ShowArrival"/> puts one up as ever.
     /// </summary>
     public void HideArrival() => _banner = null;
 
@@ -123,7 +156,7 @@ public sealed class DungeonHud
         if (_banner is not null)
         {
             _bannerAge += deltaTime;
-            if (_bannerAge >= BannerSeconds)
+            if (_bannerAge >= _banner.Seconds)
                 _banner = null;
         }
     }
@@ -169,7 +202,7 @@ public sealed class DungeonHud
             DrawInventory(w, h, active, turns);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h, !scene.Visit.BossDefeated);
+            DrawMenu(w, h);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
             DrawConfirmLeave(w, h);
@@ -188,11 +221,11 @@ public sealed class DungeonHud
 
         // The stairs' fade goes over everything drawn so far, the world and the
         // HUD alike — the floor line changes at black, never in view — and the
-        // arrival banner over the fade, so it is up at black and the new floor
+        // banner over the fade, so the arrival's is up at black and the new floor
         // comes in under it. Only ever the new floor's: the banner of the floor
         // being left came down when its fade began (HideArrival).
         _fade.Draw(_game.ShaderManager, scene.TransitFade);
-        DrawArrivalBanner(scene, w, h);
+        DrawBanner(scene, w, h);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -247,11 +280,66 @@ public sealed class DungeonHud
     /// on floor 3 of a five-floor visit as of a ten-floor one. That is what keeps
     /// the depth from being scummed: nothing on screen tells a shallow roll from
     /// a deep one before the bottom is under the party's feet.
+    /// <para>
+    /// Once the boss has fallen the line says what the dungeon has become, on
+    /// every floor for the rest of the visit — <c>THE TUTORIAL - FLOOR 1 - NOTHING
+    /// REVIVES</c> — since the climb out is fought against a floor that no longer
+    /// replenishes, and every corpse on it is lying on what it carried (§4.3).
+    /// </para>
     /// </summary>
     internal static string FloorLine(DungeonState visit)
     {
         ArgumentNullException.ThrowIfNull(visit);
-        return $"{visit.Def.Name.ToUpperInvariant()} - {ArrivalBanner(visit)}";
+        string line = $"{visit.Def.Name.ToUpperInvariant()} - {ArrivalBanner(visit)}";
+        return visit.BossDefeated ? $"{line} - {NothingRevives}" : line;
+    }
+
+    /// <summary>What the dungeon is once its boss is down (§4.3): said on the floor line, and in the boss's fall.</summary>
+    private const string NothingRevives = "NOTHING REVIVES";
+
+    /// <summary>A boss by the name its plate reads, for the lines that speak of it: <c>STONE GOLEM</c>.</summary>
+    private static string BossName(EnemyState boss) => boss.Title?.ToUpperInvariant() ?? "BOSS";
+
+    /// <summary>
+    /// The trade the boss floor states before the fight (§4.3, settled's backlog:
+    /// "surface the boss-floor lockout/re-roll trade-off ... before a player
+    /// commits"), under its arrival banner: who waits here, and what beating it
+    /// costs — the tutorial closes for good (§4.3: it is the one dungeon the game
+    /// is allowed to warn you about); any other dungeon locks for as many runs as
+    /// its floor, <c>BossFloor × CooldownRunsPerFloor</c>, while leaving without
+    /// the fight re-rolls the depth for next time (PHASE4-026). The depth is the
+    /// party's to know by now: they are standing on it.
+    /// <para>
+    /// Empty everywhere else — above the bottom, where saying so would disclose
+    /// how deep the dungeon goes (PHASE4-024), and on the bottom once the boss is
+    /// down, when there is no trade left to make.
+    /// </para>
+    /// </summary>
+    internal static IReadOnlyList<string> BossFloorBanner(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        if (visit.Current.Boss is not { Alive: true } boss || visit.BossDefeated)
+            return [];
+
+        string waits = $"THE {BossName(boss)} WAITS ON THIS FLOOR";
+        string dungeon = visit.Def.Name.ToUpperInvariant();
+        if (visit.Def.RetiresOnClear)
+            return [waits, $"BEATING IT CLOSES {dungeon} FOR GOOD"];
+
+        int runs = visit.BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor;
+        return [waits, $"BEATING IT LOCKS {dungeon} FOR {runs} {(runs == 1 ? "RUN" : "RUNS")}", "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS"];
+    }
+
+    /// <summary>
+    /// What the boss's fall says (§4.3): who fell, and what it means —
+    /// <c>THE STONE GOLEM FALLS</c>, then <c>NOTHING REVIVES - FIGHT YOUR WAY OUT</c>:
+    /// the farm is over, the dungeon is finite, and the boss does not end the run
+    /// (§4.4) — the party turns round and climbs back through everything it farmed.
+    /// </summary>
+    internal static (string Headline, string Aftermath) BossFalls(EnemyState boss)
+    {
+        ArgumentNullException.ThrowIfNull(boss);
+        return ($"THE {BossName(boss)} FALLS", $"{NothingRevives} - FIGHT YOUR WAY OUT");
     }
 
     /// <summary>The arrival banner's line: <c>FLOOR 2</c>, the floor number reached and nothing about how many there are (§4.3).</summary>
@@ -349,19 +437,28 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The arrival banner, fading over its last <see cref="BannerFadeSeconds"/>:
-    /// the dungeon's name, and the floor reached under it. Not over a menu or the
-    /// game-over screen, whose words are at the same height and are the ones
-    /// being asked about; and never over the fade away from the floor it names,
-    /// which takes it down as it starts (<see cref="HideArrival"/>).
+    /// The banner, fading over its last <see cref="BannerFadeSeconds"/>: the
+    /// line over it (the dungeon's name, on arrival), the line itself (the floor
+    /// reached, the boss fallen), and any warning under it (the boss floor's
+    /// trade, what the fall means). Not over a menu or the game-over screen, whose
+    /// words are at the same height and are the ones being asked about; and never
+    /// over the fade away from the floor it speaks of, which takes it down as it
+    /// starts (<see cref="HideArrival"/>).
     /// </summary>
-    private void DrawArrivalBanner(DungeonScene scene, int w, int h)
+    private void DrawBanner(DungeonScene scene, int w, int h)
     {
         if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
-        float alpha = Math.Clamp((BannerSeconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
+        float alpha = Math.Clamp((banner.Seconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
         float y = h / 3f;
-        DrawCentered(w, y - 30f, banner.Dungeon, 2f, Grey with { W = alpha });
-        DrawCentered(w, y, banner.Floor, 5f, White with { W = alpha });
+        if (banner.Over.Length > 0)
+            DrawCentered(w, y - 30f, banner.Over, 2f, Grey with { W = alpha });
+        DrawCentered(w, y, banner.Main, 5f, White with { W = alpha });
+        float underY = y + 52f;
+        foreach (string line in banner.Under)
+        {
+            DrawCentered(w, underY, line, 2f, Yellow with { W = alpha });
+            underY += 26f;
+        }
     }
 
     // Party selector layout, shared between drawing and click hit-testing.
@@ -427,21 +524,24 @@ public sealed class DungeonHud
 
     private void DrawEnemyLabels(Camera camera, DungeonScene scene, int w, int h)
     {
+        var boss = scene.Visit.Current.Boss;
         foreach (var obj in scene.Enemies)
         {
             if (!obj.IsActive || !obj.State.Alive) continue; // fogged or dead
-            var anchor = obj.Position + Vector3.UnitY * 0.9f;
+            var anchor = obj.Position + Vector3.UnitY * (0.9f * obj.Size);   // a boss's box is taller, and so is where its plate hangs
             if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
             var enemy = obj.State;
-            // HEALER is what mends (the innate's status restores HP); every other caster, warding or debuffing, is CASTER.
-            string name = enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY";
-            string label = $"{name} [{enemy.Weapon.Name}]";
+            string label = EnemyTitle(enemy);
+            // The boss's name is the one plate on the floor that is not a dummy's: larger, and in the stone its golem is cut from.
+            bool isBoss = enemy == boss;
+            float titleScale = isBoss ? 1.8f : 1.5f;
+            float titleY = px.Y - (isBoss ? 21f : 18f);
             // Inside the held wand's shape as aimed right now: a click there catches it.
             if (scene.AimCaught.Contains(enemy))
-                DrawCenteredAt(px.X, px.Y - 18f, $"> {label} <", 1.5f, Yellow);
+                DrawCenteredAt(px.X, titleY, $"> {label} <", titleScale, Yellow);
             else
-                DrawCenteredAt(px.X, px.Y - 18f, label, 1.5f, enemy.Weapon.IsCaster ? Cyan : Orange);
+                DrawCenteredAt(px.X, titleY, label, titleScale, isBoss ? Stone : enemy.Weapon.IsCaster ? Cyan : Orange);
 
             DrawRunsCenteredAt(px.X, px.Y, 1.5f, NameplateRuns(enemy));
 
@@ -454,12 +554,27 @@ public sealed class DungeonHud
                 DrawCenteredAt(px.X, y, cue.Label, 1.4f, cue.Ready ? White : Grey);
                 y += 14f;
             }
-            foreach (var line in StatusLegend(enemy, GameConstants.EnemyMove))
+            foreach (var line in StatusLegend(enemy, enemy.MoveBudget))   // Mire cuts this enemy's own budget: a golem's 40, a dummy's 100
             {
                 DrawCenteredAt(px.X, y, line.Text, 1.2f, line.Color);
                 y += 12f;
             }
         }
+    }
+
+    /// <summary>
+    /// The title line over an enemy's plate: what it is, and what it is holding
+    /// in brackets — <c>DUMMY [Arming Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
+    /// and a boss by its own name, <c>STONE GOLEM [Hatchet]</c> (§4.3: it wields
+    /// a weapon like a dummy does). HEALER is what mends (the innate's status
+    /// restores HP); every other caster, warding or debuffing, is CASTER.
+    /// </summary>
+    internal static string EnemyTitle(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        string name = enemy.Title?.ToUpperInvariant()
+            ?? (enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY");
+        return $"{name} [{enemy.Weapon.Name}]";
     }
 
     /// <summary>
@@ -682,24 +797,18 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The pause menu, and one entry that is scaffolding: stopping resurrection
-    /// is the boss's doing (§4.3), and until the boss exists there is no way to
-    /// reach the drop path in play at all. It records the boss as fallen for the
-    /// visit, so it holds on every floor — and it says so, since that is what it
-    /// stands in for. It is one-way, as the boss kill is, and it goes when the
-    /// boss arrives — the line it leaves behind says what the dungeon has become.
+    /// The pause menu: close it, or leave the game. Stopping resurrection is the
+    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for
+    /// it went when the boss arrived — so what the dungeon has become is the
+    /// floor line's to say (<see cref="FloorLine"/>).
     /// </summary>
-    private void DrawMenu(int w, int h, bool resurrectionActive)
+    private void DrawMenu(int w, int h)
     {
         float top = h / 2f - 90f;
         DrawCentered(w, top, "PAUSED", 4f, Cyan);
         DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
         DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
-        if (resurrectionActive)
-            DrawCentered(w, top + 146f, "3  STOP RESURRECTION (DEV) - AS IF THE BOSS FELL", 2f, White);
-        else
-            DrawCentered(w, top + 146f, "RESURRECTION STOPPED - DEFEATS ARE PERMANENT", 1.5f, Orange);
-        DrawCentered(w, top + 196f, "ESC TO CLOSE", 1.5f, Grey);
+        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────
@@ -1071,9 +1180,12 @@ public sealed class DungeonHud
         };
 
     /// <summary>
-    /// A dummy's plate: its hit points out of a maximum its revivals may have
-    /// raised, <c>xN</c> once it has been put down at least once, then the same
-    /// effect badges a party row carries — riders land on enemies too.
+    /// An enemy's plate: its hit points out of a maximum its revivals may have
+    /// raised, <c>xN</c> once it has been put down at least once, the damage its
+    /// revivals have added (<c>+9 DMG</c>), what it carries on itself whatever it
+    /// holds (a boss's <c>BLOCK 9</c>, <see cref="InnateReadout"/>), then the same
+    /// effect badges a party row carries — riders land on enemies too. A farmed
+    /// dummy reads <c>62/74  x7  +9 DMG</c>; the golem <c>80/80  BLOCK 9</c>.
     /// <para>
     /// The count has to read as a threat level and a reward tier at once (§3.2),
     /// "which is honest, because that is exactly what it is": one number saying
@@ -1081,6 +1193,15 @@ public sealed class DungeonHud
     /// hits than the one beside it. It sits between the pool and the badges so
     /// the two things a player reads before deciding to swing — what is left of
     /// it, and how many times they have done this — are adjacent.
+    /// </para>
+    /// <para>
+    /// <strong>And the threat half is shown, not only implied</strong> (§4.5,
+    /// PHASE4-137): "a bare 7 communicates the reward half and hides the half
+    /// that kills you". The earned statline stands next to the count — the HP the
+    /// farm added is already in the maximum, and the damage it added follows the
+    /// count — and the count reddens as it climbs (<see cref="ThreatColor"/>), so
+    /// "further is worse" reads with no denominator: the count is unbounded, and
+    /// never prints as <c>n/5</c> (PHASE4-139).
     /// </para>
     /// <para>
     /// <c>xN</c> with an ASCII x, the <c>CRIT 19+ x3</c> convention this HUD
@@ -1094,9 +1215,67 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(enemy);
         var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
         if (enemy.DefeatCount > 0)
-            plate.Add(new Run($"x{enemy.DefeatCount}", Orange));
+            plate.Add(new Run($"x{enemy.DefeatCount}", ThreatColor(enemy.DefeatCount)));
+        if (enemy.RevivalDamage > 0)
+            plate.Add(new Run($"+{enemy.RevivalDamage} DMG", Red));
+        string innate = InnateReadout(enemy);
+        if (innate.Length > 0)
+            plate.Add(new Run(innate, Stone));
         plate.AddRange(StatusBadgeRuns(enemy));
         return plate;
+    }
+
+    /// <summary>
+    /// The colour a farmed count is printed in (§3.2, §4.5): orange at the first
+    /// defeat, reddening with every one after it, and fully red from
+    /// <see cref="Tuning.UniqueChanceMidpoint"/> on — the depth at which a farm is
+    /// hot both ways, a coin-flip's unique chance on a dummy that hits
+    /// accordingly. Monotonic: a deeper count is never less red. That is how the
+    /// plate says "further is worse" without a denominator (PHASE4-139), while
+    /// the number itself stays a bare <c>xN</c>.
+    /// </summary>
+    internal static Vector4 ThreatColor(int defeatCount)
+    {
+        int hot = Math.Max(2, GameContent.Current.Tuning.UniqueChanceMidpoint);
+        float t = Math.Clamp((defeatCount - 1) / (float)(hot - 1), 0f, 1f);
+        return Vector4.Lerp(Orange, DeepRed, t);
+    }
+
+    /// <summary>
+    /// What an actor carries on itself whatever it holds (§4.3's innate
+    /// modifiers — the golem's Block), resolved as a hit meets it: weapon plus
+    /// innate, in the readout's own words, so a golem holding a hatchet reads
+    /// <c>BLOCK 9</c> and one holding a Tower Guard <c>BLOCK 15</c> — the Block its
+    /// blows are absorbed by, never its innate stacks alone. Empty for an actor
+    /// with nothing innate, which is every dummy.
+    /// </summary>
+    internal static string InnateReadout(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        var parts = new List<string>();
+        foreach (var (type, _) in actor.Innate.Entries)
+        {
+            string text = ModifierFormats.TryGetValue(type, out var format) && actor.EquippedWeapon is { } held
+                ? format(new ReadoutContext(held, actor, Equipped: false, AttacksThisTurn: 0))
+                : $"{type.ToString().ToUpperInvariant()} {actor.Value(type)}";
+            if (!parts.Contains(text)) // the crit pair reads as one entry
+                parts.Add(text);
+        }
+        return string.Join("  ", parts);
+    }
+
+    /// <summary>
+    /// The beat over a dummy the moment it gets up stronger (§4.5, PHASE4-138):
+    /// what this revival's rolls added — <c>STRONGER +3 DMG +8 HP</c> — so the
+    /// player connects the count going up with the statline going up. Null when
+    /// a revival added nothing, which none does: every cycle rolls one gain or both.
+    /// </summary>
+    internal static string? RevivalBeat(int damageGained, int healthGained)
+    {
+        var gains = new List<string>(2);
+        if (damageGained > 0) gains.Add($"+{damageGained} DMG");
+        if (healthGained > 0) gains.Add($"+{healthGained} HP");
+        return gains.Count == 0 ? null : $"STRONGER {string.Join(" ", gains)}";
     }
 
     /// <summary>

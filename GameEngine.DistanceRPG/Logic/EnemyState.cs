@@ -1,8 +1,11 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// Gameplay state of the training-dummy enemy, ported from the prototype.
-/// Position is the circle centre in logic space.
+/// Gameplay state of an enemy: the training dummy ported from the prototype,
+/// and — built to its dungeon's statline, with a name, a movement budget and
+/// modifiers of its own (<see cref="DungeonState.BossRow"/>) — the boss waiting
+/// on a dungeon's bottom floor (§4.3), which is a row like any dummy's in every
+/// other respect. Position is the circle centre in logic space.
 /// </summary>
 public sealed class EnemyState : ActorState
 {
@@ -10,7 +13,8 @@ public sealed class EnemyState : ActorState
     public const string DefaultWeaponId = "arming_sword";
 
     /// <summary>
-    /// A dummy's HP is the flat constant plus whatever its revivals have added
+    /// An enemy's HP is its base (<see cref="BaseMaxHp"/> — a dummy's flat
+    /// constant, a boss's statline) plus whatever its revivals have added
     /// (<see cref="RevivalMaxHp"/>, §3.2), and it spawns full: unwritten HP reads
     /// as this (<see cref="ActorState.Hp"/>), so no constructor copies it.
     /// <para>
@@ -21,7 +25,35 @@ public sealed class EnemyState : ActorState
     /// one you cannot at 10.
     /// </para>
     /// </summary>
-    public override int MaxHp => GameConstants.DummyHp + RevivalMaxHp;
+    public override int MaxHp => BaseMaxHp + RevivalMaxHp;
+
+    /// <summary>
+    /// The HP this enemy has before any revival adds to it: the flat
+    /// <see cref="GameConstants.DummyHp"/> for rank and file, and its dungeon's
+    /// statline for a boss (§5.8 — the golem's 80, <see cref="DungeonState.BossRow"/>).
+    /// Settable like every field a row is restored from, though a save need not
+    /// store a boss's: it re-derives from content (§5.1).
+    /// </summary>
+    public int BaseMaxHp { get; set; } = GameConstants.DummyHp;
+
+    /// <summary>
+    /// How far this enemy moves in a turn, in logic units (32 per tile): the
+    /// standard <see cref="GameConstants.EnemyMove"/> for rank and file, and a
+    /// boss's statline for a boss (§5.8 — the golem's 40, slow in a game whose
+    /// party moves 160). Read wherever an enemy's turn budget is read — the walk
+    /// it plans, the mana an idle turn banks, the Mire legend over it — and
+    /// nowhere else: the attack-cost scale stays the standard budget's
+    /// (<c>EnemyMove / MaxDistance</c>), which converts the party's costs into an
+    /// enemy's, so a slower enemy buys fewer swings as well as fewer steps.
+    /// </summary>
+    public float MoveBudget { get; set; } = GameConstants.EnemyMove;
+
+    /// <summary>
+    /// The name its plate reads: a boss's (<see cref="BossDef.Name"/> — the Stone
+    /// Golem). Null for rank and file, whose plate names what they are by what
+    /// they hold: DUMMY, HEALER or CASTER.
+    /// </summary>
+    public string? Title { get; set; }
 
     /// <summary>
     /// What this dummy adds to whatever it is holding: its accumulated revival

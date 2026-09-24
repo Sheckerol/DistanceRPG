@@ -5,13 +5,13 @@ using OpenTK.Mathematics;
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// 3D stand-in for a training-dummy enemy, mirroring its logic-space position.
-/// Defeated dummies ease down to a flat floor remnant — they never blocked
-/// movement, but a full-size corpse read as if it did — and grow back on
-/// resurrection; one already dead when its floor is built starts as the
-/// remnant. A shove or a drag slides it to where it landed rather than
-/// teleporting it there, while it is in sight; hidden in the fog, it is simply
-/// where the logic put it.
+/// 3D stand-in for an enemy, mirroring its logic-space position: a dummy's box,
+/// or a larger one for a boss. Defeated enemies ease down to a flat floor
+/// remnant — they never blocked movement, but a full-size corpse read as if it
+/// did — and grow back on resurrection; one already dead when its floor is built
+/// starts as the remnant. A shove or a drag slides it to where it landed rather
+/// than teleporting it there, while it is in sight; hidden in the fog, it is
+/// simply where the logic put it.
 /// </summary>
 public class EnemyObject : PrimitiveBoxObject
 {
@@ -27,15 +27,49 @@ public class EnemyObject : PrimitiveBoxObject
 
     public EnemyState State { get; }
 
+    /// <summary>
+    /// How much larger than a dummy's box this stand-in is drawn: 1 for rank and
+    /// file, more for a boss, which should read as the one thing on the floor that
+    /// is not a dummy. Only the drawing grows — its plate and its click target
+    /// with it — never its reach or its footprint, which are the logic's.
+    /// </summary>
+    public float Size { get; }
+
+    private readonly float _height;
     private Vector3 _targetScale = Vector3.One;
     private Vector3 _slideFrom;
     private float _slideLeft;
 
-    public EnemyObject(EnemyState state, Vector4 color)
-        : base(Width, Height, Width, color)
+    // The farm's gains (§3.2) this stand-in last announced: what a revival's
+    // beat is measured from (TakeRevivalGains).
+    private int _shownDamage;
+    private int _shownMaxHp;
+
+    /// <param name="state">The enemy row it stands in for.</param>
+    /// <param name="color">Its colour while it stands.</param>
+    /// <param name="size">How much larger than a dummy it is drawn: 1 for rank and file.</param>
+    public EnemyObject(EnemyState state, Vector4 color, float size = 1f)
+        : base(Width * size, Height * size, Width * size, color)
     {
         State = state;
+        Size = size;
+        _height = Height * size;
+        (_shownDamage, _shownMaxHp) = (state.RevivalDamage, state.RevivalMaxHp);
         SyncTransform();
+    }
+
+    /// <summary>
+    /// What the enemy's revivals have added since this stand-in last said so
+    /// (§3.2) — the damage and the maximum HP its row has gained — which a
+    /// revival's beat announces, and which are then marked as said. Taken from the
+    /// row when the stand-in is built, so a floor the party returns to announces
+    /// only what is gained while the party is there to see it.
+    /// </summary>
+    public (int Damage, int MaxHp) TakeRevivalGains()
+    {
+        var gained = (State.RevivalDamage - _shownDamage, State.RevivalMaxHp - _shownMaxHp);
+        (_shownDamage, _shownMaxHp) = (State.RevivalDamage, State.RevivalMaxHp);
+        return gained;
     }
 
     /// <summary>
@@ -114,7 +148,7 @@ public class EnemyObject : PrimitiveBoxObject
     /// </summary>
     public void SyncTransform()
     {
-        var target = WorldSpace.FromLogic(State.X, State.Y, Height * Scale.Y / 2f);
+        var target = WorldSpace.FromLogic(State.X, State.Y, _height * Scale.Y / 2f);
         if (_slideLeft > 0f)
         {
             float t = 1f - _slideLeft / SlideSeconds;

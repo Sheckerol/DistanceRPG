@@ -284,10 +284,16 @@ public class FloorGenerationTests
         Assert.True(StairPlacer.FurthestRoom(bottom.Map).Contains(bottom.Lair!.Value.R, bottom.Lair.Value.C));
         Assert.Equal(bottom.Map.PlayerStart, bottom.UpStairs);
 
+        // The same map and the same placed rows, in the same order: the flag moves
+        // no draw. What it adds is the dungeon's boss, appended after every placed
+        // row on a stream of its own (Phase 4.5), so the placed rows are the
+        // bottom floor's rows less its last.
         var asIfNot = Floor.Generate(GoldenSeed, bossFloor - 1, bottom: false, hall);
         Assert.Equal(asIfNot.DownStairs, bottom.Lair);
         Assert.Equal(GridText(asIfNot.Map.Grid), GridText(bottom.Map.Grid));
-        Assert.Equal(asIfNot.Enemies.Select(Row), bottom.Enemies.Select(Row));
+        Assert.Equal(asIfNot.Enemies.Select(Row), bottom.Enemies.SkipLast(1).Select(Row));
+        Assert.Same(bottom.Boss, bottom.Enemies[^1]);
+        Assert.Null(asIfNot.Boss);
 
         for (int n = 0; n < bossFloor - 1; n++)
         {

@@ -54,21 +54,21 @@ public sealed class TurnSystem
     public int TurnCount { get; private set; }
 
     /// <summary>
-    /// Whether a defeated dummy comes back (§3.2, §4.3). True for the whole of a
-    /// visit today: the dungeon is an infinite farm, the timer runs, and a defeat
+    /// Whether a defeated dummy comes back (§3.2, §4.3). True until the boss
+    /// falls: the dungeon is an infinite farm, the timer runs, and a defeat
     /// writes nothing but <see cref="EnemyState.DefeatCount"/> — "nothing is
-    /// handed over at the time". Set false and the dungeon is finite: nothing
+    /// handed over at the time". False and the dungeon is finite: nothing
     /// revives, and every defeat is the permanent kill that collects what the
     /// dummy was carrying (<see cref="EnemyDropped"/>, <see cref="GroundItemOf"/>).
     /// <para>
-    /// This is the seam Phase 4's boss takes over — killing the boss is what
-    /// stops resurrection (§4.3) — and nothing in this system flips it on its
-    /// own. The visit sets it: every floor's system opens with it off once the
-    /// visit has recorded the boss's death (<see cref="DungeonState.OpenTurns"/>,
-    /// <see cref="DungeonState.RecordBossDefeated"/>), so the stop holds on every
-    /// floor rather than lapsing with the floor it happened on. Until that boss
-    /// exists the scene's pause menu carries a dev switch, so the drop path can
-    /// be played rather than only tested.
+    /// Killing the boss is what stops it (§4.3), and that is the one thing in
+    /// this system that flips it: the boss's death feed turns it off before the
+    /// boss's own defeat runs (<see cref="BossDefeated"/>). The visit records the
+    /// death and sets it on every floor's system it opens afterwards
+    /// (<see cref="DungeonState.OpenTurns"/>, <see cref="DungeonState.RecordBossDefeated"/>),
+    /// so the stop holds on every floor rather than lapsing with the floor it
+    /// happened on. It keeps its setter: a system built outside a visit — a
+    /// fixture about collection, a reload — is told where it stands.
     /// </para>
     /// <para>
     /// Stopping resurrection ends the ladder and refunds none of it: a floor
@@ -93,6 +93,16 @@ public sealed class TurnSystem
     public event Action<EnemyState>? EnemyDefeated;
     public event Action<EnemyState, Drop>? EnemyDropped;                    // a permanent kill handed over what the dummy was carrying (§3.5): the corpse, and the weapon now lying on it
     public event Action<EnemyState>? EnemyResurrected;
+
+    /// <summary>
+    /// The boss fell (§4.3), and with it resurrection: raised last of everything
+    /// its death does — after <see cref="ResurrectionActive"/> went false, after its
+    /// defeat ran and its own drop was handed over (<see cref="EnemyDropped"/>) — so
+    /// a subscriber re-deriving what the floor's corpses are lying on finds the
+    /// boss's item already down and lays no second one. The visit subscribes
+    /// first and records the death (<see cref="DungeonState.RecordBossDefeated"/>).
+    /// </summary>
+    public event Action<EnemyState>? BossDefeated;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action<EnemyState>? EnemyBraceTriggered;
     public event Action<PartyMemberState, StatusEffect>? CharacterBuffed;   // a cast landed a status on the member: an ally's buff or an enemy's debuff
@@ -246,11 +256,22 @@ public sealed class TurnSystem
     /// an earlier turn is dropped, since every counter in it was reset when that
     /// turn ended. Null opens the turn fresh.
     /// </param>
+    /// <param name="boss">
+    /// The floor's boss — one of <paramref name="enemies"/> — or null on a floor
+    /// that has none (§4.3). Its death is a defeat like any enemy's and one thing
+    /// more: it stops resurrection first, then runs the defeat, so its own drop
+    /// is down before anyone hears of it, then raises <see cref="BossDefeated"/>.
+    /// That is fixed here, as the roster's death feed for that actor, like every
+    /// other consequence of a death: nothing asks an actor its kind when it dies.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="boss"/> is not one of <paramref name="enemies"/>.</exception>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
         IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0,
-        int firstTurn = 0, TurnCarry? carry = null)
+        int firstTurn = 0, TurnCarry? carry = null, EnemyState? boss = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(firstTurn);
+        if (boss is not null && !enemies.Contains(boss))
+            throw new ArgumentException("The boss is one of the floor's enemies: pass it on the roster it is the boss of.", nameof(boss));
 
         _grid = grid;
         _party = party;
@@ -308,6 +329,11 @@ public sealed class TurnSystem
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
+        // The boss is an enemy whose death means more (§4.3): the feed the roster
+        // fixes for it stops resurrection around its defeat. Its hits, heals,
+        // movement and reactions are any enemy's.
+        if (boss is not null)
+            _deathFeeds[boss] = () => OnBossDefeated(boss);
         _rosters = [party.ToArray<ActorState>(), enemies.ToArray<ActorState>()];
         _zones = [_partyZone, _enemyZone];
         _onReactionFired = new Dictionary<ModifierType, Action<ActorState>>
@@ -794,7 +820,7 @@ public sealed class TurnSystem
     /// maze full of idle dummies costs no wall-clock time. On the way past,
     /// each enemy banks the budget it left as mana by the party's divisor
     /// (§1.3): the one that just acted whatever its action left, an idle one
-    /// the whole of its (mired) budget.
+    /// the whole of its (mired) budget — its own, <see cref="EnemyState.MoveBudget"/>.
     /// </summary>
     private void AdvanceToNextEnemy()
     {
@@ -807,7 +833,7 @@ public sealed class TurnSystem
             if (!enemy.Alive) continue;
             if (enemy.TurnsSinceSeen >= 2 && !HasPassiveAction(enemy))
             {
-                enemy.RegenManaFromUnusedMovement(StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove));
+                enemy.RegenManaFromUnusedMovement(StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget));
                 continue;
             }
 
@@ -820,8 +846,9 @@ public sealed class TurnSystem
 
     private void StartEnemyAction(EnemyState enemy)
     {
-        // The budget after Mire's cut, the same 10% a level the party pays.
-        _enemyBudget = StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove);
+        // The enemy's own budget — a dummy's 100, a boss's statline (the golem's
+        // 40) — after Mire's cut, the same 10% a level the party pays.
+        _enemyBudget = StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget);
 
         if (enemy.IsSupportCaster)
         {
@@ -939,40 +966,19 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Nearest floor tile not occupied by a living actor, breadth-first from
-    /// the enemy's own tile (so its own tile wins when it's free). Expansion
-    /// only crosses floor, keeping the result in the same room or corridor.
-    /// Falls back to staying put if everything reachable is somehow taken.
+    /// the enemy's own tile (so its own tile wins when it's free) — the one
+    /// search <see cref="GridUtils.NearestFreeTile"/> runs, which generation also
+    /// stands a boss with. Expansion only crosses floor, keeping the result in
+    /// the same room or corridor. Falls back to staying put if everything
+    /// reachable is somehow taken.
     /// </summary>
     private (int R, int C) FindNearestFreeTile(EnemyState self)
-    {
-        var start = TileOf(self.X, self.Y);
-        int rows = _grid.GetLength(0), cols = _grid.GetLength(1);
-        var visited = new HashSet<(int R, int C)> { start };
-        var queue = new Queue<(int R, int C)>();
-        queue.Enqueue(start);
+        => GridUtils.NearestFreeTile(_grid, TileOf(self.X, self.Y), tile => IsTaken(tile, self));
 
-        while (queue.Count > 0)
-        {
-            var (r, c) = queue.Dequeue();
-            if (IsFreeTile(r, c, self)) return (r, c);
-
-            foreach (var (nr, nc) in new[] { (r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1) })
-            {
-                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-                if (_grid[nr, nc] != 0 || !visited.Add((nr, nc))) continue;
-                queue.Enqueue((nr, nc));
-            }
-        }
-
-        return start;
-    }
-
-    private bool IsFreeTile(int r, int c, EnemyState self)
-    {
-        if (_grid[r, c] != 0) return false;
-        if (_party.Any(m => m.Alive && TileOf(m.X, m.Y) == (r, c))) return false;
-        return !_enemies.Any(e => e != self && e.Alive && TileOf(e.X, e.Y) == (r, c));
-    }
+    /// <summary>Whether a living actor other than <paramref name="self"/> stands on <paramref name="tile"/>.</summary>
+    private bool IsTaken((int R, int C) tile, EnemyState self)
+        => _party.Any(m => m.Alive && TileOf(m.X, m.Y) == tile)
+        || _enemies.Any(e => e != self && e.Alive && TileOf(e.X, e.Y) == tile);
 
     private void UpdateEnemyMovement(float deltaTime)
     {
@@ -1176,11 +1182,14 @@ public sealed class TurnSystem
             return;
         }
 
-        // Attack cost scales the same way the prototype scaled it: the enemy's
-        // budget is 100 vs the player's 160, so weapon costs shrink to match.
-        // The cost taken is the wielder's, which for an actor with no pools is
-        // the weapon's own (§2.2) -- the seam whichever phase gives enemies
-        // progression will need, and a no-op until it does.
+        // Attack cost scales the same way the prototype scaled it: the standard
+        // enemy budget is 100 vs the player's 160, so weapon costs shrink to
+        // match. The scale is that standard budget's, never the enemy's own: it
+        // converts the party's cost units into an enemy's, so a slower enemy (a
+        // boss's 40, EnemyState.MoveBudget) buys fewer swings as well as fewer
+        // steps. The cost taken is the wielder's, which for an actor with no
+        // pools is the weapon's own (§2.2) -- the seam whichever phase gives
+        // enemies progression will need, and a no-op until it does.
         float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
@@ -2201,6 +2210,35 @@ public sealed class TurnSystem
         EnemyDefeated?.Invoke(target);
         if (GroundItemOf(target) is { } drop)
             EnemyDropped?.Invoke(target, drop);
+    }
+
+    /// <summary>
+    /// What the boss's death means (§4.3): killing it stops resurrection, and
+    /// the dungeon is finite from here — "whatever is left, you take once". The
+    /// boss's death feed, fixed by the roster (the constructor's
+    /// <c>boss</c>), so nothing asks the dead its kind. In this order, each for a reason:
+    /// <list type="number">
+    /// <item><see cref="ResurrectionActive"/> goes false <em>first</em>, because
+    /// the drop is derived off it: the boss's own kill is the first permanent
+    /// one, and its weapon is lying on it (<see cref="GroundItemOf"/>).</item>
+    /// <item>Then the defeat every enemy's death is (<see cref="OnEnemyDefeated"/>):
+    /// the defeat turn, <see cref="EnemyDefeated"/>, and <see cref="EnemyDropped"/>
+    /// with that weapon, exactly as any permanent kill hands one over.</item>
+    /// <item><see cref="BossDefeated"/> <em>last</em>, so whoever answers it by
+    /// re-deriving every corpse's item finds the boss's already down. A dummy that
+    /// fell earlier in the same swing ran its defeat with resurrection still on and
+    /// handed nothing over; its item is that re-derivation's to lay.</item>
+    /// </list>
+    /// It never revives — nothing does, from now — and its
+    /// <see cref="EnemyState.DefeatCount"/> advanced once, at this death, which
+    /// nothing reads. The run goes on: the party turns round and fights its way
+    /// out (§4.4).
+    /// </summary>
+    private void OnBossDefeated(EnemyState boss)
+    {
+        ResurrectionActive = false;
+        OnEnemyDefeated(boss);
+        BossDefeated?.Invoke(boss);
     }
 
     /// <summary>

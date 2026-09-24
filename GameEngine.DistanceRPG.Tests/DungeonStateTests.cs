@@ -750,7 +750,8 @@ public class DungeonStateTests
         // and the third with resurrection off, and a floor caught up afterwards is
         // caught up only to turn 10: a return due before then still happens (due
         // at 8), one due after never does (due at 11, though the party is back at
-        // 13). The seam the boss's death calls, and the scene's dev switch until then.
+        // 13). The seam the boss's death calls, through the subscription OpenTurns
+        // makes; this calls it directly, on a floor that is not the boss's.
         var party = Party(Maul());
         var visit = DungeonState.Enter(SpearHall, GoldenSeed, party);
         var first = visit.Current;
@@ -788,6 +789,56 @@ public class DungeonStateTests
         var third = Down(visit, party);
         Assert.Equal(2, visit.FloorIndex);
         Assert.False(third.ResurrectionActive);
+    }
+
+    [Fact]
+    public void TheBottomFloorsSystemHasItsBoss_AndItsDeathIsTheVisits()
+    {
+        // The boss is a row of the bottom floor like any other, and the system the
+        // visit opens there rosters it as the boss: its death — and nothing short
+        // of its death — is recorded by the visit, in Logic, before anything else
+        // hears of it. After that the floor it lay on is a floor like any other:
+        // left and come back to, the boss is still down where it fell, lying on the
+        // same weapon, and nothing records it again.
+        var party = Party(Maul());
+        var visit = DungeonState.Enter(Tutorial, GoldenSeed, party);
+        visit.OpenTurns(party, Ten);
+        Assert.Null(visit.Current.Boss);
+
+        var below = Down(visit, party);
+        var bottom = visit.Current;
+        var boss = bottom.Boss!;
+        Assert.Same(bottom.Enemies[^1], boss);
+        Assert.True(below.ResurrectionActive);
+
+        // Hurt, it has recorded nothing: a Maul's 60 into its Block 9 leaves 29 of its 80.
+        StandBeside(bottom, party[0], boss);
+        Assert.True(below.TryAttack(party[0], boss));
+        Assert.Equal((true, 29), (boss.Alive, boss.Hp));
+        Assert.False(visit.BossDefeated);
+
+        bool recordedWhenHeard = false;
+        below.BossDefeated += _ => recordedWhenHeard = visit.BossDefeated;
+        Assert.True(below.TryAttack(party[0], boss));
+        Assert.False(boss.Alive);
+        Assert.True(recordedWhenHeard);
+        Assert.Equal((true, 0), (visit.BossDefeated, visit.BossDefeatedAtTurn));
+        Assert.False(below.ResurrectionActive);
+        var drop = below.GroundItemOf(boss);
+        Assert.NotNull(drop);
+
+        Home(visit, party);
+        PassTurns(below, 3);
+        var above = Up(visit, party);
+        Assert.False(above.ResurrectionActive);
+        var again = Down(visit, party);
+        Assert.False(again.ResurrectionActive);
+        Assert.False(boss.Alive);
+        Assert.Equal(TileOf(party[0]), bottom.UpStairs);
+        Assert.Equal((true, 0), (visit.BossDefeated, visit.BossDefeatedAtTurn));
+        var still = again.GroundItemOf(boss);
+        Assert.NotNull(still);
+        Assert.Equal((drop.Weapon.Id, drop.Weapon.Modifiers, drop.DefeatCount), (still.Weapon.Id, still.Weapon.Modifiers, still.DefeatCount));
     }
 
     [Fact]

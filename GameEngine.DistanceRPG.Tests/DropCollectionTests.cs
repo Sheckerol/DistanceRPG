@@ -10,8 +10,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// the floor's own seed, and that it is still there after a reload, is this.
 /// <para>
 /// The switch is <c>TurnSystem.ResurrectionActive</c>, the seam Phase 4's boss
-/// takes over (§4.3). Nothing in the logic flips it, so every test below throws it
-/// by hand exactly where the boss will.
+/// took over (§4.3): the boss's death is what flips it now, and the visit keeps
+/// it flipped on every floor (<see cref="BossTests"/>). These tests are about
+/// collection rather than about the boss, so each one throws the switch by hand
+/// exactly where the boss's death throws it.
 /// </para>
 /// </summary>
 public class DropCollectionTests
@@ -150,7 +152,7 @@ public class DropCollectionTests
         Assert.Equal(3, farm.Enemy.DefeatCount);
         Assert.Empty(farm.Dropped);
 
-        // The boss is Phase 4's; the switch it will throw is here.
+        // The switch the boss's death throws (BossTests), thrown here by hand.
         farm.Turns.ResurrectionActive = false;
         Kill(farm);
 

@@ -51,6 +51,49 @@ public static class GridUtils
     }
 
     /// <summary>
+    /// The nearest floor tile to <paramref name="start"/> that
+    /// <paramref name="taken"/> does not claim, breadth-first — up, down, left,
+    /// right, crossing floor tiles only, so the answer stays in the start's room
+    /// or corridor — and the start itself whenever it is free. The neighbour order
+    /// is fixed, so a tie is always settled the same way and never by a set's
+    /// iteration. Falls back to the start when everything it can reach is taken.
+    /// <para>
+    /// The one search for "stand here, or as near as you can": a revived dummy
+    /// wakes through it (<see cref="TurnSystem"/>, off whoever stands on its
+    /// remnant), and a boss whose lair a placed dummy already holds waits on the
+    /// tile it finds (<see cref="Floor"/>'s generation).
+    /// </para>
+    /// </summary>
+    /// <param name="grid">The floor's grid: 0 is floor, anything else a wall.</param>
+    /// <param name="start">Where the actor would stand.</param>
+    /// <param name="taken">Whether a floor tile is held by someone else.</param>
+    public static (int R, int C) NearestFreeTile(int[,] grid, (int R, int C) start, Func<(int R, int C), bool> taken)
+    {
+        ArgumentNullException.ThrowIfNull(grid);
+        ArgumentNullException.ThrowIfNull(taken);
+
+        int rows = grid.GetLength(0), cols = grid.GetLength(1);
+        var visited = new HashSet<(int R, int C)> { start };
+        var queue = new Queue<(int R, int C)>();
+        queue.Enqueue(start);
+
+        while (queue.Count > 0)
+        {
+            var (r, c) = queue.Dequeue();
+            if (grid[r, c] == 0 && !taken((r, c))) return (r, c);
+
+            foreach (var (nr, nc) in new[] { (r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1) })
+            {
+                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+                if (grid[nr, nc] != 0 || !visited.Add((nr, nc))) continue;
+                queue.Enqueue((nr, nc));
+            }
+        }
+
+        return start;
+    }
+
+    /// <summary>
     /// True if every floor tile is reachable from (startR, startC) — used by
     /// tests to prove generated maps are fully connected.
     /// </summary>
