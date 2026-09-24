@@ -6,14 +6,25 @@ public static class GridUtils
     /// Find <paramref name="count"/> open floor tiles for the party, starting
     /// at the spawn tile and spiralling outward ring by ring (Chebyshev rings,
     /// max radius 7), matching the prototype's spawn placement. Pads with the
-    /// start tile if not enough open tiles are found.
+    /// first tile found if not enough open tiles are found.
+    /// <para>
+    /// <paramref name="blocked"/> names tiles nobody may be put on — the living
+    /// enemies of a floor the party is arriving on (§4.2): a dummy may stand on
+    /// the very stairs the party arrives by, and a member is placed around it,
+    /// never inside it. The start tile itself is skipped when it is blocked, and
+    /// the padding is then the first free tile the rings found. Without a set —
+    /// or with one naming nothing near — the tiles are exactly the prototype's.
+    /// </para>
     /// </summary>
-    public static List<(int R, int C)> FindPartySpawnTiles(int[,] grid, int startR, int startC, int count)
+    public static List<(int R, int C)> FindPartySpawnTiles(int[,] grid, int startR, int startC, int count,
+        IReadOnlySet<(int R, int C)>? blocked = null)
     {
         int rows = grid.GetLength(0);
         int cols = grid.GetLength(1);
 
-        var tiles = new List<(int R, int C)> { (startR, startC) };
+        var tiles = new List<(int R, int C)>();
+        if (blocked?.Contains((startR, startC)) != true)
+            tiles.Add((startR, startC));
         var seen = new HashSet<(int, int)> { (startR, startC) };
 
         for (int ring = 1; tiles.Count < count && ring < 8; ring++)
@@ -28,12 +39,14 @@ public static class GridUtils
                     if (!seen.Add((r, c))) continue;
                     if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
                     if (grid[r, c] != 0) continue;
+                    if (blocked?.Contains((r, c)) == true) continue;
                     tiles.Add((r, c));
                 }
             }
         }
 
-        while (tiles.Count < count) tiles.Add((startR, startC));
+        var pad = tiles.Count > 0 ? tiles[0] : (startR, startC);
+        while (tiles.Count < count) tiles.Add(pad);
         return tiles;
     }
 

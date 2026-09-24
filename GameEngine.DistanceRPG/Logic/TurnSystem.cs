@@ -44,7 +44,13 @@ public sealed class TurnSystem
 
     public TurnPhase Phase { get; private set; } = TurnPhase.Player;
 
-    /// <summary>Completed turn count; increments when a new player turn starts.</summary>
+    /// <summary>
+    /// Completed turn count; increments when a new player turn starts. It is
+    /// the visit's one clock (§4.1): a floor's system opens at the turn the
+    /// party arrived on (<c>firstTurn</c>) and hands its count back when the
+    /// party leaves, so a <see cref="EnemyState.DefeatedAtTurn"/> written on one
+    /// floor means the same turn on every floor.
+    /// </summary>
     public int TurnCount { get; private set; }
 
     /// <summary>
@@ -56,9 +62,13 @@ public sealed class TurnSystem
     /// dummy was carrying (<see cref="EnemyDropped"/>, <see cref="GroundItemOf"/>).
     /// <para>
     /// This is the seam Phase 4's boss takes over — killing the boss is what
-    /// stops resurrection (§4.3) — and nothing in the logic flips it on its own.
-    /// Until that boss exists the scene's pause menu carries a dev switch, so the
-    /// drop path can be played rather than only tested.
+    /// stops resurrection (§4.3) — and nothing in this system flips it on its
+    /// own. The visit sets it: every floor's system opens with it off once the
+    /// visit has recorded the boss's death (<see cref="DungeonState.OpenTurns"/>,
+    /// <see cref="DungeonState.RecordBossDefeated"/>), so the stop holds on every
+    /// floor rather than lapsing with the floor it happened on. Until that boss
+    /// exists the scene's pause menu carries a dev switch, so the drop path can
+    /// be played rather than only tested.
     /// </para>
     /// <para>
     /// Stopping resurrection ends the ladder and refunds none of it: a floor
@@ -209,7 +219,7 @@ public sealed class TurnSystem
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
     // The floor's own generation seed — the value MapGenerator.Generate was
-    // given, which DungeonScene holds and hands over. The revival ladder (§3.2)
+    // given, Floor.Seed, which the visit hands over. The revival ladder (§3.2)
     // is drawn on mapSeed ^ FarmLadder.ReviveSalt, per enemy and per cycle, so
     // this is the one thing that makes a farm replay identically after a reload.
     // It is NOT allowed to fall back to Random.Shared the way _rollD20 does: a
@@ -222,14 +232,32 @@ public sealed class TurnSystem
     /// The floor's generation seed, for the streams a save replays from (§3.2).
     /// Defaults to 0 for fixtures that roll nothing off it.
     /// </param>
+    /// <param name="firstTurn">
+    /// The visit's turn this system opens on (§4.1: one clock for the visit):
+    /// <see cref="TurnCount"/> starts here rather than at 0, so a floor re-entered
+    /// later in the visit reads its corpses' <see cref="EnemyState.DefeatedAtTurn"/>
+    /// on the clock they were written on. 0 for a one-floor fixture.
+    /// </param>
+    /// <param name="carry">
+    /// The counters of the turn in progress, brought from the floors the party
+    /// has already stood on in it (<see cref="TurnCarry"/>): imported — the
+    /// entries of this system's own roster, nobody else's — only when
+    /// <see cref="TurnCarry.Turn"/> is <paramref name="firstTurn"/>. A carry from
+    /// an earlier turn is dropped, since every counter in it was reset when that
+    /// turn ended. Null opens the turn fresh.
+    /// </param>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
-        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0)
+        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0,
+        int firstTurn = 0, TurnCarry? carry = null)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(firstTurn);
+
         _grid = grid;
         _party = party;
         _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
         _mapSeed = mapSeed;
+        TurnCount = firstTurn;
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
@@ -293,7 +321,56 @@ public sealed class TurnSystem
             },
         };
 
+        if (carry is not null && carry.Turn == firstTurn)
+            Import(carry);
+
         SnapshotZones();
+    }
+
+    /// <summary>
+    /// Take up the counters of the turn in progress from the floors the party
+    /// has already stood on in it (<see cref="TurnCarry"/>) — this roster's
+    /// entries only: the party's, which every floor's roster holds, and this
+    /// floor's own enemies', which a same-turn return finds as it left them.
+    /// Another floor's enemies are nobody here.
+    /// </summary>
+    private void Import(TurnCarry carry)
+    {
+        foreach (var (actor, attacks) in carry.Attacks)
+            if (_sides.ContainsKey(actor))
+                _attacksThisTurn[actor] = attacks;
+        foreach (var (reactor, uses) in carry.ZoneUses)
+            if (_sides.TryGetValue(reactor, out var side))
+                _zones[(int)side].RestoreUses(reactor, uses);
+        foreach (var ((actor, type), uses) in carry.ReactionUses)
+            if (_sides.ContainsKey(actor))
+                _ripostes.RestoreUses(actor, type, uses);
+        foreach (var enemy in carry.Seen)
+            if (_sides.ContainsKey(enemy))
+                _seenThisTurn.Add(enemy);
+    }
+
+    /// <summary>
+    /// Every per-turn counter this system holds, for the floor the party is
+    /// about to arrive on (§4.2: transit keeps the turn — all of it): the
+    /// attacks each actor has chosen, each reactor's zone uses, each reaction
+    /// use a hit answered, and the enemies seen, stamped with the turn they were
+    /// spent in. A copy — the next system reads it, and nothing it does reaches
+    /// back into this one.
+    /// </summary>
+    internal TurnCarry ExportCarry()
+    {
+        var zoneUses = new Dictionary<ActorState, int>(ReferenceEqualityComparer.Instance);
+        foreach (var zone in _zones)
+            foreach (var (reactor, uses) in zone.SpentUses)
+                zoneUses[reactor] = uses;
+
+        return new TurnCarry(
+            TurnCount,
+            new Dictionary<ActorState, int>(_attacksThisTurn, ReferenceEqualityComparer.Instance),
+            zoneUses,
+            new Dictionary<(ActorState Actor, ModifierType Type), int>(_ripostes.SpentUses),
+            new HashSet<EnemyState>(_seenThisTurn, ReferenceEqualityComparer.Instance));
     }
 
     /// <summary>
@@ -1205,29 +1282,8 @@ public sealed class TurnSystem
         // (GroundItemOf), and the floor the party farmed is the gauntlet it now
         // walks back through — still stronger, just no longer replenishing.
         foreach (var enemy in _enemies)
-        {
-            if (ResurrectionActive && !enemy.Alive
-                && TurnCount - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount))
-            {
-                // What comes back is stronger than what died (§3.2), and it is
-                // rolled here, BEFORE the HP is restored: a Health roll lifts the
-                // maximum this line then fills, so rolling after it would restore
-                // the old full and silently lose the cycle.
-                ApplyRevivalGains(enemy);
-
-                enemy.Hp = enemy.MaxHp;
-                enemy.Alive = true;
-                enemy.TurnsSinceSeen = 2;
-
-                // Someone may be standing on the remnant: wake up on the
-                // nearest free tile instead of inside them.
-                var (r, c) = FindNearestFreeTile(enemy);
-                enemy.X = c * GameConstants.Tile + GameConstants.Tile / 2f;
-                enemy.Y = r * GameConstants.Tile + GameConstants.Tile / 2f;
-
-                EnemyResurrected?.Invoke(enemy);
-            }
-        }
+            if (ResurrectionActive && IsDue(enemy, TurnCount))
+                Revive(enemy);
 
         // A new turn: every reaction's uses are restored, held shots lapse,
         // the party's chosen attacks are counted afresh, and both sides' zones
@@ -1253,6 +1309,72 @@ public sealed class TurnSystem
 
         Phase = TurnPhase.Player;
         PlayerTurnStarted?.Invoke();
+    }
+
+    /// <summary>
+    /// The revivals a floor nobody was standing on owes (§4.1, §3.2): every dead
+    /// dummy whose wait had run out by <paramref name="asOfTurn"/> gets up now,
+    /// through the one <see cref="Revive"/> a player turn's start uses — its
+    /// pending ladder cycles rolled in order, HP restored after them, woken on
+    /// the nearest free tile — in roster order, which is spawn order, so where two
+    /// want the same free tile the earlier spawn takes it. Then both sides' zones
+    /// are re-read from where everyone now stands, exactly as a player turn's
+    /// start re-reads them after its revivals: a member already inside a woken
+    /// dummy's reach is marked inside, so their first step is not an entry.
+    /// <para>
+    /// <strong>A floor nobody is on is frozen, except for resurrection
+    /// timers.</strong> Nothing else there ticks, so the visit calls this when the
+    /// party arrives (<see cref="DungeonState.OpenTurns"/>) instead of simulating
+    /// the floor — which is what makes "every dummy you killed on the way down is
+    /// up again" hold on the way out without a stair hop being a free respawn:
+    /// the clock decides, and a hop inside one turn moves no clock.
+    /// </para>
+    /// <para>
+    /// The cutoff, not <see cref="ResurrectionActive"/>, is what the boss's death
+    /// stops it with: the visit passes the turn the boss fell once it has, so a
+    /// return that fell due before then still happens and one due after never
+    /// does. Called after the party is placed, so nobody wakes inside a member,
+    /// and before any handler is wired: <see cref="EnemyResurrected"/> is raised
+    /// to nobody, and whoever builds the floor's presentation reads the rows.
+    /// </para>
+    /// </summary>
+    /// <param name="asOfTurn">The turn the floor's clock is caught up to.</param>
+    public void CatchUpRevivals(int asOfTurn)
+    {
+        foreach (var enemy in _enemies)
+            if (IsDue(enemy, asOfTurn))
+                Revive(enemy);
+        SnapshotZones();
+    }
+
+    /// <summary>Whether <paramref name="enemy"/> is down and its wait (§3.2's ladder, shorter the more it has died) has run out by <paramref name="asOfTurn"/>.</summary>
+    private static bool IsDue(EnemyState enemy, int asOfTurn)
+        => !enemy.Alive && asOfTurn - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount);
+
+    /// <summary>
+    /// One revival, the only one there is: a player turn's start and a floor's
+    /// catch-up both come through here. What comes back is stronger than what
+    /// died (§3.2), passive until it is seen again, and standing on the nearest
+    /// free tile to its remnant.
+    /// </summary>
+    private void Revive(EnemyState enemy)
+    {
+        // The gains are rolled BEFORE the HP is restored: a Health roll lifts
+        // the maximum the next line fills, so rolling after it would restore the
+        // old full and silently lose the cycle.
+        ApplyRevivalGains(enemy);
+
+        enemy.Hp = enemy.MaxHp;
+        enemy.Alive = true;
+        enemy.TurnsSinceSeen = 2;
+
+        // Someone may be standing on the remnant: wake up on the
+        // nearest free tile instead of inside them.
+        var (r, c) = FindNearestFreeTile(enemy);
+        enemy.X = c * GameConstants.Tile + GameConstants.Tile / 2f;
+        enemy.Y = r * GameConstants.Tile + GameConstants.Tile / 2f;
+
+        EnemyResurrected?.Invoke(enemy);
     }
 
     /// <summary>

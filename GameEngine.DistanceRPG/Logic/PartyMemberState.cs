@@ -252,6 +252,31 @@ public sealed class PartyMemberState : ActorState
     }
 
     /// <summary>
+    /// The rest before a dungeon (§4.1): the member walks in whole — alive, HP
+    /// full, mana full to the spendable ceiling (<see cref="ActorState.UsableMaxMana"/>,
+    /// the pool a spend reads, §3.3), every status shed, and the turn's budget
+    /// as a turn with nothing banked starts it: the base movement, no saved
+    /// bonus, no shot held. The permanent half is untouched — the weapons
+    /// carried, the XP earned, the innate spread — because a rest is between
+    /// runs and never a reset of the campaign.
+    /// <para>
+    /// Taken at the next entry, not when a run ends, so the run's end still
+    /// shows the fallen as fallen.
+    /// </para>
+    /// </summary>
+    public void Rest()
+    {
+        Alive = true;
+        StatusEffects.Clear();
+        Hp = MaxHp;
+        Mana = UsableMaxMana;
+        HeldShots = 0;
+        SavedMovement = 0;
+        EffectiveMax = GameConstants.MaxDistance;
+        DistLeft = GameConstants.MaxDistance;
+    }
+
+    /// <summary>
     /// End-of-turn banking: save half the unspent budget (capped at half the
     /// base). Returns the amount saved.
     /// </summary>

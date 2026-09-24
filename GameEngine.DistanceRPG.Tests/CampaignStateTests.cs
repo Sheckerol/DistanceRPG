@@ -133,11 +133,26 @@ public class CampaignStateTests
         Assert.Equal(ids.OrderBy(id => id, StringComparer.Ordinal), forwards.SeenInOrder);
         Assert.Equal(forwards.SeenInOrder, backwards.SeenInOrder);
 
+        // The campaign grows the views §5.1 saves (Phase 4: the party, the
+        // permanent half), and each is an ordered list whose order is a fact of
+        // the data. The party is roster order: the order it was handed, read the
+        // same way every time, and for a new campaign the roster file's order.
+        var a = TestPools.Char("A");
+        var b = TestPools.Char("B");
+        var handed = new CampaignState([b, a]);
+        Assert.Equal(new[] { b, a }, handed.Party);
+        Assert.Equal(handed.Party, handed.Party);
+
+        var roster = GameContent.Current.Party.All.Select(def => def.Id).ToArray();
+        Assert.Equal(roster, CampaignState.Start(GameContent.Current).Party.Select(m => m.Id));
+        Assert.Equal(roster, CampaignState.Start(GameContent.Current).Party.Select(m => m.Id));
+
         // And the type hands out no other view to iterate by accident: no public
-        // set, no public list, nothing but the sorted one.
+        // set, no hash-ordered list, nothing but the named ordered views.
+        string[] orderedViews = [nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party)];
         var iterable = typeof(CampaignState)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.Name != nameof(CampaignState.SeenInOrder))
+            .Where(p => !orderedViews.Contains(p.Name))
             .Where(p => typeof(IEnumerable).IsAssignableFrom(p.PropertyType) && p.PropertyType != typeof(string))
             .Select(p => p.Name)
             .Concat(typeof(CampaignState)
