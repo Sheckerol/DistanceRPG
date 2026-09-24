@@ -503,7 +503,9 @@ public sealed class DungeonState
     /// <summary>
     /// The party wiped (§4.4): raised from the <see cref="TurnSystem.GameOver"/>
     /// of every floor's system <see cref="OpenTurns"/> opens, so the run ends in
-    /// Logic at that transition, whatever is or is not watching.
+    /// Logic at that transition, whatever is or is not watching. A boss that fell
+    /// in the same cascade is already recorded (<see cref="BossDefeated"/>) when
+    /// this is raised, whichever of the two deaths drained first.
     /// <see cref="CampaignState.Enter"/> subscribes it to
     /// <see cref="CampaignState.EndRun"/> — the wiring runs campaign to visit, and
     /// the visit never holds the campaign.
@@ -569,7 +571,9 @@ public sealed class DungeonState
     /// resurrection off once the boss is dead. The visit hears the boss's death
     /// on that system before anyone else does and records it
     /// (<see cref="RecordBossDefeated"/>), and hears a wipe the same way and
-    /// raises it (<see cref="Wiped"/>): in Logic, whatever is watching. Then
+    /// raises it (<see cref="Wiped"/>): in Logic, whatever is watching — first
+    /// recording a boss that fell in the wipe's own cascade but whose death had
+    /// not drained yet, so the run's end never reads a dead boss as standing. Then
     /// every dummy here whose wait ran out while the party was elsewhere gets up
     /// (<see cref="TurnSystem.CatchUpRevivals"/>) — as of now, or as of the turn
     /// the boss fell once it has — and the zones are re-read around them. So the
@@ -598,7 +602,18 @@ public sealed class DungeonState
             ResurrectionActive = !BossDefeated,
         };
         turns.BossDefeated += _ => RecordBossDefeated();
-        turns.GameOver += () => Wiped?.Invoke();   // the run ends at the wipe, in Logic, before anyone watching hears it
+        turns.GameOver += () =>
+        {
+            // One cascade can take the boss and the last member together, and its
+            // held deaths drain in the order they fell: with the member's first,
+            // the game is over before the boss's own death feed has run. What killed
+            // the boss, a blow or a tick, wrote its row before any death drained, so
+            // the row says it is down: record the kill, and the wipe ends a run whose
+            // boss is dead (§4.4, §6.3: killed the boss, died on the way out).
+            if (floor.Boss is { Alive: false } && !BossDefeated)
+                RecordBossDefeated();
+            Wiped?.Invoke();   // the run ends at the wipe, in Logic, before anyone watching hears it
+        };
         turns.CatchUpRevivals(BossDefeated ? BossDefeatedAtTurn : _turn);
         Turns = turns;
         return turns;
@@ -732,7 +747,9 @@ public sealed class DungeonState
     /// caught up only to this turn, so a return that fell due before the boss
     /// fell still happens and none after it does. One-way, and a second call
     /// moves nothing. The boss's death calls this, through the subscription
-    /// <see cref="OpenTurns"/> makes on the system of every floor it opens.
+    /// <see cref="OpenTurns"/> makes on the system of every floor it opens — or
+    /// the wipe does, ahead of it, when the boss and the last member fell in one
+    /// cascade and the member's death drained first (<see cref="Wiped"/>).
     /// </summary>
     public void RecordBossDefeated()
     {

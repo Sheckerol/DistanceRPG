@@ -67,7 +67,10 @@ public sealed class CampaignState
     // The run's-end records (§4.5, §6.7), keyed by dungeon id: the run each
     // cleared dungeon is locked until, the dungeons cleared at least once, and
     // the dungeons retired for good. Lookups only; the sorted views are what
-    // anyone iterates or saves.
+    // anyone iterates or saves. Only a run's end writes them, and RunCounter:
+    // there is no restore path yet. Phase 5's load (§5.1) adds one of its own,
+    // an internal restore constructor or factory taking the counter and the
+    // three sorted views, never a public setter or a public Retire.
     private readonly Dictionary<string, int> _lockedUntilRun = new(StringComparer.Ordinal);
     private readonly HashSet<string> _cleared = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);

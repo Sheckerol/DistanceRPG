@@ -611,6 +611,79 @@ public class RunOutcomeTests
         Assert.NotEmpty(result.Clawbacks);   // the kill's XP, half of it
     }
 
+    [Fact]
+    public void ABossFallingInTheSameRaiseAsTheLastMemberIsStillAClear()
+    {
+        // PHASE4-030, -107: the boss kill is what makes a run succeed, however the
+        // deaths of one cascade drain. A raise can take the boss and the last member
+        // together, and held deaths run in the order they fell: with the member's
+        // first, the game is over before the boss's own death feed has run. What
+        // killed the boss — a blow or a tick — has already written its row, so the
+        // visit reads it and records the kill before the wipe ends the run. Nothing
+        // shipped is known to order a cascade that way — once the last member is
+        // down every hit it queued lands on nothing, and a turn's ticks drain actor
+        // by actor — so a probe on Killed hands the boss its last poison tick inside
+        // the member's own raise: one raise, the member first. The run is then what
+        // killing the boss and dying makes it: the success tick, the lock, the clear.
+        var campaign = Campaign();
+        var party = campaign.Party;
+        var visit = campaign.Enter("spear_hall", FiveDeep);
+        Assert.Equal(5, visit.BossFloor);
+        var turns = visit.OpenTurns(party, Ten);
+        while (visit.Current.DownStairs is not null)
+            turns = Down(visit, party);
+        var boss = visit.Current.Boss!;
+        int spearAtTheDoor = visit.EntrySnapshot.Members[1].WeaponXp[(int)Spear];
+        party[1].WeaponXp[Spear] += 40;   // earned on the run: the wipe takes half
+
+        // A alone still standing, on 1 HP and poisoned; the boss on 1 HP, poisoned too.
+        foreach (var fallen in party.Skip(1))
+            (fallen.Hp, fallen.Alive) = (0, false);
+        party[0].Hp = 1;
+        party[0].ApplyStatus(StatusEffectType.Poison, null, 5);
+        boss.Hp = 1;
+        boss.ApplyStatus(StatusEffectType.Poison, null, 5);
+        turns.Events.On<KillPayload>(GameEvent.Killed, new HandlerPriority(9, 0), "probe", (p, _, dead) =>
+        {
+            if (ReferenceEquals(dead, party[0]))
+                turns.Events.Enqueue(GameEvent.TurnEnd, new TurnPayload(turns.TurnCount, Side.Enemy), boss, boss);
+            return p;
+        });
+
+        var heard = new List<string>();
+        RunResult? ended = null;
+        turns.CharacterDied += member => heard.Add(member.Id);
+        turns.BossDefeated += _ => heard.Add("boss");
+        campaign.RunEnded += result =>
+        {
+            ended = result;
+            heard.Add("run over");
+        };
+        turns.EndTurn();   // A's turn-end tick takes A, and inside that raise the boss's takes the boss
+
+        // The member's death drained first: the run was over before the boss's own feed ran.
+        Assert.Equal(new[] { "A", "run over", "boss" }, heard);
+        Assert.Equal(TurnPhase.GameOver, turns.Phase);
+        Assert.False(boss.Alive);
+
+        var run = ended ?? throw new Xunit.Sdk.XunitException("The wipe ended no run.");
+        Assert.Same(run, campaign.LastResult);
+        Assert.Null(campaign.Visit);
+        Assert.Equal((RunOutcome.Death, true, 5, (int?)5), (run.Outcome, run.BossDefeated, run.DeepestFloor, run.BossFloorRevealed));
+        Assert.Equal((true, false), (run.ServiceTick, run.MercyTick));   // the success tick, never a mercy
+        Assert.Equal((1, 1), (run.RunCounter, campaign.RunCounter));
+        Assert.Equal(1 + 5, run.LockedUntilRun);
+        Assert.Equal(new[] { ("spear_hall", 6) }, campaign.LockedInOrder);
+        Assert.True(campaign.HasCleared("spear_hall"));
+        Assert.False(campaign.IsSelectable(SpearHall));
+        Assert.Equal(new XpClawback("B", "Spear", spearAtTheDoor + 40, spearAtTheDoor + 20), Assert.Single(run.Clawbacks));
+
+        // Recorded at the turn the boss fell, before the wipe; the feed that drained
+        // after it found the kill already written and moved nothing.
+        Assert.Equal((true, turns.TurnCount, turns.TurnCount), (visit.BossDefeated, visit.BossDefeatedAtTurn, boss.DefeatedAtTurn));
+        Assert.False(turns.ResurrectionActive);
+    }
+
     // ── What counts ──────────────────────────────────────────────────────────
 
     [Fact]
