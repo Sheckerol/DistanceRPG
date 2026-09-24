@@ -560,7 +560,8 @@ public static class ContentValidator
 
     /// <summary>
     /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier
-    /// relation names only modifiers, no id excludes itself, excludes closes
+    /// relation names only modifiers (<c>kind</c> and <c>forgedOnly</c>, which
+    /// only modifiers have, among them), no id excludes itself, excludes closes
     /// symmetrically, requires is acyclic, and nothing both requires and excludes
     /// the same id. <paramref name="knownIds"/> is every modifier and enchantment
     /// id content may name. (The "every forgedOnly id is forged on at least one
@@ -596,6 +597,9 @@ public static class ContentValidator
 
         // A relation keyed by a modifier names only modifiers; see the method.
         ValidateModifierRelations(data);
+
+        // And the two relations only modifiers have name nothing else; see the method.
+        ValidateModifierOnlyRelations(data);
 
         // No id excludes itself: a group naming an id twice would.
         foreach (var group in data.Excludes)
@@ -639,7 +643,9 @@ public static class ContentValidator
     /// Relations keyed by an enchantment are free to name enchantments; they are
     /// read beside the enchantment catalogue. The entry named is the modifier.
     /// <see cref="ModifierRules"/> runs this itself as well, so the rules can
-    /// never be built around a dropped relation.
+    /// never be built around a dropped relation. (<c>kind</c> and
+    /// <c>forgedOnly</c> are modifier relations whole, and the load refuses an
+    /// enchantment in either: <see cref="ValidateModifierOnlyRelations"/>.)
     /// </summary>
     public static void ValidateModifierRelations(RestrictedData data)
     {
@@ -656,6 +662,36 @@ public static class ContentValidator
         foreach (var (id, needs) in data.Requires.OrderBy(r => r.Key, StringComparer.Ordinal))
             if (isModifier(id) && !needs.All(isModifier))
                 throw new ContentException(id, RuleModifierRelationIds);
+    }
+
+    /// <summary>
+    /// <c>kind</c> and <c>forgedOnly</c> name modifiers alone (PHASE5-092, -108,
+    /// -109): §1.1's weapon-kind restriction and its safety rule — §5.5's
+    /// <c>Brace</c> melee and <c>Charges</c> — are modifier relations whole.
+    /// <see cref="ModifierRules"/> keeps their modifier rows, and nothing reads
+    /// either for an enchantment: unlike an exclusion group or a <c>requires</c>
+    /// row, neither has an enchantment reading anywhere. So an enchantment named
+    /// in one resolves — the id check passes it — and then silently does not
+    /// apply, the failure §5.5's id check exists to prevent. Refused under
+    /// <see cref="RuleModifierRelationIds"/>, the entry the enchantment, the
+    /// detail naming the file and the row; <c>kind</c> in ordinal key order, then
+    /// <c>forgedOnly</c> in its own order, so the one reported is the same every
+    /// run. This is the relations' own check, at <c>restricted.json</c>'s stage
+    /// of the load, before any rules are built. It is not in
+    /// <see cref="ValidateModifierRelations"/>, which the rules also run: they
+    /// skip a row keyed by an enchantment by contract, and the load refuses one.
+    /// </summary>
+    private static void ValidateModifierOnlyRelations(RestrictedData data)
+    {
+        foreach (var (id, kind) in data.Kind.OrderBy(k => k.Key, StringComparer.Ordinal))
+            if (!ModifierRules.ModifierIds.Contains(id))
+                throw new ContentException(id, RuleModifierRelationIds,
+                    $"'{id}' is an enchantment, and kind limits modifiers alone - {RestrictedJson.FileName} kind {id}: {kind}");
+
+        foreach (var id in data.ForgedOnly)
+            if (!ModifierRules.ModifierIds.Contains(id))
+                throw new ContentException(id, RuleModifierRelationIds,
+                    $"'{id}' is an enchantment, and forgedOnly lists modifiers alone - {RestrictedJson.FileName} forgedOnly {id}");
     }
 
     /// <summary>

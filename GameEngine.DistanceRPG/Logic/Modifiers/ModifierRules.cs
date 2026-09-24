@@ -58,8 +58,11 @@ public sealed class ModifierRules
     /// <summary>
     /// Build the rules from data. Enchantment ids share the relations file
     /// (§5.5) but not these tables: a relation keyed by an enchantment is
-    /// skipped here and validated alongside the enchantment catalogue instead,
-    /// while a modifier relation naming an enchantment is refused
+    /// skipped here — an exclusion group or a <c>requires</c> row is validated
+    /// alongside the enchantment catalogue instead, and a <c>kind</c> row or a
+    /// <c>forgedOnly</c> id, relations only modifiers have, is refused by the
+    /// load before these rules are built (<see cref="ContentValidator.ValidateRestricted"/>)
+    /// — while a modifier relation naming an enchantment is refused
     /// (<see cref="ContentValidator.RuleModifierRelationIds"/>) rather than
     /// quietly losing the member <see cref="Allowed"/> could never see.
     /// </summary>

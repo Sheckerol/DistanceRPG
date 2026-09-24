@@ -206,4 +206,32 @@ public class RestrictedJsonTests
         }
         Assert.EndsWith("did you mean burning?", Load(DataTexts.Edit(Shipped, ", \"burning\"]", ", \"buring\"]")).Error!.Detail);
     }
+
+    [Fact]
+    public void AnEnchantmentInKindOrForgedOnlyAbortsStartupNamingIt()
+    {
+        // PHASE5-092, -108, -109: kind keeps a modifier to a kind of weapon (Brace
+        // melee) and forgedOnly keeps one from being added from zero (Charges) —
+        // relations only modifiers have, which the modifier rules read and nothing
+        // else does. An enchantment named in either resolves, and then no rule
+        // reads it: "a rule that silently does not apply". So the edit stops the
+        // game at restricted.json's stage, naming the id, the key and the file,
+        // rather than loading as though it said something.
+        var kind = Load(DataTexts.Edit(Shipped, "\"Brace\": \"melee\",", "\"Brace\": \"melee\",\n    \"flaming\": \"melee\",")).Error!;
+        Assert.Equal(("flaming", ContentValidator.RuleModifierRelationIds, RestrictedJson.FileName, false),
+            (kind.EntryId, kind.Rule, kind.File, kind.Compiled));
+        Assert.Equal("'flaming' is an enchantment, and kind limits modifiers alone - restricted.json kind flaming: melee", kind.Detail);
+
+        var forgedOnly = Load(DataTexts.Edit(Shipped, "\"forgedOnly\": [\"Charges\"]", "\"forgedOnly\": [\"Charges\", \"burning\"]")).Error!;
+        Assert.Equal(("burning", ContentValidator.RuleModifierRelationIds, RestrictedJson.FileName, false),
+            (forgedOnly.EntryId, forgedOnly.Rule, forgedOnly.File, forgedOnly.Compiled));
+        Assert.Equal("'burning' is an enchantment, and forgedOnly lists modifiers alone - restricted.json forgedOnly burning", forgedOnly.Detail);
+
+        // A modifier added to kind is the relation it always was, and loads: the
+        // riposte blade, a sword, is the one weapon forged with Riposte.
+        var counter = Load(DataTexts.Edit(Shipped, "\"Opportunist\": \"melee\",", "\"Opportunist\": \"melee\",\n    \"Riposte\": \"melee\","));
+        Assert.Null(counter.Error);
+        Assert.Equal(WeaponKind.Melee, counter.Content!.Modifiers.RequiresKind[Riposte]);
+        Assert.False(counter.Content.Modifiers.Allowed(Riposte, WeaponKind.Ranged, ModifierSet.Of((Block, 1))));
+    }
 }

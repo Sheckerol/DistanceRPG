@@ -137,10 +137,11 @@ public static class RestrictedJson
             + "crit rider and currency groups, then the opposed damage types: an element is opposed by exactly one other.",
         ["requires"] = "Dependencies, one way: an id to the ids it cannot exist without on the same weapon - Riposte and "
             + "BlockWeaken need Block, Rout needs Cleave, and a lingering element needs its element ahead of it.",
-        ["kind"] = "Weapon-type restrictions: an id to melee, ranged or caster, in lower case. An id not named here goes "
-            + "on any kind of weapon.",
+        ["kind"] = "Weapon-type restrictions: a modifier to melee, ranged or caster, in lower case. A modifier not named "
+            + "here goes on any kind of weapon. Modifiers only: an enchantment here stops the game.",
         ["forgedOnly"] = "Deepened where it is already forged, never added from zero - a safety rule: Charges granted to a "
-            + "bow would be a cap where there was none. Each id here must be forged on some weapon.",
+            + "bow would be a cap where there was none. Each must be a modifier forged on some weapon; an enchantment "
+            + "here stops the game.",
         ["neverRolled"] = "Never granted by any roll, and never copied - an economy rule: the unique enchantments. Every "
             + "entry enchantments.json marks unique is here, and nothing else is.",
     };
@@ -149,7 +150,7 @@ public static class RestrictedJson
     [
         "restricted.json - what may sit together on a weapon, and what may be rolled, for modifiers and",
         "enchantments alike. An id is a modifier's name (Block, CritWindow) or an enchantment's id from",
-        "enchantments.json (flaming, burning).",
+        "enchantments.json (flaming, burning); kind and forgedOnly name modifiers alone.",
         "",
         "Read once, when the game starts, and checked before anything else is: an id that names nothing, a",
         "group naming an id twice, a requires that loops or that asks for what the same id excludes stops",

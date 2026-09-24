@@ -180,6 +180,29 @@ public class RestrictedDataTests
     }
 
     [Fact]
+    public void Validator_RejectsAnEnchantmentInKindOrForgedOnly()
+    {
+        // kind and forgedOnly are relations only modifiers have (§1.1's weapon-kind
+        // restriction and its safety rule): the modifier rules keep their modifier
+        // rows and nothing reads an enchantment's, so an enchantment named in either
+        // could only be dropped silently. The relations' own check refuses it,
+        // naming the enchantment — kind in ordinal key order, forgedOnly in its own.
+        var known = KnownPlus("flaming", "burning");
+
+        var kind = Assert.Throws<ContentException>(() => ContentValidator.ValidateRestricted(
+            Data(kind: new Dictionary<string, string> { ["flaming"] = "caster", ["Brace"] = "melee", ["burning"] = "melee" }), known));
+        Assert.Equal(("burning", ContentValidator.RuleModifierRelationIds), (kind.EntryId, kind.Rule));
+
+        var forgedOnly = Assert.Throws<ContentException>(() =>
+            ContentValidator.ValidateRestricted(Data(forgedOnly: ["Charges", "flaming", "burning"]), known));
+        Assert.Equal(("flaming", ContentValidator.RuleModifierRelationIds), (forgedOnly.EntryId, forgedOnly.Rule));
+
+        // Modifiers in both pass, as they always have.
+        ContentValidator.ValidateRestricted(
+            Data(kind: new Dictionary<string, string> { ["Brace"] = "melee" }, forgedOnly: ["Charges"]), known);   // does not throw
+    }
+
+    [Fact]
     public void Validator_AcceptsRelationsOverEnchantmentIds_OnceTheyAreKnown()
     {
         var data = Data(

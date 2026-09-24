@@ -123,9 +123,11 @@ built-in ones; their files come next.
 - **`restricted.json`** holds the relations: what may sit together on a weapon
   and what may be rolled, for modifiers and enchantments alike. `excludes` is a
   list of groups (every id in a group excludes every other, both ways), `requires`
-  maps an id to the ids it cannot exist without, `kind` limits an id to `melee`,
-  `ranged` or `caster` (lower case), `forgedOnly` lists what can be deepened but
-  never added, and `neverRolled` lists what no roll grants (the unique souls).
+  maps an id to the ids it cannot exist without, `kind` limits a modifier to
+  `melee`, `ranged` or `caster` (lower case), `forgedOnly` lists the modifiers
+  that can be deepened but never added, and `neverRolled` lists what no roll
+  grants (the unique souls). `kind` and `forgedOnly` are for modifiers only: an
+  enchantment in either stops the game.
   A relation is an edit here, never a rebuild: take the crit riders' group
   (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
 - **`enchantments.json`** holds the catalogue and the unique souls, one entry
@@ -151,8 +153,12 @@ built-in ones; their files come next.
   shown. Each file's shape is checked before anything reads it, and
   `enchantments.json`'s shape comes before `restricted.json`'s own rules, because
   those check the relations' ids against the enchantments'. When a file beside a
-  built-in record breaks it, the screen marks the built-in one `(COMPILED)` and the
-  detail names the file that did it.
+  built-in record breaks it, the screen marks the built-in one `(COMPILED)`. A
+  `restricted.json` edit that breaks the built-in enchantments names
+  `restricted.json` in the detail. One that makes a weapon illegal is reported
+  against the built-in weapons, `WEAPONS.JSON (COMPILED)`, naming the weapon and
+  what it carries but not yet the relation that refused it: that comes when the
+  weapons get a file of their own.
 - **A missing file plays the built-in one, and says so**: delete
   `enchantments.json` and the game plays the built-in catalogue, with
   `ENCHANTMENTS.JSON IS MISSING - THE BUILT-IN ENCHANTMENTS ARE PLAYING` under the

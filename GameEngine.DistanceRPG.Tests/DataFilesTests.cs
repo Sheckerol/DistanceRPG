@@ -79,19 +79,22 @@ public class DataFilesTests
             if (OperatingSystem.IsWindows())
                 Assert.Equal("another program has it open", why);
             Assert.DoesNotContain(folder, why, StringComparison.OrdinalIgnoreCase);   // the path is the log's; the screen names the file
-            Assert.StartsWith($"[Data] {path} could not be read (", Assert.Single(report, line => line.Contains(path, StringComparison.Ordinal)), StringComparison.Ordinal);
+            Assert.Collection(report,
+                line => Assert.StartsWith($"[Data] {path} could not be read (", line, StringComparison.Ordinal),
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, RestrictedJson.FileName)}", line),
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, EnchantmentsJson.FileName)}", line));
 
             var load = ContentFiles.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
             Assert.DoesNotContain(load.Notices, notice => notice.Contains("missing", StringComparison.Ordinal));
             Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(load.Content!.Tuning));
 
-            // Once it is free again, it is read like any other.
+            // Once it is free again, it is read like any other, beside the shipped
+            // files it sits with: every text read whole, and every file reported.
             report.Clear();
             var free = DataFiles.Read(folder, report.Add);
-            Assert.Equal("""{ "MovementBudget": 200 }""", free.Tuning);
-            Assert.Null(free.Unreadable);
-            Assert.Equal($"[Data] Read {path}", Assert.Single(report, line => line.Contains(path, StringComparison.Ordinal)));
+            Assert.Equal(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementBudget": 200 }""" }, free);
+            Assert.Equal(FilesRead.Select(name => $"[Data] Read {Path.Combine(folder, name)}"), report);
         });
     }
 

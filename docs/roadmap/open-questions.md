@@ -139,3 +139,39 @@ nothing. Whoever next edits §3.3 should write "two more triggers, a fraction of
 third, and then nothing" rather than move the code toward the shorter sentence:
 an entry that refused to fire at all below its trigger would be a new rule, and
 it would contradict the one §3.1 already settled.
+
+## Whether an enchantment's numbers have bounds (§5.4, §5.7)
+
+Phase 5.2 put every enchantment's numbers in `enchantments.json`, a file a
+playtester edits by hand, and the load checks only a few of them: a `lock` of at
+least 1 (`RuleEnchantmentLockIsPositive`), a `trigger` that is never 0 or less
+(`RuleZeroTrigger`), and a `potency` of at least 1 for the three kinds whose
+whole magnitude is their potency — bonus damage, Shattering and Shielding
+(`RuleMagnitudeNamesAPotency`). **Nothing else is bounded.** Phase 5.2's review
+loaded `vampiric` with `"potency": -5`, `"applyPercent": -5`,
+`"potency": 2147483647` or `"lock": 2147483647`, and each played without a word.
+
+Nothing is wrong in play today: every shipped number is sensible. The risk is the
+hand edit. `Enchantment.LevelsFor` multiplies `applyPercent`, the source and the
+tier straight through, so a sign typo lands negative status levels or negative
+healing; and `Enchantment.EffectiveLock` is `Lock x Tier` in unchecked
+arithmetic, so a huge lock wraps negative, and so do the mana sums built on it.
+Where `tuning.json` owns the same numbers — `ApplyPercent` and `ArcanePotency` —
+they are clamped to 0–1000, so the two files disagree about how far such a
+number is trusted.
+
+Two readings, and the choice wants a ruling rather than a guess:
+
+- **Range rules.** `ContentValidator.ValidateEnchantments` refuses a negative
+  `potency`, an `applyPercent` outside 0 to a ceiling, and a `lock` or `trigger`
+  above a ceiling, each a startup failure naming the entry and the rule — content
+  is "validated rather than clamped" (§5.4), so never a clamp. The ceilings are
+  numbers someone must pick; `tuning.json`'s 1000 is the nearest precedent.
+- **Trusted fields.** These numbers are the designer's, and the load refuses only
+  what makes an entry mean nothing: a free lock, a free trigger, a magnitude of
+  zero. [Settled](settled.md) then says so, and a negative potency is a choice
+  the file permits rather than an oversight.
+
+Phase 5 brings the content files without adding a new kind of content rule, so
+it ships neither: whoever rules on this should add the rules, or the settled
+line, then.
