@@ -44,13 +44,13 @@ public static class RestrictedJson
         var groups = shape.Array(shape.Required(root, "excludes", JsonShape.Top, "excludes"), "excludes", "excludes", "a list of groups");
         var excludes = new List<string[]>(groups.Count);
         for (int i = 0; i < groups.Count; i++)
-            excludes.Add(Ids(shape, groups[i], $"excludes[{i}]", "excludes", "a group: a list of ids"));
+            excludes.Add(shape.Ids(groups[i], $"excludes[{i}]", "excludes", "a group: a list of ids"));
 
         var requiresTable = shape.Object(shape.Required(root, "requires", JsonShape.Top, "requires"), "requires", "requires",
             "a table of each id to the ids it needs");
         var requires = new Dictionary<string, string[]>(StringComparer.Ordinal);
         foreach (var (id, needs) in shape.Members(requiresTable, "requires", "requires"))
-            requires[id] = Ids(shape, needs, $"requires.{id}", id, "a list of the ids it needs");
+            requires[id] = shape.Ids(needs, $"requires.{id}", id, "a list of the ids it needs");
 
         var kindTable = shape.Object(shape.Required(root, "kind", JsonShape.Top, "kind"), "kind", "kind",
             "a table of each id to melee, ranged or caster");
@@ -58,19 +58,9 @@ public static class RestrictedJson
         foreach (var (id, value) in shape.Members(kindTable, "kind", "kind"))
             kind[id] = shape.String(value, $"kind.{id}", id, "melee, ranged or caster in quotes");
 
-        string[] forgedOnly = Ids(shape, shape.Required(root, "forgedOnly", JsonShape.Top, "forgedOnly"), "forgedOnly", "forgedOnly", "a list of ids");
-        string[] neverRolled = Ids(shape, shape.Required(root, "neverRolled", JsonShape.Top, "neverRolled"), "neverRolled", "neverRolled", "a list of ids");
+        string[] forgedOnly = shape.Ids(shape.Required(root, "forgedOnly", JsonShape.Top, "forgedOnly"), "forgedOnly", "forgedOnly", "a list of ids");
+        string[] neverRolled = shape.Ids(shape.Required(root, "neverRolled", JsonShape.Top, "neverRolled"), "neverRolled", "neverRolled", "a list of ids");
         return new RestrictedData(excludes, requires, kind, forgedOnly, neverRolled);
-    }
-
-    /// <summary>A list of ids, each a non-empty string.</summary>
-    private static string[] Ids(JsonShape shape, JsonElement value, string path, string entry, string what)
-    {
-        var items = shape.Array(value, path, entry, what);
-        var ids = new string[items.Count];
-        for (int i = 0; i < items.Count; i++)
-            ids[i] = shape.Id(items[i], $"{path}[{i}]", entry);
-        return ids;
     }
 
     /// <summary>
@@ -88,11 +78,11 @@ public static class RestrictedJson
         text.Append("{\n");
 
         JsonText.Comment(text, KeyNotes["excludes"], Indent);
-        text.Append($"{Indent}\"excludes\": ").Append(Lines(data.Excludes.Select(List))).Append(",\n\n");
+        text.Append($"{Indent}\"excludes\": ").Append(Lines(data.Excludes.Select(JsonText.Ids))).Append(",\n\n");
 
         JsonText.Comment(text, KeyNotes["requires"], Indent);
         text.Append($"{Indent}\"requires\": ")
-            .Append(Rows(data.Requires.OrderBy(r => r.Key, StringComparer.Ordinal).Select(r => $"{JsonText.Quote(r.Key)}: {List(r.Value)}")))
+            .Append(Rows(data.Requires.OrderBy(r => r.Key, StringComparer.Ordinal).Select(r => $"{JsonText.Quote(r.Key)}: {JsonText.Ids(r.Value)}")))
             .Append(",\n\n");
 
         JsonText.Comment(text, KeyNotes["kind"], Indent);
@@ -101,19 +91,16 @@ public static class RestrictedJson
             .Append(",\n\n");
 
         JsonText.Comment(text, KeyNotes["forgedOnly"], Indent);
-        text.Append($"{Indent}\"forgedOnly\": {List(data.ForgedOnly)},\n\n");
+        text.Append($"{Indent}\"forgedOnly\": {JsonText.Ids(data.ForgedOnly)},\n\n");
 
         JsonText.Comment(text, KeyNotes["neverRolled"], Indent);
-        text.Append($"{Indent}\"neverRolled\": {List(data.NeverRolled)}\n");
+        text.Append($"{Indent}\"neverRolled\": {JsonText.Ids(data.NeverRolled)}\n");
 
         text.Append("}\n");
         return text.ToString();
     }
 
     private const string Indent = "  ";
-
-    /// <summary>A list of ids on one line: <c>["Brace", "Opportunist", "Overwatch"]</c>.</summary>
-    private static string List(IEnumerable<string> ids) => $"[{string.Join(", ", ids.Select(JsonText.Quote))}]";
 
     /// <summary>A list whose items are each a line of their own, or <c>[]</c> for none.</summary>
     private static string Lines(IEnumerable<string> items)

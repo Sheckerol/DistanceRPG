@@ -7,11 +7,13 @@ internal class Program
 {
     /// <summary>
     /// The command that writes the data files instead of playing:
-    /// <c>DistanceRPG --write-data &lt;folder&gt;</c> writes what the generator makes of
-    /// the compiled content (<see cref="ContentFiles.WriteDefaults"/>) into the
+    /// <c>DistanceRPG --write-data &lt;folder&gt;</c> writes the six files the
+    /// generator makes of the compiled content (<see cref="ContentFiles.WriteDefaults"/>:
+    /// <c>tuning.json</c>, <c>restricted.json</c>, <c>enchantments.json</c>,
+    /// <c>weapons.json</c>, <c>dungeons.json</c> and <c>party.json</c>) into the
     /// folder and exits, no window opened. Run on <c>GameEngine.DistanceRPG/Data</c>
     /// it regenerates the shipped files the tests pin; run on the folder beside the
-    /// executable it resets an edited copy to the built-in numbers.
+    /// executable it resets every edited copy to the built-in content.
     /// </summary>
     internal const string WriteDataOption = "--write-data";
 
@@ -58,7 +60,7 @@ internal class Program
     }
 
     /// <summary>
-    /// The generator's files, written into <paramref name="directory"/> (made
+    /// The generator's six files, written into <paramref name="directory"/> (made
     /// absolute against the working folder, and created if need be), each path
     /// reported as it is written. The command's whole body, so a test runs it into
     /// a folder of its own.

@@ -114,11 +114,12 @@ every key.
 - Nothing the golden tests pin — the map generator, the random streams, the
   pathfinder — is in it, and a test keeps it that way.
 
-## The content files: `restricted.json` and `enchantments.json`
+## The content files
 
-Two content files sit beside `tuning.json` (`docs/roadmap/phase-5-save.md`
-§5.5, §5.7). The weapons, the dungeons and the starting roster are still the
-built-in ones; their files come next.
+Five content files sit beside `tuning.json` (`docs/roadmap/phase-5-save.md`
+§5.4–§5.9): `restricted.json`, `enchantments.json`, `weapons.json`,
+`dungeons.json` and `party.json`. They are read once, when the game starts, in
+that order, and everything in them is named by a stable string id.
 
 - **`restricted.json`** holds the relations: what may sit together on a weapon
   and what may be rolled, for modifiers and enchantments alike. `excludes` is a
@@ -134,6 +135,30 @@ built-in ones; their files come next.
   each, every entry naming all eleven fields. `effect` names the behaviour — one
   of the game's `EffectKind` names, since the behaviour itself is code — so a new
   entry of an existing kind is a data edit.
+- **`weapons.json`** holds every weapon: the thirty-two variants (eight classes
+  of four) and the uniques, each with its statline (`range`, `damage`, `cost`,
+  `manaCost`), its forged spread (`"forged": { "Block": 1, "Push": 1 }`), the
+  enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier left
+  out when it is 1) and a wand's `shape`. A class's baseline is not written
+  anywhere: it is what the class's four variants share, so re-basing a class is
+  an edit to all four. Give the Weakspot Stiletto `"damage": 25` and restart, and
+  A hits harder. `arming_sword` (what a dummy holds) and `staff_of_renewal` (a
+  crowded room's healer) are named by the code, so they must stay.
+- **`dungeons.json`** holds the dungeons the screen between runs lists: `theme`,
+  `attunement` (a damage type, or `null`), `bossFloorMin`/`bossFloorMax` (`null`
+  plays `tuning.json`'s range), the `boss` (its statline and `innate` modifiers)
+  and `retiresOnClear`, the tutorial's alone. There is no drop table: what a boss
+  drops is computed from its theme and `restricted.json`, so taking `Brace` out
+  of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
+  with no edit to this file.
+- **`party.json`** holds the four who start a campaign: `id`, `name`, `stats`
+  (`STR`, `DEX`, `CON` and `INT`, the numbers 1 to 4 in some order),
+  `startingWeaponId` and `bagWeaponIds`. A campaign starts with the party this
+  file names; with no saves yet, every start of the game is a new campaign, so
+  swapping two members' `stats` and restarting plays them swapped.
+- **A row marked `/* provisional */`** after its id is one the docs did not fix
+  — the four dungeons beside the tutorial and their bosses, the three unnamed
+  uniques, `aegis` and `burning` — a first guess, expected to move after play.
 - **Edit the copies beside the exe** (`bin/Debug/net10.0/`), as with
   `tuning.json`: the ones in `GameEngine.DistanceRPG/Data/` are generated from
   `Logic/Content/ContentDefaults.cs` and pinned by `ShippedDataTests`. The file
@@ -152,25 +177,30 @@ built-in ones; their files come next.
   enchantments, weapons, dungeons, roster, and the first check to fail is the one
   shown. Each file's shape is checked before anything reads it, and
   `enchantments.json`'s shape comes before `restricted.json`'s own rules, because
-  those check the relations' ids against the enchantments'. When a file beside a
-  built-in record breaks it, the screen marks the built-in one `(COMPILED)`. A
-  `restricted.json` edit that breaks the built-in enchantments names
-  `restricted.json` in the detail. One that makes a weapon illegal is reported
-  against the built-in weapons, `WEAPONS.JSON (COMPILED)`, naming the weapon and
-  what it carries but not yet the relation that refused it: that comes when the
-  weapons get a file of their own.
+  those check the relations' ids against the enchantments'. A later file's
+  mistake never hides an earlier one's: a typo in `party.json` waits behind a
+  broken relation. When a file beside a built-in record breaks it, the screen
+  marks the built-in one `(COMPILED)`. A `restricted.json` edit that breaks the
+  enchantments names `restricted.json` in the detail, and one that makes a weapon
+  illegal names both the weapon and the relation that refused it, for modifiers
+  and enchantments alike: add `["Push", "Block"]` to `excludes` and the game
+  opens on `WEAPONS.JSON`, `ARMING_SWORD`, and a detail ending
+  `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`.
 - **A missing file plays the built-in one, and says so**: delete
   `enchantments.json` and the game plays the built-in catalogue, with
   `ENCHANTMENTS.JSON IS MISSING - THE BUILT-IN ENCHANTMENTS ARE PLAYING` under the
-  title and the path it looked in in the log.
+  title and the path it looked in in the log. The same goes for every content
+  file.
 - **Some numbers are `tuning.json`'s**: the `applyPercent` of `flaming`, `cold`,
   `shocking`, `acidic` and `serrated`, and `arcane`'s `potency`, are set by
   `tuning.json` (`ApplyPercent`, `ArcanePotency`), and the file marks each with
   `/* tuning.json ... sets this */`. An edit to one in `enchantments.json` cannot
   take effect, so the game says `ENCHANTMENTS.JSON FLAMING.APPLYPERCENT 30 IS
   OVERRIDDEN BY TUNING.JSON APPLYPERCENT.FLAMING 20`. Turn the dial instead.
-- `--write-data <folder>` writes all three files: `tuning.json`,
-  `restricted.json` and `enchantments.json`.
+- `--write-data <folder>` writes all six files: `tuning.json` and the five
+  content files. Run on the folder beside the exe it resets every edited copy;
+  `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped ones after a
+  change to `ContentDefaults.cs`.
 
 ## How the port was verified
 

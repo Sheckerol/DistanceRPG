@@ -1,0 +1,114 @@
+/*
+ * dungeons.json - the dungeons the screen between runs lists, in its order, each with its boss.
+ *
+ * Read once, when the game starts, after weapons.json. A dungeon is checked, never clamped: a
+ * theme that is no class's signature, a boss floor range that is inverted or deep enough to pay
+ * a farm's stacks, a boss without its theme, two dungeons that retire on clear, or a field the
+ * game does not know stops the game on a screen naming the file, the dungeon and the rule. Every
+ * dungeon names all eight fields, and its boss all five; comments and trailing commas are fine.
+ * A dungeon is an edit here, never a rebuild: start the game again to play it.
+ *
+ * id: what everything names the dungeon by - a lock, a save. name: what the screen calls it.
+ * theme: a modifier - the boss carries it whatever it holds and forges it onto its drop, and every
+ * other drop there may roll it; a class's signature, so the dungeon has one unique to hunt.
+ * attunement: the damage type everything it spawns is attuned to (Flaming, Cold, Shocking or
+ * Acidic), or null. bossFloorMin, bossFloorMax: the floors the boss is rolled between, or null
+ * for tuning.json's BossFloorMin and BossFloorMax. boss: its id, name, maxHp, movementBudget (in
+ * logic units a turn, 32 a tile) and innate modifiers, each to its stack count, the theme among
+ * them. retiresOnClear: beating the boss closes the dungeon for good - the tutorial's, and only
+ * one dungeon may.
+ *
+ * There is no drop table: what a boss drops is computed from its theme and restricted.json, so a
+ * relation edited there moves it with no edit here. A dungeon or a boss whose id is marked
+ * provisional is a first guess the docs did not fix, expected to move after play.
+ *
+ * The copy to edit is the one beside the game (bin/Debug/net10.0/dungeons.json - the log prints
+ * its full path). GameEngine.DistanceRPG/Data/dungeons.json is generated from the compiled
+ * content (DistanceRPG --write-data <folder>) and pinned by the tests: a dungeon worth keeping
+ * goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy
+ * plays the built-in dungeons, and the screen says so.
+ */
+{
+  "dungeons": [
+    {
+      "id": "tutorial",
+      "name": "The Tutorial",
+      "theme": "Block",
+      "attunement": null,
+      "bossFloorMin": 2,
+      "bossFloorMax": 2,
+      "boss": {
+        "id": "stone_golem",
+        "name": "Stone Golem",
+        "maxHp": 80,
+        "movementBudget": 40,
+        "innate": { "Block": 3 }
+      },
+      "retiresOnClear": true
+    },
+    {
+      "id": "spear_hall", /* provisional */
+      "name": "The Spear Hall",
+      "theme": "Brace",
+      "attunement": null,
+      "bossFloorMin": null,
+      "bossFloorMax": null,
+      "boss": {
+        "id": "spear_warden", /* provisional */
+        "name": "Spear Warden",
+        "maxHp": 200,
+        "movementBudget": 70,
+        "innate": { "Brace": 3 }
+      },
+      "retiresOnClear": false
+    },
+    {
+      "id": "long_gallery", /* provisional */
+      "name": "The Long Gallery",
+      "theme": "Longshot",
+      "attunement": null,
+      "bossFloorMin": null,
+      "bossFloorMax": null,
+      "boss": {
+        "id": "gallery_marksman", /* provisional */
+        "name": "Gallery Marksman",
+        "maxHp": 200,
+        "movementBudget": 70,
+        "innate": { "Longshot": 3 }
+      },
+      "retiresOnClear": false
+    },
+    {
+      "id": "knife_warrens", /* provisional */
+      "name": "The Knife Warrens",
+      "theme": "CritWindow",
+      "attunement": null,
+      "bossFloorMin": null,
+      "bossFloorMax": null,
+      "boss": {
+        "id": "knife_mother", /* provisional */
+        "name": "Knife Mother",
+        "maxHp": 200,
+        "movementBudget": 70,
+        "innate": { "CritWindow": 3 }
+      },
+      "retiresOnClear": false
+    },
+    {
+      "id": "quiver_pits", /* provisional */
+      "name": "The Quiver Pits",
+      "theme": "Charges",
+      "attunement": null,
+      "bossFloorMin": null,
+      "bossFloorMax": null,
+      "boss": {
+        "id": "quiver_keeper", /* provisional */
+        "name": "Quiver Keeper",
+        "maxHp": 200,
+        "movementBudget": 70,
+        "innate": { "Charges": 3 }
+      },
+      "retiresOnClear": false
+    }
+  ]
+}

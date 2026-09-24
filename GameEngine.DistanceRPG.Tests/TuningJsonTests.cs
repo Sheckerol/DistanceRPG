@@ -196,8 +196,9 @@ public class TuningJsonTests
         // both ways; and the cases where keys meet each other or the content —
         // floors inverted, carries the party cannot share or the roster cannot fit,
         // the deepest boss against the shallowest farm, every forge limit at 1. Each
-        // loads through the loader with the shipped content (in Phase 5.1, the
-        // compiled content), and the tuning it plays still passes the validator,
+        // loads through the loader beside the five shipped content files — the
+        // generator's, so TuningFit reads the weapons, dungeons and roster the files
+        // parse to — and the tuning it plays still passes the validator,
         // which stays the refusal for a tuning built in code. And under it no
         // shipped weapon's swing or cast costs less than nothing, however deep
         // its Light or Resonant runs: a discount past 100 percent takes the
@@ -236,10 +237,11 @@ public class TuningJsonTests
         ]);
         Assert.True(files.Count > 170, $"{files.Count} files: the sweep is not reading the schema");
 
+        var shipped = ContentFiles.WriteDefaults();
         var failures = new List<string>();
         foreach (string file in files)
         {
-            var load = ContentFiles.Load(new ContentTexts(Tuning: file));
+            var load = ContentFiles.Load(shipped with { Tuning = file });
             if (load.Content is not { } content)
             {
                 failures.Add($"{file} -> {load.Error?.Message ?? "no content"}");

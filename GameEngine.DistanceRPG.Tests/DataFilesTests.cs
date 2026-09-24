@@ -25,8 +25,9 @@ public class DataFilesTests
         }
     }
 
-    /// <summary>The data files the edge reads in Phase 5.2, in §5.4's order: the tuning, the relations, the enchantments (the weapons, dungeons and roster are compiled until Phase 5.3).</summary>
-    private static readonly string[] FilesRead = [TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName];
+    /// <summary>The data files the edge reads, in §5.4's order: the tuning, then the five content files — the relations, the enchantments, the weapons, the dungeons, the roster.</summary>
+    private static readonly string[] FilesRead =
+        [TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName, PartyJson.FileName];
 
     [Fact]
     public void ReadsWhatIsBesideTheExecutable_AndNothingThatIsAbsent()
@@ -42,8 +43,8 @@ public class DataFilesTests
             Assert.Equal(FilesRead.Select(name => $"[Data] {Path.Combine(folder, name)} is missing - the built-in one plays"), report);
 
             // A tuning.json alone: read whole, reported by its path in that folder,
-            // and the two content files the edge reads looked for and reported
-            // missing — the compiled records play for them.
+            // and the five content files looked for and reported missing — the
+            // compiled records play for them.
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             report.Clear();
             var texts = DataFiles.Read(folder, report.Add);
@@ -82,7 +83,10 @@ public class DataFilesTests
             Assert.Collection(report,
                 line => Assert.StartsWith($"[Data] {path} could not be read (", line, StringComparison.Ordinal),
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, RestrictedJson.FileName)}", line),
-                line => Assert.Equal($"[Data] Read {Path.Combine(folder, EnchantmentsJson.FileName)}", line));
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, EnchantmentsJson.FileName)}", line),
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, WeaponsJson.FileName)}", line),
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, DungeonsJson.FileName)}", line),
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, PartyJson.FileName)}", line));
 
             var load = ContentFiles.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
@@ -136,6 +140,9 @@ public class DataFilesTests
             Assert.Equal(Encoding.UTF8.GetBytes(written.Tuning!), File.ReadAllBytes(path));
             Assert.Equal(Encoding.UTF8.GetBytes(written.Restricted!), File.ReadAllBytes(Path.Combine(target, RestrictedJson.FileName)));
             Assert.Equal(Encoding.UTF8.GetBytes(written.Enchantments!), File.ReadAllBytes(Path.Combine(target, EnchantmentsJson.FileName)));
+            Assert.Equal(Encoding.UTF8.GetBytes(written.Weapons!), File.ReadAllBytes(Path.Combine(target, WeaponsJson.FileName)));
+            Assert.Equal(Encoding.UTF8.GetBytes(written.Dungeons!), File.ReadAllBytes(Path.Combine(target, DungeonsJson.FileName)));
+            Assert.Equal(Encoding.UTF8.GetBytes(written.Party!), File.ReadAllBytes(Path.Combine(target, PartyJson.FileName)));
             Assert.Equal(written, DataFiles.Read(target));
         });
     }

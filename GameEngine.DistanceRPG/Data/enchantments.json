@@ -17,6 +17,8 @@
  *
  * A field marked "tuning.json ... sets this" is a number tuning.json owns: the game plays the
  * dial there whatever the field says, and the screen says so when the two differ. Turn the dial.
+ * An entry whose id is marked provisional is a first guess the docs did not fix, expected to move
+ * after play.
  *
  * The copy to edit is the one beside the game (bin/Debug/net10.0/enchantments.json - the log
  * prints its full path). GameEngine.DistanceRPG/Data/enchantments.json is generated from the
@@ -170,7 +172,7 @@
       "unique": false
     },
     {
-      "id": "aegis",
+      "id": "aegis", /* provisional */
       "name": "Aegis",
       "effect": "Shielding",
       "targets": "Ally",
@@ -300,7 +302,7 @@
       "unique": true
     },
     {
-      "id": "burning",
+      "id": "burning", /* provisional */
       "name": "Burning",
       "effect": "LingeringElement",
       "targets": "Enemy",

@@ -28,10 +28,10 @@ internal static class DataFiles
     /// with the reason (<see cref="Why"/>), so the screen can say what happened
     /// instead of calling it missing. Each file read, missed or unreadable is
     /// reported to <paramref name="report"/> with its full path, and an
-    /// unreadable one with the whole error too. Phase 5.2 reads
-    /// <c>tuning.json</c>, <c>restricted.json</c> and <c>enchantments.json</c>;
-    /// the weapons, the dungeons and the roster are the compiled records until
-    /// the sub-step that ships their files.
+    /// unreadable one with the whole error too: all six — <c>tuning.json</c>,
+    /// then the five content files, <c>restricted.json</c>,
+    /// <c>enchantments.json</c>, <c>weapons.json</c>, <c>dungeons.json</c> and
+    /// <c>party.json</c>.
     /// </summary>
     public static ContentTexts Read(string directory, Action<string>? report = null)
     {
@@ -40,7 +40,11 @@ internal static class DataFiles
         string? tuning = ReadOne(directory, TuningJson.FileName, unreadable, report);
         string? restricted = ReadOne(directory, RestrictedJson.FileName, unreadable, report);
         string? enchantments = ReadOne(directory, EnchantmentsJson.FileName, unreadable, report);
+        string? weapons = ReadOne(directory, WeaponsJson.FileName, unreadable, report);
+        string? dungeons = ReadOne(directory, DungeonsJson.FileName, unreadable, report);
+        string? party = ReadOne(directory, PartyJson.FileName, unreadable, report);
         return new ContentTexts(Tuning: tuning, Restricted: restricted, Enchantments: enchantments,
+            Weapons: weapons, Dungeons: dungeons, Party: party,
             Unreadable: unreadable.Count == 0 ? null : unreadable);
     }
 

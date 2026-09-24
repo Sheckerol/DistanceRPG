@@ -173,6 +173,25 @@ public static class ContentValidator
     public const string RuleMartialVariantNoEnchantment = "a martial variant arrives carrying no enchantment of its own";
 
     /// <summary>
+    /// The weapons the code names by id resolve (1a): what a dummy holds unless
+    /// told otherwise (<see cref="EnemyState.DefaultWeaponId"/>, instantiated by
+    /// every <c>new EnemyState</c>) and the staff a crowded room's healer is
+    /// converted to (<see cref="EnemyPlacer.HealerWeaponId"/>). A compiled
+    /// reference a <c>weapons.json</c> edit could otherwise orphan into a crash
+    /// one construction deep — the same kind of check as the drop pool's
+    /// (<see cref="RuleDropPoolResolves"/>) and the caster drop order's
+    /// (<see cref="RuleCasterVariantPool"/>), not a new invariant.
+    /// </summary>
+    public const string RuleCodeNamedWeaponsExist = "every weapon the code names resolves: a dummy's default and the placer's healer staff";
+
+    /// <summary>The weapons the code names by id, each with what it is named as: <see cref="RuleCodeNamedWeaponsExist"/>'s list, in the order it is asked.</summary>
+    private static readonly (string Id, string NamedAs)[] CodeNamedWeapons =
+    [
+        (EnemyState.DefaultWeaponId, "what a dummy holds unless told otherwise (EnemyState.DefaultWeaponId)"),
+        (EnemyPlacer.HealerWeaponId, "the staff a crowded room's healer carries (EnemyPlacer.HealerWeaponId)"),
+    ];
+
+    /// <summary>
     /// The "class feature" column of the §1.2 table (phase-1-modifiers.md:16-25):
     /// the modifier a class is named for, which every variant of the class
     /// carries and a Purity variant deepens. Compiled, like <see cref="Weapon.KindOf"/>,
@@ -886,7 +905,20 @@ public static class ContentValidator
     /// <see cref="LootTable.CasterVariants"/> names, since the drop's draw
     /// indexes that rather than the file's order; and a martial variant carries
     /// no enchantment of its own, so the one entry a drop attaches is the one it
-    /// rolled.
+    /// rolled. So do the two weapons the code names by id
+    /// (<see cref="RuleCodeNamedWeaponsExist"/>), asked once every row has passed
+    /// its own checks and before the checks over whole classes.
+    /// </para>
+    /// <para>
+    /// <strong>A relations edit that makes a weapon illegal names both</strong>
+    /// (§5.5, S:220-224): the weapon is the entry, and the detail ends with the
+    /// <c>restricted.json</c> relation that refused it — for a forged modifier the
+    /// clause <see cref="ModifierRules.Allowed"/> refused on
+    /// (<see cref="WhyNotAllowed"/>), for two enchantments the group that
+    /// excludes them, for a dependency the <c>requires</c> row — read off
+    /// <paramref name="restricted"/>, the relations in hand. So is a
+    /// <c>forgedOnly</c> id no weapon is forged with: the check reads
+    /// <c>restricted.json</c> at the weapons' stage, and says so.
     /// </para>
     /// </summary>
     public static void ValidateWeapons(WeaponsData data, ModifierRules rules, RestrictedData restricted, EnchantmentCatalogue enchantments)
@@ -917,27 +949,29 @@ public static class ContentValidator
 
             // One hit cannot be two contradictory things: an entry's enchantments
             // never include a pair the relations exclude, in attachment order so
-            // the pair reported is the same one every run.
+            // the pair reported is the same one every run — naming the
+            // restricted.json group that excludes them (S:220-224: "naming both").
             for (int i = 0; i < def.Enchantments.Count; i++)
                 for (int j = i + 1; j < def.Enchantments.Count; j++)
                 {
                     string a = def.Enchantments[i].Id, b = def.Enchantments[j].Id;
                     if (excludes.TryGetValue(a, out var excludedByA) && excludedByA.Contains(b))
-                        throw new ContentException(def.Id, RuleEnchantmentsExcluded, $"'{a}' and '{b}'");
+                        throw new ContentException(def.Id, RuleEnchantmentsExcluded, WithRelation($"'{a}' and '{b}'", ExcludingGroup(restricted, a, b)));
                 }
 
             // A dependency (§5.5 requires, keyed by an enchantment) is met on the
             // weapon itself, ahead of the dependent in attachment order: the loop
             // fires in that order (§1.7), and a lingering element reads the
             // element that fired before it, so behind it the burn could never
-            // fire. Content that leaves the element off is refused here; a
-            // transfer that takes it off later (§6.5) leaves the burn quiet.
+            // fire. Content that leaves the element off is refused here, naming
+            // the restricted.json row it breaks; a transfer that takes it off
+            // later (§6.5) leaves the burn quiet.
             for (int i = 0; i < def.Enchantments.Count; i++)
             {
                 string id = def.Enchantments[i].Id;
                 foreach (var need in enchantments.Prerequisites(id))
                     if (!def.Enchantments.Take(i).Any(r => r.Id == need))
-                        throw new ContentException(def.Id, RuleEnchantmentDependency, $"'{id}' needs '{need}' ahead of it");
+                        throw new ContentException(def.Id, RuleEnchantmentDependency, WithRelation($"'{id}' needs '{need}' ahead of it", RequiresRow(restricted, id)));
             }
 
             // Overheal alone is inert (§1.5): an entry whose behaviour fires on
@@ -967,12 +1001,18 @@ public static class ContentValidator
                     if (enchantments[reference.Id].Unique)
                         throw new ContentException(def.Id, RuleUniqueSoulOnUnique, $"'{reference.Id}' on a variant");
 
+            // Allowed is the question, asked exactly as every graft and roll asks it
+            // (PHASE5-133: "no new validation code exists"); when it refuses, the
+            // detail names the restricted.json relation that refused, read off the
+            // relations in hand (PHASE5-122: the weapon "and the rule that made it
+            // so"). A member outside the table is no relation's doing, and keeps
+            // its detail as it is.
             foreach (var (t, n) in spread.Entries)
             {
                 if (!rules.Allowed(t, kind, spread))
                     throw new ContentException(def.Id, RuleForgedNotAllowed, ModifierRules.NeverStacked.Contains(t)
                         ? $"{t} x{n}: not in the modifier table, so never a stack on any weapon"
-                        : $"{t} x{n} on a {kind} weapon beside {spread}");
+                        : WithRelation($"{t} x{n} on a {kind} weapon beside {spread}", WhyNotAllowed(t, kind, spread, restricted)));
                 if (n > rules.MaxForged(t))
                     throw new ContentException(def.Id, RuleMaxForged, $"{t} x{n}, MaxForged {rules.MaxForged(t)}");
             }
@@ -1014,6 +1054,15 @@ public static class ContentValidator
             }
         }
 
+        // The weapons the code names by id are here (RuleCodeNamedWeaponsExist):
+        // after every row has passed its own checks, and ahead of the checks over
+        // whole classes, so a row taken out is named for what the code needs of
+        // it rather than for the class it leaves short.
+        foreach (var (id, namedAs) in CodeNamedWeapons)
+            if (!seen.Contains(id))
+                throw new ContentException(id, RuleCodeNamedWeaponsExist,
+                    $"the code names it as {namedAs}, and {WeaponsJson.FileName} has no such weapon");
+
         var baselines = new Dictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>>();
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
@@ -1051,10 +1100,80 @@ public static class ContentValidator
 
         ValidateUniques(data, enchantments, baselines);
 
+        // A check that reads restricted.json at the weapons' stage names it (1h).
         foreach (var id in restricted.ForgedOnly)
             if (ModifierRules.TryParseId(id, out var t) && !data.Weapons.Any(w => w.Forged.GetValueOrDefault(t) > 0))
-                throw new ContentException(id, RuleForgedOnlyUnused);
+                throw new ContentException(id, RuleForgedOnlyUnused,
+                    $"{RestrictedJson.FileName} forgedOnly {id}, and no weapon in {WeaponsJson.FileName} is forged with it");
     }
+
+    /// <summary>
+    /// Why <see cref="ModifierRules.Allowed"/> refuses <paramref name="t"/> on a
+    /// weapon of <paramref name="kind"/> carrying <paramref name="present"/> — the
+    /// relation that refused it, as <c>restricted.json</c> writes it — or null when
+    /// it is allowed (S:220-224, PHASE5-122: a relations edit that makes a weapon
+    /// illegal names "the weapon that is now illegal <em>and</em> the rule that
+    /// made it so").
+    /// <para>
+    /// An explanation, never a check (PHASE5-133: "no new validation code
+    /// exists"): the validator asks <see cref="ModifierRules.Allowed"/> and calls
+    /// this only once it has refused. It asks Allowed's own clauses in Allowed's
+    /// order — a member outside the modifier table, the weapon kind, forged-only,
+    /// the exclusion groups, the dependencies — so when several refuse, the first
+    /// is the one named; and it reads them off <paramref name="restricted"/>, the
+    /// relations the rules in hand were built from, the way
+    /// <see cref="ModifierRules"/> reads them: a group or a row keyed by an
+    /// enchantment is no modifier's. So it is non-null exactly when Allowed is
+    /// false. The wording is the forge's — <paramref name="present"/> is the
+    /// spread a row is forged with — and a member outside the table names no
+    /// relation at all, since none refused it.
+    /// </para>
+    /// </summary>
+    internal static string? WhyNotAllowed(ModifierType t, WeaponKind kind, ModifierSet present, RestrictedData restricted)
+    {
+        ArgumentNullException.ThrowIfNull(present);
+        ArgumentNullException.ThrowIfNull(restricted);
+        string name = t.ToString();
+
+        if (ModifierRules.NeverStacked.Contains(t))
+            return $"{name} is not in the modifier table";
+
+        if (restricted.Kind.TryGetValue(name, out var only) && RestrictedData.TryParseKind(only, out var required) && !required.HasFlag(kind))
+            return $"{RestrictedJson.FileName} kind {name}: {only}";
+
+        if (restricted.ForgedOnly.Contains(name, StringComparer.Ordinal) && present.Stacks(t) == 0)
+            return $"{RestrictedJson.FileName} forgedOnly {name}";
+
+        foreach (var group in restricted.Excludes)
+        {
+            if (!group.Contains(name, StringComparer.Ordinal))
+                continue;
+            foreach (var other in group)
+                if (other != name && ModifierRules.TryParseId(other, out var excluded) && present.Stacks(excluded) > 0)
+                    return $"{RestrictedJson.FileName} excludes [{string.Join(", ", group)}]: {other} is already forged here";
+        }
+
+        if (restricted.Requires.TryGetValue(name, out var needs))
+        {
+            var missing = needs.Where(need => ModifierRules.TryParseId(need, out var needed) && present.Stacks(needed) == 0).Distinct(StringComparer.Ordinal).ToList();
+            if (missing.Count > 0)
+                return $"{RestrictedJson.FileName} requires {name}: [{string.Join(", ", needs)}], and this weapon has no {string.Join(" or ", missing)}";
+        }
+        return null;
+    }
+
+    /// <summary><paramref name="detail"/>, then the restricted.json relation that refused it after a dash — or the detail alone when no relation is named.</summary>
+    private static string WithRelation(string detail, string? relation) => relation is null ? detail : $"{detail} - {relation}";
+
+    /// <summary>The first exclusion group, in file order, holding both <paramref name="a"/> and <paramref name="b"/>, as <c>restricted.json</c> writes it; null when none does.</summary>
+    private static string? ExcludingGroup(RestrictedData restricted, string a, string b)
+        => restricted.Excludes.FirstOrDefault(group => group.Contains(a, StringComparer.Ordinal) && group.Contains(b, StringComparer.Ordinal)) is { } found
+            ? $"{RestrictedJson.FileName} excludes [{string.Join(", ", found)}]"
+            : null;
+
+    /// <summary><paramref name="id"/>'s <c>requires</c> row as <c>restricted.json</c> writes it; null when it has none.</summary>
+    private static string? RequiresRow(RestrictedData restricted, string id)
+        => restricted.Requires.TryGetValue(id, out var needs) ? $"{RestrictedJson.FileName} requires {id}: [{string.Join(", ", needs)}]" : null;
 
     private static void ValidateCasterInnate(WeaponDef def, EnchantmentCatalogue enchantments)
     {

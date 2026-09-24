@@ -35,12 +35,12 @@ public sealed record ContentLoad(GameContent? Content, ContentException? Error, 
 /// the generator (<c>DistanceRPG --write-data &lt;dir&gt;</c>), whose output is the
 /// shipped files, pinned byte for byte by the tests.
 /// <para>
-/// <strong>Phase 5.2 reads <c>tuning.json</c>, <c>restricted.json</c> and
-/// <c>enchantments.json</c></strong>; the weapons, the dungeons and the roster
-/// are the compiled records (<see cref="ContentDefaults"/>) until the sub-step
-/// that ships their files. The tuning is read first (clamped, never refused);
-/// then every present content file is parsed, its shape failure recorded rather
-/// than thrown; then the tuning is fitted to the records that parsed
+/// <strong>All six are read</strong>: <c>tuning.json</c>, then the five content
+/// files (§5.4) — <c>restricted.json</c>, <c>enchantments.json</c>,
+/// <c>weapons.json</c>, <c>dungeons.json</c> and <c>party.json</c>. The tuning
+/// is read first (clamped, never refused); then every present content file is
+/// parsed, its shape failure recorded rather than thrown; then the tuning is
+/// fitted to the weapons, dungeons and roster that parsed
 /// (<see cref="TuningFit"/>); then the staged load validates them in §5.4's
 /// order and reports the first stage to break (<see cref="GameContent"/>'s
 /// staged <c>Load</c>, 1h).
@@ -56,14 +56,14 @@ public sealed record ContentLoad(GameContent? Content, ContentException? Error, 
 /// </summary>
 public static class ContentFiles
 {
-    /// <summary>The weapons' file (§5.6), read from Phase 5.3; until then its stage runs the compiled weapons.</summary>
-    internal const string WeaponsFileName = "weapons.json";
+    /// <summary>The weapons' file (§5.6): <see cref="WeaponsJson.FileName"/>, by the name the staged load stamps its stage with.</summary>
+    internal const string WeaponsFileName = WeaponsJson.FileName;
 
-    /// <summary>The dungeons' file (§5.8), read from Phase 5.3; until then its stage runs the compiled dungeons.</summary>
-    internal const string DungeonsFileName = "dungeons.json";
+    /// <summary>The dungeons' file (§5.8): <see cref="DungeonsJson.FileName"/>, by the name the staged load stamps its stage with.</summary>
+    internal const string DungeonsFileName = DungeonsJson.FileName;
 
-    /// <summary>The roster's file (§5.9), read from Phase 5.3; until then its stage runs the compiled roster.</summary>
-    internal const string PartyFileName = "party.json";
+    /// <summary>The roster's file (§5.9): <see cref="PartyJson.FileName"/>, by the name the staged load stamps its stage with.</summary>
+    internal const string PartyFileName = PartyJson.FileName;
 
     /// <summary>Every data file, in §5.4's load order: the tuning, then the relations, the enchantments, the weapons, the dungeons, the roster.</summary>
     public static IReadOnlyList<string> FileNames { get; } =
@@ -71,12 +71,13 @@ public static class ContentFiles
 
     /// <summary>
     /// Load the content from <paramref name="texts"/>: the tuning read, then the
-    /// relations and the enchantments parsed — a file with no text is its
+    /// five content files parsed in §5.4's order — a file with no text is its
     /// compiled record, with a notice that tells a missing file from one there and
     /// unreadable — then the tuning fitted to the weapons, dungeons and roster it
-    /// will run beside, any <c>ApplyPercent</c> id the loaded enchantments do not
-    /// have dropped with a notice, a dialled number the enchantments' file edits
-    /// to no effect said with a notice, and then the staged load. Never throws a
+    /// will run beside (a file that did not parse is fitted to nothing), any
+    /// <c>ApplyPercent</c> id the loaded enchantments do not have dropped with a
+    /// notice, a dialled number the enchantments' file edits to no effect said
+    /// with a notice, and then the staged load. Never throws a
     /// <see cref="ContentException"/>: the first stage to break comes back as
     /// <see cref="ContentLoad.Error"/>, stamped with its file, beside every notice
     /// raised before it.
@@ -93,9 +94,9 @@ public static class ContentFiles
 
         var restricted = Parse(texts, texts.Restricted, RestrictedJson.FileName, "relations", RestrictedJson.Read, ContentDefaults.Restricted, notices);
         var enchantments = Parse(texts, texts.Enchantments, EnchantmentsJson.FileName, "enchantments", EnchantmentsJson.Read, ContentDefaults.Enchantments, notices);
-        var weapons = ContentSource<WeaponsData>.Built(WeaponsFileName, ContentDefaults.Weapons);
-        var dungeons = ContentSource<DungeonsData>.Built(DungeonsFileName, ContentDefaults.Dungeons);
-        var party = ContentSource<PartyData>.Built(PartyFileName, ContentDefaults.Party);
+        var weapons = Parse(texts, texts.Weapons, WeaponsJson.FileName, "weapons", WeaponsJson.Read, ContentDefaults.Weapons, notices);
+        var dungeons = Parse(texts, texts.Dungeons, DungeonsJson.FileName, "dungeons", DungeonsJson.Read, ContentDefaults.Dungeons, notices);
+        var party = Parse(texts, texts.Party, PartyJson.FileName, "party members", PartyJson.Read, ContentDefaults.Party, notices);
 
         var tuning = TuningFit.ToContent(read.Tuning, weapons.Data, dungeons.Data, party.Data, notices);
         if (enchantments.Data is { } catalogue)
@@ -117,16 +118,20 @@ public static class ContentFiles
     }
 
     /// <summary>
-    /// The generator: the compiled content as the data files it ships as, text
-    /// for text — what <c>--write-data</c> writes and what the committed files
-    /// are pinned to. Phase 5.2 writes <c>tuning.json</c>, <c>restricted.json</c>
-    /// and <c>enchantments.json</c>, whose dialled fields say which
-    /// <c>tuning.json</c> key sets them.
+    /// The generator (USER DECISION 3): the compiled content as the six data files
+    /// it ships as, text for text — what <c>--write-data</c> writes and what the
+    /// committed files are pinned to. <see cref="ContentDefaults"/> stays the one
+    /// source; each file reads back to the record it was written from. The
+    /// enchantments' dialled fields say which <c>tuning.json</c> key sets them, and
+    /// every row the docs did not fix says it is provisional.
     /// </summary>
     public static ContentTexts WriteDefaults() => new(
         Tuning: TuningJson.Write(ContentDefaults.Tuning),
         Restricted: RestrictedJson.Write(ContentDefaults.Restricted),
-        Enchantments: EnchantmentsJson.Write(ContentDefaults.Enchantments, ContentDefaults.Tuning));
+        Enchantments: EnchantmentsJson.Write(ContentDefaults.Enchantments, ContentDefaults.Tuning),
+        Weapons: WeaponsJson.Write(ContentDefaults.Weapons),
+        Dungeons: DungeonsJson.Write(ContentDefaults.Dungeons),
+        Party: PartyJson.Write(ContentDefaults.Party));
 
     /// <summary>The notice a data file that was not there gets: the compiled record played in its place, and said so, so a renamed or deleted file never passes unseen.</summary>
     internal static string Missing(string file, string what) => $"{file} is missing - the built-in {what} are playing";

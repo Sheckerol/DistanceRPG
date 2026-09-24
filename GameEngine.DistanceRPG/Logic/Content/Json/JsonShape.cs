@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace GameEngine.DistanceRPG.Logic;
@@ -15,11 +16,38 @@ internal static class JsonText
     /// <summary>How wide a comment runs before it wraps, indentation included.</summary>
     public const int Width = 100;
 
-    /// <summary><paramref name="name"/> as a JSON string.</summary>
-    public static string Quote(string name) => $"\"{JsonEncodedText.Encode(name)}\"";
+    /// <summary>
+    /// <paramref name="name"/> as a JSON string, escaping only what JSON itself
+    /// requires — a quote, a backslash, a control character — so a name reads in
+    /// the file as it reads on screen (<c>"Warden's Shield"</c>, never with its
+    /// apostrophe written as a six-character escape): the file is data a designer
+    /// edits, never HTML, so the web encoder's extra escapes would buy nothing.
+    /// </summary>
+    public static string Quote(string name) => $"\"{JsonEncodedText.Encode(name, JavaScriptEncoder.UnsafeRelaxedJsonEscaping)}\"";
 
     /// <summary>A whole number as a JSON number, in the invariant culture.</summary>
     public static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>A list of ids on one line: <c>["Brace", "Opportunist", "Overwatch"]</c>, or <c>[]</c>.</summary>
+    public static string Ids(IEnumerable<string> ids) => $"[{string.Join(", ", ids.Select(Quote))}]";
+
+    /// <summary>A table of modifiers to stack counts on one line, in <see cref="ModifierType"/> order whatever order the record holds them in: <c>{ "Block": 1, "Push": 1 }</c>, or <c>{}</c>.</summary>
+    public static string Modifiers(IReadOnlyDictionary<ModifierType, int> stacks)
+    {
+        ArgumentNullException.ThrowIfNull(stacks);
+        var entries = stacks.OrderBy(entry => entry.Key).Select(entry => $"{Quote(entry.Key.ToString())}: {Number(entry.Value)}").ToList();
+        return entries.Count == 0 ? "{}" : $"{{ {string.Join(", ", entries)} }}";
+    }
+
+    /// <summary>
+    /// The comment written after the id of a row the docs did not fix
+    /// (<see cref="ContentDefaults.ProvisionalIds"/>): a first guess, expected to
+    /// move after play. The readers skip it, as they skip every comment.
+    /// </summary>
+    public const string ProvisionalNote = "/* provisional */";
+
+    /// <summary>What a row's id line carries after it: <see cref="ProvisionalNote"/> for a provisional row, or null.</summary>
+    public static string? IdNote(string id) => ContentDefaults.ProvisionalIds.Contains(id) ? ProvisionalNote : null;
 
     /// <summary>A comment above what it describes, wrapped at <see cref="Width"/>, its continuation lines aligned under its first word.</summary>
     public static void Comment(StringBuilder text, string words, string indent)
@@ -196,6 +224,62 @@ internal sealed class JsonShape
     {
         string id = String(value, path, entry, "an id in quotes");
         return string.IsNullOrWhiteSpace(id) ? throw Fail(entry, path, "is an empty id - an id names its entry") : id;
+    }
+
+    /// <summary><see cref="Id"/>, or null for a JSON null: a reference the shape lets be empty.</summary>
+    public string? IdOrNull(JsonElement value, string path, string entry)
+        => value.ValueKind == JsonValueKind.Null ? null : Id(value, path, entry);
+
+    /// <summary>A list of ids, each a non-empty string, in the file's order; <paramref name="what"/> says what the list is, for a failure.</summary>
+    public string[] Ids(JsonElement value, string path, string entry, string what)
+    {
+        var items = Array(value, path, entry, what);
+        var ids = new string[items.Count];
+        for (int i = 0; i < items.Count; i++)
+            ids[i] = Id(items[i], $"{path}[{i}]", entry);
+        return ids;
+    }
+
+    /// <summary>
+    /// What a failure inside the row <paramref name="row"/> at <paramref name="path"/>
+    /// is reported against: the row's id when it has one that reads, else its
+    /// place in the file. The id's own failure comes in field order, like any other.
+    /// </summary>
+    public static string EntryOf(JsonElement row, string path)
+        => row.ValueKind == JsonValueKind.Object && row.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(id.GetString())
+            ? id.GetString()!
+            : path;
+
+    /// <summary>
+    /// A table of modifier names to stack counts — a weapon's forged spread, a
+    /// boss's innate modifiers — in the file's order. Each name is a
+    /// <see cref="ModifierType"/>'s, exactly: a modifier is content's id, so a name
+    /// that is none is an id that resolves to nothing
+    /// (<see cref="ContentValidator.RuleUnknownId"/>), pointing at the name it is
+    /// nearest. No name twice, and every count a whole number; whether a count is
+    /// one the rules allow is the validator's.
+    /// </summary>
+    /// <param name="what">What the table is, for a failure: <c>a table of modifiers to stack counts</c>.</param>
+    public IReadOnlyDictionary<ModifierType, int> Modifiers(JsonElement value, string path, string entry, string what)
+    {
+        var table = Object(value, path, entry, what);
+        var stacks = new Dictionary<ModifierType, int>();
+        foreach (var member in table.EnumerateObject())
+        {
+            string at = Member(path, member.Name);
+            if (!ModifierRules.TryParseId(member.Name, out var type))
+            {
+                string? near = TuningSchema.Nearest(member.Name, System.Enum.GetNames<ModifierType>());
+                throw Fail(entry, at, near is null
+                    ? $"is not a modifier - the modifiers are {string.Join(", ", System.Enum.GetNames<ModifierType>())}"
+                    : $"is not a modifier - did you mean {near}?", ContentValidator.RuleUnknownId);
+            }
+            if (stacks.ContainsKey(type))
+                throw Fail(entry, at, "is named twice");
+            stacks[type] = Int(member.Value, at, entry);
+        }
+        return stacks;
     }
 
     /// <summary>

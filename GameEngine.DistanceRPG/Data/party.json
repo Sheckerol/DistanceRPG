@@ -1,0 +1,55 @@
+/*
+ * party.json - the four who start a campaign, in the order they stand and are numbered (1-4).
+ *
+ * Read once, when the game starts, last of the data files, since it names weapons. A member is
+ * checked, never clamped: stats that are not 1, 2, 3 and 4 in some order, a weapon weapons.json
+ * does not have, more weapons than a member's share of tuning.json's PartyCarrySlots, a party
+ * with no caster in hand, or a field the game does not know stops the game on a screen naming
+ * the file, the member and the rule. Every member names all five fields; comments and trailing
+ * commas are fine. A campaign starts with the party named here, so an edit plays from the next
+ * campaign started.
+ *
+ * id: what everything names the member by - a save. name: what the screen calls them. stats:
+ * STR, DEX, CON and INT, the numbers 1 to 4 in some order - a stat divides the XP a pool needs,
+ * so a 4 learns four times as fast as a 1, and nobody is better endowed, only differently
+ * arranged. startingWeaponId: the weapon in hand, an id from weapons.json. bagWeaponIds: the
+ * weapons in the bag, in slot order, each an id from weapons.json.
+ *
+ * The copy to edit is the one beside the game (bin/Debug/net10.0/party.json - the log prints its
+ * full path). GameEngine.DistanceRPG/Data/party.json is generated from the compiled content
+ * (DistanceRPG --write-data <folder>) and pinned by the tests: a party worth keeping goes into
+ * Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy plays the
+ * built-in party, and the screen says so.
+ */
+{
+  "members": [
+    {
+      "id": "A",
+      "name": "Dagger",
+      "stats": { "STR": 1, "DEX": 4, "CON": 2, "INT": 3 },
+      "startingWeaponId": "weakspot_stiletto",
+      "bagWeaponIds": ["staff_of_renewal"]
+    },
+    {
+      "id": "B",
+      "name": "Shield",
+      "stats": { "STR": 3, "DEX": 1, "CON": 4, "INT": 2 },
+      "startingWeaponId": "tower_guard",
+      "bagWeaponIds": ["staff_of_renewal"]
+    },
+    {
+      "id": "C",
+      "name": "Axe",
+      "stats": { "STR": 4, "DEX": 2, "CON": 3, "INT": 1 },
+      "startingWeaponId": "great_axe",
+      "bagWeaponIds": ["staff_of_renewal"]
+    },
+    {
+      "id": "D",
+      "name": "Caster",
+      "stats": { "STR": 2, "DEX": 3, "CON": 1, "INT": 4 },
+      "startingWeaponId": "staff_of_renewal",
+      "bagWeaponIds": ["staff_of_mire"]
+    }
+  ]
+}

@@ -63,8 +63,7 @@ public static class EnchantmentsJson
 
             // Name the entry by its id wherever a failure in it is reported, when
             // it has one that reads; the id's own failure comes in field order.
-            string entry = row.TryGetProperty("id", out var peek) && peek.ValueKind == JsonValueKind.String
-                && !string.IsNullOrWhiteSpace(peek.GetString()) ? peek.GetString()! : path;
+            string entry = JsonShape.EntryOf(row, path);
             shape.Only(row, Fields, path, entry);
 
             JsonElement Get(string name) => shape.Required(row, name, path, entry);
@@ -91,8 +90,10 @@ public static class EnchantmentsJson
     /// how it is read, then every entry in the record's order, one field a line in
     /// the record's parameter order, with <c>/* tuning.json … sets this */</c>
     /// after each field a dial in <paramref name="dials"/> owns
-    /// (<see cref="ApplyPercentDial"/>, <see cref="PotencyDial"/>). Canonical, with
-    /// <c>"\n"</c> line ends, so one catalogue is one text.
+    /// (<see cref="ApplyPercentDial"/>, <see cref="PotencyDial"/>) and
+    /// <c>/* provisional */</c> after the id of a row the docs did not fix
+    /// (<see cref="JsonText.IdNote"/>). Canonical, with <c>"\n"</c> line ends, so
+    /// one catalogue is one text.
     /// </summary>
     public static string Write(EnchantmentsData data, Tuning dials)
     {
@@ -106,14 +107,14 @@ public static class EnchantmentsJson
         {
             var e = data.Enchantments[i];
             text.Append("    {\n");
-            Field(text, "id", JsonText.Quote(e.Id));
+            Field(text, "id", JsonText.Quote(e.Id), JsonText.IdNote(e.Id));
             Field(text, "name", JsonText.Quote(e.Name));
             Field(text, "effect", JsonText.Quote(e.Effect.ToString()));
             Field(text, "targets", JsonText.Quote(e.Targets.ToString()));
             Field(text, "lock", JsonText.Number(e.Lock));
             Field(text, "trigger", e.Trigger is { } trigger ? JsonText.Number(trigger) : "null");
-            Field(text, "potency", JsonText.Number(e.Potency), PotencyDial(e.Id));
-            Field(text, "applyPercent", JsonText.Number(e.ApplyPercent), ApplyPercentDial(dials, e.Id));
+            Field(text, "potency", JsonText.Number(e.Potency), Noted(PotencyDial(e.Id)));
+            Field(text, "applyPercent", JsonText.Number(e.ApplyPercent), Noted(ApplyPercentDial(dials, e.Id)));
             Field(text, "applies", e.Applies is { } status ? JsonText.Quote(status.ToString()) : "null");
             Field(text, "damageType", e.DamageType is { } type ? JsonText.Quote(type.ToString()) : "null");
             Field(text, "unique", e.Unique ? "true" : "false", last: true);
@@ -145,12 +146,15 @@ public static class EnchantmentsJson
     /// <summary>What the file says after a field a dial owns: which key sets it.</summary>
     internal static string DialNote(string key) => $"/* {TuningJson.FileName} {key} sets this */";
 
-    /// <summary>One field's line, with the comma JSON wants after every field but the last and, for a dialled field, the note saying which key sets it.</summary>
-    private static void Field(StringBuilder text, string name, string value, string? dial = null, bool last = false)
+    /// <summary>The note after a field <paramref name="dial"/> owns (<see cref="DialNote"/>), or none when no dial owns it.</summary>
+    private static string? Noted(string? dial) => dial is null ? null : DialNote(dial);
+
+    /// <summary>One field's line, with the comma JSON wants after every field but the last and, after it, <paramref name="note"/> when there is one: which key sets a dialled field, or that a row is provisional.</summary>
+    private static void Field(StringBuilder text, string name, string value, string? note = null, bool last = false)
     {
         text.Append($"      {JsonText.Quote(name)}: {value}{(last ? "" : ",")}");
-        if (dial is not null)
-            text.Append(' ').Append(DialNote(dial));
+        if (note is not null)
+            text.Append(' ').Append(note);
         text.Append('\n');
     }
 
@@ -174,6 +178,8 @@ public static class EnchantmentsJson
         "",
         "A field marked \"tuning.json ... sets this\" is a number tuning.json owns: the game plays the",
         "dial there whatever the field says, and the screen says so when the two differ. Turn the dial.",
+        "An entry whose id is marked provisional is a first guess the docs did not fix, expected to move",
+        "after play.",
         "",
         "The copy to edit is the one beside the game (bin/Debug/net10.0/enchantments.json - the log",
         "prints its full path). GameEngine.DistanceRPG/Data/enchantments.json is generated from the",

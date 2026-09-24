@@ -140,4 +140,42 @@ public class GameStartupTests
         Assert.Null(Program.WriteDataDirectory(["--write-data", "--new-campaign"]));
         Assert.Null(Program.WriteDataDirectory([]));
     }
+
+    [Fact]
+    public void TheWriteDataCommandWritesTheSixFiles()
+    {
+        // DistanceRPG --write-data <folder> regenerates everything the tests pin
+        // (USER DECISION 3): the tuning and the five content files, each the
+        // generator's text byte for byte — UTF-8, no byte order mark, "\n" line
+        // ends — each reported by its full path, and nothing else in the folder.
+        // Run into a temp folder of its own, so no real folder is touched; a game
+        // started beside what it wrote plays the compiled content, saying nothing.
+        var folder = Directory.CreateTempSubdirectory("distancerpg-");
+        try
+        {
+            string target = Path.Combine(folder.FullName, "data");
+            var report = new List<string>();
+            Program.WriteData(target, report.Add);
+
+            var generated = ContentFiles.WriteDefaults();
+            string?[] texts = [generated.Tuning, generated.Restricted, generated.Enchantments, generated.Weapons, generated.Dungeons, generated.Party];
+            Assert.Equal(6, ContentFiles.FileNames.Count);
+            Assert.Equal(ContentFiles.FileNames.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                Assert.NotNull(texts[i]);
+                Assert.Equal(System.Text.Encoding.UTF8.GetBytes(texts[i]!), File.ReadAllBytes(Path.Combine(target, ContentFiles.FileNames[i])));
+            }
+            Assert.Equal(ContentFiles.FileNames.Order(StringComparer.Ordinal),
+                Directory.GetFiles(target).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+
+            var load = ContentFiles.Load(DataFiles.Read(target));
+            Assert.Null(load.Error);
+            Assert.Empty(load.Notices);
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
+    }
 }

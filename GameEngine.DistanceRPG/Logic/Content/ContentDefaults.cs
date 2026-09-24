@@ -280,6 +280,26 @@ public static class ContentDefaults
         string startingWeaponId, params string[] bagWeaponIds)
         => new(id, name, new InnateStats(str, dex, con, @int), startingWeaponId, bagWeaponIds);
 
+    /// <summary>
+    /// The rows the docs did not fix — the ids the comments above already mark
+    /// provisional, first guesses expected to move after play: the shielding
+    /// entry's id (<c>aegis</c>, whose name the docs never give) and Burning's
+    /// lock, which the §3.3 unique table does not price; the three uniques the
+    /// docs leave unnamed; and the four dungeons beside the tutorial with their
+    /// bosses, names and statlines alike. The generator writes
+    /// <c>/* provisional */</c> after each one's id in its file
+    /// (<see cref="JsonText.IdNote"/>), so a designer tuning the copy beside the
+    /// game can tell a guessed row from one the docs fixed — the way
+    /// <c>tuning.json</c>'s <c>Provisional:</c> descriptions mark a number.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> ProvisionalIds = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "aegis", "burning",                                                      // enchantments.json
+        "flensing_knife_unique", "wand_of_the_nova_unique", "staff_of_renewal_unique",   // weapons.json: the Nameless three
+        "spear_hall", "spear_warden", "long_gallery", "gallery_marksman",        // dungeons.json: the four and their bosses
+        "knife_warrens", "knife_mother", "quiver_pits", "quiver_keeper",
+    };
+
     private static EnchantmentDef Innate(string id, string name, TargetSide targets, int @lock, int potency, StatusEffectType applies)
         => new(id, name, EffectKind.ApplyStatus, targets, @lock, Trigger: null, potency, ApplyPercent: 100, applies, DamageType: null, Unique: false);
 
