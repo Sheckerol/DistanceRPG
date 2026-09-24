@@ -1286,8 +1286,9 @@ Rulings the Phase 4 branch made where the phase doc was silent, or where two
 passages met and one had to be read in the light of the other. Each is written
 down here so the next reader meets the ruling rather than the code that assumes
 it. Four of them bend a rule above or a line of the phase doc rather than fill
-a silence; those four are marked **pending the user's ruling** and ship
-provisionally, and open-questions.md sets out the alternatives to each.
+a silence; those four are marked **ruled by the user (2026-09-24)**: each shipped
+provisionally, open-questions.md set out the alternatives, and the user kept all
+four as shipped.
 
 - **The campaign lives outside the dungeon, and holds the visit.**
   `CampaignState` is §6.7's campaign: the party, what it has met, the run
@@ -1318,7 +1319,7 @@ provisionally, and open-questions.md sets out the alternatives to each.
   gates it (§4.4). The first floor's up-stairs are the way out, and floors are
   adjacent only.
 - **The boss wields what an enemy can field and drops from its theme's whole
-  table — pending the user's ruling.** The class it holds is drawn over the
+  table — ruled by the user (2026-09-24): kept.** The class it holds is drawn over the
   theme's table narrowed to the placer's close-range classes (the `EnemyPlacer`
   entry above), because a staff in an enemy's hands flees and a wand has no
   enemy AI. The class it drops is drawn over the whole table, all eight for
@@ -1328,7 +1329,7 @@ provisionally, and open-questions.md sets out the alternatives to each.
   over a compiled list rather than step to the next legal class, so the drop is
   uniform over its table and no class is favoured by the gaps.
 - **The golem stands behind its own Block ×3 plus whatever its weapon forges —
-  pending the user's ruling.** Resolution reads weapon plus innate (§4.3), and
+  ruled by the user (2026-09-24): kept.** Resolution reads weapon plus innate (§4.3), and
   the golem holds a class an enemy fields, drawn like any boss's. Four of the
   five forge no Block, and against those it stands behind 9 and teaches §4.3's
   numbers exactly: the sword's 10 lands for 1, the dagger's 15 for 6, the axe's
@@ -1350,7 +1351,7 @@ provisionally, and open-questions.md sets out the alternatives to each.
   Pin and Light never can. Validation refuses a theme whose own class falls out
   of its table, the accident that would make the unique unobtainable.
 - **Attunement is its own field, and "themed" in the entry above means
-  element-themed — pending the user's ruling.** "A themed dungeon attunes every
+  element-themed — ruled by the user (2026-09-24): kept.** "A themed dungeon attunes every
   floor it has" sits with §1.4's wand chart, and §5.8 makes attunement a field
   of its own that may be none. So a dungeon's modifier theme attunes nothing;
   `DungeonDef.Attunement` attunes every enemy the dungeon spawns, and none of
@@ -1402,9 +1403,10 @@ provisionally, and open-questions.md sets out the alternatives to each.
   dungeon left, each named with its theme and never its depth, a locked one
   counting down in runs rather than vanishing (§4.5).
 - **With every dungeon locked, the one whose lock lifts soonest is offered early
-  — pending the user's ruling.** With four dungeons and locks of five runs or
+  — ruled by the user (2026-09-24): kept.** With four dungeons and locks of five runs or
   more, four straight clears reach a dead end where no run can tick and no lock
   can lift. Entering the early offer sets its lock to the run counter and moves
   nothing else. This bends the entry above ("clearing a dungeon locks it for
-  `bossFloor` runs") in that one corner, and open-questions.md holds the
-  alternatives.
+  `bossFloor` runs") in that one corner. The alternatives weighed were a
+  second clock (ruled out above), shortening every lock while all are locked,
+  and making a sixth dungeon a Phase 4 requirement; the early offer stands.

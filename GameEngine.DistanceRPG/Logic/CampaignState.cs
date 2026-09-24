@@ -504,9 +504,9 @@ public sealed class CampaignState
     /// outlast the three ticks after the first). So the dungeon whose lock lifts
     /// soonest is offered early — ties in the content's file order, never a
     /// dictionary's — and entering it (<see cref="Enter"/>) sets its lock to the
-    /// run counter. <strong>Provisional</strong>: it changes settled.md's "clearing
-    /// a dungeon locks it for <c>bossFloor</c> runs" in this one corner, and
-    /// open-questions.md holds the decision for the user.
+    /// run counter. It changes settled.md's "clearing a dungeon locks it for
+    /// <c>bossFloor</c> runs" in this one corner, and the user kept it
+    /// (settled.md, Phase 4 implementation pass).
     /// </para>
     /// Null whenever some dungeon not retired is selectable — the tutorial, until
     /// it is beaten, always is — and when nothing is left that is not retired.

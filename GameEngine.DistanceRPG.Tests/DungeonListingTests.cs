@@ -181,7 +181,7 @@ public class DungeonListingTests
         // campaign offers the dungeon whose lock lifts soonest early (ties in file
         // order), and the list shows it as the one line that can be entered,
         // marked early. Every other line goes on counting down. Early is the early
-        // offer's alone. Provisional, as the offer is (open-questions.md).
+        // offer's alone. The offer is the user's ruling (settled.md, Phase 4 pass).
         var campaign = CampaignRuns.Campaign();
         CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);                  // counter 1
         Assert.Equal(6, DungeonState.RollBossFloor(CampaignRuns.SixDeep, SpearHall));

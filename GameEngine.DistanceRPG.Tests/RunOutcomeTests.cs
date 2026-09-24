@@ -976,8 +976,8 @@ public class RunOutcomeTests
         // So the dungeon whose lock lifts soonest is offered early, ties in the
         // content's file order and never a dictionary's; the next run goes there;
         // and entering it sets its lock to the run counter and changes nothing else.
-        // Provisional, and in open-questions.md: it bends settled.md's lock rule in
-        // this one corner.
+        // It bends settled.md's lock rule in this one corner, and the user kept it
+        // (settled.md, Phase 4 implementation pass).
         var campaign = Campaign();
         Clear(campaign, "tutorial", GoldenSeed);
         Assert.Equal(6, DungeonState.RollBossFloor(SixDeep, SpearHall));
