@@ -29,8 +29,8 @@ public enum GameMenu
     /// the XP kept or clawed back, whether the run counted, the lock or the
     /// tutorial closing. Opened by the campaign's <see cref="CampaignState.RunEnded"/>
     /// on either ending, the way out's or a wipe's. <strong>Modal</strong>: ENTER
-    /// alone moves on — once — to the next run; ESC, the bag, the stairs, the
-    /// number keys, the turn's keys and every click do nothing, because the run
+    /// alone moves on — once — to the next run; ESC, the bag and its X, the stairs,
+    /// the number keys, the turn's keys and every click do nothing, because the run
     /// they would act on has ended.
     /// </summary>
     RunSummary,
@@ -55,8 +55,14 @@ public readonly record struct StairPrompt(StairUse Stair, string Cue, bool Ready
 public sealed record StairMarker(StairUse Stair, GameObject Slab);
 
 /// <summary>
-/// A weapon lying where its carrier fell (§3.5): the corpse whose row fixes it,
-/// the drop itself, the marker drawn on its tile, and that tile.
+/// A weapon lying on the floor being played, in one of its two forms. A
+/// <strong>drop</strong> lies where its carrier fell (§3.5): it has the corpse
+/// whose row fixes it and the drop itself. A <strong>loose item</strong> is a
+/// weapon the party put down (§4.4): it has the floor's own record of it
+/// (<see cref="Loose"/>) and nothing else. Both have the marker drawn on the tile
+/// and that tile, and <c>G</c> takes either. A loose item is never dressed up as
+/// a drop: no <see cref="Drop"/> is made for it, so nothing reads a farm depth or
+/// a corpse into a weapon the party carried.
 /// <para>
 /// <strong>The tile is on the record rather than read back off the corpse.</strong>
 /// The marker is fixed where the body lay when the item was laid down; a target
@@ -72,10 +78,21 @@ public sealed record StairMarker(StairUse Stair, GameObject Slab);
 /// floor's seed, so a load re-derives it (<see cref="TurnSystem.GroundItemOf"/>)
 /// rather than restoring it, and picking it up sets
 /// <see cref="EnemyState.DropTaken"/> on that row, which is the one thing that
-/// retires the offer.
+/// retires the offer. A loose item is the floor's (<see cref="Floor.LooseItems"/>),
+/// so it is stored there, and this is only its marker. Both are laid again on
+/// every arrival.
 /// </para>
 /// </summary>
-public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker, (int R, int C) Tile);
+/// <param name="Corpse">A drop's corpse; null for a loose item.</param>
+/// <param name="Drop">The drop; null for a loose item.</param>
+/// <param name="Marker">The plate drawn on the tile.</param>
+/// <param name="Tile">The tile it lies on, (row, column).</param>
+/// <param name="Loose">A loose item's record on the floor; null for a drop.</param>
+public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marker, (int R, int C) Tile, LooseItem? Loose = null)
+{
+    /// <summary>The weapon lying here, whichever form the item takes.</summary>
+    public Weapon Weapon => Drop?.Weapon ?? Loose!.Weapon;
+}
 
 /// <summary>
 /// The main gameplay scene: one visit to a dungeon (§4.5), played a floor at a
@@ -224,7 +241,9 @@ public class DungeonScene : Scene
 
     // What the permanent kills have left on the floor being played (§3.5). Not
     // stored by the floor: re-derived from the enemy rows on every arrival, and
-    // dropped whole on every swap. What the campaign has met (§3.3) is the
+    // dropped whole on every swap. Beside them, the markers of what the party
+    // put down here (§4.4), laid from the floor's own list (Floor.LooseItems),
+    // which is stored and outlives the swap. What the campaign has met (§3.3) is the
     // campaign's, which outlives this scene and every visit — met at the start
     // from the loadout (CampaignState.Start) and added to at every pickup.
     private readonly List<GroundItem> _groundItems = new();
@@ -300,8 +319,38 @@ public class DungeonScene : Scene
     /// <summary>The stairs of the floor being played, each with the slab it is drawn as.</summary>
     public IReadOnlyList<StairMarker> StairMarkers => _stairMarkers;
 
-    public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
+    /// <summary>
+    /// The menu that is open, or <see cref="GameMenu.None"/>. Whatever closes the
+    /// bag — I, ESC, the turn's end, the run's end putting its summary up — also
+    /// disarms its "leave" (<see cref="LeaveArmed"/>), here in the one place every
+    /// one of those paths goes through, so the next time the bag opens, a number
+    /// equips again.
+    /// </summary>
+    public GameMenu ActiveMenu
+    {
+        get => _activeMenu;
+        private set
+        {
+            _activeMenu = value;
+            if (value != GameMenu.Inventory)
+                _leaveArmed = false;
+        }
+    }
+
+    private GameMenu _activeMenu = GameMenu.None;
+
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+
+    /// <summary>
+    /// True while the bag's X has armed "leave" (§4.4): the next bag number puts
+    /// that slot's weapon down where the active member stands, rather than
+    /// equipping it, and the bag's key hint says so (<see cref="DungeonHud.LeaveHint"/>).
+    /// Only ever true with the bag open. X again, closing the bag, or the turn's
+    /// end disarms it, and so does a weapon put down.
+    /// </summary>
+    public bool LeaveArmed => _leaveArmed && InventoryOpen;
+
+    private bool _leaveArmed;
     public Vector2 MousePos => _mousePos;
     public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
@@ -523,7 +572,8 @@ public class DungeonScene : Scene
     //   3. BuildFloorObjects             — walls, stairs, the enemies from their rows, the fog, its emitters
     //   4. the party's stand-ins synced  — the fallen included: they were carried
     //   5. WireTurnSystem                — every handler, on the new floor's system only
-    //   6. RederiveGroundItems           — what a permanent kill left here, off the rows
+    //   6. RederiveGroundItems           — what a permanent kill left here, off the rows;
+    //      then LayLoose                 — what the party put down here, off the floor's own list
     //   7. RevealArrival                 — lit only where the party now stands
     //   8. marching, the camera, the banner, and the fade back in
     //
@@ -537,7 +587,10 @@ public class DungeonScene : Scene
     /// while the party was elsewhere is up and standing where it woke), so the
     /// enemy stand-ins are built from the rows as they now are and nothing here
     /// waits for a revival event: those fired before any handler was wired, to
-    /// nobody, and nobody was there to see them.
+    /// nobody, and nobody was there to see them. What the party put down here is
+    /// laid again from the floor's own list (<see cref="Floor.LooseItems"/>), after
+    /// what the corpses are lying on: a weapon left on the first floor is there,
+    /// visible and takeable, when the party climbs back.
     /// </summary>
     private void ArriveOnFloor(TurnSystem turns)
     {
@@ -550,6 +603,9 @@ public class DungeonScene : Scene
             + (_floor.Boss is { } boss
                 ? $"; {boss.Title} ({(boss.Alive ? "standing" : "fallen")}) holding {boss.Weapon.Name} at {Displacer.TileOf(boss)}, lair {_floor.Lair}"
                 : "")
+            + (_floor.LooseItems.Count > 0
+                ? $"; left here: {string.Join(", ", _floor.LooseItems.Select(item => $"{item.Weapon.Name} at {item.Tile}"))}"
+                : "")
             + $"; turn {turns.TurnCount}");
 
         BuildFloorObjects();
@@ -557,6 +613,8 @@ public class DungeonScene : Scene
             member.SyncTransform();
         WireTurnSystem(turns);
         RederiveGroundItems();   // laid without a word: nothing lands as the party arrives (AnnounceDrop)
+        foreach (var loose in _floor.LooseItems)
+            LayLoose(loose);     // what the party put down here, where it was put
         RevealArrival();
 
         EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
@@ -583,6 +641,8 @@ public class DungeonScene : Scene
         foreach (var enemy in _enemies)
             RemoveGameObject(enemy);
         _enemies.Clear();
+        // Drops' markers and loose items' alike. A loose item itself is the
+        // floor's (Floor.LooseItems) and stays on it, to be laid again on a return.
         foreach (var item in _groundItems)
             RemoveGameObject(item.Marker);
         _groundItems.Clear();
@@ -816,7 +876,7 @@ public class DungeonScene : Scene
             LastBankedMovement = saved;
             foreach (var member in _party)
                 _banked[member.State] = member.State.SavedMovement;
-            if (InventoryOpen) ActiveMenu = GameMenu.None;
+            if (InventoryOpen) ActiveMenu = GameMenu.None;   // the bag closes at the turn's end, and its "leave" is disarmed with it
             ResetFogVisibility();
         };
 
@@ -1077,7 +1137,11 @@ public class DungeonScene : Scene
         // yes to leaving when the way out has asked.
         input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
-        // G takes what the active member is standing on (§3.5).
+        // X, in the bag, arms "leave": the next bag number puts that weapon down
+        // where the active member stands, rather than equipping it (§4.4).
+        input.SubscribeToKeyPressed(_ => LeaveKey(), Keys.X);
+        // G takes what the active member is standing on (§3.5): a drop, or a
+        // weapon the party put down.
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) PickUp(); }, Keys.G);
         // O holds fire: a ranged weapon with Overwatch banks its shot against
         // whatever walks into reach on the enemy turn. The member says so — the
@@ -1138,12 +1202,13 @@ public class DungeonScene : Scene
     /// <summary>
     /// A number key, routed by the menu that is open (§4.4: the swap keys
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
-    /// printed with that number into the hand — 1 is the hand itself; on the
-    /// pause menu, 1 closes it and 2 exits, and every other number does nothing
-    /// (never a member selected behind the menu); with no menu open, 1-4 select a
-    /// party member. Behind any other menu — the way out's "leave the dungeon?"
-    /// among them — a number key does nothing at all: it never selects a member
-    /// behind a prompt. Nor during a stair's fade.
+    /// printed with that number into the hand — 1 is the hand itself — or, with
+    /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
+    /// on the pause menu, 1 closes it and 2 exits, and every other number does
+    /// nothing (never a member selected behind the menu); with no menu open, 1-4
+    /// select a party member. Behind any other menu — the way out's "leave the
+    /// dungeon?" among them — a number key does nothing at all: it never selects a
+    /// member behind a prompt. Nor during a stair's fade.
     /// </summary>
     private void NumberKey(int digit)
     {
@@ -1157,7 +1222,12 @@ public class DungeonScene : Scene
         {
             int slot = digit - 1;   // the printed number is the slot plus one
             if (slot > 0 && slot < ActiveCharacter.State.Inventory.Length)
-                EquipSlot(slot);
+            {
+                if (LeaveArmed)
+                    LeaveSlot(slot);
+                else
+                    EquipSlot(slot);
+            }
         }
         else if (!AnyMenuOpen)
         {
@@ -1190,7 +1260,8 @@ public class DungeonScene : Scene
     /// I opens the bag and closes it — from no menu or from the bag only, so it
     /// never swaps a prompt (the pause menu, "leave the dungeon?", the run's
     /// summary) for the bag behind the player's back — and never during a stair's
-    /// fade or on the defeat screen.
+    /// fade or on the defeat screen. Closing it disarms its X
+    /// (<see cref="ActiveMenu"/>).
     /// </summary>
     private void ToggleInventory()
     {
@@ -1232,6 +1303,52 @@ public class DungeonScene : Scene
             Log.Info($"[Combat] {state.Id} equips {state.EquippedWeapon?.Name} (swap cost {_turns.SwapCost})");
         else
             Log.Info($"[Combat] {state.Id} cannot swap to slot {slot} (cost {_turns.SwapCost}, movement {state.DistLeft:0})");
+    }
+
+    /// <summary>
+    /// X, in the bag (§4.4): arm "leave", so the next bag number puts that slot's
+    /// weapon down where the active member stands rather than equipping it, and
+    /// the bag's key hint becomes <c>LEAVE WHICH? 2-6 - X CANCELS</c>. X again
+    /// disarms it. It arms only in the party's own phase, which is when a member
+    /// acts at all; outside the bag, or during a stair's fade, it does nothing
+    /// and says nothing.
+    /// </summary>
+    private void LeaveKey()
+    {
+        if (Transiting || !InventoryOpen) return;
+        if (_leaveArmed)
+        {
+            _leaveArmed = false;
+            return;
+        }
+        if (_turns.Phase != TurnPhase.Player || !ActiveCharacter.State.Alive) return;
+        _leaveArmed = true;
+    }
+
+    /// <summary>
+    /// With the bag's X armed, a bag number (§4.4): the active member puts that
+    /// slot's weapon down on the floor it stands on. The floor keeps it for the
+    /// rest of the visit (<see cref="Floor.Leave"/>). Its marker goes down on the
+    /// member's tile, where <c>G</c> takes it back like anything else lying there.
+    /// It costs nothing: it is not a swap, and the weapon in hand stays in hand.
+    /// A weapon put down disarms X. An empty slot says so, as a full bag says
+    /// <c>BAG FULL</c>, and leaves X armed for another pick.
+    /// </summary>
+    private void LeaveSlot(int slot)
+    {
+        var member = ActiveCharacter.State;
+        if (_turns.Phase != TurnPhase.Player || !member.Alive) return;
+        if (member.Inventory[slot] is null)
+        {
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.EmptySlotCue(slot), false));
+            return;
+        }
+
+        var loose = _floor.Leave(member, slot);
+        _leaveArmed = false;
+        LayLoose(loose);
+        Log.Info($"[Loot] {member.Id} leaves {loose.Weapon.Name} from slot {slot + 1} on floor {_floor.Index + 1} at {loose.Tile}");
+        _hud.AddFloatingText(ActiveCharacter.Position, DungeonHud.LeftBeat(loose.Weapon), LootColor, -52f);
     }
 
     private void UpdateActiveCharacterMovement(float deltaTime)
@@ -2021,7 +2138,9 @@ public class DungeonScene : Scene
     /// The ground item the active member is standing on — what <c>G</c> would
     /// take — or null: outside the player phase, with a menu open, during a
     /// stair's fade, or standing anywhere else. Tile equality, not reach: you
-    /// pick up what is under you.
+    /// pick up what is under you. Where more than one item lies on the tile, it is
+    /// the first laid, so a drop comes before a weapon the party put down on it,
+    /// and <c>G</c> again takes the next.
     /// </summary>
     public GroundItem? PickupTarget
     {
@@ -2070,6 +2189,30 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
+    /// Lay the marker of a weapon the party put down on this floor (§4.4): the
+    /// same plate a drop lies on, centred on the item's tile, and labelled as
+    /// itself rather than as a corpse's drop (<see cref="DungeonHud.LooseItemRuns"/>).
+    /// The item is the floor's (<see cref="Floor.LooseItems"/>). The marker is the
+    /// scene's, laid when the weapon is put down and again on every arrival, and it
+    /// is as visible as its tile. It goes after anything already lying on the
+    /// tile, so <c>G</c> takes a drop first: a full bag that puts its weak weapon
+    /// down on the drop it wants picks up that drop next.
+    /// </summary>
+    private GroundItem LayLoose(LooseItem loose)
+    {
+        var (x, y) = Displacer.CentreOf(loose.Tile.R, loose.Tile.C);
+        var marker = new PrimitiveBoxObject(GroundItemWidth, GroundItemHeight, GroundItemWidth, LootColor)
+        {
+            Position = WorldSpace.FromLogic(x, y, GroundItemHeight / 2f),
+        };
+        AddGameObject(marker);
+        var laid = new GroundItem(null, null, marker, loose.Tile, loose);
+        _groundItems.Add(laid);
+        UpdateGroundItemVisibility();
+        return laid;
+    }
+
+    /// <summary>
     /// The beat an item earns as it lands in front of the party, over the corpse
     /// it came off: a unique by name, in gold — <c>UNIQUE: THE BULWARK!</c>
     /// (<see cref="DungeonHud.UniqueBeat"/>) — whether the farm's lottery paid out
@@ -2091,9 +2234,10 @@ public class DungeonScene : Scene
     /// </summary>
     private void AnnounceDrop(GroundItem laid)
     {
-        if (DungeonHud.UniqueBeat(laid.Drop) is not { } beat) return;
+        // A drop's only: a loose item is laid by the party's own hand, and lands in front of nobody.
+        if (laid is not { Corpse: { } corpse, Drop: { } drop } || DungeonHud.UniqueBeat(drop) is not { } beat) return;
         Log.Info($"[Loot] {beat}");
-        var obj = EnemyObjectFor(laid.Corpse);
+        var obj = EnemyObjectFor(corpse);
         if (obj.IsActive)
             _hud.AddFloatingText(obj.Position, beat, LootColor, UniqueBeatOffset);
     }
@@ -2133,24 +2277,31 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Take what the active member is standing on: the bag, the retired offer,
-    /// the met entries and the run's spoils are <see cref="Pickup.Take"/>'s, which
-    /// decides them without a window and is tested that way; what is left here is
-    /// the scene's — the marker that goes, the reach that changed, the cue that
-    /// says why a full bag took nothing (a carry limit, not a fault: §4.4's six
-    /// slots a member, 24 party-wide, which loot shares with the weapons being
-    /// carried). What is taken here is carried home by the way out and lost to a
-    /// wipe (§4.4).
+    /// Take what the active member is standing on: a drop, or a weapon the party
+    /// put down. The bag, the retired offer, the met entries and the run's spoils
+    /// are <see cref="Pickup.Take"/>'s — or, for a loose item, <see cref="Pickup.TakeLoose"/>'s,
+    /// which takes it off the floor's list and never makes it a spoil — and each
+    /// decides them without a window and is tested that way. What is left here is
+    /// the scene's: the marker that goes, the reach that changed, and the cue that
+    /// says why a full bag took nothing. That is a carry limit, not a fault:
+    /// §4.4's six slots a member, 24 party-wide, which loot shares with the weapons
+    /// being carried. So the cue says how to make room: the bag's X puts one down
+    /// here. A spoil taken is carried home by the way out and lost to a wipe (§4.4).
     /// </summary>
     private void PickUp()
     {
         if (PickupTarget is not { } item) return;
 
         var member = ActiveCharacter.State;
-        int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member, _visit);
+        int slot = item switch
+        {
+            { Loose: { } loose } => Pickup.TakeLoose(_campaign, _floor, loose, member),
+            { Corpse: { } corpse, Drop: { } drop } => Pickup.Take(_campaign, corpse, drop, member, _visit),
+            _ => throw new InvalidOperationException("A ground item is a drop, with its corpse, or a loose item: this one is neither."),
+        };
         if (slot == Pickup.BagFull)
         {
-            SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {member.Inventory.Length} CARRIED", false));
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.BagFullCue(member.Inventory.Length), false));
             return;
         }
 
@@ -2159,8 +2310,8 @@ public class DungeonScene : Scene
         if (slot == 0)
             _turns.NotifyWeaponChanged(member);   // an empty hand filled is a reach changed
 
-        Log.Info($"[Loot] {member.Id} picks up {item.Drop.Weapon.Name} into slot {slot + 1}");
-        _hud.AddFloatingText(ActiveCharacter.Position, $"TOOK {item.Drop.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
+        Log.Info($"[Loot] {member.Id} picks up {item.Weapon.Name} into slot {slot + 1}{(item.Loose is null ? "" : ", back off the floor")}");
+        _hud.AddFloatingText(ActiveCharacter.Position, $"TOOK {item.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
     }
 
     /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>

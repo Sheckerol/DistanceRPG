@@ -1225,4 +1225,79 @@ public class RunOutcomeTests
         Assert.Same(bow.Weapon, Assert.Single(result.SpoilsKept));
         Assert.Same(other.Weapon, party[1].Inventory[2]);
     }
+
+    [Fact]
+    public void OnlyWhatIsInABagIsKeptOrLost()
+    {
+        // Spoils, not gear, and only the spoils still in a bag. A spoil put down
+        // on a floor is in no bag, so it is neither kept nor lost: it goes with the
+        // dungeon. One put down and taken back is in a bag again, so it is kept on
+        // the way out and lost to a wipe. Taking a weapon back never makes it a
+        // spoil: a weapon the party carried in is gear however often it is put down
+        // and taken back, and a wipe leaves it in the bag.
+        foreach (var ending in new[] { RunEnding.Exited, RunEnding.Wiped })
+        {
+            var party = Party(Sledge());
+            var gear = TestWeapons.Get("longbow");
+            party[3].Inventory[1] = gear;   // D carries its own longbow in
+            var campaign = new CampaignState(party);
+            var visit = campaign.Enter("tutorial", GoldenSeed);
+            var turns = visit.OpenTurns(party, Ten);
+            var floor = visit.Current;
+
+            // Three spoils into B's bag, slots 1 to 3, off a corpse laid down for the purpose.
+            var corpse = Row(floor, 23, "hatchet");
+            corpse.Alive = false;
+            Weapon Spoil(string weaponId)
+            {
+                var drop = new Drop(TestWeapons.Get(weaponId), 0, false);
+                Assert.NotEqual(Pickup.BagFull, Pickup.Take(campaign, corpse, drop, party[1], visit));
+                return drop.Weapon;
+            }
+            var kept = Spoil("hunting_bow");
+            var dropped = Spoil("arming_sword");
+            var retaken = Spoil("tower_guard");
+            Assert.Equal(new Weapon?[] { kept, dropped, retaken }, party[1].Inventory[1..4]);
+            Assert.Equal(new[] { kept, dropped, retaken }, visit.Spoils);
+
+            // B puts two down: the sword stays down, and the Tower Guard B takes
+            // back, into slot 2, the first empty. D puts its own longbow down and
+            // takes it back. The spoils are the three they were: taking a weapon
+            // back records nothing.
+            floor.Leave(party[1], 2);
+            var back = floor.Leave(party[1], 3);
+            Assert.Equal(2, Pickup.TakeLoose(campaign, floor, back, party[1]));
+            var own = floor.Leave(party[3], 1);
+            Assert.Equal(1, Pickup.TakeLoose(campaign, floor, own, party[3]));
+            Assert.Equal(new[] { kept, dropped, retaken }, visit.Spoils);
+            Assert.Same(dropped, Assert.Single(floor.LooseItems).Weapon);
+
+            var result = ending == RunEnding.Exited ? Exit(campaign) : Wipe(campaign, turns);
+
+            // The two in B's bag are the run's spoils, in the order taken: kept
+            // on the way out, or out of the bag and lost to the wipe.
+            if (ending == RunEnding.Exited)
+            {
+                Assert.Equal(RunOutcome.Retreat, result.Outcome);
+                Assert.Equal(new[] { kept, retaken }, result.SpoilsKept);
+                Assert.Empty(result.SpoilsLost);
+                Assert.Equal(new Weapon?[] { kept, retaken }, party[1].Inventory[1..3]);
+            }
+            else
+            {
+                Assert.Equal(RunOutcome.Death, result.Outcome);
+                Assert.Equal(new[] { kept, retaken }, result.SpoilsLost);
+                Assert.Empty(result.SpoilsKept);
+                Assert.Equal(new Weapon?[] { null, null }, party[1].Inventory[1..3]);
+            }
+
+            // The sword on the floor is in neither list, and in nobody's bag: it went with the dungeon.
+            Assert.DoesNotContain(dropped, result.SpoilsKept);
+            Assert.DoesNotContain(dropped, result.SpoilsLost);
+            Assert.DoesNotContain(party.SelectMany(m => m.Inventory), w => ReferenceEquals(w, dropped));
+
+            // D's longbow, put down and taken back, is gear: still in the bag, whichever way the run ended.
+            Assert.Same(gear, party[3].Inventory[1]);
+        }
+    }
 }

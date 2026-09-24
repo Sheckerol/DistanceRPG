@@ -503,6 +503,40 @@ public class HudTextTests
     }
 
     [Fact]
+    public void ALooseItemIsLabelledAsItself()
+    {
+        // A weapon the party put down (4.4) is labelled by what it is, and by
+        // nothing a corpse's drop carries. It has no xN, because the farm's depth
+        // was the dummy's and not the weapon's. It has no corpse behind it: a
+        // loose item is a weapon and a tile. The label is its name alone, a
+        // unique's in the same gold as everywhere else.
+        static string[] Loose(LooseItem item) => DungeonHud.LooseItemRuns(item).Select(r => r.Text).ToArray();
+
+        var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
+        Assert.Equal(new[] { "Tower Guard" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
+
+        var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
+        var unique = DungeonHud.LooseItemRuns(new LooseItem(won.Weapon, (5, 5)));
+        Assert.Equal(new[] { "Widowmaker" }, unique.Select(r => r.Text));
+        Assert.Equal(DungeonHud.GroundItemRuns(won)[0].Color, unique[0].Color);
+        Assert.NotEqual(DungeonHud.LooseItemRuns(new LooseItem(farmed.Weapon, (5, 5)))[0].Color, unique[0].Color);
+
+        // The record is the weapon and its tile. It has no corpse, no drop and no count to read a label from.
+        Assert.Equal(new[] { nameof(LooseItem.Tile), nameof(LooseItem.Weapon) },
+            typeof(LooseItem).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
+
+        // On a real floor: a member puts its bag weapon down, and the label is its name alone.
+        var party = Party();
+        party[0].Inventory[1] = TestWeapons.Get("tower_guard");
+        var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        var left = visit.Current.Leave(party[0], 1);
+        Assert.Equal(new[] { "Tower Guard" }, Loose(left));
+        Assert.DoesNotContain(Loose(left), text => text.StartsWith('x'));
+    }
+
+    [Fact]
     public void StatusLegend_ResolvesEachStatus_AndGivesTheRidersTheirFlavour()
     {
         var enemy = new EnemyState();
@@ -725,6 +759,50 @@ public class HudTextTests
         Assert.Equal(9, DungeonScene.HighestSlotKey);
         Assert.Equal("PRESS 2-8 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(8));
         Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(12));
+    }
+
+    [Fact]
+    public void TheLeaveHintNamesItsKeys()
+    {
+        // In the bag, X arms "leave" (4.4), and while it is armed the key hint
+        // asks which weapon to put down: by the bag's own numbers, the same keys
+        // that equip, read off the same slots, with X again to back out. Never 1:
+        // the weapon in hand is not put down this way.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots));
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(TestPools.Char("A").Inventory.Length));
+
+        var words = DungeonHud.LeaveHint(slots).Split([' ', '?'], StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("X", words);
+        Assert.Contains("CANCELS", words);
+        Assert.DoesNotContain("1", DungeonHud.LeaveHint(slots));
+
+        // The same keys the equip hint names, whatever depth the carry is tuned to:
+        // Phase 3's three, a bag of one, the deepest the number row reaches, and
+        // no key past it. A hand and no bag has nothing to put down.
+        foreach (int n in new[] { 2, 3, 6, 8, 12 })
+        {
+            string keys = DungeonHud.EquipHint(n).Split(' ')[1];   // PRESS 2-6 TO EQUIP: the keys
+            Assert.Equal($"LEAVE WHICH? {keys} - X CANCELS", DungeonHud.LeaveHint(n));
+        }
+        Assert.Equal("LEAVE WHICH? 2 - X CANCELS", DungeonHud.LeaveHint(2));
+        Assert.Equal("LEAVE WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12));
+        Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1));
+
+        // Unarmed, the panel names the key, so X can be found at all. An armed
+        // number on an empty slot says so by the number pressed, and a weapon put
+        // down says what was left, answered by TOOK when it is taken back.
+        Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
+        Assert.Equal("SLOT 3 IS EMPTY", DungeonHud.EmptySlotCue(2));
+        Assert.Equal("SLOT 6 IS EMPTY", DungeonHud.EmptySlotCue(5));
+        Assert.Equal("LEFT HATCHET HERE", DungeonHud.LeftBeat(TestWeapons.Get("hatchet")));
+
+        // And a full bag's refusal is still a carry limit, not a fault, and now
+        // says how to make room: open the bag, and X.
+        string full = DungeonHud.BagFullCue(slots);
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", full);
+        Assert.Contains("X", full.Split(' '));
+        Assert.Contains("I", full.Split(' '));
     }
 
     [Fact]

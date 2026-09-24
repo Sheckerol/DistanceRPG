@@ -9,9 +9,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <para>
 /// <strong>Stored versus derived.</strong> What a visit changes lives here and
 /// is what a save would store (§5.1): the enemy rows — position, HP,
-/// <c>Alive</c>, the farm's history — and <see cref="Fog"/>'s explored memory.
-/// Everything else re-derives bit-identically from the seed: the map, the fog
-/// boxes, the stairs (their own stream, <see cref="StairPlacer"/>), and every
+/// <c>Alive</c>, the farm's history — <see cref="Fog"/>'s explored memory, and
+/// the weapons the party put down here (<see cref="LooseItems"/>), which nothing
+/// could give back. Everything else re-derives bit-identically from the seed:
+/// the map, the fog boxes, the stairs (their own stream, <see cref="StairPlacer"/>), and every
 /// ground item a permanent kill left (<see cref="TurnSystem.GroundItemOf"/>).
 /// So a floor left and returned to is a pointer move, never a rebuild. The
 /// boss's row is a row like the rest — where it stands, what it holds, whether
@@ -112,6 +113,70 @@ public sealed class Floor
 
     /// <summary>Whether the party has stood on this floor this visit: §5.1 saves visited floors only. Set by the visit on arrival.</summary>
     public bool Visited { get; internal set; }
+
+    /// <summary>
+    /// The weapons the party has put down on this floor (<see cref="Leave"/>), in
+    /// the order they were left. This is the one list a floor stores rather than
+    /// re-derives: no corpse fixes a loose item and no seed rolls it, so a save
+    /// keeps each whole — the weapon and its tile (§5.1). Each one lies here for
+    /// the rest of the visit, whichever floor the party is on, until someone takes
+    /// it back (<see cref="Pickup.TakeLoose"/>). A new visit's floors hold none:
+    /// leaving the dungeon discards everything in it (§4.1), and a weapon left
+    /// behind is in it now.
+    /// </summary>
+    public List<LooseItem> LooseItems { get; } = new();
+
+    /// <summary>
+    /// <paramref name="member"/> puts down the weapon in its bag slot
+    /// <paramref name="slot"/> where it stands (§4.4): out of the bag and onto
+    /// this floor at the member's tile, where it lies for the rest of the visit
+    /// (<see cref="LooseItems"/>). It is free. It is not a swap, and the weapon in
+    /// hand does not change.
+    /// <para>
+    /// <strong>This is what makes the climb out <em>targeted</em>.</strong> Loot
+    /// and weapons share the same six slots (there is no haul bag), so a full bag
+    /// can still trade: the weak pickup goes down beside the better drop it makes
+    /// room for, and the better one goes into the slot it freed.
+    /// </para>
+    /// <para>
+    /// Only a bag slot, 1 and up. Slot 0 is the weapon in hand, and nobody empties
+    /// their own hand this way. The weapon is still whatever it was: a spoil stays
+    /// a spoil, and gear stays gear. But a spoil lying here is in no bag, so the
+    /// run's end counts it neither kept nor lost
+    /// (<see cref="CampaignState.EndRun"/>): it is lost with the dungeon unless
+    /// someone picks it up again.
+    /// </para>
+    /// </summary>
+    /// <param name="member">The member putting it down, standing on this floor.</param>
+    /// <param name="slot">The bag slot it comes out of: 1 up to the member's last slot.</param>
+    /// <returns>The item now lying on this floor, the last of <see cref="LooseItems"/>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is the hand (0), or no slot the member carries.</exception>
+    /// <exception cref="ArgumentException">
+    /// The slot is empty, so there is nothing to put down; or the member does not
+    /// stand on a floor tile of this floor.
+    /// </exception>
+    public LooseItem Leave(PartyMemberState member, int slot)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        if (slot < 1 || slot >= member.Inventory.Length)
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, slot == 0
+                ? "Slot 0 is the weapon in hand: only a bag slot is put down, and nobody empties their own hand this way."
+                : $"Member '{member.Id}' carries slots 0 to {member.Inventory.Length - 1}, the hand and its bag: there is no slot {slot}.");
+        var weapon = member.Inventory[slot]
+            ?? throw new ArgumentException($"Slot {slot} of member '{member.Id}' is empty: there is nothing in it to put down.", nameof(slot));
+
+        var tile = Displacer.TileOf(member);
+        var grid = Map.Grid;
+        if (tile.R < 0 || tile.R >= grid.GetLength(0) || tile.C < 0 || tile.C >= grid.GetLength(1) || grid[tile.R, tile.C] != 0)
+            throw new ArgumentException(
+                $"Member '{member.Id}' stands at {tile}, which is not a floor tile of floor {Index + 1}: a weapon is put down where its carrier stands.",
+                nameof(member));
+
+        member.Inventory[slot] = null;
+        var item = new LooseItem(weapon, tile);
+        LooseItems.Add(item);
+        return item;
+    }
 
     /// <summary>
     /// Build floor <paramref name="index"/> of the dungeon seeded
@@ -224,6 +289,24 @@ public sealed class Floor
 }
 
 /// <summary>
+/// A weapon the party put down (§4.4, <see cref="Floor.Leave"/>): the weapon
+/// itself and the tile it lies on. It lies on the floor where it was left, in
+/// that floor's <see cref="Floor.LooseItems"/>, for the rest of the visit, and
+/// anyone can take it back (<see cref="Pickup.TakeLoose"/>). It is gone with the
+/// dungeon.
+/// <para>
+/// <strong>Not a drop.</strong> No corpse fixes it and no seed rolls it, so
+/// nothing re-derives it: the floor stores it, and a save keeps both halves (§5.1).
+/// It carries nothing a drop takes from the corpse it came off. There is no farm
+/// depth (the count was the dummy's, not the weapon's), and taking it back never
+/// makes it a spoil (<see cref="DungeonState.Spoils"/> are what came off a corpse).
+/// </para>
+/// </summary>
+/// <param name="Weapon">The weapon: the very instance that left the bag, by reference.</param>
+/// <param name="Tile">Where it lies, (row, column): the tile its carrier stood on.</param>
+public sealed record LooseItem(Weapon Weapon, (int R, int C) Tile);
+
+/// <summary>
 /// What the boss stream rolls at entry (§4.3, <see cref="DungeonState.RollBoss"/>),
 /// in the order it draws them: the boss's floor, then the class of the weapon it
 /// <em>wields</em> and that weapon's variant role. What it drops is another draw
@@ -291,7 +374,8 @@ public enum StairRefusal
 /// <see cref="Enter"/> — a pure function of the map seed, its index and the
 /// dungeon — and never rebuilt inside the visit, so going back up a floor is a
 /// pointer move: its rows (alive or dead, where they stand, what the farm made
-/// of them) and its explored fog are exactly as the party left them.
+/// of them), its explored fog, and whatever the party put down on it
+/// (<see cref="Floor.LooseItems"/>) are exactly as the party left them.
 /// </para>
 /// <para>
 /// <strong>One clock.</strong> <see cref="Turn"/> is the visit's; each floor's

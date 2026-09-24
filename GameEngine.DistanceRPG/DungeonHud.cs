@@ -9,11 +9,13 @@ namespace GameEngine.DistanceRPG;
 /// Screen-space HUD for the dungeon scene, drawn with the engine's bitmap
 /// <see cref="TextRenderer"/>: movement/weapon readouts, the floor line, the
 /// party selector, the enemy nameplates — a boss's among them — and their effect
-/// badges, the stairs' labels and the cue at the one underfoot, the click and aim
-/// cues, floating combat text, the end-of-turn banner, the inventory panel, the
-/// pause menu and the way out's prompt with what leaving now means, the stairs'
-/// fade and the banner over it (the floor reached, the trade on the boss floor,
-/// the boss's fall), and the run's end — its summary, over the defeat screen when
+/// badges, the stairs' labels and the cue at the one underfoot, what lies on the
+/// floor (a corpse's drop, or a weapon the party put down), the click and aim
+/// cues, floating combat text, the end-of-turn banner, the inventory panel and
+/// its "leave" (X, then the slot), the pause menu and the way out's prompt with
+/// what leaving now means, the stairs' fade and the banner over it (the floor
+/// reached, the trade on the boss floor, the boss's fall), and the run's end —
+/// its summary, over the defeat screen when
 /// the party wiped. Every number it shows is a resolved one — a swing's cost
 /// after Light, a cast's mana after Resonant, a Block as the points it absorbs,
 /// a crit window as the roll it needs, Mire as the budget it leaves — never a
@@ -210,7 +212,7 @@ public sealed class DungeonHud
         }
 
         if (scene.InventoryOpen)
-            DrawInventory(w, h, active, turns);
+            DrawInventory(w, h, active, turns, scene.LeaveArmed);
 
         if (scene.PauseMenuOpen)
             DrawMenu(w, h);
@@ -815,24 +817,55 @@ public sealed class DungeonHud
         return $"{name} [{enemy.Weapon.Name}]";
     }
 
+    /// <summary>How far apart the labels of two items on one tile stack: a label's height and a hair.</summary>
+    private const float GroundItemLabelPitch = 13f;
+
     /// <summary>
     /// What is lying on the floor: over each ground item in sight, the weapon it
-    /// is and the farm's depth it was collected at, and — on the one the active
-    /// member is standing on — the key that takes it. Nothing is drawn for an
-    /// item on a fogged tile: it is exactly as visible as the corpse it came off.
+    /// is — a drop's with the farm's depth it was collected at, a weapon the party
+    /// put down as itself — and, on the one the active member is standing on, the
+    /// key that takes it. Nothing is drawn for an item on a fogged tile: it is
+    /// exactly as visible as the tile it lies on. Where several lie on one tile — a
+    /// full bag's weak weapon put down on the drop it makes room for — their labels
+    /// stack upward in the order <c>G</c> takes them, the next one lowest, just
+    /// above its key.
     /// </summary>
     private void DrawGroundItems(Camera camera, DungeonScene scene, int w, int h)
     {
         var target = scene.PickupTarget;
+        var stacked = new Dictionary<(int R, int C), int>();
         foreach (var item in scene.GroundItems)
         {
             if (!item.Marker.IsActive) continue;
             if (!WorldToScreen(camera, item.Marker.Position + Vector3.UnitY * 0.5f, w, h, out var px)) continue;
 
-            DrawRunsCenteredAt(px.X, px.Y - 14f, 1.5f, GroundItemRuns(item.Drop));
+            int under = stacked.GetValueOrDefault(item.Tile);
+            stacked[item.Tile] = under + 1;
+            DrawRunsCenteredAt(px.X, px.Y - 14f - under * GroundItemLabelPitch, 1.5f, ItemRuns(item));
             if (item == target)
                 DrawCenteredAt(px.X, px.Y + 2f, DungeonScene.PickupHint, 1.4f, White);
         }
+    }
+
+    /// <summary>An item on the floor's label, by what it is: a drop's (<see cref="GroundItemRuns"/>), or a weapon the party put down (<see cref="LooseItemRuns"/>).</summary>
+    private static IReadOnlyList<Run> ItemRuns(GroundItem item) => item switch
+    {
+        { Loose: { } loose } => LooseItemRuns(loose),
+        { Drop: { } drop } => GroundItemRuns(drop),
+        _ => [],   // neither: nothing the scene lays, and nothing to name
+    };
+
+    /// <summary>
+    /// A weapon the party put down (§4.4), as the floor labels it: its name, a
+    /// unique's in the gold every other readout gives it, and nothing else. It
+    /// carries no <c>xN</c>, because the farm's depth was the dummy's and not the
+    /// weapon's, and no corpse's drop is made up to borrow a label from. It is
+    /// labelled as what it is: a weapon someone left here.
+    /// </summary>
+    internal static IReadOnlyList<Run> LooseItemRuns(LooseItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return [new Run(item.Weapon.Name, item.Weapon.Unique ? Orange : White)];
     }
 
     /// <summary>
@@ -924,6 +957,9 @@ public sealed class DungeonHud
     /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under.</summary>
     private const float InventoryTopMargin = 56f;
 
+    /// <summary>How far either side of the middle the panel's column runs: its slots start this far left, and the header row's right-hand hint ends this far right.</summary>
+    private const float InventoryHalfWidth = 190f;
+
     /// <summary>Where the inventory panel opens, how many of its progression rows there is room for, and the line past its last glyph.</summary>
     internal readonly record struct InventoryLayout(float Top, int Rows, float Bottom);
 
@@ -955,7 +991,16 @@ public sealed class DungeonHud
         return new InventoryLayout(top, rows, top + fixedHeight + rows * InventoryRowPitch);
     }
 
-    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns)
+    /// <summary>
+    /// The inventory panel: the member's slots with their statlines, the
+    /// progression rows, what a swap costs, and the key hint. With the bag's X
+    /// armed (<paramref name="leaving"/>), the key hint asks which weapon to put
+    /// down (<see cref="LeaveHint"/>) instead of naming the equip keys. When it is
+    /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
+    /// wherever X would arm it: in the party's phase, with a bag to put a weapon
+    /// down from.
+    /// </summary>
+    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
     {
         float cx = w / 2f;
 
@@ -969,10 +1014,16 @@ public sealed class DungeonHud
 
         var layout = LayoutInventory(h, active.Inventory.Length, rows.Count);
         float top = layout.Top;
-        float left = cx - 190f;
+        float left = cx - InventoryHalfWidth;
 
         DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", 3f, Cyan);
         _text.DrawText("EQUIPPED", left, top + 46f, 1.2f, Grey);
+        if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
+        {
+            // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
+            float width = LeaveKeyHint.Length * GlyphAdvance * 1.2f;
+            _text.DrawText(LeaveKeyHint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
+        }
 
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
@@ -1011,7 +1062,10 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
-        DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
+        if (leaving)
+            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length), 1.5f, Yellow);
+        else
+            DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
     }
 
     /// <summary>
@@ -1024,14 +1078,67 @@ public sealed class DungeonHud
     /// reaches and no key that does nothing.
     /// </summary>
     internal static string EquipHint(int slots)
+        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO EQUIP - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
+
+    /// <summary>
+    /// The number keys that reach a bag slot, as a hint prints them — <c>2-6</c>
+    /// for §4.4's six slots, <c>2</c> for a bag of one — or null for a hand and no
+    /// bag. Each key is the number the panel prints beside its slot, so the hand
+    /// is 1 and never among them. The range stops at the scene's highest binding
+    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names no key that does
+    /// nothing. Equipping and putting down read the same keys
+    /// (<see cref="EquipHint"/>, <see cref="LeaveHint"/>).
+    /// </summary>
+    private static string? BagKeys(int slots)
     {
         int last = Math.Min(slots, DungeonScene.HighestSlotKey);
         return last switch
         {
-            < 2 => "I TO CLOSE",                             // a hand and no bag: nothing to swap in
-            2 => "PRESS 2 TO EQUIP - I TO CLOSE",
-            _ => $"PRESS 2-{last} TO EQUIP - I TO CLOSE",
+            < 2 => null,
+            2 => "2",
+            _ => $"2-{last}",
         };
+    }
+
+    /// <summary>
+    /// The bag's key hint while its X is armed (§4.4): which weapon to put down,
+    /// by the same number keys that equip, and how to back out. For six slots it
+    /// is <c>LEAVE WHICH? 2-6 - X CANCELS</c>. It replaces <see cref="EquipHint"/>
+    /// on the panel for as long as X is armed. It names no key for the hand,
+    /// because the weapon in hand is never put down this way.
+    /// </summary>
+    /// <param name="slots">The member's slots, the hand among them.</param>
+    internal static string LeaveHint(int slots)
+        => BagKeys(slots) is { } keys ? $"LEAVE WHICH? {keys} - X CANCELS" : "NOTHING TO LEAVE - X CANCELS";
+
+    /// <summary>
+    /// What the panel's header row says while X is not armed, so the key can be
+    /// found at all: X puts a weapon down where the member stands (§4.4). It is
+    /// the way a full bag makes room.
+    /// </summary>
+    internal const string LeaveKeyHint = "X TO LEAVE ONE HERE";
+
+    /// <summary>
+    /// What an armed bag number says when its slot holds nothing: <c>SLOT 3 IS
+    /// EMPTY</c>, by the number the panel prints for <paramref name="slot"/> (the
+    /// key that was pressed). X stays armed for another pick.
+    /// </summary>
+    /// <param name="slot">The slot, 0 being the hand.</param>
+    internal static string EmptySlotCue(int slot) => $"SLOT {slot + 1} IS EMPTY";
+
+    /// <summary>
+    /// What <c>G</c> says when the bag has no room (§4.4): a carry limit, not a
+    /// fault — <c>BAG FULL - 6 CARRIED</c>, loot sharing the slots the weapons are
+    /// carried in — and how to make room: open the bag and put one down.
+    /// </summary>
+    /// <param name="carried">The member's slots, every one of them full.</param>
+    internal static string BagFullCue(int carried) => $"BAG FULL - {carried} CARRIED - I THEN X LEAVES ONE";
+
+    /// <summary>The beat over a member who has just put a weapon down: <c>LEFT HATCHET HERE</c>, so it reads as a thing done on purpose, answered by <c>TOOK HATCHET</c> when it is taken back.</summary>
+    internal static string LeftBeat(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return $"LEFT {weapon.Name.ToUpperInvariant()} HERE";
     }
 
     /// <summary>
