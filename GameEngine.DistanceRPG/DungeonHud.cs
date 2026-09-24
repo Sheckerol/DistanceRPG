@@ -64,7 +64,9 @@ public sealed class DungeonHud
     /// <summary>One coloured piece of HUD text; runs drawn side by side read as one line.</summary>
     public readonly record struct Run(string Text, Vector4 Color);
 
-    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset)
+    /// <summary>A line rising over a world position, and fading as it rises.</summary>
+    /// <param name="Speaker">Whoever it answers for, on the answer to a key or a click (<see cref="AddAnswer"/>); null on everything else.</param>
+    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null)
     {
         public float Age;
     }
@@ -141,6 +143,23 @@ public sealed class DungeonHud
         => _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset));
 
     /// <summary>
+    /// Spawn the answer to a key or a click over <paramref name="speaker"/>: why it
+    /// did nothing, or what it just did. It takes the place of any answer still
+    /// rising over the same speaker, so there is one answer a speaker, the latest.
+    /// A refusal and the act that follows it never stack on one spot. Without this,
+    /// <c>SLOT 3 IS EMPTY</c> and then <c>LEFT HATCHET HERE</c> would stack over the
+    /// member at the middle of the screen, which is where the open bag's panel is.
+    /// Every other rising line (a hit, a beat, a level) is left alone.
+    /// </summary>
+    /// <param name="speaker">Whoever the answer is said over: the scene object it rises from.</param>
+    public void AddAnswer(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
+        _floatingTexts.RemoveAll(ft => ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker));
+    }
+
+    /// <summary>
     /// Spawn one line of differently coloured pieces above a world position,
     /// laid out left to right and centred as a group — a hit's number with
     /// what blocked it on one side and what warded it on the other.
@@ -194,11 +213,20 @@ public sealed class DungeonHud
         DrawPartySelector(scene);
         if (ended is null)
         {
-            // The world's own labels, which a run's summary is drawn clear of:
-            // the run they label is over.
-            DrawEnemyLabels(camera, scene, w, h);
-            DrawStairs(camera, scene, w, h);
-            DrawGroundItems(camera, scene, w, h);
+            // The world's own labels: the plates, the stairs, what lies on the
+            // floor. Every menu is drawn clear of them. Over the dimmed floor they
+            // would read as the menu's own lines: a weapon just put down would be
+            // named across the bag's slots, and the way out's label would sit in
+            // its own question. None of them is what the menu is asking about.
+            // The rising lines stay, because a key pressed in the bag answers
+            // there, one answer at a time (AddAnswer).
+            // A run's summary is drawn clear of all of it: the run is over.
+            if (!scene.AnyMenuOpen)
+            {
+                DrawEnemyLabels(camera, scene, w, h);
+                DrawStairs(camera, scene, w, h);
+                DrawGroundItems(camera, scene, w, h);
+            }
             DrawAllyCue(camera, scene, w, h);
             DrawFloatingTexts(camera, w, h);
             DrawAimCue(scene);
@@ -474,6 +502,8 @@ public sealed class DungeonHud
     /// seen — explored, it shows through the shroud, and its label is how the way
     /// back is found — and at the stair the active member stands on, what E
     /// would do there, or why not (<see cref="DungeonScene.ActiveStairPrompt"/>).
+    /// Never under a menu (<see cref="Render"/>): standing on the way out, its label
+    /// would land among the lines under the way out's own question.
     /// </summary>
     private void DrawStairs(Camera camera, DungeonScene scene, int w, int h)
     {
@@ -825,10 +855,13 @@ public sealed class DungeonHud
     /// is — a drop's with the farm's depth it was collected at, a weapon the party
     /// put down as itself — and, on the one the active member is standing on, the
     /// key that takes it. Nothing is drawn for an item on a fogged tile: it is
-    /// exactly as visible as the tile it lies on. Where several lie on one tile — a
-    /// full bag's weak weapon put down on the drop it makes room for — their labels
-    /// stack upward in the order <c>G</c> takes them, the next one lowest, just
-    /// above its key.
+    /// exactly as visible as the tile it lies on, and nothing is drawn under a menu
+    /// (<see cref="Render"/>). Where several lie on one tile — a full bag's weak
+    /// weapon put down on the drop it makes room for — their labels stack upward in
+    /// the order <c>G</c> takes them, the next one lowest, just above its key. That
+    /// is the order the scene hands them over in
+    /// (<see cref="DungeonScene.GroundItems"/>, <see cref="DungeonScene.InTakingOrder"/>),
+    /// so the stack and the key cannot disagree.
     /// </summary>
     private void DrawGroundItems(Camera camera, DungeonScene scene, int w, int h)
     {

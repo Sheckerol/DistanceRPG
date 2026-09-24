@@ -11,7 +11,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// one it makes room for.
 /// <para>
 /// These run on real floors of the shipped seed's tutorial, through the campaign
-/// that holds the visit. Every fact a test leans on is pinned before it is used.
+/// that holds the visit. The exception is the order <c>G</c> takes a tile's items
+/// in, which is the scene's rule and is pinned on the items alone. Every fact a
+/// test leans on is pinned before it is used.
 /// </para>
 /// </summary>
 public class LooseItemTests
@@ -228,6 +230,56 @@ public class LooseItemTests
         (a.X, a.Y) = standing;
         Assert.Same(hatchet, floor.Leave(a, 3).Weapon);
         Assert.Null(a.Inventory[3]);
+    }
+
+    [Fact]
+    public void ADropIsTakenBeforeAWeaponPutDownOnItsTile_WhicheverLandedFirst()
+    {
+        // G takes from a tile in one order, whatever order things landed there in:
+        // a corpse's drop before a weapon the party put down, each kind in the
+        // order it was laid. A weapon put down on a drop is the full bag's trade,
+        // and G then takes the drop it made room for, never the weapon back. The
+        // same holds when a dummy falls for good on a weapon put down earlier in
+        // the stay: its drop is taken first there too, as it is when the party
+        // comes back and an arrival lays the drops first. The HUD stacks a tile's
+        // labels in this same order (DungeonScene.GroundItems).
+        (int R, int C) tile = (7, 12), beside = (7, 13);
+
+        static GroundItem PutDown(string id, (int R, int C) at)
+            => new(null, null, new GameEngine.Core.TransformNodeObject(), at, new LooseItem(TestWeapons.Get(id), at));
+
+        static GroundItem Fell(string id, (int R, int C) at)
+        {
+            var corpse = new EnemyState { Weapon = TestWeapons.Get(id) };
+            return new GroundItem(corpse, new Drop(corpse.Weapon, DefeatCount: 3, WasUniqueRoll: false), new GameEngine.Core.TransformNodeObject(), at);
+        }
+
+        var hatchet = PutDown("hatchet", tile);   // put down first,
+        var sword = Fell("arming_sword", beside);
+        var tower = Fell("tower_guard", tile);    // then a dummy fell for good on the same tile,
+        var knife = Fell("flensing_knife", tile); // and another after it
+        var laid = new List<GroundItem> { hatchet, sword, tower, knife };   // the order they landed in
+
+        // Every drop first, each in the order laid, then the weapon put down.
+        Assert.Equal(new[] { sword, tower, knife, hatchet }, DungeonScene.InTakingOrder(laid));
+        Assert.Same(tower, DungeonScene.NextToTake(laid, tile));
+        Assert.Same(sword, DungeonScene.NextToTake(laid, beside));
+        Assert.Null(DungeonScene.NextToTake(laid, (0, 0)));   // nothing lies there
+
+        // G takes them off the tile one at a time, the weapon put down last.
+        var taken = new List<GroundItem>();
+        while (DungeonScene.NextToTake(laid, tile) is { } next)
+        {
+            taken.Add(next);
+            laid.Remove(next);
+        }
+        Assert.Equal(new[] { tower, knife, hatchet }, taken);
+        Assert.Equal(new[] { sword }, laid);   // what lies beside it is untouched
+
+        // An arrival lays the drops (re-derived) and then the floor's loose items.
+        // It takes them in the same order: the order does not hang on which landed first.
+        Assert.Equal(new[] { tower, knife, hatchet }, DungeonScene.InTakingOrder([tower, knife, hatchet]));
+        Assert.Equal(new[] { tower, knife, hatchet }, DungeonScene.InTakingOrder([hatchet, tower, knife]));
     }
 
     [Fact]

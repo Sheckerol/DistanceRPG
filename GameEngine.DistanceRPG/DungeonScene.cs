@@ -243,9 +243,12 @@ public class DungeonScene : Scene
     // stored by the floor: re-derived from the enemy rows on every arrival, and
     // dropped whole on every swap. Beside them, the markers of what the party
     // put down here (§4.4), laid from the floor's own list (Floor.LooseItems),
-    // which is stored and outlives the swap. What the campaign has met (§3.3) is the
-    // campaign's, which outlives this scene and every visit — met at the start
-    // from the loadout (CampaignState.Start) and added to at every pickup.
+    // which is stored and outlives the swap. The list is in the order laid. What
+    // G takes and how a tile's labels stack read it in the order G takes things
+    // (InTakingOrder), which does not depend on that. What the campaign has met
+    // (§3.3) is the campaign's, which outlives this scene and every visit — met
+    // at the start from the loadout (CampaignState.Start) and added to at every
+    // pickup.
     private readonly List<GroundItem> _groundItems = new();
 
     // The stairs (§4.2): a swap runs under a fade either side of it, and once the
@@ -304,7 +307,12 @@ public class DungeonScene : Scene
     public int ActiveIndex => _activeIdx;
     public TurnSystem Turns => _turns;
     public IReadOnlyList<EnemyObject> Enemies => _enemies;
-    public IReadOnlyList<GroundItem> GroundItems => _groundItems;
+    /// <summary>
+    /// What lies on the floor being played, in the order <c>G</c> takes it from any
+    /// one tile (<see cref="InTakingOrder"/>): the HUD stacks the labels on a tile
+    /// in this order, the next to be taken lowest.
+    /// </summary>
+    public IReadOnlyList<GroundItem> GroundItems => InTakingOrder(_groundItems).ToArray();
     public CampaignState Campaign => _campaign;
 
     /// <summary>The visit this scene plays: the floor line reads the dungeon and the floor number off it, and never its depth. Kept after the run ends, when the campaign has already let it go, so the last floor still draws under the summary.</summary>
@@ -1332,7 +1340,10 @@ public class DungeonScene : Scene
     /// member's tile, where <c>G</c> takes it back like anything else lying there.
     /// It costs nothing: it is not a swap, and the weapon in hand stays in hand.
     /// A weapon put down disarms X. An empty slot says so, as a full bag says
-    /// <c>BAG FULL</c>, and leaves X armed for another pick.
+    /// <c>BAG FULL</c>, and leaves X armed for another pick. What was left says so
+    /// over the member in place of any answer still rising there, such as that
+    /// <c>SLOT 3 IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
+    /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack on the open panel.
     /// </summary>
     private void LeaveSlot(int slot)
     {
@@ -1348,7 +1359,7 @@ public class DungeonScene : Scene
         _leaveArmed = false;
         LayLoose(loose);
         Log.Info($"[Loot] {member.Id} leaves {loose.Weapon.Name} from slot {slot + 1} on floor {_floor.Index + 1} at {loose.Tile}");
-        _hud.AddFloatingText(ActiveCharacter.Position, DungeonHud.LeftBeat(loose.Weapon), LootColor, -52f);
+        _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, DungeonHud.LeftBeat(loose.Weapon), LootColor, -52f);
     }
 
     private void UpdateActiveCharacterMovement(float deltaTime)
@@ -2070,11 +2081,11 @@ public class DungeonScene : Scene
         return member.DistLeft < cost ? $"NEED {cost} MOVE" : "NO SHOTS LEFT";
     }
 
-    /// <summary>A click or key that did nothing says why, over <paramref name="obj"/>: only in the player phase, when the turn was the party's to spend.</summary>
+    /// <summary>A click or key that did nothing says why, over <paramref name="obj"/>: only in the player phase, when the turn was the party's to spend, and in place of any answer still rising over it (<see cref="DungeonHud.AddAnswer"/>).</summary>
     private void SayRefusal(GameObject obj, ClickCue? cue)
     {
         if (_turns.Phase == TurnPhase.Player && obj.IsActive && cue is { Ready: false } refused)
-            _hud.AddFloatingText(obj.Position, refused.Label, CueColor, -40f);
+            _hud.AddAnswer(obj, obj.Position, refused.Label, CueColor, -40f);
     }
 
     /// <summary>The mouse ray in world space; false while the window has no area.</summary>
@@ -2139,18 +2150,38 @@ public class DungeonScene : Scene
     /// take — or null: outside the player phase, with a menu open, during a
     /// stair's fade, or standing anywhere else. Tile equality, not reach: you
     /// pick up what is under you. Where more than one item lies on the tile, it is
-    /// the first laid, so a drop comes before a weapon the party put down on it,
-    /// and <c>G</c> again takes the next.
+    /// the next in the order <c>G</c> takes them (<see cref="NextToTake"/>). A drop
+    /// comes before a weapon the party put down, whichever landed first, and
+    /// <c>G</c> again takes the next.
     /// </summary>
     public GroundItem? PickupTarget
     {
         get
         {
             if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return null;
-            var tile = LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y);
-            return _groundItems.FirstOrDefault(item => item.Tile == tile);
+            return NextToTake(_groundItems, LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y));
         }
     }
+
+    /// <summary>
+    /// What lies on the floor, in the order <c>G</c> takes it from any one tile:
+    /// every corpse's drop before every weapon the party put down, and each kind in
+    /// the order it was laid (the sort is stable). Which one landed first does not
+    /// matter. When a weapon is put down on a drop, that is the full bag's trade,
+    /// and <c>G</c> takes the drop it made room for, never the weapon back. When a
+    /// dummy falls for good on a weapon put down earlier in the stay, its drop is
+    /// taken first as well. So the order on a tile is the same on every visit to the
+    /// floor; an arrival lays the drops first anyway (<see cref="ArriveOnFloor"/>).
+    /// </summary>
+    internal static IEnumerable<GroundItem> InTakingOrder(IEnumerable<GroundItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        return items.OrderBy(item => item.Loose is not null);   // a drop (false) sorts before a loose item (true)
+    }
+
+    /// <summary>What <c>G</c> takes next from <paramref name="tile"/>: the first of <paramref name="items"/> lying there in <see cref="InTakingOrder"/>, or null when nothing does.</summary>
+    internal static GroundItem? NextToTake(IEnumerable<GroundItem> items, (int R, int C) tile)
+        => InTakingOrder(items).FirstOrDefault(item => item.Tile == tile);
 
     /// <summary>
     /// Put a dropped weapon on the floor at the corpse it came off. The drop
@@ -2194,9 +2225,9 @@ public class DungeonScene : Scene
     /// itself rather than as a corpse's drop (<see cref="DungeonHud.LooseItemRuns"/>).
     /// The item is the floor's (<see cref="Floor.LooseItems"/>). The marker is the
     /// scene's, laid when the weapon is put down and again on every arrival, and it
-    /// is as visible as its tile. It goes after anything already lying on the
-    /// tile, so <c>G</c> takes a drop first: a full bag that puts its weak weapon
-    /// down on the drop it wants picks up that drop next.
+    /// is as visible as its tile. <c>G</c> takes it after any drop on its tile,
+    /// whichever landed first (<see cref="InTakingOrder"/>): a full bag that puts its
+    /// weak weapon down on the drop it wants picks up that drop next.
     /// </summary>
     private GroundItem LayLoose(LooseItem loose)
     {
@@ -2311,7 +2342,8 @@ public class DungeonScene : Scene
             _turns.NotifyWeaponChanged(member);   // an empty hand filled is a reach changed
 
         Log.Info($"[Loot] {member.Id} picks up {item.Weapon.Name} into slot {slot + 1}{(item.Loose is null ? "" : ", back off the floor")}");
-        _hud.AddFloatingText(ActiveCharacter.Position, $"TOOK {item.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
+        // G's answer, like its BAG FULL: it replaces the LEFT ... HERE of a trade made a moment before.
+        _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, $"TOOK {item.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
     }
 
     /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>
