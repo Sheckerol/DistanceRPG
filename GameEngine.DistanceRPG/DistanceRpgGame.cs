@@ -45,7 +45,10 @@ namespace GameEngine.DistanceRPG;
 /// Every path read or missed, every number the file changed and every notice the
 /// load raised goes to the log; the notices also go to whichever scene the game
 /// opens on first, so a playtest never runs under numbers it did not mean
-/// without saying so on screen.
+/// without saying so on screen. A content file that is there and broken stops
+/// the game (§5.4): no campaign is built, and the game opens on the screen that
+/// names the file, the entry and the rule (<see cref="StartupErrorScene"/>),
+/// where ESC quits.
 /// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
@@ -55,6 +58,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     /// <summary>The one name the screen between runs is registered under.</summary>
     private const string BetweenRunsSceneName = "BetweenRunsScene";
+
+    /// <summary>The name the screen a broken content file stops the game on is registered under.</summary>
+    private const string StartupErrorSceneName = "StartupErrorScene";
 
     /// <summary>
     /// A dev override: set to a dungeon's id (<c>spear_hall</c>, say), the game
@@ -107,10 +113,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         GL.ClearColor(0f, 0f, 0f, 1f);
 
         if (!LoadData())
-        {
-            Close();   // the content does not load: nothing to play, and it is in the log why
-            return;
-        }
+            return;   // the content does not load: the screen says why, no campaign is built, and ESC quits
 
         var content = GameContent.Current;
         _campaign = CampaignState.Start(content);
@@ -137,9 +140,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// hot-reloaded), and make what they load the content the session plays
     /// under. The log gets every path read or missed, every notice, the numbers
     /// the tuning changed and the tuning's hash; the notices wait for the first
-    /// scene. False — logged, with nothing made current — when the content does
-    /// not load, which no <c>tuning.json</c> can cause: every tuning a file can
-    /// make is clamped and fitted to the content it plays beside.
+    /// scene. False when the content does not load — a content file that is
+    /// there and broken (§5.4: "invalid content aborts startup, naming the entry
+    /// and the rule it broke"); no <c>tuning.json</c> can cause it, since every
+    /// tuning a file can make is clamped and fitted to the content it plays
+    /// beside. Then nothing is made current, the failure's lines go to the log,
+    /// and the game opens on the screen that shows them
+    /// (<see cref="StartupErrorScene"/>), handed the load's notices.
     /// </summary>
     private bool LoadData()
     {
@@ -151,8 +158,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
         if (load.Content is not { } content)
         {
-            var error = load.Error;
-            Log.Error($"[Data] The content does not load - {error?.Message ?? "no content and no reason"}");
+            var error = load.Error ?? throw new InvalidOperationException("The data files loaded neither content nor a reason why not.");
+            Log.Error($"[Data] The content does not load - {error.Message}");
+            foreach (string line in StartupErrorScene.Lines(error, load.TuningOverrides))
+                Log.Error($"[Data] {line}");
+            SwapTo(StartupErrorSceneName, new StartupErrorScene(this, error, load.TuningOverrides, load.Notices));
             return false;
         }
 
@@ -292,9 +302,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// Escape goes to the scene being played. In a dungeon it closes a menu or
     /// opens the pause menu, whose EXIT is how a run is quit, and it does nothing
     /// on a run's summary, where ENTER is the one way on. The screen between runs
-    /// consumes none of it, so there ESC quits the game. Only what a scene leaves
-    /// unconsumed quits. Mid-transition between scenes it does nothing at all,
-    /// neither scene's to answer and never a quit on the way in or out of a run.
+    /// consumes none of it, so there ESC quits the game — and so does the screen
+    /// a broken content file stops the game on, which has no campaign behind it.
+    /// Only what a scene leaves unconsumed quits. Mid-transition between scenes it
+    /// does nothing at all, neither scene's to answer and never a quit on the way
+    /// in or out of a run.
     /// </summary>
     private void OnEscape()
     {

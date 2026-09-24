@@ -12,6 +12,18 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public static class ContentValidator
 {
+    /// <summary>
+    /// A content file's own shape (1h): JSON, the documented members and no
+    /// others, each value of the documented kind. Checked as each file is read
+    /// (<see cref="JsonShape"/>) and reported at that file's stage of the load,
+    /// before anything reads the record — the one new check a file brings, and no
+    /// new invariant: the record it reads to is checked by every rule below.
+    /// </summary>
+    public const string RuleFileShape = "a content file is well-formed JSON of its documented shape";
+
+    /// <summary>§5.7's "every effect reference resolves to an EffectKind" (S:280): an entry names its behaviour, and a name that is no kind would fire nothing — "a typo is not a silent no-op". Checked as <c>enchantments.json</c> is read, since the reader resolves the name.</summary>
+    public const string RuleUnknownEffect = "every effect reference resolves to an EffectKind";
+
     public const string RuleUnknownId = "id does not resolve to a modifier or an enchantment";
     public const string RuleModifierRelationIds = "a modifier relation may only name modifier ids";
     public const string RuleKindValue = "kind must be melee, ranged or caster";
@@ -553,6 +565,9 @@ public static class ContentValidator
     /// the same id. <paramref name="knownIds"/> is every modifier and enchantment
     /// id content may name. (The "every forgedOnly id is forged on at least one
     /// weapon" check needs the weapon list and lives with the weapon checks.)
+    /// An id that resolves to nothing is checked against the enchantment ids
+    /// <c>enchantments.json</c> declared, so its detail names that file, and the
+    /// id it is nearest when it is a typo of one.
     /// </summary>
     public static void ValidateRestricted(RestrictedData data, IReadOnlySet<string> knownIds)
     {
@@ -727,7 +742,8 @@ public static class ContentValidator
     /// <c>neverRolled</c> names nothing but unique entries — so declaring one
     /// and forgetting the other aborts startup rather than letting a unique
     /// appear in the enchanter's catalogue. <see cref="EnchantmentCatalogue"/>
-    /// runs this itself as well.
+    /// runs this itself as well, at the enchantments' stage of the load; the
+    /// detail names <c>restricted.json</c>, the other file of the two.
     /// </summary>
     public static void ValidateNeverRolled(EnchantmentsData data, RestrictedData restricted)
     {
@@ -737,12 +753,12 @@ public static class ContentValidator
         var never = new HashSet<string>(restricted.NeverRolled, StringComparer.Ordinal);
         foreach (var e in data.Enchantments)
             if (e.Unique && !never.Contains(e.Id))
-                throw new ContentException(e.Id, RuleUniqueNeverRolled, "unique, but absent from neverRolled");
+                throw new ContentException(e.Id, RuleUniqueNeverRolled, $"unique, but absent from neverRolled in {RestrictedJson.FileName}");
 
         var byId = data.Enchantments.ToDictionary(e => e.Id, StringComparer.Ordinal);
         foreach (var id in restricted.NeverRolled)
             if (!byId.TryGetValue(id, out var e) || !e.Unique)
-                throw new ContentException(id, RuleUniqueNeverRolled, "in neverRolled, but not a unique enchantment");
+                throw new ContentException(id, RuleUniqueNeverRolled, $"in neverRolled, but not a unique enchantment - {RestrictedJson.FileName} neverRolled names it");
     }
 
     /// <summary>
@@ -751,7 +767,9 @@ public static class ContentValidator
     /// exactly one elemental entry, and the exclusion groups of
     /// <paramref name="restricted"/> oppose every element to exactly one other,
     /// both ways. Returns the chart it validated — each type to the one that
-    /// opposes it — for the catalogue to answer the type-chart step with.
+    /// opposes it — for the catalogue to answer the type-chart step with. Run at
+    /// the enchantments' stage of the load, so a pair the groups get wrong names
+    /// <c>restricted.json</c> in its detail.
     /// </summary>
     public static IReadOnlyDictionary<DamageType, DamageType> ValidateOpposition(EnchantmentsData data, RestrictedData restricted)
     {
@@ -784,9 +802,9 @@ public static class ContentValidator
         {
             var opposed = excludes.TryGetValue(e.Id, out var set) ? set.Where(byId.ContainsKey).ToList() : new List<string>();
             if (opposed.Count != 1)
-                throw new ContentException(e.Id, RuleOpposition, $"opposed by {opposed.Count} elements, not one");
+                throw new ContentException(e.Id, RuleOpposition, $"opposed by {opposed.Count} elements, not one, in {RestrictedJson.FileName} excludes");
             if (!excludes.TryGetValue(opposed[0], out var back) || !back.Contains(e.Id))
-                throw new ContentException(e.Id, RuleOpposition, $"'{opposed[0]}' does not oppose it back");
+                throw new ContentException(e.Id, RuleOpposition, $"'{opposed[0]}' does not oppose it back in {RestrictedJson.FileName} excludes");
             chart[e.DamageType!.Value] = byId[opposed[0]].DamageType!.Value;
         }
         return chart;
@@ -1279,11 +1297,21 @@ public static class ContentValidator
         return ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
     }
 
+    /// <summary>
+    /// Every id in <paramref name="ids"/> is a modifier or an enchantment. The
+    /// detail names the file the enchantment ids come from — the relations are
+    /// checked against it — and the known id a typo is nearest, walked in ordinal
+    /// order so the one suggested is the same every run.
+    /// </summary>
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)
     {
         foreach (var id in ids)
             if (!knownIds.Contains(id))
-                throw new ContentException(id, RuleUnknownId);
+            {
+                string? near = TuningSchema.Nearest(id, knownIds.Order(StringComparer.Ordinal));
+                throw new ContentException(id, RuleUnknownId,
+                    $"not a modifier, nor an enchantment in {EnchantmentsJson.FileName}" + (near is null ? "" : $" - did you mean {near}?"));
+            }
     }
 
     /// <summary>Directed pairs from the groups, over string ids, for the checks above.</summary>

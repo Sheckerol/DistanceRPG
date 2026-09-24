@@ -22,21 +22,26 @@ internal static class DataFiles
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// The data files in <paramref name="directory"/>. Each is null when it is
-    /// not there, or when it is there and could not be read. An unreadable file
-    /// is also listed in <see cref="ContentTexts.Unreadable"/> with the reason
-    /// (<see cref="Why"/>), so the screen can say what happened instead of
-    /// calling it missing. Each file read, missed or unreadable is reported to
-    /// <paramref name="report"/> with its full path, and an unreadable one with
-    /// the whole error too. Phase 5.1 reads <c>tuning.json</c>; the content files
-    /// are the compiled records until the sub-steps that ship them.
+    /// The data files in <paramref name="directory"/>, in §5.4's order. Each is
+    /// null when it is not there, or when it is there and could not be read. An
+    /// unreadable file is also listed in <see cref="ContentTexts.Unreadable"/>
+    /// with the reason (<see cref="Why"/>), so the screen can say what happened
+    /// instead of calling it missing. Each file read, missed or unreadable is
+    /// reported to <paramref name="report"/> with its full path, and an
+    /// unreadable one with the whole error too. Phase 5.2 reads
+    /// <c>tuning.json</c>, <c>restricted.json</c> and <c>enchantments.json</c>;
+    /// the weapons, the dungeons and the roster are the compiled records until
+    /// the sub-step that ships their files.
     /// </summary>
     public static ContentTexts Read(string directory, Action<string>? report = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         var unreadable = new Dictionary<string, string>(StringComparer.Ordinal);
         string? tuning = ReadOne(directory, TuningJson.FileName, unreadable, report);
-        return new ContentTexts(Tuning: tuning, Unreadable: unreadable.Count == 0 ? null : unreadable);
+        string? restricted = ReadOne(directory, RestrictedJson.FileName, unreadable, report);
+        string? enchantments = ReadOne(directory, EnchantmentsJson.FileName, unreadable, report);
+        return new ContentTexts(Tuning: tuning, Restricted: restricted, Enchantments: enchantments,
+            Unreadable: unreadable.Count == 0 ? null : unreadable);
     }
 
     /// <summary>

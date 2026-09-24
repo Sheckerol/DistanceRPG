@@ -25,6 +25,9 @@ public class DataFilesTests
         }
     }
 
+    /// <summary>The data files the edge reads in Phase 5.2, in §5.4's order: the tuning, the relations, the enchantments (the weapons, dungeons and roster are compiled until Phase 5.3).</summary>
+    private static readonly string[] FilesRead = [TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName];
+
     [Fact]
     public void ReadsWhatIsBesideTheExecutable_AndNothingThatIsAbsent()
     {
@@ -33,19 +36,19 @@ public class DataFilesTests
             string path = Path.Combine(folder, TuningJson.FileName);
             var report = new List<string>();
 
-            // Nothing there: no text, and the log says where it looked.
+            // Nothing there: no text, and the log says where it looked for each file.
             var none = DataFiles.Read(folder, report.Add);
-            Assert.Null(none.Tuning);
-            Assert.Equal([$"[Data] {path} is missing - the built-in one plays"], report);
+            Assert.Equal(new ContentTexts(), none);
+            Assert.Equal(FilesRead.Select(name => $"[Data] {Path.Combine(folder, name)} is missing - the built-in one plays"), report);
 
             // A tuning.json alone: read whole, reported by its path in that folder,
-            // and nothing else read — the content files are the compiled records in
-            // Phase 5.1.
+            // and the two content files the edge reads looked for and reported
+            // missing — the compiled records play for them.
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             report.Clear();
             var texts = DataFiles.Read(folder, report.Add);
             Assert.Equal(new ContentTexts(Tuning: """{ "MovementBudget": 200 }"""), texts);
-            Assert.Equal([$"[Data] Read {path}"], report);
+            Assert.Equal([$"[Data] Read {path}", .. FilesRead.Skip(1).Select(name => $"[Data] {Path.Combine(folder, name)} is missing - the built-in one plays")], report);
             Assert.StartsWith(folder, path, StringComparison.Ordinal);
 
             // And the game plays what it read.
@@ -62,6 +65,8 @@ public class DataFilesTests
         // never that it is missing. The log has the path and the whole error.
         InTempFolder(folder =>
         {
+            // The other data files sit beside it, as they ship, so any notice is the tuning's.
+            DataFiles.Write(folder, ContentFiles.WriteDefaults() with { Tuning = null });
             string path = Path.Combine(folder, TuningJson.FileName);
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             var report = new List<string>();
@@ -74,7 +79,7 @@ public class DataFilesTests
             if (OperatingSystem.IsWindows())
                 Assert.Equal("another program has it open", why);
             Assert.DoesNotContain(folder, why, StringComparison.OrdinalIgnoreCase);   // the path is the log's; the screen names the file
-            Assert.StartsWith($"[Data] {path} could not be read (", Assert.Single(report), StringComparison.Ordinal);
+            Assert.StartsWith($"[Data] {path} could not be read (", Assert.Single(report, line => line.Contains(path, StringComparison.Ordinal)), StringComparison.Ordinal);
 
             var load = ContentFiles.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
@@ -84,8 +89,9 @@ public class DataFilesTests
             // Once it is free again, it is read like any other.
             report.Clear();
             var free = DataFiles.Read(folder, report.Add);
-            Assert.Equal(new ContentTexts(Tuning: """{ "MovementBudget": 200 }"""), free);
-            Assert.Equal([$"[Data] Read {path}"], report);
+            Assert.Equal("""{ "MovementBudget": 200 }""", free.Tuning);
+            Assert.Null(free.Unreadable);
+            Assert.Equal($"[Data] Read {path}", Assert.Single(report, line => line.Contains(path, StringComparison.Ordinal)));
         });
     }
 
@@ -123,8 +129,10 @@ public class DataFilesTests
             DataFiles.Write(target, written, report.Add);
 
             string path = Path.Combine(target, TuningJson.FileName);
-            Assert.Equal([$"[Data] Wrote {path}"], report);
+            Assert.Equal(FilesRead.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
             Assert.Equal(Encoding.UTF8.GetBytes(written.Tuning!), File.ReadAllBytes(path));
+            Assert.Equal(Encoding.UTF8.GetBytes(written.Restricted!), File.ReadAllBytes(Path.Combine(target, RestrictedJson.FileName)));
+            Assert.Equal(Encoding.UTF8.GetBytes(written.Enchantments!), File.ReadAllBytes(Path.Combine(target, EnchantmentsJson.FileName)));
             Assert.Equal(written, DataFiles.Read(target));
         });
     }

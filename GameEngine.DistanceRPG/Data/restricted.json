@@ -1,0 +1,59 @@
+/*
+ * restricted.json - what may sit together on a weapon, and what may be rolled, for modifiers and
+ * enchantments alike. An id is a modifier's name (Block, CritWindow) or an enchantment's id from
+ * enchantments.json (flaming, burning).
+ *
+ * Read once, when the game starts, and checked before anything else is: an id that names nothing, a
+ * group naming an id twice, a requires that loops or that asks for what the same id excludes stops
+ * the game on a screen naming the file, the entry and the rule - and so does a weapon or an
+ * enchantment an edit here makes illegal. Unlike tuning.json nothing here is clamped: a key the
+ * game does not know, or a value of the wrong kind, stops the game too. Comments and trailing
+ * commas are fine. A relation is an edit here, never a rebuild: start the game again to play it.
+ *
+ * The copy to edit is the one beside the game (bin/Debug/net10.0/restricted.json - the log prints
+ * its full path). GameEngine.DistanceRPG/Data/restricted.json is generated from the compiled
+ * content (DistanceRPG --write-data <folder>) and pinned by the tests: a relation worth keeping
+ * goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy
+ * plays the built-in relations, and the screen says so.
+ */
+{
+  /* Exclusion groups: every id in a group excludes every other, both ways - a group of three is six
+     exclusions - so a group is one line and cannot be half-declared. The threat zone, displacement,
+     block response, crit rider and currency groups, then the opposed damage types: an element is
+     opposed by exactly one other. */
+  "excludes": [
+    ["Brace", "Opportunist", "Overwatch"],
+    ["Push", "Drag", "Rout"],
+    ["Riposte", "BlockWeaken"],
+    ["CritWeaken", "CritSunder"],
+    ["Light", "Resonant"],
+    ["flaming", "cold"],
+    ["shocking", "acidic"]
+  ],
+
+  /* Dependencies, one way: an id to the ids it cannot exist without on the same weapon - Riposte
+     and BlockWeaken need Block, Rout needs Cleave, and a lingering element needs its element ahead
+     of it. */
+  "requires": {
+    "BlockWeaken": ["Block"],
+    "Riposte": ["Block"],
+    "Rout": ["Cleave"],
+    "burning": ["flaming"]
+  },
+
+  /* Weapon-type restrictions: an id to melee, ranged or caster, in lower case. An id not named here
+     goes on any kind of weapon. */
+  "kind": {
+    "Brace": "melee",
+    "Opportunist": "melee",
+    "Overwatch": "ranged"
+  },
+
+  /* Deepened where it is already forged, never added from zero - a safety rule: Charges granted to
+     a bow would be a cap where there was none. Each id here must be forged on some weapon. */
+  "forgedOnly": ["Charges"],
+
+  /* Never granted by any roll, and never copied - an economy rule: the unique enchantments. Every
+     entry enchantments.json marks unique is here, and nothing else is. */
+  "neverRolled": ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"]
+}

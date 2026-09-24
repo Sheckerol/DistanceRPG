@@ -39,13 +39,16 @@ public class TuningJsonTests
         }
 
         // The loader adds the missing file's notice — and only for a missing one.
-        Assert.Equal(["tuning.json is missing - the built-in numbers are playing"], ContentFiles.Load(new ContentTexts()).Notices);
-        Assert.Empty(ContentFiles.Load(new ContentTexts(Tuning: "{}")).Notices);
+        // The other data files sit beside it, as they ship, so any notice is the
+        // tuning's (an absent content file has a notice of its own).
+        var others = ContentFiles.WriteDefaults() with { Tuning = null };
+        Assert.Equal(["tuning.json is missing - the built-in numbers are playing"], ContentFiles.Load(others).Notices);
+        Assert.Empty(ContentFiles.Load(others with { Tuning = "{}" }).Notices);
 
         // A file that is there and could not be read is not a missing file. The
         // edge says why, the notice says so, and the built-in numbers play. A
         // text that was read wins over any reason given beside it.
-        var unreadable = new ContentTexts(Unreadable: new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" });
+        var unreadable = others with { Unreadable = new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" } };
         var locked = ContentFiles.Load(unreadable);
         Assert.Equal(["tuning.json could not be read (another program has it open) - the built-in numbers are playing"], locked.Notices);
         TuningValues.Same(Compiled, locked.Content!.Tuning);
@@ -531,7 +534,7 @@ public class TuningJsonTests
         var read = TuningJson.Read("""{ "ApplyPercent": { "flamming": 30 } }""");
         Assert.Empty(read.Warnings);
 
-        var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "ApplyPercent": { "flamming": 30 } }"""));
+        var load = ContentFiles.Load(ContentFiles.WriteDefaults() with { Tuning = """{ "ApplyPercent": { "flamming": 30 } }""" });   // beside the shipped content files
         Assert.Equal(["tuning.json: ApplyPercent.flamming names no enchantment - ignored; did you mean flaming?"], load.Notices);
         Assert.False(load.Content!.Tuning.ApplyPercent.ContainsKey("flamming"));
         Assert.Equal(TuningJson.Hash(Compiled), TuningJson.Hash(load.Content.Tuning));

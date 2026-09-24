@@ -366,29 +366,13 @@ public static class TuningJson
         return tuning;
     }
 
-    /// <summary>What a value is, in the words a warning uses: its number, the text it holds, true, false, null, a list, a table.</summary>
-    private static string Describe(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Number => value.GetRawText(),
-        JsonValueKind.String => $"the text {value.GetString()}",
-        JsonValueKind.True => "true",
-        JsonValueKind.False => "false",
-        JsonValueKind.Null => "null",
-        JsonValueKind.Array => "a list",
-        JsonValueKind.Object => "a table",
-        _ => "nothing",
-    };
+    /// <summary>What a value is, in the words a warning uses — the content files' words too (<see cref="JsonShape.Describe"/>).</summary>
+    private static string Describe(JsonElement value) => JsonShape.Describe(value);
 
-    /// <summary>A file that is not JSON at all: where the reader stopped, and why, in words a notice can show.</summary>
+    /// <summary>A file that is not JSON at all: where the reader stopped, and why, in words a notice can show — the same words a content file's syntax error uses (<see cref="JsonShape.SyntaxError"/>).</summary>
     private static string Malformed(JsonException error)
     {
-        long line = (error.LineNumber ?? 0) + 1;
-        long column = (error.BytePositionInLine ?? 0) + 1;
-        string reason = error.Message;
-        int where = reason.IndexOf(" LineNumber:", StringComparison.Ordinal);   // the reader appends the position, said above in words
-        if (where >= 0)
-            reason = reason[..where];
-        reason = reason.Replace("'", "", StringComparison.Ordinal).Replace("\"", "", StringComparison.Ordinal).Trim().TrimEnd('.');
+        var (line, column, reason) = JsonShape.SyntaxError(error);
         return $"{Prefix}line {line}, column {column} is not valid JSON ({reason}) - the built-in numbers are playing";
     }
 
@@ -416,9 +400,6 @@ public static class TuningJson
     ];
 
     private const string Indent = "  ";
-
-    /// <summary>How wide a comment runs before it wraps, indentation included.</summary>
-    private const int CommentWidth = 100;
 
     /// <summary>One key's line — or, for a table, its block — with the comma JSON wants after every key but the last.</summary>
     private static void WriteKey(StringBuilder text, TuningKey key, Tuning tuning, bool isLast)
@@ -451,28 +432,8 @@ public static class TuningJson
     }
 
     /// <summary>A name as a JSON string.</summary>
-    private static string Quote(string name) => $"\"{JsonEncodedText.Encode(name)}\"";
+    private static string Quote(string name) => JsonText.Quote(name);
 
-    /// <summary>A comment above a key or a member, wrapped at <see cref="CommentWidth"/>, its continuation lines aligned under its first word.</summary>
-    private static void Comment(StringBuilder text, string words, string indent)
-    {
-        var lines = new List<string>();
-        var line = new StringBuilder();
-        foreach (string word in words.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (line.Length > 0 && indent.Length + 3 + line.Length + 1 + word.Length > CommentWidth)
-            {
-                lines.Add(line.ToString());
-                line.Clear();
-            }
-            if (line.Length > 0)
-                line.Append(' ');
-            line.Append(word);
-        }
-        if (line.Length > 0)
-            lines.Add(line.ToString());
-
-        for (int i = 0; i < lines.Count; i++)
-            text.Append(indent).Append(i == 0 ? "/* " : "   ").Append(lines[i]).Append(i == lines.Count - 1 ? " */" : "").Append('\n');
-    }
+    /// <summary>A comment above a key or a member, wrapped as every data file wraps one (<see cref="JsonText.Comment"/>).</summary>
+    private static void Comment(StringBuilder text, string words, string indent) => JsonText.Comment(text, words, indent);
 }

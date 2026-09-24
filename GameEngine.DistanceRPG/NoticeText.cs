@@ -5,8 +5,9 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The one wrapper every notice goes through before it is drawn (1h): what the
 /// data files raised at startup — a <c>tuning.json</c> value clamped, a file
-/// missing — under the between-runs title, or over the first floor of a dungeon
-/// an override boots straight into. Each notice is upper-cased (the HUD's font
+/// missing — under the between-runs title, over the first floor of a dungeon
+/// an override boots straight into, or on the screen a broken content file
+/// stops the game on, whose own lines it wraps too. Each notice is upper-cased (the HUD's font
 /// is capitals) and wrapped at the width the screens' lines wrap at
 /// (<see cref="LineChars"/>, the summary's), its continuation rows indented
 /// under it; and the whole is capped at <see cref="MaxRows"/> rows plus one
@@ -51,9 +52,15 @@ internal static class NoticeText
     /// <summary>The last row when notices did not fit: how many, and where they all are.</summary>
     internal static string More(int count) => $"+{count} MORE - SEE THE LOG";
 
-    /// <summary>One notice as rows: words kept whole where they fit, a word longer than a row cut, every row after the first indented.</summary>
-    private static List<string> Wrap(string notice)
+    /// <summary>
+    /// One notice — or one line of the screen that stops the game — as rows,
+    /// upper-cased, each under <see cref="LineChars"/>: words kept whole where
+    /// they fit, a word longer than a row cut, every row after the first
+    /// indented. Uncapped: <see cref="Rows"/> is what caps a list of notices.
+    /// </summary>
+    internal static IReadOnlyList<string> Wrap(string notice)
     {
+        ArgumentNullException.ThrowIfNull(notice);
         var rows = new List<string>();
         var row = new StringBuilder();
         foreach (string word in notice.Trim().ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))

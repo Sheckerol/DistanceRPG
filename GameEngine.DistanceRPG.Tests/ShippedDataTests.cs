@@ -14,7 +14,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class ShippedDataTests
 {
-    private static string Shipped(string name) => Path.Combine(AppContext.BaseDirectory, "Data", name);
+    /// <summary>The test output's own linked copies of the shipped files, read by this explicit path.</summary>
+    internal static string ShippedFolder => Path.Combine(AppContext.BaseDirectory, "Data");
+
+    internal static string Shipped(string name) => Path.Combine(ShippedFolder, name);
 
     private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
@@ -35,7 +38,7 @@ public class ShippedDataTests
         // the game ships, and it is exactly what the generator writes from the
         // compiled content — so the two can never tell different stories.
         var generated = Generated().ToList();
-        Assert.Contains(generated, file => file.Name == TuningJson.FileName);
+        Assert.Equal([TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName], generated.Select(file => file.Name));
         foreach (var (name, text) in generated)
         {
             string path = Shipped(name);
@@ -45,7 +48,7 @@ public class ShippedDataTests
         }
 
         // And nothing is shipped that the generator does not write.
-        var shipped = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Data"), "*.json").Select(Path.GetFileName).Order(StringComparer.Ordinal);
+        var shipped = Directory.GetFiles(ShippedFolder, "*.json").Select(Path.GetFileName).Order(StringComparer.Ordinal);
         Assert.Equal(generated.Select(file => file.Name).Order(StringComparer.Ordinal), shipped);
     }
 
@@ -60,7 +63,9 @@ public class ShippedDataTests
         Assert.Empty(read.Overrides);
         Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(read.Tuning));
 
-        var load = ContentFiles.Load(new ContentTexts(Tuning: File.ReadAllText(Shipped(TuningJson.FileName))));
+        // Read beside the other shipped data files, as the game reads it, so any
+        // notice would be the tuning's.
+        var load = ContentFiles.Load(DataFiles.Read(ShippedFolder));
         Assert.Empty(load.Notices);
         Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(load.Content!.Tuning));
     }

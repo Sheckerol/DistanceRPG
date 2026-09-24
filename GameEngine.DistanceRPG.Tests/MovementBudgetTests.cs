@@ -74,7 +74,7 @@ public class MovementBudgetTests
         Assert.Equal(GameConstants.MaxDistance, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
 
         // And a file turns it: the playtest's edit is the game's budget.
-        var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "MovementBudget": 240 }"""));
+        var load = ContentFiles.Load(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
         Assert.Empty(load.Notices);
         Assert.Equal(["MovementBudget 240"], load.TuningOverrides);
         Assert.Equal(240, load.Content!.Tuning.MovementBudget);

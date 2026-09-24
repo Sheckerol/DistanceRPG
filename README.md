@@ -108,11 +108,63 @@ every key.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write a fresh one:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <folder>`
-  writes the shipped file into `<folder>` and exits without opening a window.
+  writes the shipped files into `<folder>` and exits without opening a window.
   A number worth keeping goes into `GameEngine.DistanceRPG/Logic/Content/Tuning.cs`,
-  and `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped file.
+  and `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped files.
 - Nothing the golden tests pin — the map generator, the random streams, the
   pathfinder — is in it, and a test keeps it that way.
+
+## The content files: `restricted.json` and `enchantments.json`
+
+Two content files sit beside `tuning.json` (`docs/roadmap/phase-5-save.md`
+§5.5, §5.7). The weapons, the dungeons and the starting roster are still the
+built-in ones; their files come next.
+
+- **`restricted.json`** holds the relations: what may sit together on a weapon
+  and what may be rolled, for modifiers and enchantments alike. `excludes` is a
+  list of groups (every id in a group excludes every other, both ways), `requires`
+  maps an id to the ids it cannot exist without, `kind` limits an id to `melee`,
+  `ranged` or `caster` (lower case), `forgedOnly` lists what can be deepened but
+  never added, and `neverRolled` lists what no roll grants (the unique souls).
+  A relation is an edit here, never a rebuild: take the crit riders' group
+  (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
+- **`enchantments.json`** holds the catalogue and the unique souls, one entry
+  each, every entry naming all eleven fields. `effect` names the behaviour — one
+  of the game's `EffectKind` names, since the behaviour itself is code — so a new
+  entry of an existing kind is a data edit.
+- **Edit the copies beside the exe** (`bin/Debug/net10.0/`), as with
+  `tuning.json`: the ones in `GameEngine.DistanceRPG/Data/` are generated from
+  `Logic/Content/ContentDefaults.cs` and pinned by `ShippedDataTests`. The file
+  headers say what each key and field means. Restart to apply.
+- **Content is checked, never clamped.** A number out of range in `tuning.json`
+  costs a warning; in a content file it is a broken rule, and the game does not
+  start. It opens on `THE GAME CANNOT START` instead, naming the file, the entry,
+  the rule and what broke it, with what `tuning.json` changed and
+  `FIX THE FILE AND START AGAIN - ESC QUITS`; the log has the same lines. A typo
+  such as `"Riposte": ["Blok"]` shows `RESTRICTED.JSON`, `BLOK` and `ID DOES NOT
+  RESOLVE TO A MODIFIER OR AN ENCHANTMENT - DID YOU MEAN BLOCK?`. A field the game
+  does not know, a value of the wrong kind, or a file that is not JSON is refused
+  the same way, naming the path in the file (`enchantments[8].effect`). Comments
+  and trailing commas are fine.
+- **What is reported first**: the files load in the order tuning, relations,
+  enchantments, weapons, dungeons, roster, and the first check to fail is the one
+  shown. Each file's shape is checked before anything reads it, and
+  `enchantments.json`'s shape comes before `restricted.json`'s own rules, because
+  those check the relations' ids against the enchantments'. When a file beside a
+  built-in record breaks it, the screen marks the built-in one `(COMPILED)` and the
+  detail names the file that did it.
+- **A missing file plays the built-in one, and says so**: delete
+  `enchantments.json` and the game plays the built-in catalogue, with
+  `ENCHANTMENTS.JSON IS MISSING - THE BUILT-IN ENCHANTMENTS ARE PLAYING` under the
+  title and the path it looked in in the log.
+- **Some numbers are `tuning.json`'s**: the `applyPercent` of `flaming`, `cold`,
+  `shocking`, `acidic` and `serrated`, and `arcane`'s `potency`, are set by
+  `tuning.json` (`ApplyPercent`, `ArcanePotency`), and the file marks each with
+  `/* tuning.json ... sets this */`. An edit to one in `enchantments.json` cannot
+  take effect, so the game says `ENCHANTMENTS.JSON FLAMING.APPLYPERCENT 30 IS
+  OVERRIDDEN BY TUNING.JSON APPLYPERCENT.FLAMING 20`. Turn the dial instead.
+- `--write-data <folder>` writes all three files: `tuning.json`,
+  `restricted.json` and `enchantments.json`.
 
 ## How the port was verified
 
