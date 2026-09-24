@@ -12,7 +12,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// A tile inside the room furthest from the arrival tile by A* cost
 /// (<see cref="StairPlacer.FurthestRoom"/>): the down-stairs on every floor but
 /// the last, and on the last — the boss floor, the dungeon's bottom, where there
-/// is no way down — the lair the boss waits in.
+/// is no way down — the lair the boss waits in. Drawn without looking at the
+/// floor's enemies, so a dummy may spawn on it (<see cref="StairPlacer.Place"/>).
 /// </param>
 public readonly record struct StairTiles((int R, int C) Up, (int R, int C) Far);
 
@@ -158,7 +159,21 @@ public static class StairPlacer
     /// <see cref="FurthestRoom"/> by the stair stream's one draw —
     /// <c>NextInt(0, W·H − 1)</c> over the room's tiles, row-major — off
     /// <c>new Mulberry32(SeedFor(mapSeed, floorIndex))</c>. Every room tile is
-    /// floor, so the tile is always walkable.
+    /// floor, so the tile is never a wall — though it may be occupied.
+    /// <para>
+    /// <strong>The draw never looks at the floor's enemies.</strong>
+    /// <see cref="EnemyPlacer"/> puts 0–4 dummies on random tiles of the same
+    /// room off a stream of its own, so on about one floor in 25 a dummy spawns
+    /// on the far tile — the down-stairs, or on the bottom floor the lair
+    /// (<c>FloorGenerationTests</c> pins a seed of each, and the rate). That is
+    /// kept rather than redrawn: the stairs stay a function of the map and their
+    /// own stream, so no change to the placer ever moves a staircase. Whatever
+    /// reads the tile must cope with an occupant instead: an arrival places
+    /// members around living enemies, never inside one; the boss takes the
+    /// nearest free tile from the lair; and a live dummy on the stairs blocks
+    /// them only until it walks off to close on the party or falls — a corpse is
+    /// walked over — so it guards the stairs and never seals them.
+    /// </para>
     /// </summary>
     /// <param name="map">The floor's generated map.</param>
     /// <param name="mapSeed">The dungeon's seed, which the stair seed is derived from.</param>

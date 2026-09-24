@@ -296,4 +296,66 @@ public class FloorGenerationTests
             Assert.Null(above.Lair);
         }
     }
+
+    [Fact]
+    public void ADummyMaySpawnOnTheFarTile_AndNeitherPassMovesForTheOther()
+    {
+        // PHASE4-013, -022: the far tile is the stair stream's one draw over the
+        // furthest room, and EnemyPlacer puts 0-4 dummies on random tiles of that
+        // same room off the floor's own stream. Neither pass reads the other, so
+        // a dummy sometimes spawns on the down-stairs — or, on the bottom floor,
+        // in the lair. A known case, kept rather than redrawn: the stairs stay a
+        // function of the map and their own stream, so no placer change ever
+        // moves a staircase, and whatever reads the tile copes with an occupant.
+        // Arrival places members around living enemies, the boss takes the
+        // nearest free tile from the lair, and a live dummy holds the stairs only
+        // until it walks off to close on the party or falls (a corpse is walked
+        // over): it guards the stairs, never seals them.
+        var tutorial = Tutorial;
+
+        // The tutorial's floor 1 of seed 2084311110: a spear dummy on the way
+        // down — floor 1 always has one, the tutorial's bottom being floor 2.
+        const long DownSeed = 2084311110;
+        Assert.Equal(2, DungeonState.RollBossFloor(DownSeed, tutorial));
+        var first = Floor.Generate(DownSeed, 0, bottom: false, tutorial);
+        Assert.Equal((19, 4), first.DownStairs);
+        var guard = Assert.Single(first.Enemies, e => Displacer.TileOf(e) == first.DownStairs!.Value);
+        Assert.Equal((9, "phalanx_spear", true), (guard.SpawnIndex, guard.Weapon.Id, guard.Alive));
+
+        // Neither moved for the other: the stairs are the stair stream's draw on
+        // the bare map, and the dummy stands exactly where the placer put it.
+        long floorSeed = DungeonState.FloorSeed(DownSeed, 0);
+        var bare = MapGenerator.Generate(new Mulberry32(floorSeed));
+        Assert.Equal(StairPlacer.Place(bare, DownSeed, 0).Far, first.DownStairs);
+        var placed = EnemyPlacer.PlaceEnemies(bare, floorSeed)[guard.SpawnIndex];
+        Assert.Equal((placed.X, placed.Y, placed.WeaponId), (guard.X, guard.Y, guard.Weapon.Id));
+
+        // The tutorial's floor 2, its bottom, of seed 1697034193: a thrower in
+        // the lair. The boss cannot stand there on this seed and takes the
+        // nearest free tile from it instead.
+        const long LairSeed = 1697034193;
+        Assert.Equal(2, DungeonState.RollBossFloor(LairSeed, tutorial));
+        var bottom = Floor.Generate(LairSeed, 1, bottom: true, tutorial);
+        Assert.Equal((58, 28), bottom.Lair);
+        var squatter = Assert.Single(bottom.Enemies, e => Displacer.TileOf(e) == bottom.Lair!.Value);
+        Assert.Equal((15, "bandolier", true), (squatter.SpawnIndex, squatter.Weapon.Id, squatter.Alive));
+
+        // Not a one-off. Over the stair tests' sweep — the golden seed, then 99
+        // spread over the 32-bit range, ten floors each — 41 floors of the 1000
+        // have a dummy on the far tile, in 33 of the 100 ten-floor dungeons:
+        // about one floor in 25, a third of the deepest visits. Pinned as measured.
+        var perDungeon = new int[100];
+        Parallel.For(0, perDungeon.Length, i =>
+        {
+            long seed = i == 0 ? GoldenSeed : (uint)(i * 2654435761u);
+            for (int n = 0; n < 10; n++)
+            {
+                var floor = Floor.Generate(seed, n, bottom: false, tutorial);
+                var far = floor.DownStairs!.Value;
+                if (floor.Enemies.Any(e => Displacer.TileOf(e) == far))
+                    perDungeon[i]++;
+            }
+        });
+        Assert.Equal((41, 33), (perDungeon.Sum(), perDungeon.Count(hits => hits > 0)));
+    }
 }

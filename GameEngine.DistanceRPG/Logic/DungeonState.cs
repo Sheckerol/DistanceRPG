@@ -75,10 +75,21 @@ public sealed class Floor
     /// <summary>The arrival tile, <see cref="MapData.PlayerStart"/> (§4.2). On the first floor it is the way out.</summary>
     public (int R, int C) UpStairs { get; }
 
-    /// <summary>The down-stairs, in the room furthest from the arrival tile by A* cost; null on the boss floor, the dungeon's bottom (§4.3).</summary>
+    /// <summary>
+    /// The down-stairs, in the room furthest from the arrival tile by A* cost;
+    /// null on the boss floor, the dungeon's bottom (§4.3). A dummy may stand on
+    /// them from the start: the stair draw never looks at <see cref="Enemies"/>
+    /// (<see cref="StairPlacer.Place"/>), so an arrival here must be placed
+    /// around it, never inside it.
+    /// </summary>
     public (int R, int C)? DownStairs { get; }
 
-    /// <summary>On the boss floor, the tile its furthest room holds instead of a way down: where the boss waits. Null on every other floor.</summary>
+    /// <summary>
+    /// On the boss floor, the tile its furthest room holds instead of a way down:
+    /// where the boss waits. Null on every other floor. Drawn like the
+    /// down-stairs, so a dummy may already stand on it; the boss must then take
+    /// the nearest free tile from it, never the dummy's.
+    /// </summary>
     public (int R, int C)? Lair { get; }
 
     /// <summary>Whether the party has stood on this floor this visit: §5.1 saves visited floors only. Set by the visit on arrival.</summary>
@@ -89,7 +100,8 @@ public sealed class Floor
     /// <paramref name="mapSeed"/>: the map from <see cref="DungeonState.FloorSeed"/>,
     /// its fog boxes, its enemy rows — placed off the same floor seed and attuned
     /// to <paramref name="def"/>'s <see cref="DungeonDef.Attunement"/> — and its
-    /// stairs, each on its own stream, none continuing another.
+    /// stairs, each on its own stream, none continuing another and none reading
+    /// another's result: a row may stand on the far tile (<see cref="StairPlacer.Place"/>).
     /// </summary>
     /// <param name="mapSeed">The dungeon's seed, rolled once per entry.</param>
     /// <param name="index">The 0-based floor index.</param>
