@@ -211,8 +211,10 @@ public sealed class PartyMemberState : ActorState
     /// The slots a member carries under <paramref name="tuning"/>: its carry over
     /// the party's size. <see cref="ContentValidator.ValidateTuning"/> refuses a
     /// carry that does not divide evenly, a slot or more each, so nothing is lost
-    /// to the division. Content being loaded passes its own tuning, since the
-    /// content <see cref="InventorySlots"/> reads is not current yet.
+    /// to the division, and one that shares out past
+    /// <see cref="GameConstants.MaxInventorySlots"/>, so every slot has a key.
+    /// Content being loaded passes its own tuning, since the content
+    /// <see cref="InventorySlots"/> reads is not current yet.
     /// </summary>
     internal static int SlotsFor(Tuning tuning)
     {

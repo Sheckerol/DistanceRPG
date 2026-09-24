@@ -34,8 +34,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </para>
 /// Like <see cref="EnchantmentCatalogue"/>, the constructor validates what it
 /// builds (<see cref="ContentValidator.ValidateDungeons"/>) against the tables
-/// it has just computed, so no dungeon is ever served that its own rules
-/// refuse.
+/// it has just computed and the rules it computed them from, so no dungeon is
+/// ever served that its own rules refuse.
 /// </summary>
 public sealed class DungeonCatalogue
 {
@@ -74,7 +74,7 @@ public sealed class DungeonCatalogue
         }
 
         All = data.Dungeons.ToArray();
-        ContentValidator.ValidateDungeons(data, this, weapons);   // never serve a row its own tables refuse
+        ContentValidator.ValidateDungeons(data, this, modifiers, weapons);   // never serve a row its own tables refuse, against the rules they were computed from
 
         foreach (var def in All)
             _byId[def.Id] = def;   // unique by then

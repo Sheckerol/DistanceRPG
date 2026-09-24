@@ -65,10 +65,11 @@ public static class ContentValidator
     public const string RuleFloorNumberStartsAtOne = "a floor number starts at 1";
     public const string RuleShareIsAPercentage = "a share is a percentage, 0 to 100";
     public const string RuleCarryFillsTheParty = "the party's carry divides evenly among its members, at least one slot each";
+    public const string RuleEverySlotHasAKey = "a member carries no more slots than the number keys can equip";
     public const string RuleGatherTakesATile = "the stairs gather the party from at least a tile away";
 
     public const string RuleThemeIsClassSignature = "a dungeon's theme is a class signature";
-    public const string RuleThemeHasAUnique = "a theme's own class has a Purity variant whose unique raises the theme to x3";
+    public const string RuleThemeHasAUnique = "a theme's own class has a Purity variant whose unique raises the theme to its forge limit";
     public const string RuleThemeReachesAClass = "at least one class can carry a dungeon's theme";
     public const string RuleThemeReachesItsOwnClass = "a theme's own class can carry it, so its unique can drop";
     public const string RuleBossWieldsAClass = "a dungeon's boss can wield at least one class that carries its theme";
@@ -207,7 +208,10 @@ public static class ContentValidator
     /// is a floor number, which starts at 1; the death clawback is a share of a
     /// gain; the carry divides evenly among the members with a slot each, or
     /// somebody has no hand to hold a weapon in and the party's 24 is not what
-    /// the members carry; and the stairs gather from at least a tile away.
+    /// the members carry, and shares out no deeper than the number keys equip
+    /// (<see cref="GameConstants.MaxInventorySlots"/>, nine a member), or loot
+    /// lands in a slot no key can reach; and the stairs gather from at least a
+    /// tile away.
     /// "Six stacks is short of ten" and every other judgement between these
     /// numbers is a test on the compiled values, never a refusal here.
     /// </para>
@@ -245,6 +249,9 @@ public static class ContentValidator
         if (tuning.PartyCarrySlots < GameConstants.PartySize || tuning.PartyCarrySlots % GameConstants.PartySize != 0)
             throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleCarryFillsTheParty,
                 $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members");
+        if (PartyMemberState.SlotsFor(tuning) > GameConstants.MaxInventorySlots)
+            throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleEverySlotHasAKey,
+                $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members is {PartyMemberState.SlotsFor(tuning)} each, past {GameConstants.MaxInventorySlots}");
         if (tuning.StairGatherTiles < 1)
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
     }
@@ -338,14 +345,22 @@ public static class ContentValidator
     /// <list type="bullet">
     /// <item><strong>The theme is a class signature</strong> (§4.3's list, as
     /// the compiled <see cref="Signature"/> table holds it), and its own class's
-    /// Purity variant has a unique raising it to x3 — the dungeon's one unique,
-    /// the Purity coincidence §5.8 exists to protect. A theme that is not a
-    /// signature "still works — it just quietly means that dungeon can never
-    /// produce its unique, and nothing else in the game announces the
-    /// difference". <c>Pin</c> and <c>Light</c> are refused here, and so are
-    /// <c>CritMultiplier</c> — a second baseline modifier no Purity variant
-    /// doubles — and <c>Resonant</c>, forge-limited to x1; <c>Cleave</c> is a
-    /// signature with no unique on its Purity variant until one is authored.</item>
+    /// Purity variant has a unique raising it to its forge limit — the
+    /// dungeon's one unique, the Purity coincidence §5.8 exists to protect. A
+    /// theme that is not a signature "still works — it just quietly means that
+    /// dungeon can never produce its unique, and nothing else in the game
+    /// announces the difference". <c>Pin</c> and <c>Light</c> are refused here,
+    /// and so are <c>CritMultiplier</c> — a second baseline modifier no Purity
+    /// variant doubles — and <c>Resonant</c>, forge-limited to x1; <c>Cleave</c>
+    /// is a signature with no unique on its Purity variant until one is
+    /// authored. The limit checked is the tuned one —
+    /// <paramref name="modifiers"/>' <see cref="ModifierRules.MaxForged"/> —
+    /// rather than the compiled x3 a unique is raised to: a boss's drop becomes
+    /// the unique by arithmetic only when its graft takes the theme to
+    /// <c>MaxForged(theme)</c> (§4.3), so a tuning that raised a theme's limit
+    /// past its unique would pass every weapon check — nothing is forged past
+    /// the limit, the graft stays legal — and quietly make the unique
+    /// unobtainable. In effect, a theme's forge limit stays its unique's x3.</item>
     /// <item><strong>The drop table is not empty</strong>, or "the boss drops
     /// nothing at all", <strong>and holds the theme's own class</strong>: a
     /// relations edit that pushed the theme's own class out of its table would
@@ -370,10 +385,15 @@ public static class ContentValidator
     /// would leave the hub nothing to open behind.</item>
     /// </list>
     /// </summary>
-    public static void ValidateDungeons(DungeonsData data, DungeonCatalogue tables, WeaponCatalogue weapons)
+    /// <param name="data">The dungeon rows, in file order.</param>
+    /// <param name="tables">The drop and wield tables computed from <paramref name="modifiers"/> and <paramref name="weapons"/>.</param>
+    /// <param name="modifiers">The in-flight rules the tables were computed from, whose forge limit a theme's unique must reach; never the current content's.</param>
+    /// <param name="weapons">The weapon catalogue whose uniques the themes hunt.</param>
+    public static void ValidateDungeons(DungeonsData data, DungeonCatalogue tables, ModifierRules modifiers, WeaponCatalogue weapons)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(tables);
+        ArgumentNullException.ThrowIfNull(modifiers);
         ArgumentNullException.ThrowIfNull(weapons);
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -388,15 +408,20 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleThemeIsClassSignature, $"{theme} is no class's signature");
 
             // The Purity variant forges its class's signature at x2; the unique
-            // derived from it is the one the boss's graft reaches by arithmetic.
+            // derived from it is the one the boss's graft reaches by arithmetic,
+            // and the graft makes a drop that unique only when it takes the theme
+            // to its forge limit (§4.3). So the check reads the limit the rules
+            // were tuned to, not a compiled x3: a limit raised past the unique
+            // leaves the graft legal and the unique unreachable.
             var purity = weapons.ByClass(own).Count > 0 ? weapons.Variant(own, VariantRole.Purity) : null;
             var unique = purity is null ? null : weapons.UniqueDerivedFrom(purity.Id);
-            if (unique is null || unique.Forged.GetValueOrDefault(theme) != UniqueRaise)
+            int limit = modifiers.MaxForged(theme);
+            if (unique is null || unique.Forged.GetValueOrDefault(theme) != limit)
                 throw new ContentException(def.Id, RuleThemeHasAUnique, purity is null
                     ? $"the weapons carry no {own} Purity variant"
                     : unique is null
                         ? $"'{purity.Id}' has no unique derived from it"
-                        : $"'{unique.Id}' carries {theme} x{unique.Forged.GetValueOrDefault(theme)}, not x{UniqueRaise}");
+                        : $"'{unique.Id}' carries {theme} x{unique.Forged.GetValueOrDefault(theme)}, and {theme}'s forge limit is x{limit}");
 
             var table = tables.ThemeClasses(theme);
             if (table.Count == 0)

@@ -162,8 +162,44 @@ public class CarryLimitTests
         Assert.Equal(ContentValidator.RuleCarryFillsTheParty, loaded.Rule);
         Assert.Same(before, GameContent.Current);
 
-        // Every multiple of the party that gives each member a hand divides evenly and loads.
+        // Every multiple of the party from a hand each to nine slots each divides evenly and loads.
         foreach (int carry in new[] { 4, 24, 28, 36 })
             ContentValidator.ValidateTuning(ContentDefaults.Tuning with { PartyCarrySlots = carry });
+    }
+
+    [Fact]
+    public void ACarryDeeperThanTheNumberKeysIsRefused()
+    {
+        // With the bag open a slot is equipped by the number key printed beside it
+        // -- the hand is 1, the bag runs from 2 -- and the number row stops at 9
+        // (PHASE4-143). Forty slots would give each member ten, and a pickup would
+        // land in a tenth slot no key can swap into the hand, so the loader refuses
+        // any carry deeper than nine a member: 36 party-wide loads, 40 does not.
+        Assert.Equal(9, GameConstants.MaxInventorySlots);
+        int deepest = GameConstants.PartySize * GameConstants.MaxInventorySlots;
+        Assert.Equal(36, deepest);
+        ContentValidator.ValidateTuning(ContentDefaults.Tuning with { PartyCarrySlots = deepest });
+        foreach (int carry in new[] { deepest + GameConstants.PartySize, 400 })
+        {
+            var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ContentDefaults.Tuning with { PartyCarrySlots = carry }));
+            Assert.Equal((nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasAKey), (ex.EntryId, ex.Rule));
+        }
+
+        // Refused at load, before a member is built on it, leaving the running content alone.
+        var before = GameContent.Current;
+        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: ContentDefaults.Tuning with { PartyCarrySlots = deepest + GameConstants.PartySize }));
+        Assert.Equal(ContentValidator.RuleEverySlotHasAKey, loaded.Rule);
+        Assert.Same(before, GameContent.Current);
+
+        // The other end of the same rule: the scene binds a number key for every
+        // slot the loader admits. At the deepest carry a member holds nine, the
+        // bag reads 2-9, and each of its eight slots has its key.
+        Assert.InRange(GameConstants.MaxInventorySlots, 1, DungeonScene.HighestSlotKey);
+        using (TestContent.Use(tuning: ContentDefaults.Tuning with { PartyCarrySlots = deepest }))
+        {
+            var member = TestPools.Char("A");
+            Assert.Equal(GameConstants.MaxInventorySlots, member.Inventory.Length);
+            Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(member.Inventory.Length));
+        }
     }
 }

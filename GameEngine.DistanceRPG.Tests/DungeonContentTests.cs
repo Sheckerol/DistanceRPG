@@ -59,6 +59,14 @@ public class DungeonContentTests
         => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons,
             dungeons: dungeons);
 
+    /// <summary>The compiled content under <paramref name="tuning"/>, loaded (and never made current).</summary>
+    private static GameContent LoadTuned(Tuning tuning)
+        => GameContent.Load(tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);
+
+    /// <summary>The compiled tuning with <paramref name="t"/>'s forge limit set to <paramref name="limit"/>, every other limit as compiled.</summary>
+    private static Tuning WithMaxForged(ModifierType t, int limit)
+        => ContentDefaults.Tuning with { MaxForged = new Dictionary<ModifierType, int>(ContentDefaults.Tuning.MaxForged) { [t] = limit } };
+
     private static ContentException Rejected(DungeonsData dungeons) => Assert.Throws<ContentException>(() => Load(dungeons));
 
     private static void Refused(DungeonsData dungeons, string entry, string rule)
@@ -338,6 +346,47 @@ public class DungeonContentTests
     }
 
     [Fact]
+    public void AThemesUniqueSitsAtItsForgeLimit_ALimitTunedPastItIsRefused()
+    {
+        // A boss's drop becomes its theme's unique by arithmetic alone: the graft
+        // takes the theme to MaxForged(theme) and the grafted spread is the
+        // unique's (S6). The Purity variant is forged x2 and its unique x3, so the
+        // two meet only while the theme's forge limit is x3 -- and for every
+        // shipped theme it is (PHASE4-058).
+        foreach (var def in Dungeons.All)
+        {
+            var own = Assert.IsType<WeaponClass>(ContentValidator.ClassSignedBy(def.Theme));
+            var purity = Weapons.Variant(own, VariantRole.Purity);
+            var unique = Weapons.UniqueDerivedFrom(purity.Id);
+            Assert.NotNull(unique);
+            Assert.Equal(Rules.MaxForged(def.Theme), purity.Forged[def.Theme] + 1);   // the graft lands on the limit
+            Assert.Equal(Rules.MaxForged(def.Theme), unique.Forged[def.Theme]);       // and the unique sits there
+        }
+
+        // Block's limit tuned to x4. The graft is still legal -- a Tower Guard takes
+        // it, so the golem's table is still all eight -- but it stops at x3, a stack
+        // short of the limit, and no weapon check notices: nothing is forged past
+        // x4. No golem drop could ever become The Bulwark, so the tutorial, the
+        // dungeon that hunts it, is refused.
+        var blockToFour = WithMaxForged(Block, 4);
+        var towerGuard = Spread(Weapons["tower_guard"]);
+        Assert.True(new ModifierRules(blockToFour, ContentDefaults.Restricted).CanGraft(Block, WeaponKind.Melee, towerGuard, towerGuard, asForged: true));
+        Assert.Equal(3, towerGuard.Stacks(Block) + 1);
+        var ex = Assert.Throws<ContentException>(() => LoadTuned(blockToFour));
+        Assert.Equal(("tutorial", ContentValidator.RuleThemeHasAUnique), (ex.EntryId, ex.Rule));
+        Assert.Contains("'the_bulwark' carries Block x3, and Block's forge limit is x4", ex.Message);
+
+        // One signature's limit is the business of the dungeon themed on it: Brace's names the Spear Hall.
+        ex = Assert.Throws<ContentException>(() => LoadTuned(WithMaxForged(Brace, 4)));
+        Assert.Equal(("spear_hall", ContentValidator.RuleThemeHasAUnique), (ex.EntryId, ex.Rule));
+
+        // And a signature no dungeon is themed on is none of theirs: Cleave at x4 loads.
+        var cleaveToFour = LoadTuned(WithMaxForged(Cleave, 4));
+        Assert.Equal(4, cleaveToFour.Modifiers.MaxForged(Cleave));
+        Assert.Equal(3, cleaveToFour.Modifiers.MaxForged(Block));
+    }
+
+    [Fact]
     public void ABossWithNothingToWieldIsRefused()
     {
         // Longshot kept to the bows alone. Ranged-only is not enough on its own:
@@ -499,21 +548,26 @@ public class DungeonContentTests
         Rejected(t => t with { DeathXpLossPercent = 101 }, nameof(Tuning.DeathXpLossPercent), ContentValidator.RuleShareIsAPercentage);
         Rejected(t => t with { DeathXpLossPercent = -1 }, nameof(Tuning.DeathXpLossPercent), ContentValidator.RuleShareIsAPercentage);
 
-        // The carry divides among the members, a slot each at least.
+        // The carry divides among the members, a slot each at least, and no member
+        // carries more slots than the number keys can equip.
         Rejected(t => t with { PartyCarrySlots = 25 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleCarryFillsTheParty);
         Rejected(t => t with { PartyCarrySlots = 0 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleCarryFillsTheParty);
+        Rejected(t => t with { PartyCarrySlots = 40 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasAKey);
 
         // The stairs gather the party from a tile away at least.
         Rejected(t => t with { StairGatherTiles = 0 }, nameof(Tuning.StairGatherTiles), ContentValidator.RuleGatherTakesATile);
 
         // The ends of every range are choices, not errors: a one-floor range, no
-        // offset, no lock, no clawback or all of it, one slot a member, one tile.
+        // offset, no lock, no clawback or all of it, one slot a member or nine, one tile.
         ContentValidator.ValidateTuning(ContentDefaults.Tuning with
         {
             BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, CooldownRunsPerFloor = 0,
             MercyFloor = 1, DeathXpLossPercent = 0, PartyCarrySlots = GameConstants.PartySize, StairGatherTiles = 1,
         });
-        ContentValidator.ValidateTuning(ContentDefaults.Tuning with { DeathXpLossPercent = 100 });
+        ContentValidator.ValidateTuning(ContentDefaults.Tuning with
+        {
+            DeathXpLossPercent = 100, PartyCarrySlots = GameConstants.PartySize * GameConstants.MaxInventorySlots,
+        });
     }
 
     [Fact]

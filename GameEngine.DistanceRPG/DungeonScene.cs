@@ -760,13 +760,17 @@ public class DungeonScene : Scene
     // ── Party control ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The highest number key the scene binds. With the bag open a key equips
-    /// the bag slot printed with its number — the panel numbers slots from 1,
-    /// the weapon in hand being 1 — so keys 2 up reach every bag slot a member
-    /// carries: 2-6 for the six of §4.4's carry, and up to eight bag slots if
-    /// the carry is tuned that deep. The inventory panel's key hint reads its
-    /// range off the same number (<see cref="DungeonHud.EquipHint"/>), so the
-    /// hint and the bindings cannot drift apart.
+    /// The highest number key the scene binds: the top of the number row. With
+    /// the bag open a key equips the bag slot printed with its number — the
+    /// panel numbers slots from 1, the weapon in hand being 1 — so keys 2 up
+    /// reach every bag slot a member carries: 2-6 for the six of §4.4's carry,
+    /// and 2-9 at the deepest carry the loader admits. That ceiling is
+    /// <see cref="GameConstants.MaxInventorySlots"/>, refused past at load
+    /// (<see cref="ContentValidator.RuleEverySlotHasAKey"/>) and held at or
+    /// under this number by test, so no slot a member carries is beyond its
+    /// key. The inventory panel's key hint reads its range off the same number
+    /// (<see cref="DungeonHud.EquipHint"/>), so the hint and the bindings
+    /// cannot drift apart.
     /// </summary>
     internal const int HighestSlotKey = 9;
 

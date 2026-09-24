@@ -400,6 +400,14 @@ public sealed record Tuning
     /// weapons share it — there is no haul bag — and slot 0 of each member's
     /// share is the weapon in hand. "Exact number is a tuning target; the
     /// structure is the decision."
+    /// <para>
+    /// A multiple of the party's size, at most 36:
+    /// <see cref="ContentValidator.ValidateTuning"/> refuses a carry that does not
+    /// divide evenly, and one deeper than
+    /// <see cref="GameConstants.MaxInventorySlots"/> (nine) a member, because a
+    /// slot is equipped by the number key printed beside it and the number row
+    /// stops at 9.
+    /// </para>
     /// </summary>
     public int PartyCarrySlots { get; init; } = 24;
 }
