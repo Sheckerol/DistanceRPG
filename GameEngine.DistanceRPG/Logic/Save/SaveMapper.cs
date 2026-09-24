@@ -304,12 +304,23 @@ internal static class SaveMapper
         return rows.ToArray();
     }
 
-    /// <summary>How the last run ended, as its summary reads it: the dungeon and the members it names are the content's and the party's, its spoils weapons like any other.</summary>
+    /// <summary>
+    /// How the last run ended, as its summary reads it: the dungeon and the
+    /// members it names are the content's and the party's, its floors and its
+    /// counts in the range play writes them, its spoils weapons like any other.
+    /// </summary>
     private static RunResult Result(RunResultDto row, GameContent content, IReadOnlyList<PartyMemberState> party, string at)
     {
         if (!content.Dungeons.TryGet(row.DungeonId, out _))
             throw new SaveFormatException($"{at}.dungeonId", $"'{row.DungeonId}' is no dungeon in the content");
         var outcome = EnumOf<RunOutcome>(row.Outcome, $"{at}.outcome", "run outcome");
+
+        // The depth reached and the boss floor are floor numbers, the first floor
+        // 1 (RunResult); the counter and the lock count runs, as the campaign's own do.
+        int deepest = FloorNumber(row.DeepestFloor, $"{at}.deepestFloor");
+        int? bossFloor = row.BossFloorRevealed is { } revealed ? FloorNumber(revealed, $"{at}.bossFloorRevealed") : null;
+        int runCounter = NotNegative(row.RunCounter, $"{at}.runCounter");
+        int? lockedUntil = row.LockedUntilRun is { } until ? NotNegative(until, $"{at}.lockedUntilRun") : null;
 
         Weapon[] Spoils(IReadOnlyList<WeaponDto> spoils, string where)
         {
@@ -330,8 +341,8 @@ internal static class SaveMapper
             taken[i] = new XpClawback(clawback.MemberId, clawback.Pool, NotNegative(clawback.Before, $"{where}.before"), NotNegative(clawback.After, $"{where}.after"));
         }
 
-        return new RunResult(row.DungeonId, outcome, row.BossDefeated, row.DeepestFloor, row.BossFloorRevealed, row.ServiceTick, row.MercyTick,
-            row.RunCounter, row.LockedUntilRun, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken);
+        return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
+            runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken);
     }
 
     // ── What every reader asks ───────────────────────────────────────────────
@@ -356,6 +367,10 @@ internal static class SaveMapper
 
     private static int NotNegative(int value, string at)
         => value >= 0 ? value : throw new SaveFormatException(at, $"{value} is below 0");
+
+    /// <summary>A floor by the number a run's summary gives it: the party starts on floor 1, and a boss floor range starts there too.</summary>
+    private static int FloorNumber(int value, string at)
+        => value >= 1 ? value : throw new SaveFormatException(at, $"{value} is no floor: floors are numbered from 1");
 
     /// <summary>An enum member by its exact name: never a number, never another case, never a list of flags.</summary>
     private static T EnumOf<T>(string? name, string at, string kind) where T : struct, Enum

@@ -798,6 +798,25 @@ public class CampaignSaveTests
         foreach (var (edit, where) in impossible)
             Assert.Equal(where, RefusedAfter(text, edit).Where);
 
+        // The last run's summary is held to the same, since the screen between runs
+        // shows its numbers: its floors are numbered from 1, and its run counter
+        // and its lock are counts of runs, never below 0. A clear's summary names
+        // both the boss floor and the lock, and each is edited out of range.
+        var ended = NewCampaign();
+        var hall = Clear(ended, "spear_hall");
+        Assert.NotNull(hall.BossFloorRevealed);
+        Assert.NotNull(hall.LockedUntilRun);
+        string summary = Save(ended);
+        (Action<JsonObject> Edit, string Where)[] unplayed =
+        [
+            (tree => tree["campaign"]!["lastResult"]!["deepestFloor"] = 0, "campaign.lastResult.deepestFloor"),
+            (tree => tree["campaign"]!["lastResult"]!["bossFloorRevealed"] = 0, "campaign.lastResult.bossFloorRevealed"),
+            (tree => tree["campaign"]!["lastResult"]!["runCounter"] = -1, "campaign.lastResult.runCounter"),
+            (tree => tree["campaign"]!["lastResult"]!["lockedUntilRun"] = -1, "campaign.lastResult.lockedUntilRun"),
+        ];
+        foreach (var (edit, where) in unplayed)
+            Assert.Equal(where, RefusedAfter(summary, edit).Where);
+
         // The capture is between runs, and the restore is under the current content.
         var campaign = NewCampaign();
         In(campaign, "tutorial", FiveDeep);
