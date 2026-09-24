@@ -102,6 +102,10 @@ public class DungeonScene : Scene
     private readonly Game _game;
     private readonly DungeonHud _hud;
 
+    // The floor being played, and the three parts of it this scene reads most:
+    // its map, its fog boxes and its fog, which is the floor's and not the
+    // scene's (§4.5) — the floor keeps what the party explored.
+    private Floor _floor = null!;
     private MapData _map = null!;
     private FogBoxSet _fogBoxes = null!;
     private FogState _fog = null!;
@@ -267,9 +271,17 @@ public class DungeonScene : Scene
         base.Initialize();
 
         Log.Info($"[Map] Generating dungeon with seed {MapSeed}");
-        _map = MapGenerator.Generate(new Mulberry32(MapSeed));
-        _fogBoxes = FogBoxBuilder.Build(_map); // also expands _map.Corridors in place
-        _fog = new FogState(MapGenerator.Rows, MapGenerator.Cols);
+        // The first floor of the tutorial, built by Logic (§4.5): its map, fog
+        // boxes, fog, enemy rows and stairs are a pure function of the seed, and
+        // floor 0's seed is MapSeed itself, so this is the dungeon the scene has
+        // always generated, tile for tile. Moving between floors is the visit's.
+        var dungeon = GameContent.Current.Dungeons.Tutorial;
+        _floor = Floor.Generate(MapSeed, 0, bottom: DungeonState.RollBossFloor(MapSeed, dungeon) == 1, dungeon);
+        _map = _floor.Map;
+        _fogBoxes = _floor.FogBoxes;   // built with the floor, which expanded _map.Corridors in place
+        _fog = _floor.Fog;
+        Log.Info($"[Map] Floor 1 of {dungeon.Name}: up-stairs (the way out) at {_floor.UpStairs}, "
+            + (_floor.DownStairs is { } down ? $"down-stairs at {down}" : "no way down"));
 
         BuildFloor();
         BuildWalls();
@@ -411,28 +423,17 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// First-entry enemy population: EnemyPlacer decides positions from the
-    /// map seed on its own RNG stream. When save games arrive, a loaded
-    /// entry skips this and restores saved enemy states instead.
-    /// <para>
-    /// Each dummy keeps the index it was placed at (§3.2's
-    /// <see cref="EnemyState.SpawnIndex"/>): the revival ladder is seeded from
-    /// the map seed and that index, so it is the dummy's own rather than the
-    /// floor's, and a save restores it beside the accumulated values.
-    /// </para>
+    /// One stand-in per enemy row of the floor. The rows are the floor's
+    /// (<see cref="Floor.Enemies"/>): EnemyPlacer decided positions and weapons
+    /// off the floor's seed on its own stream, and each row keeps the index it
+    /// was placed at (§3.2's <see cref="EnemyState.SpawnIndex"/>), which seeds its
+    /// drop and its revival ladder. The scene supplies only what is the scene's —
+    /// the box and its colour.
     /// </summary>
     private void SpawnEnemies()
     {
-        int spawnIndex = 0;
-        foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
+        foreach (var state in _floor.Enemies)
         {
-            var state = new EnemyState
-            {
-                X = x,
-                Y = y,
-                Weapon = GameContent.Current.Weapons.Instantiate(weaponId),
-                SpawnIndex = spawnIndex++,
-            };
             var enemy = new EnemyObject(state, EnemyColor);
             _enemies.Add(enemy);
             AddGameObject(enemy);
@@ -493,9 +494,10 @@ public class DungeonScene : Scene
     {
         // The floor's own generation seed goes in with the roster: the revival
         // ladder (§3.2) is drawn off mapSeed ^ ReviveSalt, per enemy and per
-        // cycle, so a farm replays identically from a save that restored it.
+        // cycle, so a farm replays identically from a save that restored it —
+        // and every floor's seed is its own, so no two floors share a ladder.
         _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(),
-            _enemies.Select(e => e.State).ToList(), RollD20, MapSeed);
+            _enemies.Select(e => e.State).ToList(), RollD20, _floor.Seed);
 
         _turns.TurnEnded += saved =>
         {
