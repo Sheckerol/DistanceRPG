@@ -305,10 +305,13 @@ public sealed class DungeonHud
     /// "surface the boss-floor lockout/re-roll trade-off ... before a player
     /// commits"), under its arrival banner: who waits here, and what beating it
     /// costs — the tutorial closes for good (§4.3: it is the one dungeon the game
-    /// is allowed to warn you about); any other dungeon locks for as many runs as
-    /// its floor, <c>BossFloor × CooldownRunsPerFloor</c>, while leaving without
-    /// the fight re-rolls the depth for next time (PHASE4-026). The depth is the
-    /// party's to know by now: they are standing on it.
+    /// is allowed to warn you about); any other dungeon locks for
+    /// <see cref="DungeonState.LockRuns"/> — as many runs as its floor, at the
+    /// shipped tuning — while leaving without the fight re-rolls the depth for
+    /// next time (PHASE4-026). The number is the visit's, never worked out here:
+    /// the lock a clear writes is <c>RunCounter + LockRuns</c>, the same rule, so
+    /// the promise cannot drift from what is applied. The depth is the party's to
+    /// know by now: they are standing on it.
     /// <para>
     /// Empty everywhere else — above the bottom, where saying so would disclose
     /// how deep the dungeon goes (PHASE4-024), and on the bottom once the boss is
@@ -326,7 +329,7 @@ public sealed class DungeonHud
         if (visit.Def.RetiresOnClear)
             return [waits, $"BEATING IT CLOSES {dungeon} FOR GOOD"];
 
-        int runs = visit.BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor;
+        int runs = visit.LockRuns;
         return [waits, $"BEATING IT LOCKS {dungeon} FOR {runs} {(runs == 1 ? "RUN" : "RUNS")}", "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS"];
     }
 

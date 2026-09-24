@@ -403,7 +403,7 @@ public class HudTextTests
 
         // The Spear Hall on a seed it rolls seven floors on: nothing on the way
         // down, then the lock — seven runs, the floor times the tuning's runs a
-        // floor — and the re-roll.
+        // floor, as the visit itself states it — and the re-roll.
         var spearHall = GameContent.Current.Dungeons["spear_hall"];
         var hall = DungeonState.Enter(spearHall, 7, party);
         Assert.Equal(7, hall.BossFloor);
@@ -413,7 +413,7 @@ public class HudTextTests
             Assert.Empty(DungeonHud.BossFloorBanner(hall));
             GoDown(hall, party);
         }
-        Assert.Equal(7, hall.BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor);
+        Assert.Equal(7, hall.LockRuns);
         Assert.Equal(new[]
         {
             "THE SPEAR WARDEN WAITS ON THIS FLOOR",

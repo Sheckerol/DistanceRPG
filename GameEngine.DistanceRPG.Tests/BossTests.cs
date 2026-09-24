@@ -769,8 +769,9 @@ public class BossTests
         Assert.Equal(2, Swings(new EnemyState { Weapon = TestWeapons.Get("hatchet") }));
 
         // Tough, and it never gets up: two 60s into Block 9 — 51 and 51 — put it
-        // down, not cleanly, so its count advances once; twenty turns later it is
-        // still down and nothing has been rolled for it.
+        // down and its count advances once (as it does for a clean kill too:
+        // TheBossCountsItsOneDeathOnce_HoweverCleanTheBlow); twenty turns later it
+        // is still down and nothing has been rolled for it.
         var killer = TestPools.Holding("A", TestWeapons.Make("Maul", range: 60, damage: 60, cost: 30));
         Put(killer, (5, 5));
         Put(golem, (5, 6));
@@ -791,5 +792,80 @@ public class BossTests
 
         // And a boss is one of its floor's enemies, or the system refuses it.
         Assert.Throws<ArgumentException>(() => new TurnSystem(new int[12, 20], new[] { killer }, Array.Empty<EnemyState>(), Ten, boss: golem));
+    }
+
+    [Fact]
+    public void TheBossCountsItsOneDeathOnce_HoweverCleanTheBlow()
+    {
+        // A clean kill — one blow of at least the target's whole maximum — counts
+        // a dummy's death twice (§3.2's CleanKillBonus): the farm's reward for
+        // overkill, on a ladder that comes back for more. Nobody farms the boss.
+        // It dies once, so however clean the blow its DefeatCount advances by one:
+        // the defeat feed the roster fixed for it, never the blow's size. The same
+        // sledge in the same hands, on the shipped tutorial's bottom floor: the
+        // hatchet dummy beside the lair, then the golem, each in one blow.
+        Assert.Equal(2, GameContent.Current.Tuning.CleanKillBonus);
+        var party = Party(Sledge());
+        var (visit, _, turns) = AtTheGolem(party);
+        var floor = visit.Current;
+        var golem = floor.Boss!;
+        var blows = new List<(EnemyState Target, int Dealt)>();
+        turns.EnemyHit += (target, hit) => blows.Add((target, hit.Dealt));
+
+        // The dummy: one blow past its 50, a clean kill, paid the bonus.
+        var dummy = Row(floor, 22, "hatchet");
+        Kill(turns, floor, party[0], dummy);
+        var (struck, dealt) = Assert.Single(blows);
+        Assert.Same(dummy, struck);
+        Assert.Equal(GameContent.Current.Tuning.CleanKillBonus, FarmLadder.DefeatAdvance(dealt, dummy.MaxHp));
+        Assert.Equal(2, dummy.DefeatCount);
+
+        // The golem: one blow past its 80 through its Block — a blow a dummy would
+        // be paid the bonus for — and its count is the one death it is.
+        blows.Clear();
+        Assert.Equal((80, 80), (golem.Hp, golem.MaxHp));
+        Kill(turns, floor, party[0], golem);
+        (struck, dealt) = Assert.Single(blows);
+        Assert.Same(golem, struck);
+        Assert.Equal(GameContent.Current.Tuning.CleanKillBonus, FarmLadder.DefeatAdvance(dealt, golem.MaxHp));
+        Assert.Equal((false, 1, 0), (golem.Alive, golem.DefeatCount, golem.RevivalsRolled));
+        Assert.True(visit.BossDefeated);
+    }
+
+    // ── What beating it costs ────────────────────────────────────────────────
+
+    [Fact]
+    public void TheLockIsTheBossFloorInRuns_AndTheBannerPromisesThatLock()
+    {
+        // Beating a boss locks its dungeon for BossFloor × CooldownRunsPerFloor
+        // runs (§4.3): one rule for every dungeon, written once, on the visit
+        // (DungeonState.LockRuns). The number the boss floor's banner promises
+        // before the fight is that rule's, never a second copy of it that could
+        // drift from the lock a clear applies. At the shipped one run a floor, a
+        // Spear Hall five, seven or ten floors deep locks for five, seven or ten.
+        Assert.Equal(1, GameContent.Current.Tuning.CooldownRunsPerFloor);
+        foreach (var (seed, floors) in new (long Seed, int Floors)[] { (4, 5), (7, 7), (6, 10) })
+        {
+            var visit = DungeonState.Enter(Dungeons["spear_hall"], seed, Party());
+            Assert.Equal((floors, floors), (visit.BossFloor, visit.LockRuns));
+        }
+
+        // Tuned to three runs a floor, the seven-floor Spear Hall locks for
+        // twenty-one, and its bottom floor's banner says twenty-one.
+        using (TestContent.Use(tuning: ContentDefaults.Tuning with { CooldownRunsPerFloor = 3 }))
+        {
+            var party = Party();
+            var visit = DungeonState.Enter(Dungeons["spear_hall"], 7, party);
+            Assert.Equal((7, 21), (visit.BossFloor, visit.LockRuns));
+            visit.OpenTurns(party, Ten);
+            while (visit.Current.DownStairs is not null)
+                Down(visit, party);
+            Assert.Equal(new[]
+            {
+                "THE SPEAR WARDEN WAITS ON THIS FLOOR",
+                "BEATING IT LOCKS THE SPEAR HALL FOR 21 RUNS",
+                "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS",
+            }, DungeonHud.BossFloorBanner(visit));
+        }
     }
 }

@@ -116,7 +116,10 @@ public sealed class EnemyState : ActorState
     /// carrying <em>and</em> how dangerous it has become, deliberately the same
     /// number (§3.2). Advanced by <see cref="FarmLadder.DefeatAdvance"/> when the
     /// Killed event settles — by 1, or by <see cref="Tuning.CleanKillBonus"/> for
-    /// a blow that dealt at least this dummy's <see cref="MaxHp"/>.
+    /// a blow that dealt at least this dummy's <see cref="MaxHp"/>. A boss's
+    /// advances by exactly 1 at its one death, however clean the blow: nobody
+    /// farms it, so the clean kill's bonus is not its to earn (the defeat feed
+    /// <see cref="TurnSystem"/> fixes for the roster's boss).
     /// </summary>
     public int DefeatCount { get; set; }
 

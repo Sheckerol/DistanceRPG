@@ -205,10 +205,11 @@ public sealed class TurnSystem
 
     // And for a defeat (§3.2): the Killed applier hands the blow's unclamped
     // figure to the feed the roster fixed for whatever died, and a dummy's
-    // advances its DefeatCount by FarmLadder.DefeatAdvance. A party member's is
-    // a no-op, exactly as its XP feed is — nothing here asks an actor its kind,
-    // and the day a party member starts recording its own deaths is the day
-    // this one line changes.
+    // advances its DefeatCount by FarmLadder.DefeatAdvance. A boss's advances it
+    // by one, the blow unasked — it is not farmed, so the clean kill's bonus is
+    // not its (§4.3). A party member's is a no-op, exactly as its XP feed is —
+    // nothing here asks an actor its kind, and the day a party member starts
+    // recording its own deaths is the day this one line changes.
     private readonly Dictionary<ActorState, Action<int>> _defeatFeeds = new(ReferenceEqualityComparer.Instance);
 
     // ── Turn economy ─────────────────────────────────────────────────────────
@@ -260,9 +261,11 @@ public sealed class TurnSystem
     /// The floor's boss — one of <paramref name="enemies"/> — or null on a floor
     /// that has none (§4.3). Its death is a defeat like any enemy's and one thing
     /// more: it stops resurrection first, then runs the defeat, so its own drop
-    /// is down before anyone hears of it, then raises <see cref="BossDefeated"/>.
-    /// That is fixed here, as the roster's death feed for that actor, like every
-    /// other consequence of a death: nothing asks an actor its kind when it dies.
+    /// is down before anyone hears of it, then raises <see cref="BossDefeated"/>;
+    /// and the defeat counts once in its <see cref="EnemyState.DefeatCount"/>,
+    /// however clean the blow, since nobody farms it. Both are fixed here, as the
+    /// roster's death and defeat feeds for that actor, like every other
+    /// consequence of a death: nothing asks an actor its kind when it dies.
     /// </param>
     /// <exception cref="ArgumentException"><paramref name="boss"/> is not one of <paramref name="enemies"/>.</exception>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
@@ -329,11 +332,18 @@ public sealed class TurnSystem
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
-        // The boss is an enemy whose death means more (§4.3): the feed the roster
-        // fixes for it stops resurrection around its defeat. Its hits, heals,
-        // movement and reactions are any enemy's.
+        // The boss is an enemy whose death means more (§4.3): the feeds the roster
+        // fixes for it stop resurrection around its defeat, and count that defeat
+        // as the one death it is. Nobody farms a boss, so a clean kill's bonus —
+        // the farm's reward on a ladder the boss never climbs — is not its to
+        // earn, and the blow's size goes unasked: however clean the kill, the
+        // count advances by one (and the drop it hands over reads that count).
+        // Its hits, heals, movement and reactions are any enemy's.
         if (boss is not null)
+        {
             _deathFeeds[boss] = () => OnBossDefeated(boss);
+            _defeatFeeds[boss] = _ => boss.DefeatCount += 1;
+        }
         _rosters = [party.ToArray<ActorState>(), enemies.ToArray<ActorState>()];
         _zones = [_partyZone, _enemyZone];
         _onReactionFired = new Dictionary<ModifierType, Action<ActorState>>
@@ -2229,10 +2239,13 @@ public sealed class TurnSystem
     /// fell earlier in the same swing ran its defeat with resurrection still on and
     /// handed nothing over; its item is that re-derivation's to lay.</item>
     /// </list>
-    /// It never revives — nothing does, from now — and its
-    /// <see cref="EnemyState.DefeatCount"/> advanced once, at this death, which
-    /// nothing reads. The run goes on: the party turns round and fights its way
-    /// out (§4.4).
+    /// It never revives — nothing does, from now. Its
+    /// <see cref="EnemyState.DefeatCount"/> advanced by exactly one at this death,
+    /// however clean the blow: the defeat feed the roster fixed for it counts the
+    /// one death it is, where a dummy's pays a clean kill the farm's bonus. The
+    /// drop it hands over is read off the row like any corpse's
+    /// (<see cref="GroundItemOf"/>), that count included, so no overkill deepens
+    /// it. The run goes on: the party turns round and fights its way out (§4.4).
     /// </summary>
     private void OnBossDefeated(EnemyState boss)
     {

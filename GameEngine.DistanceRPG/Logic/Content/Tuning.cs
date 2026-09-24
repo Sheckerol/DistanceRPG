@@ -360,7 +360,7 @@ public sealed record Tuning
     /// </summary>
     public int BossStackOffset { get; init; } = 4;
 
-    /// <summary>Runs a clear locks its dungeon for, per floor its boss was beaten on: the lock is <c>BossFloor × CooldownRunsPerFloor</c> (§4.3), counted on the campaign's run counter.</summary>
+    /// <summary>Runs a clear locks its dungeon for, per floor its boss was beaten on: the lock is <c>BossFloor × CooldownRunsPerFloor</c> (§4.3), counted on the campaign's run counter, and multiplied out in one place, <see cref="DungeonState.LockRuns"/>.</summary>
     public int CooldownRunsPerFloor { get; init; } = 1;
 
     /// <summary>

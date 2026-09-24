@@ -348,6 +348,27 @@ public sealed class DungeonState
     public int BossFloor { get; }
 
     /// <summary>
+    /// How many runs beating this visit's boss locks its dungeon for (§4.3):
+    /// <c>BossFloor × CooldownRunsPerFloor</c> — as many runs as the floor the boss
+    /// waits on, at the shipped one run a floor — counted on the campaign's run
+    /// counter.
+    /// <para>
+    /// <strong>The one place the rule is written.</strong> The boss floor's banner
+    /// promises the lock before the fight by reading this
+    /// (<c>DungeonHud.BossFloorBanner</c>), and the lock a clear writes is
+    /// <c>RunCounter + LockRuns</c> — never a second copy of the arithmetic — so
+    /// the promise and the lock can never state different numbers: any change to
+    /// the rule (a rounding, a per-dungeon length, a tuning captured at entry) is
+    /// made here, once. The depth is the visit's own, fixed at entry; the runs a
+    /// floor are <see cref="Tuning.CooldownRunsPerFloor"/> as it stands when
+    /// asked. A dungeon that retires on its clear
+    /// (<see cref="DungeonDef.RetiresOnClear"/>, the tutorial) is closed rather
+    /// than locked, and never applies it.
+    /// </para>
+    /// </summary>
+    public int LockRuns => BossFloor * GameContent.Current.Tuning.CooldownRunsPerFloor;
+
+    /// <summary>
     /// Every floor of the visit, index 0 first — the first floor, whose up-stairs
     /// are the way out — to the boss floor at <c>BossFloor − 1</c>, the bottom.
     /// All of them built at <see cref="Enter"/> and none rebuilt inside the visit.

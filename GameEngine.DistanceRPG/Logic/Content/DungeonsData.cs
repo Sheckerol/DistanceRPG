@@ -25,8 +25,8 @@ public sealed record BossDef(string Id, string Name, int MaxHp, int MovementBudg
 /// as deliberate as what is: the drop table is computed from the theme and the
 /// relations and never authored (<see cref="DungeonCatalogue.ThemeClasses"/>);
 /// depth is a range rolled at entry, never a stored floor; and the cooldown is
-/// <c>BossFloor × CooldownRunsPerFloor</c>, one rule for every dungeon rather
-/// than a field of each.
+/// <c>BossFloor × CooldownRunsPerFloor</c> (<see cref="DungeonState.LockRuns"/>),
+/// one rule for every dungeon rather than a field of each.
 /// </summary>
 /// <param name="Id">The stable string id everything refers to the dungeon by — the doc's <c>DungeonId</c>, a string as every content id is.</param>
 /// <param name="Name">The display name.</param>
