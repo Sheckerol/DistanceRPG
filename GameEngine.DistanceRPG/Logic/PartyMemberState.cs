@@ -227,11 +227,18 @@ public sealed class PartyMemberState : ActorState
 
     public override Weapon? EquippedWeapon => Inventory[0];
 
+    /// <summary>
+    /// The base movement a turn refills (§1.2): <see cref="Tuning.MovementBudget"/>
+    /// under the current content, read on every use and never cached, so a
+    /// member built after a tuning is loaded moves by that tuning's number.
+    /// </summary>
+    private static float Budget => GameContent.Current.Tuning.MovementBudget;
+
     /// <summary>Movement budget left this turn, in logic units.</summary>
-    public float DistLeft { get; set; } = GameConstants.MaxDistance;
+    public float DistLeft { get; set; } = Budget;
 
     /// <summary>This turn's cap: base budget plus movement saved last turn, less what Mire cut.</summary>
-    public float EffectiveMax { get; set; } = GameConstants.MaxDistance;
+    public float EffectiveMax { get; set; } = Budget;
 
     /// <summary>Banked at end of turn (half the unspent budget, capped).</summary>
     public float SavedMovement { get; set; }
@@ -247,7 +254,7 @@ public sealed class PartyMemberState : ActorState
     {
         float bonus = SavedMovement;
         SavedMovement = 0;
-        EffectiveMax = StatusBehaviours.MiredBudget(this, GameConstants.MaxDistance + bonus);
+        EffectiveMax = StatusBehaviours.MiredBudget(this, Budget + bonus);
         DistLeft = EffectiveMax;
     }
 
@@ -291,8 +298,8 @@ public sealed class PartyMemberState : ActorState
         Mana = UsableMaxMana;
         HeldShots = 0;
         SavedMovement = 0;
-        EffectiveMax = GameConstants.MaxDistance;
-        DistLeft = GameConstants.MaxDistance;
+        EffectiveMax = Budget;
+        DistLeft = Budget;
     }
 
     /// <summary>
@@ -306,7 +313,7 @@ public sealed class PartyMemberState : ActorState
             SavedMovement = 0;
             return 0;
         }
-        float save = Math.Min(MathF.Floor(DistLeft / 2f), GameConstants.MaxDistance / 2f);
+        float save = Math.Min(MathF.Floor(DistLeft / 2f), Budget / 2f);
         SavedMovement = save;
         return save;
     }

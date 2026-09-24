@@ -196,6 +196,12 @@ public class DungeonScene : Scene
     private readonly DungeonState _visit;
     private readonly IRunHost _host;
 
+    // What the game's startup had to say — the data files' notices — when this
+    // scene is the first the game opens on (a dev override booting straight in,
+    // past the screen between runs that says them otherwise): put up over the
+    // first floor's arrival banner. Empty for every other run.
+    private readonly IReadOnlyList<string> _startupNotices;
+
     // The floor being played, and the three parts of it this scene reads most:
     // its map, its fog boxes and its fog, which is the floor's and not the
     // scene's (§4.5) — the floor keeps what the party explored. All four follow
@@ -286,8 +292,9 @@ public class DungeonScene : Scene
     /// <param name="game">The game window: its size, its shaders, its close.</param>
     /// <param name="campaign">The campaign, with the visit this scene plays already entered (<see cref="CampaignState.Enter"/>): the party stands at its first floor's arrival.</param>
     /// <param name="host">Who is told when the run is over (<see cref="IRunHost.RunOver"/>).</param>
+    /// <param name="notices">What the game's startup has to say over the first floor — the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">The campaign has no visit in progress: there is nothing to play.</exception>
-    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host) : base("DungeonScene")
+    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host, IReadOnlyList<string>? notices = null) : base("DungeonScene")
     {
         ArgumentNullException.ThrowIfNull(campaign);
         ArgumentNullException.ThrowIfNull(host);
@@ -297,6 +304,7 @@ public class DungeonScene : Scene
         _visit = campaign.Visit
             ?? throw new ArgumentException("A dungeon scene plays a visit in progress: enter a dungeon before building one.", nameof(campaign));
         _host = host;
+        _startupNotices = notices ?? [];
         _hud = new DungeonHud(game);
     }
 
@@ -407,10 +415,23 @@ public class DungeonScene : Scene
     /// turn start cuts (<see cref="PartyMemberState.StartTurn"/>). In the
     /// player phase that is what this turn's cap was cut from, so a Mire
     /// legend agrees with the MOVE readout at the same level; once the turn
-    /// has ended, it is the coming turn's.
+    /// has ended, it is the coming turn's. The allowance is the tuning's
+    /// (<see cref="Tuning.MovementBudget"/>), as <see cref="PartyMemberState.StartTurn"/>'s is.
     /// </summary>
     public float BudgetBeforeMire(PartyMemberState member)
-        => GameConstants.MaxDistance + _banked.GetValueOrDefault(member);
+        => BudgetBeforeMire(GameContent.Current.Tuning, _banked.GetValueOrDefault(member));
+
+    /// <summary>
+    /// The whole a turn start cuts Mire from, under <paramref name="tuning"/>:
+    /// its <see cref="Tuning.MovementBudget"/> plus <paramref name="banked"/>,
+    /// the movement saved at the last turn's end — so the legend reads the
+    /// tuned budget exactly as the MOVE readout's cap was cut from it.
+    /// </summary>
+    internal static float BudgetBeforeMire(Tuning tuning, float banked)
+    {
+        ArgumentNullException.ThrowIfNull(tuning);
+        return tuning.MovementBudget + banked;
+    }
 
     // What the mouse is over and what a click there would do, refreshed each
     // frame through the same pick a click acts on (UpdateHover): the HUD's
@@ -497,6 +518,8 @@ public class DungeonScene : Scene
         SpawnParty();
         _campaign.RunEnded += OnRunEnded;   // before any system opens: a wipe ends the run in Logic, and this scene shows it
         ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20));
+        if (_startupNotices.Count > 0)
+            _hud.ShowNotices(_startupNotices);   // over the first floor's banner: the startup had something to say
         WireInput();
 
         _camera.Yaw = -90f;   // face -Z (up the map)

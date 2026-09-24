@@ -67,6 +67,48 @@ line of sight breaks. Sighting the enemy revokes it for the rest of the turn:
 everyone stops following, characters body-block each other, and turns end
 manually.
 
+## Tuning the numbers: `tuning.json`
+
+Every number the game is tuned by — the movement budget, the mana divisor, each
+status's effect per level, what a stack of each modifier is worth, the farm's
+odds, the boss depths, the carry — sits in one file, `tuning.json`, grouped
+under the headings of `docs/roadmap/phase-5-save.md` §5.3 with a comment on
+every key.
+
+- **Where**: beside the executable — `GameEngine.DistanceRPG/bin/Debug/net10.0/tuning.json`
+  after a Debug build. The log prints its full path at startup
+  (`[Data] Read D:\...\net10.0\tuning.json`); the logs are in
+  `%LOCALAPPDATA%\Sheckerol\GameEngine\logs`.
+- **Edit that copy**, not `GameEngine.DistanceRPG/Data/tuning.json`. The one in
+  `Data/` is generated from the compiled numbers and pinned byte for byte by
+  `ShippedDataTests`, so editing it fails the tests. A build copies it beside
+  the exe only when it is newer than the copy there, so an edited copy survives
+  a rebuild; `dotnet clean`, or a regenerated `Data/` file, replaces it.
+- **Restart to apply**: the file is read once, when the game starts, and never
+  during play.
+- **Name only what you change**: a key left out keeps its built-in number, so
+  `{ "MovementBudget": 240 }` is a whole file. Comments and trailing commas are fine.
+- **A mistake costs a warning, never a crash**: an unknown key, a value out of
+  range, or one that is not a whole number is shown under the BETWEEN RUNS title
+  (or over the first floor when `DISTANCERPG_DUNGEON` boots straight in) and
+  written to the log, and the game plays on — `"MovementUnitsPerMana": 0` plays 1
+  and says `TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1`. A few keys
+  are also fitted to the content: `"PartyCarrySlots": 4` plays 8, because every
+  starting member carries two weapons. The log lists every number the file
+  changed (`[Data] ...\tuning.json changes 2 numbers: MovementBudget 240, ...`).
+- **Derived numbers do not follow**: `MovementUnitsPerMana` is derived from the
+  movement budget and the cast costs, and turning `MovementBudget` leaves it
+  where it was — so a longer budget also banks more mana a turn. Its comment
+  gives the formula to re-derive it by hand.
+- **To reset** the copy, delete it (the built-in numbers play, and the screen
+  says the file is missing), or write a fresh one:
+  `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <folder>`
+  writes the shipped file into `<folder>` and exits without opening a window.
+  A number worth keeping goes into `GameEngine.DistanceRPG/Logic/Content/Tuning.cs`,
+  and `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped file.
+- Nothing the golden tests pin — the map generator, the random streams, the
+  pathfinder — is in it, and a test keeps it that way.
+
 ## How the port was verified
 
 `GameEngine.DistanceRPG.Tests/TestData/distancerpg-golden.json` was generated

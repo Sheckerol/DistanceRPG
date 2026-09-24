@@ -132,4 +132,49 @@ public class LogicPurityTests
         Assert.True(Builds(typeof(Floor)));
         Assert.True(Builds(typeof(EnemyPlacer)));
     }
+
+    /// <summary>What reading or writing the machine looks like from IL: a file or a folder, the environment's variables and folders, the executable's own folder, a stream opened on a path.</summary>
+    private static bool TouchesTheDisk(MethodBase target)
+    {
+        var type = target.DeclaringType;
+        if (type is null) return false;
+        if (type == typeof(File) || type == typeof(Directory) || type == typeof(FileInfo) || type == typeof(DirectoryInfo) || type == typeof(FileStream))
+            return true;
+        if (type == typeof(Environment))
+            return target.Name is nameof(Environment.GetEnvironmentVariable) or nameof(Environment.GetFolderPath);
+        if (type == typeof(AppContext))
+            return target.Name == "get_" + nameof(AppContext.BaseDirectory);
+        return (type == typeof(StreamReader) || type == typeof(StreamWriter))
+            && target is ConstructorInfo constructor
+            && constructor.GetParameters() is [{ ParameterType: var first }, ..] && first == typeof(string);
+    }
+
+    [Fact]
+    public void NoLogicTypeTouchesTheDisk()
+    {
+        // A31, 1e: Logic reads strings and never the disk. The data files are read
+        // at the edge (DataFiles) and handed in as text, so every reader is tested
+        // on text and no test can touch a real folder through Logic. Nothing in the
+        // namespace calls into a file, a folder, the environment's variables or
+        // folders, or the executable's own folder — the IL of every Logic type,
+        // compiler-generated nested types included.
+        var calls = Calls(Game).Where(c => Root(c.From.DeclaringType)?.Namespace == LogicNamespace).ToArray();
+        var offenders = calls.Where(c => TouchesTheDisk(c.Target)).Select(Describe).Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([], offenders);
+
+        // Both guards read the namespace exactly, so a Logic type declared in a
+        // namespace under it (…Logic.Content.Json, say) would slip past both: no
+        // type of the game's is declared in one.
+        var nested = Types(Game).Where(t => t.Namespace?.StartsWith(LogicNamespace + ".", StringComparison.Ordinal) == true)
+            .Select(t => t.FullName ?? t.Name).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([], nested);
+
+        // The scan is not reading nothing: the new readers are in it, and the same
+        // predicate catches the edge, which does read and write the disk.
+        var logic = LogicTypes();
+        Assert.Contains(typeof(TuningJson), logic);
+        Assert.Contains(typeof(ContentFiles), logic);
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(DataFiles) && TouchesTheDisk(c.Target));
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(DistanceRpgGame) && TouchesTheDisk(c.Target));
+    }
 }

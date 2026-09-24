@@ -1,0 +1,150 @@
+using GameEngine.DistanceRPG.Logic;
+using static GameEngine.DistanceRPG.Logic.ModifierType;
+
+namespace GameEngine.DistanceRPG.Tests;
+
+/// <summary>
+/// Where the tuning meets the content, the tuning bends (1g; A3): three keys are
+/// measured against the content as well as themselves — the carry against the
+/// roster's loadouts, the forge limits against the weapons' spreads, the boss
+/// offset against the dungeons' pinned floors — and a value in its own range
+/// that would break shipped content is raised to what the content needs, with a
+/// warning naming the entry that needed it; never an abort. Content no in-range
+/// value could serve is left to fail as content. Nothing here is made current.
+/// </summary>
+public class TuningFitTests
+{
+    private static readonly Tuning Compiled = ContentDefaults.Tuning;
+
+    private static Tuning Fit(Tuning tuning, List<string> warnings, WeaponsData? weapons = null, DungeonsData? dungeons = null, PartyData? party = null)
+        => TuningFit.ToContent(tuning, weapons ?? ContentDefaults.Weapons, dungeons ?? ContentDefaults.Dungeons, party ?? ContentDefaults.Party, warnings);
+
+    private static GameContent Load(Tuning tuning, PartyData? party = null, DungeonsData? dungeons = null, WeaponsData? weapons = null)
+        => GameContent.Load(tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, weapons ?? ContentDefaults.Weapons, party, dungeons);
+
+    [Fact]
+    public void ACarryTheRosterCannotFitIsRaisedToIt_NamingTheMember()
+    {
+        // A carry of 4 is one slot a member, and every member of the shipped
+        // roster starts with two weapons (RulePartyBagFits): the carry is raised
+        // to 8 — two a member, shared evenly — naming who needed it and what they
+        // carry, and the roster then fits.
+        var warnings = new List<string>();
+        var fitted = Fit(Compiled with { PartyCarrySlots = 4 }, warnings);
+        Assert.Equal(8, fitted.PartyCarrySlots);
+        Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (weakspot_stiletto, staff_of_renewal) - using 8"], warnings);
+        ContentValidator.ValidateParty(ContentDefaults.Party, Load(fitted).Weapons, fitted);
+        Assert.Throws<ContentException>(() => Load(Compiled with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
+
+        // A carry that already fits is left alone, and says nothing.
+        warnings.Clear();
+        Assert.Equal(24, Fit(Compiled, warnings).PartyCarrySlots);
+        Assert.Equal(8, Fit(Compiled with { PartyCarrySlots = 8 }, warnings).PartyCarrySlots);
+        Assert.Empty(warnings);
+
+        // Through the loader, as a playtest meets it: a file of 4 plays 8, and says so.
+        var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "PartyCarrySlots": 4 }"""));
+        Assert.Equal(8, load.Content!.Tuning.PartyCarrySlots);
+        Assert.Contains(load.Notices, notice => notice.Contains("A carries 2 weapons", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AForgeLimitBelowAShippedSpreadIsRaisedToIt_NamingTheWeapon()
+    {
+        // A forge limit below a shipped spread breaks RuleMaxForged. CritWindow 2
+        // is below the Widowmaker's x3, the deepest any weapon forges it: 3,
+        // naming it. Cleave 1 is below the Great Axe's x2 — no Cleave unique exists
+        // yet, so x2 is the deepest — and is raised to 2, not to a unique's 3.
+        var warnings = new List<string>();
+        var limits = new Dictionary<ModifierType, int> { [CritWindow] = 2, [Cleave] = 1, [Light] = 1, [Brace] = 3 };
+        var fitted = Fit(Compiled with { MaxForged = limits }, warnings);
+        var rules = Load(fitted).Modifiers;
+        Assert.Equal((3, 2, 1, 3), (rules.MaxForged(CritWindow), rules.MaxForged(Cleave), rules.MaxForged(Light), rules.MaxForged(Brace)));
+        Assert.Equal(
+        [
+            "tuning.json: MaxForged.CritWindow 2 is below widowmaker, which is forged CritWindow x3 - using 3",
+            "tuning.json: MaxForged.Cleave 1 is below great_axe, which is forged Cleave x2 - using 2",
+        ], warnings);
+
+        // A limit at or above every forging is left alone, and says nothing.
+        warnings.Clear();
+        Fit(Compiled, warnings);
+        Fit(Compiled with { MaxForged = new Dictionary<ModifierType, int> { [Pin] = 2, [Charges] = 3 } }, warnings);
+        Assert.Empty(warnings);
+
+        // Every limit at 1: after the fit, every dungeon's theme limit is still its
+        // unique's x3 — the Purity coincidence the boss's graft lands on
+        // (RuleThemeHasAUnique) — and the content loads.
+        var ones = Enum.GetValues<ModifierType>().ToDictionary(t => t, _ => 1);
+        var all = Fit(Compiled with { MaxForged = ones }, warnings);
+        var content = Load(all);
+        foreach (var dungeon in content.Dungeons.All)
+            Assert.Equal(3, content.Modifiers.MaxForged(dungeon.Theme));
+    }
+
+    [Fact]
+    public void AnOffsetThatLetsAPinnedBossPayTheFarmIsRaised_NamingTheDungeon()
+    {
+        // A one-floor range at floor 1 with the shallowest farm (headroom 1: a
+        // well-farmed weapon banks 2) is fine for the tuning's own range, and the
+        // offset of 0 passes the tuning's own clamp — but the tutorial pins its
+        // floor to 2, whose boss would pay 2 stacks against a farm of 2
+        // (RuleBossPaysLessThanTheFarm on the dungeon). The offset is raised to 1,
+        // naming the dungeon and the floor.
+        var tuning = Compiled with { BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, AcquiredHeadroom = 1 };
+        ContentValidator.ValidateTuning(tuning);
+        Assert.Throws<ContentException>(() => Load(tuning));
+
+        var warnings = new List<string>();
+        var fitted = Fit(tuning, warnings);
+        Assert.Equal(1, fitted.BossStackOffset);
+        Assert.Equal(["tuning.json: BossStackOffset 0 lets the tutorial boss on floor 2 pay 2 stacks, and a well-farmed weapon banks 2 - using 1"], warnings);
+        var dungeons = Load(fitted).Dungeons;
+        Assert.Equal(1, dungeons.MostStacksPaid(dungeons.Tutorial));   // one stack against a farm of two
+        Assert.True(dungeons.MostStacksPaid(dungeons.Tutorial) < ContentValidator.FarmBanks(fitted.AcquiredHeadroom));
+
+        // The shipped numbers need nothing.
+        warnings.Clear();
+        Assert.Equal(4, Fit(Compiled, warnings).BossStackOffset);
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    public void ContentNoValueCanServeIsLeftToFailAsContent()
+    {
+        // Content no in-range value can serve is content's own error (1g): a member
+        // carrying ten weapons (forty slots, past the thirty-six the number keys
+        // reach), a dungeon pinned to floor 500, a weapon forged x4. The tuning is
+        // left as it was, says nothing, and the content fails as content, naming
+        // the entry and the rule.
+        var warnings = new List<string>();
+
+        var ten = new PartyData(ContentDefaults.Party.Members.Select((m, i) => i == 0
+            ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
+            : m).ToList());
+        var carry = Fit(Compiled, warnings, party: ten);
+        Assert.Equal(24, carry.PartyCarrySlots);
+        Assert.Equal(ContentValidator.RulePartyBagFits, Assert.Throws<ContentException>(() => Load(carry, party: ten)).Rule);
+
+        var deep = new DungeonsData(ContentDefaults.Dungeons.Dungeons
+            .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 500, BossFloorMax = 500 } : d).ToList());
+        var offset = Fit(Compiled, warnings, dungeons: deep);
+        Assert.Equal(4, offset.BossStackOffset);
+        var refused = Assert.Throws<ContentException>(() => Load(offset, dungeons: deep));
+        Assert.Equal(("spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm), (refused.EntryId, refused.Rule));
+
+        var forged = new WeaponsData(ContentDefaults.Weapons.Weapons
+            .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList());
+        var limit = Fit(Compiled, warnings, weapons: forged);
+        Assert.Equal(3, new ModifierRules(limit, ContentDefaults.Restricted).MaxForged(CritWindow));
+        Assert.Equal(("widowmaker", ContentValidator.RuleMaxForged), Refusal(() => Load(limit, weapons: forged)));
+
+        Assert.Empty(warnings);
+    }
+
+    private static (string EntryId, string Rule) Refusal(Action load)
+    {
+        var refused = Assert.Throws<ContentException>(load);
+        return (refused.EntryId, refused.Rule);
+    }
+}

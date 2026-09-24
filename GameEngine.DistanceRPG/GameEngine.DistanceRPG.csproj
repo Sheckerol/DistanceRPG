@@ -29,4 +29,15 @@
                  CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
+    <!-- The data files (phase-5-save.md 5.3, 5.4): generated from the compiled content
+         (the write-data command, run on this Data folder) and pinned byte for byte by
+         ShippedDataTests, then copied beside the executable, where the game reads them once
+         at startup and a playtest edits them. PreserveNewest leaves a copy edited there alone. -->
+    <ItemGroup>
+        <None Remove="Data\**" />
+        <Content Include="Data\*.json"
+                 Link="%(Filename)%(Extension)"
+                 CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

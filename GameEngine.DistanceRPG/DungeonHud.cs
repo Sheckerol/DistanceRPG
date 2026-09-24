@@ -88,6 +88,20 @@ public sealed class DungeonHud
     private Banner? _banner;
     private float _bannerAge;
 
+    /// <summary>How long the startup notices stay over the first floor, and the last stretch of it over which they fade: long enough to read three rows.</summary>
+    private const float NoticeSeconds = 12f;
+    private const float NoticeFadeSeconds = 2f;
+
+    /// <summary>The notices' rows: their scale, their pitch, and the gap they keep above the banner's line over it.</summary>
+    private const float NoticeScale = 1.5f;
+    private const float NoticePitch = 18f;
+    private const float NoticeGap = 12f;
+
+    // The startup notices up now (ShowNotices), as NoticeText laid them out, and
+    // how long they have been up.
+    private IReadOnlyList<string> _noticeRows = [];
+    private float _noticeAge;
+
     public DungeonHud(Game game)
     {
         _game = game;
@@ -138,6 +152,24 @@ public sealed class DungeonHud
     /// </summary>
     public void HideArrival() => _banner = null;
 
+    /// <summary>
+    /// Put the startup notices up over the arrival banner — what the data files
+    /// raised: a <c>tuning.json</c> value clamped or fitted, a file missing — for a
+    /// dungeon the game booted straight into, which never passes the screen
+    /// between runs that says them otherwise. Wrapped and capped by
+    /// <see cref="NoticeText.Rows"/>, the one wrapper every notice goes through,
+    /// and up for <see cref="NoticeSeconds"/>, fading at the end.
+    /// </summary>
+    public void ShowNotices(IReadOnlyList<string> notices)
+    {
+        ArgumentNullException.ThrowIfNull(notices);
+        _noticeRows = NoticeText.Rows(notices);
+        _noticeAge = 0f;
+    }
+
+    /// <summary>The notice rows up now, as <see cref="ShowNotices"/> laid them out: what the HUD draws over the banner.</summary>
+    internal IReadOnlyList<string> NoticeRows => _noticeRows;
+
     /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
     public void ClearFloatingTexts() => _floatingTexts.Clear();
 
@@ -187,6 +219,13 @@ public sealed class DungeonHud
             _bannerAge += deltaTime;
             if (_bannerAge >= _banner.Seconds)
                 _banner = null;
+        }
+
+        if (_noticeRows.Count > 0)
+        {
+            _noticeAge += deltaTime;
+            if (_noticeAge >= NoticeSeconds)
+                _noticeRows = [];
         }
     }
 
@@ -274,6 +313,7 @@ public sealed class DungeonHud
         // being left came down when its fade began (HideArrival).
         _fade.Draw(_game.ShaderManager, scene.TransitFade);
         DrawBanner(scene, w, h);
+        DrawNotices(scene, w, h);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -661,6 +701,24 @@ public sealed class DungeonHud
         {
             DrawCentered(w, underY, line, 2f, Yellow with { W = alpha });
             underY += 26f;
+        }
+    }
+
+    /// <summary>
+    /// The startup notices (<see cref="ShowNotices"/>), over the arrival banner —
+    /// above the line over it, clear of the top readouts — in the warning's
+    /// orange, fading over their last <see cref="NoticeFadeSeconds"/>. Like the
+    /// banner, not over a menu or the game-over screen.
+    /// </summary>
+    private void DrawNotices(DungeonScene scene, int w, int h)
+    {
+        if (_noticeRows.Count == 0 || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
+        float alpha = Math.Clamp((NoticeSeconds - _noticeAge) / NoticeFadeSeconds, 0f, 1f);
+        float y = h / 3f - 30f - NoticeGap - _noticeRows.Count * NoticePitch;
+        foreach (string row in _noticeRows)
+        {
+            DrawCentered(w, y, row, NoticeScale, Orange with { W = alpha });
+            y += NoticePitch;
         }
     }
 

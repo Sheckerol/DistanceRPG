@@ -55,6 +55,7 @@ public static class ContentValidator
     public const string RulePartyHasACaster = "a roster always includes a caster";
 
     public const string RulePoolBarIsPositive = "a pool's bar is at least one";
+    public const string RuleDivisorIsPositive = "a ratio's divisor is at least one";
     public const string RuleChanceIsAPercentage = "a chance is a percentage, 0 to 100";
     public const string RuleRevivalTakesATurn = "a revival takes at least one turn";
     public const string RuleCurveMidpointIsACount = "the unique curve's midpoint is a DefeatCount, never negative";
@@ -240,6 +241,18 @@ public static class ContentValidator
     /// between these numbers, is a test on the compiled values, never a refusal
     /// here.
     /// </para>
+    /// <para>
+    /// And §5.3's ratios are integer divisors, so each one the game divides by
+    /// is at least 1 (<see cref="RuleDivisorIsPositive"/>): the mana a banked
+    /// unit of movement buys (<see cref="Tuning.MovementUnitsPerMana"/>), the
+    /// party's budget an enemy's costs are scaled by
+    /// (<see cref="Tuning.MovementBudget"/>), the surplus healing a Ward level
+    /// takes (<see cref="Tuning.OverhealPerWard"/>) and the damage a point of
+    /// trigger mana buys (<see cref="Tuning.DotDamagePerMana"/>, which divides
+    /// with no guard of its own). A <c>tuning.json</c> never reaches this with
+    /// one below 1 — the file clamps (<see cref="TuningJson.Read"/>) — so this
+    /// is the refusal for a <see cref="Tuning"/> built in code.
+    /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
     {
@@ -249,6 +262,11 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.StartingPool), RulePoolBarIsPositive, $"{tuning.StartingPool}");
         if (tuning.WeaponXpPerLevel < 1)
             throw new ContentException(nameof(Tuning.WeaponXpPerLevel), RulePoolBarIsPositive, $"{tuning.WeaponXpPerLevel}");
+
+        RequireDivisor(tuning.MovementUnitsPerMana, nameof(Tuning.MovementUnitsPerMana));
+        RequireDivisor(tuning.MovementBudget, nameof(Tuning.MovementBudget));
+        RequireDivisor(tuning.OverhealPerWard, nameof(Tuning.OverhealPerWard));
+        RequireDivisor(tuning.DotDamagePerMana, nameof(Tuning.DotDamagePerMana));
 
         RequirePercentage(tuning.DefeatStackChance, nameof(Tuning.DefeatStackChance));
         RequirePercentage(tuning.DropEnchantChancePercent, nameof(Tuning.DropEnchantChancePercent));
@@ -281,6 +299,13 @@ public static class ContentValidator
                 $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members is {PartyMemberState.SlotsFor(tuning)} each, past {GameConstants.MaxInventorySlots}");
         if (tuning.StairGatherTiles < 1)
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
+    }
+
+    /// <summary>A ratio the game divides by is at least 1: zero would divide by nothing, and a negative would turn a cost into a refund.</summary>
+    private static void RequireDivisor(int value, string key)
+    {
+        if (value < 1)
+            throw new ContentException(key, RuleDivisorIsPositive, $"{value}");
     }
 
     /// <summary>A knob that counts something is never negative; zero is a choice (nothing locks, nothing is offset).</summary>

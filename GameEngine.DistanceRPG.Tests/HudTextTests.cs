@@ -1108,4 +1108,33 @@ public class HudTextTests
         }
         Assert.Equal("ENTER TO CONTINUE", DungeonHud.ContinueHint);
     }
+
+    [Fact]
+    public void AnOverrideLaunchShowsTheStartupNotices()
+    {
+        // A dev override boots straight into a dungeon, past the screen between
+        // runs that says the startup notices otherwise (1h, 1i): the scene hands
+        // the host's notices to its HUD over the first floor's banner, and the rows
+        // it draws are the one wrapper's rows of them. The HUD lays them out with
+        // no window — the drawing is untested, as ever — so it is built without one.
+        var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }"""));
+        Assert.Equal(2, load.Notices.Count);
+
+        var hud = new DungeonHud(game: null!);
+        Assert.Empty(hud.NoticeRows);
+        hud.ShowNotices(load.Notices);
+        Assert.Equal(NoticeText.Rows(load.Notices), hud.NoticeRows);
+        Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", hud.NoticeRows[0]);
+        Assert.Contains(hud.NoticeRows, row => row.Contains("USING 8", StringComparison.Ordinal));
+
+        // Up long enough to read, then gone: the log keeps every one of them.
+        hud.Update(5f);
+        Assert.Equal(NoticeText.Rows(load.Notices), hud.NoticeRows);
+        hud.Update(10f);
+        Assert.Empty(hud.NoticeRows);
+
+        // Nothing to say, nothing shown.
+        hud.ShowNotices([]);
+        Assert.Empty(hud.NoticeRows);
+    }
 }

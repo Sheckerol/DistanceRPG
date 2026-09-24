@@ -43,8 +43,9 @@ public sealed class EnemyState : ActorState
     /// party moves 160). Read wherever an enemy's turn budget is read — the walk
     /// it plans, the mana an idle turn banks, the Mire legend over it — and
     /// nowhere else: the attack-cost scale stays the standard budget's
-    /// (<c>EnemyMove / MaxDistance</c>), which converts the party's costs into an
-    /// enemy's, so a slower enemy buys fewer swings as well as fewer steps.
+    /// (<c>EnemyMove / MovementBudget</c>, the party's tuned budget), which
+    /// converts the party's costs into an enemy's, so a slower enemy buys fewer
+    /// swings as well as fewer steps.
     /// </summary>
     public float MoveBudget { get; set; } = GameConstants.EnemyMove;
 

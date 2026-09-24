@@ -7,7 +7,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// themes name modifiers and whose drop tables are computed over the weapons,
 /// then the roster that names weapons — and validated on the way in: invalid
 /// content throws <see cref="ContentException"/> and the game does not start.
-/// Phase 1 loads the compiled defaults; Phase 5 adds the files. Nothing here
+/// The compiled defaults are what <see cref="Current"/> opens on; the game's
+/// startup reads the data files once (<see cref="ContentFiles.Load"/>) and makes
+/// what they load current before anything is built from it. Nothing here
 /// instantiates a <see cref="Weapon"/>, so the static initialiser cannot cycle
 /// through a weapon reading its own modifiers — the roster's weapon ids are
 /// checked against catalogue membership, never by building one, and the
@@ -15,7 +17,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public sealed class GameContent
 {
-    /// <summary>The content the game is running under. Swapped only by tests, through <see cref="Use"/>.</summary>
+    /// <summary>
+    /// The content the game is running under: the compiled defaults until the
+    /// game's startup makes the data files' content current, once, through
+    /// <see cref="Use"/> — read once, never hot-reloaded (§5.3) — and otherwise
+    /// swapped only by tests.
+    /// </summary>
     public static GameContent Current { get; private set; } =
         Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons,
             ContentDefaults.Party, ContentDefaults.Dungeons);
@@ -99,7 +106,7 @@ public sealed class GameContent
         return new GameContent(tuning, modifiers, enchantmentCatalogue, weaponCatalogue, dungeonCatalogue, roster);
     }
 
-    /// <summary>Make <paramref name="content"/> current. Tests swap content; production loads once and never calls this twice.</summary>
+    /// <summary>Make <paramref name="content"/> current. Tests swap content; production calls this once, at startup, with what the data files loaded, and never again.</summary>
     public static void Use(GameContent content)
     {
         ArgumentNullException.ThrowIfNull(content);

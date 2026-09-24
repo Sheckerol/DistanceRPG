@@ -8,7 +8,9 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
 /// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it.
+/// the hub's dungeon list under it, and the keys that choose from it — and,
+/// under the title of the first one the game opens on, what the data files
+/// raised at startup (<see cref="NoticeText"/>).
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before
@@ -294,8 +296,23 @@ public sealed class BetweenRunsHud : IDisposable
     private const float TitleY = 36f;
     private const float TitleScale = 4f;
 
+    /// <summary>A glyph's height at scale 1: the font is 5 x 7.</summary>
+    private const float GlyphHeight = 7f;
+
+    /// <summary>Where the title's glyphs end: the startup notices start under it.</summary>
+    internal const float TitleBottom = TitleY + GlyphHeight * TitleScale;
+
+    /// <summary>
+    /// The startup notices (<see cref="NoticeText.Rows"/>) sit under the title, a
+    /// row a pitch, and everything below them — the last run and the list — moves
+    /// down by as many pitches as there are rows (<see cref="ScreenLayout.Shift"/>).
+    /// </summary>
+    internal const float NoticeTop = 72f;
+    internal const float NoticePitch = 16f;
+    private const float NoticeScale = 1.4f;
+
     /// <summary>The last run's heading, its headline under it, and the rest of its lines from the first row down.</summary>
-    private const float LastRunHeadingY = 88f;
+    internal const float LastRunHeadingY = 88f;
     private const float HeadlineY = 106f;
     private const float HeadlineScale = 2.6f;
     private const float SummaryFirstRowY = 134f;
@@ -315,8 +332,15 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>How far down the window the list starts when there is no last run to show above it.</summary>
     private const float ListTopShareAlone = 0.3f;
 
-    /// <summary>Where the list starts, and how many of the summary's lines under the headline there is room for.</summary>
-    internal readonly record struct ScreenLayout(float ListTop, int SummaryRows);
+    /// <summary>
+    /// Where the list starts, how many of the summary's lines under the headline
+    /// there is room for, and how far the startup notices push the last run and
+    /// the list down from where they sit without them.
+    /// </summary>
+    internal readonly record struct ScreenLayout(float ListTop, int SummaryRows, float Shift = 0f);
+
+    /// <summary>How far <paramref name="noticeRows"/> rows of notices push everything under the title down: a pitch a row, none for none.</summary>
+    internal static float NoticeShift(int noticeRows) => noticeRows <= 0 ? 0f : noticeRows * NoticePitch;
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -330,27 +354,35 @@ public sealed class BetweenRunsHud : IDisposable
     /// that claws back from every member and loses a full haul, and the dungeon's
     /// own summary showed all of it. With no run to show yet, the list sits in the
     /// upper third, so the upper half is not left empty.
+    /// <para>
+    /// <paramref name="noticeRows"/> rows of startup notices under the title push
+    /// the last run and the list down by their height (<see cref="NoticeShift"/>);
+    /// the list still comes first, so the summary is what gives way to them.
+    /// </para>
     /// </summary>
-    internal static ScreenLayout Layout(float windowHeight, int summaryLines, float listHeight)
+    internal static ScreenLayout Layout(float windowHeight, int summaryLines, float listHeight, int noticeRows = 0)
     {
+        float shift = NoticeShift(noticeRows);
         float lowest = windowHeight - ListBottomMargin - listHeight;   // the lowest the list may start and still clear the keys line
         if (summaryLines <= 0)
-            return new ScreenLayout(MathF.Max(HeadlineY, MathF.Min(lowest, windowHeight * ListTopShareAlone)), 0);
+            return new ScreenLayout(MathF.Max(HeadlineY + shift, MathF.Min(lowest, windowHeight * ListTopShareAlone)), 0, shift);
 
-        float underTheSummary = SummaryFirstRowY + (summaryLines - 1) * SummaryPitch + SummaryRowHeight + ListGap;
+        float firstRow = SummaryFirstRowY + shift;
+        float underTheSummary = firstRow + (summaryLines - 1) * SummaryPitch + SummaryRowHeight + ListGap;
         if (underTheSummary <= lowest)
-            return new ScreenLayout(underTheSummary, summaryLines);
+            return new ScreenLayout(underTheSummary, summaryLines, shift);
 
-        float listTop = MathF.Max(lowest, SummaryFirstRowY + SummaryRowHeight + ListGap);
-        int room = (int)MathF.Floor((listTop - ListGap - SummaryRowHeight - SummaryFirstRowY) / SummaryPitch) + 1;
-        return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines));
+        float listTop = MathF.Max(lowest, firstRow + SummaryRowHeight + ListGap);
+        int room = (int)MathF.Floor((listTop - ListGap - SummaryRowHeight - firstRow) / SummaryPitch) + 1;
+        return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines), shift);
     }
 
     // ── Drawing ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The screen: its title, the last run above (when there has been one), the
-    /// list under it with the choice marked, and the keys along the bottom.
+    /// The screen: its title, the startup notices under it (when there are any),
+    /// the last run above (when there has been one), the list under it with the
+    /// choice marked, and the keys along the bottom.
     /// </summary>
     public void Render(BetweenRunsScene scene)
     {
@@ -365,15 +397,19 @@ public sealed class BetweenRunsHud : IDisposable
 
         DrawCentered(w, TitleY, Title, TitleScale, DungeonHud.Cyan);
 
+        var notices = scene.NoticeRows;
+        for (int i = 0; i < notices.Count; i++)
+            DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, DungeonHud.Orange);
+
         var rows = ListRows(scene.Listings, scene.Chosen);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
-        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch));
+        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), notices.Count);
 
         if (summary.Count > 0)
         {
-            DrawCentered(w, LastRunHeadingY, LastRunHeading, SummaryScale, DungeonHud.Grey);
-            DrawCentered(w, HeadlineY, summary[0].Text, HeadlineScale, summary[0].Color);
-            float y = SummaryFirstRowY;
+            DrawCentered(w, LastRunHeadingY + layout.Shift, LastRunHeading, SummaryScale, DungeonHud.Grey);
+            DrawCentered(w, HeadlineY + layout.Shift, summary[0].Text, HeadlineScale, summary[0].Color);
+            float y = SummaryFirstRowY + layout.Shift;
             int shown = layout.SummaryRows;
             bool cut = shown < summary.Count - 1;
             for (int i = 0; i < shown; i++)

@@ -1212,14 +1212,16 @@ public sealed class TurnSystem
         }
 
         // Attack cost scales the same way the prototype scaled it: the standard
-        // enemy budget is 100 vs the player's 160, so weapon costs shrink to
-        // match. The scale is that standard budget's, never the enemy's own: it
-        // converts the party's cost units into an enemy's, so a slower enemy (a
-        // boss's 40, EnemyState.MoveBudget) buys fewer swings as well as fewer
-        // steps. The cost taken is the wielder's, which for an actor with no
-        // pools is the weapon's own (§2.2) -- the seam whichever phase gives
-        // enemies progression will need, and a no-op until it does.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.MovementCost(enemy.Weapon);
+        // enemy budget is 100 vs the party's MovementBudget (160, the tuning's
+        // compiled default), so weapon costs shrink to match. The scale is that
+        // standard budget's, never the enemy's own: it converts the party's cost
+        // units into an enemy's, so a slower enemy (a boss's 40,
+        // EnemyState.MoveBudget) buys fewer swings as well as fewer steps, and a
+        // party budget tuned longer makes every enemy swing cheaper. The cost
+        // taken is the wielder's, which for an actor with no pools is the
+        // weapon's own (§2.2) -- the seam whichever phase gives enemies
+        // progression will need, and a no-op until it does.
+        float scaledCost = EnemyCostScale * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
         if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
@@ -1244,6 +1246,13 @@ public sealed class TurnSystem
 
         _timer = AttackBeatSeconds;
     }
+
+    /// <summary>
+    /// What converts the party's movement costs into an enemy's: the standard
+    /// enemy budget over the party's, <c>EnemyMove / MovementBudget</c> — 100 / 160
+    /// at the compiled tuning, read from the current one at each beat.
+    /// </summary>
+    private static float EnemyCostScale => GameConstants.EnemyMove / GameContent.Current.Tuning.MovementBudget;
 
     /// <summary>The nearest living party member <paramref name="enemy"/>'s weapon reaches from where it stands (ties in roster order), or null.</summary>
     private PartyMemberState? NearestHittable(EnemyState enemy)
@@ -1275,7 +1284,7 @@ public sealed class TurnSystem
     private void TryEnemyCastBeat(EnemyState caster)
     {
         var weapon = caster.Weapon;
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * caster.MovementCost(weapon);
+        float scaledCost = EnemyCostScale * caster.MovementCost(weapon);
         ActorState? target = caster.IsSupportCaster
             ? EnemyAi.SelectSupportTarget(caster, _enemies)
             : NearestHittable(caster);

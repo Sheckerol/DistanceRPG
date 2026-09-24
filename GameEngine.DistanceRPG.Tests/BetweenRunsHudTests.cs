@@ -244,4 +244,45 @@ public class BetweenRunsHudTests
         Assert.Equal(0, alone.SummaryRows);
         Assert.InRange(alone.ListTop, 100f, h / 3f);
     }
+
+    [Fact]
+    public void NoticesSitUnderTheTitle_AndNeverPushTheListOffA720Window()
+    {
+        // The startup notices (1h, 1i) — a tuning.json value clamped, a file
+        // missing — sit under the title, in the rows the one wrapper lays them out
+        // in, and push the last run and the list down by their height. The list is
+        // still never pushed off the shipped 1280 x 720: the summary gives way.
+        const float h = 720f;
+        var notices = NoticeText.Rows(Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1").ToList());
+        Assert.Equal(NoticeText.MaxRows + 1, notices.Count);   // three, and how many more are in the log
+
+        var campaign = CampaignRuns.Campaign();
+        CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+        float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch) + 20f;
+
+        // Under the title, and above everything they push down.
+        Assert.True(BetweenRunsHud.NoticeTop > BetweenRunsHud.TitleBottom);
+        var plain = BetweenRunsHud.Layout(h, summaryLines: 7, listHeight);
+        var noted = BetweenRunsHud.Layout(h, summaryLines: 7, listHeight, notices.Count);
+        Assert.Equal(0f, plain.Shift);
+        Assert.Equal(notices.Count * BetweenRunsHud.NoticePitch, noted.Shift);
+        Assert.True(BetweenRunsHud.NoticeTop + notices.Count * BetweenRunsHud.NoticePitch <= BetweenRunsHud.LastRunHeadingY + noted.Shift);
+        Assert.Equal(7, noted.SummaryRows);
+        Assert.Equal(plain.ListTop + noted.Shift, noted.ListTop);
+        Assert.True(noted.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin);
+
+        // The longest summary a run can write gives way further; the list still clears the keys line.
+        var longest = BetweenRunsHud.Layout(h, summaryLines: 40, listHeight, notices.Count);
+        Assert.InRange(longest.SummaryRows, 1, BetweenRunsHud.Layout(h, summaryLines: 40, listHeight).SummaryRows - 1);
+        Assert.Equal(h - BetweenRunsHud.ListBottomMargin, longest.ListTop + listHeight, precision: 3);
+
+        // Before any run: the list sits under the notices, and still on the screen.
+        var alone = BetweenRunsHud.Layout(h, summaryLines: 0, listHeight, notices.Count);
+        Assert.True(alone.ListTop >= BetweenRunsHud.NoticeTop + notices.Count * BetweenRunsHud.NoticePitch);
+        Assert.True(alone.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin);
+
+        // No notices: the screen is exactly as it was.
+        Assert.Empty(NoticeText.Rows([]));
+        Assert.Equal(plain, BetweenRunsHud.Layout(h, summaryLines: 7, listHeight, noticeRows: 0));
+    }
 }

@@ -45,6 +45,12 @@ public interface IBetweenRunsHost
 /// each time the screen is shown. What it reads is the campaign's, which was
 /// written when the last run ended, and nothing here writes to it.
 /// </para>
+/// <para>
+/// The first one the game opens on carries the startup notices under its title
+/// — what the data files raised: a <c>tuning.json</c> value clamped or fitted,
+/// a file missing — so a playtest never runs under numbers it did not mean
+/// without saying so. Every later showing carries none; the log keeps them all.
+/// </para>
 /// </summary>
 public sealed class BetweenRunsScene : Scene
 {
@@ -59,8 +65,9 @@ public sealed class BetweenRunsScene : Scene
     /// <param name="game">The game window: its size and its shaders, for the text.</param>
     /// <param name="campaign">The campaign between its runs: no visit is in progress.</param>
     /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>).</param>
+    /// <param name="notices">What the startup has to say under the title — the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">A visit is in progress: its run has to end before the screen between runs can show.</exception>
-    public BetweenRunsScene(Game game, CampaignState campaign, IBetweenRunsHost host) : base("BetweenRunsScene")
+    public BetweenRunsScene(Game game, CampaignState campaign, IBetweenRunsHost host, IReadOnlyList<string>? notices = null) : base("BetweenRunsScene")
     {
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(campaign);
@@ -70,7 +77,11 @@ public sealed class BetweenRunsScene : Scene
         _campaign = campaign;
         _host = host;
         _hud = new BetweenRunsHud(game);
+        NoticeRows = NoticeText.Rows(notices ?? []);
     }
+
+    /// <summary>The startup notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, capped, or none.</summary>
+    internal IReadOnlyList<string> NoticeRows { get; }
 
     /// <summary>The dungeon list, as the campaign gave it when the screen opened.</summary>
     public IReadOnlyList<DungeonListing> Listings => _listings;

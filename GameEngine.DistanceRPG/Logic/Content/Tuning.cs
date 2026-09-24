@@ -3,14 +3,17 @@ using static GameEngine.DistanceRPG.Logic.ModifierType;
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The §5.3 <c>tuning.json</c> scalars Phase 1 reads, with their compiled
-/// fallbacks as the initialisers: a partial file is valid key by key and the
-/// game runs with no file at all. Read once at startup, never hot-reloaded.
-/// Ratios are integer divisors whose names say what they convert. Nothing the
-/// golden tests pin belongs here. The tables are per-key overlays on the
-/// compiled instance: readers go through <see cref="Lookup"/>, so a file that
-/// names one entry leaves the rest at their compiled values and a deserialiser
-/// may replace a table wholesale without merging it.
+/// The §5.3 <c>tuning.json</c> scalars, with their compiled fallbacks as the
+/// initialisers: a partial file is valid key by key and the game runs with no
+/// file at all. Read once at startup (<see cref="TuningJson.Read"/>, from the
+/// file beside the executable), never hot-reloaded. A file's key is a property's
+/// name here, verbatim, and <see cref="TuningSchema"/> lists every one of them
+/// with its group, its clamp range and its description. Ratios are integer
+/// divisors whose names say what they convert. Nothing the golden tests pin
+/// belongs here. The tables are per-key overlays on the compiled instance:
+/// readers go through <see cref="Lookup"/>, so a file that names one entry
+/// leaves the rest at their compiled values and a deserialiser may replace a
+/// table wholesale without merging it.
 /// </summary>
 public sealed record Tuning
 {
@@ -283,6 +286,27 @@ public sealed record Tuning
     /// </summary>
     public int MovementUnitsPerMana { get; init; } = 10;
 
+    /// <summary>
+    /// How far a party member moves in a turn, in logic units (32 per tile):
+    /// the 160 every movement cost is priced against (§1.2, §1.3) — a swing, a
+    /// cast, a swap — the whole a turn start refills before Mire cuts it
+    /// (<see cref="PartyMemberState.StartTurn"/>), and the half of it a turn may
+    /// bank. It is also what converts the party's costs into an enemy's: an
+    /// enemy pays <c>EnemyMove / MovementBudget</c> of a weapon's cost, so a
+    /// longer party budget makes every enemy swing cheaper as well. settled.md's
+    /// Phase 2 pass names it: the caster's 160 "is <c>MovementBudget</c>" beside
+    /// <see cref="StartingPool"/>. <see cref="GameConstants.MaxDistance"/> is its
+    /// compiled default.
+    /// <para>
+    /// <see cref="MovementUnitsPerMana"/> is derived from it and does
+    /// <strong>not</strong> follow it: a budget turned in <c>tuning.json</c>
+    /// leaves the divisor where it was, so a longer budget also banks more mana a
+    /// turn, and whoever turns one re-derives the other by hand (settled.md: the
+    /// divisor "re-derives when the movement budget or cast costs move").
+    /// </para>
+    /// </summary>
+    public int MovementBudget { get; init; } = (int)GameConstants.MaxDistance;
+
     /// <summary>Movement a weapon swap costs once a live enemy has been seen this turn; free otherwise.</summary>
     public int WeaponSwapCost { get; init; } = 20;
 
@@ -313,8 +337,8 @@ public sealed record Tuning
     /// <strong>A caster's pool opens here too, on 30 and not on 160.</strong>
     /// settled.md had both figures live; the 160 in §1.3's derivations is the
     /// <em>movement</em> budget — <c>(160 - 40) / (8 + 3)</c> divides a staff's
-    /// 40-unit movement cost out of <see cref="GameConstants.MaxDistance"/>,
-    /// which is what <see cref="MovementUnitsPerMana"/> above is derived from —
+    /// 40-unit movement cost out of <see cref="MovementBudget"/>, which is what
+    /// <see cref="MovementUnitsPerMana"/> above is derived from —
     /// so there is no second starting-mana key and this one number is every
     /// pool's bar. Recorded under settled.md's Phase 2 implementation pass, with
     /// the consequence it accepts: a fresh caster gets one cast from a full

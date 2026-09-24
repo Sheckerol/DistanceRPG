@@ -13,14 +13,19 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public sealed class ModifierRules
 {
-    /// <summary>Fallback when tuning names no offset: nothing is granted before the first stack.</summary>
-    private const int DefaultOffset = 0;
+    /// <summary>
+    /// Fallback when tuning names no offset: nothing is granted before the first
+    /// stack. Internal so <see cref="TuningSchema"/>'s table says what this
+    /// reader falls back to, and the file and the hash state what the game reads.
+    /// </summary>
+    internal const int DefaultOffset = 0;
 
     /// <summary>
     /// Fallback when tuning names no forge limit: a unique is a variant with one
-    /// modifier raised to x3, so nothing is forged past 3 (§1.1, §1.5).
+    /// modifier raised to x3, so nothing is forged past 3 (§1.1, §1.5). Internal
+    /// for the same reason as <see cref="DefaultOffset"/>.
     /// </summary>
-    private const int DefaultMaxForged = 3;
+    internal const int DefaultMaxForged = 3;
 
     private static readonly IReadOnlyDictionary<string, ModifierType> ByName =
         Enum.GetValues<ModifierType>().ToDictionary(t => t.ToString(), t => t, StringComparer.Ordinal);

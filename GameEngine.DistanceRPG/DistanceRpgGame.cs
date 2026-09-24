@@ -36,6 +36,17 @@ namespace GameEngine.DistanceRPG;
 /// change: unregister, register, transition — never while a transition is
 /// already running.
 /// </para>
+/// <para>
+/// <strong>The numbers are read once, here, at startup</strong> (§5.3): the data
+/// files beside the executable (<see cref="DataFiles"/>, <c>tuning.json</c>
+/// first) are loaded into the content the whole session plays under
+/// (<see cref="ContentFiles.Load"/>), made current before the campaign is built
+/// from it, and never read again — a run resolves under one set of numbers.
+/// Every path read or missed, every number the file changed and every notice the
+/// load raised goes to the log; the notices also go to whichever scene the game
+/// opens on first, so a playtest never runs under numbers it did not mean
+/// without saying so on screen.
+/// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 {
@@ -68,6 +79,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     private CampaignState? _campaign;
 
+    // What the data files raised at startup — a tuning value clamped or fitted,
+    // a file missing — handed to the first scene the game opens on and to no
+    // other (TakeStartupNotices). The log has them all.
+    private IReadOnlyList<string> _startupNotices = [];
+
     // The boot seed when the override named one, spent by the first BeginRun
     // that actually enters a dungeon.
     private long? _bootSeed;
@@ -90,6 +106,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         // Black background so the void beyond the map reads as unexplored fog.
         GL.ClearColor(0f, 0f, 0f, 1f);
 
+        if (!LoadData())
+        {
+            Close();   // the content does not load: nothing to play, and it is in the log why
+            return;
+        }
+
         var content = GameContent.Current;
         _campaign = CampaignState.Start(content);
 
@@ -108,6 +130,44 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
             BeginRun(BootDungeonId(requested, content.Dungeons));
         else
             ShowBetweenRuns();
+    }
+
+    /// <summary>
+    /// Read the data files beside the executable, once (§5.3: never
+    /// hot-reloaded), and make what they load the content the session plays
+    /// under. The log gets every path read or missed, every notice, the numbers
+    /// the tuning changed and the tuning's hash; the notices wait for the first
+    /// scene. False — logged, with nothing made current — when the content does
+    /// not load, which no <c>tuning.json</c> can cause: every tuning a file can
+    /// make is clamped and fitted to the content it plays beside.
+    /// </summary>
+    private bool LoadData()
+    {
+        string directory = AppContext.BaseDirectory;
+        var load = ContentFiles.Load(DataFiles.Read(directory, line => Log.Info(line)));
+        foreach (string notice in load.Notices)
+            Log.Warn($"[Data] {notice}");
+        Log.Info(DataFiles.TuningSummary(directory, load.TuningOverrides));
+
+        if (load.Content is not { } content)
+        {
+            var error = load.Error;
+            Log.Error($"[Data] The content does not load - {error?.Message ?? "no content and no reason"}");
+            return false;
+        }
+
+        GameContent.Use(content);
+        Log.Info($"[Data] Playing under tuning {TuningJson.Hash(content.Tuning)}");
+        _startupNotices = load.Notices;
+        return true;
+    }
+
+    /// <summary>The startup notices, for the scene about to be shown — the first one only: every later scene gets none.</summary>
+    private IReadOnlyList<string> TakeStartupNotices()
+    {
+        var notices = _startupNotices;
+        _startupNotices = [];
+        return notices;
     }
 
     /// <summary>
@@ -183,7 +243,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         }
 
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this));
+        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, TakeStartupNotices()));
     }
 
     /// <summary>
@@ -207,7 +267,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         var visit = campaign.Enter(dungeonId, mapSeed);
         Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed} - run counter {campaign.RunCounter}");
 
-        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this));
+        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, TakeStartupNotices()));
     }
 
     /// <summary>
