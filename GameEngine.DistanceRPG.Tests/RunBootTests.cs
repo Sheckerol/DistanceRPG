@@ -3,14 +3,42 @@ using GameEngine.DistanceRPG.Logic;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// Which dungeon the game boots into. A campaign begins in the tutorial; the
-/// <c>DISTANCERPG_DUNGEON</c> override is the dev route into any other — how a
-/// five- to ten-floor dungeon is played before a screen exists to choose one —
-/// and a typo in it must boot the tutorial rather than stop the game at the
-/// door.
+/// Where the game boots. A campaign begins on the screen between runs, whose
+/// list offers the tutorial alone until it is beaten, so its first run is the
+/// tutorial. The <c>DISTANCERPG_DUNGEON</c> override is the dev route straight
+/// into any dungeon, past that screen. It is how a five- to ten-floor dungeon is
+/// played without first beating the tutorial that opens the hub. A typo in it
+/// must open the screen as usual rather than stop the game at the door.
 /// </summary>
 public class RunBootTests
 {
+    [Fact]
+    public void WithoutTheOverrideTheGameOpensOnTheScreenBetweenRuns()
+    {
+        // Unset, blank, or naming nothing: the screen between runs, where the
+        // campaign's first choice is the tutorial. The override is a dev route,
+        // and a typo in it is no reason to skip the screen or to stop the game.
+        var dungeons = GameContent.Current.Dungeons;
+        foreach (string? notADungeon in new[] { null, "", "   ", "spear_hal", "The Spear Hall", "SPEAR_HALL" })
+            Assert.False(DistanceRpgGame.BootsIntoADungeon(notADungeon, dungeons), $"'{notADungeon}' boots past the screen");
+
+        // Naming one, whitespace round it ignored: straight into that dungeon, and
+        // the one it boots is the one it named.
+        foreach (var def in dungeons.All)
+        {
+            Assert.True(DistanceRpgGame.BootsIntoADungeon(def.Id, dungeons));
+            Assert.Equal(def.Id, DistanceRpgGame.BootDungeonId(def.Id, dungeons));
+        }
+        Assert.True(DistanceRpgGame.BootsIntoADungeon("  spear_hall\n", dungeons));
+
+        // Without it, the first run is still the tutorial, chosen on the screen:
+        // a new campaign's list offers nothing else, and its choice starts there.
+        var campaign = CampaignRuns.Campaign();
+        var listed = Assert.Single(campaign.Listings());
+        Assert.Equal(DistanceRpgGame.BootDungeonId(null, dungeons), listed.Def.Id);
+        Assert.Equal(0, BetweenRunsScene.FirstChoice(campaign.Listings(), campaign.DefaultNext()));
+    }
+
     [Fact]
     public void TheGameBootsTheTutorial_UnlessTheOverrideNamesADungeon()
     {

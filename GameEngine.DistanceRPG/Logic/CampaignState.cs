@@ -1,6 +1,25 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
+/// One line of the hub's dungeon list (§4.5, <see cref="CampaignState.Listings"/>):
+/// a dungeon as the between-runs screen offers it. Plain numbers read off the
+/// campaign, so the screen states them and decides nothing.
+/// </summary>
+/// <param name="Def">The dungeon: its name and its theme are what the line names.</param>
+/// <param name="Selectable">Whether it can be entered now: <see cref="CampaignState.Enter"/> would take it between runs, its lock lifted or never written, or it is the early offer.</param>
+/// <param name="RunsUntilAvailable">
+/// How many runs that count (§6.3) until its lock lifts:
+/// <c>LockedUntilRun − RunCounter</c> for a locked dungeon — "available in 4
+/// runs" — and 0 for one that can be entered now, the early offer included.
+/// </param>
+/// <param name="Early">
+/// Whether it is the early offer (<see cref="CampaignState.EarlyOffer"/>): every
+/// dungeon is locked, and this one, whose lock lifts soonest, can be entered
+/// anyway. Provisional, as that offer is.
+/// </param>
+public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUntilAvailable, bool Early);
+
+/// <summary>
 /// The campaign (§6.7): what lives <em>outside</em> any one dungeon and outlasts
 /// every visit — the party, the permanent half of the game — and the visit in
 /// progress, the renewable half, which is null between runs. §6.7's "a save with
@@ -53,7 +72,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// a clear writes against that counter (<see cref="LockedUntilRun"/>), the fact
 /// of the clear (<see cref="HasCleared"/>), the tutorial's retirement
 /// (<see cref="IsRetired"/>) — plus whatever is in the bags, and the XP the
-/// party kept. The dungeon itself is discarded whole.
+/// party kept. The dungeon itself is discarded whole. Between runs, the hub's
+/// dungeon list is read off those numbers (<see cref="Listings"/>).
 /// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>: it
 /// rolls nothing — a visit's seed is handed to <see cref="Enter"/> by whoever
@@ -189,9 +209,9 @@ public sealed class CampaignState
     /// (<see cref="EarlyOffer"/>) — with every dungeon locked, the one whose lock
     /// lifts soonest may be entered, and entering it sets its lock to the run
     /// counter now, so it stands as a lifted lock and nothing else moves. The
-    /// hub's gate — the tutorial alone until it is beaten — is the between-runs
-    /// screen's to present; entering asks only whether the dungeon is locked or
-    /// retired.
+    /// hub's gate — the tutorial alone until it is beaten — is what the dungeon
+    /// list offers (<see cref="Listings"/>), which the between-runs screen
+    /// presents; entering asks only whether the dungeon is locked or retired.
     /// </para>
     /// </summary>
     /// <returns>The new visit, which is also <see cref="Visit"/>.</returns>
@@ -509,7 +529,9 @@ public sealed class CampaignState
     /// until it is beaten, then the first selectable dungeon in the content's
     /// file order, and with every dungeon locked, the early offer
     /// (<see cref="EarlyOffer"/>). Never null: whoever begins the next run always
-    /// has a dungeon it can enter.
+    /// has a dungeon it can enter. It is where the between-runs screen's choice
+    /// starts, and it is always one of the <see cref="Listings"/> that can be
+    /// entered.
     /// </summary>
     /// <exception cref="InvalidOperationException">No dungeon is left that is not retired: content with nothing but the tutorial, beaten.</exception>
     public string DefaultNext()
@@ -522,6 +544,54 @@ public sealed class CampaignState
                 return def.Id;
         return EarlyOffer()
             ?? throw new InvalidOperationException("No dungeon is left to enter: every dungeon in the content is retired.");
+    }
+
+    /// <summary>
+    /// The hub's dungeon list (§4.5, §6.7): what the between-runs screen shows,
+    /// one line a dungeon, in the content's file order — never a dictionary's.
+    /// <list type="bullet">
+    /// <item><strong>Before the tutorial is beaten, the tutorial alone</strong>
+    /// (§4.3): it is the thing that opens the hub, so there is nowhere else to go
+    /// yet, and failing it leaves it where it was.</item>
+    /// <item><strong>After, every dungeon not retired</strong> — the tutorial is
+    /// gone for good — each with whether it can be entered now and, when it
+    /// cannot, how many runs that count until its lock lifts. <strong>A locked
+    /// dungeon is listed, never hidden</strong> (§4.5: "a dungeon that silently
+    /// vanishes reads as a bug and makes the rotation impossible to think
+    /// about"), counting down on the same run counter the lock was written
+    /// against.</item>
+    /// <item><strong>With every dungeon locked</strong>, the one whose lock lifts
+    /// soonest is listed as the early offer (<see cref="EarlyOffer"/>) and can be
+    /// entered; every other line goes on counting down.</item>
+    /// </list>
+    /// A line can be entered exactly when <see cref="Enter"/> would take its
+    /// dungeon between runs: its lock has lifted, or it is the early offer.
+    /// Nothing here says how deep a dungeon goes: the depth is rolled at each
+    /// entry and learned by reaching it (§4.3), so the list has none to give.
+    /// Empty only when content leaves nothing that is not retired.
+    /// </summary>
+    public IReadOnlyList<DungeonListing> Listings()
+    {
+        var dungeons = GameContent.Current.Dungeons;
+        var tutorial = dungeons.Tutorial;
+        if (!IsRetired(tutorial.Id))
+            return [Listing(tutorial, early: false)];   // the hub opens behind it: never locked, it retires instead
+
+        string? early = EarlyOffer();
+        var listings = new List<DungeonListing>();
+        foreach (var def in dungeons.All)
+            if (!IsRetired(def.Id))   // a retired dungeon is gone for good
+                listings.Add(Listing(def, early: def.Id == early));
+        return listings;
+    }
+
+    /// <summary><paramref name="def"/>'s line: the early offer can be entered with its lock standing; any other line can be entered once its lock has lifted, and counts down until it has.</summary>
+    private DungeonListing Listing(DungeonDef def, bool early)
+    {
+        if (early)
+            return new DungeonListing(def, Selectable: true, RunsUntilAvailable: 0, Early: true);
+        bool selectable = IsSelectable(def);
+        return new DungeonListing(def, selectable, selectable ? 0 : LockedUntilRun(def.Id) - RunCounter, Early: false);
     }
 
     private static IReadOnlyList<string> Sorted(HashSet<string> ids)

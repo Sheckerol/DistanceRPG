@@ -1279,3 +1279,108 @@ it.
   30 to 30 and buy nothing. The rungs keep widening, so reaching the third step
   is now 70 hits on one weapon rather than 55 — a longer arc, deliberately, and
   still three steps with no fourth until play asks for one.
+
+## Implementation pass — Phase 4 (floors, the boss, the theme, the way out)
+
+Rulings the Phase 4 branch made where the phase doc was silent, or where two
+passages met and one had to be read in the light of the other. Each is written
+down here so the next reader meets the ruling rather than the code that assumes
+it. Three of them bend a rule above or a line of the phase doc rather than fill
+a silence; those three are marked **pending the user's ruling** and ship
+provisionally.
+
+- **The campaign lives outside the dungeon, and holds the visit.**
+  `CampaignState` is §6.7's campaign: the party, what it has met, the run
+  counter, the locks, the cleared and retired dungeons — and the visit in
+  progress (`DungeonState`), which is null between runs. What the campaign has
+  met is campaign-wide: it outlives every floor and every visit, and §4.1's reset
+  never touches it, which closes the old question of where `CampaignState`
+  lives. The game owns one campaign for the process, the scenes are views of it,
+  and the visit never holds the campaign.
+- **A floor number is 1-based; a floor index is 0-based.** Prose, the HUD,
+  `BossFloor` (5–10, the tutorial's 2) and `MercyFloor` (3) are numbers; the
+  seeds' `n` and `floorIndex` are indices, so the boss floor's index is
+  `BossFloor − 1`. Floor index 0 of a map seed is that seed's dungeon exactly
+  (`floorSeed(0) == mapSeed`), which keeps the golden dungeon the first floor of
+  the shipped seed. The HUD says `FLOOR 3`, never "of 7".
+- **One clock for the whole visit, and the turn travels with the party.** Every
+  floor counts turns on the visit's one clock, so a dummy's defeat turn means the
+  same on every floor. A floor nobody is standing on is frozen except for
+  resurrection: on arrival, every dummy whose wait ran out while the party was
+  elsewhere gets up, cut off at the turn the boss died. So the corridor behind a
+  retreat is armed (§6.3: "every dummy you killed on the way down is up again"),
+  and a stair hop is not a free respawn. Taking the stairs keeps the turn, all of
+  it: the movement left, the attacks and reactions already spent (a thrower's
+  `Charges`), and the enemies already seen. A down-and-up hop buys nothing.
+- **The party gathers to take the stairs.** `E` works with the active member on
+  the stair and every living member within `StairGatherTiles` (3) tiles of it.
+  The fallen are carried, so nobody is ever on another floor. No enemy count
+  gates it (§4.4). The first floor's up-stairs are the way out, and floors are
+  adjacent only.
+- **The boss wields what an enemy can field and drops from its theme's whole
+  table — pending the user's ruling.** The class it holds is drawn over the
+  theme's table narrowed to the placer's close-range classes (the `EnemyPlacer`
+  entry above), because a staff in an enemy's hands flees and a wand has no
+  enemy AI. The class it drops is drawn over the whole table, all eight for
+  Block as §4.3 says of the golem, so the Long Gallery drops bows no enemy
+  swings. That departs from §3.2's "an enemy drops a weapon of its own class"
+  for the one enemy whose table bends to the guarantee. Both class draws redraw
+  over a compiled list rather than step to the next legal class, so the drop is
+  uniform over its table and no class is favoured by the gaps.
+- **A boss drop becomes its class's unique only at ×3.** The graft makes the drop
+  the unique when it takes the theme to its forge limit (×3) and the forged
+  spread then equals the unique's. The ×3 is load-bearing: a Flensing Knife
+  grafted with CritWindow reaches the Nameless Knife's forged spread at ×2, and
+  without the condition a CritWindow dungeon would hold two uniques. Each
+  dungeon has exactly one.
+- **The themes that can carry a dungeon are the class signatures with a unique
+  to hunt.** Block, Brace, Longshot, CritWindow and Charges ship. Cleave waits
+  for a Great Axe unique; CritMultiplier and Resonant are refused under the
+  shipped content, since neither can reach the Purity coincidence a unique needs;
+  Pin and Light never can. Validation refuses a theme whose own class falls out
+  of its table, the accident that would make the unique unobtainable.
+- **Attunement is its own field, and "themed" in the entry above means
+  element-themed — pending the user's ruling.** "A themed dungeon attunes every
+  floor it has" sits with §1.4's wand chart, and §5.8 makes attunement a field
+  of its own that may be none. So a dungeon's modifier theme attunes nothing;
+  `DungeonDef.Attunement` attunes every enemy the dungeon spawns, and none of
+  the shipped five sets it. Attuning one is a one-field content edit. The other
+  reading would attune every dungeon.
+- **The tutorial's "one stack" is the forged graft itself.** A boss drop carries
+  `max(0, BossFloor − 4)` guaranteed acquired stacks — 1 at floor 5, 6 at floor
+  10 — so the tutorial's floor 2 adds none, and the one stack §4.3 prices it at
+  is the forged Block. The count is fixed at entry, with the depth, so a tuning
+  change during the visit moves neither.
+- **The lock is written after the clearing run's tick.** A clear ticks the run
+  counter first, then locks the dungeon until
+  `RunCounter + BossFloor × CooldownRunsPerFloor`. A floor-5 clear is back after
+  exactly five more runs that count, "available in n runs" is the lock less the
+  counter, and a dungeon can be picked once the counter reaches its lock (absent
+  reads available). The tutorial is never locked: it retires, a flag, and the
+  hub opens when it does.
+- **The cleared set is its own campaign field**, never read back off the locks.
+  Every boss kill adds its dungeon, the tutorial's included, and nothing takes
+  one out.
+- **A wipe forfeits spoils, not gear.** The spoils are what the party picked up
+  this run and still carries. Gear carried in is never taken, and a weapon put
+  down in the dungeon is lost with it either way.
+- **Four dungeons ship beside the tutorial, not the six above — provisional.** The
+  missing two need content that does not exist yet (a Great Axe unique, or a
+  repeated theme), and Phase 6b completes the roster. The four's names, bosses
+  and statlines are provisional, and so is `DeathXpLossPercent` at 50: the entry
+  above leaves it unfixed, and §4.4 asks only that it be data rather than a
+  hardcoded 100%.
+- **The hub's dungeon list is the screen between runs.** The game opens on it.
+  Before the tutorial is beaten it offers the tutorial alone and says under it,
+  before the run is committed to, that beating the golem closes the dungeon and
+  its Block farm for good: the one dungeon the game is allowed to warn you about
+  (§4.3). The boss floor's arrival banner says so again. After, it lists every
+  dungeon left, each named with its theme and never its depth, a locked one
+  counting down in runs rather than vanishing (§4.5).
+- **With every dungeon locked, the one whose lock lifts soonest is offered early
+  — pending the user's ruling.** With four dungeons and locks of five runs or
+  more, four straight clears reach a dead end where no run can tick and no lock
+  can lift. Entering the early offer sets its lock to the run counter and moves
+  nothing else. This bends the entry above ("clearing a dungeon locks it for
+  `bossFloor` runs") in that one corner, and open-questions.md holds the
+  alternatives.

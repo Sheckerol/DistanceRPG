@@ -29,9 +29,9 @@ public enum GameMenu
     /// the XP kept or clawed back, whether the run counted, the lock or the
     /// tutorial closing. Opened by the campaign's <see cref="CampaignState.RunEnded"/>
     /// on either ending, the way out's or a wipe's. <strong>Modal</strong>: ENTER
-    /// alone moves on — once — to the next run; ESC, the bag and its X, the stairs,
-    /// the number keys, the turn's keys and every click do nothing, because the run
-    /// they would act on has ended.
+    /// alone moves on — once — to the screen between runs, where the next dungeon
+    /// is chosen; ESC, the bag and its X, the stairs, the number keys, the turn's
+    /// keys and every click do nothing, because the run they would act on has ended.
     /// </summary>
     RunSummary,
 }
@@ -115,7 +115,8 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
 /// and so does a wipe, in Logic, at the turn system's game over; either way the
 /// campaign says so (<see cref="CampaignState.RunEnded"/>) and this scene puts up
 /// the summary (<see cref="GameMenu.RunSummary"/>). ENTER there hands the run back
-/// to the host, which starts the next visit in a scene of its own.
+/// to the host, which opens the screen between runs (<see cref="BetweenRunsScene"/>),
+/// where the next dungeon is chosen and the next visit gets a scene of its own.
 /// </para>
 /// </summary>
 public class DungeonScene : Scene
@@ -263,10 +264,9 @@ public class DungeonScene : Scene
     private StairUse _transitStair;
     private bool _runOverSent;
 
-    // The run's end (§4.4), as the campaign reported it, and the dungeon the next
-    // run will go into, named once as the summary goes up.
+    // The run's end (§4.4), as the campaign reported it. The next dungeon is not
+    // this scene's to name: it is chosen on the screen between runs.
     private RunResult? _endedRun;
-    private string? _nextRunName;
 
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
@@ -321,9 +321,6 @@ public class DungeonScene : Scene
     /// <summary>How the run ended, once it has (§4.4) — what the summary shows — or null while it goes on.</summary>
     public RunResult? EndedRun => _endedRun;
 
-    /// <summary>The dungeon ENTER on the summary goes into next, by name (<see cref="CampaignState.DefaultNext"/>), or null when there is none to name.</summary>
-    public string? NextRunName => _nextRunName;
-
     /// <summary>The stairs of the floor being played, each with the slab it is drawn as.</summary>
     public IReadOnlyList<StairMarker> StairMarkers => _stairMarkers;
 
@@ -364,7 +361,7 @@ public class DungeonScene : Scene
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
 
-    /// <summary>True while a stair's fade runs, either side of the swap, or once the run's summary has been left for the next run: presses are ignored.</summary>
+    /// <summary>True while a stair's fade runs, either side of the swap, or once the run's summary has been left for the screen between runs: presses are ignored.</summary>
     public bool Transiting => _transit != Transit.None;
 
     /// <summary>
@@ -1281,12 +1278,12 @@ public class DungeonScene : Scene
     /// <summary>
     /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
     /// no — or opens the pause menu, whose EXIT quits the game. During a stair's
-    /// fade, and once the party is on its way to the next run, it is swallowed:
+    /// fade, and once the party is on its way to the screen between runs, it is swallowed:
     /// nothing opens over a floor being swapped. <strong>On a run's end it does
     /// nothing</strong> — the summary, and the defeat screen under it: the run's
     /// counter, locks and retirement live only in memory until Phase 5 saves
     /// them, so a quit there would drop what the run just wrote. ENTER is the one
-    /// way on, and quitting is the pause menu's in the next run. Always consumed,
+    /// way on, and quitting is the screen between runs' to offer. Always consumed,
     /// so the game never quits behind the scene's back.
     /// </summary>
     public bool HandleEscape()
@@ -1470,7 +1467,7 @@ public class DungeonScene : Scene
             BeginTransit(stair);
     }
 
-    /// <summary>ENTER, routed by the menu that is open: on to the next run from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
+    /// <summary>ENTER, routed by the menu that is open: on to the screen between runs from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
     private void EnterKey()
     {
         if (Transiting) return;
@@ -1608,7 +1605,6 @@ public class DungeonScene : Scene
     {
         if (_endedRun is not null) return;
         _endedRun = result;
-        _nextRunName = NextRunNameOf(_campaign);
         _hud.HideArrival();
         ActiveMenu = GameMenu.RunSummary;
 
@@ -1616,36 +1612,23 @@ public class DungeonScene : Scene
             + $", {(result.ServiceTick ? result.MercyTick ? "a mercy tick" : "a success tick" : "no tick")} (run counter {result.RunCounter})"
             + (result.LockedUntilRun is { } until ? $", locked until run {until}" : "")
             + (result.Retired ? ", retired for good" : "")
-            + $"; spoils kept {result.SpoilsKept.Count}, lost {result.SpoilsLost.Count}; {result.Clawbacks.Count} pool(s) clawed back"
-            + (_nextRunName is { } next ? $"; next: {next}" : ""));
+            + $"; spoils kept {result.SpoilsKept.Count}, lost {result.SpoilsLost.Count}; {result.Clawbacks.Count} pool(s) clawed back");
         foreach (var claw in result.Clawbacks)
             Log.Info($"[Run] {claw.MemberId} {claw.Pool} XP {claw.Before} -> {claw.After}");
     }
 
-    /// <summary>The name of the dungeon the campaign's next run goes into, or null when content leaves none to enter.</summary>
-    private static string? NextRunNameOf(CampaignState campaign)
-    {
-        try
-        {
-            return GameContent.Current.Dungeons[campaign.DefaultNext()].Name;
-        }
-        catch (InvalidOperationException e)
-        {
-            Log.Warn($"[Run] No next run to name: {e.Message}");
-            return null;
-        }
-    }
-
     /// <summary>
-    /// ENTER on the run's summary: on to the next run — once. The screen fades to
-    /// black and the run is handed back to the host (<see cref="IRunHost.RunOver"/>),
-    /// which begins the next visit. Never while the engine is still fading
-    /// between scenes, and never twice: the fade, once started, is the only way on.
+    /// ENTER on the run's summary: on to the screen between runs — once. The
+    /// screen fades to black and the run is handed back to the host
+    /// (<see cref="IRunHost.RunOver"/>), which shows the dungeon list with this
+    /// run's summary above it, where the next dungeon is chosen. Never while the
+    /// engine is still fading between scenes, and never twice: the fade, once
+    /// started, is the only way on.
     /// </summary>
     private void ContinueAfterRun()
     {
         if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || SceneManager.Instance.IsTransitioning) return;
-        Log.Info("[Run] On to the next run");
+        Log.Info("[Run] On to the screen between runs");
         StartFadeOut(Transit.Leaving);
     }
 

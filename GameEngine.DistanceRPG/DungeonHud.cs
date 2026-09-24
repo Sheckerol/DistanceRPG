@@ -15,8 +15,9 @@ namespace GameEngine.DistanceRPG;
 /// its "leave" (X, then the slot), the pause menu and the way out's prompt with
 /// what leaving now means, the stairs' fade and the banner over it (the floor
 /// reached, the trade on the boss floor, the boss's fall), and the run's end —
-/// its summary, over the defeat screen when
-/// the party wiped. Every number it shows is a resolved one — a swing's cost
+/// its summary, over the defeat screen when the party wiped, in the lines the
+/// between-runs screen repeats above the dungeon list (<see cref="BetweenRunsHud"/>).
+/// Every number it shows is a resolved one — a swing's cost
 /// after Light, a cast's mana after Resonant, a Block as the points it absorbs,
 /// a crit window as the roll it needs, Mire as the budget it leaves — never a
 /// percentage, a stack count or a base with a discount (§1.1, §1.7); and nothing
@@ -41,14 +42,16 @@ public sealed class DungeonHud
     /// <summary>Spaces between two runs drawn side by side.</summary>
     private const int RunGap = 2;
 
-    private static readonly Vector4 White = new(1f, 1f, 1f, 1f);
-    private static readonly Vector4 Yellow = new(1f, 0.87f, 0f, 1f);
-    private static readonly Vector4 Grey = new(0.6f, 0.6f, 0.65f, 1f);
-    private static readonly Vector4 DarkGrey = new(0.4f, 0.4f, 0.42f, 1f);
-    private static readonly Vector4 Red = new(1f, 0.27f, 0.27f, 1f);
-    private static readonly Vector4 Orange = new(0.96f, 0.65f, 0.14f, 1f);
-    private static readonly Vector4 Cyan = new(0.31f, 0.76f, 0.97f, 1f);
-    private static readonly Vector4 Green = new(0.27f, 0.87f, 0.47f, 1f);
+    // The HUD's palette, which the between-runs screen shares (BetweenRunsHud):
+    // a run's summary reads in the same colours on both screens.
+    internal static readonly Vector4 White = new(1f, 1f, 1f, 1f);
+    internal static readonly Vector4 Yellow = new(1f, 0.87f, 0f, 1f);
+    internal static readonly Vector4 Grey = new(0.6f, 0.6f, 0.65f, 1f);
+    internal static readonly Vector4 DarkGrey = new(0.4f, 0.4f, 0.42f, 1f);
+    internal static readonly Vector4 Red = new(1f, 0.27f, 0.27f, 1f);
+    internal static readonly Vector4 Orange = new(0.96f, 0.65f, 0.14f, 1f);
+    internal static readonly Vector4 Cyan = new(0.31f, 0.76f, 0.97f, 1f);
+    internal static readonly Vector4 Green = new(0.27f, 0.87f, 0.47f, 1f);
 
     /// <summary>Where a farmed count's colour ends up (<see cref="ThreatColor"/>): a red past the hit colour's, the deepest farm on the floor.</summary>
     private static readonly Vector4 DeepRed = new(1f, 0.12f, 0.1f, 1f);
@@ -130,7 +133,7 @@ public sealed class DungeonHud
     /// out by the way out. The banner is drawn over the stairs' fade, which is
     /// what puts the next floor's up at black; left up, the floor being left would
     /// go on naming itself on that black — until the swap on the stairs, and
-    /// through the whole fade to the next visit on the way out. The next
+    /// through the whole fade to the screen between runs on the way out. The next
     /// <see cref="ShowArrival"/> puts one up as ever.
     /// </summary>
     public void HideArrival() => _banner = null;
@@ -250,7 +253,7 @@ public sealed class DungeonHud
 
         if (ended is not null)
         {
-            DrawRunSummary(w, h, ended, scene.NextRunName);   // a wipe's included: its headline is the defeat
+            DrawRunSummary(w, h, ended);   // a wipe's included: its headline is the defeat
         }
         else if (turns.Phase == TurnPhase.GameOver)
         {
@@ -572,7 +575,7 @@ public sealed class DungeonHud
     }
 
     /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
-    private static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
+    internal static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
 
     // ── The run's end ────────────────────────────────────────────────────────
 
@@ -581,109 +584,28 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to
-    /// the next run, and ESC does nothing there — what the run just wrote lives
-    /// only in memory until it is saved, so it never offers a quit.
+    /// the between-runs screen, and ESC does nothing there — what the run just
+    /// wrote lives only in memory until it is saved, so it never offers a quit.
     /// </summary>
     internal const string ContinueHint = "ENTER TO CONTINUE";
 
-    /// <summary>How many characters a summary line runs to before a list on it wraps: a little over half the shipped window at the summary's scale.</summary>
-    private const int SummaryLineChars = 64;
-
     /// <summary>
-    /// A run's summary (§4.4), a line a fact, the headline first and the key
-    /// last: what the run was — <c>CLEARED</c>, <c>RETREATED</c>, <c>DEFEATED</c> —
-    /// where and how deep, the boss (its floor only where the party reached it,
-    /// §4.3), the spoils kept or lost by name, the XP kept or what the wipe clawed
-    /// back member by member, whether the run counted and the counter it stands
-    /// at (§6.3), the lock or the closing a clear wrote, and <c>ENTER TO
-    /// CONTINUE</c> — naming <paramref name="next"/>, the dungeon the next run
-    /// goes into, when there is one — and never ESC.
+    /// A run's summary as its end shows it over the last floor (§4.4): the run's
+    /// own facts, a line a fact and the headline first — the lines the
+    /// between-runs screen shows again above the dungeon list
+    /// (<see cref="BetweenRunsHud.SummaryLines"/>, where they are written) — and
+    /// last the key the panel answers, <c>ENTER TO CONTINUE</c>, never ESC. The
+    /// key names <paramref name="next"/>, the next run's dungeon, when a caller
+    /// knows it. The dungeon scene names none: ENTER goes on to the between-runs
+    /// screen, and the next dungeon is chosen there.
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
     /// <param name="next">The next run's dungeon, by name; null names none.</param>
     internal static IReadOnlyList<Run> RunSummaryLines(RunResult result, string? next = null)
     {
-        ArgumentNullException.ThrowIfNull(result);
-        var content = GameContent.Current;
-        var def = content.Dungeons.TryGet(result.DungeonId, out var found) ? found : null;
-        string dungeon = (def?.Name ?? result.DungeonId).ToUpperInvariant();
-        string boss = def?.Boss.Name.ToUpperInvariant() ?? "BOSS";
-
-        var lines = new List<Run>
-        {
-            result.Outcome switch
-            {
-                RunOutcome.BossKill => new Run("CLEARED", Green),
-                RunOutcome.Retreat => new Run("RETREATED", Yellow),
-                _ => new Run(DefeatHeadline, Red),
-            },
-            new Run($"{dungeon} - DEEPEST FLOOR {result.DeepestFloor}", Grey),
-        };
-
-        // The boss, and the depth only where the party stood on it (§4.3).
-        if (result.BossDefeated)
-            lines.Add(new Run(result.BossFloorRevealed is { } fell ? $"THE {boss} FELL ON FLOOR {fell}" : $"THE {boss} FELL", Green));
-        else if (result.BossFloorRevealed is { } waited)
-            lines.Add(new Run($"THE {boss} WAITED ON FLOOR {waited} - THE DEPTH RE-ROLLS NEXT TIME", Grey));
-        else
-            lines.Add(new Run($"THE {boss} STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME", Grey));
-
-        // What was carried home, or lost with the party.
-        if (result.SpoilsKept.Count > 0)
-            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.Name.ToUpperInvariant()), Orange));
-        if (result.SpoilsLost.Count > 0)
-            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.Name.ToUpperInvariant()), Red));
-        if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
-            lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", Grey));
-
-        // The XP: kept, or the share of each pool's gain a wipe took back, member by member.
-        if (result.Outcome != RunOutcome.Death)
-            lines.Add(new Run("XP KEPT", Green));
-        else if (result.Clawbacks.Count == 0)
-            lines.Add(new Run("XP KEPT - NOTHING CLAWED BACK", Green));   // nothing gained, or a share of 0
-        else
-        {
-            lines.Add(new Run("XP CLAWED BACK:", Red));
-            foreach (var member in result.Clawbacks.GroupBy(c => c.MemberId))
-                lines.AddRange(Wrapped($"{member.Key}:", member.Select(c => $"{c.Pool.ToUpperInvariant()} -{c.Before - c.After}"), Red));
-        }
-
-        // Whether the run counted (§6.3), and where the counter stands.
-        string counted = result.ServiceTick
-            ? result.MercyTick ? "RUN COUNTED - A MERCY FOR FAILING DEEP" : "RUN COUNTED"
-            : $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}";
-        lines.Add(new Run($"{counted} - {Runs(result.RunCounter)} SO FAR", Cyan));
-
-        // What the clear did to the dungeon.
-        if (result.Retired)
-            lines.Add(new Run($"{dungeon} IS CLOSED FOR GOOD", Yellow));
-        else if (result.LockedUntilRun is { } until)
-            lines.Add(new Run($"{dungeon} IS LOCKED FOR {Runs(until - result.RunCounter)}", Yellow));
-
+        var lines = new List<Run>(BetweenRunsHud.SummaryLines(result));
         lines.Add(new Run(next is null ? ContinueHint : $"{ContinueHint} - NEXT: {next.ToUpperInvariant()}", White));
         return lines;
-    }
-
-    /// <summary>A list under a heading, as many summary lines as it takes: the heading and the items on the first, the rest indented under it, comma-separated.</summary>
-    private static IEnumerable<Run> Wrapped(string heading, IEnumerable<string> items, Vector4 color)
-    {
-        var line = new System.Text.StringBuilder(heading);
-        bool first = true;
-        foreach (string item in items)
-        {
-            string piece = first ? $" {item}" : $", {item}";
-            if (!first && line.Length + piece.Length > SummaryLineChars)
-            {
-                yield return new Run(line.Append(',').ToString(), color);
-                line.Clear().Append("  ").Append(item);
-            }
-            else
-            {
-                line.Append(piece);
-            }
-            first = false;
-        }
-        yield return new Run(line.ToString(), color);
     }
 
     /// <summary>
@@ -691,9 +613,9 @@ public sealed class DungeonHud
     /// the headline large, each line under it, and the key last, a step apart.
     /// Anchored above the middle, never over the top readouts.
     /// </summary>
-    private void DrawRunSummary(int w, int h, RunResult result, string? next)
+    private void DrawRunSummary(int w, int h, RunResult result)
     {
-        var lines = RunSummaryLines(result, next);
+        var lines = RunSummaryLines(result);
         float y = MathF.Max(80f, h / 2f - 170f);
         DrawCentered(w, y, lines[0].Text, 5f, lines[0].Color);
         y += 56f;
