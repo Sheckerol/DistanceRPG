@@ -140,7 +140,7 @@ third, and then nothing" rather than move the code toward the shorter sentence:
 an entry that refused to fire at all below its trigger would be a new rule, and
 it would contradict the one §3.1 already settled.
 
-## Whether an enchantment's numbers have bounds (§5.4, §5.7)
+## Whether a content file's numbers have bounds (§5.4, §5.6, §5.7)
 
 Phase 5.2 put every enchantment's numbers in `enchantments.json`, a file a
 playtester edits by hand, and the load checks only a few of them: a `lock` of at
@@ -160,17 +160,48 @@ Where `tuning.json` owns the same numbers — `ApplyPercent` and `ArcanePotency`
 they are clamped to 0–1000, so the two files disagree about how far such a
 number is trusted.
 
-Two readings, and the choice wants a ruling rather than a guess:
+**`weapons.json` has the same gap** (Phase 5.3). A weapon's forged spread is
+bounded — every stack at least 1 (`RuleForgedStackCount`) and at most its
+`MaxForged` (`RuleMaxForged`) — but nothing checks a statline's `range`,
+`damage`, `cost` or `manaCost` or a wand shape's dimensions, and an enchantment
+reference's `tier` answers only to the unique shapes' own rules, none of which
+sets a ceiling. Phase 5.3's review loaded the Halberd with a `range`, `damage`,
+`cost` or `manaCost` of -1, 0 or -2147483648, the Staff of Mire's `manaCost` and
+the Wand of the Blast's `radius` and `targetReach` at the same three, and the
+Nameless Knife's `vampiric` at tier -1, 0 or 2147483647, and each loaded without
+a word.
+
+These fail more quietly than the enchantment numbers, because play floors some
+of them. A `tier` below 1 plays as 1 (`WeaponCatalogue.Instantiate` floors it),
+so the file names a tier the game never plays; a huge one goes through
+`Lock x Tier` unchecked, so `vampiric`'s lock of 20 at tier 2147483647 wraps
+to -20. A `cost` below 1 is charged the one-unit minimum wherever movement is
+paid (`Progression.MovementCost`), while the HUD's `COST` still shows a number
+below 1. A `manaCost` below 0 leaves `ResolvedManaCost` at 0 or below, so the
+cast gate (`Mana >= ResolvedManaCost`) passes on an empty pool. `damage`,
+`range` and a shape's dimensions are read as written. The other content files
+already bound theirs — a boss's statline and innate stacks at least 1
+(`RuleBossStatline`, `RuleBossInnateStackable`), a boss floor range that starts
+at 1 and never inverts (`RuleBossFloorRange`), a member's stats a permutation
+of 1 to 4 (`RulePartyStatPermutation`) — so `enchantments.json` and
+`weapons.json` are the two whose numbers the load mostly takes on trust.
+
+Two readings, and the choice wants a ruling rather than a guess — one ruling
+for both files, since the question is the same:
 
 - **Range rules.** `ContentValidator.ValidateEnchantments` refuses a negative
   `potency`, an `applyPercent` outside 0 to a ceiling, and a `lock` or `trigger`
-  above a ceiling, each a startup failure naming the entry and the rule — content
-  is "validated rather than clamped" (§5.4), so never a clamp. The ceilings are
-  numbers someone must pick; `tuning.json`'s 1000 is the nearest precedent.
+  above a ceiling; `ContentValidator.ValidateWeapons` refuses a statline number,
+  a shape dimension or a `tier` outside a range of its own — per field, since a
+  staff's `damage` and a martial weapon's `manaCost` are 0 today. Each is a
+  startup failure naming the entry and the rule — content is "validated rather
+  than clamped" (§5.4), so never a clamp. The ceilings are numbers someone must
+  pick; `tuning.json`'s 1000 is the nearest precedent.
 - **Trusted fields.** These numbers are the designer's, and the load refuses only
   what makes an entry mean nothing: a free lock, a free trigger, a magnitude of
-  zero. [Settled](settled.md) then says so, and a negative potency is a choice
-  the file permits rather than an oversight.
+  zero, a spread the relations refuse. [Settled](settled.md) then says so for
+  both files, and a negative potency or cost is a choice the file permits
+  rather than an oversight.
 
 Phase 5 brings the content files without adding a new kind of content rule, so
 it ships neither: whoever rules on this should add the rules, or the settled

@@ -470,10 +470,10 @@ public class ContentFilesTests
         Assert.Equal(Lf(texts.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
         Assert.Equal(Lf(texts.Party), PartyJson.Write(new PartyData(content.Party.All)));
 
-        // PHASE5-090: "which weapons and dungeons use it?" is the content files'
-        // to answer. A statline, a dungeon's name and a member's loadout are each
-        // an edit to a file beside the game, and the content that loads is the
-        // edited one — 1i's playtest: the Weakspot Stiletto's damage 25.
+        // Content is an edit to a file beside the game: a statline, a dungeon's
+        // name and a member's loadout are each changed in their own file, and the
+        // content that loads is the edited one — 1i's playtest: the Weakspot
+        // Stiletto's damage 25.
         var edited = ContentFiles.Load(Shipped with
         {
             Weapons = DataTexts.InRow(Shipped.Weapons!, "weakspot_stiletto", "\"damage\": 15,", "\"damage\": 25,"),
@@ -485,6 +485,56 @@ public class ContentFilesTests
         Assert.Equal(15, edited.Content.Weapons["assassins_fang"].Damage);
         Assert.Equal("The Pike Hall", edited.Content.Dungeons["spear_hall"].Name);
         Assert.Equal(["staff_of_blight"], edited.Content.Party["D"].BagWeaponIds);
+
+        // PHASE5-090: "which weapons and dungeons use it?" — "it" a modifier or an
+        // enchantment, beside "what does it do?" (code) and "what may it coexist
+        // with?" (restricted.json) — is the content files' to answer. So moving
+        // one between rows is an edit to the files alone, and the content that
+        // loads follows it. A modifier between weapons: Pin from the Pinning Lance
+        // to the Halberd, and Push the other way, so each is still a Spear variant
+        // adding one rider. An enchantment between weapons: the Staff of Mire's
+        // innate to the Staff of Warding, and Ward the other way. A theme between
+        // dungeons: the Long Gallery's Longshot to the Knife Warrens, and
+        // CritWindow the other way, each boss carrying its new theme. And a
+        // dungeon attuned: the Spear Hall to Cold, the cold enchantment's element.
+        static string InRows(string text, params (string Id, string From, string To)[] edits)
+            => edits.Aggregate(text, (done, edit) => DataTexts.InRow(done, edit.Id, edit.From, edit.To));
+        var moved = ContentFiles.Load(Shipped with
+        {
+            Weapons = InRows(Shipped.Weapons!,
+                ("halberd", "\"Push\": 1", "\"Pin\": 1"),
+                ("pinning_lance", "\"Pin\": 1", "\"Push\": 1"),
+                ("staff_of_warding", "{ \"id\": \"ward\" }", "{ \"id\": \"mire\" }"),
+                ("staff_of_mire", "{ \"id\": \"mire\" }", "{ \"id\": \"ward\" }")),
+            Dungeons = InRows(Shipped.Dungeons!,
+                ("long_gallery", "\"theme\": \"Longshot\"", "\"theme\": \"CritWindow\""),
+                ("long_gallery", "\"innate\": { \"Longshot\": 3 }", "\"innate\": { \"CritWindow\": 3 }"),
+                ("knife_warrens", "\"theme\": \"CritWindow\"", "\"theme\": \"Longshot\""),
+                ("knife_warrens", "\"innate\": { \"CritWindow\": 3 }", "\"innate\": { \"Longshot\": 3 }"),
+                ("spear_hall", "\"attunement\": null", "\"attunement\": \"Cold\"")),
+        });
+        Assert.Null(moved.Error);
+        Assert.Empty(moved.Notices);
+        var after = moved.Content!;
+
+        // Which weapons forge Pin and which carry mire or ward, which dungeon is
+        // themed on Longshot or CritWindow, and what the Spear Hall is attuned to:
+        // asked of the shipped content, then of the moved.
+        static IEnumerable<string> Forging(GameContent c, ModifierType t) => c.Weapons.All.Where(w => w.Forged.GetValueOrDefault(t) > 0).Select(w => w.Id);
+        static IEnumerable<string> Carrying(GameContent c, string id) => c.Weapons.All.Where(w => w.Enchantments.Any(r => r.Id == id)).Select(w => w.Id);
+        static IEnumerable<string> ThemedOn(GameContent c, ModifierType t) => c.Dungeons.All.Where(d => d.Theme == t).Select(d => d.Id);
+        Assert.Equal(["pinning_lance", "pinning_bow"], Forging(content, Pin));
+        Assert.Equal(["halberd", "pinning_bow"], Forging(after, Pin));
+        Assert.Equal((0, 1), (after.Weapons["halberd"].Forged.GetValueOrDefault(Push), after.Weapons["pinning_lance"].Forged.GetValueOrDefault(Push)));
+        Assert.Equal(["staff_of_mire"], Carrying(content, "mire"));
+        Assert.Equal(["staff_of_warding"], Carrying(after, "mire"));
+        Assert.Equal(["staff_of_mire"], Carrying(after, "ward"));
+        Assert.Equal(["long_gallery"], ThemedOn(content, Longshot));
+        Assert.Equal(["knife_warrens"], ThemedOn(after, Longshot));
+        Assert.Equal(["long_gallery"], ThemedOn(after, CritWindow));
+        Assert.Equal(3, after.Dungeons["knife_warrens"].Boss.Innate[Longshot]);
+        Assert.Null(content.Dungeons["spear_hall"].Attunement);
+        Assert.Equal(DamageType.Cold, after.Dungeons["spear_hall"].Attunement);
 
         // A file that is missing plays its built-in record, and says so, for the
         // three new files as for the others.
