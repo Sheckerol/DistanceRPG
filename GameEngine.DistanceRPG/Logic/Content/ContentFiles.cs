@@ -2,11 +2,22 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The texts of the data files, as the edge found them beside the executable
-/// (<c>DataFiles</c>): null for a file that is not there. <c>Logic/</c> takes
-/// strings and never touches the disk, so every reader here is tested on text.
+/// (<c>DataFiles</c>): null for a file with no text, whether it is not there or
+/// it is there and could not be read. <c>Logic/</c> takes strings and never
+/// touches the disk, so every reader here is tested on text.
 /// </summary>
+/// <param name="Unreadable">
+/// The files that are there but could not be read, by file name
+/// (<c>tuning.json</c>), each with the reason in a few words
+/// (<c>another program has it open</c>). The reason comes from the edge, which
+/// saw the error; the full error goes to the log. It is null when every file
+/// that is there was read. The notice then says the file could not be read,
+/// rather than that it is missing: a playtester looking at the file in its
+/// folder must not be told it is not there.
+/// </param>
 public sealed record ContentTexts(string? Tuning = null, string? Restricted = null, string? Enchantments = null,
-    string? Weapons = null, string? Dungeons = null, string? Party = null);
+    string? Weapons = null, string? Dungeons = null, string? Party = null,
+    IReadOnlyDictionary<string, string>? Unreadable = null);
 
 /// <summary>
 /// What loading the data files made: the content the game runs under, or the
@@ -38,7 +49,8 @@ public static class ContentFiles
 
     /// <summary>
     /// Load the content from <paramref name="texts"/>: the tuning read, a notice
-    /// when there was no file, the tuning fitted to the weapons, dungeons and
+    /// when there was no text (the file missing, or there and unreadable, which
+    /// the notice tells apart), the tuning fitted to the weapons, dungeons and
     /// roster it will run beside, any <c>ApplyPercent</c> id the enchantments do
     /// not have dropped with a notice, then <see cref="GameContent.Load"/>. Never
     /// throws a <see cref="ContentException"/>: one comes back as
@@ -51,7 +63,7 @@ public static class ContentFiles
         var notices = new List<string>();
 
         if (texts.Tuning is null)
-            notices.Add(Missing(TuningJson.FileName, "numbers"));
+            notices.Add(NoText(texts, TuningJson.FileName, "numbers"));
         var read = TuningJson.Read(texts.Tuning);
         notices.AddRange(read.Warnings);
 
@@ -85,6 +97,13 @@ public static class ContentFiles
 
     /// <summary>The notice a data file that was not there gets: the compiled record played in its place, and said so, so a renamed or deleted file never passes unseen.</summary>
     internal static string Missing(string file, string what) => $"{file} is missing - the built-in {what} are playing";
+
+    /// <summary>The notice a data file that is there but could not be read gets: why, in the edge's words, and the compiled record played in its place.</summary>
+    internal static string Unreadable(string file, string why, string what) => $"{file} could not be read ({why}) - the built-in {what} are playing";
+
+    /// <summary>The notice for a data file the edge handed no text for: <see cref="Unreadable"/> when it said the file is there and why it could not be read, <see cref="Missing"/> otherwise.</summary>
+    private static string NoText(ContentTexts texts, string file, string what)
+        => texts.Unreadable?.GetValueOrDefault(file) is { } why ? Unreadable(file, why, what) : Missing(file, what);
 
     /// <summary>
     /// An <c>ApplyPercent</c> id the enchantments do not have warns once the

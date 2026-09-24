@@ -172,12 +172,13 @@ public sealed class Weapon
 
     /// <summary>
     /// The movement a swing or cast costs after Light's discount:
-    /// <c>Cost * (100 - Modifiers.Value(Light)) / 100</c>, truncated. Computed
-    /// once and cached, so the HUD and the movement gate agree on one number.
+    /// <c>Cost * (100 - Modifiers.Value(Light)) / 100</c>, truncated, and never
+    /// below 0 (<see cref="Discounted"/>). Computed once and cached, so the HUD
+    /// and the movement gate agree on one number.
     /// </summary>
     public int ResolvedCost { get; private set; }
 
-    /// <summary>The mana a cast costs after Resonant's discount, the same shape against <see cref="ManaCost"/>.</summary>
+    /// <summary>The mana a cast costs after Resonant's discount, the same shape against <see cref="ManaCost"/>, and never below 0 either.</summary>
     public int ResolvedManaCost { get; private set; }
 
     /// <summary>
@@ -264,9 +265,23 @@ public sealed class Weapon
 
     private void Resolve()
     {
-        ResolvedCost = Cost * (Percent - Modifiers.Value(ModifierType.Light)) / Percent;
-        ResolvedManaCost = ManaCost * (Percent - Modifiers.Value(ModifierType.Resonant)) / Percent;
+        ResolvedCost = Discounted(Cost, ModifierType.Light);
+        ResolvedManaCost = Discounted(ManaCost, ModifierType.Resonant);
     }
+
+    /// <summary>
+    /// <paramref name="cost"/> less <paramref name="discount"/>'s percentage off
+    /// it, truncated. A discount takes at most the whole cost, so the result is
+    /// never below 0. The shipped numbers peak at 60 percent (10 a stack, x6).
+    /// A <c>tuning.json</c> can go well past 100: <c>PerStack.Resonant</c> 20 is
+    /// 120 percent off at x6, and <c>AcquiredHeadroom</c> 10 lets Light reach x11,
+    /// 110 percent at the shipped 10 a stack. Past 100 percent the cost is 0,
+    /// never a negative number on the weapon line. A swing still costs
+    /// <see cref="Progression.MinimumMovementCost"/> where it is paid, and a
+    /// trigger still costs 1 (<see cref="Enchantment.ResolvedTriggerCost"/>).
+    /// </summary>
+    private int Discounted(int cost, ModifierType discount)
+        => cost * Math.Max(0, Percent - Modifiers.Value(discount)) / Percent;
 
     public override string ToString() => $"{Name} ({Id}: {Modifiers})";
 }

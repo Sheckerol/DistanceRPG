@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using GameEngine.DistanceRPG.Logic;
 
@@ -9,9 +10,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// key or a value out of range costs a warning and never a crash, a ratio is an
 /// integer — written with every number on one screen, grouped and commented, and
 /// hashed on its values alone. Every case reads text: nothing here touches a
-/// file, and nothing makes a tuning current (a load is built and looked at, never
-/// used), so no collection is needed.
+/// file. One case makes each tuning it loads current for a moment, to price every
+/// shipped weapon under it (<see cref="NegativeCosts"/>), so the class sits in the
+/// content collection.
 /// </summary>
+[Collection(TestContent.Collection)]
 public class TuningJsonTests
 {
     private static readonly Tuning Compiled = ContentDefaults.Tuning;
@@ -38,6 +41,15 @@ public class TuningJsonTests
         // The loader adds the missing file's notice — and only for a missing one.
         Assert.Equal(["tuning.json is missing - the built-in numbers are playing"], ContentFiles.Load(new ContentTexts()).Notices);
         Assert.Empty(ContentFiles.Load(new ContentTexts(Tuning: "{}")).Notices);
+
+        // A file that is there and could not be read is not a missing file. The
+        // edge says why, the notice says so, and the built-in numbers play. A
+        // text that was read wins over any reason given beside it.
+        var unreadable = new ContentTexts(Unreadable: new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" });
+        var locked = ContentFiles.Load(unreadable);
+        Assert.Equal(["tuning.json could not be read (another program has it open) - the built-in numbers are playing"], locked.Notices);
+        TuningValues.Same(Compiled, locked.Content!.Tuning);
+        Assert.Empty(ContentFiles.Load(unreadable with { Tuning = "{}" }).Notices);
     }
 
     [Fact]
@@ -139,12 +151,37 @@ public class TuningJsonTests
         string clamp = Assert.Single(read.Warnings, w => w.StartsWith($"tuning.json: {label} {value} is ", StringComparison.Ordinal));
         Assert.EndsWith(value < bound ? $"is below {bound} - using {bound}" : $"is above {bound} - using {bound}", clamp);
 
+        // Only the key's own clamp names the value. A clamp between keys can then
+        // move two keys past their bound, and no others: BossFloorMax (raised to
+        // BossFloorMin) and BossStackOffset (raised over the deepest boss). When
+        // it does, the key lands on the number that clamp's warning says it is
+        // using. Every other key lands on the bound, and so do those two when
+        // nothing moved them. BossFloorMin and AcquiredHeadroom can make the
+        // offset move, but they stay on their own bound.
+        Assert.All(read.Warnings.Where(w => w != clamp), w => Assert.DoesNotContain($"{label} {value}", w));
         int landed = member is null ? ((IntKey)Key(name)).Get(read.Tuning) : Table(read.Tuning, name)[member];
-        if (read.Warnings.Count == 1)
+        string? moved = read.Warnings.SingleOrDefault(w => w != clamp && w.StartsWith($"tuning.json: {label} ", StringComparison.Ordinal));
+        if (moved is null)
+        {
             Assert.Equal(bound, landed);
+        }
         else
-            Assert.All(read.Warnings.Where(w => w != clamp), w => Assert.DoesNotContain($"{label} {value}", w));
+        {
+            Assert.Contains(label, MovedByARelation);
+            Assert.Equal(Using(moved), landed);
+        }
         ContentValidator.ValidateTuning(read.Tuning);
+    }
+
+    /// <summary>The keys a clamp between keys may move after their own clamp: the deep end of the boss floor range, and the boss offset.</summary>
+    private static readonly string[] MovedByARelation = [nameof(Tuning.BossFloorMax), nameof(Tuning.BossStackOffset)];
+
+    /// <summary>The number a warning says the game is using: <c>... - using 5</c>.</summary>
+    private static int Using(string warning)
+    {
+        var match = Regex.Match(warning, @" - using (\d+)$");
+        Assert.True(match.Success, $"'{warning}' does not say what it is using");
+        return int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
     }
 
     [Fact]
@@ -158,7 +195,10 @@ public class TuningJsonTests
         // the deepest boss against the shallowest farm, every forge limit at 1. Each
         // loads through the loader with the shipped content (in Phase 5.1, the
         // compiled content), and the tuning it plays still passes the validator,
-        // which stays the refusal for a tuning built in code.
+        // which stays the refusal for a tuning built in code. And under it no
+        // shipped weapon's swing or cast costs less than nothing, however deep
+        // its Light or Resonant runs: a discount past 100 percent takes the
+        // whole cost and no more (PerStack.Resonant 20 is 120 percent at x6).
         long[] ends = [int.MinValue, -1, 0, 1, int.MaxValue];
         var files = new List<string>();
         foreach (var key in TuningSchema.Keys)
@@ -188,6 +228,8 @@ public class TuningJsonTests
             """{ "BossFloorMax": 99, "BossStackOffset": 0, "AcquiredHeadroom": 1 }""",
             """{ "BossFloorMin": 1, "BossFloorMax": 1, "BossStackOffset": 0, "AcquiredHeadroom": 1 }""",
             $$"""{ "MaxForged": { {{string.Join(", ", Enum.GetNames<ModifierType>().Select(m => $"\"{m}\": 1"))}} } }""",
+            """{ "PerStack": { "Light": 20, "Resonant": 20 } }""",
+            """{ "Offset": { "Light": 150, "Resonant": 150 } }""",
         ]);
         Assert.True(files.Count > 170, $"{files.Count} files: the sweep is not reading the schema");
 
@@ -208,8 +250,45 @@ public class TuningJsonTests
             {
                 failures.Add($"{file} -> plays a tuning the validator refuses: {error.Message}");
             }
+            failures.AddRange(NegativeCosts(content).Select(cost => $"{file} -> {cost}"));
         }
         Assert.Empty(failures);
+    }
+
+    /// <summary>
+    /// Every shipped weapon that would cost less than nothing to swing or cast
+    /// under <paramref name="content"/>, made current for the pricing and put back
+    /// after. Each weapon is priced at the deepest Light, and then the deepest
+    /// Resonant, that any weapon can carry: forged to that modifier's limit and
+    /// farmed to its cap (forged + AcquiredHeadroom), with the other discount of
+    /// the pair taken off, since the two exclude each other.
+    /// </summary>
+    private static List<string> NegativeCosts(GameContent content)
+    {
+        var previous = GameContent.Current;
+        GameContent.Use(content);
+        try
+        {
+            var found = new List<string>();
+            foreach (var def in content.Weapons.All)
+            {
+                foreach (var (discount, other) in new[] { (ModifierType.Light, ModifierType.Resonant), (ModifierType.Resonant, ModifierType.Light) })
+                {
+                    var spread = def.Forged.Where(entry => entry.Key != other).ToDictionary(entry => entry.Key, entry => entry.Value);
+                    spread[discount] = content.Modifiers.MaxForged(discount);
+                    var weapon = new Weapon(def with { Forged = spread }, []);
+                    if (content.Modifiers.Allowed(discount, weapon.Kind, weapon.Modifiers))
+                        weapon.Acquire(discount, content.Modifiers.AcquiredHeadroom);
+                    if (weapon.ResolvedCost < 0 || weapon.ResolvedManaCost < 0)
+                        found.Add($"{def.Id} at {discount} x{weapon.Stacks(discount)} costs {weapon.ResolvedCost} movement and {weapon.ResolvedManaCost} mana");
+                }
+            }
+            return found;
+        }
+        finally
+        {
+            GameContent.Use(previous);
+        }
     }
 
     [Fact]

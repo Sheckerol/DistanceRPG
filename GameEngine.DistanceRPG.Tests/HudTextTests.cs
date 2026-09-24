@@ -1120,6 +1120,18 @@ public class HudTextTests
         var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }"""));
         Assert.Equal(2, load.Notices.Count);
 
+        // The scene the host builds with them has them up for its first floor.
+        // One built with none has none. Nothing a scene does before Initialize
+        // touches a window or a camera, so these are built with neither, over a
+        // real campaign with a real visit entered.
+        var campaign = CampaignState.Start(GameContent.Current);
+        campaign.Enter(GameContent.Current.Dungeons.Tutorial.Id, mapSeed: 7);
+        var booted = new DungeonScene(camera: null!, game: null!, campaign, new NoRunHost(), load.Notices);
+        Assert.Equal(NoticeText.Rows(load.Notices), booted.NoticeRows);
+        Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", booted.NoticeRows[0]);
+        Assert.Empty(new DungeonScene(camera: null!, game: null!, campaign, new NoRunHost()).NoticeRows);
+        Assert.Empty(new DungeonScene(camera: null!, game: null!, campaign, new NoRunHost(), []).NoticeRows);
+
         var hud = new DungeonHud(game: null!);
         Assert.Empty(hud.NoticeRows);
         hud.ShowNotices(load.Notices);
@@ -1136,5 +1148,11 @@ public class HudTextTests
         // Nothing to say, nothing shown.
         hud.ShowNotices([]);
         Assert.Empty(hud.NoticeRows);
+    }
+
+    /// <summary>The host of a scene that is built and read, never played: none of its runs ever ends.</summary>
+    private sealed class NoRunHost : IRunHost
+    {
+        public void RunOver() => throw new InvalidOperationException("A scene built to be read is never played to its end.");
     }
 }

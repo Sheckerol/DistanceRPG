@@ -12,9 +12,9 @@ namespace GameEngine.DistanceRPG;
 /// executable's own folder (the files sit beside the exe, S:43) and the
 /// generator whatever <c>--write-data</c> names.
 /// <para>
-/// Every file read, or looked for and not found, is reported with its full path
-/// — which is how a playtester finds the copy to edit, and how a log says which
-/// file a game ran under.
+/// Every file read, looked for and not found, or found and not readable, is
+/// reported with its full path. That is how a playtester finds the copy to edit,
+/// and how a log says which file a game ran under.
 /// </para>
 /// </summary>
 internal static class DataFiles
@@ -22,15 +22,21 @@ internal static class DataFiles
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// The data files beside <paramref name="directory"/>, each null when it is
-    /// not there; each one read or missed is reported to <paramref name="report"/>
-    /// with its full path. Phase 5.1 reads <c>tuning.json</c>; the content files
+    /// The data files in <paramref name="directory"/>. Each is null when it is
+    /// not there, or when it is there and could not be read. An unreadable file
+    /// is also listed in <see cref="ContentTexts.Unreadable"/> with the reason
+    /// (<see cref="Why"/>), so the screen can say what happened instead of
+    /// calling it missing. Each file read, missed or unreadable is reported to
+    /// <paramref name="report"/> with its full path, and an unreadable one with
+    /// the whole error too. Phase 5.1 reads <c>tuning.json</c>; the content files
     /// are the compiled records until the sub-steps that ship them.
     /// </summary>
     public static ContentTexts Read(string directory, Action<string>? report = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
-        return new ContentTexts(Tuning: ReadOne(directory, TuningJson.FileName, report));
+        var unreadable = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? tuning = ReadOne(directory, TuningJson.FileName, unreadable, report);
+        return new ContentTexts(Tuning: tuning, Unreadable: unreadable.Count == 0 ? null : unreadable);
     }
 
     /// <summary>
@@ -80,8 +86,13 @@ internal static class DataFiles
         yield return (names[5], texts.Party);
     }
 
-    /// <summary>One file's text, or null — not there, or not readable (reported as such: the game plays the built-in one).</summary>
-    private static string? ReadOne(string directory, string name, Action<string>? report)
+    /// <summary>
+    /// One file's text, or null when it is not there or cannot be read. Each case
+    /// is reported as what it is, and the game plays the built-in one. An
+    /// unreadable file goes into <paramref name="unreadable"/> by name, with
+    /// <see cref="Why"/>.
+    /// </summary>
+    private static string? ReadOne(string directory, string name, IDictionary<string, string> unreadable, Action<string>? report)
     {
         string path = Path.Combine(directory, name);
         if (!File.Exists(path))
@@ -99,7 +110,34 @@ internal static class DataFiles
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             report?.Invoke($"[Data] {path} could not be read ({error.Message}) - the built-in one plays");
+            unreadable[name] = Why(error, path, name);
             return null;
         }
     }
+
+    /// <summary>
+    /// Why a file that is there could not be read, in a few words a notice can
+    /// show. Two cases are named: another program holding it open, as an
+    /// editor does, and no permission to read it. Any other error gives the
+    /// system's own message with the file's name in place of its full path,
+    /// which the log line already has.
+    /// </summary>
+    internal static string Why(Exception error, string path, string name)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return error switch
+        {
+            UnauthorizedAccessException => "no permission to read it",
+            IOException io when IsHeldOpen(io) => "another program has it open",
+            _ => error.Message.Replace(path, name, StringComparison.OrdinalIgnoreCase).Trim().TrimEnd('.'),
+        };
+    }
+
+    /// <summary>
+    /// A sharing or lock violation (Windows errors 32 and 33): the file is open
+    /// in another program that will not share it. Windows only, because on Unix
+    /// the error's code is the system's errno.
+    /// </summary>
+    private static bool IsHeldOpen(IOException error)
+        => OperatingSystem.IsWindows() && ((error.HResult & 0xFFFF) is 32 or 33);
 }

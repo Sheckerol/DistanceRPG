@@ -80,9 +80,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     private CampaignState? _campaign;
 
     // What the data files raised at startup — a tuning value clamped or fitted,
-    // a file missing — handed to the first scene the game opens on and to no
-    // other (TakeStartupNotices). The log has them all.
-    private IReadOnlyList<string> _startupNotices = [];
+    // a file missing or unreadable — handed to the first scene the game opens on
+    // and to no other. The log has them all.
+    private readonly StartupNotices _startupNotices = new();
 
     // The boot seed when the override named one, spent by the first BeginRun
     // that actually enters a dungeon.
@@ -158,16 +158,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
         GameContent.Use(content);
         Log.Info($"[Data] Playing under tuning {TuningJson.Hash(content.Tuning)}");
-        _startupNotices = load.Notices;
+        _startupNotices.Hold(load.Notices);
         return true;
-    }
-
-    /// <summary>The startup notices, for the scene about to be shown — the first one only: every later scene gets none.</summary>
-    private IReadOnlyList<string> TakeStartupNotices()
-    {
-        var notices = _startupNotices;
-        _startupNotices = [];
-        return notices;
     }
 
     /// <summary>
@@ -243,7 +235,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         }
 
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, TakeStartupNotices()));
+        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, _startupNotices.Take()));
     }
 
     /// <summary>
@@ -267,7 +259,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         var visit = campaign.Enter(dungeonId, mapSeed);
         Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed} - run counter {campaign.RunCounter}");
 
-        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, TakeStartupNotices()));
+        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, _startupNotices.Take()));
     }
 
     /// <summary>

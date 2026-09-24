@@ -57,5 +57,11 @@ public class NoticeTextTests
 
         // A deleted file plays the compiled numbers, and says so.
         Assert.Equal(["TUNING.JSON IS MISSING - THE BUILT-IN NUMBERS ARE PLAYING"], NoticeText.Rows(ContentFiles.Load(new ContentTexts()).Notices));
+
+        // So does one another program is holding open, and it says why rather
+        // than calling the file missing. That takes two rows, within the cap.
+        var unreadable = new ContentTexts(Unreadable: new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" });
+        Assert.Equal(["TUNING.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN) -", "  THE BUILT-IN NUMBERS ARE PLAYING"],
+            NoticeText.Rows(ContentFiles.Load(unreadable).Notices));
     }
 }

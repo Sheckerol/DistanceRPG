@@ -196,12 +196,6 @@ public class DungeonScene : Scene
     private readonly DungeonState _visit;
     private readonly IRunHost _host;
 
-    // What the game's startup had to say — the data files' notices — when this
-    // scene is the first the game opens on (a dev override booting straight in,
-    // past the screen between runs that says them otherwise): put up over the
-    // first floor's arrival banner. Empty for every other run.
-    private readonly IReadOnlyList<string> _startupNotices;
-
     // The floor being played, and the three parts of it this scene reads most:
     // its map, its fog boxes and its fog, which is the floor's and not the
     // scene's (§4.5) — the floor keeps what the party explored. All four follow
@@ -304,9 +298,19 @@ public class DungeonScene : Scene
         _visit = campaign.Visit
             ?? throw new ArgumentException("A dungeon scene plays a visit in progress: enter a dungeon before building one.", nameof(campaign));
         _host = host;
-        _startupNotices = notices ?? [];
         _hud = new DungeonHud(game);
+
+        // What the game's startup had to say: the data files' notices, when this
+        // scene is the first the game opens on. A dev override boots straight in,
+        // past the screen between runs that would say them otherwise. They go up
+        // over the first floor's arrival banner. Every other run is handed none.
+        // They are handed to the HUD here, not in Initialize: nothing before the
+        // first Update ages them, and a test can read the rows with no window.
+        _hud.ShowNotices(notices ?? []);
     }
+
+    /// <summary>The startup notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped, capped, or none.</summary>
+    internal IReadOnlyList<string> NoticeRows => _hud.NoticeRows;
 
     public CharacterObject ActiveCharacter => _party[_activeIdx];
 
@@ -518,8 +522,6 @@ public class DungeonScene : Scene
         SpawnParty();
         _campaign.RunEnded += OnRunEnded;   // before any system opens: a wipe ends the run in Logic, and this scene shows it
         ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20));
-        if (_startupNotices.Count > 0)
-            _hud.ShowNotices(_startupNotices);   // over the first floor's banner: the startup had something to say
         WireInput();
 
         _camera.Yaw = -90f;   // face -Z (up the map)

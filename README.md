@@ -85,7 +85,12 @@ every key.
   the exe only when it is newer than the copy there, so an edited copy survives
   a rebuild; `dotnet clean`, or a regenerated `Data/` file, replaces it.
 - **Restart to apply**: the file is read once, when the game starts, and never
-  during play.
+  during play. If the file is there but the game cannot read it, the built-in
+  numbers play and the screen says why. This happens when an editor holds the
+  file open and locked, or the folder does not let the game read it. The screen
+  shows `TUNING.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN) - THE
+  BUILT-IN NUMBERS ARE PLAYING` and does not call the file missing. The log has
+  the whole error.
 - **Name only what you change**: a key left out keeps its built-in number, so
   `{ "MovementBudget": 240 }` is a whole file. Comments and trailing commas are fine.
 - **A mistake costs a warning, never a crash**: an unknown key, a value out of
