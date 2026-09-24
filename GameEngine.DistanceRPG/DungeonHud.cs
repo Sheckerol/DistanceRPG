@@ -7,18 +7,26 @@ namespace GameEngine.DistanceRPG;
 
 /// <summary>
 /// Screen-space HUD for the dungeon scene, drawn with the engine's bitmap
-/// <see cref="TextRenderer"/>: movement/weapon readouts, the party selector,
-/// the enemy nameplates and their effect badges, the click and aim cues,
-/// floating combat text, the end-of-turn banner, the inventory panel, and the
-/// game-over screen. Every number it shows is a resolved one — a swing's cost
-/// after Light, a cast's mana after Resonant, a Block as the points it
+/// <see cref="TextRenderer"/>: movement/weapon readouts, the floor line, the
+/// party selector, the enemy nameplates and their effect badges, the stairs'
+/// labels and the cue at the one underfoot, the click and aim cues, floating
+/// combat text, the end-of-turn banner, the inventory panel, the pause menu and
+/// the way out's prompt, the stairs' fade and the arrival banner over it, and
+/// the game-over screen. Every number it shows is a resolved one — a swing's
+/// cost after Light, a cast's mana after Resonant, a Block as the points it
 /// absorbs, a crit window as the roll it needs, Mire as the budget it leaves —
-/// never a percentage, a stack count or a base with a discount (§1.1, §1.7).
+/// never a percentage, a stack count or a base with a discount (§1.1, §1.7);
+/// and nothing it shows names how deep the dungeon goes before the party has
+/// reached the bottom (§4.3).
 /// </summary>
 public sealed class DungeonHud
 {
     private const float FloatingTextLife = 1.2f;
     private const float FloatingTextRise = 50f;
+
+    /// <summary>How long the arrival banner stays up, and the last stretch of it over which it fades.</summary>
+    private const float BannerSeconds = 2.4f;
+    private const float BannerFadeSeconds = 0.8f;
 
     /// <summary>Pixels a character advances at scale 1: the 5-px glyph and its 1-px gap.</summary>
     private const float GlyphAdvance = 6f;
@@ -50,10 +58,31 @@ public sealed class DungeonHud
 
     private readonly List<FloatingText> _floatingTexts = new();
 
+    // The arrival banner (ShowArrival): the floor reached and the dungeon it is
+    // in, and how long it has been up.
+    private (string Floor, string Dungeon)? _banner;
+    private float _bannerAge;
+
     public DungeonHud(Game game)
     {
         _game = game;
     }
+
+    /// <summary>
+    /// Put the arrival banner up for the floor <paramref name="visit"/> now
+    /// stands on — <c>FLOOR 2</c>, the dungeon's name over it — for
+    /// <see cref="BannerSeconds"/>. Drawn over the stairs' fade, so it is there
+    /// at black and the floor comes up under it.
+    /// </summary>
+    public void ShowArrival(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        _banner = (ArrivalBanner(visit), visit.Def.Name.ToUpperInvariant());
+        _bannerAge = 0f;
+    }
+
+    /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
+    public void ClearFloatingTexts() => _floatingTexts.Clear();
 
     /// <summary>Spawn combat text above a world position, rising and fading out.</summary>
     public void AddFloatingText(Vector3 worldPos, string text, Vector4 color, float pixelYOffset = 0f)
@@ -78,6 +107,13 @@ public sealed class DungeonHud
             if (_floatingTexts[i].Age >= FloatingTextLife)
                 _floatingTexts.RemoveAt(i);
         }
+
+        if (_banner is not null)
+        {
+            _bannerAge += deltaTime;
+            if (_bannerAge >= BannerSeconds)
+                _banner = null;
+        }
     }
 
     public void Render(Camera camera, DungeonScene scene)
@@ -101,8 +137,10 @@ public sealed class DungeonHud
             _fade.Draw(_game.ShaderManager, 0.65f);
 
         DrawTopReadouts(w, active, turns);
+        DrawFloorLine(scene.Visit);
         DrawPartySelector(scene);
         DrawEnemyLabels(camera, scene, w, h);
+        DrawStairs(camera, scene, w, h);
         DrawGroundItems(camera, scene, w, h);
         DrawAllyCue(camera, scene, w, h);
         DrawFloatingTexts(camera, w, h);
@@ -119,7 +157,10 @@ public sealed class DungeonHud
             DrawInventory(w, h, active, turns);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h, turns.ResurrectionActive);
+            DrawMenu(w, h, !scene.Visit.BossDefeated);
+
+        if (scene.ActiveMenu == GameMenu.ConfirmLeave)
+            DrawConfirmLeave(w, h);
 
         if (turns.Phase == TurnPhase.GameOver)
         {
@@ -131,6 +172,14 @@ public sealed class DungeonHud
             DrawCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
         }
 
+        _text.Flush(_game.ShaderManager);
+
+        // The stairs' fade goes over everything drawn so far, the world and the
+        // HUD alike — the floor line changes at black, never in view — and the
+        // arrival banner over the fade, so it is up at black and the new floor
+        // comes in under it.
+        _fade.Draw(_game.ShaderManager, scene.TransitFade);
+        DrawArrivalBanner(scene, w, h);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -168,6 +217,137 @@ public sealed class DungeonHud
         return actor.PaidLocks > 0
             ? $"MANA: {actor.Mana} / {actor.UsableMaxMana} ({actor.MaxMana})"
             : $"MANA: {actor.Mana} / {actor.MaxMana}";
+    }
+
+    // ── The floor, its stairs, and leaving ──────────────────────────────────
+
+    /// <summary>The floor line, top left: which dungeon, which floor (<see cref="FloorLine"/>).</summary>
+    private void DrawFloorLine(DungeonState visit)
+        => _text.DrawText(FloorLine(visit), 14f, 14f, 1.5f, Cyan);
+
+    /// <summary>
+    /// Where the party is, as the floor line prints it: the dungeon and the
+    /// floor <em>number</em> — the index plus one — <c>THE TUTORIAL - FLOOR 1</c>.
+    /// <strong>Never the depth</strong> (§4.3, PHASE4-024): the boss floor is
+    /// rolled at entry and not disclosed, the player learns it only by reaching
+    /// it, so the line is never "floor 3 of 7", never "3/7", and reads the same
+    /// on floor 3 of a five-floor visit as of a ten-floor one. That is what keeps
+    /// the depth from being scummed: nothing on screen tells a shallow roll from
+    /// a deep one before the bottom is under the party's feet.
+    /// </summary>
+    internal static string FloorLine(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        return $"{visit.Def.Name.ToUpperInvariant()} - {ArrivalBanner(visit)}";
+    }
+
+    /// <summary>The arrival banner's line: <c>FLOOR 2</c>, the floor number reached and nothing about how many there are (§4.3).</summary>
+    internal static string ArrivalBanner(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        return $"FLOOR {visit.FloorIndex + 1}";
+    }
+
+    /// <summary>What each kind of stair is labelled, on its slab once its tile has been seen.</summary>
+    private static readonly IReadOnlyDictionary<Stair, string> StairLabels = new Dictionary<Stair, string>
+    {
+        [Stair.Down] = "STAIRS DOWN",
+        [Stair.Up] = "STAIRS UP",
+        [Stair.Exit] = "WAY OUT",
+    };
+
+    /// <summary>What E does on each kind of stair, when the party may take it: a verb with its key.</summary>
+    private static readonly IReadOnlyDictionary<Stair, string> StairVerbs = new Dictionary<Stair, string>
+    {
+        [Stair.Down] = "E: DESCEND",
+        [Stair.Up] = "E: CLIMB",
+        [Stair.Exit] = "E: LEAVE THE DUNGEON",
+    };
+
+    /// <summary>
+    /// A stair's label, by what it does: <c>STAIRS DOWN</c>, <c>STAIRS UP</c>,
+    /// and the first floor's up-stairs <c>WAY OUT</c> — the kind is the visit's
+    /// (<see cref="DungeonState.StairsOf"/>), so a label never says up where the
+    /// stair leads out.
+    /// </summary>
+    internal static string StairLabel(Stair kind)
+        => StairLabels.GetValueOrDefault(kind, kind.ToString().ToUpperInvariant());
+
+    /// <summary>
+    /// The cue at the stair the active member stands on, given what the visit
+    /// said to it (<see cref="DungeonState.CanUse"/>): the stair's verb with its
+    /// key when the party may take it — <c>E: DESCEND</c>, <c>E: CLIMB</c>,
+    /// <c>E: LEAVE THE DUNGEON</c> — or, with the party short, how short it is,
+    /// <c>GATHER THE PARTY - 2 OF 4 HERE</c>: <paramref name="gathered"/> of the
+    /// <paramref name="living"/> members within reach of it, the fallen counted
+    /// in neither, since they are carried. Null when it is not the party's turn:
+    /// the cue is drawn only in the player phase, and there E says nothing.
+    /// </summary>
+    internal static string? StairCue(StairUse stair, StairRefusal? refusal, int gathered, int living) => refusal switch
+    {
+        null => StairVerbs.GetValueOrDefault(stair.Kind, $"E: {stair.Kind.ToString().ToUpperInvariant()}"),
+        StairRefusal.PartyNotGathered => $"GATHER THE PARTY - {gathered} OF {living} HERE",
+        _ => null,
+    };
+
+    /// <summary>
+    /// The question the way out asks before the party leaves, with the keys
+    /// that answer it — never a number key, since 2 on the pause menu is the
+    /// exit from the game.
+    /// </summary>
+    internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
+
+    // A stair's label and its cue hang under the near edge of its tile — the
+    // edge toward the camera, which looks up the map (-Z) — so at any zoom they
+    // clear the slab, whoever stands on it, the nameplate of a dummy standing
+    // on it, and a ground item's name and PRESS G on the same tile.
+    private const float StairLabelOffset = 6f;
+    private const float StairCueOffset = 22f;
+
+    /// <summary>
+    /// Each stair of the floor, labelled in its colour once its tile has been
+    /// seen — explored, it shows through the shroud, and its label is how the way
+    /// back is found — and at the stair the active member stands on, what E
+    /// would do there, or why not (<see cref="DungeonScene.ActiveStairPrompt"/>).
+    /// </summary>
+    private void DrawStairs(Camera camera, DungeonScene scene, int w, int h)
+    {
+        var seen = scene.Visit.Current.Fog.Seen;
+        var prompt = scene.ActiveStairPrompt;
+        foreach (var marker in scene.StairMarkers)
+        {
+            var (r, c) = marker.Stair.Tile;
+            if (!seen[r, c]) continue;
+            var nearEdge = marker.Slab.Position + Vector3.UnitZ * (WorldSpace.UnitsPerTile / 2f);
+            if (!WorldToScreen(camera, nearEdge, w, h, out var px)) continue;
+
+            DrawCenteredAt(px.X, px.Y + StairLabelOffset, StairLabel(marker.Stair.Kind), 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
+            if (prompt is { } p && p.Stair == marker.Stair)
+                DrawCenteredAt(px.X, px.Y + StairCueOffset, p.Cue, 1.4f, p.Ready ? White : Grey);
+        }
+    }
+
+    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, and what leaving costs — the whole visit.</summary>
+    private void DrawConfirmLeave(int w, int h)
+    {
+        float top = h / 2f - 50f;
+        DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
+        DrawCentered(w, top + 44f, "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON", 1.5f, Grey);
+    }
+
+    /// <summary>
+    /// The arrival banner, fading over its last <see cref="BannerFadeSeconds"/>:
+    /// the dungeon's name, and the floor reached under it. Not over a menu or the
+    /// game-over screen, whose words are at the same height and are the ones
+    /// being asked about.
+    /// </summary>
+    private void DrawArrivalBanner(DungeonScene scene, int w, int h)
+    {
+        if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
+        float alpha = Math.Clamp((BannerSeconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
+        float y = h / 3f;
+        DrawCentered(w, y - 30f, banner.Dungeon, 2f, Grey with { W = alpha });
+        DrawCentered(w, y, banner.Floor, 5f, White with { W = alpha });
     }
 
     // Party selector layout, shared between drawing and click hit-testing.
@@ -489,10 +669,11 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The pause menu, and one entry that is scaffolding: stopping resurrection
-    /// is Phase 4's boss's doing (§4.3), and until that boss exists there is no
-    /// way to reach the drop path in play at all. It is one-way, as the boss kill
-    /// it stands in for is, and it goes when the boss arrives — the line it
-    /// leaves behind says what the dungeon has become.
+    /// is the boss's doing (§4.3), and until the boss exists there is no way to
+    /// reach the drop path in play at all. It records the boss as fallen for the
+    /// visit, so it holds on every floor — and it says so, since that is what it
+    /// stands in for. It is one-way, as the boss kill is, and it goes when the
+    /// boss arrives — the line it leaves behind says what the dungeon has become.
     /// </summary>
     private void DrawMenu(int w, int h, bool resurrectionActive)
     {
@@ -501,7 +682,7 @@ public sealed class DungeonHud
         DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
         DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
         if (resurrectionActive)
-            DrawCentered(w, top + 146f, "3  STOP RESURRECTION", 2f, White);
+            DrawCentered(w, top + 146f, "3  STOP RESURRECTION (DEV) - AS IF THE BOSS FELL", 2f, White);
         else
             DrawCentered(w, top + 146f, "RESURRECTION STOPPED - DEFEATS ARE PERMANENT", 1.5f, Orange);
         DrawCentered(w, top + 196f, "ESC TO CLOSE", 1.5f, Grey);
@@ -786,7 +967,7 @@ public sealed class DungeonHud
     /// The bottom help line for what the active member holds: how its weapon is
     /// used — a swing, a staff's cast on the side its effect lands on, a wand's
     /// aim by its shape, Overwatch's hold on a ranged weapon that has it — then
-    /// the keys every turn shares.
+    /// the keys every turn shares, the stairs' E among them (§4.2).
     /// </summary>
     internal static string HelpLine(PartyMemberState active)
     {
@@ -800,7 +981,7 @@ public sealed class DungeonHud
             parts.Add("CLICK ENEMY: ATTACK");
         if (weapon is { Kind: WeaponKind.Ranged } && active.Value(ModifierType.Overwatch) > 0)
             parts.Add("O: HOLD FIRE");
-        parts.Add("SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
+        parts.Add("SPACE END TURN - E STAIRS - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
         return string.Join(" - ", parts);
     }
 

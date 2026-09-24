@@ -25,6 +25,34 @@ public class HudTextTests
 
     private static string[] Item(Drop drop) => DungeonHud.GroundItemRuns(drop).Select(r => r.Text).ToArray();
 
+    /// <summary>Four fixture members in roster order, a Weakspot Stiletto each: a party to walk a real visit's floors with.</summary>
+    private static PartyMemberState[] Party()
+        => new[] { "A", "B", "C", "D" }
+            .Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
+            .ToArray();
+
+    /// <summary>
+    /// Stand the first <paramref name="count"/> members round <paramref name="stair"/>
+    /// as a party that walked there would — around living enemies, never on them —
+    /// and leave the rest where they are.
+    /// </summary>
+    private static void Gather(DungeonState visit, IReadOnlyList<PartyMemberState> party, (int R, int C) stair, int count)
+    {
+        var floor = visit.Current;
+        var taken = floor.Enemies.Where(e => e.Alive).Select(Displacer.TileOf).ToHashSet();
+        var tiles = GridUtils.FindPartySpawnTiles(floor.Map.Grid, stair.R, stair.C, count, taken);
+        for (int i = 0; i < count; i++)
+            (party[i].X, party[i].Y) = Displacer.CentreOf(tiles[i].R, tiles[i].C);
+    }
+
+    /// <summary>Gather the whole party at the down-stairs, take them, and open the floor below.</summary>
+    private static void GoDown(DungeonState visit, IReadOnlyList<PartyMemberState> party)
+    {
+        Gather(visit, party, visit.Current.DownStairs!.Value, party.Count);
+        visit.Descend(party);
+        visit.OpenTurns(party, () => 10);
+    }
+
     [Fact]
     public void WeaponStats_ShowTheResolvedCosts_NeverAPercentage()
     {
@@ -443,5 +471,143 @@ public class HudTextTests
         Assert.Equal(9, DungeonScene.HighestSlotKey);
         Assert.Equal("PRESS 2-8 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(8));
         Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(12));
+    }
+
+    [Fact]
+    public void TheFloorLineNamesTheFloorAndNeverTheDepth()
+    {
+        // PHASE4-024: the boss floor is rolled at entry and not disclosed - the
+        // player learns the depth only by reaching the bottom, which is what keeps
+        // the depth-scaled payout from being scummed. So the floor line and the
+        // arrival banner name the dungeon and the floor number, and nothing that
+        // would tell a deep roll from a shallow one: no "of N", no "3/7".
+        var spearHall = GameContent.Current.Dungeons["spear_hall"];
+        const long SevenDeep = 7;   // a seed the Spear Hall rolls seven floors on
+        var party = Party();
+        var visit = DungeonState.Enter(spearHall, SevenDeep, party);
+        Assert.Equal(7, visit.BossFloor);
+        visit.OpenTurns(party, () => 10);
+
+        Assert.Equal("THE SPEAR HALL - FLOOR 1", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 1", DungeonHud.ArrivalBanner(visit));
+
+        GoDown(visit, party);
+        GoDown(visit, party);
+        Assert.Equal(2, visit.FloorIndex);
+        Assert.Equal("THE SPEAR HALL - FLOOR 3", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 3", DungeonHud.ArrivalBanner(visit));
+
+        // Every floor above the bottom, the third among them: the number of the
+        // floor stood on, and never the seven, a slash, or an "of".
+        while (visit.Current.DownStairs is not null)
+        {
+            foreach (string shown in new[] { DungeonHud.FloorLine(visit), DungeonHud.ArrivalBanner(visit) })
+            {
+                Assert.Contains($"FLOOR {visit.FloorIndex + 1}", shown);
+                Assert.DoesNotContain("7", shown);
+                Assert.DoesNotContain("/", shown);
+                Assert.DoesNotContain("OF", shown.Split(' '));
+            }
+            GoDown(visit, party);
+        }
+
+        // Reached, the bottom is simply the floor the party stands on: it is its
+        // number now because the party is there, not because the line knew.
+        Assert.Equal(visit.BossFloor, visit.FloorIndex + 1);
+        Assert.Equal("THE SPEAR HALL - FLOOR 7", DungeonHud.FloorLine(visit));
+
+        // And the line is the same on the same floor of any depth: a five-floor
+        // visit's first floor reads exactly as a ten-floor one's.
+        var shallow = DungeonState.Enter(spearHall, 4, party);
+        var deep = DungeonState.Enter(spearHall, 6, party);
+        Assert.Equal((5, 10), (shallow.BossFloor, deep.BossFloor));
+        Assert.Equal(DungeonHud.FloorLine(shallow), DungeonHud.FloorLine(deep));
+        Assert.Equal(DungeonHud.ArrivalBanner(shallow), DungeonHud.ArrivalBanner(deep));
+    }
+
+    [Fact]
+    public void EveryStairSaysWhatItDoes_OrWhyNot()
+    {
+        // Each stair is labelled by what it does (4.2) - the first floor's
+        // up-stairs are the way out, every other floor's the way up, and the
+        // bottom has no way down - and standing on one, the cue says what E does
+        // there, or why the party cannot take it yet.
+        Assert.Equal("STAIRS DOWN", DungeonHud.StairLabel(Stair.Down));
+        Assert.Equal("STAIRS UP", DungeonHud.StairLabel(Stair.Up));
+        Assert.Equal("WAY OUT", DungeonHud.StairLabel(Stair.Exit));
+
+        var tile = (R: 5, C: 5);
+        Assert.Equal("E: DESCEND", DungeonHud.StairCue(new StairUse(Stair.Down, tile), null, 4, 4));
+        Assert.Equal("E: CLIMB", DungeonHud.StairCue(new StairUse(Stair.Up, tile), null, 4, 4));
+        Assert.Equal("E: LEAVE THE DUNGEON", DungeonHud.StairCue(new StairUse(Stair.Exit, tile), null, 4, 4));
+        Assert.Equal("GATHER THE PARTY - 2 OF 4 HERE",
+            DungeonHud.StairCue(new StairUse(Stair.Down, tile), StairRefusal.PartyNotGathered, 2, 4));
+
+        // Outside the party's turn the cue is not drawn and E says nothing, so
+        // there is nothing for it to say.
+        Assert.Null(DungeonHud.StairCue(new StairUse(Stair.Down, tile), StairRefusal.NotThePlayersTurn, 4, 4));
+
+        // On a real visit the kinds are the visit's, and so are the numbers. The
+        // tutorial's first floor holds the way out and a way down...
+        var party = Party();
+        var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        var first = visit.Current;
+        Assert.Equal(new[] { "WAY OUT", "STAIRS DOWN" },
+            DungeonState.StairsOf(first).Select(s => DungeonHud.StairLabel(s.Kind)));
+
+        // ...and two of the four gathered at the down-stairs are two short, the
+        // count the cue prints being the visit's own: the living within reach, of
+        // the living. The fallen are carried, so they are counted in neither.
+        var down = DungeonState.StairsOf(first).Single(s => s.Kind == Stair.Down);
+        Gather(visit, party, down.Tile, 2);
+        var refusal = visit.CanUse(down, party);
+        Assert.Equal(StairRefusal.PartyNotGathered, refusal);
+        Assert.Equal("GATHER THE PARTY - 2 OF 4 HERE",
+            DungeonHud.StairCue(down, refusal, visit.Gathered(party, down.Tile), party.Count(m => m.Alive)));
+        party[3].Alive = false;
+        Assert.Equal("GATHER THE PARTY - 2 OF 3 HERE",
+            DungeonHud.StairCue(down, visit.CanUse(down, party), visit.Gathered(party, down.Tile), party.Count(m => m.Alive)));
+        party[3].Alive = true;
+
+        // All four there, the cue is the verb; and below, on the tutorial's
+        // bottom floor, the only stair leads back up.
+        Gather(visit, party, down.Tile, party.Length);
+        Assert.Equal("E: DESCEND",
+            DungeonHud.StairCue(down, visit.CanUse(down, party), visit.Gathered(party, down.Tile), party.Length));
+        visit.Descend(party);
+        visit.OpenTurns(party, () => 10);
+        Assert.Null(visit.Current.DownStairs);
+        Assert.Equal(new[] { "STAIRS UP" }, DungeonState.StairsOf(visit.Current).Select(s => DungeonHud.StairLabel(s.Kind)));
+    }
+
+    [Fact]
+    public void HelpLine_NamesTheStairsKey()
+    {
+        // E takes the stairs whatever the member is holding, so the keys every
+        // turn shares name it - for a swing, a cast, a wand's aim, a held shot,
+        // and an empty hand alike.
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("tower_guard")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("staff_of_renewal")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("wand_of_the_nova", DamageType.Acidic)));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("crossbow")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(TestPools.Holding("A", null)));
+    }
+
+    [Fact]
+    public void TheLeavePromptNamesItsKeys()
+    {
+        // Leaving discards the whole visit (4.1), so the way out asks first, and
+        // the question names the keys that answer it: E or ENTER for yes, ESC for
+        // no. Never a number: 2 on the pause menu is the exit from the game.
+        string prompt = DungeonHud.LeavePrompt();
+        Assert.Equal("LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO", prompt);
+
+        var words = prompt.Split([' ', ':', '-', '?'], StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("E", words);
+        Assert.Contains("ENTER", words);
+        Assert.Contains("ESC", words);
+        Assert.DoesNotContain("2", prompt);
+        Assert.DoesNotContain(prompt, char.IsDigit);
     }
 }

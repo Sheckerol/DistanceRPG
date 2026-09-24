@@ -587,12 +587,21 @@ public sealed class DungeonState
         floor.Visited = true;
     }
 
-    /// <summary>The stairs <paramref name="floor"/> holds: its arrival tile — the way out on the first floor, the way up on every other — and its way down, except on the bottom.</summary>
-    private static IEnumerable<StairUse> StairsOf(Floor floor)
+    /// <summary>
+    /// The stairs <paramref name="floor"/> holds, arrival tile first: its
+    /// up-stairs — the way out on the first floor, the way up on every other —
+    /// then its way down, except on the bottom. The one place a stair's kind is
+    /// decided: <see cref="StairUnder"/> and <see cref="CanUse"/> read it, and so
+    /// does whoever draws the floor, which labels each stair by what it does and
+    /// never restates which up-stairs leads out.
+    /// </summary>
+    public static IReadOnlyList<StairUse> StairsOf(Floor floor)
     {
-        yield return new StairUse(floor.Index == 0 ? Stair.Exit : Stair.Up, floor.UpStairs);
+        ArgumentNullException.ThrowIfNull(floor);
+        var stairs = new List<StairUse>(2) { new(floor.Index == 0 ? Stair.Exit : Stair.Up, floor.UpStairs) };
         if (floor.DownStairs is { } down)
-            yield return new StairUse(Stair.Down, down);
+            stairs.Add(new StairUse(Stair.Down, down));
+        return stairs;
     }
 
     /// <summary>

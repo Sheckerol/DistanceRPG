@@ -8,7 +8,8 @@ namespace GameEngine.DistanceRPG;
 /// 3D stand-in for a training-dummy enemy, mirroring its logic-space position.
 /// Defeated dummies ease down to a flat floor remnant — they never blocked
 /// movement, but a full-size corpse read as if it did — and grow back on
-/// resurrection. A shove or a drag slides it to where it landed rather than
+/// resurrection; one already dead when its floor is built starts as the
+/// remnant. A shove or a drag slides it to where it landed rather than
 /// teleporting it there, while it is in sight; hidden in the fog, it is simply
 /// where the logic put it.
 /// </summary>
@@ -37,9 +38,20 @@ public class EnemyObject : PrimitiveBoxObject
         SyncTransform();
     }
 
-    /// <summary>Shrink to the floor remnant on defeat; grow back on resurrection.</summary>
-    public void SetDefeatedVisual(bool defeated)
-        => _targetScale = defeated ? DefeatedScale : Vector3.One;
+    /// <summary>
+    /// Shrink to the floor remnant on defeat; grow back on resurrection. Eased,
+    /// so a kill is seen to land — unless <paramref name="snap"/>, which sets
+    /// the scale outright: a corpse on a floor the party returns to was lying
+    /// there before anyone arrived, and is built lying down rather than seen to
+    /// fall a second time.
+    /// </summary>
+    public void SetDefeatedVisual(bool defeated, bool snap = false)
+    {
+        _targetScale = defeated ? DefeatedScale : Vector3.One;
+        if (!snap) return;
+        Scale = _targetScale;
+        SyncTransform();   // seated on the floor at its new height
+    }
 
     /// <summary>
     /// Sync on displacement: the turn system shoved or dragged the dummy tile

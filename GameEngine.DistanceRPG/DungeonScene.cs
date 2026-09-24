@@ -13,6 +13,14 @@ public enum GameMenu
     None,
     Inventory,
     Pause,
+
+    /// <summary>
+    /// "Leave the dungeon?" — opened by E on the first floor's way out with the
+    /// party gathered, because leaving discards the whole visit (§4.1). E or
+    /// ENTER leaves, ESC stays, and every other key and click does nothing while
+    /// it is up: no member is selected and no bag is opened behind it.
+    /// </summary>
+    ConfirmLeave,
 }
 
 /// <summary>
@@ -21,6 +29,17 @@ public enum GameMenu
 /// would take it now, or why not (OUT OF REACH, NEED 30 MOVE) when it would not.
 /// </summary>
 public readonly record struct ClickCue(string Label, bool Ready);
+
+/// <summary>
+/// What E would do on the stair the active member is standing on (§4.2), for
+/// the cue the HUD draws at it: the stair, the cue — the stair's own verb when
+/// the party may take it (<c>E: DESCEND</c>), or why not (<c>GATHER THE PARTY
+/// - 2 OF 4 HERE</c>) — and whether it is the verb.
+/// </summary>
+public readonly record struct StairPrompt(StairUse Stair, string Cue, bool Ready);
+
+/// <summary>A stair of the floor being played and the slab it is drawn as, for its label.</summary>
+public sealed record StairMarker(StairUse Stair, GameObject Slab);
 
 /// <summary>
 /// A weapon lying where its carrier fell (§3.5): the corpse whose row fixes it,
@@ -46,20 +65,25 @@ public readonly record struct ClickCue(string Label, bool Ready);
 public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker, (int R, int C) Tile);
 
 /// <summary>
-/// The main gameplay scene: a procedurally generated dungeon explored by a
-/// four-character party in turn-based, distance-budgeted combat. The dungeon
-/// is the prototype's exact map (same seed, same generator), reinterpreted in
-/// 3D: floor slab on the XZ plane, extruded wall boxes, angled top-down camera.
+/// The main gameplay scene: one visit to a dungeon (§4.5), played a floor at a
+/// time by a four-character party in turn-based, distance-budgeted combat.
+/// Each floor is a procedurally generated map — floor 1 of the shipped seed is
+/// the prototype's exact dungeon — reinterpreted in 3D: floor slab on the XZ
+/// plane, extruded wall boxes, angled top-down camera.
+/// <para>
+/// <strong>A view of the visit, never its owner.</strong> The campaign and the
+/// visit in it are handed in by the host (<see cref="IRunHost"/>), which rolled
+/// the seed and entered the dungeon; the floors, their rows and their fog are
+/// the visit's (<see cref="DungeonState"/>), the party is the campaign's, and
+/// this scene draws whichever floor the visit stands on. Taking the stairs is a
+/// swap inside it — tear the floor's objects down, move the visit, build the
+/// next floor from what the visit holds — under a short fade, and leaving by the
+/// first floor's way out hands the run back to the host, which starts the next
+/// visit in a scene of its own.
+/// </para>
 /// </summary>
 public class DungeonScene : Scene
 {
-    /// <summary>
-    /// This run's dungeon seed, rolled fresh per scene and logged at startup
-    /// so any map can be reproduced. (Golden tests still pin the prototype's
-    /// shipped seed to guarantee generator parity.)
-    /// </summary>
-    public long MapSeed { get; } = (uint)Random.Shared.NextInt64();
-
     private const float WallHeight = 1.2f;
     private const float FloorThickness = 0.2f;
 
@@ -80,6 +104,21 @@ public class DungeonScene : Scene
     private static readonly Vector4 LevelUpColor = Rgb(0x8cff6b);  // a pool or a ladder crossing a bar (§2.2)
     private static readonly Vector4 LootColor = Rgb(0xffcf5a);     // a weapon on the floor, and the beat when it is taken (§3.5)
 
+    /// <summary>
+    /// Each stair's colour, on its slab and on its label (§4.2): down violet, up
+    /// teal, and the first floor's way out gold — three colours the dungeon's
+    /// palette uses for nothing else, so a stair reads as a stair across a room.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<Stair, Vector4> StairColors = new Dictionary<Stair, Vector4>
+    {
+        [Stair.Down] = Rgb(0x9b6bff),
+        [Stair.Up] = Rgb(0x2ec4b6),
+        [Stair.Exit] = Rgb(0xe8a93a),
+    };
+
+    /// <summary>The colour a stair of this kind is drawn and labelled in.</summary>
+    internal static Vector4 StairColor(Stair kind) => StairColors.GetValueOrDefault(kind, WallColor);
+
     private static readonly Vector4[] PartyColors =
     {
         Rgb(0xe94560), // A
@@ -89,12 +128,11 @@ public class DungeonScene : Scene
     };
 
     /// <summary>
-    /// Party members this scene can spawn: one colour each, and the count
-    /// <see cref="SpawnParty"/> asks the map for spawn tiles for. The roster's
-    /// length is the rule (<see cref="GameConstants.PartySize"/>) and this is the
-    /// presentation's capacity for it; a test asserts the two are equal, because
-    /// a roster longer than this spawns a prefix and drops whoever came last
-    /// without a word.
+    /// Party members this scene can draw: one colour each, by roster position,
+    /// for every member of the campaign's party (<see cref="SpawnParty"/>). The
+    /// roster's length is the rule (<see cref="GameConstants.PartySize"/>) and
+    /// this is the presentation's capacity for it; a test asserts the two are
+    /// equal, because a member with no colour would have no stand-in.
     /// </summary>
     internal static int PartyColorCount => PartyColors.Length;
 
@@ -102,15 +140,35 @@ public class DungeonScene : Scene
     private readonly Game _game;
     private readonly DungeonHud _hud;
 
+    // What this scene is a view of (§6.7): the campaign — the party, the
+    // permanent half, and everything it has met — and the visit in progress,
+    // captured once at construction. The visit is never read back off the
+    // campaign afterwards: the host drops it and enters the next one the moment
+    // this scene hands the run back, while this scene is still fading out.
+    private readonly CampaignState _campaign;
+    private readonly DungeonState _visit;
+    private readonly IRunHost _host;
+
     // The floor being played, and the three parts of it this scene reads most:
     // its map, its fog boxes and its fog, which is the floor's and not the
-    // scene's (§4.5) — the floor keeps what the party explored.
+    // scene's (§4.5) — the floor keeps what the party explored. All four follow
+    // the visit onto whichever floor it stands on (ArriveOnFloor).
     private Floor _floor = null!;
     private MapData _map = null!;
     private FogBoxSet _fogBoxes = null!;
     private FogState _fog = null!;
     private FogOverlayRenderer _fogOverlay = null!;
+
+    // The floor's turn system: the one the visit's OpenTurns returned for the
+    // floor being played (visit.Turns), replaced whole on every arrival.
     private TurnSystem _turns = null!;
+
+    // Every object the floor being played put in the scene that has no list of
+    // its own — its walls, its stair slabs, the fog overlay and the two fog
+    // emitters — so a swap takes all of them down (TearDownFloor). The party's
+    // stand-ins and the map-independent slab are the visit's, and stay.
+    private readonly List<GameObject> _floorObjects = new();
+    private readonly List<StairMarker> _stairMarkers = new();
 
     // Fog particles: mist puffs on reveal (staggered with the ripple) and
     // ambient wisps drifting over explored-but-out-of-view tiles.
@@ -135,18 +193,23 @@ public class DungeonScene : Scene
     private readonly Dictionary<EnemyObject, (int R, int C)> _lastEnemyTile = new();
     private int _activeIdx;
 
-    // What the permanent kills have left on the floor, and what the campaign has
-    // met (§3.3, §3.5). Neither is stored by the floor: the ground items are
-    // re-derived from the enemy rows on entry, and the seen set only ever grows —
-    // seeded from the starting loadout in SpawnParty and added to at every pickup.
-    //
-    // The seen set is campaign-wide by right and scene-wide in fact: one scene is
-    // one floor, so as written it starts empty on every floor. Nothing reads it
-    // before §6.4, so nothing is wrong today, but whoever builds §4.1's floor
-    // persistence owns lifting it out of the scene (and §5.1 owns saving it) —
-    // recorded in docs/roadmap/open-questions.md so the seam belongs to someone.
+    // What the permanent kills have left on the floor being played (§3.5). Not
+    // stored by the floor: re-derived from the enemy rows on every arrival, and
+    // dropped whole on every swap. What the campaign has met (§3.3) is the
+    // campaign's, which outlives this scene and every visit — met at the start
+    // from the loadout (CampaignState.Start) and added to at every pickup.
     private readonly List<GroundItem> _groundItems = new();
-    private readonly CampaignState _campaign = new();
+
+    // The stairs (§4.2): a swap runs under a fade either side of it, and the way
+    // out fades to black and hands the run back to the host. While any of it
+    // runs, presses and the movement they drive are ignored — releases never
+    // are, so a key let go mid-fade is up on arrival.
+    private const float TransitFadeSeconds = 0.25f;
+    private enum Transit { None, FadingOut, FadingIn, Leaving }
+    private Transit _transit;
+    private float _transitClock;
+    private StairUse _transitStair;
+    private bool _runOverSent;
 
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
@@ -162,10 +225,21 @@ public class DungeonScene : Scene
     private const float MaxCameraDistance = 30f;
     private const float CameraFollowRate = 6f;
 
-    public DungeonScene(Camera camera, Game game) : base("DungeonScene")
+    /// <param name="camera">The game's camera, which the scene aims.</param>
+    /// <param name="game">The game window: its size, its shaders, its close.</param>
+    /// <param name="campaign">The campaign, with the visit this scene plays already entered (<see cref="CampaignState.Enter"/>): the party stands at its first floor's arrival.</param>
+    /// <param name="host">Who is told when the run is over (<see cref="IRunHost.RunOver"/>).</param>
+    /// <exception cref="ArgumentException">The campaign has no visit in progress: there is nothing to play.</exception>
+    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host) : base("DungeonScene")
     {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(host);
         _camera = camera;
         _game = game;
+        _campaign = campaign;
+        _visit = campaign.Visit
+            ?? throw new ArgumentException("A dungeon scene plays a visit in progress: enter a dungeon before building one.", nameof(campaign));
+        _host = host;
         _hud = new DungeonHud(game);
     }
 
@@ -178,12 +252,55 @@ public class DungeonScene : Scene
     public IReadOnlyList<EnemyObject> Enemies => _enemies;
     public IReadOnlyList<GroundItem> GroundItems => _groundItems;
     public CampaignState Campaign => _campaign;
+
+    /// <summary>The visit this scene plays: the floor line reads the dungeon and the floor number off it, and never its depth.</summary>
+    public DungeonState Visit => _visit;
+
+    /// <summary>The stairs of the floor being played, each with the slab it is drawn as.</summary>
+    public IReadOnlyList<StairMarker> StairMarkers => _stairMarkers;
+
     public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
     public Vector2 MousePos => _mousePos;
     public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
+
+    /// <summary>True while a stair's fade runs, either side of the swap, or once the party has left: presses are ignored.</summary>
+    public bool Transiting => _transit != Transit.None;
+
+    /// <summary>
+    /// How far the screen has faded to black for the stairs, 0 to 1: up to black
+    /// over <see cref="TransitFadeSeconds"/>, the floor swapped at black, and back
+    /// down over as long again; leaving the dungeon fades up and stays black.
+    /// </summary>
+    public float TransitFade => _transit switch
+    {
+        Transit.FadingOut or Transit.Leaving => Math.Clamp(_transitClock / TransitFadeSeconds, 0f, 1f),
+        Transit.FadingIn => Math.Clamp(1f - _transitClock / TransitFadeSeconds, 0f, 1f),
+        _ => 0f,
+    };
+
+    /// <summary>
+    /// What E would do right now on the stair the active member is standing on,
+    /// or null: off every stair, with a menu open, during a fade, or outside the
+    /// player phase — when E does nothing and there is nothing to say. The rule
+    /// is the visit's (<see cref="DungeonState.CanUse"/>); the words are the HUD's.
+    /// </summary>
+    public StairPrompt? ActiveStairPrompt
+    {
+        get
+        {
+            if (Transiting || AnyMenuOpen || _turns.Phase != TurnPhase.Player) return null;
+            var active = ActiveCharacter.State;
+            if (_visit.StairUnder(active) is not { } stair) return null;
+
+            var party = _campaign.Party;
+            var refusal = _visit.CanUse(stair, party, active);
+            string? cue = DungeonHud.StairCue(stair, refusal, _visit.Gathered(party, stair.Tile), LivingMembers());
+            return cue is null ? null : new StairPrompt(stair, cue, refusal is null);
+        }
+    }
 
     // What each member banked at the last turn's end (TurnEnded): the bonus
     // its turn start adds to the base allowance before Mire cuts the whole.
@@ -233,19 +350,22 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// True while the party marches freely. Marching is granted only at the
-    /// start of a turn — no live enemy visible and the party regrouped within
-    /// each member's max movement of the leader — and once revoked (a live
-    /// enemy sighted) stays off for the rest of the turn. This keeps a split
-    /// party from charging back into formation the moment line of sight to
-    /// the enemy breaks mid-fight.
+    /// start of a turn, or on arriving on a floor — no live enemy visible and
+    /// the party regrouped within each member's max movement of the leader —
+    /// and once revoked (a live enemy sighted) stays off for the rest of the
+    /// turn. This keeps a split party from charging back into formation the
+    /// moment line of sight to the enemy breaks mid-fight; a party that has
+    /// just taken the stairs is together by construction, having gathered to
+    /// take them.
     /// </summary>
     public bool Marching => _turns.Phase == TurnPhase.Player
         && _marchingThisTurn
         && !_turns.AnyLiveEnemySeenThisTurn;
 
     /// <summary>
-    /// The turn-start marching decision: needs the enemy dead or out of view
-    /// and every living member within their own max movement of the leader.
+    /// The turn-start (and floor-arrival) marching decision: needs the enemy
+    /// dead or out of view and every living member within their own max
+    /// movement of the leader.
     /// </summary>
     private void EvaluateMarchingForTurn()
     {
@@ -266,40 +386,23 @@ public class DungeonScene : Scene
     }
     public Vector4 PartyColor(int idx) => PartyColors[idx];
 
+    /// <summary>
+    /// The first floor, entered: the same path every arrival takes
+    /// (<see cref="ArriveOnFloor"/>) without a floor to leave first. The visit
+    /// was entered by the host, so the floors exist and the party already stands
+    /// around the first floor's arrival tile — the dungeon the scene has always
+    /// generated, tile for tile, when the seed is the shipped one (floor 0's
+    /// seed is the map seed itself).
+    /// </summary>
     public override void Initialize()
     {
         base.Initialize();
 
-        Log.Info($"[Map] Generating dungeon with seed {MapSeed}");
-        // The first floor of the tutorial, built by Logic (§4.5): its map, fog
-        // boxes, fog, enemy rows and stairs are a pure function of the seed, and
-        // floor 0's seed is MapSeed itself, so this is the dungeon the scene has
-        // always generated, tile for tile. Moving between floors is the visit's.
-        var dungeon = GameContent.Current.Dungeons.Tutorial;
-        _floor = Floor.Generate(MapSeed, 0, bottom: DungeonState.RollBossFloor(MapSeed, dungeon) == 1, dungeon);
-        _map = _floor.Map;
-        _fogBoxes = _floor.FogBoxes;   // built with the floor, which expanded _map.Corridors in place
-        _fog = _floor.Fog;
-        Log.Info($"[Map] Floor 1 of {dungeon.Name}: up-stairs (the way out) at {_floor.UpStairs}, "
-            + (_floor.DownStairs is { } down ? $"down-stairs at {down}" : "no way down"));
-
-        BuildFloor();
-        BuildWalls();
+        BuildFloor();   // the map-independent slab every floor of the visit stands on
         SpawnParty();
-        SpawnEnemies();
-        BuildFogOverlay();   // after all geometry: its translucent pass blends over everything
-        BuildFogParticles(); // after the fog overlay: mist blends over the shroud
-        WireTurnSystem();
-        RederiveGroundItems();   // after the turn system: what a permanent kill left here is read back off the enemy rows (§3.5)
+        ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20));
         WireInput();
 
-        // Initial fog reveal around the party, and hide the enemy if fogged.
-        foreach (var member in _party)
-            UpdateFogFor(member);
-        UpdateEnemyVisibility();
-        EvaluateMarchingForTurn(); // the first turn starts without a PlayerTurnStarted event
-
-        _cameraTarget = ActiveCharacter.Position;
         _camera.Yaw = -90f;   // face -Z (up the map)
         _camera.Pitch = -60f; // angled top-down
         _camera.Far = 300f;
@@ -309,8 +412,11 @@ public class DungeonScene : Scene
     {
         base.Update(deltaTime);
 
-        _turns.Update(deltaTime);
+        AdvanceTransit(deltaTime);
         _hud.Update(deltaTime);
+        if (_transit == Transit.Leaving) return;   // the run is over here: nothing moves while the host takes over
+
+        _turns.Update(deltaTime);
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
         UpdateMarchingFollowers(deltaTime);
@@ -362,8 +468,132 @@ public class DungeonScene : Scene
         base.Shutdown();
     }
 
+    // ── The floor being played ───────────────────────────────────────────────
+    //
+    // One visit, many floors, one scene (§4.5): taking the stairs tears the
+    // floor's objects down and builds the next floor's from what the visit
+    // holds, in the order below. The order is the design — each step reads what
+    // the one before it left:
+    //
+    //   1. fade out, then TearDownFloor  — every object and every cache of the floor left
+    //   2. the visit moves               — Descend/Ascend place everyone, OpenTurns catches the floor up
+    //   3. BuildFloorObjects             — walls, stairs, the enemies from their rows, the fog, its emitters
+    //   4. the party's stand-ins synced  — the fallen included: they were carried
+    //   5. WireTurnSystem                — every handler, on the new floor's system only
+    //   6. RederiveGroundItems           — what a permanent kill left here, off the rows
+    //   7. RevealArrival                 — lit only where the party now stands
+    //   8. marching, the camera, the banner, and the fade back in
+    //
+    // Initialize is steps 3 to 8 for the first floor, with nothing to leave.
+
+    /// <summary>
+    /// Play the floor the visit now stands on — steps 3 to 8 above — with
+    /// <paramref name="turns"/>, the system the visit's
+    /// <see cref="DungeonState.OpenTurns"/> returned for it. That system comes
+    /// back with the floor already caught up (§4.1: a dummy whose wait ran out
+    /// while the party was elsewhere is up and standing where it woke), so the
+    /// enemy stand-ins are built from the rows as they now are and nothing here
+    /// waits for a revival event: those fired before any handler was wired, to
+    /// nobody, and nobody was there to see them.
+    /// </summary>
+    private void ArriveOnFloor(TurnSystem turns)
+    {
+        _floor = _visit.Current;
+        _map = _floor.Map;
+        _fogBoxes = _floor.FogBoxes;   // built with the floor, which expanded _map.Corridors in place
+        _fog = _floor.Fog;
+        Log.Info($"[Map] {_visit.Def.Name}, floor {_floor.Index + 1}: " + string.Join(", ",
+            DungeonState.StairsOf(_floor).Select(s => $"{s.Kind} at {s.Tile}"))
+            + $"; turn {turns.TurnCount}");
+
+        BuildFloorObjects();
+        foreach (var member in _party)
+            member.SyncTransform();
+        WireTurnSystem(turns);
+        RederiveGroundItems();
+        RevealArrival();
+
+        EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
+        _cameraTarget = ActiveCharacter.Position;
+        _hud.ShowArrival(_visit);
+    }
+
+    /// <summary>
+    /// Step 1: take down everything the floor being left put in the scene, and
+    /// forget everything cached about it — the party's stand-ins and the slab
+    /// stay. <strong>Every per-floor cache belongs on this list</strong>: one
+    /// keyed by a kept object (a member) or holding the old floor's coordinates
+    /// survives the swap otherwise and acts on the wrong map — the marching
+    /// trail would walk the followers into the new floor's walls, a fog tile
+    /// remembered for a member would skip their reveal, a wisp would drift over
+    /// the next floor, a floating number would hang where nothing is.
+    /// </summary>
+    private void TearDownFloor()
+    {
+        foreach (var obj in _floorObjects)
+            RemoveGameObject(obj);
+        _floorObjects.Clear();
+        _stairMarkers.Clear();
+        foreach (var enemy in _enemies)
+            RemoveGameObject(enemy);
+        _enemies.Clear();
+        foreach (var item in _groundItems)
+            RemoveGameObject(item.Marker);
+        _groundItems.Clear();
+
+        _pendingMistBursts.Clear();
+        _hud.ClearFloatingTexts();
+        _lastEnemyTile.Clear();
+        _riderLevels.Clear();
+        _lastFogTile.Clear();
+        HoveredEnemy = null;
+        HoveredMember = null;
+        HoverCue = null;
+        AimCue = null;
+        AimCaught = Array.Empty<ActorState>();
+        _march.Reset();
+        _marchLeader = null;
+        _wasMarching = false;
+    }
+
+    /// <summary>
+    /// Step 3, in the order the scene has always built a floor: the walls, the
+    /// stair slabs, the enemies' stand-ins, then the fog overlay — after all the
+    /// geometry, so its translucent pass blends over everything — and its mist
+    /// and wisps after that, so they blend over the shroud.
+    /// </summary>
+    private void BuildFloorObjects()
+    {
+        BuildWalls();
+        BuildStairs();
+        SpawnEnemies();
+        BuildFogOverlay();
+        BuildFogParticles();
+    }
+
+    /// <summary>
+    /// Step 7: the floor is lit only where the party now stands. A floor
+    /// returned to still holds the sight it had when the party left it, and
+    /// read as it is that stale sight would arm the zones of the enemies it
+    /// showed and price a swap at 20 for dummies nobody can see — so visibility
+    /// is cleared first (the explored memory stays: it is the floor's), then
+    /// revealed around each living member without the ripple, the reset
+    /// <see cref="ResetFogVisibility"/> makes at a turn's end, less its refog.
+    /// </summary>
+    private void RevealArrival()
+    {
+        _fog.ResetVisibility();
+        _lastFogTile.Clear();   // a member arriving on the (row, column) it left on the other map is revealed, not skipped
+        foreach (var member in _party)
+            if (member.State.Alive)
+                UpdateFogFor(member, animate: false);
+        _fogOverlay.MarkDirty();
+        UpdateEnemyVisibility();
+    }
+
     // ── Setup ────────────────────────────────────────────────────────────────
 
+    /// <summary>The floor slab under the whole map: every floor of a visit is the same 70 x 50, so it is built once and kept across swaps.</summary>
     private void BuildFloor()
     {
         float w = MapGenerator.Cols * WorldSpace.UnitsPerTile;
@@ -371,6 +601,13 @@ public class DungeonScene : Scene
         var floor = new PrimitiveBoxObject(w, FloorThickness, d, FloorColor);
         floor.Position = new Vector3(w / 2f, -FloorThickness / 2f, d / 2f);
         AddGameObject(floor);
+    }
+
+    /// <summary>An object the floor being played owns: added to the scene, and taken down with the floor.</summary>
+    private void AddFloorObject(GameObject obj)
+    {
+        AddGameObject(obj);
+        _floorObjects.Add(obj);
     }
 
     private void BuildWalls()
@@ -384,37 +621,51 @@ public class DungeonScene : Scene
                 (rect.X + rect.W / 2f) * WorldSpace.UnitsPerTile,
                 WallHeight / 2f,
                 (rect.Y + rect.H / 2f) * WorldSpace.UnitsPerTile);
-            AddGameObject(wall);
+            AddFloorObject(wall);
+        }
+    }
+
+    /// <summary>A stair's slab: a flat square filling most of its tile, low enough to walk over and to sit under a dummy standing on it.</summary>
+    private const float StairSlabWidth = 0.9f;
+    private const float StairSlabHeight = 0.06f;
+
+    /// <summary>
+    /// One slab per stair the visit says this floor holds
+    /// (<see cref="DungeonState.StairsOf"/>), in the stair's colour — the kinds
+    /// are the visit's, never restated here. Built before the enemies: a dummy
+    /// may stand on the stairs from the start (the stair draw never reads the
+    /// rows), and the slab is then drawn under it, guarding the stairs rather
+    /// than sealing them. Under the fog like the walls: unseen, it is black;
+    /// explored, it shows through the shroud, labelled (the HUD's).
+    /// </summary>
+    private void BuildStairs()
+    {
+        foreach (var stair in DungeonState.StairsOf(_floor))
+        {
+            var slab = new PrimitiveBoxObject(StairSlabWidth, StairSlabHeight, StairSlabWidth, StairColor(stair.Kind))
+            {
+                Position = WorldSpace.TileCenter(stair.Tile.R, stair.Tile.C, StairSlabHeight / 2f),
+            };
+            AddFloorObject(slab);
+            _stairMarkers.Add(new StairMarker(stair, slab));
         }
     }
 
     /// <summary>
-    /// The party the roster describes, in file order (§2.1, §5.9): one member per
-    /// row, each built by <see cref="PartyMemberState.From"/> so the spread, the
-    /// equipped weapon and the bag all come off the same content the validator
-    /// checked. The scene supplies only what is the scene's — where they stand
-    /// and what colour they are.
+    /// A stand-in for every member of the campaign's party, in roster order
+    /// (§2.1, §5.9) — one colour each by position. The members are the
+    /// campaign's: built once for the whole campaign
+    /// (<see cref="CampaignState.Start"/>), their loadout already met, and stood
+    /// where the visit put them. The scene supplies only what is the scene's —
+    /// the box and its colour. Built once per scene and kept across every swap:
+    /// the party is the one thing every floor of the visit shares.
     /// </summary>
     private void SpawnParty()
     {
-        var roster = GameContent.Current.Party.All;
-        var tiles = GridUtils.FindPartySpawnTiles(
-            _map.Grid, _map.PlayerStart.Row, _map.PlayerStart.Col, GameConstants.PartySize);
-
-        for (int i = 0; i < tiles.Count; i++)
+        var members = _campaign.Party;
+        for (int i = 0; i < members.Count; i++)
         {
-            var state = PartyMemberState.From(
-                roster[i], i,
-                tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
-                tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f);
-
-            // The loadout is met the moment it is handed over (§3.3): "whenever a
-            // weapon carrying one enters your inventory" is a rule about the bag,
-            // not about the floor, and a party that starts with a Renewal staff
-            // has met regeneration however it came by it.
-            _campaign.See(state);
-
-            var character = new CharacterObject(state, PartyColors[i]);
+            var character = new CharacterObject(members[i], PartyColors[i]);
             _party.Add(character);
             AddGameObject(character);
         }
@@ -423,22 +674,28 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// One stand-in per enemy row of the floor. The rows are the floor's
-    /// (<see cref="Floor.Enemies"/>): EnemyPlacer decided positions and weapons
-    /// off the floor's seed on its own stream, and each row keeps the index it
-    /// was placed at (§3.2's <see cref="EnemyState.SpawnIndex"/>), which seeds its
-    /// drop and its revival ladder. The scene supplies only what is the scene's —
-    /// the box and its colour.
+    /// One stand-in per enemy row of the floor, built from the row as it is now.
+    /// The rows are the floor's (<see cref="Floor.Enemies"/>): EnemyPlacer decided
+    /// positions and weapons off the floor's seed on its own stream, each keeps
+    /// the index it was placed at (§3.2's <see cref="EnemyState.SpawnIndex"/>),
+    /// and whatever happened to them while the party was here — or, for a dummy
+    /// whose wait ran out, while it was elsewhere — is on them. A row that is
+    /// down is built as the corpse it is: grey and already lying on the floor,
+    /// not a full-size box with no plate that nothing can click and anyone can
+    /// walk through. The scene supplies only what is the scene's — the box and
+    /// its colour.
     /// </summary>
     private void SpawnEnemies()
     {
         foreach (var state in _floor.Enemies)
         {
-            var enemy = new EnemyObject(state, EnemyColor);
+            var enemy = new EnemyObject(state, state.Alive ? EnemyColor : DeadColor);
+            if (!state.Alive)
+                enemy.SetDefeatedVisual(true, snap: true);
             _enemies.Add(enemy);
             AddGameObject(enemy);
         }
-        Log.Info($"[Map] Spawned {_enemies.Count} enemies across {_map.DebugRooms.Count} rooms");
+        Log.Info($"[Map] {_enemies.Count(e => e.State.Alive)} of {_enemies.Count} enemies standing across {_map.DebugRooms.Count} rooms");
     }
 
     private void BuildFogOverlay()
@@ -447,7 +704,7 @@ public class DungeonScene : Scene
         _fogOverlay = fogObject.AddComponent<FogOverlayRenderer>();
         _fogOverlay.Fog = _fog;
         _fogOverlay.Height = WallHeight + 0.05f;
-        AddGameObject(fogObject);
+        AddFloorObject(fogObject);
     }
 
     // Added after the fog overlay so the mist blends over the shroud.
@@ -469,7 +726,7 @@ public class DungeonScene : Scene
         mist.EndColor = new Vector4(0.24f, 0.24f, 0.30f, 0f);     // thins toward gray as it fades
         mist.Drag = 1.2f;
         mist.Gravity = new Vector3(0f, 0.25f, 0f); // gentle updraft as the fog dissipates
-        AddGameObject(mistObject);
+        AddFloorObject(mistObject);
 
         var wispObject = new TransformNodeObject();
         _wispEmitter = wispObject.AddComponent<ParticleEmitter>();
@@ -487,17 +744,20 @@ public class DungeonScene : Scene
         wisp.EndColor = new Vector4(0.10f, 0.10f, 0.14f, 0f);
         wisp.Drag = 0.4f;
         wisp.Gravity = new Vector3(0f, 0.05f, 0f);
-        AddGameObject(wispObject);
+        AddFloorObject(wispObject);
     }
 
-    private void WireTurnSystem()
+    /// <summary>
+    /// Step 5: take up <paramref name="turns"/> — the system the visit opened on
+    /// the floor being played, built by the visit with the floor's own seed (so
+    /// no two floors share a drop or a revival ladder, §3.2) and on its one
+    /// clock — and wire every handler to it. The previous floor's system was
+    /// dropped by the visit on the stairs, and its subscriptions die with it:
+    /// nothing is unsubscribed because nothing will raise them again.
+    /// </summary>
+    private void WireTurnSystem(TurnSystem turns)
     {
-        // The floor's own generation seed goes in with the roster: the revival
-        // ladder (§3.2) is drawn off mapSeed ^ ReviveSalt, per enemy and per
-        // cycle, so a farm replays identically from a save that restored it —
-        // and every floor's seed is its own, so no two floors share a ladder.
-        _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(),
-            _enemies.Select(e => e.State).ToList(), RollD20, _floor.Seed);
+        _turns = turns;
 
         _turns.TurnEnded += saved =>
         {
@@ -704,7 +964,8 @@ public class DungeonScene : Scene
 
         // KeyPressed fires once per physical press (the engine routes OS
         // auto-repeat to KeyRepeated), so one-shot actions like Tab-cycling
-        // never machine-gun while held.
+        // never machine-gun while held. Every press below does nothing while a
+        // stair's fade runs (Transiting); the releases above never wait on it.
         //
         // Number keys, 1 to HighestSlotKey, all through one routed handler
         // (NumberKey): they equip bag slots while the bag is open, pick a
@@ -714,18 +975,24 @@ public class DungeonScene : Scene
             int pressed = digit;
             input.SubscribeToKeyPressed(_ => NumberKey(pressed), Keys.D0 + pressed);
         }
-        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) CycleActiveCharacter(); }, Keys.Tab);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) CycleActiveCharacter(); }, Keys.Tab);
 
-        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
+        // Space ends the turn and nothing else; ENTER is routed by the menu open
+        // — it ends the turn with none, and says yes to leaving the dungeon.
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) _turns.EndTurn(); }, Keys.Space);
+        input.SubscribeToKeyPressed(_ => EnterKey(), Keys.Enter, Keys.KeyPadEnter);
+        // E takes the stairs the active member is standing on (§4.2), and says
+        // yes to leaving when the way out has asked.
+        input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
         // G takes what the active member is standing on (§3.5).
-        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) PickUp(); }, Keys.G);
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) PickUp(); }, Keys.G);
         // O holds fire: a ranged weapon with Overwatch banks its shot against
         // whatever walks into reach on the enemy turn. The member says so — the
         // readout then shows the shots held — or says why it cannot.
         input.SubscribeToKeyPressed(_ =>
         {
-            if (AnyMenuOpen) return;
+            if (AnyMenuOpen || Transiting) return;
             var state = ActiveCharacter.State;
             if (_turns.TryOverwatch(state))
             {
@@ -741,7 +1008,7 @@ public class DungeonScene : Scene
         // no aim. The other three are aimed by a click on the floor or on an enemy.
         input.SubscribeToKeyPressed(_ =>
         {
-            if (AnyMenuOpen) return;
+            if (AnyMenuOpen || Transiting) return;
             var state = ActiveCharacter.State;
             var wand = state.EquippedWeapon;
             if (wand?.AreaShape?.Kind != AreaShapeKind.Nova) return;
@@ -781,11 +1048,13 @@ public class DungeonScene : Scene
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
     /// printed with that number into the hand — 1 is the hand itself; on the
     /// pause menu, 1 closes it, 2 exits and 3 is the dev stop; with no menu
-    /// open, 1-4 select a party member. Behind any other menu a number key does
-    /// nothing at all — it never selects a member behind a prompt.
+    /// open, 1-4 select a party member. Behind any other menu — the way out's
+    /// "leave the dungeon?" among them — a number key does nothing at all: it
+    /// never selects a member behind a prompt. Nor during a stair's fade.
     /// </summary>
     private void NumberKey(int digit)
     {
+        if (Transiting) return;
         if (PauseMenuOpen)
         {
             if (digit == 1) ActiveMenu = GameMenu.None;
@@ -825,18 +1094,29 @@ public class DungeonScene : Scene
         }
     }
 
+    /// <summary>
+    /// I opens the bag and closes it — from no menu or from the bag only, so it
+    /// never swaps a prompt (the pause menu, "leave the dungeon?") for the bag
+    /// behind the player's back — and never during a stair's fade or on the
+    /// game-over screen.
+    /// </summary>
     private void ToggleInventory()
     {
-        if (_turns.Phase == TurnPhase.GameOver || PauseMenuOpen) return;
+        if (Transiting || _turns.Phase == TurnPhase.GameOver) return;
+        if (ActiveMenu is not (GameMenu.None or GameMenu.Inventory)) return;
         ActiveMenu = InventoryOpen ? GameMenu.None : GameMenu.Inventory;
     }
 
     /// <summary>
-    /// Escape closes whatever menu is open, or opens the pause menu. Only on
-    /// the game-over screen is it left unconsumed, so the game quits directly.
+    /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
+    /// no — or opens the pause menu. During a stair's fade, and once the party
+    /// has left, it is swallowed: nothing opens over a floor being swapped, and
+    /// nothing quits a run on its way to the next. Only on the game-over screen
+    /// is it left unconsumed, so the game quits directly.
     /// </summary>
     public bool HandleEscape()
     {
+        if (Transiting) return true;
         if (_turns.Phase == TurnPhase.GameOver) return false;
         ActiveMenu = AnyMenuOpen ? GameMenu.None : GameMenu.Pause;
         return true;
@@ -860,7 +1140,7 @@ public class DungeonScene : Scene
 
     private void UpdateActiveCharacterMovement(float deltaTime)
     {
-        if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
+        if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
 
         var state = ActiveCharacter.State;
         if (!state.Alive || state.DistLeft <= 0f) return;
@@ -926,6 +1206,152 @@ public class DungeonScene : Scene
         _turns.NotifyCharacterMoved(state); // spear enemies brace against walk-ins
     }
 
+    // ── The stairs ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// E (§4.2): take the stairs the active member is standing on. Whether the
+    /// party may is the visit's to say (<see cref="DungeonState.CanUse"/>) — the
+    /// player phase, and every living member gathered — and no enemy count
+    /// enters into it (§4.4: no gate). With a menu open, during a fade, or
+    /// outside the player phase it does nothing and says nothing, and off every
+    /// stair it does nothing; with the party short it says how short. Down and
+    /// up fade and swap the floor; the way out asks first, and under that
+    /// prompt E is the yes.
+    /// </summary>
+    private void StairKey()
+    {
+        if (Transiting) return;
+        if (ActiveMenu == GameMenu.ConfirmLeave)
+        {
+            Leave();
+            return;
+        }
+        if (AnyMenuOpen || _turns.Phase != TurnPhase.Player) return;
+
+        var active = ActiveCharacter.State;
+        if (_visit.StairUnder(active) is not { } stair) return;
+
+        var party = _campaign.Party;
+        var refusal = _visit.CanUse(stair, party, active);
+        if (refusal is not null)
+        {
+            if (DungeonHud.StairCue(stair, refusal, _visit.Gathered(party, stair.Tile), LivingMembers()) is { } why)
+                SayRefusal(ActiveCharacter, new ClickCue(why, false));
+            return;
+        }
+
+        if (stair.Kind == Stair.Exit)
+            ActiveMenu = GameMenu.ConfirmLeave;
+        else
+            BeginTransit(stair);
+    }
+
+    /// <summary>ENTER, routed by the menu that is open: the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
+    private void EnterKey()
+    {
+        if (Transiting) return;
+        if (ActiveMenu == GameMenu.ConfirmLeave)
+            Leave();
+        else if (!AnyMenuOpen)
+            _turns.EndTurn();
+    }
+
+    /// <summary>The living members: the party's size as far as gathering at the stairs goes, the fallen being carried.</summary>
+    private int LivingMembers() => _campaign.Party.Count(member => member.Alive);
+
+    /// <summary>
+    /// Start down or up <paramref name="stair"/>: the screen fades to black over
+    /// <see cref="TransitFadeSeconds"/>, the floor is swapped at black
+    /// (<see cref="TakeStairs"/>), and the new floor fades in over as long again.
+    /// Nothing is pressed and nobody walks while it runs.
+    /// </summary>
+    private void BeginTransit(StairUse stair)
+    {
+        Log.Info($"[Stairs] {ActiveCharacter.State.Id} leads the party {(stair.Kind == Stair.Down ? "down" : "up")} from floor {_floor.Index + 1}");
+        _transitStair = stair;
+        _transit = Transit.FadingOut;
+        _transitClock = 0f;
+    }
+
+    /// <summary>
+    /// The stairs' clock, once a frame: the fade out, the swap at black, the fade
+    /// in; and, once the party has left, the fade to black after which the run
+    /// is handed back to the host — once, whatever happens to this scene after.
+    /// </summary>
+    private void AdvanceTransit(float deltaTime)
+    {
+        switch (_transit)
+        {
+            case Transit.FadingOut:
+                _transitClock += deltaTime;
+                if (_transitClock < TransitFadeSeconds) return;
+                TakeStairs(_transitStair);
+                _transit = Transit.FadingIn;
+                _transitClock = 0f;
+                return;
+
+            case Transit.FadingIn:
+                _transitClock += deltaTime;
+                if (_transitClock < TransitFadeSeconds) return;
+                _transit = Transit.None;
+                _transitClock = 0f;
+                return;
+
+            case Transit.Leaving:
+                _transitClock = MathF.Min(_transitClock + deltaTime, TransitFadeSeconds);
+                if (_transitClock < TransitFadeSeconds || _runOverSent) return;
+                _runOverSent = true;
+                _host.RunOver();
+                return;
+        }
+    }
+
+    /// <summary>
+    /// The swap, at black — steps 1 to 8 of the floor's lifecycle, in order:
+    /// the floor left is taken down, the visit moves the party (every member,
+    /// the fallen included) and opens the next floor caught up, and that floor is
+    /// built from what the visit holds. Asked of the visit once more first:
+    /// nothing can have moved under the fade, but a refusal here swaps nothing
+    /// and the fade simply comes back up on the floor the party never left.
+    /// </summary>
+    private void TakeStairs(StairUse stair)
+    {
+        var party = _campaign.Party;
+        var active = ActiveCharacter.State;
+        if (_visit.StairUnder(active) != stair || _visit.CanUse(stair, party, active) is not null)
+        {
+            Log.Warn($"[Stairs] The {stair.Kind} stairs at {stair.Tile} were no longer the party's to take: nothing moved");
+            return;
+        }
+
+        TearDownFloor();
+        if (stair.Kind == Stair.Down)
+            _visit.Descend(party, active);
+        else
+            _visit.Ascend(party, active);
+        ArriveOnFloor(_visit.OpenTurns(party, RollD20));
+    }
+
+    /// <summary>
+    /// The yes to "leave the dungeon?": the party walks out of the first floor's
+    /// way out, the screen fades to black, and the run is handed back to the
+    /// host (<see cref="IRunHost.RunOver"/>), which discards this visit whole —
+    /// every floor, every row, every farm (§4.1) — and begins the next. The way
+    /// out is asked of the visit again first; nothing can have moved under the
+    /// prompt, but if it has the prompt is simply withdrawn.
+    /// </summary>
+    private void Leave()
+    {
+        ActiveMenu = GameMenu.None;
+        var active = ActiveCharacter.State;
+        if (_visit.StairUnder(active) is not { Kind: Stair.Exit } exit || _visit.CanUse(exit, _campaign.Party, active) is not null)
+            return;
+
+        Log.Info($"[Run] The party leaves {_visit.Def.Name} at turn {_turns.TurnCount}: the visit is discarded whole");
+        _transit = Transit.Leaving;
+        _transitClock = 0f;
+    }
+
     // ── Marching formation ───────────────────────────────────────────────────
 
     /// <summary>
@@ -936,6 +1362,7 @@ public class DungeonScene : Scene
     /// </summary>
     private void UpdateMarchingFollowers(float deltaTime)
     {
+        if (Transiting) return;   // the stairs place everyone; nobody walks while they do
         if (!Marching)
         {
             _wasMarching = false;
@@ -987,7 +1414,10 @@ public class DungeonScene : Scene
     /// </summary>
     private void AutoEndTurnWhenDry()
     {
-        if (!Marching || AnyMenuOpen) return; // Marching implies the player phase
+        // Marching implies the player phase. Never mid-fade: the stairs are
+        // taken in the player phase, and a turn ended under the fade would leave
+        // them nobody's to take.
+        if (Transiting || !Marching || AnyMenuOpen) return;
 
         // Budgets deplete through float math and may stop just shy of zero;
         // treat anything below a hair's width as dry (a full budget is 160).
@@ -1035,7 +1465,7 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (AnyMenuOpen) return;
+        if (AnyMenuOpen || Transiting) return;
 
         // The HUD party list doubles as buttons and wins over world picking.
         if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))
@@ -1226,7 +1656,8 @@ public class DungeonScene : Scene
     /// the cursor — a Nova's around the caster wherever the mouse is — and in
     /// every wand case the bodies the shape would catch. The turn system's own
     /// gates decide whether a cue is ready; the reasons only explain its
-    /// refusals. Only in the player phase with no menu open.
+    /// refusals. Only in the player phase with no menu open and no stair's fade
+    /// running.
     /// </summary>
     private void UpdateHover()
     {
@@ -1235,7 +1666,7 @@ public class DungeonScene : Scene
         HoverCue = null;
         AimCue = null;
         AimCaught = Array.Empty<ActorState>();
-        if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
+        if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
         if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out _)) return;
         if (!TryMouseRay(out var origin, out var dir)) return;
 
@@ -1418,14 +1849,15 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// The ground item the active member is standing on — what <c>G</c> would
-    /// take — or null: outside the player phase, with a menu open, or standing
-    /// anywhere else. Tile equality, not reach: you pick up what is under you.
+    /// take — or null: outside the player phase, with a menu open, during a
+    /// stair's fade, or standing anywhere else. Tile equality, not reach: you
+    /// pick up what is under you.
     /// </summary>
     public GroundItem? PickupTarget
     {
         get
         {
-            if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return null;
+            if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return null;
             var tile = LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y);
             return _groundItems.FirstOrDefault(item => item.Tile == tile);
         }
@@ -1460,10 +1892,12 @@ public class DungeonScene : Scene
     /// carried, and nothing stored that — the enemy row and the floor's seed
     /// re-derive the identical item.
     /// <para>
-    /// Read at floor entry, where on a first visit nothing is dead and it places
-    /// nothing (a loaded floor, §5.1, is what it is for), and again the moment
-    /// resurrection stops, because that is the other way a corpse becomes one
-    /// that is offering rather than one that is going to get up.
+    /// Read on every arrival — on a first visit nothing is dead and it places
+    /// nothing; on a floor returned to after resurrection stopped, every corpse
+    /// left there is lying on its weapon again, re-derived rather than
+    /// remembered (and a loaded floor, §5.1, is the same case) — and again the
+    /// moment resurrection stops, because that is the other way a corpse becomes
+    /// one that is offering rather than one that is going to get up.
     /// </para>
     /// </summary>
     private void RederiveGroundItems()
@@ -1507,20 +1941,26 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Scaffolding (§3.5), and labelled as such where it is drawn: killing the
-    /// boss is what stops resurrection (§4.3), and until Phase 4 has one there is
-    /// no way to reach the drop path in play. One-way, like the boss kill it
-    /// stands in for, and it goes when the boss arrives.
+    /// boss is what stops resurrection (§4.3), and until the boss exists this is
+    /// the only way to reach the drop path in play. It goes through the seam the
+    /// boss's death will call — the visit records the boss as fallen
+    /// (<see cref="DungeonState.RecordBossDefeated"/>) — so it holds on every
+    /// floor for the rest of the visit, rather than lapsing with the floor's
+    /// turn system at the next stairs, where a floor reopened with resurrection
+    /// on would take back the drops it had just laid and its catch-up would
+    /// raise their corpses. One-way, like the boss kill it stands in for, and it
+    /// goes when the boss arrives.
     /// </summary>
     private void StopResurrection()
     {
-        if (!_turns.ResurrectionActive) return;
-        _turns.ResurrectionActive = false;
+        if (_visit.BossDefeated) return;
+        _visit.RecordBossDefeated();
         ActiveMenu = GameMenu.None;
         // Whatever was already down is now a corpse that stays down, and a corpse
-        // that stays down is carrying its weapon on the floor: the same rule the
-        // floor entry reads, applied the moment it starts being true.
+        // that stays down is carrying its weapon on the floor: the same rule every
+        // arrival reads, applied the moment it starts being true.
         RederiveGroundItems();
-        Log.Info("[Dev] Resurrection stopped: every defeat from here is permanent and hands over what the dummy was carrying");
+        Log.Info($"[Dev] Resurrection stopped for the rest of the visit, as if the boss fell at turn {_visit.BossDefeatedAtTurn}: every defeat from here is permanent and hands over what the dummy was carrying");
     }
 
     /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>
