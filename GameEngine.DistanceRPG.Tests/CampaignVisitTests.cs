@@ -111,6 +111,21 @@ public class CampaignVisitTests
     }
 
     [Fact]
+    public void StartTakesOnlyTheCurrentContent()
+    {
+        // A member is built under the current content — its weapons out of the
+        // current catalogue, its bag sized by the current tuning — so a roster
+        // read from any other content would be one content's rows carrying
+        // another's weapons. The campaign refuses to start that party rather than
+        // build it half and half.
+        var other = GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);
+        Assert.NotSame(GameContent.Current, other);
+        Assert.Throws<ArgumentException>(() => CampaignState.Start(other));
+        Assert.Throws<ArgumentNullException>(() => CampaignState.Start(null!));
+        Assert.Equal(GameConstants.PartySize, CampaignState.Start(GameContent.Current).Party.Count);
+    }
+
+    [Fact]
     public void TheSeenSetOutlivesEveryFloorAndEveryVisit()
     {
         // open-questions.md's "Where CampaignState lives", resolved: the seen set

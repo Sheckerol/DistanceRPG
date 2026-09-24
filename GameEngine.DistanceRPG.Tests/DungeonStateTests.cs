@@ -639,6 +639,75 @@ public class DungeonStateTests
     }
 
     [Fact]
+    public void TheStairsAreTakenFromTheStairTile()
+    {
+        // The stairs are used with the active member standing on them and the
+        // living party gathered. Handed the active member, the visit holds the
+        // first half as well as the second, so a stair is never taken from beside
+        // it: this seed's spear dummy stands on the first floor's down-stairs, and
+        // a party gathered round it is gathered, but nobody stands on the stairs,
+        // so they wait until the dummy falls — it guards them and never seals them.
+        var party = Party(Maul());
+        var visit = DungeonState.Enter(Tutorial, GuardedStairsSeed, party);
+        var first = visit.Current;
+        var stairs = first.DownStairs!.Value;
+        Assert.Equal((19, 4), stairs);
+        var guard = Row(first, 9, "phalanx_spear");
+        Assert.Equal(stairs, TileOf(guard));
+        var down = new StairUse(Stair.Down, stairs);
+        var turns = visit.OpenTurns(party, Ten);
+
+        // Gathered round the live guard: all four within reach, none on the stairs.
+        Gather(visit, party, stairs);
+        Assert.Equal(party.Length, visit.Gathered(party, stairs));
+        Assert.All(party, m => Assert.Null(visit.StairUnder(m)));
+        Assert.Null(visit.CanUse(down, party));             // the party's half alone is met...
+        foreach (var member in party)                       // ...and nobody stands on them to take them
+            Assert.Throws<ArgumentException>(() => visit.CanUse(down, party, member));
+        Assert.Throws<ArgumentException>(() => visit.Descend(party, party[0]));
+        Assert.Equal(0, visit.FloorIndex);
+        Assert.Same(turns, visit.Turns);                     // refused before anything moved: the floor is still open
+
+        // Put down, it is only a corpse: a member steps over it onto the stairs,
+        // and they are that member's to take — not the one beside them, nor a
+        // stranger standing on them, nor a member who has fallen there.
+        Kill(turns, first, party[0], guard);
+        Put(party[0], stairs);
+        Assert.Equal(down, visit.StairUnder(party[0]));
+        Assert.Null(visit.CanUse(down, party, party[0]));
+        Assert.Throws<ArgumentException>(() => visit.CanUse(down, party, party[1]));
+        var stranger = TestPools.Holding("X", TestWeapons.Get("weakspot_stiletto"));
+        Put(stranger, stairs);
+        Assert.Equal(down, visit.StairUnder(stranger));
+        Assert.Throws<ArgumentException>(() => visit.CanUse(down, party, stranger));
+        party[0].Alive = false;
+        Assert.Throws<ArgumentException>(() => visit.CanUse(down, party, party[0]));
+        party[0].Alive = true;
+
+        visit.Descend(party, party[0]);
+        Assert.Equal(1, visit.FloorIndex);
+
+        // Up the same way: the member who arrived on the up-stairs takes them,
+        // and the one beside cannot.
+        var second = visit.Current;
+        visit.OpenTurns(party, Ten);
+        var up = new StairUse(Stair.Up, second.UpStairs);
+        Assert.Equal(up, visit.StairUnder(party[0]));
+        Assert.Throws<ArgumentException>(() => visit.Ascend(party, party[1]));
+        Assert.Equal(1, visit.FloorIndex);
+        visit.Ascend(party, party[0]);
+        Assert.Equal(0, visit.FloorIndex);
+
+        // And the way out asks the same of whoever would take it.
+        visit.OpenTurns(party, Ten);
+        Gather(visit, party, first.UpStairs);
+        var exit = new StairUse(Stair.Exit, first.UpStairs);
+        Assert.Equal(exit, visit.StairUnder(party[0]));
+        Assert.Null(visit.CanUse(exit, party, party[0]));
+        Assert.Throws<ArgumentException>(() => visit.CanUse(exit, party, party[1]));
+    }
+
+    [Fact]
     public void TheFallenTravelWithTheParty()
     {
         // Nobody is left on another floor: a dead member is carried, placed on the
@@ -764,12 +833,13 @@ public class DungeonStateTests
         // PHASE4-031, -099: no shortcut exit. One floor per transit, down or up;
         // the bottom has no way down; and the only way out is the first floor's
         // up-stairs, so a party leaves by climbing back through every floor it
-        // came down. Every arrival is announced, one floor at a time.
+        // came down. Every arrival is announced, one floor at a time, and says
+        // whether it is the party's first time on that floor.
         var party = Party();
         var walker = party[0];
         var visit = DungeonState.Enter(SpearHall, GoldenSeed, party);
-        var reached = new List<int>();
-        visit.FloorReached += floor => reached.Add(floor.Index);
+        var reached = new List<(int Index, bool FirstVisit)>();
+        visit.FloorReached += (floor, firstVisit) => reached.Add((floor.Index, firstVisit));
         visit.OpenTurns(party, Ten);
 
         for (int n = 0; n < visit.BossFloor - 1; n++)
@@ -814,7 +884,29 @@ public class DungeonStateTests
         Assert.Null(visit.StairUnder(walker));
         walker.Alive = true;
 
-        Assert.Equal(new[] { 1, 2, 3, 4, 3, 2, 1, 0 }, reached);
+        Assert.Equal(new[] { (1, true), (2, true), (3, true), (4, true), (3, false), (2, false), (1, false), (0, false) }, reached);
+    }
+
+    [Fact]
+    public void FloorReachedTellsAFirstArrivalFromAReturn()
+    {
+        // Every transit is announced, and each says whether the party has stood on
+        // that floor before in this visit — the one thing a subscriber cannot read
+        // off the visit when it hears, since by then the floor is Visited and the
+        // deepest index counts it. A return is a return whichever way the party
+        // came: down onto a floor already stood on is no first arrival.
+        var party = Party();
+        var visit = DungeonState.Enter(SpearHall, GoldenSeed, party);
+        var heard = new List<(int Index, bool FirstVisit, bool Visited, int Deepest)>();
+        visit.FloorReached += (floor, firstVisit) => heard.Add((floor.Index, firstVisit, floor.Visited, visit.DeepestFloorIndex));
+        visit.OpenTurns(party, Ten);
+
+        Down(visit, party);   // the second floor, for the first time
+        Up(visit, party);     // the first, again
+        Down(visit, party);   // the second again: a descent, and still a return
+        Down(visit, party);   // the third, for the first time
+
+        Assert.Equal(new[] { (1, true, true, 1), (0, false, true, 1), (1, false, true, 1), (2, true, true, 2) }, heard);
     }
 
     // ── The turn that travels ────────────────────────────────────────────────
@@ -961,10 +1053,11 @@ public class DungeonStateTests
         // stairs the party arrives by — this seed's first floor has a spear dummy
         // on its down-stairs. Climbing back up onto them, the party is placed
         // around it, never inside it, and it is not moved for them. (In play the
-        // scene takes the stairs only with the active member standing on them,
-        // which a live dummy there prevents; the placement does not rely on that.)
-        // A corpse there is another matter: it is walked over, and a member stands
-        // on the stairs.
+        // stairs are taken with the active member standing on them — CanUse,
+        // handed that member: TheStairsAreTakenFromTheStairTile — which a live
+        // dummy there prevents; this descent omits the member, and the placement
+        // does not rely on the rule.) A corpse there is another matter: it is
+        // walked over, and a member stands on the stairs.
         var party = Party();
         var visit = DungeonState.Enter(Tutorial, GuardedStairsSeed, party);
         var first = visit.Current;

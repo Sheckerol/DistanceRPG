@@ -82,10 +82,22 @@ public sealed class CampaignState
     /// who carry home whatever they carry. They stand nowhere yet; entering a
     /// dungeon places them.
     /// </summary>
-    /// <param name="content">The content whose roster starts the campaign — in the game, the current content, whose catalogue <see cref="PartyMemberState.From"/> instantiates the weapons from.</param>
+    /// <param name="content">
+    /// The content whose roster starts the campaign, which must be
+    /// <see cref="GameContent.Current"/>: a member is built under the current
+    /// content — <see cref="PartyMemberState.From"/> instantiates its weapons
+    /// from the current catalogue and sizes its bag by the current tuning — so a
+    /// roster read from any other content would come out as rows of one content
+    /// carrying another's weapons.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
     public static CampaignState Start(GameContent content)
     {
         ArgumentNullException.ThrowIfNull(content);
+        if (!ReferenceEquals(content, GameContent.Current))
+            throw new ArgumentException(
+                "A campaign starts under the current content: its members' weapons come from GameContent.Current's catalogue and their bags from its tuning, so the roster must be the current content's too.",
+                nameof(content));
 
         var roster = content.Party.All;
         var members = new PartyMemberState[roster.Count];

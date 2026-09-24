@@ -178,6 +178,13 @@ public readonly record struct StairUse(Stair Kind, (int R, int C) Tile);
 /// These two and nothing else: there is no gate on how many enemies a floor
 /// still holds (§4.4 — a percentage-of-enemies gate was considered and
 /// rejected), so a floor can always be left.
+/// <para>
+/// Standing on the stair is not a refusal either. The stair asked about is the
+/// one the active member stands on (<see cref="DungeonState.StairUnder"/>) — a
+/// player off every stair has nothing to ask — so asking about a stair the
+/// active member handed in is not on is a wrong question, answered with an
+/// exception.
+/// </para>
 /// </summary>
 public enum StairRefusal
 {
@@ -313,12 +320,20 @@ public sealed class DungeonState
     public int BossDefeatedAtTurn { get; private set; } = -1;
 
     /// <summary>
-    /// Raised when the party arrives on a floor by the stairs, either way, once
-    /// every member stands on it and before its turn system opens: §6.7's
-    /// "reaching a new floor" signal on the floor-transit path. Entering the
-    /// dungeon is not a transit and raises nothing.
+    /// Raised on every transit, either way, once every member stands on the
+    /// floor reached and before its turn system opens: §6.7's "reaching a new
+    /// floor" signal on the floor-transit path. Entering the dungeon is not a
+    /// transit and raises nothing.
+    /// <para>
+    /// The second argument tells a first arrival from a return: true the first
+    /// time the party stands on the floor this visit — always a descent, onto a
+    /// floor deeper than any before it — and false on every return, down as well
+    /// as up. It is the only way to tell: by the time this is raised the floor is
+    /// already <see cref="Floor.Visited"/> and <see cref="DeepestFloorIndex"/>
+    /// already counts it.
+    /// </para>
     /// </summary>
-    public event Action<Floor>? FloorReached;
+    public event Action<Floor, bool>? FloorReached;
 
     /// <summary>
     /// Enter <paramref name="def"/> on <paramref name="mapSeed"/> (§4.5): roll the
@@ -438,13 +453,35 @@ public sealed class DungeonState
     /// gathered at it (<see cref="Gathered"/>) — the party moves as one, so
     /// nobody is ever on another floor, the fallen included. Nothing else is
     /// asked: a floor may be left with every enemy on it standing (§4.4: no gate).
+    /// <para>
+    /// <strong>Taken from the stair tile.</strong> The stairs are used by the
+    /// active member standing on them, so the stair asked about is the one
+    /// <see cref="StairUnder"/> finds under that member. Handed
+    /// <paramref name="active"/>, the visit holds that half of the rule too: a
+    /// party gathered beside a stair nobody stands on cannot take it — around a
+    /// live dummy on the very tile, say, which guards the stairs until it falls
+    /// or walks off, and never seals them. Whoever plays the floor passes the
+    /// active member here and to <see cref="Descend"/> and <see cref="Ascend"/>.
+    /// </para>
     /// </summary>
-    /// <exception cref="ArgumentException"><paramref name="stair"/> is not a stair of the current floor.</exception>
-    public StairRefusal? CanUse(StairUse stair, IReadOnlyList<PartyMemberState> party)
+    /// <param name="stair">A stair of the current floor: the one <see cref="StairUnder"/> found under the active member.</param>
+    /// <param name="party">The members, in roster order.</param>
+    /// <param name="active">
+    /// The member taking the stairs: one of <paramref name="party"/>, standing on
+    /// <paramref name="stair"/>. Omitted, only the party's half is asked — the
+    /// phase and the gathering.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="stair"/> is not a stair of the current floor, or
+    /// <paramref name="active"/> is given and is not one of the party or does not stand on <paramref name="stair"/>.
+    /// </exception>
+    public StairRefusal? CanUse(StairUse stair, IReadOnlyList<PartyMemberState> party, PartyMemberState? active = null)
     {
         ArgumentNullException.ThrowIfNull(party);
         if (!StairsOf(Current).Contains(stair))
             throw new ArgumentException($"{stair} is not a stair of floor {Current.Index + 1}.", nameof(stair));
+        if (active is not null)
+            RequireStandingOn(stair, party, active);
 
         if (Turns is not { Phase: TurnPhase.Player })
             return StairRefusal.NotThePlayersTurn;
@@ -459,13 +496,16 @@ public sealed class DungeonState
     /// stands around the next floor's up-stairs. Open the new floor with
     /// <see cref="OpenTurns"/>.
     /// </summary>
+    /// <param name="party">The members, in roster order — the fallen among them, who are carried.</param>
+    /// <param name="active">The member taking the stairs, who must stand on them (<see cref="CanUse"/>). Omitted, only the party's half of the rule is asked.</param>
     /// <exception cref="InvalidOperationException">This is the bottom floor, or <see cref="CanUse"/> refuses the stairs.</exception>
-    public void Descend(IReadOnlyList<PartyMemberState> party)
+    /// <exception cref="ArgumentException"><paramref name="active"/> is given and is not one of the party or does not stand on the down-stairs.</exception>
+    public void Descend(IReadOnlyList<PartyMemberState> party, PartyMemberState? active = null)
     {
         RequireParty(party);
         var down = Current.DownStairs
             ?? throw new InvalidOperationException($"Floor {Current.Index + 1} is the dungeon's bottom: there is no way down from it.");
-        Transit(party, new StairUse(Stair.Down, down), FloorIndex + 1);
+        Transit(party, active, new StairUse(Stair.Down, down), FloorIndex + 1);
     }
 
     /// <summary>
@@ -474,13 +514,16 @@ public sealed class DungeonState
     /// down (§4.4). Everything else as <see cref="Descend"/>. The first floor's
     /// up-stairs are the way out, which ends the visit and is not a transit.
     /// </summary>
+    /// <param name="party">The members, in roster order — the fallen among them, who are carried.</param>
+    /// <param name="active">The member taking the stairs, who must stand on them (<see cref="CanUse"/>). Omitted, only the party's half of the rule is asked.</param>
     /// <exception cref="InvalidOperationException">This is the first floor, or <see cref="CanUse"/> refuses the stairs.</exception>
-    public void Ascend(IReadOnlyList<PartyMemberState> party)
+    /// <exception cref="ArgumentException"><paramref name="active"/> is given and is not one of the party or does not stand on the up-stairs.</exception>
+    public void Ascend(IReadOnlyList<PartyMemberState> party, PartyMemberState? active = null)
     {
         RequireParty(party);
         if (FloorIndex == 0)
             throw new InvalidOperationException("The first floor's up-stairs are the way out of the dungeon: leaving ends the visit, it moves no floor.");
-        Transit(party, new StairUse(Stair.Up, Current.UpStairs), FloorIndex - 1);
+        Transit(party, active, new StairUse(Stair.Up, Current.UpStairs), FloorIndex - 1);
     }
 
     /// <summary>
@@ -502,9 +545,9 @@ public sealed class DungeonState
     }
 
     /// <summary>The one transit: the stair asked of, the clock and the counters handed back, the old system dropped, the party stood on floor <paramref name="to"/>.</summary>
-    private void Transit(IReadOnlyList<PartyMemberState> party, StairUse stair, int to)
+    private void Transit(IReadOnlyList<PartyMemberState> party, PartyMemberState? active, StairUse stair, int to)
     {
-        if (CanUse(stair, party) is { } refusal)
+        if (CanUse(stair, party, active) is { } refusal)
             throw new InvalidOperationException($"The party cannot take the {stair.Kind} stairs of floor {Current.Index + 1}: {refusal}.");
 
         // CanUse refused a missing system, so there is one to hand the turn back.
@@ -518,8 +561,9 @@ public sealed class DungeonState
         FloorIndex = to;
         DeepestFloorIndex = Math.Max(DeepestFloorIndex, to);
         var floor = Current;
+        bool firstVisit = !floor.Visited;   // read before the arrival marks it: afterwards every floor reached is visited
         Arrive(party, down ? floor.UpStairs : floor.DownStairs!.Value);
-        FloorReached?.Invoke(floor);
+        FloorReached?.Invoke(floor, firstVisit);
     }
 
     /// <summary>
@@ -549,6 +593,22 @@ public sealed class DungeonState
         yield return new StairUse(floor.Index == 0 ? Stair.Exit : Stair.Up, floor.UpStairs);
         if (floor.DownStairs is { } down)
             yield return new StairUse(Stair.Down, down);
+    }
+
+    /// <summary>
+    /// The stair-tile half of the rule: <paramref name="active"/> is one of the
+    /// party and stands on <paramref name="stair"/> — alive, on its tile
+    /// (<see cref="StairUnder"/>). A party gathered beside the stairs, or around
+    /// a live dummy standing on them, has nobody on them to take them.
+    /// </summary>
+    private void RequireStandingOn(StairUse stair, IReadOnlyList<PartyMemberState> party, PartyMemberState active)
+    {
+        if (!party.Contains(active))
+            throw new ArgumentException($"Member '{active.Id}' is not one of the party: it takes no stairs for it.", nameof(active));
+        if (StairUnder(active) != stair)
+            throw new ArgumentException(
+                $"Member '{active.Id}' does not stand on the {stair.Kind} stairs at {stair.Tile}: the stairs are taken from the stair tile, by the member standing on it.",
+                nameof(active));
     }
 
     private static void RequireParty(IReadOnlyList<PartyMemberState> party)
