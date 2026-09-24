@@ -278,12 +278,16 @@ public class ThemedDropTests
         var golemsDrop = BossLoot.Roll(golem, visit.Floors[^1].Seed).Weapon;
         Assert.Equal(Spread(Weapons[golemsDrop.Id]).Stacks(Block) + 1, golemsDrop.Forged.Stacks(Block));
 
+        // Nothing here has been farmed, and Block goes on every variant of all
+        // eight classes (its table is the whole of it), so whether a drop is
+        // forged with Block is the one question LootTable.Eligible leaves: its
+        // theme entry asks nothing of a unique.
         foreach (var (floor, row) in rows.Where(r => r.Row != golem))
         {
             var drop = LootTable.Roll(row, floor.Seed).Weapon;
             var usual = EligibleFor(drop, theme: null);
             var inTheTutorial = EligibleFor(drop, row.Theme);
-            if (drop.Forged.Stacks(Block) == 0 && !drop.Unique)
+            if (drop.Forged.Stacks(Block) == 0)
                 Assert.Equal(usual.Append(Block), inTheTutorial);   // the usual pool, plus Block
             else
                 Assert.Equal(usual, inTheTutorial);               // a sword already carries it, as its own depth

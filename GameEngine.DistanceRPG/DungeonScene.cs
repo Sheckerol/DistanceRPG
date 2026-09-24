@@ -523,7 +523,7 @@ public class DungeonScene : Scene
         foreach (var member in _party)
             member.SyncTransform();
         WireTurnSystem(turns);
-        RederiveGroundItems();
+        RederiveGroundItems();   // laid without a word: nothing lands as the party arrives (AnnounceDrop)
         RevealArrival();
 
         EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
@@ -830,11 +830,14 @@ public class DungeonScene : Scene
         // weapon the dummy was carrying is on the floor where it fell, and the
         // turn system has already rolled it off the floor's own seed — the boss's
         // off its own table, forged with its dungeon's theme (§4.3). A unique says
-        // so the moment it lands, whichever way it came.
+        // so the moment it lands (AnnounceDrop). A corpse already lying on its item
+        // is neither laid nor named again: a dummy that fell after the boss in the
+        // same raise was laid, and named, by the boss's fall, whose held death ran
+        // first — and then its own defeat hands the same item over.
         _turns.EnemyDropped += (corpse, drop) =>
         {
-            DropOnFloor(corpse, drop);
-            AnnounceDrop(corpse, drop);
+            if (DropOnFloor(corpse, drop) is { } laid)
+                AnnounceDrop(laid);
         };
 
         // The boss is down (§4.3). The visit heard first — its handler was on this
@@ -843,12 +846,16 @@ public class DungeonScene : Scene
         // floor (EnemyDropped fired before this). Whatever else is down is a
         // corpse that stays down now, and a corpse that stays down is lying on
         // what it was carrying: the rule every arrival reads, applied the moment it
-        // starts being true. Then the banner says what it means, and what the
-        // boss left behind.
+        // starts being true. This is the moment those items land — a dummy that
+        // fell earlier in the same swing, or one that was waiting to get up, has
+        // shown nobody its item until now — so a unique among them says so as it
+        // lands, exactly as a permanent kill's does. Then the banner says what it
+        // means, and what the boss left behind.
         _turns.BossDefeated += boss =>
         {
             Log.Info($"[Run] {boss.Title ?? "The boss"} falls at turn {_visit.BossDefeatedAtTurn}: nothing revives for the rest of the visit, and every corpse is lying on its weapon");
-            RederiveGroundItems();
+            foreach (var laid in RederiveGroundItems())
+                AnnounceDrop(laid);
             _hud.ShowBossFall(boss, _groundItems.FirstOrDefault(item => item.Corpse == boss)?.Drop);
         };
 
@@ -1938,13 +1945,16 @@ public class DungeonScene : Scene
     /// read one fact rather than two that have to keep agreeing.
     /// </para>
     /// </summary>
-    private void DropOnFloor(EnemyState corpse, Drop drop)
+    /// <returns>The item laid, or null when <paramref name="corpse"/> is already lying on one — so a caller that names what lands (<see cref="AnnounceDrop"/>) names each item once.</returns>
+    private GroundItem? DropOnFloor(EnemyState corpse, Drop drop)
     {
         // One item a corpse. The boss's own drop is laid by its EnemyDropped before
         // BossDefeated re-derives the floor, and the re-derivation skips a corpse
-        // that already has one; this refuses a second lay whichever way round it
-        // comes, as a guard.
-        if (_groundItems.Any(item => item.Corpse == corpse)) return;
+        // that already has one. A dummy that fell after the boss in the same raise
+        // comes the other way round: the boss's held death runs first, its fall
+        // lays the dummy's item, and then the dummy's own defeat hands the same
+        // item over. The second lay, whichever it is, is refused here.
+        if (_groundItems.Any(item => item.Corpse == corpse)) return null;
 
         Log.Info($"[Loot] Dropped {drop.Weapon.Name} [{drop.Weapon.Modifiers}] (x{drop.DefeatCount}"
             + $"{(drop.Weapon.Unique ? drop.WasUniqueRoll ? ", UNIQUE ROLL" : ", UNIQUE BY ARITHMETIC" : "")}"
@@ -1954,24 +1964,37 @@ public class DungeonScene : Scene
             Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
         };
         AddGameObject(marker);
-        _groundItems.Add(new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y)));
+        var laid = new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y));
+        _groundItems.Add(laid);
         UpdateGroundItemVisibility();
+        return laid;
     }
 
     /// <summary>
-    /// The beat a drop earns as it lands, over the corpse it came off: a unique
-    /// by name, in gold — <c>UNIQUE: THE BULWARK!</c> (<see cref="DungeonHud.UniqueBeat"/>)
-    /// — whether the farm's lottery paid out or the boss's graft took its
-    /// theme's Purity variant to ×3 (§4.3). Only as it lands, never on a floor's
-    /// re-derivation: an item the party has already seen fall is not announced
-    /// again. In sight only, like every beat; a unique that fell in the fog is
-    /// still named in gold when its tile is lit.
+    /// The beat an item earns as it lands in front of the party, over the corpse
+    /// it came off: a unique by name, in gold — <c>UNIQUE: THE BULWARK!</c>
+    /// (<see cref="DungeonHud.UniqueBeat"/>) — whether the farm's lottery paid out
+    /// or the boss's graft took its theme's Purity variant to ×3 (§4.3).
+    /// <para>
+    /// An item lands in front of the party two ways: a permanent kill hands it
+    /// over (<see cref="TurnSystem.EnemyDropped"/>), and the boss's fall lays the
+    /// item of every corpse down at that moment — a dummy that fell earlier in the
+    /// same swing, one waiting to get up — none of which anyone has seen until
+    /// then (<see cref="RederiveGroundItems"/>). Only an item
+    /// <see cref="DropOnFloor"/> has just laid is named, so each is named once,
+    /// whichever way it came. Never on an arrival's re-derivation: nothing lands
+    /// as the party arrives — the floor holds what it held when the party left,
+    /// or what the boss's fall laid on it while the party was elsewhere — and the
+    /// gold label names a unique there.
+    /// </para>
+    /// In sight only, like every beat; a unique that fell in the fog is still
+    /// named in gold when its tile is lit.
     /// </summary>
-    private void AnnounceDrop(EnemyState corpse, Drop drop)
+    private void AnnounceDrop(GroundItem laid)
     {
-        if (DungeonHud.UniqueBeat(drop) is not { } beat) return;
+        if (DungeonHud.UniqueBeat(laid.Drop) is not { } beat) return;
         Log.Info($"[Loot] {beat}");
-        var obj = EnemyObjectFor(corpse);
+        var obj = EnemyObjectFor(laid.Corpse);
         if (obj.IsActive)
             _hud.AddFloatingText(obj.Position, beat, LootColor, UniqueBeatOffset);
     }
@@ -1993,14 +2016,21 @@ public class DungeonScene : Scene
     /// one that is offering rather than one that is going to get up.
     /// </para>
     /// </summary>
-    private void RederiveGroundItems()
+    /// <returns>
+    /// What it laid, in the order laid. The boss's fall names a unique among
+    /// them, because that is the moment those items land
+    /// (<see cref="AnnounceDrop"/>); an arrival lays them without a word.
+    /// </returns>
+    private List<GroundItem> RederiveGroundItems()
     {
+        var laid = new List<GroundItem>();
         foreach (var enemy in _enemies)
         {
             if (_groundItems.Any(item => item.Corpse == enemy.State)) continue;
-            if (_turns.GroundItemOf(enemy.State) is { } drop)
-                DropOnFloor(enemy.State, drop);
+            if (_turns.GroundItemOf(enemy.State) is { } drop && DropOnFloor(enemy.State, drop) is { } item)
+                laid.Add(item);
         }
+        return laid;
     }
 
     /// <summary>

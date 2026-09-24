@@ -599,6 +599,62 @@ public class BossTests
     }
 
     [Fact]
+    public void WhatFallsAfterTheBossInTheSameShotIsLyingOnItsItemAsTheBossFalls()
+    {
+        // The cascade's other order. Above, a dummy fell earlier in the swing that
+        // felled the boss; here a Stormcrow's shot fells the golem and carries on
+        // into a dummy behind it, which dies in the same raise. Held deaths run in
+        // the order they fell, so the golem's runs first: resurrection stops, its
+        // drop is handed over, and BossDefeated is raised with the dummy already
+        // down and lying on its item — which whoever answers BossDefeated by
+        // re-deriving the floor lays then. Only after that does the dummy's own
+        // defeat run, and it hands the identical item over again. So the scene
+        // lays, and names, a corpse's item once, whichever reaches it first
+        // (DungeonScene.DropOnFloor): a unique here would otherwise be called twice.
+        var archer = TestPools.Holding("A", TestWeapons.Get("stormcrow"));
+        Put(archer, (5, 2));
+        var golem = DungeonState.BossRow(Tutorial, TestWeapons.Get("hatchet"));
+        golem.SpawnIndex = 1;
+        Put(golem, (5, 6));
+        var dummy = new EnemyState { Weapon = TestWeapons.Get("hatchet"), SpawnIndex = 0, Theme = Block };
+        Put(dummy, (5, 10));
+        (golem.Hp, dummy.Hp) = (1, 1);   // the shot takes at least 1 off each, through the golem's Block 9 too
+        var turns = new TurnSystem(new int[12, 20], new[] { archer }, new[] { dummy, golem }, Ten, GoldenSeed, boss: golem);
+
+        var events = new List<string>();
+        Drop? downAtTheFall = null;
+        var handedOver = new List<Drop>();
+        turns.EnemyDefeated += e => events.Add($"defeated {e.SpawnIndex}");
+        turns.EnemyDropped += (e, d) =>
+        {
+            events.Add($"dropped {e.SpawnIndex}");
+            if (e == dummy) handedOver.Add(d);
+        };
+        turns.BossDefeated += _ =>
+        {
+            downAtTheFall = turns.GroundItemOf(dummy);
+            events.Add($"boss down; the dummy {(dummy.Alive ? "standing" : "down")}, its item {(downAtTheFall is null ? "not down" : "down")}");
+        };
+
+        Assert.True(turns.TryAttack(archer, golem));
+        Assert.Equal((false, false), (golem.Alive, dummy.Alive));
+        Assert.Equal(new[]
+        {
+            "defeated 1",
+            "dropped 1",
+            "boss down; the dummy down, its item down",
+            "defeated 0",
+            "dropped 0",
+        }, events);
+
+        // One item, down at the fall and handed over after it: the dummy's own
+        // table's, off its row as the shot left it.
+        Assert.NotNull(downAtTheFall);
+        Assert.Equal(Describe(downAtTheFall!), Describe(Assert.Single(handedOver)));
+        Assert.Equal(Describe(LootTable.Roll(dummy, GoldenSeed)), Describe(downAtTheFall!));
+    }
+
+    [Fact]
     public void AReturnDueBeforeTheBossDiedStillHappens_OneDueAfterDoesNot()
     {
         // A floor nobody is on is frozen but for its resurrection timers, and the
