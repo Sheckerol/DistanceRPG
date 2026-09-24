@@ -817,9 +817,10 @@ public class CampaignSaveTests
         foreach (var (edit, where) in unplayed)
             Assert.Equal(where, RefusedAfter(summary, edit).Where);
 
-        // The capture is between runs, and the restore is under the current content.
+        // The capture is at a safe point — between runs, or at a player turn with
+        // nothing in flight (Phase 5.6) — and the restore is under the current content.
         var campaign = NewCampaign();
-        In(campaign, "tutorial", FiveDeep);
+        In(campaign, "tutorial", FiveDeep).Turns!.EndTurn();   // the banner is up: the enemies' turn has begun
         Assert.Throws<InvalidOperationException>(() => SaveGame.Capture(campaign));
         var other = GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);
         Assert.Throws<ArgumentException>(() => SaveGame.Restore(SaveCodec.Read(text), other));

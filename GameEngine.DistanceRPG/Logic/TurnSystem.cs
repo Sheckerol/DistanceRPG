@@ -1414,6 +1414,7 @@ public sealed class TurnSystem
         enemy.Hp = enemy.MaxHp;
         enemy.Alive = true;
         enemy.TurnsSinceSeen = 2;
+        enemy.PinnedDrop = null;   // up, it lies on nothing: whatever a save pinned under the corpse went with it
 
         // Someone may be standing on the remnant: wake up on the
         // nearest free tile instead of inside them.
@@ -2293,13 +2294,22 @@ public sealed class TurnSystem
     /// (<see cref="EnemyState.DropTaken"/>) is not offered twice.
     /// <para>
     /// <strong>It is derived, never stored</strong>, which is the whole of §3.5's
-    /// answer to a save taken between the permanent kill and the pickup: the
-    /// table reads the enemy row and this system's map seed and nothing else, so
-    /// a floor re-entry re-derives the identical weapon — same variant, same
-    /// stacks, same tiers, same unique outcome — rather than either re-rolling it
-    /// (a different weapon) or forgetting it (a lost one). Both the defeat above
-    /// and the scene's floor entry read this one method, so there is one rule
-    /// rather than two that have to agree.
+    /// answer to a floor left and returned to: the table reads the enemy row and
+    /// this system's map seed and nothing else of the visit, so a floor re-entry
+    /// re-derives the identical weapon — same variant, same stacks, same tiers,
+    /// same unique outcome — rather than either re-rolling it (a different
+    /// weapon) or forgetting it (a lost one). Both the defeat above and the
+    /// scene's floor entry read this one method, so there is one rule rather
+    /// than two that have to agree.
+    /// </para>
+    /// <para>
+    /// <strong>Except across a save.</strong> The table also reads the loaded
+    /// tuning and content, which a session and its reload need not share, so a
+    /// save writes what each such row is lying on and the load pins it
+    /// (<see cref="EnemyState.PinnedDrop"/>): a pinned row answers its pin, the
+    /// weapon that lay there when the game was saved, and only a row nobody
+    /// pinned derives. The pin answers only while the row lies on its drop —
+    /// never for a row standing, or a drop taken.
     /// </para>
     /// <para>
     /// <strong>Which table is the roster's to say</strong>: the drop feed the
@@ -2317,7 +2327,7 @@ public sealed class TurnSystem
         if (!_dropFeeds.TryGetValue(enemy, out var drop))
             throw new InvalidOperationException("Asked what an enemy that is not on this turn system's roster is lying on: its drop is its own floor's to derive.");
         if (ResurrectionActive || enemy.Alive || enemy.DropTaken) return null;
-        return drop();
+        return enemy.PinnedDrop ?? drop();
     }
 
     private static float Dist2(ActorState a, ActorState b)

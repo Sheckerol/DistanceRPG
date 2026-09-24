@@ -268,6 +268,81 @@ public class FloorGenerationTests
     }
 
     [Fact]
+    public void ARestoredFloorStandsOnTheTerrainGenerationBuilds()
+    {
+        // PHASE5-025, -026: maps are never serialized — a floor a save brings back
+        // is its terrain regenerated from the seed, the very ground generation
+        // builds: the grid, the rooms, the start, the corridors as the fog boxes
+        // expanded them, the fog boxes, the stairs and the lair. On it stand the
+        // save's rows — the objects handed in, placed by nobody — the save's
+        // explored fog, and the floor counts as visited. Nothing is placed and no
+        // boss is rolled: the placer's stream is never drawn.
+        var hall = GameContent.Current.Dungeons["spear_hall"];
+        int bossFloor = DungeonState.RollBossFloor(GoldenSeed, hall);
+        Assert.Equal(5, bossFloor);
+        for (int n = 0; n < bossFloor; n++)
+        {
+            bool bottom = n == bossFloor - 1;
+            var generated = Floor.Generate(GoldenSeed, n, bottom, hall, promisedStacks: 1);
+
+            // The rows as a visit left them: one moved, one fallen — nothing here is the placer's.
+            var rows = generated.Enemies;
+            rows[0].X += GameConstants.Tile;
+            rows[1].Alive = false;
+            var (r, c) = generated.UpStairs;
+            generated.Fog.RevealAt(r, c, generated.FogBoxes.FogBoxes);
+            var seen = FogState.Encode(generated.Fog.Seen);
+
+            var restored = Floor.Restore(GoldenSeed, n, bottom, rows, generated.Boss, [], seen, visible: null);
+            Assert.Equal((n, generated.Seed), (restored.Index, restored.Seed));
+            Assert.Equal(GridText(generated.Map.Grid), GridText(restored.Map.Grid));
+            Assert.Equal(GridText(generated.Map.RoomGrid), GridText(restored.Map.RoomGrid));
+            Assert.Equal(generated.Map.DebugRooms.Select(room => (room.X, room.Y, room.W, room.H)), restored.Map.DebugRooms.Select(room => (room.X, room.Y, room.W, room.H)));
+            Assert.Equal((generated.Map.PlayerStart, generated.Map.EnemyStart), (restored.Map.PlayerStart, restored.Map.EnemyStart));
+            Assert.Equal(generated.Map.Corridors.Select(k => (k.X, k.Y, k.W, k.H)), restored.Map.Corridors.Select(k => (k.X, k.Y, k.W, k.H)));
+            Assert.Equal(generated.FogBoxes.FogBoxes.Select(b => (b.X, b.Y, b.W, b.H)), restored.FogBoxes.FogBoxes.Select(b => (b.X, b.Y, b.W, b.H)));
+            Assert.Equal((generated.UpStairs, generated.DownStairs, generated.Lair), (restored.UpStairs, restored.DownStairs, restored.Lair));
+
+            Assert.Equal(rows.Count, restored.Enemies.Count);
+            for (int i = 0; i < rows.Count; i++)
+                Assert.Same(rows[i], restored.Enemies[i]);
+            Assert.Same(generated.Boss, restored.Boss);
+            Assert.Equal(seen, FogState.Encode(restored.Fog.Seen));
+            Assert.DoesNotContain(true, restored.Fog.Visible.Cast<bool>());
+            Assert.True(restored.Visited);
+            Assert.Empty(restored.LooseItems);
+        }
+
+        // The placer's stream untouched: a restore calls neither the placer nor the
+        // boss's roll, and the terrain it stands on is Generate's own helper.
+        var calls = TestIl.Calls(typeof(Floor).Assembly)
+            .Where(call => call.From.DeclaringType == typeof(Floor) && call.From.Name is nameof(Floor.Restore) or "Terrain")
+            .Select(call => $"{call.Target.DeclaringType?.Name}.{call.Target.Name}")
+            .ToHashSet();
+        Assert.Contains("Floor.Terrain", calls);
+        Assert.Contains("StairPlacer.Place", calls);
+        Assert.DoesNotContain("EnemyPlacer.PlaceEnemies", calls);
+        Assert.DoesNotContain("Floor.PlaceEnemies", calls);
+        Assert.DoesNotContain("Floor.PlaceBoss", calls);
+        Assert.DoesNotContain("DungeonState.RollBoss", calls);
+        var generate = TestIl.Calls(typeof(Floor).Assembly)
+            .Where(call => call.From.DeclaringType == typeof(Floor) && call.From.Name == nameof(Floor.Generate))
+            .Select(call => $"{call.Target.DeclaringType?.Name}.{call.Target.Name}")
+            .ToArray();
+        Assert.Contains("Floor.Terrain", generate);
+        Assert.Contains("Floor.PlaceEnemies", generate);
+
+        // What no floor can hold is refused at the door: a boss above the bottom,
+        // none on it, a spawn index twice, a fog row that does not fit the map.
+        var bottomFloor = Floor.Generate(GoldenSeed, bossFloor - 1, bottom: true, hall, promisedStacks: 1);
+        var dark = FogState.Encode(new bool[MapGenerator.Rows, MapGenerator.Cols]);
+        Assert.Throws<ArgumentException>(() => Floor.Restore(GoldenSeed, bossFloor - 1, bottom: true, bottomFloor.Enemies, boss: null, [], dark, null));
+        Assert.Throws<ArgumentException>(() => Floor.Restore(GoldenSeed, 0, bottom: false, bottomFloor.Enemies, bottomFloor.Boss, [], dark, null));
+        Assert.Throws<ArgumentException>(() => Floor.Restore(GoldenSeed, 0, bottom: false, [bottomFloor.Enemies[0], bottomFloor.Enemies[0]], null, [], dark, null));
+        Assert.Throws<ArgumentException>(() => Floor.Restore(GoldenSeed, 0, bottom: false, [], null, [], dark.Skip(1).ToArray(), null));
+    }
+
+    [Fact]
     public void TheBottomFloorHasNoWayDown()
     {
         // PHASE4-022: the boss floor is the dungeon's bottom. It has no

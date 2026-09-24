@@ -23,29 +23,47 @@ public sealed record LoadedCampaign(CampaignState Campaign, bool TuningChanged, 
 /// it, so none of them carries a serialisation attribute or a public setter for
 /// a load's sake (§5.2).
 /// <para>
-/// This step saves the campaign <strong>between runs</strong> — the party,
-/// what it carries and has met, the run counter, the locks, the cleared and
-/// retired dungeons and the last run's summary — which is already a whole save
-/// (§6.7: "a save with no dungeon in progress is now a valid state"). A visit
-/// in progress is Phase 5.6's to save, and until then a capture refuses one.
+/// A campaign is saved <strong>between runs</strong> — the party, what it
+/// carries and has met, the run counter, the locks, the cleared and retired
+/// dungeons and the last run's summary, which is already a whole save (§6.7: "a
+/// save with no dungeon in progress is now a valid state") — and <strong>at any
+/// safe point of a visit</strong> (<see cref="IsSafePoint"/>), the visit inside
+/// it: §5.1's Run group and every floor the party has stood on.
 /// </para>
 /// </summary>
 public static class SaveGame
 {
     /// <summary>
+    /// Whether <paramref name="campaign"/> can be saved as it stands (1f): between
+    /// runs; in a visit with no floor's system open — right after the entry, or
+    /// between the stairs and the arrival; or with the floor's system in the
+    /// player phase and no raise running. Never while the enemies take their turn,
+    /// its banner included, and never inside a raise: a save holds none of the
+    /// enemy phase's working state, and a raise's cascade is half-settled.
+    /// </summary>
+    public static bool IsSafePoint(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        if (campaign.Visit is not { } visit || visit.Turns is not { } turns)
+            return true;
+        return turns.Phase == TurnPhase.Player && !turns.Events.Running;
+    }
+
+    /// <summary>
     /// The campaign as a document, stamped with <see cref="SaveCodec.CurrentVersion"/>
     /// and the hash of the tuning it is being played under — the current
-    /// content's — and never the tuning's values (§5.3).
+    /// content's — and never the tuning's values (§5.3): between runs, or with
+    /// the visit in progress at a safe point.
     /// </summary>
-    /// <param name="campaign">The campaign, between runs.</param>
+    /// <param name="campaign">The campaign, at a safe point (<see cref="IsSafePoint"/>).</param>
     /// <param name="view">What the scene is showing, carried for it; null for nothing to say.</param>
-    /// <exception cref="InvalidOperationException">A visit is in progress: this build saves a campaign between runs.</exception>
+    /// <exception cref="InvalidOperationException">The campaign is not at a safe point: the enemies are moving, their turn's banner is up, or a raise is running.</exception>
     public static SaveFile Capture(CampaignState campaign, ViewDto? view = null)
     {
         ArgumentNullException.ThrowIfNull(campaign);
-        if (campaign.Visit is { } visit)
+        if (!IsSafePoint(campaign))
             throw new InvalidOperationException(
-                $"A visit to '{visit.Def.Id}' is in progress: a campaign is saved between runs here, and the visit in progress is not saved yet.");
+                $"A visit to '{campaign.Visit!.Def.Id}' is not at a safe point ({campaign.Visit.Turns!.Phase}{(campaign.Visit.Turns.Events.Running ? ", a raise running" : "")}): a campaign is saved between runs, or at a player turn with nothing in flight.");
 
         return new SaveFile(SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning), SaveMapper.Capture(campaign), view);
     }
@@ -54,9 +72,13 @@ public static class SaveGame
     /// The campaign <paramref name="file"/> describes, whole, under
     /// <paramref name="content"/>: every weapon, enchantment, dungeon and status it
     /// names resolved by id or by name, every member rebuilt with the bag it was
-    /// built with, and nothing re-derived that the save holds. A different tuning
-    /// warns and loads (<see cref="LoadedCampaign.TuningChanged"/>); an id the
-    /// content no longer has refuses the save, naming where.
+    /// built with, the visit in progress — if there was one — with every floor it
+    /// reached stood back on its regenerated terrain and the rest regenerated
+    /// from the seed, and nothing re-derived that the save holds. No floor's
+    /// system is open: whoever plays the visit opens it
+    /// (<see cref="DungeonState.OpenTurns"/>), as an arrival does. A different
+    /// tuning warns and loads (<see cref="LoadedCampaign.TuningChanged"/>); an id
+    /// the content no longer has refuses the save, naming where.
     /// </summary>
     /// <param name="file">A document as <see cref="SaveCodec.Read"/> returns it, at <see cref="SaveCodec.CurrentVersion"/>.</param>
     /// <param name="content">

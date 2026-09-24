@@ -317,12 +317,18 @@ internal static class CampaignBoot
 
     /// <summary>
     /// Save <paramref name="campaign"/> to <paramref name="store"/> — between runs,
-    /// which is all this build saves — with the tuning's hash, atomically. A text
-    /// the save already holds is not written again, so the backup stays the save
-    /// before it. Never throws: a write that fails — a full disk, a folder with no
-    /// rights, a locked file, a campaign that cannot be captured — is logged whole
-    /// and comes back as the notice to show, and the save on the disk is what it
-    /// was.
+    /// which is all the game saves until Phase 5.8 brings the run in progress in —
+    /// with the tuning's hash, atomically. A text the save already holds is not
+    /// written again, so the backup stays the save before it. Never throws: a write
+    /// that fails — a full disk, a folder with no rights, a locked file, a campaign
+    /// that cannot be captured, a run in progress — is logged whole and comes back
+    /// as the notice to show, and the save on the disk is what it was.
+    /// <para>
+    /// <c>Logic/</c> can capture a visit at any safe point from Phase 5.6
+    /// (<see cref="SaveGame.Capture"/>); the game does not write one yet, since
+    /// nothing resumes it into the dungeon before 5.8, and a save holding a run the
+    /// game could only reopen between runs would strand it there.
+    /// </para>
     /// </summary>
     /// <returns>Null when saved, or the notice a failed write shows.</returns>
     internal static string? Save(SaveStore store, CampaignState campaign, ViewDto? view = null, Action<string>? report = null)
@@ -331,6 +337,9 @@ internal static class CampaignBoot
         ArgumentNullException.ThrowIfNull(campaign);
         try
         {
+            if (campaign.Visit is { } visit)
+                throw new InvalidOperationException(
+                    $"A visit to '{visit.Def.Id}' is in progress: the game saves a campaign between runs, and the run in progress is not saved yet.");
             string text = SaveCodec.Write(SaveGame.Capture(campaign, view));
             if (Holds(store, text))
             {

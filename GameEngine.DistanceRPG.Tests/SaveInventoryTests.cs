@@ -38,8 +38,8 @@ public class SaveInventoryTests
             new("_cleared", Kept.Saved, "campaign.cleared[] = ClearedInOrder"),
             new("_retired", Kept.Saved, "campaign.retired[] = RetiredInOrder"),
             new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a relaunch"),
-            new("Visit", Kept.NotSaved, "the visit in progress is Phase 5.6's to save; until then SaveGame.Capture refuses a campaign holding one, and between runs it is null"),
-            new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter makes on a visit's Wiped, remade with the visit"),
+            new("Visit", Kept.Saved, "campaign.visit: the Run group and every visited floor, or null between runs"),
+            new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],
         [typeof(ActorState)] =
@@ -98,6 +98,140 @@ public class SaveInventoryTests
         [
             new("_xp", Kept.Saved, "weaponXp: each class by name, zeros left out"),
         ],
+
+        // ── The visit in progress (Phase 5.6) ─────────────────────────────────
+        [typeof(DungeonState)] =
+        [
+            new("Def", Kept.Saved, "visit.dungeonId: the content's dungeon by id"),
+            new("MapSeed", Kept.Saved, "visit.mapSeed: every floor, stair and stream derives from it"),
+            new("BossFloor", Kept.Saved, "visit.bossFloor: the value a load uses, never rolled again through a tuning that may have changed"),
+            new("PromisedStacks", Kept.Saved, "visit.promisedStacks: the value a load uses, never re-derived"),
+            new("FloorIndex", Kept.Saved, "visit.floorIndex"),
+            new("DeepestFloorIndex", Kept.Saved, "visit.deepestFloorIndex: floors down to it are the visited ones, and saved"),
+            new("_turn", Kept.Saved, "visit.turn: the visit's clock (Turn reads it while no system is open)"),
+            new("_carry", Kept.Saved, "visit.carry = CurrentCarry(): merged with the open system's counters, this turn's only, in canonical order"),
+            new("BossDefeated", Kept.Saved, "visit.bossDefeated"),
+            new("BossDefeatedAtTurn", Kept.Saved, "visit.bossDefeatedAtTurn"),
+            new("EntrySnapshot", Kept.Saved, "visit.entrySnapshot: weapon XP by class name, HP XP, mana XP — PHASE4-114"),
+            new("_spoils", Kept.Saved, "visit.spoils[] in the order taken, each a locator: a bag slot, or a floor's loose item"),
+            new("Spoils", Kept.Derived, "the read-only view of _spoils"),
+            new("Floors", Kept.Saved, "visit.floors[]: the visited ones restored on their regenerated terrain, the rest generated from the seed"),
+            new("Turns", Kept.NotSaved, "reopened by OpenTurns on load, which imports the carry and catches the floor up as an arrival does"),
+            new("FloorReached", Kept.NotSaved, "wiring: whoever plays the visit subscribes afresh"),
+            new("Wiped", Kept.NotSaved, "wiring: the campaign's restore subscribes it to the run's end, as Enter does"),
+        ],
+        [typeof(Floor)] =
+        [
+            new("Index", Kept.Saved, "floors[].index"),
+            new("Seed", Kept.Derived, "FloorSeed(mapSeed, index)"),
+            new("Map", Kept.Derived, "regenerated from the seed: maps are never serialized (§5.1)"),
+            new("FogBoxes", Kept.Derived, "regenerated with the map"),
+            new("UpStairs", Kept.Derived, "regenerated: the map's start"),
+            new("DownStairs", Kept.Derived, "regenerated: the stair stream's draw"),
+            new("Lair", Kept.Derived, "regenerated: the stair stream's draw, on the bottom floor"),
+            new("Fog", Kept.Saved, "floors[].seen (and the current floor's visible)"),
+            new("Enemies", Kept.Saved, "floors[].enemies[] on a visited floor; placed afresh on one nobody has stood on"),
+            new("Boss", Kept.Saved, "boss: true on that row"),
+            new("Visited", Kept.Derived, "a saved floor is a visited one"),
+            new("LooseItems", Kept.Saved, "floors[].looseItems[]: weapon and tile, in the order left"),
+        ],
+        [typeof(FogState)] =
+        [
+            new("Seen", Kept.Saved, "seen[]: one '0'/'1' string per map row"),
+            new("Visible", Kept.Saved, "visible[] on the current floor only — the turn's sight the pick and the march read; any other floor's is reset by the arrival that next shows it"),
+            new("Rows", Kept.Derived, "the map's"),
+            new("Cols", Kept.Derived, "the map's"),
+        ],
+        [typeof(TurnCarry)] =
+        [
+            new("Turn", Kept.Saved, "carry.turn"),
+            new("Attacks", Kept.Saved, "carry.attacks[], sorted: members in roster order, then enemies by floor and spawn"),
+            new("ZoneUses", Kept.Saved, "carry.zoneUses[], sorted the same way"),
+            new("ReactionUses", Kept.Saved, "carry.reactionUses[], by actor, then modifier in enum order"),
+            new("Seen", Kept.Saved, "carry.seen[], sorted by floor and spawn"),
+        ],
+        [typeof(EnemyState)] =
+        [
+            new("SpawnIndex", Kept.Saved, "enemies[].spawnIndex"),
+            new("Weapon", Kept.Saved, "enemies[].weapon: by id with both spreads — the boss's too, restored and never rolled again"),
+            new("DefeatedAtTurn", Kept.Saved, "enemies[].defeatedAtTurn"),
+            new("TurnsSinceSeen", Kept.Saved, "enemies[].turnsSinceSeen"),
+            new("DefeatCount", Kept.Saved, "enemies[].defeatCount"),
+            new("RevivalsRolled", Kept.Saved, "enemies[].revivalsRolled"),
+            new("RevivalDamage", Kept.Saved, "enemies[].revivalDamage"),
+            new("RevivalMaxHp", Kept.Saved, "enemies[].revivalMaxHp"),
+            new("DropTaken", Kept.Saved, "enemies[].dropTaken"),
+            new("PinnedDrop", Kept.Saved, "enemies[].groundItem: the drop an untaken permanent kill lies on, pinned as the game answered it at the save"),
+            new("BaseMaxHp", Kept.Derived, "the dungeon's: a dummy's DummyHp, the boss's statline (BossRow)"),
+            new("MoveBudget", Kept.Derived, "the dungeon's: a dummy's EnemyMove, the boss's statline"),
+            new("Title", Kept.Derived, "the boss's name from its dungeon; none for rank and file"),
+            new("Theme", Kept.Derived, "its dungeon's theme"),
+            new("PromisedStacks", Kept.Derived, "the visit's promisedStacks, on the boss row only"),
+        ],
+        [typeof(TurnSystem)] =
+        [
+            new("Phase", Kept.NotSaved, "a save is taken in the player phase (SaveGame.IsSafePoint), which OpenTurns opens in"),
+            new("TurnCount", Kept.Saved, "visit.turn: OpenTurns opens on it"),
+            new("ResurrectionActive", Kept.Derived, "!visit.bossDefeated, set by OpenTurns"),
+            new("_seenThisTurn", Kept.Saved, "carry.seen[], sorted"),
+            new("_attacksThisTurn", Kept.Saved, "carry.attacks[], sorted"),
+            new("_partyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived by SnapshotZones from where everyone stands, kept true continuously"),
+            new("_enemyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived as the party's are"),
+            new("_ripostes", Kept.Saved, "carry.reactionUses[], sorted"),
+            new("_grid", Kept.Derived, "the floor's regenerated map"),
+            new("_party", Kept.Derived, "the campaign's party, handed to OpenTurns"),
+            new("_enemies", Kept.Derived, "the floor's rows"),
+            new("_mapSeed", Kept.Derived, "the floor's seed"),
+            new("_rollD20", Kept.NotSaved, "the die is handed in by whoever opens the floor (the visit's own saved die is Phase 5.7's)"),
+            new("_zones", Kept.Derived, "the two zones, by side: built by the constructor"),
+            new("_rosters", Kept.Derived, "built by the constructor from the party and the rows"),
+            new("_sides", Kept.Derived, "built by the constructor"),
+            new("_mayReact", Kept.Derived, "built by the constructor"),
+            new("_braceFeeds", Kept.Derived, "built by the constructor"),
+            new("_onReactionFired", Kept.Derived, "built by the constructor"),
+            new("_events", Kept.Derived, "the event table: every behaviour registered by the constructor; empty outside a raise, which a safe point excludes"),
+            new("_hitFeeds", Kept.Derived, "built by the constructor"),
+            new("_healFeeds", Kept.Derived, "built by the constructor"),
+            new("_deathFeeds", Kept.Derived, "built by the constructor"),
+            new("_statusFeeds", Kept.Derived, "built by the constructor"),
+            new("_movementFeeds", Kept.Derived, "built by the constructor"),
+            new("_xpFeeds", Kept.Derived, "built by the constructor"),
+            new("_defeatFeeds", Kept.Derived, "built by the constructor"),
+            new("_dropFeeds", Kept.Derived, "built by the constructor, the boss named by its saved row"),
+            new("_heldDeaths", Kept.NotSaved, "empty outside a raise, which a safe point excludes"),
+            new("_enemyIdx", Kept.NotSaved, "the enemy phase's working state: the enemy phase is never a save point"),
+            new("_timer", Kept.NotSaved, "the enemy phase's working state"),
+            new("_enemyBudget", Kept.NotSaved, "the enemy phase's working state"),
+            new("_waypoints", Kept.NotSaved, "the enemy phase's working state"),
+            new("_waypointIdx", Kept.NotSaved, "the enemy phase's working state"),
+            new("_enemyTurnPending", Kept.NotSaved, "the enemy phase's working state"),
+            new("_nextEnemyPending", Kept.NotSaved, "the enemy phase's working state"),
+            new("TurnEnded", Kept.NotSaved, "an event: whoever plays the floor subscribes"),
+            new("PlayerTurnStarted", Kept.NotSaved, "an event"),
+            new("CharacterHit", Kept.NotSaved, "an event"),
+            new("CharacterDied", Kept.NotSaved, "an event"),
+            new("EnemyHit", Kept.NotSaved, "an event"),
+            new("EnemyDefeated", Kept.NotSaved, "an event"),
+            new("EnemyDropped", Kept.NotSaved, "an event"),
+            new("EnemyResurrected", Kept.NotSaved, "an event"),
+            new("BossDefeated", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
+            new("BraceTriggered", Kept.NotSaved, "an event"),
+            new("EnemyBraceTriggered", Kept.NotSaved, "an event"),
+            new("CharacterBuffed", Kept.NotSaved, "an event"),
+            new("CharacterHealed", Kept.NotSaved, "an event"),
+            new("EnemyBuffed", Kept.NotSaved, "an event"),
+            new("EnemyHealed", Kept.NotSaved, "an event"),
+            new("EnemyFleeing", Kept.NotSaved, "an event"),
+            new("ActorStatusTicked", Kept.NotSaved, "an event"),
+            new("ActorStatusApplied", Kept.NotSaved, "an event"),
+            new("ActorDisplaced", Kept.NotSaved, "an event"),
+            new("OpportunistTriggered", Kept.NotSaved, "an event"),
+            new("OverwatchTriggered", Kept.NotSaved, "an event"),
+            new("RiposteTriggered", Kept.NotSaved, "an event"),
+            new("XpCredited", Kept.NotSaved, "an event"),
+            new("EnchantmentTiered", Kept.NotSaved, "an event"),
+            new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
+        ],
     };
 
     /// <summary>A field's member name: an auto-property's backing field is its property, a field-like event its event.</summary>
@@ -122,8 +256,11 @@ public class SaveInventoryTests
         }
 
         // The scan reads real fields, the raw pools among them: the ones a save
-        // must keep below the public state, which reads them as their ceilings.
+        // must keep below the public state, which reads them as their ceilings —
+        // and, from the visit, the pin under a corpse and the turn's counters.
         Assert.Contains("_hp", typeof(ActorState).GetFields(Declared).Select(MemberOf));
         Assert.Contains("BudgetBeforeMire", typeof(PartyMemberState).GetFields(Declared).Select(MemberOf));
+        Assert.Contains("PinnedDrop", typeof(EnemyState).GetFields(Declared).Select(MemberOf));
+        Assert.Contains("_carry", typeof(DungeonState).GetFields(Declared).Select(MemberOf));
     }
 }

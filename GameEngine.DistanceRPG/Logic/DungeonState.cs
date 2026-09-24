@@ -8,13 +8,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// every run and every machine.
 /// <para>
 /// <strong>Stored versus derived.</strong> What a visit changes lives here and
-/// is what a save would store (§5.1): the enemy rows — position, HP,
+/// is what a save stores (§5.1): the enemy rows — position, HP,
 /// <c>Alive</c>, the farm's history — <see cref="Fog"/>'s explored memory, and
 /// the weapons the party put down here (<see cref="LooseItems"/>), which nothing
 /// could give back. Everything else re-derives bit-identically from the seed:
 /// the map, the fog boxes, the stairs (their own stream, <see cref="StairPlacer"/>), and every
-/// ground item a permanent kill left (<see cref="TurnSystem.GroundItemOf"/>).
-/// So a floor left and returned to is a pointer move, never a rebuild. The
+/// ground item a permanent kill left (<see cref="TurnSystem.GroundItemOf"/>) — which a
+/// save pins as it lay, since its derivation reads the loaded tuning and content
+/// too (<see cref="EnemyState.PinnedDrop"/>). So a floor left and returned to is a
+/// pointer move, never a rebuild, and a floor loaded is its terrain regenerated
+/// with the saved state stood on it (<see cref="Restore"/>). The
 /// boss's row is a row like the rest — where it stands, what it holds, whether
 /// it has fallen — and only its statline and its theme are content's to
 /// re-derive; the stacks its drop is promised are the visit's
@@ -111,7 +114,7 @@ public sealed class Floor
     /// </summary>
     public (int R, int C)? Lair { get; }
 
-    /// <summary>Whether the party has stood on this floor this visit: §5.1 saves visited floors only. Set by the visit on arrival.</summary>
+    /// <summary>Whether the party has stood on this floor this visit: §5.1 saves visited floors only. Set by the visit on arrival, and by a load for every floor it restores (<see cref="Restore"/>).</summary>
     public bool Visited { get; internal set; }
 
     /// <summary>
@@ -213,9 +216,7 @@ public sealed class Floor
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentNullException.ThrowIfNull(def);
 
-        long seed = DungeonState.FloorSeed(mapSeed, index);
-        var map = MapGenerator.Generate(new Mulberry32(seed));
-        var fogBoxes = FogBoxBuilder.Build(map);   // expands map.Corridors in place, exactly as the scene always has
+        var (seed, map, fogBoxes) = Terrain(mapSeed, index);
         var rows = PlaceEnemies(map, seed, def);
         var stairs = StairPlacer.Place(map, mapSeed, index);
 
@@ -228,6 +229,94 @@ public sealed class Floor
             enemies = [.. rows, boss];
         }
         return new Floor(index, seed, map, fogBoxes, enemies, stairs, bottom, boss);
+    }
+
+    /// <summary>
+    /// Floor <paramref name="index"/> of the dungeon seeded <paramref name="mapSeed"/>
+    /// as a save describes it (§5.1): the terrain <see cref="Generate"/> builds —
+    /// the map, its fog boxes and its stairs, regenerated from the seed, since maps
+    /// are never serialized — standing the saved rows on it instead of placing
+    /// any: "regenerate the dungeon from the seed on every entry, place enemies
+    /// only on the first visit, restore saved states afterwards". The explored
+    /// fog comes back, and on the floor the party stands on what it can see this
+    /// turn; so do the weapons put down here, in the order they were left. A
+    /// saved floor is a visited one.
+    /// <para>
+    /// Nothing is placed, rolled or arrived: <see cref="EnemyPlacer"/>'s stream
+    /// is never drawn, the boss is never rolled — its row is the save's, what it
+    /// holds included — and nobody is moved. The rows are the load's to have
+    /// built (<see cref="SaveGame.Restore"/>); this takes them as they are and
+    /// refuses only what no floor can hold.
+    /// </para>
+    /// </summary>
+    /// <param name="mapSeed">The dungeon's seed, as saved.</param>
+    /// <param name="index">The 0-based floor index.</param>
+    /// <param name="bottom">Whether this is the boss floor: the far tile is then the lair, and <paramref name="boss"/> is required.</param>
+    /// <param name="rows">Every row of the floor in spawn order, the boss's among them on the bottom floor, each spawn index once.</param>
+    /// <param name="boss">The row among <paramref name="rows"/> that is the floor's boss: on the bottom floor, and only there.</param>
+    /// <param name="looseItems">The weapons put down here, in the order they were left, each on a floor tile of the map.</param>
+    /// <param name="seen">The explored fog, one string per map row, <c>'1'</c> for a tile seen (<see cref="FogState.Encode"/>).</param>
+    /// <param name="visible">What the party can see this turn in the same encoding, or null for nothing: the current floor's alone.</param>
+    /// <exception cref="ArgumentException">
+    /// A row is null or a spawn index repeats; a boss where the floor is not the
+    /// bottom, none where it is, or one that is not among the rows; a fog row that
+    /// does not fit the map; or a loose item off the floor.
+    /// </exception>
+    internal static Floor Restore(long mapSeed, int index, bool bottom, IReadOnlyList<EnemyState> rows, EnemyState? boss,
+        IReadOnlyList<LooseItem> looseItems, IReadOnlyList<string> seen, IReadOnlyList<string>? visible)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(looseItems);
+        ArgumentNullException.ThrowIfNull(seen);
+        if (rows.Any(row => row is null))
+            throw new ArgumentException($"Floor {index + 1}'s rows name a null row.", nameof(rows));
+        if (rows.Select(row => row.SpawnIndex).Distinct().Count() != rows.Count)
+            throw new ArgumentException($"Floor {index + 1}'s rows repeat a spawn index: each row has its own, which seeds its drop and its ladder.", nameof(rows));
+        if (bottom != (boss is not null))
+            throw new ArgumentException(bottom
+                ? $"Floor {index + 1} is the dungeon's bottom, and names no boss: the bottom floor holds the dungeon's one boss."
+                : $"Floor {index + 1} is not the dungeon's bottom, and names a boss: only the bottom floor holds one.", nameof(boss));
+        if (boss is not null && !rows.Any(row => ReferenceEquals(row, boss)))
+            throw new ArgumentException($"Floor {index + 1}'s boss is not one of its rows.", nameof(boss));
+
+        var (seed, map, fogBoxes) = Terrain(mapSeed, index);
+        var stairs = StairPlacer.Place(map, mapSeed, index);
+        var floor = new Floor(index, seed, map, fogBoxes, rows.ToArray(), stairs, bottom, boss);
+
+        FogState.Decode(seen, floor.Fog.Seen, nameof(seen));
+        if (visible is not null)
+            FogState.Decode(visible, floor.Fog.Visible, nameof(visible));
+
+        var grid = map.Grid;
+        for (int i = 0; i < looseItems.Count; i++)
+        {
+            var item = looseItems[i] ?? throw new ArgumentException($"Floor {index + 1}'s loose item {i} is null.", nameof(looseItems));
+            var (r, c) = item.Tile;
+            if (r < 0 || r >= grid.GetLength(0) || c < 0 || c >= grid.GetLength(1) || grid[r, c] != 0)
+                throw new ArgumentException(
+                    $"Floor {index + 1}'s loose item {i}, {item.Weapon.Name}, lies at {item.Tile}, which is not a floor tile of the map: a weapon is put down where its carrier stood.",
+                    nameof(looseItems));
+            floor.LooseItems.Add(item);
+        }
+
+        floor.Visited = true;
+        return floor;
+    }
+
+    /// <summary>
+    /// A floor's ground: its seed, the map generated from it, and the map's fog
+    /// boxes — whose build expands <see cref="MapData.Corridors"/> in place,
+    /// exactly as the scene's always did. What <see cref="Generate"/> and
+    /// <see cref="Restore"/> both stand a floor on, in <see cref="Generate"/>'s
+    /// order, so a saved floor is regenerated to the tile.
+    /// </summary>
+    private static (long Seed, MapData Map, FogBoxSet FogBoxes) Terrain(long mapSeed, int index)
+    {
+        long seed = DungeonState.FloorSeed(mapSeed, index);
+        var map = MapGenerator.Generate(new Mulberry32(seed));
+        var fogBoxes = FogBoxBuilder.Build(map);   // expands map.Corridors in place, exactly as the scene always has
+        return (seed, map, fogBoxes);
     }
 
     /// <summary>
@@ -642,6 +731,151 @@ public sealed class DungeonState
         var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors, XpSnapshot.Of(party));
         visit.Arrive(party, floors[0].UpStairs);
         return visit;
+    }
+
+    /// <summary>
+    /// A visit as a save describes it (§5.1's Run group): the dungeon, the seed,
+    /// and the depth and the promise the entry fixed — the values the load uses,
+    /// never rolled or re-derived through a tuning that may have changed since
+    /// (§4.3: "a tuning change during the visit moves neither") — every floor
+    /// already built (the visited ones restored, <see cref="Floor.Restore"/>; the
+    /// rest generated from the seed, the depth and the promise), the floor the
+    /// party is on and the deepest it has reached, the clock, the boss's death,
+    /// the party's XP at the door, this turn's counters, and the spoils — the very
+    /// weapons now in the bags and on the floors. The one door a visit comes back
+    /// through: internal, beside <see cref="Enter"/>.
+    /// <para>
+    /// <strong>It opens nothing, places nobody and rolls nothing.</strong> No
+    /// system is open (<see cref="Turns"/> is null): whoever plays the floor opens
+    /// it (<see cref="OpenTurns"/>), which imports the saved counters and catches
+    /// the floor up exactly as an arrival does. The party stands where the save
+    /// has it — arriving would move it to the stairs — and the rows where the
+    /// floors have them.
+    /// </para>
+    /// </summary>
+    /// <param name="def">The dungeon.</param>
+    /// <param name="mapSeed">The seed it was entered on.</param>
+    /// <param name="bossFloor">The boss floor, a 1-based floor number: <paramref name="floors"/> holds exactly this many.</param>
+    /// <param name="promisedStacks">The stacks the boss's drop was promised at entry.</param>
+    /// <param name="entrySnapshot">The party's XP at the door.</param>
+    /// <param name="floors">Every floor, index 0 first: the visited ones down to <paramref name="deepestFloorIndex"/>, the rest never stood on.</param>
+    /// <param name="floorIndex">The floor the party is on.</param>
+    /// <param name="deepestFloorIndex">The deepest floor it has stood on.</param>
+    /// <param name="turn">The visit's clock.</param>
+    /// <param name="bossDefeated">Whether the boss has fallen.</param>
+    /// <param name="bossDefeatedAtTurn">The turn it fell, or -1 while it stands.</param>
+    /// <param name="carry">This turn's counters, or null for none: only this turn's, since a carry from an earlier one is dead weight.</param>
+    /// <param name="spoils">The spoils in the order taken, each the very weapon where it now is.</param>
+    /// <exception cref="ArgumentException">
+    /// The floors are not the dungeon's depth, out of order, or visited other than
+    /// down to the deepest; the floor or the deepest is out of the dungeon; the
+    /// boss's death names no turn it could have been; the carry is another turn's;
+    /// or a spoil is null or listed twice.
+    /// </exception>
+    internal static DungeonState Restore(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, XpSnapshot entrySnapshot, Floor[] floors,
+        int floorIndex, int deepestFloorIndex, int turn, bool bossDefeated, int bossDefeatedAtTurn, TurnCarry? carry, IReadOnlyList<Weapon> spoils)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        ArgumentNullException.ThrowIfNull(entrySnapshot);
+        ArgumentNullException.ThrowIfNull(floors);
+        ArgumentNullException.ThrowIfNull(spoils);
+        ArgumentOutOfRangeException.ThrowIfLessThan(bossFloor, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(promisedStacks);
+        ArgumentOutOfRangeException.ThrowIfNegative(turn);
+        if (floors.Length != bossFloor)
+            throw new ArgumentException($"{floors.Length} floors for a boss on floor {bossFloor}: a visit holds every floor down to its boss.", nameof(floors));
+        if (floorIndex < 0 || floorIndex > deepestFloorIndex || deepestFloorIndex >= bossFloor)
+            throw new ArgumentException(
+                $"Floor index {floorIndex} with the deepest {deepestFloorIndex} in a dungeon {bossFloor} floors deep: the party stands on a floor it has reached, inside the dungeon.",
+                nameof(floorIndex));
+        for (int n = 0; n < floors.Length; n++)
+        {
+            var floor = floors[n] ?? throw new ArgumentException($"Floor {n + 1} is null.", nameof(floors));
+            if (floor.Index != n)
+                throw new ArgumentException($"Floor {n + 1} holds the floor indexed {floor.Index}: the floors run in order from the first.", nameof(floors));
+            if (floor.Visited != (n <= deepestFloorIndex))
+                throw new ArgumentException(
+                    $"Floor {n + 1} is {(floor.Visited ? "" : "not ")}visited with the deepest reached {deepestFloorIndex + 1}: floors are adjacent, so every floor down to the deepest was stood on, and none below it.",
+                    nameof(floors));
+            if ((floor.DownStairs is null) != (n == bossFloor - 1))
+                throw new ArgumentException($"Floor {n + 1} is {(floor.DownStairs is null ? "" : "not ")}a bottom floor in a dungeon {bossFloor} floors deep.", nameof(floors));
+        }
+        if (bossDefeated ? bossDefeatedAtTurn < 0 || bossDefeatedAtTurn > turn : bossDefeatedAtTurn != -1)
+            throw new ArgumentException(
+                bossDefeated
+                    ? $"The boss fell at turn {bossDefeatedAtTurn}, and the clock stands at {turn}: it fell on a turn the visit has had."
+                    : $"The boss stands, and fell at turn {bossDefeatedAtTurn}: a standing boss fell at no turn (-1).",
+                nameof(bossDefeatedAtTurn));
+        if (carry is not null && carry.Turn != turn)
+            throw new ArgumentException($"The counters are turn {carry.Turn}'s, and the clock stands at {turn}: a visit carries this turn's alone.", nameof(carry));
+        for (int i = 0; i < spoils.Count; i++)
+        {
+            if (spoils[i] is null)
+                throw new ArgumentException($"Spoil {i} is null.", nameof(spoils));
+            for (int j = 0; j < i; j++)
+                if (ReferenceEquals(spoils[j], spoils[i]))
+                    throw new ArgumentException($"Spoil {i} is spoil {j} again: a weapon is one spoil, once.", nameof(spoils));
+        }
+
+        var visit = new DungeonState(def, mapSeed, bossFloor, promisedStacks, floors, entrySnapshot)
+        {
+            FloorIndex = floorIndex,
+            DeepestFloorIndex = deepestFloorIndex,
+            BossDefeated = bossDefeated,
+            BossDefeatedAtTurn = bossDefeatedAtTurn,
+        };
+        visit._turn = turn;
+        visit._carry = carry;
+        visit._spoils.AddRange(spoils);
+        return visit;
+    }
+
+    /// <summary>
+    /// The counters of the turn in progress as a save must keep them
+    /// (<see cref="TurnCarry"/>): the floors already stood on in this turn, merged
+    /// with the open system's own (<see cref="TurnSystem.ExportCarry"/>) exactly
+    /// as the stairs merge them — the open system's figures win, and another
+    /// floor's enemies are kept — or, with no system open, the carry the stairs
+    /// left. This turn's alone: null when the counters are an earlier turn's, and
+    /// when there are none. For reading: the save sorts what it reads into its own
+    /// lists, and nothing here writes the live counters.
+    /// </summary>
+    internal TurnCarry? CurrentCarry()
+    {
+        var carry = Turns is { } open
+            ? (_carry is null ? open.ExportCarry() : _carry.MergedWith(open.ExportCarry()))
+            : _carry;
+        if (carry is null || carry.Turn != Turn)
+            return null;
+        return carry.Attacks.Count == 0 && carry.ZoneUses.Count == 0 && carry.ReactionUses.Count == 0 && carry.Seen.Count == 0
+            ? null
+            : carry;
+    }
+
+    /// <summary>
+    /// What <paramref name="row"/> lies on right now, for a floor with no system
+    /// open (§3.5): exactly what <see cref="TurnSystem.GroundItemOf"/> answers for
+    /// a row of the floor it is open on. Nothing while the dungeon still
+    /// resurrects — the boss standing — nothing on a row standing, and nothing
+    /// once taken; a pin a load handed back (<see cref="EnemyState.PinnedDrop"/>)
+    /// before anything derived; and otherwise the drop the roster's feed would
+    /// roll, off the floor's own seed — the boss's own drop for
+    /// <see cref="Floor.Boss"/> (<see cref="BossLoot.Roll"/>), every other row's
+    /// own class's (<see cref="LootTable.Roll"/>).
+    /// </summary>
+    /// <param name="floor">The floor the row is on.</param>
+    /// <param name="row">One of <paramref name="floor"/>'s rows.</param>
+    /// <param name="bossDefeated">Whether the visit's boss has fallen: what stops resurrection and lays every corpse's drop.</param>
+    /// <exception cref="ArgumentException"><paramref name="row"/> is not one of <paramref name="floor"/>'s rows: its drop is its own floor's to derive.</exception>
+    internal static Drop? GroundItemOf(Floor floor, EnemyState row, bool bossDefeated)
+    {
+        ArgumentNullException.ThrowIfNull(floor);
+        ArgumentNullException.ThrowIfNull(row);
+        if (!floor.Enemies.Any(enemy => ReferenceEquals(enemy, row)))
+            throw new ArgumentException($"The row is not one of floor {floor.Index + 1}'s: its drop is its own floor's to derive.", nameof(row));
+        if (!bossDefeated || row.Alive || row.DropTaken)
+            return null;
+        return row.PinnedDrop ?? (ReferenceEquals(row, floor.Boss) ? BossLoot.Roll(row, floor.Seed) : LootTable.Roll(row, floor.Seed));
     }
 
     /// <summary>

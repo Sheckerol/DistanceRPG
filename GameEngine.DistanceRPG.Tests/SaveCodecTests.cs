@@ -302,6 +302,9 @@ public class SaveCodecTests
         [
             typeof(SaveFile), typeof(ViewDto), typeof(CampaignDto), typeof(LockDto), typeof(MemberDto), typeof(StatsDto), typeof(ActorDto),
             typeof(StatusDto), typeof(WeaponDto), typeof(EnchantmentDto), typeof(RunResultDto), typeof(ClawbackDto),
+            // Phase 5.6: the visit in progress.
+            typeof(VisitDto), typeof(XpSnapshotDto), typeof(MemberXpDto), typeof(SpoilDto), typeof(CarryDto), typeof(CountDto),
+            typeof(ReactionUseDto), typeof(ActorRefDto), typeof(FloorDto), typeof(EnemyDto), typeof(DropDto), typeof(LooseItemDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>
@@ -311,7 +314,7 @@ public class SaveCodecTests
         });
 
         // No DTO holds a gameplay type: plain values, lists and tables of them, and other DTOs.
-        Type[] plain = [typeof(int), typeof(float), typeof(bool), typeof(string), typeof(int?)];
+        Type[] plain = [typeof(int), typeof(float), typeof(bool), typeof(string), typeof(int?), typeof(long)];   // long: a visit's map seed (5.6)
         var offenders = dtos
             .SelectMany(dto => dto.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => (Where: $"{dto.Name}.{p.Name}", p.PropertyType)))
             .Where(p => Constituents(p.PropertyType).Any(t => !plain.Contains(t) && !dtos.Contains(t)

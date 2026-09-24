@@ -25,21 +25,27 @@ namespace GameEngine.DistanceRPG.Tests;
 /// cycle — or the same pair — twice. Indexers and delegates are skipped.</item>
 /// </list>
 /// Public state only: what a save keeps below it (the raw pools) is compared
-/// by the two captures' texts, which every round trip also asserts.
+/// by the two captures' texts, which every round trip also asserts. A caller
+/// may name paths that are not state the comparison is about (<c>ignore</c>) —
+/// what a save declares it does not keep, such as another floor's stale sight —
+/// and must say why where it does.
 /// </summary>
 internal static class StateAssert
 {
     /// <summary>Fail, naming the path, at the first place <paramref name="actual"/> reads differently from <paramref name="expected"/>.</summary>
-    public static void Equivalent(object? expected, object? actual, string root = "state")
+    /// <param name="ignore">Paths left out of the comparison, whole: null compares everything.</param>
+    public static void Equivalent(object? expected, object? actual, string root = "state", Func<string, bool>? ignore = null)
     {
-        if (Difference(expected, actual, root, new HashSet<(object, object)>(PairComparer.Instance)) is { } difference)
+        if (Difference(expected, actual, root, new HashSet<(object, object)>(PairComparer.Instance), ignore ?? (_ => false)) is { } difference)
             Assert.Fail(difference);
     }
 
     private static readonly HashSet<Type> ContentRows = [typeof(EnchantmentDef), typeof(WeaponDef), typeof(DungeonDef), typeof(PartyMemberDef)];
 
-    private static string? Difference(object? expected, object? actual, string path, HashSet<(object, object)> walked)
+    private static string? Difference(object? expected, object? actual, string path, HashSet<(object, object)> walked, Func<string, bool> ignore)
     {
+        if (ignore(path))
+            return null;
         if (expected is null || actual is null)
             return expected is null && actual is null ? null : $"{path}: expected {Show(expected)}, was {Show(actual)}";
 
@@ -50,7 +56,7 @@ internal static class StateAssert
             var left = sequence.Cast<object?>().ToList();
             var right = other.Cast<object?>().ToList();
             for (int i = 0; i < Math.Min(left.Count, right.Count); i++)
-                if (Difference(left[i], right[i], $"{path}[{i}]", walked) is { } inner)
+                if (Difference(left[i], right[i], $"{path}[{i}]", walked, ignore) is { } inner)
                     return inner;
             return left.Count == right.Count ? null : $"{path}: expected {left.Count} items, was {right.Count}";
         }
@@ -85,7 +91,7 @@ internal static class StateAssert
         if (type.IsGenericType && type.FullName!.StartsWith("System.ValueTuple`", StringComparison.Ordinal))
         {
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
-                if (Difference(field.GetValue(expected), field.GetValue(actual), $"{path}.{field.Name}", walked) is { } inner)
+                if (Difference(field.GetValue(expected), field.GetValue(actual), $"{path}.{field.Name}", walked, ignore) is { } inner)
                     return inner;
             return null;
         }
@@ -101,7 +107,7 @@ internal static class StateAssert
                 return $"{path}.{property.Name}: expected {(leftThrew ?? Show(left))}, was {(rightThrew ?? Show(right))}";
             if (leftThrew is not null)
                 continue;   // both refuse the read, alike
-            if (Difference(left, right, $"{path}.{property.Name}", walked) is { } inner)
+            if (Difference(left, right, $"{path}.{property.Name}", walked, ignore) is { } inner)
                 return inner;
         }
         return null;
