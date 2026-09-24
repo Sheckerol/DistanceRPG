@@ -33,15 +33,29 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 
 ## Controls
 
-| Input | Action |
+The game opens on the screen between runs: the dungeon list, with the last
+run's summary above it once a run has ended. Until the tutorial's golem is
+beaten it lists the tutorial alone.
+
+| Between runs | Action |
+| --- | --- |
+| W/S / arrows | Choose a dungeon (a locked one shows its countdown and is skipped) |
+| Enter | Descend into the chosen dungeon |
+| Esc | Quit the game |
+
+| In a dungeon | Action |
 | --- | --- |
 | WASD / arrows | Move the active character |
 | 1–4 / Tab / click | Switch party member (click their box or the party list) |
 | Left-click enemy | Attack with the equipped weapon |
 | Space / Enter | End turn (banks half your unspent movement) |
+| E | Take the stairs the active character stands on: down, up, or out by the first floor's way out. Every living member must be within 3 tiles; the way out asks first, and E or Enter says yes |
+| G | Pick up what the active character stands on: a drop, or a weapon the party left there |
 | I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
+| X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
 | Scroll wheel | Zoom |
-| Esc | Close inventory, otherwise open/close the pause menu |
+| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the pause menu. Does nothing on a run's summary |
+| Enter (run's summary) | Back to the screen between runs |
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement

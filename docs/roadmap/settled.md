@@ -1287,7 +1287,7 @@ passages met and one had to be read in the light of the other. Each is written
 down here so the next reader meets the ruling rather than the code that assumes
 it. Three of them bend a rule above or a line of the phase doc rather than fill
 a silence; those three are marked **pending the user's ruling** and ship
-provisionally.
+provisionally, and open-questions.md sets out the alternatives to each.
 
 - **The campaign lives outside the dungeon, and holds the visit.**
   `CampaignState` is §6.7's campaign: the party, what it has met, the run
@@ -1323,7 +1323,7 @@ provisionally.
   entry above), because a staff in an enemy's hands flees and a wand has no
   enemy AI. The class it drops is drawn over the whole table, all eight for
   Block as §4.3 says of the golem, so the Long Gallery drops bows no enemy
-  swings. That departs from §3.2's "an enemy drops a weapon of its own class"
+  swings. That departs from §3.1's "an enemy drops a weapon of its own class"
   for the one enemy whose table bends to the guarantee. Both class draws redraw
   over a compiled list rather than step to the next legal class, so the drop is
   uniform over its table and no class is favoured by the gaps.

@@ -171,3 +171,56 @@ rules out); shorten every lock while all are locked; or make the hub's sixth
 dungeon a Phase 4 requirement so the corner is rare rather than certain. Phase
 6b's full roster makes it rare whichever is chosen — but not impossible, so some
 rule has to exist. settled.md's Phase 4 implementation pass records the ruling.
+
+## What a dungeon's theme attunes (§1.4, §4.3, §5.8)
+
+settled.md's entry on theme reads: "A themed dungeon attunes every floor it has;
+an unthemed dungeon attunes none of them." §4.3 says each dungeon is themed, so
+taken word for word, every dungeon attunes every floor. But the theme §4.3
+means is a modifier (`Block`, `Brace`), which names no element to attune
+anything to, and §5.8 gives `dungeons.json` an `attunement` field of its own: "a
+damage type, or none". The entry cites §1.4, whose type chart speaks of "a
+Flaming floor" and "a Cold dungeon", and read there "themed" means
+element-themed.
+
+**Shipped provisionally: attunement is its own field.** A dungeon's attunement
+is `DungeonDef.Attunement`, apart from its modifier theme, and every enemy the
+dungeon spawns carries it. None of the five shipped dungeons sets one, so
+nothing in play is attuned yet and the type chart (the same element halved, the
+opposed one ×1.5) changes no hit. The mechanism is built and tested on a
+fixture dungeon. The tutorial's golem teaches `Block`, not the chart.
+
+**This reads a settled entry one way rather than the other, so it is the user's
+to decide.** The alternatives: keep it, and attune a dungeon only where content
+says so; take the entry word for word and attune every dungeon, which needs an
+element chosen for each of the five; or attune the four ordinary dungeons and
+leave the tutorial unattuned, so the golem still teaches `Block` alone. The
+last two are content edits, one field a dungeon, with no code to change.
+settled.md's Phase 4 implementation pass records the ruling.
+
+## What class a boss drops (§3.1, §4.3, §5.8)
+
+§3.1 says "an enemy drops a weapon of its own class": the drop reads back the
+class the enemy holds. §4.3 says the boss's drop is a guarantee, so "its drop
+table bends to it rather than the other way round", and that "the golem's table
+is all eight classes"; §5.8 computes that table by running `Allowed` over the
+eight. The two meet at the boss, because an enemy holds only the close-range
+classes `EnemyPlacer` fields (settled.md's `EnemyPlacer` entry): a staff in an
+enemy's hands flees, and a wand has no enemy AI. Read off the weapon it holds,
+the golem's table would shrink from all eight classes to those, and the Long
+Gallery (`Longshot`, a bow's class feature) could never drop a bow — so its
+unique, Stormcrow, could never drop at all.
+
+**Shipped provisionally: what a boss holds and what it drops are two draws.** It
+holds a class from its theme's table narrowed to what an enemy fields
+(`DungeonCatalogue.WieldClasses`), and drops a class drawn over the whole table
+(`BossLoot.Roll`, which never reads the held weapon). So a golem swinging a
+hatchet can drop a bow, a staff or a wand, each forged with `Block`.
+
+**This departs from §3.1 for the one enemy whose table bends to the guarantee,
+so it is the user's to decide.** The alternatives: keep it; read the drop off
+the held weapon as §3.1 says, which shrinks every table to the classes an enemy
+fields, so the Long Gallery drops neither a bow nor its unique until enemies
+can use one; or let the boss hold any class in its table, so one draw serves
+both, which waits on the kiting AI and wand placement that the `EnemyPlacer`
+entry waits on. settled.md's Phase 4 implementation pass records the ruling.
