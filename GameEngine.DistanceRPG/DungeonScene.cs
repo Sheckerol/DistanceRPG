@@ -1269,7 +1269,22 @@ public class DungeonScene : Scene
     {
         Log.Info($"[Stairs] {ActiveCharacter.State.Id} leads the party {(stair.Kind == Stair.Down ? "down" : "up")} from floor {_floor.Index + 1}");
         _transitStair = stair;
-        _transit = Transit.FadingOut;
+        StartFadeOut(Transit.FadingOut);
+    }
+
+    /// <summary>
+    /// Start a fade to black away from the floor being played: the stairs'
+    /// (<see cref="Transit.FadingOut"/>) or the way out's
+    /// (<see cref="Transit.Leaving"/>). The floor's arrival banner comes down
+    /// first (<see cref="DungeonHud.HideArrival"/>). It is drawn over the fade,
+    /// which is how the next floor's is up at black, so one still up from the
+    /// arrival — a quick hop on, a leave straight off the way out — would
+    /// otherwise hang on the black naming the floor the party is leaving.
+    /// </summary>
+    private void StartFadeOut(Transit fade)
+    {
+        _hud.HideArrival();
+        _transit = fade;
         _transitClock = 0f;
     }
 
@@ -1348,8 +1363,7 @@ public class DungeonScene : Scene
             return;
 
         Log.Info($"[Run] The party leaves {_visit.Def.Name} at turn {_turns.TurnCount}: the visit is discarded whole");
-        _transit = Transit.Leaving;
-        _transitClock = 0f;
+        StartFadeOut(Transit.Leaving);
     }
 
     // ── Marching formation ───────────────────────────────────────────────────

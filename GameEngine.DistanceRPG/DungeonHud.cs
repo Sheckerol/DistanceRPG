@@ -59,7 +59,8 @@ public sealed class DungeonHud
     private readonly List<FloatingText> _floatingTexts = new();
 
     // The arrival banner (ShowArrival): the floor reached and the dungeon it is
-    // in, and how long it has been up.
+    // in, and how long it has been up — taken down early (HideArrival) the
+    // moment the party starts off the floor it names.
     private (string Floor, string Dungeon)? _banner;
     private float _bannerAge;
 
@@ -80,6 +81,17 @@ public sealed class DungeonHud
         _banner = (ArrivalBanner(visit), visit.Def.Name.ToUpperInvariant());
         _bannerAge = 0f;
     }
+
+    /// <summary>
+    /// Take the arrival banner down before its time: the party is starting off
+    /// the floor it names, down or up the stairs or out by the way out. The
+    /// banner is drawn over the stairs' fade, which is what puts the next
+    /// floor's up at black; left up, the floor being left would go on naming
+    /// itself on that black — until the swap on the stairs, and through the whole
+    /// fade to the next visit on the way out. The next <see cref="ShowArrival"/>
+    /// puts one up as ever.
+    /// </summary>
+    public void HideArrival() => _banner = null;
 
     /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
     public void ClearFloatingTexts() => _floatingTexts.Clear();
@@ -177,7 +189,8 @@ public sealed class DungeonHud
         // The stairs' fade goes over everything drawn so far, the world and the
         // HUD alike — the floor line changes at black, never in view — and the
         // arrival banner over the fade, so it is up at black and the new floor
-        // comes in under it.
+        // comes in under it. Only ever the new floor's: the banner of the floor
+        // being left came down when its fade began (HideArrival).
         _fade.Draw(_game.ShaderManager, scene.TransitFade);
         DrawArrivalBanner(scene, w, h);
         _text.Flush(_game.ShaderManager);
@@ -339,7 +352,8 @@ public sealed class DungeonHud
     /// The arrival banner, fading over its last <see cref="BannerFadeSeconds"/>:
     /// the dungeon's name, and the floor reached under it. Not over a menu or the
     /// game-over screen, whose words are at the same height and are the ones
-    /// being asked about.
+    /// being asked about; and never over the fade away from the floor it names,
+    /// which takes it down as it starts (<see cref="HideArrival"/>).
     /// </summary>
     private void DrawArrivalBanner(DungeonScene scene, int w, int h)
     {
