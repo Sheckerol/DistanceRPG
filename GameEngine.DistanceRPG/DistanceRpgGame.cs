@@ -12,12 +12,16 @@ namespace GameEngine.DistanceRPG;
 /// <para>
 /// <strong>The game owns the campaign</strong> (§6.7): one
 /// <see cref="CampaignState"/> for the process — the party, built once, and
-/// everything it has met — which every run is played by and which outlives every
-/// scene (Phase 5 will load and save it). A run is a <see cref="DungeonScene"/>
-/// over the campaign's visit: <see cref="BeginRun"/> rolls the visit's seed —
-/// out here, never in <c>Logic/</c> — enters the dungeon, and hands the scene a
-/// view of it; the scene tells the game when the run is over
-/// (<see cref="IRunHost.RunOver"/>), and the game begins the next one.
+/// everything it has met, and every number a run carries out (the run counter,
+/// the locks, the cleared and retired dungeons) — which every run is played by
+/// and which outlives every scene (Phase 5 will load and save it). A run is a
+/// <see cref="DungeonScene"/> over the campaign's visit: <see cref="BeginRun"/>
+/// rolls the visit's seed — out here, never in <c>Logic/</c> — enters the
+/// dungeon, and hands the scene a view of it; the run ends in the campaign
+/// (<see cref="CampaignState.EndRun"/>), the scene shows its summary, and tells
+/// the game when the player moves on (<see cref="IRunHost.RunOver"/>), and the
+/// game begins the next one in the campaign's next dungeon
+/// (<see cref="CampaignState.DefaultNext"/>).
 /// </para>
 /// <para>
 /// Gameplay scenes are single-use (the engine disposes one for good when it is
@@ -56,9 +60,7 @@ public class DistanceRpgGame : Game, IRunHost
     // BeginRun that actually enters a dungeon.
     private long? _bootSeed;
 
-    // The dungeon the current run is in, for RunOver to begin again; and a run
-    // asked for while the engine was mid-transition, begun once it is not.
-    private string? _runDungeonId;
+    // A run asked for while the engine was mid-transition, begun once it is not.
     private string? _pendingRun;
 
     public DistanceRpgGame()
@@ -118,18 +120,19 @@ public class DistanceRpgGame : Game, IRunHost
     }
 
     /// <summary>
-    /// The run the current scene was playing is over (the party left by the
-    /// way out): the visit is discarded whole — every floor, every row, every
-    /// farm (§4.1) — and a fresh visit to the same dungeon begins, on a new
-    /// seed, with the party rested. What happens here grows with the run's end
-    /// (its outcomes, the next dungeon) and the between-runs screen.
+    /// The run the current scene was playing is over, and its summary has been
+    /// read: the campaign has already ended it (<see cref="CampaignState.EndRun"/>
+    /// — the outcome, the tick, the lock or the retirement written, the visit
+    /// discarded whole), so the next run begins, in the campaign's next dungeon
+    /// (<see cref="CampaignState.DefaultNext"/>: the tutorial until it is beaten,
+    /// then the first dungeon whose lock has lifted, and with every one locked the
+    /// early offer), on a new seed, with the party rested. The between-runs screen
+    /// takes this over when it exists.
     /// </summary>
     public void RunOver()
     {
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        string dungeonId = campaign.Visit?.Def.Id ?? _runDungeonId ?? GameContent.Current.Dungeons.Tutorial.Id;
-        campaign.Abandon();
-        BeginRun(dungeonId);
+        BeginRun(campaign.DefaultNext());
     }
 
     /// <summary>
@@ -152,8 +155,7 @@ public class DistanceRpgGame : Game, IRunHost
         long mapSeed = _bootSeed ?? (uint)Random.Shared.NextInt64();
         _bootSeed = null;   // the override is the boot run's alone
         var visit = campaign.Enter(dungeonId, mapSeed);
-        _runDungeonId = visit.Def.Id;
-        Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed}");
+        Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed} - run counter {campaign.RunCounter}");
 
         var scene = new DungeonScene(_camera!, this, campaign, this);
         if (scenes.HasScene(DungeonSceneName))
@@ -175,8 +177,9 @@ public class DistanceRpgGame : Game, IRunHost
 
     /// <summary>
     /// Escape goes to the scene being played: it closes a menu or opens the pause
-    /// menu there, and only what the scene leaves unconsumed — the game-over
-    /// screen's — quits. Mid-transition between scenes it does nothing at all,
+    /// menu there — whose EXIT is how the game is quit — and does nothing on a
+    /// run's summary, where ENTER is the one way on; only what a scene leaves
+    /// unconsumed quits. Mid-transition between scenes it does nothing at all,
     /// neither scene's to answer and never a quit on the way into a run.
     /// </summary>
     private void OnEscape()

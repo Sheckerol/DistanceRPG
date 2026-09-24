@@ -139,3 +139,35 @@ nothing. Whoever next edits §3.3 should write "two more triggers, a fraction of
 third, and then nothing" rather than move the code toward the shorter sentence:
 an entry that refused to fire at all below its trigger would be a new rule, and
 it would contradict the one §3.1 already settled.
+
+## What happens when every dungeon is locked (§4.3, §6.3)
+
+settled.md fixes the lock: "clearing a dungeon locks it for `bossFloor` runs",
+counted "by the same events that tick the enchanter, so there is no second
+clock". **With every dungeon that is not retired locked, that rule has no way
+out**: no dungeon can be entered, so no run can end, so nothing ticks, so no
+lock ever lifts. The game would be stuck on the between-runs screen for good.
+
+**The cause is Phase 4's four dungeons, not the rule.** settled.md's first
+playable hub has six non-tutorial dungeons; Phase 4 ships four, because the
+other two need content that does not exist yet (a Great Axe unique for a
+Cleave dungeon, or a repeated theme — Phase 6b completes the roster). With four
+and a lock of at least five runs, four straight clears lock every one of them,
+certainly: the first lock outlasts the three ticks after it. At six the dead end
+needs long locks to line up and is rare; at four it is one ordinary streak away.
+
+**Shipped provisionally, as the least rule that prevents it**
+(`CampaignState.EarlyOffer`): with every non-retired dungeon locked, the one
+whose lock lifts soonest — ties in `dungeons.json` file order — is offered early.
+The next run goes there by default (`CampaignState.DefaultNext`), and entering
+it sets its `LockedUntilRun` to the current run counter, so it stands as a lock
+that has just lifted; nothing else moves (the cleared set, the other locks, the
+counter). It is the only place a lock is ever shortened.
+
+**This changes a settled rule in one corner, so it is the user's to decide.**
+The alternatives worth weighing: keep the early offer; let a locked dungeon's
+lock tick down on an entry that is not a run (a second clock, which settled.md
+rules out); shorten every lock while all are locked; or make the hub's sixth
+dungeon a Phase 4 requirement so the corner is rare rather than certain. Phase
+6b's full roster makes it rare whichever is chosen — but not impossible, so some
+rule has to exist. settled.md's Phase 4 implementation pass records the ruling.

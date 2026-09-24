@@ -15,6 +15,44 @@ public class CampaignStateTests
     private static Weapon Carrying(params string[] enchantmentIds)
         => TestWeapons.Enchanted("Met", range: 40, damage: 10, cost: 30, enchantmentIds);
 
+    /// <summary>Stand the party round <paramref name="tile"/> — around living enemies, never on them — as a party that walked there would.</summary>
+    private static void Gather(DungeonState visit, IReadOnlyList<PartyMemberState> party, (int R, int C) tile)
+    {
+        var floor = visit.Current;
+        var taken = floor.Enemies.Where(e => e.Alive).Select(Displacer.TileOf).ToHashSet();
+        var tiles = GridUtils.FindPartySpawnTiles(floor.Map.Grid, tile.R, tile.C, party.Count, taken);
+        for (int i = 0; i < party.Count; i++)
+            (party[i].X, party[i].Y) = Displacer.CentreOf(tiles[i].R, tiles[i].C);
+    }
+
+    /// <summary>
+    /// A clear of <paramref name="dungeonId"/>: in, down every floor, the boss's
+    /// death recorded on the bottom one as its fall records it
+    /// (<see cref="DungeonState.RecordBossDefeated"/>), back up, and out by the
+    /// first floor's way out.
+    /// </summary>
+    private static void Clear(CampaignState campaign, string dungeonId)
+    {
+        var party = campaign.Party;
+        var visit = campaign.Enter(dungeonId, 4);   // five floors deep wherever the range is the tuning's
+        visit.OpenTurns(party, () => 10);
+        while (visit.Current.DownStairs is { } down)
+        {
+            Gather(visit, party, down);
+            visit.Descend(party);
+            visit.OpenTurns(party, () => 10);
+        }
+        visit.RecordBossDefeated();
+        while (visit.FloorIndex > 0)
+        {
+            Gather(visit, party, visit.Current.UpStairs);
+            visit.Ascend(party);
+            visit.OpenTurns(party, () => 10);
+        }
+        Gather(visit, party, visit.Current.UpStairs);
+        Assert.Equal(RunOutcome.BossKill, campaign.EndRun(RunEnding.Exited).Outcome);
+    }
+
     [Fact]
     public void SeeAddsEveryEnchantmentAWeaponCarries_AndOnlyGrows()
     {
@@ -147,9 +185,21 @@ public class CampaignStateTests
         Assert.Equal(roster, CampaignState.Start(GameContent.Current).Party.Select(m => m.Id));
         Assert.Equal(roster, CampaignState.Start(GameContent.Current).Party.Select(m => m.Id));
 
+        // And the run's-end records (Phase 4: the locks, the cleared set, the
+        // retired set), each an ordinal-sorted view read the same way every time
+        // (LocksAndRetirementsAreOrdinalOrdered fills them).
+        var fresh = new CampaignState();
+        Assert.Equal(fresh.LockedInOrder, fresh.LockedInOrder);
+        Assert.Equal(fresh.ClearedInOrder, fresh.ClearedInOrder);
+        Assert.Equal(fresh.RetiredInOrder, fresh.RetiredInOrder);
+
         // And the type hands out no other view to iterate by accident: no public
         // set, no hash-ordered list, nothing but the named ordered views.
-        string[] orderedViews = [nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party)];
+        string[] orderedViews =
+        [
+            nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party),
+            nameof(CampaignState.LockedInOrder), nameof(CampaignState.ClearedInOrder), nameof(CampaignState.RetiredInOrder),
+        ];
         var iterable = typeof(CampaignState)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => !orderedViews.Contains(p.Name))
@@ -159,5 +209,46 @@ public class CampaignStateTests
                 .GetFields(BindingFlags.Public | BindingFlags.Instance)
                 .Select(f => f.Name));
         Assert.Empty(iterable);
+    }
+
+    [Fact]
+    public void LocksAndRetirementsAreOrdinalOrdered()
+    {
+        // The run's-end records §5.1 will save — the lock each clear wrote, the
+        // dungeons cleared at least once, the dungeons retired for good — are kept
+        // for lookups and handed out sorted by id with the ordinal comparer,
+        // whatever order the runs came in: two campaigns clearing the same
+        // dungeons in opposite orders read identically, and neither reads a hash
+        // set's order. The tutorial retires and is never a lock.
+        string[] hub = ["spear_hall", "long_gallery", "knife_warrens", "quiver_pits"];
+        PartyMemberState[] Party() => new[] { "A", "B", "C", "D" }.Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i)).ToArray();
+
+        var forwards = new CampaignState(Party());
+        Clear(forwards, "tutorial");
+        foreach (string id in hub)
+            Clear(forwards, id);
+
+        var backwards = new CampaignState(Party());
+        Clear(backwards, "tutorial");
+        foreach (string id in hub.Reverse())
+            Clear(backwards, id);
+
+        string[] sorted = ["knife_warrens", "long_gallery", "quiver_pits", "spear_hall"];
+        Assert.Equal(sorted, hub.Order(StringComparer.Ordinal));
+        Assert.Equal(sorted, forwards.LockedInOrder.Select(l => l.DungeonId));
+        Assert.Equal(sorted, backwards.LockedInOrder.Select(l => l.DungeonId));
+        Assert.Equal(forwards.LockedInOrder, forwards.LockedInOrder);
+        foreach (var (id, until) in forwards.LockedInOrder)
+            Assert.Equal(forwards.LockedUntilRun(id), until);   // the view and the lookup are one record
+
+        Assert.Equal(sorted.Append("tutorial"), forwards.ClearedInOrder);
+        Assert.Equal(forwards.ClearedInOrder, backwards.ClearedInOrder);
+        Assert.Equal(new[] { "tutorial" }, forwards.RetiredInOrder);
+        Assert.Equal(forwards.RetiredInOrder, backwards.RetiredInOrder);
+        Assert.DoesNotContain("tutorial", forwards.LockedInOrder.Select(l => l.DungeonId));
+
+        // The same five clears, the same counter; only which dungeon waits longest differs.
+        Assert.Equal((5, 5), (forwards.RunCounter, backwards.RunCounter));
+        Assert.NotEqual(forwards.LockedInOrder, backwards.LockedInOrder);
     }
 }

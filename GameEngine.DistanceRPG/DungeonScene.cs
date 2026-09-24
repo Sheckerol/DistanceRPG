@@ -16,11 +16,24 @@ public enum GameMenu
 
     /// <summary>
     /// "Leave the dungeon?" — opened by E on the first floor's way out with the
-    /// party gathered, because leaving discards the whole visit (§4.1). E or
-    /// ENTER leaves, ESC stays, and every other key and click does nothing while
-    /// it is up: no member is selected and no bag is opened behind it.
+    /// party gathered, because leaving discards the whole visit (§4.1) and ends
+    /// the run. It previews what leaving now means — the boss down and what you
+    /// carry kept, or a retreat. E or ENTER leaves, ESC stays, and every other key
+    /// and click does nothing while it is up: no member is selected and no bag is
+    /// opened behind it.
     /// </summary>
     ConfirmLeave,
+
+    /// <summary>
+    /// The run is over (§4.4): its summary — the outcome, the spoils kept or lost,
+    /// the XP kept or clawed back, whether the run counted, the lock or the
+    /// tutorial closing. Opened by the campaign's <see cref="CampaignState.RunEnded"/>
+    /// on either ending, the way out's or a wipe's. <strong>Modal</strong>: ENTER
+    /// alone moves on — once — to the next run; ESC, the bag, the stairs, the
+    /// number keys, the turn's keys and every click do nothing, because the run
+    /// they would act on has ended.
+    /// </summary>
+    RunSummary,
 }
 
 /// <summary>
@@ -77,9 +90,15 @@ public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker,
 /// the visit's (<see cref="DungeonState"/>), the party is the campaign's, and
 /// this scene draws whichever floor the visit stands on. Taking the stairs is a
 /// swap inside it — tear the floor's objects down, move the visit, build the
-/// next floor from what the visit holds — under a short fade, and leaving by the
-/// first floor's way out hands the run back to the host, which starts the next
-/// visit in a scene of its own.
+/// next floor from what the visit holds — under a short fade.
+/// </para>
+/// <para>
+/// <strong>The run ends in the campaign, and this scene shows it.</strong>
+/// Leaving by the first floor's way out ends it (<see cref="CampaignState.EndRun"/>),
+/// and so does a wipe, in Logic, at the turn system's game over; either way the
+/// campaign says so (<see cref="CampaignState.RunEnded"/>) and this scene puts up
+/// the summary (<see cref="GameMenu.RunSummary"/>). ENTER there hands the run back
+/// to the host, which starts the next visit in a scene of its own.
 /// </para>
 /// </summary>
 public class DungeonScene : Scene
@@ -210,16 +229,22 @@ public class DungeonScene : Scene
     // from the loadout (CampaignState.Start) and added to at every pickup.
     private readonly List<GroundItem> _groundItems = new();
 
-    // The stairs (§4.2): a swap runs under a fade either side of it, and the way
-    // out fades to black and hands the run back to the host. While any of it
-    // runs, presses and the movement they drive are ignored — releases never
-    // are, so a key let go mid-fade is up on arrival.
+    // The stairs (§4.2): a swap runs under a fade either side of it, and once the
+    // run is over and its summary read, the scene fades to black and hands the
+    // run back to the host. While any of it runs, presses and the movement they
+    // drive are ignored — releases never are, so a key let go mid-fade is up on
+    // arrival.
     private const float TransitFadeSeconds = 0.25f;
     private enum Transit { None, FadingOut, FadingIn, Leaving }
     private Transit _transit;
     private float _transitClock;
     private StairUse _transitStair;
     private bool _runOverSent;
+
+    // The run's end (§4.4), as the campaign reported it, and the dungeon the next
+    // run will go into, named once as the summary goes up.
+    private RunResult? _endedRun;
+    private string? _nextRunName;
 
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
@@ -263,8 +288,14 @@ public class DungeonScene : Scene
     public IReadOnlyList<GroundItem> GroundItems => _groundItems;
     public CampaignState Campaign => _campaign;
 
-    /// <summary>The visit this scene plays: the floor line reads the dungeon and the floor number off it, and never its depth.</summary>
+    /// <summary>The visit this scene plays: the floor line reads the dungeon and the floor number off it, and never its depth. Kept after the run ends, when the campaign has already let it go, so the last floor still draws under the summary.</summary>
     public DungeonState Visit => _visit;
+
+    /// <summary>How the run ended, once it has (§4.4) — what the summary shows — or null while it goes on.</summary>
+    public RunResult? EndedRun => _endedRun;
+
+    /// <summary>The dungeon ENTER on the summary goes into next, by name (<see cref="CampaignState.DefaultNext"/>), or null when there is none to name.</summary>
+    public string? NextRunName => _nextRunName;
 
     /// <summary>The stairs of the floor being played, each with the slab it is drawn as.</summary>
     public IReadOnlyList<StairMarker> StairMarkers => _stairMarkers;
@@ -276,7 +307,7 @@ public class DungeonScene : Scene
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
     public float LastBankedMovement { get; private set; }
 
-    /// <summary>True while a stair's fade runs, either side of the swap, or once the party has left: presses are ignored.</summary>
+    /// <summary>True while a stair's fade runs, either side of the swap, or once the run's summary has been left for the next run: presses are ignored.</summary>
     public bool Transiting => _transit != Transit.None;
 
     /// <summary>
@@ -410,6 +441,7 @@ public class DungeonScene : Scene
 
         BuildFloor();   // the map-independent slab every floor of the visit stands on
         SpawnParty();
+        _campaign.RunEnded += OnRunEnded;   // before any system opens: a wipe ends the run in Logic, and this scene shows it
         ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20));
         WireInput();
 
@@ -474,6 +506,7 @@ public class DungeonScene : Scene
 
     public override void Shutdown()
     {
+        _campaign.RunEnded -= OnRunEnded;   // the campaign outlives this scene: the next run's end is the next scene's to show
         _hud.Dispose();
         base.Shutdown();
     }
@@ -994,7 +1027,10 @@ public class DungeonScene : Scene
         _turns.OverwatchTriggered += actor => AnnounceReaction(actor, "OVERWATCH!");
         _turns.RiposteTriggered += actor => AnnounceReaction(actor, "RIPOSTE!");
 
-        _turns.GameOver += () => Log.Info("[Turns] GAME OVER");
+        // The wipe has already ended the run by now (§4.4): the visit heard the
+        // game over first and the campaign ended the run in Logic, whose
+        // RunEnded put the summary up. What is left here is the log line.
+        _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
     }
 
     /// <summary>A reaction's floating callout over whoever fired it, on either side.</summary>
@@ -1152,9 +1188,9 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// I opens the bag and closes it — from no menu or from the bag only, so it
-    /// never swaps a prompt (the pause menu, "leave the dungeon?") for the bag
-    /// behind the player's back — and never during a stair's fade or on the
-    /// game-over screen.
+    /// never swaps a prompt (the pause menu, "leave the dungeon?", the run's
+    /// summary) for the bag behind the player's back — and never during a stair's
+    /// fade or on the defeat screen.
     /// </summary>
     private void ToggleInventory()
     {
@@ -1165,15 +1201,19 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
-    /// no — or opens the pause menu. During a stair's fade, and once the party
-    /// has left, it is swallowed: nothing opens over a floor being swapped, and
-    /// nothing quits a run on its way to the next. Only on the game-over screen
-    /// is it left unconsumed, so the game quits directly.
+    /// no — or opens the pause menu, whose EXIT quits the game. During a stair's
+    /// fade, and once the party is on its way to the next run, it is swallowed:
+    /// nothing opens over a floor being swapped. <strong>On a run's end it does
+    /// nothing</strong> — the summary, and the defeat screen under it: the run's
+    /// counter, locks and retirement live only in memory until Phase 5 saves
+    /// them, so a quit there would drop what the run just wrote. ENTER is the one
+    /// way on, and quitting is the pause menu's in the next run. Always consumed,
+    /// so the game never quits behind the scene's back.
     /// </summary>
     public bool HandleEscape()
     {
         if (Transiting) return true;
-        if (_turns.Phase == TurnPhase.GameOver) return false;
+        if (ActiveMenu == GameMenu.RunSummary || _turns.Phase == TurnPhase.GameOver) return true;
         ActiveMenu = AnyMenuOpen ? GameMenu.None : GameMenu.Pause;
         return true;
     }
@@ -1302,11 +1342,13 @@ public class DungeonScene : Scene
             BeginTransit(stair);
     }
 
-    /// <summary>ENTER, routed by the menu that is open: the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
+    /// <summary>ENTER, routed by the menu that is open: on to the next run from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
     private void EnterKey()
     {
         if (Transiting) return;
-        if (ActiveMenu == GameMenu.ConfirmLeave)
+        if (ActiveMenu == GameMenu.RunSummary)
+            ContinueAfterRun();
+        else if (ActiveMenu == GameMenu.ConfirmLeave)
             Leave();
         else if (!AnyMenuOpen)
             _turns.EndTurn();
@@ -1330,12 +1372,12 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Start a fade to black away from the floor being played: the stairs'
-    /// (<see cref="Transit.FadingOut"/>) or the way out's
-    /// (<see cref="Transit.Leaving"/>). The floor's arrival banner comes down
-    /// first (<see cref="DungeonHud.HideArrival"/>). It is drawn over the fade,
-    /// which is how the next floor's is up at black, so one still up from the
-    /// arrival — a quick hop on, a leave straight off the way out — would
-    /// otherwise hang on the black naming the floor the party is leaving.
+    /// (<see cref="Transit.FadingOut"/>) or, once the run is over and its summary
+    /// read, the run's own (<see cref="Transit.Leaving"/>). The floor's arrival
+    /// banner comes down first (<see cref="DungeonHud.HideArrival"/>). It is
+    /// drawn over the fade, which is how the next floor's is up at black, so one
+    /// still up from the arrival — a quick hop on — would otherwise hang on the
+    /// black naming the floor the party is leaving.
     /// </summary>
     private void StartFadeOut(Transit fade)
     {
@@ -1346,8 +1388,9 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// The stairs' clock, once a frame: the fade out, the swap at black, the fade
-    /// in; and, once the party has left, the fade to black after which the run
-    /// is handed back to the host — once, whatever happens to this scene after.
+    /// in; and, once the run's summary has been read, the fade to black after
+    /// which the run is handed back to the host — once, whatever happens to this
+    /// scene after.
     /// </summary>
     private void AdvanceTransit(float deltaTime)
     {
@@ -1405,11 +1448,14 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// The yes to "leave the dungeon?": the party walks out of the first floor's
-    /// way out, the screen fades to black, and the run is handed back to the
-    /// host (<see cref="IRunHost.RunOver"/>), which discards this visit whole —
-    /// every floor, every row, every farm (§4.1) — and begins the next. The way
-    /// out is asked of the visit again first; nothing can have moved under the
-    /// prompt, but if it has the prompt is simply withdrawn.
+    /// way out and the run ends there, in the campaign
+    /// (<see cref="CampaignState.EndRun"/>) — a boss kill or a retreat, the
+    /// spoils in the bags kept, the tick, the lock or the retirement written, and
+    /// this visit discarded whole: every floor, every row, every farm (§4.1). The
+    /// campaign's <see cref="CampaignState.RunEnded"/> puts the summary up
+    /// (<see cref="OnRunEnded"/>). The way out is asked of the visit again first;
+    /// nothing can have moved under the prompt, but if it has the prompt is simply
+    /// withdrawn.
     /// </summary>
     private void Leave()
     {
@@ -1419,6 +1465,59 @@ public class DungeonScene : Scene
             return;
 
         Log.Info($"[Run] The party leaves {_visit.Def.Name} at turn {_turns.TurnCount}: the visit is discarded whole");
+        _campaign.EndRun(RunEnding.Exited);
+    }
+
+    /// <summary>
+    /// The run is over (§4.4), by the way out or by a wipe — which ends it in
+    /// Logic, inside the turn system's game over, before this scene hears of it:
+    /// the summary goes up over whatever was open, modal, until ENTER moves on
+    /// (<see cref="ContinueAfterRun"/>). This scene shows one run's end, its
+    /// own: a second result — which nothing raises while this scene is current —
+    /// is ignored.
+    /// </summary>
+    private void OnRunEnded(RunResult result)
+    {
+        if (_endedRun is not null) return;
+        _endedRun = result;
+        _nextRunName = NextRunNameOf(_campaign);
+        _hud.HideArrival();
+        ActiveMenu = GameMenu.RunSummary;
+
+        Log.Info($"[Run] {result.Outcome} in {result.DungeonId}: deepest floor {result.DeepestFloor}, boss {(result.BossDefeated ? "down" : "standing")}"
+            + $", {(result.ServiceTick ? result.MercyTick ? "a mercy tick" : "a success tick" : "no tick")} (run counter {result.RunCounter})"
+            + (result.LockedUntilRun is { } until ? $", locked until run {until}" : "")
+            + (result.Retired ? ", retired for good" : "")
+            + $"; spoils kept {result.SpoilsKept.Count}, lost {result.SpoilsLost.Count}; {result.Clawbacks.Count} pool(s) clawed back"
+            + (_nextRunName is { } next ? $"; next: {next}" : ""));
+        foreach (var claw in result.Clawbacks)
+            Log.Info($"[Run] {claw.MemberId} {claw.Pool} XP {claw.Before} -> {claw.After}");
+    }
+
+    /// <summary>The name of the dungeon the campaign's next run goes into, or null when content leaves none to enter.</summary>
+    private static string? NextRunNameOf(CampaignState campaign)
+    {
+        try
+        {
+            return GameContent.Current.Dungeons[campaign.DefaultNext()].Name;
+        }
+        catch (InvalidOperationException e)
+        {
+            Log.Warn($"[Run] No next run to name: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// ENTER on the run's summary: on to the next run — once. The screen fades to
+    /// black and the run is handed back to the host (<see cref="IRunHost.RunOver"/>),
+    /// which begins the next visit. Never while the engine is still fading
+    /// between scenes, and never twice: the fade, once started, is the only way on.
+    /// </summary>
+    private void ContinueAfterRun()
+    {
+        if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || SceneManager.Instance.IsTransitioning) return;
+        Log.Info("[Run] On to the next run");
         StartFadeOut(Transit.Leaving);
     }
 
@@ -2034,19 +2133,21 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Take what the active member is standing on: the bag, the retired offer and
-    /// the met entries are <see cref="Pickup.Take"/>'s, which decides them without
-    /// a window and is tested that way; what is left here is the scene's — the
-    /// marker that goes, the reach that changed, the cue that says why a full bag
-    /// took nothing (a carry limit, not a fault: §4.4's six slots a member, 24
-    /// party-wide, which loot shares with the weapons being carried).
+    /// Take what the active member is standing on: the bag, the retired offer,
+    /// the met entries and the run's spoils are <see cref="Pickup.Take"/>'s, which
+    /// decides them without a window and is tested that way; what is left here is
+    /// the scene's — the marker that goes, the reach that changed, the cue that
+    /// says why a full bag took nothing (a carry limit, not a fault: §4.4's six
+    /// slots a member, 24 party-wide, which loot shares with the weapons being
+    /// carried). What is taken here is carried home by the way out and lost to a
+    /// wipe (§4.4).
     /// </summary>
     private void PickUp()
     {
         if (PickupTarget is not { } item) return;
 
         var member = ActiveCharacter.State;
-        int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member);
+        int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member, _visit);
         if (slot == Pickup.BagFull)
         {
             SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {member.Inventory.Length} CARRIED", false));

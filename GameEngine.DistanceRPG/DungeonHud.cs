@@ -11,9 +11,10 @@ namespace GameEngine.DistanceRPG;
 /// party selector, the enemy nameplates — a boss's among them — and their effect
 /// badges, the stairs' labels and the cue at the one underfoot, the click and aim
 /// cues, floating combat text, the end-of-turn banner, the inventory panel, the
-/// pause menu and the way out's prompt, the stairs' fade and the banner over it
-/// (the floor reached, the trade on the boss floor, the boss's fall), and the
-/// game-over screen. Every number it shows is a resolved one — a swing's cost
+/// pause menu and the way out's prompt with what leaving now means, the stairs'
+/// fade and the banner over it (the floor reached, the trade on the boss floor,
+/// the boss's fall), and the run's end — its summary, over the defeat screen when
+/// the party wiped. Every number it shows is a resolved one — a swing's cost
 /// after Light, a cast's mana after Resonant, a Block as the points it absorbs,
 /// a crit window as the roll it needs, Mire as the budget it leaves — never a
 /// percentage, a stack count or a base with a discount (§1.1, §1.7); and nothing
@@ -178,6 +179,7 @@ public sealed class DungeonHud
         int h = _game.ClientSize.Y;
         var turns = scene.Turns;
         var active = scene.ActiveCharacter.State;
+        var ended = scene.ActiveMenu == GameMenu.RunSummary ? scene.EndedRun : null;
 
         // Dim layers go first so all text draws on top of them.
         if (turns.Phase == TurnPhase.GameOver)
@@ -188,12 +190,17 @@ public sealed class DungeonHud
         DrawTopReadouts(w, active, turns);
         DrawFloorLine(scene.Visit);
         DrawPartySelector(scene);
-        DrawEnemyLabels(camera, scene, w, h);
-        DrawStairs(camera, scene, w, h);
-        DrawGroundItems(camera, scene, w, h);
-        DrawAllyCue(camera, scene, w, h);
-        DrawFloatingTexts(camera, w, h);
-        DrawAimCue(scene);
+        if (ended is null)
+        {
+            // The world's own labels, which a run's summary is drawn clear of:
+            // the run they label is over.
+            DrawEnemyLabels(camera, scene, w, h);
+            DrawStairs(camera, scene, w, h);
+            DrawGroundItems(camera, scene, w, h);
+            DrawAllyCue(camera, scene, w, h);
+            DrawFloatingTexts(camera, w, h);
+            DrawAimCue(scene);
+        }
 
         if (turns.Phase == TurnPhase.TurnEnding)
         {
@@ -209,12 +216,16 @@ public sealed class DungeonHud
             DrawMenu(w, h);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
-            DrawConfirmLeave(w, h);
+            DrawConfirmLeave(w, h, scene.Visit);
 
-        if (turns.Phase == TurnPhase.GameOver)
+        if (ended is not null)
         {
-            DrawCentered(w, h / 2f - 60f, "GAME OVER", 6f, Red);
-            DrawCentered(w, h / 2f + 20f, "PRESS ESC TO QUIT", 2f, Grey);
+            DrawRunSummary(w, h, ended, scene.NextRunName);   // a wipe's included: its headline is the defeat
+        }
+        else if (turns.Phase == TurnPhase.GameOver)
+        {
+            DrawCentered(w, h / 2f - 60f, DefeatHeadline, 6f, Red);
+            DrawCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
         }
         else
         {
@@ -479,12 +490,188 @@ public sealed class DungeonHud
         }
     }
 
-    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, and what leaving costs — the whole visit.</summary>
-    private void DrawConfirmLeave(int w, int h)
+    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>) — the last line, what it costs whatever else it means, in grey.</summary>
+    private void DrawConfirmLeave(int w, int h, DungeonState visit)
     {
-        float top = h / 2f - 50f;
+        float top = h / 2f - 60f;
         DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
-        DrawCentered(w, top + 44f, "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON", 1.5f, Grey);
+        var lines = LeavePreview(visit);
+        float y = top + 44f;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            DrawCentered(w, y, lines[i], 1.5f, i == lines.Count - 1 ? Grey : White);
+            y += 22f;
+        }
+    }
+
+    /// <summary>What every leave costs, whatever else it means: the visit, whole (§4.1).</summary>
+    private const string ResetLine = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+
+    /// <summary>
+    /// What leaving now means, under the way out's question (§4.4) — said before
+    /// the player commits, since the answer ends the run. With the boss down it
+    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and the
+    /// dungeon closes for good (the tutorial) or locks for as many runs as its
+    /// floor (<see cref="DungeonState.LockRuns"/>, the number the clear will
+    /// write). With it standing it is a retreat: <c>NO BOSS - A RETREAT: XP KEPT,
+    /// THE DEPTH RE-ROLLS</c>, and whether the party got deep enough for the run
+    /// to count (§6.3's mercy, from <see cref="Tuning.MercyFloor"/>) — a rule, never
+    /// the depth. And either way, the whole visit (<see cref="ResetLine"/>), last.
+    /// </summary>
+    internal static IReadOnlyList<string> LeavePreview(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        string dungeon = visit.Def.Name.ToUpperInvariant();
+        if (visit.BossDefeated)
+        {
+            string clear = visit.Def.RetiresOnClear
+                ? $"{dungeon} CLOSES FOR GOOD"
+                : $"{dungeon} LOCKS FOR {Runs(visit.LockRuns)}";
+            return ["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear, ResetLine];
+        }
+
+        bool counts = visit.DeepestFloorIndex + 1 >= GameContent.Current.Tuning.MercyFloor;
+        return
+        [
+            "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS",
+            counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN",
+            ResetLine,
+        ];
+    }
+
+    /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
+    private static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
+
+    // ── The run's end ────────────────────────────────────────────────────────
+
+    /// <summary>A wiped run's headline (§4.4), on its summary and on the defeat screen: the run is over, not the game.</summary>
+    internal const string DefeatHeadline = "DEFEATED";
+
+    /// <summary>
+    /// The one key a run's end answers: the summary is modal, ENTER moves on to
+    /// the next run, and ESC does nothing there — what the run just wrote lives
+    /// only in memory until it is saved, so it never offers a quit.
+    /// </summary>
+    internal const string ContinueHint = "ENTER TO CONTINUE";
+
+    /// <summary>How many characters a summary line runs to before a list on it wraps: a little over half the shipped window at the summary's scale.</summary>
+    private const int SummaryLineChars = 64;
+
+    /// <summary>
+    /// A run's summary (§4.4), a line a fact, the headline first and the key
+    /// last: what the run was — <c>CLEARED</c>, <c>RETREATED</c>, <c>DEFEATED</c> —
+    /// where and how deep, the boss (its floor only where the party reached it,
+    /// §4.3), the spoils kept or lost by name, the XP kept or what the wipe clawed
+    /// back member by member, whether the run counted and the counter it stands
+    /// at (§6.3), the lock or the closing a clear wrote, and <c>ENTER TO
+    /// CONTINUE</c> — naming <paramref name="next"/>, the dungeon the next run
+    /// goes into, when there is one — and never ESC.
+    /// </summary>
+    /// <param name="result">The run's end, as the campaign returned it.</param>
+    /// <param name="next">The next run's dungeon, by name; null names none.</param>
+    internal static IReadOnlyList<Run> RunSummaryLines(RunResult result, string? next = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var content = GameContent.Current;
+        var def = content.Dungeons.TryGet(result.DungeonId, out var found) ? found : null;
+        string dungeon = (def?.Name ?? result.DungeonId).ToUpperInvariant();
+        string boss = def?.Boss.Name.ToUpperInvariant() ?? "BOSS";
+
+        var lines = new List<Run>
+        {
+            result.Outcome switch
+            {
+                RunOutcome.BossKill => new Run("CLEARED", Green),
+                RunOutcome.Retreat => new Run("RETREATED", Yellow),
+                _ => new Run(DefeatHeadline, Red),
+            },
+            new Run($"{dungeon} - DEEPEST FLOOR {result.DeepestFloor}", Grey),
+        };
+
+        // The boss, and the depth only where the party stood on it (§4.3).
+        if (result.BossDefeated)
+            lines.Add(new Run(result.BossFloorRevealed is { } fell ? $"THE {boss} FELL ON FLOOR {fell}" : $"THE {boss} FELL", Green));
+        else if (result.BossFloorRevealed is { } waited)
+            lines.Add(new Run($"THE {boss} WAITED ON FLOOR {waited} - THE DEPTH RE-ROLLS NEXT TIME", Grey));
+        else
+            lines.Add(new Run($"THE {boss} STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME", Grey));
+
+        // What was carried home, or lost with the party.
+        if (result.SpoilsKept.Count > 0)
+            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.Name.ToUpperInvariant()), Orange));
+        if (result.SpoilsLost.Count > 0)
+            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.Name.ToUpperInvariant()), Red));
+        if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
+            lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", Grey));
+
+        // The XP: kept, or the share of each pool's gain a wipe took back, member by member.
+        if (result.Outcome != RunOutcome.Death)
+            lines.Add(new Run("XP KEPT", Green));
+        else if (result.Clawbacks.Count == 0)
+            lines.Add(new Run("XP KEPT - NOTHING CLAWED BACK", Green));   // nothing gained, or a share of 0
+        else
+        {
+            lines.Add(new Run("XP CLAWED BACK:", Red));
+            foreach (var member in result.Clawbacks.GroupBy(c => c.MemberId))
+                lines.AddRange(Wrapped($"{member.Key}:", member.Select(c => $"{c.Pool.ToUpperInvariant()} -{c.Before - c.After}"), Red));
+        }
+
+        // Whether the run counted (§6.3), and where the counter stands.
+        string counted = result.ServiceTick
+            ? result.MercyTick ? "RUN COUNTED - A MERCY FOR FAILING DEEP" : "RUN COUNTED"
+            : $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}";
+        lines.Add(new Run($"{counted} - {Runs(result.RunCounter)} SO FAR", Cyan));
+
+        // What the clear did to the dungeon.
+        if (result.Retired)
+            lines.Add(new Run($"{dungeon} IS CLOSED FOR GOOD", Yellow));
+        else if (result.LockedUntilRun is { } until)
+            lines.Add(new Run($"{dungeon} IS LOCKED FOR {Runs(until - result.RunCounter)}", Yellow));
+
+        lines.Add(new Run(next is null ? ContinueHint : $"{ContinueHint} - NEXT: {next.ToUpperInvariant()}", White));
+        return lines;
+    }
+
+    /// <summary>A list under a heading, as many summary lines as it takes: the heading and the items on the first, the rest indented under it, comma-separated.</summary>
+    private static IEnumerable<Run> Wrapped(string heading, IEnumerable<string> items, Vector4 color)
+    {
+        var line = new System.Text.StringBuilder(heading);
+        bool first = true;
+        foreach (string item in items)
+        {
+            string piece = first ? $" {item}" : $", {item}";
+            if (!first && line.Length + piece.Length > SummaryLineChars)
+            {
+                yield return new Run(line.Append(',').ToString(), color);
+                line.Clear().Append("  ").Append(item);
+            }
+            else
+            {
+                line.Append(piece);
+            }
+            first = false;
+        }
+        yield return new Run(line.ToString(), color);
+    }
+
+    /// <summary>
+    /// The run's summary over the dimmed floor (<see cref="RunSummaryLines"/>):
+    /// the headline large, each line under it, and the key last, a step apart.
+    /// Anchored above the middle, never over the top readouts.
+    /// </summary>
+    private void DrawRunSummary(int w, int h, RunResult result, string? next)
+    {
+        var lines = RunSummaryLines(result, next);
+        float y = MathF.Max(80f, h / 2f - 170f);
+        DrawCentered(w, y, lines[0].Text, 5f, lines[0].Color);
+        y += 56f;
+        for (int i = 1; i < lines.Count; i++)
+        {
+            bool last = i == lines.Count - 1;
+            if (last) y += 12f;
+            DrawCentered(w, y, lines[i].Text, last ? 2f : 1.6f, lines[i].Color);
+            y += 22f;
+        }
     }
 
     /// <summary>

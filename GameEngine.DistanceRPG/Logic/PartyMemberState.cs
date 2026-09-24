@@ -260,12 +260,31 @@ public sealed class PartyMemberState : ActorState
     /// carried, the XP earned, the innate spread — because a rest is between
     /// runs and never a reset of the campaign.
     /// <para>
+    /// <strong>And armed, if there is anything to arm it with.</strong> A wipe
+    /// takes the run's spoils out of the bags (§4.4), and a spoil the member had
+    /// taken up in hand leaves the hand empty; so an empty hand takes the first
+    /// weapon carried in the bag, moved rather than copied, before the member
+    /// walks into the next dungeon. A hand already holding something is left as
+    /// it is, and a member carrying nothing stays unarmed.
+    /// </para>
+    /// <para>
     /// Taken at the next entry, not when a run ends, so the run's end still
     /// shows the fallen as fallen.
     /// </para>
     /// </summary>
     public void Rest()
     {
+        if (Inventory[0] is null)
+        {
+            for (int slot = 1; slot < Inventory.Length; slot++)
+            {
+                if (Inventory[slot] is not { } carried) continue;
+                Inventory[0] = carried;
+                Inventory[slot] = null;
+                break;
+            }
+        }
+
         Alive = true;
         StatusEffects.Clear();
         Hp = MaxHp;

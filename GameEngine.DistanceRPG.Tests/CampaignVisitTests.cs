@@ -42,6 +42,28 @@ public class CampaignVisitTests
             (party[i].X, party[i].Y) = (tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f, tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f);
     }
 
+    /// <summary>
+    /// Leave the dungeon the one way there is (§4.3: no shortcut exit): open the
+    /// floor if nobody has, climb back to the first floor, gather at its way out
+    /// and end the run there (<see cref="CampaignState.EndRun"/>). The run's end
+    /// is where the visit is discarded.
+    /// </summary>
+    private static RunResult Leave(CampaignState campaign)
+    {
+        var visit = campaign.Visit!;
+        var party = campaign.Party;
+        if (visit.Turns is null)
+            visit.OpenTurns(party, () => 10);
+        while (visit.FloorIndex > 0)
+        {
+            Gather(visit, party, visit.Current.UpStairs);
+            visit.Ascend(party);
+            visit.OpenTurns(party, () => 10);
+        }
+        Gather(visit, party, visit.Current.UpStairs);
+        return campaign.EndRun(RunEnding.Exited);
+    }
+
     /// <summary>Stand <paramref name="actor"/> on a free floor tile beside <paramref name="target"/>.</summary>
     private static void StandBeside(Floor floor, ActorState actor, EnemyState target)
     {
@@ -100,7 +122,7 @@ public class CampaignVisitTests
         var members = campaign.Party.ToArray();
         var weapons = members.Select(m => m.EquippedWeapon).ToArray();
         campaign.Enter("tutorial", GoldenSeed);
-        campaign.Abandon();
+        Leave(campaign);
         campaign.Enter("tutorial", 1);
         Assert.Equal(members.Length, campaign.Party.Count);
         for (int i = 0; i < members.Length; i++)
@@ -162,7 +184,7 @@ public class CampaignVisitTests
         Assert.Contains("shocking", met);
 
         // Out of the dungeon: the visit is gone, the met set is not.
-        campaign.Abandon();
+        Leave(campaign);
         Assert.Null(campaign.Visit);
         Assert.Equal(met, campaign.SeenInOrder);
 
@@ -202,9 +224,9 @@ public class CampaignVisitTests
         Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", 1));
         Assert.Same(first, campaign.Visit);
 
-        campaign.Abandon();
+        Leave(campaign);
         Assert.Null(campaign.Visit);
-        campaign.Abandon();   // nothing to leave between runs
+        Assert.Throws<InvalidOperationException>(() => campaign.EndRun(RunEnding.Exited));   // nothing to leave between runs
         Assert.Null(campaign.Visit);
 
         // A new seed: a new dungeon, nothing of the old one in it.
@@ -217,7 +239,7 @@ public class CampaignVisitTests
 
         // The same seed: the same maps regenerated, and every row fresh — the
         // farmed dummy's twin standing, at zero, and the fog dark.
-        campaign.Abandon();
+        Leave(campaign);
         var again = campaign.Enter("tutorial", GoldenSeed);
         Assert.Equal(first.BossFloor, again.BossFloor);
         for (int n = 0; n < again.Floors.Length; n++)
@@ -274,7 +296,7 @@ public class CampaignVisitTests
         b.Hp = 0;
 
         // Leaving rests nobody.
-        campaign.Abandon();
+        Leave(campaign);
         Assert.Equal((12, false), (a.Hp, b.Alive));
 
         var kept = campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => w?.Id)))).ToArray();

@@ -314,6 +314,14 @@ public enum StairRefusal
 /// compiled constants and never tuning keys: they decide dungeon layout, which
 /// is the golden set's neighbour.
 /// </para>
+/// <para>
+/// <strong>And what the run's end reads</strong> (§4.4): the party's XP as it
+/// stood at the door (<see cref="EntrySnapshot"/>), what the party has picked up
+/// this visit (<see cref="Spoils"/>), and the wipe that ends a run in Logic
+/// (<see cref="Wiped"/>). The visit decides none of the outcome: the campaign
+/// that holds it does (<see cref="CampaignState.EndRun"/>), and the visit is
+/// discarded once it has.
+/// </para>
 /// </summary>
 public sealed class DungeonState
 {
@@ -344,13 +352,20 @@ public sealed class DungeonState
     // until the next transit replaces it.
     private TurnCarry? _carry;
 
-    private DungeonState(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, Floor[] floors)
+    // The weapons taken into a bag this visit (Pickup.Take), by reference and in
+    // the order they were taken; never pruned — the run's end reads which of
+    // them are still in a bag.
+    private readonly List<Weapon> _spoils = new();
+
+    private DungeonState(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, Floor[] floors, XpSnapshot entrySnapshot)
     {
         Def = def;
         MapSeed = mapSeed;
         BossFloor = bossFloor;
         PromisedStacks = promisedStacks;
         Floors = floors;
+        EntrySnapshot = entrySnapshot;
+        Spoils = _spoils.AsReadOnly();
     }
 
     /// <summary>The dungeon being visited.</summary>
@@ -420,7 +435,7 @@ public sealed class DungeonState
     /// <summary>The floor the party is on.</summary>
     public Floor Current => Floors[FloorIndex];
 
-    /// <summary>The deepest floor index the party has stood on this visit: what a failed run's mercy tick will read (§6.3's "floor 3 or deeper").</summary>
+    /// <summary>The deepest floor index the party has stood on this visit: what the run's end reads for a failed run's mercy tick (§6.3's "floor 3 or deeper") and for whether the depth was reached (§4.3).</summary>
     public int DeepestFloorIndex { get; private set; }
 
     /// <summary>
@@ -462,6 +477,52 @@ public sealed class DungeonState
     public event Action<Floor, bool>? FloorReached;
 
     /// <summary>
+    /// The party's XP pools as they stood when it stepped in (§4.4): every
+    /// member's weapon XP in every class, HP XP and mana XP, taken at
+    /// <see cref="Enter"/> — innate stats never, since they never move. A wipe
+    /// claws back a share of each pool's gain since this; any other ending
+    /// leaves it untouched, and it goes with the visit. §5.1's Run group saves it.
+    /// </summary>
+    public XpSnapshot EntrySnapshot { get; }
+
+    /// <summary>
+    /// This visit's spoils (§4.4): every weapon <see cref="Pickup.Take"/> has put
+    /// into a bag off a corpse, by reference, in the order taken, and never
+    /// removed. What the party carried in is never one, and a weapon put down and
+    /// taken back is the spoil it already was, or not one. The run's end counts
+    /// only the spoils still in some member's bag — kept on the way out, lost to
+    /// a wipe — so a spoil that has left every bag needs no bookkeeping here.
+    /// <para>
+    /// Nothing drops while the dungeon still resurrects (§3.2), so no spoil can
+    /// exist before the boss falls: that is why a retreat forfeits the loot by
+    /// construction rather than by a rule.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<Weapon> Spoils { get; }
+
+    /// <summary>
+    /// The party wiped (§4.4): raised from the <see cref="TurnSystem.GameOver"/>
+    /// of every floor's system <see cref="OpenTurns"/> opens, so the run ends in
+    /// Logic at that transition, whatever is or is not watching.
+    /// <see cref="CampaignState.Enter"/> subscribes it to
+    /// <see cref="CampaignState.EndRun"/> — the wiring runs campaign to visit, and
+    /// the visit never holds the campaign.
+    /// </summary>
+    public event Action? Wiped;
+
+    /// <summary>
+    /// A weapon <see cref="Pickup.Take"/> just put into a bag off a corpse: one of
+    /// this visit's spoils (<see cref="Spoils"/>), recorded once whatever happens
+    /// to it after.
+    /// </summary>
+    internal void RecordSpoil(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        if (!_spoils.Any(spoil => ReferenceEquals(spoil, weapon)))
+            _spoils.Add(weapon);
+    }
+
+    /// <summary>
     /// Enter <paramref name="def"/> on <paramref name="mapSeed"/> (§4.5): roll the
     /// boss floor (<see cref="RollBossFloor(long, DungeonDef)"/>), fix the stacks
     /// its boss's drop is promised (<see cref="PromisedStacks"/>), build every
@@ -469,7 +530,8 @@ public sealed class DungeonState
     /// the seed, its index and the dungeon, the last one the bottom, its boss
     /// carrying the promise — and stand the party at the first floor's arrival
     /// tile, each member on its own tile in roster order, as the scene has always
-    /// spawned them.
+    /// spawned them. The party's XP is taken as it stands at the door
+    /// (<see cref="EntrySnapshot"/>), for the run's end to read.
     /// <para>
     /// Rolls nothing it is not handed: the seed is the caller's, drawn per entry
     /// — which is what re-rolls a failed dungeon's depth — so the same seed is
@@ -491,7 +553,7 @@ public sealed class DungeonState
         for (int n = 0; n < bossFloor; n++)
             floors[n] = Floor.Generate(mapSeed, n, bottom: n == bossFloor - 1, def, promised);
 
-        var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors);
+        var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors, XpSnapshot.Of(party));
         visit.Arrive(party, floors[0].UpStairs);
         return visit;
     }
@@ -506,7 +568,8 @@ public sealed class DungeonState
     /// <see cref="Floor.Boss"/> — if it has one — rostered as the boss, and
     /// resurrection off once the boss is dead. The visit hears the boss's death
     /// on that system before anyone else does and records it
-    /// (<see cref="RecordBossDefeated"/>): in Logic, whatever is watching. Then
+    /// (<see cref="RecordBossDefeated"/>), and hears a wipe the same way and
+    /// raises it (<see cref="Wiped"/>): in Logic, whatever is watching. Then
     /// every dummy here whose wait ran out while the party was elsewhere gets up
     /// (<see cref="TurnSystem.CatchUpRevivals"/>) — as of now, or as of the turn
     /// the boss fell once it has — and the zones are re-read around them. So the
@@ -535,6 +598,7 @@ public sealed class DungeonState
             ResurrectionActive = !BossDefeated,
         };
         turns.BossDefeated += _ => RecordBossDefeated();
+        turns.GameOver += () => Wiped?.Invoke();   // the run ends at the wipe, in Logic, before anyone watching hears it
         turns.CatchUpRevivals(BossDefeated ? BossDefeatedAtTurn : _turn);
         Turns = turns;
         return turns;

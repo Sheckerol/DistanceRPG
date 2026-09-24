@@ -864,4 +864,137 @@ public class HudTextTests
         Assert.DoesNotContain("2", prompt);
         Assert.DoesNotContain(prompt, char.IsDigit);
     }
+
+    [Fact]
+    public void TheLeavePromptSaysWhatLeavingCosts()
+    {
+        // The way out's question previews the answer (4.4), since the answer ends
+        // the run: with the boss down, a clear - what you carry goes home, and the
+        // dungeon closes for good or locks for its floor in runs; with it standing,
+        // a retreat - the XP kept, the depth re-rolled, and whether the party got
+        // deep enough for the run to count (6.3's mercy) - a rule, never the depth.
+        // And either way the whole visit goes.
+        const string reset = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS", "TOO SHALLOW TO COUNT AS A RUN", reset },
+            DungeonHud.LeavePreview(tutorial));
+        GoDown(tutorial, party);
+        Assert.Equal("TOO SHALLOW TO COUNT AS A RUN", DungeonHud.LeavePreview(tutorial)[1]);   // its two floors never reach the bar
+        tutorial.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE TUTORIAL CLOSES FOR GOOD", reset },
+            DungeonHud.LeavePreview(tutorial));
+
+        // The Spear Hall, seven floors deep: three floors down is deep enough to
+        // count, and nothing says how deep it goes until its boss is down, when the
+        // lock it writes is the floor's.
+        var hall = DungeonState.Enter(GameContent.Current.Dungeons["spear_hall"], 7, party);
+        Assert.Equal(7, hall.BossFloor);
+        hall.OpenTurns(party, () => 10);
+        GoDown(hall, party);
+        GoDown(hall, party);
+        var retreat = DungeonHud.LeavePreview(hall);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS", "DEEP ENOUGH TO COUNT AS A RUN", reset }, retreat);
+        Assert.DoesNotContain(retreat, line => line.Contains('7'));
+        hall.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE SPEAR HALL LOCKS FOR 7 RUNS", reset },
+            DungeonHud.LeavePreview(hall));
+    }
+
+    [Fact]
+    public void TheRunSummaryNamesTheOutcome()
+    {
+        // 4.4's three outcomes, as the run's end shows them: what the run was, where
+        // and how deep, the boss - its floor only where the party reached it - the
+        // spoils kept or lost by name, the XP kept or clawed back member by member,
+        // whether the run counted, the lock or the closing, and ENTER TO CONTINUE:
+        // the one key the summary answers. Never ESC.
+        static string[] Lines(RunResult result, string? next = null) => DungeonHud.RunSummaryLines(result, next).Select(r => r.Text).ToArray();
+        var bulwark = TestWeapons.Get("the_bulwark");
+        var tower = TestWeapons.Get("tower_guard");
+
+        var cleared = new RunResult("tutorial", RunOutcome.BossKill, BossDefeated: true, DeepestFloor: 2, BossFloorRevealed: 2,
+            ServiceTick: true, MercyTick: false, RunCounter: 1, LockedUntilRun: null, Retired: true,
+            SpoilsKept: [bulwark, tower], SpoilsLost: [], Clawbacks: []);
+        Assert.Equal(new[]
+        {
+            "CLEARED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM FELL ON FLOOR 2",
+            "SPOILS KEPT: THE BULWARK, TOWER GUARD",
+            "XP KEPT",
+            "RUN COUNTED - 1 RUN SO FAR",
+            "THE TUTORIAL IS CLOSED FOR GOOD",
+            "ENTER TO CONTINUE - NEXT: THE SPEAR HALL",
+        }, Lines(cleared, "The Spear Hall"));
+
+        // A fighting retreat from floor 3 of a dungeon seven deep: counted as a
+        // mercy, nothing to keep, and the depth never named.
+        var retreat = new RunResult("spear_hall", RunOutcome.Retreat, false, 3, null, true, true, 4, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE SPEAR HALL - DEEPEST FLOOR 3",
+            "THE SPEAR WARDEN STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN COUNTED - A MERCY FOR FAILING DEEP - 4 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(retreat));
+        Assert.DoesNotContain(Lines(retreat), line => line.Contains('7'));
+
+        // Killed the boss and died on the way out: the clear stands, the spoils
+        // and a share of the XP do not.
+        var died = new RunResult("spear_hall", RunOutcome.Death, true, 5, 5, true, false, 3, 8, false, [], [tower],
+            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)]);
+        Assert.Equal(new[]
+        {
+            DungeonHud.DefeatHeadline,
+            "THE SPEAR HALL - DEEPEST FLOOR 5",
+            "THE SPEAR WARDEN FELL ON FLOOR 5",
+            "SPOILS LOST: TOWER GUARD",
+            "XP CLAWED BACK:",
+            "A: DAGGER -22, HP -6",
+            "C: AXE -15",
+            "RUN COUNTED - 3 RUNS SO FAR",
+            "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
+            "ENTER TO CONTINUE",
+        }, Lines(died));
+        Assert.Equal("DEFEATED", DungeonHud.DefeatHeadline);
+
+        // Dead shallow, the boss standing: nothing counted, and the rule for why -
+        // and nothing clawed back, the run having gained nothing (or the share being 0).
+        var shallow = new RunResult("tutorial", RunOutcome.Death, false, 2, null, false, false, 0, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "DEFEATED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT - NOTHING CLAWED BACK",
+            "RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 0 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(shallow));
+
+        // A long haul wraps rather than running off the panel, every name once.
+        var haul = Enumerable.Range(0, 12).Select(_ => TestWeapons.Get("weakspot_stiletto")).Append(bulwark).ToArray();
+        var hauled = Lines(cleared with { SpoilsKept = haul });
+        var spoils = hauled.SkipWhile(l => !l.StartsWith("SPOILS KEPT:", StringComparison.Ordinal)).TakeWhile(l => l != "XP KEPT").ToArray();
+        Assert.True(spoils.Length > 1);
+        Assert.All(hauled, line => Assert.True(line.Length <= 70, $"'{line}' runs off the panel"));
+        Assert.Equal(12, spoils.Sum(l => l.Split("WEAKSPOT STILETTO").Length - 1));
+        Assert.Single(spoils, l => l.Contains("THE BULWARK"));
+
+        // ENTER is the one way on, on every ending: never ESC, never a quit.
+        foreach (var result in new[] { cleared, retreat, died, shallow })
+        {
+            var lines = Lines(result);
+            Assert.StartsWith(DungeonHud.ContinueHint, lines[^1], StringComparison.Ordinal);
+            var words = lines.SelectMany(l => l.Split([' ', ':', '-', ','], StringSplitOptions.RemoveEmptyEntries));
+            Assert.DoesNotContain("ESC", words);
+            Assert.DoesNotContain("QUIT", words);
+        }
+        Assert.Equal("ENTER TO CONTINUE", DungeonHud.ContinueHint);
+    }
 }
