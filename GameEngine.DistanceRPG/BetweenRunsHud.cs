@@ -8,9 +8,12 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
 /// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it — and,
-/// under the title of the first one the game opens on, what the data files
-/// raised at startup (<see cref="NoticeText"/>).
+/// the hub's dungeon list under it, and the keys that choose from it, or the NEW
+/// CAMPAIGN prompt asking again — and, under the title, the notices the game
+/// hands it (<see cref="NoticeText"/>): on the first one the game opens on, the
+/// save's word on the campaign (<see cref="Resumed"/>, a save set aside, the
+/// numbers changed since it was saved) and then what the data files raised at
+/// startup; on a later one, a save that could not be written.
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before
@@ -46,11 +49,22 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, ESC quits the game. This is the one screen
-    /// where ESC quits outright. A run's end never offers it (<see cref="DungeonHud.ContinueHint"/>),
-    /// and in a dungeon it opens the pause menu.
+    /// choice, ENTER descends into it, N asks for a new campaign, ESC saves the
+    /// campaign and quits. This is the one screen where ESC quits outright. A
+    /// run's end never offers it (<see cref="DungeonHud.ContinueHint"/>), and in a
+    /// dungeon it opens the pause menu.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC QUITS";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - N NEW CAMPAIGN - ESC SAVES AND QUITS";
+
+    /// <summary>
+    /// The NEW CAMPAIGN prompt, along the bottom in place of the keys while it is
+    /// armed (<see cref="BetweenRunsScene.NextPrompt"/>): it asks twice, because
+    /// the answer replaces the saved campaign, and any other key keeps it.
+    /// </summary>
+    internal const string NewCampaignPrompt = "NEW CAMPAIGN? N AGAIN: YES - ANY OTHER KEY: NO - THE SAVED CAMPAIGN IS REPLACED";
+
+    /// <summary>Under the title of the screen a launch resumed a saved campaign on, first among the notices (1f).</summary>
+    internal const string Resumed = "CAMPAIGN RESUMED";
 
     /// <summary>What the list says when nothing is left to enter: content whose only dungeon is the tutorial, beaten.</summary>
     internal const string NothingLeft = "NO DUNGEON IS LEFT TO ENTER";
@@ -343,6 +357,24 @@ public sealed class BetweenRunsHud : IDisposable
     internal static float NoticeShift(int noticeRows) => noticeRows <= 0 ? 0f : noticeRows * NoticePitch;
 
     /// <summary>
+    /// A notice row's colour: the campaign resuming in green — news, not a
+    /// warning — and every other notice in the warning's orange.
+    /// </summary>
+    internal static Vector4 NoticeColor(string row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return row.StartsWith(Resumed, StringComparison.Ordinal) ? DungeonHud.Green : DungeonHud.Orange;
+    }
+
+    /// <summary>
+    /// The line along the bottom, and its colour: the keys the screen answers
+    /// (<see cref="KeysLine"/>), or, with NEW CAMPAIGN armed, the prompt asking
+    /// again (<see cref="NewCampaignPrompt"/>), in the yellow a question is asked in.
+    /// </summary>
+    internal static (string Text, Vector4 Color) BottomLine(bool newCampaignArmed)
+        => newCampaignArmed ? (NewCampaignPrompt, DungeonHud.Yellow) : (KeysLine, DungeonHud.Grey);
+
+    /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
     /// The list block is <paramref name="listHeight"/> tall. The last run's
     /// summary has <paramref name="summaryLines"/> lines under its headline (0
@@ -399,7 +431,7 @@ public sealed class BetweenRunsHud : IDisposable
 
         var notices = scene.NoticeRows;
         for (int i = 0; i < notices.Count; i++)
-            DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, DungeonHud.Orange);
+            DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
 
         var rows = ListRows(scene.Listings, scene.Chosen);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
@@ -427,7 +459,8 @@ public sealed class BetweenRunsHud : IDisposable
             rowY += row.Pitch;
         }
 
-        DrawCentered(w, h - KeysLineFromBottom, KeysLine, 1.3f, DungeonHud.Grey);
+        var (bottom, bottomColor) = BottomLine(scene.NewCampaignArmed);
+        DrawCentered(w, h - KeysLineFromBottom, bottom, 1.3f, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
 

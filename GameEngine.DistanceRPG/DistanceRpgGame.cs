@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using GameEngine.Core;
 using GameEngine.Core.Diagnostics;
 using GameEngine.DistanceRPG.Logic;
@@ -14,7 +15,8 @@ namespace GameEngine.DistanceRPG;
 /// <see cref="CampaignState"/> for the process — the party, built once, and
 /// everything it has met, and every number a run carries out (the run counter,
 /// the locks, the cleared and retired dungeons) — which every run is played by
-/// and which outlives every scene (Phase 5 will load and save it).
+/// and which outlives every scene. It is saved between runs and resumed on the
+/// next launch (below).
 /// </para>
 /// <para>
 /// <strong>Two scenes take turns.</strong> The game opens on the screen between
@@ -50,6 +52,22 @@ namespace GameEngine.DistanceRPG;
 /// names the file, the entry and the rule (<see cref="StartupErrorScene"/>),
 /// where ESC quits.
 /// </para>
+/// <para>
+/// <strong>The campaign is saved between runs and resumed on launch</strong>
+/// (§5.1, 1f; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>). One campaign,
+/// one slot, in the player's save folder (<c>DISTANCERPG_SAVE_DIR</c> moves it).
+/// It is written at a run's end, once the frame the run ended in is over, so no
+/// write runs inside a turn system's raise; when NEW CAMPAIGN is confirmed; and
+/// on quitting — ESC on the screen between runs, or the window's close button,
+/// both of which arrive at <see cref="OnClosing"/>. A run in progress is not saved
+/// yet (Phase 5.8 saves it): quitting mid-run keeps the campaign as it stood when
+/// the run began, and the pause menu says so. A launch resumes the campaign on
+/// the screen between runs, with <c>CAMPAIGN RESUMED</c> under the title; a save
+/// that cannot be read, or whose resume crashed the game, is set aside where the
+/// notice says. A write that fails is a notice and a log line, never a crash, and
+/// never costs the save before it. A dev-override launch plays a fresh campaign in
+/// a slot of its own and never touches the campaign.
+/// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 {
@@ -67,8 +85,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// boots straight into that dungeon, past the screen between runs, which is
     /// how a five- to ten-floor dungeon is playtested without first beating the
     /// tutorial that opens the hub. The run it boots ends back on that screen
-    /// like any other. An id that names no dungeon is ignored, with a warning,
-    /// and the game opens on the screen between runs as usual.
+    /// like any other. It plays a fresh campaign in the save folder's
+    /// <c>override</c> slot, emptied at every such launch, and never reads or
+    /// writes the campaign's own save. An id that names no dungeon is ignored,
+    /// with a warning, and the game opens on the screen between runs as usual.
     /// </summary>
     internal const string DungeonOverrideVariable = "DISTANCERPG_DUNGEON";
 
@@ -79,16 +99,24 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// played. With <c>DISTANCERPG_SEED=7</c>, the tutorial chosen first is one
     /// whose golem drops The Bulwark. It is the first run's alone: every run after
     /// it rolls its own, as every entry must (a failed dungeon's depth re-rolls).
+    /// Like the dungeon override, it plays a fresh campaign in the override slot.
     /// Anything that is not such a number is ignored, with a warning.
     /// </summary>
     internal const string SeedOverrideVariable = "DISTANCERPG_SEED";
 
+    /// <summary>What the command line asked for: <c>--new-campaign</c>, here.</summary>
+    private readonly LaunchOptions _launch;
+
     private CampaignState? _campaign;
 
-    // What the data files raised at startup — a tuning value clamped or fitted,
-    // a file missing or unreadable — handed to the first scene the game opens on
-    // and to no other. The log has them all.
-    private readonly StartupNotices _startupNotices = new();
+    // Where this launch's campaign is saved: the player's save folder, or its
+    // dev-override slot. Null only when the content did not load.
+    private SaveStore? _store;
+
+    // What the game has to say on the next screen it shows: the data files'
+    // notices and the save's at startup, a save that could not be written later.
+    // The log has them all.
+    private readonly StartupNotices _notices = new();
 
     // The boot seed when the override named one, spent by the first BeginRun
     // that actually enters a dungeon.
@@ -98,10 +126,31 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     // screen between runs — shown once it is not.
     private Action? _pendingScene;
 
+    // A run ended since the last save: written at the end of the frame, once no
+    // raise is running.
+    private bool _saveRequested;
+
+    // A resumed campaign whose first screen is not up yet: the resume marker is
+    // cleared once it is.
+    private bool _resuming;
+
+    // The quit's save has been written: a close is saved once, however it came.
+    private bool _quitSaved;
+
     public DistanceRpgGame()
+        : this(new LaunchOptions(WriteDataDirectory: null, NewCampaign: false))
     {
-        // Esc quits only if the current scene doesn't consume it (menus). KeyPressed
-        // is edge-only, so holding Esc doesn't flicker the pause menu.
+    }
+
+    /// <param name="launch">What the command line asked for (<see cref="Program.Parse"/>).</param>
+    internal DistanceRpgGame(LaunchOptions launch)
+    {
+        ArgumentNullException.ThrowIfNull(launch);
+        _launch = launch;
+
+        // Esc goes to the scene first (menus, the NEW CAMPAIGN prompt), and quits
+        // only if it is left unconsumed. KeyPressed is edge-only, so holding Esc
+        // doesn't flicker the pause menu.
         _inputEventManager.SubscribeToKeyPressed(_ => OnEscape(), Keys.Escape);
     }
 
@@ -116,21 +165,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
             return;   // the content does not load: the screen says why, no campaign is built, and ESC quits
 
         var content = GameContent.Current;
-        _campaign = CampaignState.Start(content);
-
-        string? requested = Environment.GetEnvironmentVariable(DungeonOverrideVariable);
-        bool straightIn = BootsIntoADungeon(requested, content.Dungeons);
-        if (!string.IsNullOrWhiteSpace(requested) && !straightIn)
-            Log.Warn($"[Run] {DungeonOverrideVariable}='{requested}' names no dungeon (there are: "
-                + string.Join(", ", content.Dungeons.All.Select(d => d.Id)) + ") - opening the screen between runs");
-
-        string? seedText = Environment.GetEnvironmentVariable(SeedOverrideVariable);
-        _bootSeed = BootSeed(seedText);
-        if (!string.IsNullOrWhiteSpace(seedText) && _bootSeed is null)
-            Log.Warn($"[Run] {SeedOverrideVariable}='{seedText}' is not a map seed (a whole number from 0 to {uint.MaxValue}) - rolling one");
-
-        if (straightIn)
-            BeginRun(BootDungeonId(requested, content.Dungeons));
+        var request = LaunchRequest(content);
+        var boot = BootCampaign(content, request);
+        if (boot.StraightInto is { } dungeonId)
+            BeginRun(dungeonId);
         else
             ShowBetweenRuns();
     }
@@ -168,9 +206,73 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
         GameContent.Use(content);
         Log.Info($"[Data] Playing under tuning {TuningJson.Hash(content.Tuning)}");
-        _startupNotices.Hold(load.Notices);
+        _notices.Hold(load.Notices);
         return true;
     }
+
+    /// <summary>
+    /// What this launch was asked for: the dev overrides from the environment —
+    /// each ignored, with a warning, when it is not what it should be — and
+    /// <c>--new-campaign</c> from the command line.
+    /// </summary>
+    private BootRequest LaunchRequest(GameContent content)
+    {
+        string? requested = Environment.GetEnvironmentVariable(DungeonOverrideVariable);
+        bool straightIn = BootsIntoADungeon(requested, content.Dungeons);
+        if (!string.IsNullOrWhiteSpace(requested) && !straightIn)
+            Log.Warn($"[Run] {DungeonOverrideVariable}='{requested}' names no dungeon (there are: "
+                + string.Join(", ", content.Dungeons.All.Select(d => d.Id)) + ") - it is ignored");
+
+        string? seedText = Environment.GetEnvironmentVariable(SeedOverrideVariable);
+        long? seed = BootSeed(seedText);
+        if (!string.IsNullOrWhiteSpace(seedText) && seed is null)
+            Log.Warn($"[Run] {SeedOverrideVariable}='{seedText}' is not a map seed (a whole number from 0 to {uint.MaxValue}) - it is ignored");
+
+        return new BootRequest(straightIn ? BootDungeonId(requested, content.Dungeons) : null, seed, _launch.NewCampaign);
+    }
+
+    /// <summary>
+    /// The campaign this launch plays (<see cref="CampaignBoot.Boot"/>): the save
+    /// folder read from the environment — <c>DISTANCERPG_SAVE_DIR</c>, else the
+    /// player's own data folder — and this launch's slot in it; the campaign
+    /// resumed or begun, and held; what the boot has to say, ahead of the data
+    /// files' notices; and whether a resume marker waits to be cleared.
+    /// </summary>
+    private BootResult BootCampaign(GameContent content, BootRequest request)
+    {
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrEmpty(localAppData))
+            Log.Warn("[Save] The system names no local data folder: the saves go under the working folder");
+        string saves = SaveStore.SaveDirectory(Environment.GetEnvironmentVariable(SaveStore.DirectoryVariable), localAppData);
+        var store = CampaignBoot.StoreFor(saves, request);
+        _store = store;
+        Log.Info($"[Save] Saves in {store.Folder}{(request.DevOverride ? " - the dev override's own slot" : "")}");
+
+        var boot = CampaignBoot.Boot(store, content, request, line => Log.Info(line));
+        Adopt(boot.Campaign);
+        foreach (string notice in boot.Notices)
+            Log.Info($"[Save] {notice}");
+        _notices.Lead(boot.Notices);
+        _resuming = boot.Resumed;
+        _bootSeed = boot.FirstSeed;
+        return boot;
+    }
+
+    /// <summary>Play <paramref name="campaign"/> from now on: its run's end is a save request, and the campaign it replaces keeps no wire to the game.</summary>
+    private void Adopt(CampaignState campaign)
+    {
+        if (_campaign is { } replaced)
+            replaced.RunEnded -= SaveAtTheRunsEnd;
+        _campaign = campaign;
+        campaign.RunEnded += SaveAtTheRunsEnd;
+    }
+
+    /// <summary>
+    /// A run has ended, by the way out or by a wipe — which ends it inside the turn
+    /// system's raise — so the save is only asked for here, and written once the
+    /// frame is over (<see cref="WriteRequestedSave"/>).
+    /// </summary>
+    private void SaveAtTheRunsEnd(RunResult result) => _saveRequested = true;
 
     /// <summary>
     /// The first run's map seed: <paramref name="requested"/> — the
@@ -217,9 +319,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// The run the current scene was playing is over, and its summary has been
     /// read. The campaign has already ended it (<see cref="CampaignState.EndRun"/>):
     /// the outcome, the tick, the lock or the retirement are written and the
-    /// visit is discarded whole. So the game goes back to the screen between
-    /// runs, where the last run's summary sits above the dungeon list and the
-    /// next dungeon is chosen.
+    /// visit is discarded whole — and saved, at the end of the frame the run
+    /// ended in. So the game goes back to the screen between runs, where the last
+    /// run's summary sits above the dungeon list and the next dungeon is chosen.
     /// </summary>
     public void RunOver() => ShowBetweenRuns();
 
@@ -228,6 +330,27 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     {
         ArgumentNullException.ThrowIfNull(dungeonId);
         BeginRun(dungeonId);
+    }
+
+    /// <summary>
+    /// NEW CAMPAIGN, confirmed on the screen between runs (N, then N again): the
+    /// party from the roster, nothing met, every dungeon open — saved at once over
+    /// the saved campaign, which the replace keeps as the backup until the next
+    /// save — and a fresh screen between runs over it. A save that fails says so
+    /// there.
+    /// </summary>
+    public void NewCampaign()
+    {
+        if (_campaign?.Visit is { } visit)
+            throw new InvalidOperationException($"A visit to '{visit.Def.Id}' is in progress: a new campaign begins between runs.");
+
+        Log.Info("[Hub] A new campaign: the party from the roster, nothing met, every dungeon open - it replaces the saved campaign");
+        var campaign = CampaignState.Start(GameContent.Current);
+        Adopt(campaign);
+        _saveRequested = false;
+        if (_store is { } store)
+            Save(campaign, store, "as a new campaign begins");
+        ShowBetweenRuns();
     }
 
     /// <summary>
@@ -245,7 +368,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         }
 
         var campaign = _campaign ?? throw new InvalidOperationException("No campaign: the game has not loaded.");
-        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, _startupNotices.Take()));
+        SwapTo(BetweenRunsSceneName, new BetweenRunsScene(this, campaign, this, _notices.Take()));
     }
 
     /// <summary>
@@ -269,7 +392,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         var visit = campaign.Enter(dungeonId, mapSeed);
         Log.Info($"[Run] Entering {visit.Def.Name} ({visit.Def.Id}) on map seed {mapSeed} - run counter {campaign.RunCounter}");
 
-        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, _startupNotices.Take()));
+        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, _notices.Take()));
     }
 
     /// <summary>
@@ -296,23 +419,146 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
             _pendingScene = null;
             pending();
         }
+
+        // The frame is over, and no raise is running: what it asked of the save is done now.
+        if (_resuming)
+            ClearResumeOnceUp();
+        if (_saveRequested)
+            WriteRequestedSave();
+    }
+
+    /// <summary>
+    /// A resumed campaign's first screen is up — current, its fade in done, and
+    /// its first updates run — so the resume did not crash the game, and its
+    /// marker goes: the next launch resumes as ever, rather than setting the save
+    /// aside as crashed.
+    /// </summary>
+    private void ClearResumeOnceUp()
+    {
+        var scenes = SceneManager.Instance;
+        if (scenes.IsTransitioning || scenes.CurrentScene is null)
+            return;
+        _resuming = false;
+        ClearResumeMarker("the resumed campaign's first screen is up");
+    }
+
+    /// <summary>Clear the resume marker, saying why; a marker that will not go is a log line, never a crash.</summary>
+    private void ClearResumeMarker(string why)
+    {
+        if (_store is not { } store)
+            return;
+        try
+        {
+            store.ClearResuming();
+            Log.Info($"[Save] {store.ResumingPath} cleared: {why}");
+        }
+        catch (Exception error)
+        {
+            Log.Warn($"[Save] {store.ResumingPath} could not be cleared - the next launch sets the save aside as crashed: {error}");
+        }
+    }
+
+    /// <summary>
+    /// The save a run's end asked for, between runs. A run in progress is not
+    /// saved yet (Phase 5.8), so a request waits while one is: none can arrive
+    /// then, since a run's end is what asks.
+    /// </summary>
+    private void WriteRequestedSave()
+    {
+        if (_campaign is not { } campaign || _store is not { } store)
+        {
+            _saveRequested = false;
+            return;
+        }
+        if (campaign.Visit is not null)
+            return;
+        _saveRequested = false;
+        Save(campaign, store, "at the run's end");
+    }
+
+    /// <summary>
+    /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws:
+    /// every line to the log, and a write that failed also to the next screen the
+    /// game shows. The save on the disk is kept whatever happens.
+    /// </summary>
+    private void Save(CampaignState campaign, SaveStore store, string when)
+    {
+        Log.Info($"[Save] Saving the campaign {when}");
+        if (CampaignBoot.Save(store, campaign, view: null, line => Log.Info(line)) is { } failed)
+        {
+            Log.Warn($"[Save] {failed}");
+            _notices.Lead([failed]);
+        }
+    }
+
+    /// <summary>
+    /// The window is closing — ESC left unconsumed, the pause menu's quit, or the
+    /// close button — and every one of them arrives here (the engine's own
+    /// <c>Close</c> raises it too). Between runs the campaign is saved; mid-run it
+    /// is not yet (Phase 5.8), and the log says the campaign on the disk is the
+    /// one from before the run. Behind the screen a broken content file stops the
+    /// game on there is no campaign, and nothing to save. Nothing thrown here
+    /// stops the window closing: a failure is a log line.
+    /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        try
+        {
+            SaveOnQuit();
+        }
+        catch (Exception error)
+        {
+            Log.Error($"[Save] Saving on quit failed - the save on the disk is kept: {error}");
+        }
+        base.OnClosing(e);
+    }
+
+    private void SaveOnQuit()
+    {
+        if (_quitSaved)
+            return;
+        _quitSaved = true;
+        if (_campaign is not { } campaign || _store is not { } store)
+            return;   // the content never loaded: no campaign
+
+        if (campaign.Visit is { } visit)
+            Log.Info($"[Save] Quitting mid-run in {visit.Def.Name}: the run in progress is not saved yet - "
+                + (store.HasSave
+                    ? $"{store.SavePath} keeps the campaign as it stood before the run began"
+                    : $"nothing is saved, and {store.SavePath} is not there yet"));
+        else
+            Save(campaign, store, "on quit");
+
+        if (_resuming)
+        {
+            _resuming = false;
+            ClearResumeMarker("the game quit cleanly");
+        }
     }
 
     /// <summary>
     /// Escape goes to the scene being played. In a dungeon it closes a menu or
-    /// opens the pause menu, whose EXIT is how a run is quit, and it does nothing
-    /// on a run's summary, where ENTER is the one way on. The screen between runs
-    /// consumes none of it, so there ESC quits the game — and so does the screen
-    /// a broken content file stops the game on, which has no campaign behind it.
-    /// Only what a scene leaves unconsumed quits. Mid-transition between scenes it
-    /// does nothing at all, neither scene's to answer and never a quit on the way
-    /// in or out of a run.
+    /// opens the pause menu, whose quit is how a run is left, and it does nothing
+    /// on a run's summary, where ENTER is the one way on. On the screen between
+    /// runs it disarms the NEW CAMPAIGN prompt when that is up, and otherwise it
+    /// is not consumed, so the game saves the campaign and quits
+    /// (<see cref="OnClosing"/>) — as it quits from the screen a broken content
+    /// file stops the game on, which has no campaign behind it. Only what a scene
+    /// leaves unconsumed quits. Mid-transition between scenes it does nothing at
+    /// all, neither scene's to answer and never a quit on the way in or out of a
+    /// run.
     /// </summary>
     private void OnEscape()
     {
         var scenes = SceneManager.Instance;
         if (scenes.IsTransitioning) return;
-        if ((scenes.CurrentScene as DungeonScene)?.HandleEscape() != true)
+        bool consumed = scenes.CurrentScene switch
+        {
+            DungeonScene dungeon => dungeon.HandleEscape(),
+            BetweenRunsScene betweenRuns => betweenRuns.HandleEscape(),
+            _ => false,
+        };
+        if (!consumed)
             Close();
     }
 }

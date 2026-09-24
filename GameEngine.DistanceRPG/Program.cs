@@ -3,6 +3,15 @@ using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG;
 
+/// <summary>
+/// What the command line asked for, as <see cref="Program.Parse"/> read it: the
+/// folder <c>--write-data</c> names, or null, and whether <c>--new-campaign</c>
+/// was given.
+/// </summary>
+/// <param name="WriteDataDirectory">The folder the data files are written to, instead of playing; null when none was named.</param>
+/// <param name="NewCampaign">Set the campaign aside and start fresh at launch.</param>
+internal sealed record LaunchOptions(string? WriteDataDirectory, bool NewCampaign);
+
 internal class Program
 {
     /// <summary>
@@ -17,6 +26,14 @@ internal class Program
     /// </summary>
     internal const string WriteDataOption = "--write-data";
 
+    /// <summary>
+    /// <c>DistanceRPG --new-campaign</c> sets the campaign's save aside as
+    /// <c>campaign.abandoned-N.json</c> — never deleted — and starts a fresh
+    /// campaign (1f): the way out of a campaign a playtester wants gone without
+    /// finishing its run, beside NEW CAMPAIGN on the screen between runs.
+    /// </summary>
+    internal const string NewCampaignOption = "--new-campaign";
+
     private static int Main(string[] args)
     {
         // Install diagnostics first so any startup failure ends up in a crash dump
@@ -27,18 +44,25 @@ internal class Program
 
         try
         {
+            var warnings = new List<string>();
+            var options = Parse(args, warnings);
+            foreach (string warning in warnings)
+                Log.Warn($"[Launch] {warning}");
+
             if (Array.IndexOf(args, WriteDataOption) >= 0)
             {
-                if (WriteDataDirectory(args) is not { } directory)
+                if (options.WriteDataDirectory is not { } directory)
                 {
                     Log.Error($"{WriteDataOption} names no folder: DistanceRPG {WriteDataOption} <folder>");
                     return 1;
                 }
+                if (options.NewCampaign)
+                    Log.Warn($"[Launch] {NewCampaignOption} does nothing beside {WriteDataOption}, which writes the data files and exits without playing");
                 WriteData(directory, line => Log.Info(line));
                 return 0;
             }
 
-            using var game = new DistanceRpgGame();
+            using var game = new DistanceRpgGame(options);
             game.Run();
             return 0;
         }
@@ -47,6 +71,40 @@ internal class Program
             Log.Info("DistanceRPG shutting down");
             Log.Shutdown();
         }
+    }
+
+    /// <summary>
+    /// The command line, read: the folder <see cref="WriteDataOption"/> names
+    /// (<see cref="WriteDataDirectory"/>) and whether <see cref="NewCampaignOption"/>
+    /// is there. Pure: nothing is read but the arguments. An argument the game does
+    /// not know is ignored, and so is a <see cref="WriteDataOption"/> that names no
+    /// folder, each with a warning in <paramref name="warnings"/> for the log.
+    /// </summary>
+    internal static LaunchOptions Parse(IReadOnlyList<string> args, ICollection<string>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        string? writeData = WriteDataDirectory(args);
+        bool newCampaign = false;
+        for (int i = 0; i < args.Count; i++)
+        {
+            string arg = args[i];
+            if (arg == WriteDataOption)
+            {
+                if (writeData is not null && i + 1 < args.Count && args[i + 1] == writeData)
+                    i++;   // the folder it names
+                else
+                    warnings?.Add($"{WriteDataOption} names no folder: DistanceRPG {WriteDataOption} <folder>");
+            }
+            else if (arg == NewCampaignOption)
+            {
+                newCampaign = true;
+            }
+            else
+            {
+                warnings?.Add($"'{arg}' is no argument the game knows, and is ignored: it knows {WriteDataOption} <folder> and {NewCampaignOption}");
+            }
+        }
+        return new LaunchOptions(writeData, newCampaign);
     }
 
     /// <summary>The folder <see cref="WriteDataOption"/> names — the argument after it — or null when it names none.</summary>

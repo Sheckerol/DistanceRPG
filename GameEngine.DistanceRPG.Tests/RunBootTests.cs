@@ -80,4 +80,35 @@ public class RunBootTests
         foreach (string? notASeed in new[] { null, "", "   ", "-1", "4294967296", "7.0", "+7", "seven", "0x7" })
             Assert.Null(DistanceRpgGame.BootSeed(notASeed));
     }
+
+    [Fact]
+    public void TheSaveFolderIsTheOverridesWhenSet()
+    {
+        // 1e, 1f: the campaign is saved in the player's data folder, not beside
+        // the executable, and DISTANCERPG_SAVE_DIR moves the whole save folder —
+        // the dev overrides' slot inside it. Strings only: the game reads the
+        // variable and the data folder, and hands them in.
+        string local = Path.Combine("home", "someone", ".local", "share");
+        string mine = Path.Combine(local, "DistanceRPG", "saves");
+        string moved = Path.Combine("scratch", "playtest-saves");
+        Assert.Equal("DISTANCERPG_SAVE_DIR", SaveStore.DirectoryVariable);
+        Assert.Equal(mine, SaveStore.SaveDirectory(null, local));
+        Assert.Equal(mine, SaveStore.SaveDirectory("   ", local));
+        Assert.Equal(moved, SaveStore.SaveDirectory(moved, local));
+        Assert.Equal(moved, SaveStore.SaveDirectory($"  {moved}  ", local));
+
+        // Whichever folder it is, a launch plays in it — or, with a dev override
+        // set (a dungeon, a seed, or both), in its override slot. --new-campaign
+        // alone is no override: it sets the campaign's own save aside.
+        foreach (string saves in new[] { mine, moved })
+        {
+            string slot = Path.Combine(saves, SaveStore.OverrideSlot);
+            Assert.Equal(saves, SaveStore.SlotDirectory(saves, new BootRequest().DevOverride));
+            Assert.Equal(saves, SaveStore.SlotDirectory(saves, new BootRequest(NewCampaign: true).DevOverride));
+            Assert.Equal(slot, SaveStore.SlotDirectory(saves, new BootRequest("spear_hall").DevOverride));
+            Assert.Equal(slot, SaveStore.SlotDirectory(saves, new BootRequest(Seed: 7).DevOverride));
+            Assert.Equal(slot, SaveStore.SlotDirectory(saves, new BootRequest("spear_hall", 7, NewCampaign: true).DevOverride));
+        }
+        Assert.Equal("override", SaveStore.OverrideSlot);
+    }
 }

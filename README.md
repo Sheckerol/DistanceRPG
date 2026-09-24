@@ -35,13 +35,15 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 
 The game opens on the screen between runs: the dungeon list, with the last
 run's summary above it once a run has ended. Until the tutorial's golem is
-beaten it lists the tutorial alone.
+beaten it lists the tutorial alone. A saved campaign resumes there, with
+`CAMPAIGN RESUMED` under the title (see [Saves](#saves)).
 
 | Between runs | Action |
 | --- | --- |
 | W/S / arrows | Choose a dungeon (a locked one shows its countdown and is skipped) |
 | Enter | Descend into the chosen dungeon |
-| Esc | Quit the game |
+| N, then N | New campaign: the party from `party.json`, nothing played. It asks first, and replaces the saved campaign; any other key after the first N keeps it |
+| Esc | Save the campaign and quit (with NEW CAMPAIGN asked, Esc only answers no) |
 
 | In a dungeon | Action |
 | --- | --- |
@@ -54,7 +56,7 @@ beaten it lists the tutorial alone.
 | I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
 | X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
 | Scroll wheel | Zoom |
-| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the pause menu. Does nothing on a run's summary |
+| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the pause menu, whose 2 quits the game: a run in progress is not saved yet, so a relaunch resumes the campaign as it was before the run. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
 
 Outside combat the rest of the party marches behind the active character in a
@@ -66,6 +68,54 @@ is visible and everyone has regrouped within their max movement of the leader
 line of sight breaks. Sighting the enemy revokes it for the rest of the turn:
 everyone stops following, characters body-block each other, and turns end
 manually.
+
+## Saves
+
+There is one campaign and one save, and no manual saving: the game saves on
+its own and resumes where you left off.
+
+- **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\campaign.json` on Windows
+  (`~/.local/share/DistanceRPG/saves/` on Linux) — the player's data folder,
+  never beside the exe, which a rebuild or `dotnet clean` replaces. Set
+  `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
+  names the full path of every save written or read.
+- **When**: at a run's end (the summary is saved with it), when NEW CAMPAIGN is
+  confirmed, and on quitting between runs — Esc on the screen between runs, or
+  the window's close button. **A run in progress is not saved yet**: quitting
+  mid-run (the pause menu's `2  QUIT - THIS RUN IS NOT SAVED`, or closing the
+  window) keeps the campaign as it was before the run began.
+- **Resuming**: every launch resumes the campaign on the screen between runs,
+  with `CAMPAIGN RESUMED` under the title and the last run's summary above the
+  list. A campaign saved under other numbers (`tuning.json` edited since) plays
+  on under the new ones and says `THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS
+  SAVED - IT PLAYS ON UNDER THE NEW ONES`, once: the next save records the new
+  numbers.
+- **`campaign.bak.json`** is the save before the last one. Every write goes to a
+  temp file first and then replaces the save in one step, the old save becoming
+  the backup, so a write that fails — a full disk, a locked file, a folder with
+  no rights — costs nothing: the game says `THE CAMPAIGN COULD NOT BE SAVED`, the
+  log says why, and the save on the disk is the last good one.
+- **A save that cannot be played is set aside, never deleted**: one that is not
+  a save, one a newer build wrote, one naming content that is gone, or one that
+  crashed the game as it resumed (a `campaign.resuming` marker sits beside the
+  save while a resume is in flight; a launch that finds it knows the last resume
+  never finished). It is renamed `campaign.unreadable-N.json` (or
+  `campaign.crashed-N.json`), the backup is tried, and failing that a new
+  campaign begins. The screen says so under the title, naming the file's full
+  path — three rows at most, so a long one ends `+1 MORE - SEE THE LOG`, and the
+  log has every word. **Rename it back to `campaign.json` to try it again.**
+  Nothing ever writes over a file set aside.
+- **Starting over**: N, then N, on the screen between runs replaces the saved
+  campaign with a new one (the old one stays in `campaign.bak.json` until the
+  next save). `DistanceRPG --new-campaign` — `dotnet run --project
+  GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --new-campaign` — sets
+  the save aside as `campaign.abandoned-N.json` and starts fresh. Deleting
+  `campaign.json` by hand resumes the backup instead, if there is one.
+- **The dev overrides play apart**: a launch with `DISTANCERPG_DUNGEON` (a
+  dungeon's id: straight into it) or `DISTANCERPG_SEED` (the first run's map
+  seed) plays a fresh campaign in `saves\override\`, emptied at every such
+  launch, and never reads or writes `campaign.json` — every override launch is as
+  repeatable as ever, and your campaign is untouched. Unset them to go back to it.
 
 ## Tuning the numbers: `tuning.json`
 
@@ -154,8 +204,9 @@ that order, and everything in them is named by a stable string id.
 - **`party.json`** holds the four who start a campaign: `id`, `name`, `stats`
   (`STR`, `DEX`, `CON` and `INT`, the numbers 1 to 4 in some order),
   `startingWeaponId` and `bagWeaponIds`. A campaign starts with the party this
-  file names; with no saves yet, every start of the game is a new campaign, so
-  swapping two members' `stats` and restarting plays them swapped.
+  file names, and a saved campaign keeps the party it started with: to play an
+  edited roster — two members' `stats` swapped, say — start a new campaign
+  (N, then N, between runs, or `--new-campaign` at launch).
 - **A row marked `/* provisional */`** after its id is one the docs did not fix
   — the four dungeons beside the tutorial and their bosses, the three unnamed
   uniques, `aegis` and `burning` — a first guess, expected to move after play.

@@ -1150,6 +1150,25 @@ public class HudTextTests
         Assert.Empty(hud.NoticeRows);
     }
 
+    [Fact]
+    public void ThePauseMenuSaysARunInProgressIsNotSavedYet()
+    {
+        // 1f, 1i: the campaign is saved between runs — at a run's end, and on
+        // quitting the screen between runs — and a run in progress is not saved
+        // until Phase 5.8. So the pause menu's quit says what quitting now costs:
+        // a relaunch resumes the campaign as it stood before this run began.
+        Assert.Equal("2  QUIT - THIS RUN IS NOT SAVED", DungeonHud.PauseQuitLine);
+        Assert.Equal(["1  CLOSE", DungeonHud.PauseQuitLine], DungeonHud.PauseMenuOptions());
+
+        // Each option leads with the number key that takes it — 1 closes the menu,
+        // 2 quits — and nothing on it still calls quitting an exit that loses nothing.
+        var options = DungeonHud.PauseMenuOptions();
+        for (int i = 0; i < options.Count; i++)
+            Assert.StartsWith($"{i + 1}  ", options[i], StringComparison.Ordinal);
+        Assert.DoesNotContain(options, option => option.Contains("EXIT GAME", StringComparison.Ordinal));
+        Assert.Contains("NOT SAVED", DungeonHud.PauseQuitLine, StringComparison.Ordinal);
+    }
+
     /// <summary>The host of a scene that is built and read, never played: none of its runs ever ends.</summary>
     private sealed class NoRunHost : IRunHost
     {

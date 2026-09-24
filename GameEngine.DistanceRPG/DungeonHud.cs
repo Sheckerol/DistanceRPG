@@ -1166,17 +1166,30 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The pause menu: close it, or leave the game. Stopping resurrection is the
-    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for
-    /// it went when the boss arrived — so what the dungeon has become is the
-    /// floor line's to say (<see cref="FloorLine"/>).
+    /// The pause menu's second option, which quits the game. The campaign is saved
+    /// between runs — at a run's end, and on quitting the screen between runs — and
+    /// the run in progress is not saved yet (Phase 5.8 saves it), so the option says
+    /// what quitting now costs: a relaunch resumes the campaign as it stood before
+    /// this run began.
+    /// </summary>
+    internal const string PauseQuitLine = "2  QUIT - THIS RUN IS NOT SAVED";
+
+    /// <summary>The pause menu's options, top to bottom, each with the number key that takes it.</summary>
+    internal static IReadOnlyList<string> PauseMenuOptions() => ["1  CLOSE", PauseQuitLine];
+
+    /// <summary>
+    /// The pause menu: close it, or quit the game (<see cref="PauseMenuOptions"/>).
+    /// Stopping resurrection is the boss's doing (§4.3), and nothing else's — the
+    /// dev switch that stood in for it went when the boss arrived — so what the
+    /// dungeon has become is the floor line's to say (<see cref="FloorLine"/>).
     /// </summary>
     private void DrawMenu(int w, int h)
     {
         float top = h / 2f - 90f;
         DrawCentered(w, top, "PAUSED", 4f, Cyan);
-        DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
-        DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
+        var options = PauseMenuOptions();
+        for (int i = 0; i < options.Count; i++)
+            DrawCentered(w, top + 66f + i * 40f, options[i], 2f, White);
         DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
