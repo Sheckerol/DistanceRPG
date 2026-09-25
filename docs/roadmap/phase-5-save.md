@@ -272,13 +272,13 @@ area shape, innate enchantment id, in three sections:
 
 | Section | Holds |
 | --- | --- |
-| `classes` | Each of the eight classes once, by name: its `kind` (melee, ranged or caster), the `stats` it levels on, its `signature`, its `baseline` — the modifiers every weapon of the class is forged with — and the statline its weapons share: `range`, `damage`, `cost`, `manaCost` |
-| `variants` | The 32 weapons: each one's class, its role, the modifier it **adds** to its class's baseline, the enchantments it arrives with (a staff's innate, by id) and a wand's area shape. A statline field a variant names plays instead of its class's |
-| `uniques` | Each artifact as the variant it derives from — whose class, statline and shape it takes — the modifier it **raises**, set to the count given, and its enchantments |
+| `classes` | Each of the eight classes once, by name: its `kind` (melee, ranged or caster), the `stats` it levels on, its `signature` (none for a caster), its `baseline` — the modifiers every weapon of the class is forged with — and the statline its weapons share: `range`, `damage`, `cost`, `manaCost` |
+| `variants` | The 32 weapons: each one's class, its role, the modifier it **adds** to its class's baseline (a caster variant has no role and adds none), the enchantments it arrives with (a staff's innate, by id) and a wand's area shape. A statline field a variant names plays instead of its class's |
+| `uniques` | Each artifact as the variant it derives from — whose class, statline and shape it takes — the modifier it **raises**, set to the count given (a caster unique raises none), and its enchantments |
 
-So re-basing a class is one edit, to its row: a variant is its class plus the
-modifier it adds, and a unique is its variant with the modifier it raises. The
-loader composes each into the one weapon every other system reads.
+So re-basing a class is one edit, to its row: a variant is its class plus what
+it adds, and a unique is its variant with what it raises — both nothing, for a
+caster. The loader composes each into the one weapon every other system reads.
 
 | Check | Rule | From |
 | --- | --- | --- |
@@ -286,7 +286,7 @@ loader composes each into the one weapon every other system reads.
 | A class casts exactly when it is the Staff or the Wand | The code casts with those two: a staff's innate is its cast, a wand's element and shape arrive when it drops | §1.3, §1.4 |
 | A class levels on one or more of STR, DEX and INT | CON levels no weapon: it is the body's pool, not a craft | §1.2, §2.2 |
 | No two classes share a signature | A dungeon's theme finds its class by its signature | §4.3 |
-| A class baseline is its signature plus a second (a caster's `Resonant ×1`) | No weapon starts with fewer than two forged axes, and a caster's second is its enchantment | §1.2, §1.3 |
+| A martial class's baseline is its signature plus a second modifier; a caster class has no signature and a baseline of `Resonant ×1` alone | No weapon starts with fewer than two forged axes, and a caster's second is its enchantment | §1.2, §1.3 |
 | Every forged spread is legal | `Allowed(t, kind, present)` | §1.1 |
 | Nothing forged too deep | `MaxForged` — `×3`, or `×1` for `Light`/`Resonant` | §1.1 |
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |

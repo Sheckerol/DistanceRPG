@@ -1673,9 +1673,10 @@ it:
 - **Class baselines are a section of `weapons.json` — ruled by the user
   (2026-09-25), withdrawing the bend** (§5.6: "the class baselines leave
   `Weapons.cs`" — now for a section of the file). Each class has a row — kind,
-  levelling stats, signature, baseline, statline — a variant is written as its
-  class and the modifier it adds, and a unique as its variant and what it raises;
-  re-basing a class is one edit. (Superseded by the user's ruling, 2026-09-25:
+  levelling stats, signature (none for a caster), baseline, statline — a
+  variant is written as its class and the modifier it adds (nothing, for a
+  caster), and a unique as its variant and what it raises; re-basing a class is
+  one edit. (Superseded by the user's ruling, 2026-09-25:
   shipped provisionally as derived, never a section — every variant carrying its
   whole forged spread, a class's baseline what its four variants share.)
 - **No `condition` field in an enchantment's entry — bends the phase doc** (§5.7,
