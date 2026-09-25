@@ -21,8 +21,9 @@ internal sealed record BootRequest(string? DungeonId = null, long? Seed = null, 
 /// The campaign a launch plays, and what to say about it (1f): a dev-override
 /// launch's scratch campaign (<see cref="CampaignBoot.BootOverride"/>), the one
 /// <c>--new-campaign</c> begins (<see cref="CampaignBoot.Abandon"/>), or — put
-/// together by the game — the campaign a load brought back, or the new one begun
-/// when it brought nothing; the view its save carried; for a dev-override launch,
+/// together from the autosave's load (<see cref="CampaignBoot.ResumeOrBegin"/>) —
+/// the campaign the load brought back, or the new one begun when it brought
+/// nothing; the view its save carried; for a dev-override launch,
 /// the dungeon to boot straight into and the first run's seed; and the notices
 /// the first screen shows, in this order and whole: that the campaign resumed or
 /// a new one begins, that the numbers changed since it was saved, and that a save
@@ -38,7 +39,8 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// campaign resumed, from which slot or its backup; that the last quit could not
 /// write it; that the numbers changed since it was saved; and every file set
 /// aside on the way, where, and how to try it again. A load never makes a
-/// campaign: what follows one that brings nothing back is the caller's to decide.
+/// campaign: what follows one that brings nothing back is the caller's to decide
+/// (the launch's: <see cref="CampaignBoot.ResumeOrBegin"/>).
 /// </summary>
 internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnlyList<string> Notices)
 {
@@ -51,9 +53,11 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// The campaign's life on the disk, between the edge (<see cref="SaveStore"/>,
 /// one slot each, and <see cref="SaveSlots"/>) and <c>Logic/</c>'s save document
 /// (<see cref="SaveGame"/>, <see cref="SaveCodec"/>): a slot's load
-/// (<see cref="Load"/>), the two launches that load nothing — a dev override's
-/// scratch campaign (<see cref="BootOverride"/>) and <c>--new-campaign</c>
-/// (<see cref="Abandon"/>) — a save that never throws and never costs a file
+/// (<see cref="Load"/>), what the launch plays from the autosave's load
+/// (<see cref="ResumeOrBegin"/>), the two launches that load nothing — a dev
+/// override's scratch campaign (<see cref="BootOverride"/>) and
+/// <c>--new-campaign</c> (<see cref="Abandon"/>) — a save that never throws and
+/// never costs a file
 /// (<see cref="Save"/>), and the save a quit takes mid-run
 /// (<see cref="SaveOnQuit"/>). Engine-free, so every case is tested on a
 /// temporary folder with no window; what it has to say goes to the caller as log
@@ -70,7 +74,8 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// whose load crashed the game last time — the resume marker left behind — is set
 /// aside the same way. Every set-aside notice names the file's full path and ends
 /// <see cref="TryAgain"/>. A slot that brings nothing back makes no campaign: the
-/// caller decides what follows.</item>
+/// caller decides what follows — the launch begins one, saying so ahead of what
+/// was set aside (<see cref="ResumeOrBegin"/>).</item>
 /// <item><strong>No write costs a file</strong> (1f): a slot can be written without
 /// being loaded, so before any write a <see cref="SaveStore.FileName"/> there
 /// that no save can be read from is set aside first, and so is such a backup the
@@ -231,6 +236,35 @@ internal static class CampaignBoot
             ? $"[Save] No campaign to load in {slot.Folder}"
             : $"[Save] Nothing could be loaded from {slot.Folder}");
         return new SlotLoad(null, null, setAside);
+    }
+
+    /// <summary>
+    /// What the launch plays from the autosave's load (1f's last bullet: the launch
+    /// as it always was, until the title replaces it): the campaign
+    /// <paramref name="load"/> brought back, resumed, with the view its save
+    /// carried and the load's word as the load said it; or, when it brought
+    /// nothing back, a new campaign (<see cref="CampaignState.Start"/>) — a load
+    /// makes none of its own — whose word is <see cref="NewCampaignBegins"/>
+    /// followed by every file the load set aside, in the load's order, or nothing
+    /// at all when the slot held nothing, the first launch ever. Reads, writes and
+    /// moves no file: the load has done all of that.
+    /// </summary>
+    /// <param name="load">What <see cref="Load"/> brought back from the autosave slot.</param>
+    /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a new campaign is built under it.</param>
+    /// <param name="report">Where the log line goes when a new campaign begins.</param>
+    /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
+    internal static BootResult ResumeOrBegin(SlotLoad load, GameContent content, Action<string>? report = null)
+    {
+        ArgumentNullException.ThrowIfNull(load);
+        RequireCurrent(content);
+        if (load.Campaign is { } loaded)
+            return new BootResult(loaded, Resumed: true, load.View, StraightInto: null, FirstSeed: null, load.Notices);
+
+        report?.Invoke(load.Notices.Count == 0
+            ? "[Save] Nothing saved yet: a new campaign begins"
+            : "[Save] Nothing could be loaded: a new campaign begins");
+        IReadOnlyList<string> said = load.Notices.Count == 0 ? [] : [NewCampaignBegins, .. load.Notices];
+        return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, said);
     }
 
     /// <summary>

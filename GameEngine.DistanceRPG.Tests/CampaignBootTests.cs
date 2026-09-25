@@ -9,7 +9,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// save is resumed and says so; one that cannot be read, or whose resume crashed
 /// the game, is set aside — never deleted, never written over — with a notice
 /// naming its full path, and the backup is tried, then nothing is brought back,
-/// a load making no campaign of its own; <c>--new-campaign</c> sets the save and
+/// a load making no campaign of its own — the launch begins one, saying so ahead
+/// of what was set aside; <c>--new-campaign</c> sets the save and
 /// its backup aside before anything is read, so neither can come back as the new
 /// campaign's; the save's word is shown whole, the numbers ahead of any file set
 /// aside; a dev-override launch plays a fresh campaign in a slot of its own and
@@ -269,6 +270,133 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(newer, File.ReadAllText(Path.Combine(store.Folder, "campaign.unreadable-2.json")));
             Assert.Equal(newer, File.ReadAllText(aside));
             store.ClearResuming();
+        });
+    }
+
+    [Fact]
+    public void TheLaunchPlaysWhatTheAutosaveBringsBack_OrBeginsACampaignSayingSoFirst()
+    {
+        InTempFolder(folder =>
+        {
+            // S5's review. A load makes no campaign, so what the launch plays is put
+            // together from the autosave's load (CampaignBoot.ResumeOrBegin, which
+            // DistanceRpgGame.BootCampaign hands it): the campaign it brought back, or
+            // a new one that says so ahead of what was set aside. That is what the
+            // one launch did before the load was split from it, and each case here is
+            // one the tests of that launch pinned. A slot of its own for each; the log
+            // holds what ResumeOrBegin says, and nothing of the load's.
+            var log = new List<string>();
+            SaveStore Slot(string name) => new(Path.Combine(folder, name));
+            BootResult Launch(SaveStore store) => CampaignBoot.ResumeOrBegin(Load(store), GameContent.Current, log.Add);
+
+            // A new campaign: the roster's four, nothing met but their loadout, nothing
+            // played, every dungeon but the tutorial behind it — and nothing of a save
+            // or a dev override: no view, no dungeon to boot into, no seed.
+            void IsANewCampaign(BootResult launch)
+            {
+                Assert.False(launch.Resumed);
+                Assert.Null(launch.View);
+                Assert.Null(launch.StraightInto);
+                Assert.Null(launch.FirstSeed);
+                Assert.Equal(GameContent.Current.Party.All.Select(member => member.Id), launch.Campaign.Party.Select(member => member.Id));
+                StateAssert.Equivalent(NewCampaign(), launch.Campaign, "campaign");
+                Assert.Equal(0, launch.Campaign.RunCounter);
+                Assert.Null(launch.Campaign.LastResult);
+            }
+
+            // Nothing in the folder — the first launch ever — is a new campaign with
+            // nothing to say, and nothing is written.
+            var empty = Slot("empty");
+            var first = Launch(empty);
+            IsANewCampaign(first);
+            Assert.Empty(first.Notices);
+            Assert.False(Directory.Exists(empty.Folder));
+            Assert.Equal(["[Save] Nothing saved yet: a new campaign begins"], log);
+
+            // A save that loads is played: the very campaign and view the load brought
+            // back, resumed, with the load's word as it said it and nothing added —
+            // here a run's backup, the save beside it set aside.
+            var resumes = Slot("resumes");
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            var script = VisitScript.Enter(campaign, "spear_hall", CampaignRuns.FiveDeep);
+            script.Down();
+            Assert.Null(CampaignBoot.Save(resumes, campaign, new ViewDto("B")));   // a player turn's start
+            script.EndTurn(SaveGame.LogicStepSeconds);
+            Assert.Null(CampaignBoot.Save(resumes, campaign, new ViewDto("B")));   // the next one: the save before it is the backup
+            File.WriteAllText(resumes.SavePath, "not a save");
+            log.Clear();
+            var load = Load(resumes);
+            Assert.True(load.Loaded);
+            var resumed = CampaignBoot.ResumeOrBegin(load, GameContent.Current, log.Add);
+            Assert.True(resumed.Resumed);
+            Assert.Same(load.Campaign, resumed.Campaign);
+            Assert.Equal((new ViewDto("B"), (string?)null, (long?)null), (resumed.View, resumed.StraightInto, resumed.FirstSeed));
+            Assert.Equal(load.Notices, resumed.Notices);
+            Assert.Equal(2, resumed.Notices.Count);
+            Assert.Equal(CampaignBoot.ResumedFromBackup, resumed.Notices[0]);
+            Assert.Empty(log);
+            resumes.ClearResuming();
+
+            // Nothing that loads — the save not a save, the backup not even an object —
+            // is a new campaign that says so first, then what was set aside, in the
+            // load's order: the save, then its backup.
+            var broken = Slot("broken");
+            Directory.CreateDirectory(broken.Folder);
+            File.WriteAllText(broken.SavePath, "not a save");
+            File.WriteAllText(broken.BackupPath, "[1, 2, 3]");
+            var afterBroken = Launch(broken);
+            IsANewCampaign(afterBroken);
+            Assert.Collection(afterBroken.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", broken)})",
+                    Path.Combine(broken.Folder, "campaign.unreadable-1.json")),
+                notice => SaysSetAside(notice, "campaign.bak.json", "could not be read ($: the document is a JSON array)",
+                    Path.Combine(broken.Folder, "campaign.unreadable-2.json")));
+            Assert.Equal(["[Save] Nothing could be loaded: a new campaign begins"], log);
+
+            // A newer build's save, set aside and never written over: the same.
+            var newer = Slot("newer");
+            var tree = JsonNode.Parse(Text(NewCampaign()))!.AsObject();
+            tree["version"] = SaveCodec.CurrentVersion + 1;
+            Directory.CreateDirectory(newer.Folder);
+            File.WriteAllText(newer.SavePath, tree.ToJsonString());
+            var afterNewer = Launch(newer);
+            IsANewCampaign(afterNewer);
+            Assert.Collection(afterNewer.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.json",
+                    $"could not be read (version: {SaveCodec.CurrentVersion + 1} is newer than this build reads ({SaveCodec.CurrentVersion}))",
+                    Path.Combine(newer.Folder, "campaign.unreadable-1.json")));
+
+            // A save whose resume crashed the game, with no backup to fall back on: set
+            // aside as crashed, and the same again.
+            var crashes = Slot("crashes");
+            Saved(crashes, NewCampaign());
+            Assert.True(Load(crashes).Loaded);   // and the game goes down before the resumed screen is up: the marker stands
+            var afterCrash = Launch(crashes);
+            IsANewCampaign(afterCrash);
+            Assert.Collection(afterCrash.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.json", "crashed the game the last time it was resumed",
+                    Path.Combine(crashes.Folder, "campaign.crashed-1.json")));
+            Assert.False(crashes.WasResuming);
+
+            // Windows only: a save another program holds open can be neither read nor
+            // moved. It stays, the slot refuses its writes, and the new campaign says
+            // so after its own word.
+            if (!OperatingSystem.IsWindows())
+                return;
+            var held = Slot("held");
+            Saved(held, NewCampaign());
+            BootResult afterHeld;
+            using (new FileStream(held.SavePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                afterHeld = Launch(held);
+            IsANewCampaign(afterHeld);
+            Assert.Collection(afterHeld.Notices,
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => Assert.Equal(CampaignBoot.StuckNotice("campaign.json", "could not be read (another program has it open)", "another program has it open"), notice));
+            Assert.NotNull(held.WritesRefused);
         });
     }
 

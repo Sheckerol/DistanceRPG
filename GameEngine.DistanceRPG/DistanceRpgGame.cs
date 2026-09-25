@@ -300,7 +300,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// <item>otherwise the slots listed (<see cref="SaveListing.Read"/>, to the log)
     /// and the autosave loaded (<see cref="CampaignBoot.Load"/>) — and when it
     /// brings nothing back, a new campaign, saying <c>A NEW CAMPAIGN BEGINS</c>
-    /// ahead of whatever was set aside, or nothing when nothing was there.</item>
+    /// ahead of whatever was set aside, or nothing when nothing was there
+    /// (<see cref="CampaignBoot.ResumeOrBegin"/>).</item>
     /// </list>
     /// The campaign held; what the launch has to say, ahead of the data files'
     /// notices; and whether a resume marker waits to be cleared.
@@ -344,19 +345,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
                 if (listing.Newest is { } newest)
                     Log.Info($"[Save] The most recent save: {SaveSlots.Label(newest.Number)} - this launch loads the autosave");
 
+                // The autosave's campaign, or — when it brings nothing back — a new
+                // one, saying so ahead of whatever the load set aside.
                 var load = CampaignBoot.Load(autosave, content, report);
-                if (load.Campaign is { } loaded)
-                {
-                    boot = new BootResult(loaded, Resumed: true, load.View, StraightInto: null, FirstSeed: null, load.Notices);
-                }
-                else
-                {
-                    Log.Info(load.Notices.Count == 0
-                        ? "[Save] Nothing saved yet: a new campaign begins"
-                        : "[Save] Nothing could be loaded: a new campaign begins");
-                    IReadOnlyList<string> said = load.Notices.Count == 0 ? [] : [CampaignBoot.NewCampaignBegins, .. load.Notices];
-                    boot = new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, said);
-                }
+                boot = CampaignBoot.ResumeOrBegin(load, content, report);
             }
         }
 

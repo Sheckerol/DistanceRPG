@@ -814,11 +814,17 @@ public sealed class SaveSlotsTests : IDisposable
                 .Where(call => Same(call.Target, slotsMade)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct());
 
             // A load makes no campaign: the launch's new campaign, when the autosave
-            // brings nothing back, is the game's own.
+            // brings nothing back, is the launch's own — begun by what it plays from
+            // the load (CampaignBoot.ResumeOrBegin, S5's review, tested in
+            // CampaignBootTests), which BootCampaign alone calls.
             var start = typeof(CampaignState).GetMethod(nameof(CampaignState.Start), Declared)!;
             var load = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.Load), Declared)!;
+            var resumeOrBegin = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.ResumeOrBegin), Declared)!;
             Assert.DoesNotContain(Reachable(load), method => CallsIn(method).Any(called => Same(called, start)));
-            Assert.Contains(CallsIn(bootCampaign), called => Same(called, start));
+            Assert.Contains(CallsIn(resumeOrBegin), called => Same(called, start));
+            Assert.Contains(CallsIn(bootCampaign), called => Same(called, resumeOrBegin));
+            Assert.Equal(["DistanceRpgGame.BootCampaign"], Calls(typeof(DistanceRpgGame).Assembly)
+                .Where(call => Same(call.Target, resumeOrBegin)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct());
         });
     }
 }

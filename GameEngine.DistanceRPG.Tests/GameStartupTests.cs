@@ -566,4 +566,66 @@ public class GameStartupTests
         var close = typeof(GameEngine.Core.Game).GetMethod("Close", Type.EmptyTypes)!.GetBaseDefinition();
         Assert.Contains("DungeonScene.NumberKey", Callers(close));
     }
+
+    [Fact]
+    public void AnAutosaveWaitsForTheLoadedScreen_AndIsWrittenTheFrameItIsUp()
+    {
+        // S5's review (1f): a load's resume marker stands until the loaded
+        // campaign's first screen is up, and a write clears its slot's marker. So an
+        // autosave asked for before that screen is up — the resumed floor asks for
+        // one as it is arrived on — must wait: written at once, it would clear the
+        // marker, and a first screen that then crashed would leave nothing to set the
+        // save aside with at the next launch. WriteRequestedSave reads _resuming
+        // before either of its writes, and clears the request only past that read,
+        // so a request that arrives while a load is resuming is kept, not dropped.
+        // And the frame's end clears a resume whose screen is up before it writes a
+        // kept request, so the request is written the frame the marker clears. Read
+        // off the IL: before this pin, only the smoke launch covered it.
+        var game = typeof(DistanceRpgGame);
+        var write = game.GetMethod("WriteRequestedSave", Declared)!;
+        var save = game.GetMethod("Save", Declared)!;
+        var resuming = game.GetField("_resuming", Declared)!;
+        var requested = game.GetField("_saveRequested", Declared)!;
+
+        var walked = Walk(write);
+        int read = walked.FindIndex(i => i.Op == OpCodes.Ldfld && SameField(i.Field, resuming));
+        int firstWrite = walked.FindIndex(i => i.Called is { } called && Same(called, save));
+        Assert.True(read >= 0, "WriteRequestedSave never reads _resuming");
+        Assert.True(firstWrite > read, "WriteRequestedSave writes before it reads _resuming");
+        Assert.Equal(2, Mentions(write, save));   // between runs, and mid-run with the view: both past the read
+        var cleared = walked.Select((instruction, at) => (instruction, at))
+            .Where(i => i.at > read && i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, requested))
+            .Select(i => i.at)
+            .ToList();
+        Assert.True(cleared.Count == 1 && cleared[0] < firstWrite,
+            "WriteRequestedSave does not clear the request exactly once, past its read of _resuming and before it writes");
+
+        // The frame's end: the resume cleared once its screen is up, then the kept request written.
+        var frame = game.GetMethod("OnUpdateFrame", Declared)!;
+        var clearOnceUp = game.GetMethod("ClearResumeOnceUp", Declared)!;
+        var frameCalls = CallsIn(frame).ToList();
+        int clears = frameCalls.FindIndex(method => Same(method, clearOnceUp));
+        int writes = frameCalls.FindIndex(method => Same(method, write));
+        Assert.True(clears >= 0 && clears < writes, "OnUpdateFrame writes a kept request before it clears a resume whose screen is up");
+        Assert.Contains(Walk(clearOnceUp), i => i.Op == OpCodes.Stfld && SameField(i.Field, resuming));
+        Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(clearOnceUp));
+    }
+
+    /// <summary>Whether <paramref name="a"/> names the field <paramref name="b"/> is.</summary>
+    private static bool SameField(FieldInfo? a, FieldInfo b) => a is not null && a.Module == b.Module && a.MetadataToken == b.MetadataToken;
+
+    /// <summary>
+    /// <paramref name="method"/>'s body, one instruction at a time and in order:
+    /// each with the method it calls or names, and the field it loads or stores,
+    /// when its operand is one.
+    /// </summary>
+    private static List<(OpCode Op, MethodBase? Called, FieldInfo? Field)> Walk(MethodBase method)
+    {
+        byte[] il = Body(method)!;
+        return InstructionsAt(il)
+            .Select(i => (i.Op,
+                i.Token != 0 ? Resolve(method, i.Token) : null,
+                i.Op.OperandType == OperandType.InlineField ? method.Module.ResolveField(BitConverter.ToInt32(il, i.At)) : null))
+            .ToList();
+    }
 }
