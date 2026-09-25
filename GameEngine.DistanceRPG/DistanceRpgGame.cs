@@ -65,40 +65,44 @@ namespace GameEngine.DistanceRPG;
 /// where ESC quits.
 /// </para>
 /// <para>
-/// <strong>The campaign saves itself, and the title continues it</strong> (§5.1,
-/// 1f; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>, <see cref="SaveSlots"/>,
-/// <see cref="SaveListing"/>). One campaign in play, saved into the autosave slot
-/// — the player's save folder itself (<c>DISTANCERPG_SAVE_DIR</c> moves it), whose
-/// manual slots, <c>slot-1</c> to <c>slot-N</c>, sit beside it (R2). The title
-/// lists the slots (<see cref="ShowTitle"/>): CONTINUE loads the most recent save,
-/// LOAD GAME any slot; no play writes a manual slot yet. Whatever slot a campaign
-/// was loaded from, it autosaves into the autosave slot — a manual slot's campaign
-/// making room there first, the autosave's own files set aside after the title
-/// asked (<see cref="CampaignBoot.MakeRoom"/>; USER DECISION 2). Every save carries
+/// <strong>The campaign saves itself, the player saves it by hand, and the title
+/// continues it</strong> (§5.1, 1f; the user's ruling of 2026-09-25 on the save
+/// model, R2; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>,
+/// <see cref="SaveSlots"/>, <see cref="SaveListing"/>). One campaign in play,
+/// saved into the autosave slot — the player's save folder itself
+/// (<c>DISTANCERPG_SAVE_DIR</c> moves it), whose manual slots, <c>slot-1</c> to
+/// <c>slot-N</c>, sit beside it. The title lists the slots (<see cref="ShowTitle"/>):
+/// CONTINUE loads the most recent save, LOAD GAME any slot. Whatever slot a
+/// campaign was loaded from, it autosaves into the autosave slot — a manual slot's
+/// campaign making room there first, the autosave's own files set aside after the
+/// title asked (<see cref="CampaignBoot.MakeRoom"/>; USER DECISION 2) — and a
+/// manual slot is written only by hand: SAVE GAME on the pause menu or the menu
+/// between runs, at a safe point (<see cref="SaveToSlot"/>). Every save carries
 /// its time, from the clock here (<see cref="_clock"/>), never read in
 /// <c>Logic/</c>. It is written only at a safe point
 /// (<see cref="SaveGame.IsSafePoint"/>) and only once the frame a save was asked
 /// for in is over, so no write runs inside a turn system's raise: when a run is
 /// entered, at every player turn's start and after every floor arrival (the
 /// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, when NEW
-/// CAMPAIGN begins one — on the title, or <c>--new-campaign</c> at launch — and on
-/// quitting — the pause menu's <c>2  SAVE AND QUIT</c>, ESC on the screen between
-/// runs, or the window's close button, all of which arrive at
-/// <see cref="OnClosing"/>. A quit during the enemies' turn plays it out to the
-/// next player turn first, on the playing scene's own logic step
-/// (<see cref="CampaignBoot.SaveOnQuit"/>), and saves the turn the player would
-/// have met. A load resumes the campaign where it stood: on the screen between
-/// runs, <c>CAMPAIGN RESUMED</c> under the title, or in the dungeon at the saved
-/// floor and turn, <c>RESUMED</c> over the floor banner (<see cref="ResumeRun"/>);
-/// one that brings nothing back goes back to the title, saying why. A save that
-/// cannot be read, or whose resume crashed the game, is set aside where the
-/// notice says. A write that fails is a log line and a notice — at once over the
-/// floor being played, and on the next screen until a later save goes through —
-/// never a crash, and never costs the save before it, nor a file of the slot that
-/// cannot be read, which the write sets aside first and says so; a quit that
-/// cannot save leaves a marker, and the title says, the next time it opens, that
-/// what the autosave holds is from before that quit. A dev-override launch plays a
-/// fresh campaign in a slot of its own and never touches the campaign.
+/// CAMPAIGN begins one — on the title, or <c>--new-campaign</c> at launch — by
+/// hand into a slot, and on leaving play — the menus' QUIT TO TITLE
+/// (<see cref="QuitToTitle"/>) or the window's close button (<see cref="OnClosing"/>),
+/// both through the quit's own door (<see cref="SaveOnQuit"/>). A quit during the
+/// enemies' turn plays it out to the next player turn first, on the playing
+/// scene's own logic step (<see cref="CampaignBoot.SaveOnQuit"/>), and saves the
+/// turn the player would have met. A load resumes the campaign where it stood: on
+/// the screen between runs, <c>CAMPAIGN RESUMED</c> under the title, or in the
+/// dungeon at the saved floor and turn, <c>RESUMED</c> over the floor banner
+/// (<see cref="ResumeRun"/>); one that brings nothing back goes back to the title,
+/// saying why. A save that cannot be read, or whose resume crashed the game, is
+/// set aside where the notice says. A write that fails is a log line and a notice
+/// — at once over the floor being played, and on the next screen until a later
+/// save goes through — never a crash, and never costs the save before it, nor a
+/// file of the slot that cannot be read, which the write sets aside first and
+/// says so; a quit that cannot save leaves a marker, and the title says, the next
+/// time it opens, that what the autosave holds is from before that quit. A
+/// dev-override launch plays a fresh campaign in a slot of its own, with no title
+/// and no manual slots, and never touches the campaign.
 /// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
@@ -189,6 +193,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     // turn begun, a floor arrived on: written at the end of the frame, once no
     // raise is running, and not before the campaign stands at a safe point.
     private bool _saveRequested;
+
+    // A save by hand was asked for — the save list's choice, the slot's number:
+    // written at the end of the frame, where the safe point is asked again.
+    private int? _slotRequested;
 
     // A resumed campaign whose first screen is not up yet: the resume marker is
     // cleared once it is.
@@ -493,6 +501,134 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>QUIT on the title: the window closes. No campaign is in play there, so the close saves nothing (<see cref="OnClosing"/>).</summary>
     public void Quit() => Close();
 
+    /// <summary>Whether this session has a title and manual slots (<see cref="ISaveHost.HasTitle"/>): it made the save folder's slots, which a dev-override launch never does.</summary>
+    public bool HasTitle => _slots is not null;
+
+    /// <summary>
+    /// The save folder's slots as they stand now, for the save list the menus open
+    /// (<see cref="ISaveHost.Slots"/>): read afresh at the clock's time, never a file
+    /// moved, a file the file system would not let the game read logged. A
+    /// dev-override session has none to offer, and its menu never asks.
+    /// </summary>
+    public SaveListing Slots()
+    {
+        if (_slots is not { } slots)
+            return new SaveListing([], []);
+        var listing = SaveListing.Read(slots, _clock(), line => Log.Info(line));
+        foreach (string notice in listing.Notices)
+            Log.Warn($"[Save] {notice}");
+        return listing;
+    }
+
+    /// <summary>
+    /// The save list chose manual slot <paramref name="slot"/> (R2(d)): the save by
+    /// hand is only asked for here, and written at the end of the frame
+    /// (<see cref="WriteRequestedSlot"/>), where the safe point is asked again. A
+    /// dev-override session, which has no slots, is refused outright — whatever
+    /// asked — and the menu says so, so no path puts a scratch campaign in the
+    /// player's slots.
+    /// </summary>
+    public void SaveToSlot(int slot)
+    {
+        if (!HasTitle)
+        {
+            Log.Warn($"[Save] A save by hand into slot {slot} was asked for in a dev-override session, which saves only its scratch slot - nothing is written");
+            AnswerSlotSave(PauseMenu.NoSaveInOverride);
+            return;
+        }
+        _slotRequested = slot;
+    }
+
+    /// <summary>
+    /// The save by hand the save list asked for, written now that the frame is over
+    /// (<see cref="CampaignBoot.SaveTo"/>) into the slot's one store for the session
+    /// (<see cref="SaveSlots.Store"/>), with the playing scene's view mid-run; and the
+    /// menu told how it went, inside itself (<c>SlotSaved</c>). Off a safe point it
+    /// writes nothing and says so. One that arrives while a loaded campaign's first
+    /// screen is not up yet waits for it, as the autosaves do.
+    /// </summary>
+    private void WriteRequestedSlot()
+    {
+        if (_resuming)
+            return;   // kept: written the frame the loaded screen is up
+        int slot = _slotRequested!.Value;
+        _slotRequested = null;
+        if (_campaign is not { } campaign || _slots is not { } slots || slot < 1 || slot > slots.Count)
+        {
+            Log.Warn($"[Save] A save by hand into slot {slot} found no campaign in play or no such slot - nothing is written");
+            return;
+        }
+
+        Log.Info(campaign.Visit is { } visit
+            ? $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
+            : $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, between runs");
+        var (saved, notice) = CampaignBoot.SaveTo(slots.Store(slot), campaign, PlayingScene(campaign)?.View, slot, line => Log.Info(line), _clock());
+        if (saved)
+            Log.Info($"[Save] {notice}");
+        else
+            Log.Warn($"[Save] {notice}");
+        AnswerSlotSave(notice);
+    }
+
+    /// <summary>Tell the screen up now — the dungeon's pause menu, or the menu between runs — what a save by hand came to, drawn inside the menu.</summary>
+    private static void AnswerSlotSave(string notice)
+    {
+        switch (SceneManager.Instance.CurrentScene)
+        {
+            case DungeonScene dungeon:
+                dungeon.SlotSaved(notice);
+                break;
+            case BetweenRunsScene betweenRuns:
+                betweenRuns.SlotSaved(notice);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// QUIT TO TITLE, from the pause menu or the menu between runs (the user's ruling
+    /// of 2026-09-25 on the save model, R2(e)): the autosave written through the
+    /// window close's own door (<see cref="SaveOnQuit"/>) — a quit during the enemies'
+    /// turn played out to the next player turn first, on the playing scene's own
+    /// step, and a quit that cannot save leaving its marker, which the title says at
+    /// once — then the campaign dropped, that once-only door re-armed so the next
+    /// campaign's quit saves, and the title shown, the slots listed afresh. No
+    /// campaign is in play at the title: a close from it saves nothing, and a second
+    /// ask — a key pressed again while the screen fades to the title — finds no
+    /// campaign to leave and does nothing. A dev-override session has no title, and
+    /// is never asked; asked anyway, it closes the game, as its menu's QUIT GAME does.
+    /// </summary>
+    public void QuitToTitle()
+    {
+        if (!HasTitle)
+        {
+            Log.Warn("[Save] QUIT TO TITLE was asked for in a dev-override session, which has no title - the game closes instead");
+            Close();
+            return;
+        }
+        if (_campaign is null)
+        {
+            Log.Info("[Save] QUIT TO TITLE with no campaign in play - the title is already on its way");
+            return;
+        }
+
+        Log.Info("[Save] Leaving play for the title");
+        SaveOnQuit();
+        DropCampaign();
+        _quitSaved = false;   // re-armed: the next campaign's quit saves
+        ShowTitle();
+    }
+
+    /// <summary>Play no campaign from now on: the one in play keeps no wire to the game, and nothing it asked of the save is written.</summary>
+    private void DropCampaign()
+    {
+        if (_campaign is { } dropped)
+            dropped.RunEnded -= SaveAtTheRunsEnd;
+        _campaign = null;
+        _saveRequested = false;
+        _slotRequested = null;
+        _loadedFrom = _autosave;
+    }
+
     /// <summary>Play <paramref name="campaign"/> from now on: its run's end is a save request, and the campaign it replaces keeps no wire to the game.</summary>
     private void Adopt(CampaignState campaign)
     {
@@ -682,6 +818,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             ClearResumeOnceUp();
         if (_saveRequested)
             WriteRequestedSave();
+        if (_slotRequested is not null)
+            WriteRequestedSlot();
     }
 
     /// <summary>
@@ -797,12 +935,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             : null;
 
     /// <summary>
-    /// The window is closing — ESC left unconsumed, the pause menu's save and
-    /// quit, the title's QUIT, or the close button — and every one of them arrives
-    /// here (the engine's own <c>Close</c> raises it too), where the campaign is
-    /// saved. At the title, and behind the screen a broken content file stops the
-    /// game on, there is no campaign, and nothing to save. Nothing thrown here
-    /// stops the window closing: a failure is a log line.
+    /// The window is closing — the close button from anywhere, the title's QUIT or
+    /// ESC left unconsumed there, a dev-override session's QUIT GAME — and every one
+    /// of them arrives here (the engine's own <c>Close</c> raises it too), where the
+    /// campaign in play is saved. At the title, and behind the screen a broken
+    /// content file stops the game on, there is no campaign, and nothing to save.
+    /// Nothing thrown here stops the window closing: a failure is a log line.
     /// </summary>
     protected override void OnClosing(CancelEventArgs e)
     {
@@ -818,7 +956,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     }
 
     /// <summary>
-    /// The quit's save, once however the quit came, through the quit's own door
+    /// The quit's save, once however the quit came — the window's close, or QUIT TO
+    /// TITLE, which re-arms it for the next campaign — through the quit's own door
     /// (<see cref="CampaignBoot.SaveOnQuit"/>). Between runs the campaign is saved
     /// as it stands. Mid-run the run in progress is saved (1f): a quit during the
     /// enemies' turn plays it out to the next player turn first, one step of the
@@ -826,10 +965,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// the step live play takes — and then saves it with the scene's view as it
     /// stands after. With no scene playing the run — a quit on the way in, before
     /// its first floor has opened — no turn is running to play out, and the
-    /// campaign is saved as the entry left it. No screen follows a quit, so a quit
-    /// that cannot save leaves a marker beside the autosave instead, and the title
-    /// says, the next time it opens, that what the autosave holds is from before
-    /// this quit.
+    /// campaign is saved as the entry left it. No screen of the campaign follows a
+    /// quit, so a quit that cannot save leaves a marker beside the autosave instead,
+    /// and the title says, when it next opens, that what the autosave holds is from
+    /// before this quit.
     /// </summary>
     private void SaveOnQuit()
     {
@@ -853,16 +992,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
     /// <summary>
     /// Escape goes to the scene being played. In a dungeon it closes a menu or
-    /// opens the pause menu, whose quit is how a run is left, and it does nothing
-    /// on a run's summary, where ENTER is the one way on. On the title it says no
-    /// to an ask or closes the load list, and on the options it is not consumed,
-    /// so the game closes, as QUIT does, with nothing to save. On the screen
-    /// between runs it is never consumed, so the game saves the campaign and quits
-    /// (<see cref="OnClosing"/>) — as it quits from the screen a broken content
-    /// file stops the game on, which has no campaign behind it. Only what a scene
-    /// leaves unconsumed quits. Mid-transition between scenes it does nothing at
-    /// all, neither scene's to answer and never a quit on the way in or out of a
-    /// run.
+    /// opens the pause menu, whose QUIT TO TITLE is how play is left, and it does
+    /// nothing on a run's summary, where ENTER is the one way on. On the screen
+    /// between runs it opens and closes the same menu, always consumed. On the
+    /// title it says no to an ask or closes the load list, and on the options it is
+    /// not consumed, so the game closes, as QUIT does, with nothing to save — as it
+    /// quits from the screen a broken content file stops the game on, which has no
+    /// campaign behind it. Only what a scene leaves unconsumed quits. Mid-transition
+    /// between scenes it does nothing at all, neither scene's to answer and never a
+    /// quit on the way in or out of a run.
     /// </summary>
     private void OnEscape()
     {

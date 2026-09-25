@@ -6,14 +6,15 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// What the between-runs screen reaches the game through: a dungeon chosen. The
-/// screen never holds the concrete game that hosts it (§6.7: the campaign
-/// outlives every scene, and the scenes are views of it). It is the dungeon
-/// list's half of what <see cref="IRunHost"/> is to a dungeon scene. A new
-/// campaign is the title's to begin (<see cref="ITitleHost.BeginNewCampaign"/>),
+/// What the between-runs screen reaches the game through: a dungeon chosen, and —
+/// from the menu ESC opens (<see cref="ISaveHost"/>) — a save by hand and the way
+/// back to the title. The screen never holds the concrete game that hosts it
+/// (§6.7: the campaign outlives every scene, and the scenes are views of it). It
+/// is the dungeon list's half of what <see cref="IRunHost"/> is to a dungeon scene.
+/// A new campaign is the title's to begin (<see cref="ITitleHost.BeginNewCampaign"/>),
 /// never this screen's (the user's ruling of 2026-09-25 on the save model, R2(e)).
 /// </summary>
-public interface IBetweenRunsHost
+public interface IBetweenRunsHost : ISaveHost
 {
     /// <summary>
     /// The player chose <paramref name="dungeonId"/>, which the campaign lets the
@@ -37,13 +38,24 @@ public interface IBetweenRunsHost
 /// <para>
 /// W/S or the arrows move the choice over the lines that can be entered — a
 /// locked line is read, not chosen. ENTER descends into the choice, once, and
-/// the host begins the run (<see cref="IBetweenRunsHost.Descend"/>). ESC is the
-/// game's: it asks <see cref="HandleEscape"/> first, which never takes it here,
-/// so the game saves the campaign and quits (<c>DistanceRpgGame</c>). NEW
-/// CAMPAIGN is the title's (R2(e)), and no key here begins one. The choice starts
-/// on the campaign's own default (<see cref="CampaignState.DefaultNext"/>): the
-/// tutorial until it is beaten, then the first dungeon whose lock has lifted, then
-/// the early offer.
+/// the host begins the run (<see cref="IBetweenRunsHost.Descend"/>). The choice
+/// starts on the campaign's own default (<see cref="CampaignState.DefaultNext"/>):
+/// the tutorial until it is beaten, then the first dungeon whose lock has lifted,
+/// then the early offer. NEW CAMPAIGN is the title's (R2(e)), and no key here
+/// begins one.
+/// </para>
+/// <para>
+/// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
+/// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e);
+/// <see cref="PauseMenu"/>): 1 closes it, 2 opens the save list — between runs is
+/// always a safe point — and 3 quits to the title, the host writing the autosave
+/// first (<see cref="ISaveHost.QuitToTitle"/>), or, in a dev-override session,
+/// which has no title, closes the game. <strong>While the menu is up every key is
+/// its</strong> — 1, 2 and 3 act and every other key does nothing, so ENTER never
+/// descends behind it — and while the save list is up every key but ESC is the
+/// list's (<see cref="Route"/>). ESC answers the list's ask no, then goes back from
+/// the list to the menu, then closes the menu: always consumed here, so the game
+/// never quits from this screen but by the menu or the window's close.
 /// </para>
 /// <para>
 /// Like every gameplay scene it is single-use: the host registers a fresh one
@@ -63,40 +75,70 @@ public interface IBetweenRunsHost
 /// </summary>
 public sealed class BetweenRunsScene : Scene
 {
+    /// <summary>Where one key press goes between runs (<see cref="Route"/>).</summary>
+    internal enum KeyRoute
+    {
+        /// <summary>ESC: the game's to route, which asks <see cref="HandleEscape"/>.</summary>
+        Game,
+
+        /// <summary>The dungeon list's: W/S and the arrows move the choice, ENTER descends, and every other key does nothing.</summary>
+        List,
+
+        /// <summary>The menu's: 1, 2 and 3 act, and every other key does nothing — ENTER and the arrows included.</summary>
+        Menu,
+
+        /// <summary>The save list's: every key but ESC.</summary>
+        Saves,
+    }
+
+    private readonly Game _game;
     private readonly CampaignState _campaign;
     private readonly IBetweenRunsHost _host;
     private readonly BetweenRunsHud _hud;
 
-    private IReadOnlyList<DungeonListing> _listings = [];
-    private int _chosen = -1;
+    private readonly IReadOnlyList<DungeonListing> _listings;
+    private int _chosen;
 
-    // The host has been told something that ends this screen: a descent. After it
-    // every key is ignored while the screen fades out.
+    // The host has been told something that ends this screen: a descent, or the
+    // quit to the title. After it every key is ignored while the screen fades out.
     private bool _leaving;
 
-    /// <param name="game">The game window: its size and its shaders, for the text.</param>
+    // The menu is up (ESC opens it), with the save list in its options' place
+    // while that is up, and what the menu answers under its lines — what a save by
+    // hand came to, or why 2 saved nothing — until the next key or until the menu
+    // closes. Menus: never saved.
+    private bool _menu;
+    private SlotMenu? _saves;
+    private string? _answer;
+
+    /// <param name="game">The game window: its size and its shaders, for the text, and its close, which a dev-override session's QUIT GAME is. A screen built to be read, never shown, is handed none.</param>
     /// <param name="campaign">The campaign between its runs: no visit is in progress.</param>
-    /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>).</param>
+    /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>), and asked for a save by hand and the way to the title (<see cref="ISaveHost"/>).</param>
     /// <param name="shownWhole">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign, shown whole (<see cref="StartupNotices.Leading"/>).</param>
     /// <param name="notices">What the game has to say under the title — the save's word and the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">A visit is in progress: its run has to end before the screen between runs can show.</exception>
     public BetweenRunsScene(Game game, CampaignState campaign, IBetweenRunsHost host, int shownWhole, IReadOnlyList<string>? notices = null) : base("BetweenRunsScene")
     {
-        ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(campaign);
         ArgumentNullException.ThrowIfNull(host);
         if (campaign.Visit is { } visit)
             throw new ArgumentException($"A visit to '{visit.Def.Id}' is in progress: the screen between runs shows only once its run has ended.", nameof(campaign));
+        _game = game;
         _campaign = campaign;
         _host = host;
         _hud = new BetweenRunsHud(game);
         NoticeRows = NoticeText.Rows(notices ?? [], shownWhole);
+
+        // The list as the campaign gives it now: nothing changes the campaign
+        // between this screen being made and its being shown.
+        _listings = campaign.Listings();
+        _chosen = FirstChoice(_listings, DefaultNextOrNull(campaign));
     }
 
     /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, the save's word whole and the rest capped, or none.</summary>
     internal IReadOnlyList<string> NoticeRows { get; }
 
-    /// <summary>The dungeon list, as the campaign gave it when the screen opened.</summary>
+    /// <summary>The dungeon list, as the campaign gave it when the screen was made.</summary>
     public IReadOnlyList<DungeonListing> Listings => _listings;
 
     /// <summary>The index of the listing ENTER descends into, or -1 when there is none to enter.</summary>
@@ -105,12 +147,21 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>How the last run ended, which the screen shows above the list, or null before the first.</summary>
     public RunResult? LastResult => _campaign.LastResult;
 
+    /// <summary>Whether the menu is up: over the hub, its options or the save list in their place.</summary>
+    internal bool MenuOpen => _menu;
+
+    /// <summary>The save list while it is up, in the menu's options' place, or null.</summary>
+    internal SlotMenu? SaveList => _saves;
+
+    /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>), or why 2 saved nothing — until the next key or until the menu closes; null for nothing.</summary>
+    internal string? MenuAnswer => _answer;
+
+    /// <summary>Whether this session has a title to quit to and slots to save into (<see cref="ISaveHost.HasTitle"/>): a dev-override session has neither.</summary>
+    internal bool HasTitle => _host.HasTitle;
+
     public override void Initialize()
     {
         base.Initialize();
-
-        _listings = _campaign.Listings();
-        _chosen = FirstChoice(_listings, DefaultNextOrNull(_campaign));
         WireInput();
 
         Log.Info($"[Hub] Between runs, run counter {_campaign.RunCounter}: "
@@ -131,16 +182,59 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// Every key press, once, through one handler. KeyPressed fires once per
-    /// physical press, so a held key acts once.
+    /// Every key press, once, through one handler: the menu and the save list read
+    /// it first while they are up (<see cref="Route"/>), so a key they take never
+    /// also moves the choice or descends. KeyPressed fires once per physical press,
+    /// so a held key acts once.
     /// </summary>
     private void WireInput() => Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
 
-    private void OnKey(Keys key)
+    /// <summary>
+    /// One key press: where <see cref="Route"/> sends it. Any key but ESC clears what
+    /// the menu answered — it stays until the next key — before it does anything
+    /// else. Nothing on the way out, or while the engine fades between scenes.
+    /// </summary>
+    internal void OnKey(Keys key)
     {
-        if (key == Keys.Escape) return;   // the game's to route: it asks HandleEscape
         if (_leaving || SceneManager.Instance.IsTransitioning) return;
 
+        var route = Route(_menu, _saves is not null, key);
+        if (route != KeyRoute.Game)
+            _answer = null;
+        switch (route)
+        {
+            case KeyRoute.Saves:
+                SaveListKey(_saves!, key);
+                break;
+            case KeyRoute.Menu:
+                MenuKey(key);
+                break;
+            case KeyRoute.List:
+                ListKey(key);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Where one key press goes between runs: ESC to the game, which asks
+    /// <see cref="HandleEscape"/>; with the save list up, every other key to the
+    /// list; with the menu up, every other key to the menu — 1, 2 and 3 act, and
+    /// ENTER, W/S and the arrows do nothing, so nothing descends behind the menu; and
+    /// otherwise to the dungeon list. Pure, so it is walked key by key
+    /// (<c>BetweenRunsHudTests</c>).
+    /// </summary>
+    /// <param name="menu">Whether the menu is up.</param>
+    /// <param name="saves">Whether the save list is up, in the menu's options' place.</param>
+    /// <param name="key">The key pressed.</param>
+    internal static KeyRoute Route(bool menu, bool saves, Keys key)
+        => key == Keys.Escape ? KeyRoute.Game
+            : saves ? KeyRoute.Saves
+            : menu ? KeyRoute.Menu
+            : KeyRoute.List;
+
+    /// <summary>The dungeon list's keys: W/S or the arrows move the choice, ENTER descends; every other key does nothing.</summary>
+    private void ListKey(Keys key)
+    {
         switch (key)
         {
             case Keys.W or Keys.Up:
@@ -156,10 +250,106 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// ESC, asked by the game before it does anything else with it: never this
-    /// screen's, so false, and the game saves the campaign and quits.
+    /// The menu's keys (<see cref="PauseMenu.Press"/>): 1 closes it, 2 opens the
+    /// save list — between runs is always a safe point — and 3 quits to the title,
+    /// or, in a dev-override session, closes the game, whose close saves its scratch
+    /// slot as ever. Every other key does nothing.
     /// </summary>
-    public bool HandleEscape() => false;
+    private void MenuKey(Keys key)
+    {
+        if (SlotMenu.Digit(key) is not { } digit)
+            return;
+        var (action, said) = PauseMenu.Press(digit, canSave: true, _host.HasTitle);
+        switch (action)
+        {
+            case PauseAction.Close:
+                _menu = false;
+                break;
+            case PauseAction.OpenSaves:
+                var listing = _host.Slots();
+                _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing));
+                Log.Info("[Save] The save list: " + string.Join("; ", _saves.Rows.Select(row => $"{SaveSlots.Label(row.Number)} {row.State}")));
+                break;
+            case PauseAction.Refuse:
+                _answer = said;
+                Log.Info($"[Save] {said}");
+                break;
+            case PauseAction.QuitToTitle:
+                _leaving = true;
+                Log.Info("[Hub] QUIT TO TITLE");
+                _host.QuitToTitle();
+                break;
+            case PauseAction.QuitGame:
+                _leaving = true;
+                Log.Info("[Hub] QUIT GAME: a dev-override session has no title");
+                _game.Close();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// A key on the save list: a slot chosen — an empty one at once, one that holds
+    /// anything once its ask is answered ENTER — closes the list back to the menu,
+    /// and the host saves into it at the frame's end and tells the menu how it went
+    /// (<see cref="SlotSaved"/>). Every other key the list answers itself, an ask's
+    /// no among them.
+    /// </summary>
+    private void SaveListKey(SlotMenu list, Keys key)
+    {
+        var asked = list.Asking;
+        var step = list.Press(key);
+        if (asked is not null && step != SlotStep.Chosen)
+            Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken ({key})");
+        else if (step == SlotStep.Asking && list.Asking is { } asking)
+            Log.Info($"[Save] Saving into {SaveSlots.Label(asking.Number)}, which holds {(asking.State == SlotState.Readable ? "a save" : "a save that cannot be read")}? - ENTER to confirm, any other key to keep it");
+        if (list.Said is { } said)
+            Log.Info($"[Save] {said}");
+        if (step != SlotStep.Chosen || list.Chosen is not { } slot)
+            return;
+
+        _saves = null;   // the list closes back to the menu, where the answer is drawn
+        Log.Info($"[Save] Saving into {SaveSlots.Label(slot)} by hand");
+        _host.SaveToSlot(slot);
+    }
+
+    /// <summary>
+    /// What a save by hand came to, from the host once it is written at the frame's
+    /// end (<see cref="ISaveHost.SaveToSlot"/>): drawn inside the menu, under its
+    /// lines, until the next key or until the menu closes. With the menu closed by
+    /// then, only the log keeps it.
+    /// </summary>
+    /// <param name="notice">What the save came to: <c>SAVED TO SLOT 2</c>, or why not.</param>
+    internal void SlotSaved(string notice)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(notice);
+        if (_menu)
+            _answer = notice;
+    }
+
+    /// <summary>
+    /// ESC, asked by the game before it does anything else with it, and always
+    /// taken here: on the save list it answers an ask no, and otherwise goes back to
+    /// the menu; on the menu it closes it; with nothing up it opens the menu. So
+    /// the game never quits from this screen but by the menu's QUIT TO TITLE, a
+    /// dev-override session's QUIT GAME, or the window's close.
+    /// </summary>
+    public bool HandleEscape()
+    {
+        if (_leaving)
+            return true;   // on its way out: the host has what it asked for
+        _answer = null;
+        if (_saves is { } list)
+        {
+            var asked = list.Asking;
+            if (list.Press(Keys.Escape) == SlotStep.Back)
+                _saves = null;   // back to the menu
+            else if (asked is not null)
+                Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken (Escape)");
+            return true;
+        }
+        _menu = !_menu;
+        return true;
+    }
 
     /// <summary>Move the choice to the next line that can be entered, up or down, round the end of the list.</summary>
     private void Move(int step) => _chosen = NextChoice(_listings, _chosen, step);

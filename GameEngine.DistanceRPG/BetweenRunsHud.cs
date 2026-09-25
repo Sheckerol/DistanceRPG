@@ -1,4 +1,5 @@
 using GameEngine.Core;
+using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Mathematics;
 using Run = GameEngine.DistanceRPG.DungeonHud.Run;
@@ -13,7 +14,11 @@ namespace GameEngine.DistanceRPG;
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
 /// aside and where), and then anything else, capped; on a later one, a save that
-/// could not be written.
+/// could not be written. While the menu ESC opens is up, the hub dims under it and
+/// the menu is drawn over it as the dungeon's pause menu is
+/// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, or the save list in
+/// their place, and what a save by hand came to — and the keys line along the
+/// bottom gives way to the menu's (<see cref="BottomLine"/>).
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before
@@ -49,13 +54,23 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, ESC saves the campaign and quits. This is
-    /// the one screen with a campaign in play where ESC quits outright. A run's end
-    /// never offers it (<see cref="DungeonHud.ContinueHint"/>), and in a dungeon it
-    /// opens the pause menu. NEW CAMPAIGN is the title's (the user's ruling of
-    /// 2026-09-25 on the save model, R2(e)), so no key here begins one.
+    /// choice, ENTER descends into it, ESC opens the menu — the dungeon's pause menu,
+    /// over the hub, where the campaign is saved by hand and play is left for the
+    /// title (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)). NEW
+    /// CAMPAIGN is the title's (R2(e)), so no key here begins one.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU";
+
+    /// <summary>How the menu's keys line ends, after its options: ESC closes the menu.</summary>
+    private const string EscCloses = "ESC CLOSES";
+
+    /// <summary>
+    /// The keys line while the menu is up, in the hub's keys' place: the menu's
+    /// options, each led by its key, then ESC — <c>1  CLOSE - 2  SAVE GAME - 3  QUIT TO
+    /// TITLE - ESC CLOSES</c>, or <c>3  QUIT GAME</c> in a dev-override session.
+    /// </summary>
+    /// <param name="hasTitle">Whether the session has a title to quit to (<see cref="ISaveHost.HasTitle"/>).</param>
+    internal static string MenuKeysLine(bool hasTitle) => string.Join(" - ", [.. PauseMenu.Options(hasTitle), EscCloses]);
 
     /// <summary>Under the title of the screen a loaded campaign opens on between runs, first among the notices (1f): the word of every load, <c>CAMPAIGN RESUMED FROM SLOT 2</c> and the rest, starts with it, and so is green.</summary>
     internal const string Resumed = "CAMPAIGN RESUMED";
@@ -65,7 +80,11 @@ public sealed class BetweenRunsHud : IDisposable
 
     private readonly Game _game;
     private readonly TextRenderer _text = new();
+    private readonly FullscreenFade _fade = new();
     private bool _glReady;
+
+    /// <summary>How far the hub dims under the menu: further than the dungeon's floor does under its pause menu (0.65), since the hub is text on black, and its rows would otherwise read through the menu's.</summary>
+    private const float MenuDim = 0.88f;
 
     public BetweenRunsHud(Game game)
     {
@@ -331,7 +350,7 @@ public sealed class BetweenRunsHud : IDisposable
     private const float SummaryRowHeight = 10f;
 
     /// <summary>The keys line's distance up from the bottom, and the clearance the list keeps above it.</summary>
-    private const float KeysLineFromBottom = 28f;
+    internal const float KeysLineFromBottom = 28f;
     internal const float ListBottomMargin = 44f;
 
     /// <summary>The gap between the last summary row and the list's heading.</summary>
@@ -360,8 +379,18 @@ public sealed class BetweenRunsHud : IDisposable
         return row.StartsWith(Resumed, StringComparison.Ordinal) ? DungeonHud.Green : DungeonHud.Orange;
     }
 
-    /// <summary>The line along the bottom, and its colour: the keys the screen answers (<see cref="KeysLine"/>), in grey.</summary>
-    internal static (string Text, Vector4 Color) BottomLine() => (KeysLine, DungeonHud.Grey);
+    /// <summary>
+    /// The line along the bottom, and its colour, in grey: the keys the screen
+    /// answers (<see cref="KeysLine"/>); while the menu is up, the menu's
+    /// (<see cref="MenuKeysLine"/>) in their place; and while the save list is up,
+    /// nothing — the list's own keys are under it (<see cref="SlotText.SaveKeysLine"/>),
+    /// and its digits choose slots, not the menu's options.
+    /// </summary>
+    /// <param name="menu">Whether the menu is up.</param>
+    /// <param name="saves">Whether the save list is up, in the menu's options' place.</param>
+    /// <param name="hasTitle">Whether the session has a title to quit to.</param>
+    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool saves = false, bool hasTitle = true)
+        => (saves ? "" : menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -403,13 +432,15 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>
     /// The screen: its title, the startup notices under it (when there are any),
     /// the last run above (when there has been one), the list under it with the
-    /// choice marked, and the keys along the bottom.
+    /// choice marked, and the keys along the bottom — and, while the menu is up,
+    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>).
     /// </summary>
     public void Render(BetweenRunsScene scene)
     {
         if (!_glReady)
         {
             _text.Initialize();
+            _fade.Initialize();
             _glReady = true;
         }
 
@@ -448,10 +479,25 @@ public sealed class BetweenRunsHud : IDisposable
             rowY += row.Pitch;
         }
 
-        var (bottom, bottomColor) = BottomLine();
-        DrawCentered(w, h - KeysLineFromBottom, bottom, 1.3f, bottomColor);
+        if (scene.MenuOpen)
+        {
+            // The hub dims under the menu, as the floor does under the pause menu,
+            // and the menu is drawn over it.
+            _text.Flush(_game.ShaderManager);
+            _fade.Draw(_game.ShaderManager, MenuDim);
+            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), scene.HasTitle, scene.MenuAnswer, scene.SaveList,
+                         GameContent.Current.Dungeons, TimeZoneInfo.Local))
+                _text.DrawText(row.Text, row.Left ?? w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+        }
+
+        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.SaveList is not null, scene.HasTitle);
+        if (bottom.Length > 0)
+            DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
+
+    /// <summary>The keys line's scale.</summary>
+    internal const float KeysLineScale = 1.3f;
 
     private void DrawCentered(int viewportW, float y, string text, float scale, Vector4 color)
     {
@@ -459,5 +505,9 @@ public sealed class BetweenRunsHud : IDisposable
         _text.DrawText(text, viewportW / 2f - width / 2f, y, scale, color);
     }
 
-    public void Dispose() => _text.Dispose();
+    public void Dispose()
+    {
+        _text.Dispose();
+        _fade.Dispose();
+    }
 }

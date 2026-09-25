@@ -12,7 +12,25 @@ public enum GameMenu
 {
     None,
     Inventory,
+
+    /// <summary>
+    /// The pause menu (<see cref="PauseMenu"/>): 1 closes it, 2 opens the save list
+    /// on the party's own turn — and off it says why not — and 3 quits to the title,
+    /// the autosave written first. ESC opens and closes it. What a save by hand came
+    /// to is drawn inside it, under its lines, until the next key.
+    /// </summary>
     Pause,
+
+    /// <summary>
+    /// The save list, in the pause menu's place (the user's ruling of 2026-09-25 on
+    /// the save model, R2(d)): the manual slots to save into, asking before one that
+    /// holds anything (<see cref="SlotMenu"/>, save mode). <strong>Every key but ESC
+    /// is the list's</strong> while it is up — the turn's keys, the bag's, the
+    /// stairs' and the number keys do nothing behind it — so an ask takes exactly
+    /// the next key. ESC answers an ask no, and otherwise goes back to the menu. A
+    /// slot chosen closes the list back to the menu, where the answer is drawn.
+    /// </summary>
+    Saves,
 
     /// <summary>
     /// "Leave the dungeon?" — opened by E on the first floor's way out with the
@@ -156,6 +174,15 @@ public sealed record ResumeView(ViewDto? View, int Leading, IReadOnlyList<string
 /// active, the march as the turn decided it, what the party could see this turn
 /// still lit, the dice falling as they would have (the visit's own die,
 /// <see cref="DungeonState.RollD20"/>), and <c>RESUMED</c> over the floor banner.
+/// </para>
+/// <para>
+/// <strong>And the player saves by hand, and leaves play, from the pause
+/// menu</strong> (the user's ruling of 2026-09-25 on the save model, R2(d),
+/// R2(e); <see cref="PauseMenu"/>): 2 opens the save list on the party's own turn
+/// (<see cref="CanSaveNow"/>) — never while the enemies move — and the slot chosen
+/// is saved by the host at the frame's end (<see cref="ISaveHost.SaveToSlot"/>),
+/// which tells the menu how it went (<see cref="SlotSaved"/>); 3 quits to the
+/// title, the host writing the autosave first (<see cref="ISaveHost.QuitToTitle"/>).
 /// </para>
 /// </summary>
 public class DungeonScene : Scene
@@ -316,6 +343,13 @@ public class DungeonScene : Scene
     // this scene's to name: it is chosen on the screen between runs.
     private RunResult? _endedRun;
 
+    // The save list while it is up (GameMenu.Saves), in the pause menu's place, and
+    // what the menu answers under its lines — what a save by hand came to, or why 2
+    // saved nothing — until the next key or until the menu closes. Menus: never
+    // saved.
+    private SlotMenu? _saves;
+    private string? _answer;
+
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
 
@@ -442,7 +476,8 @@ public class DungeonScene : Scene
     /// bag — I, ESC, the turn's end, the run's end putting its summary up — also
     /// disarms its "leave" (<see cref="LeaveArmed"/>), here in the one place every
     /// one of those paths goes through, so the next time the bag opens, a number
-    /// equips again.
+    /// equips again. And whatever takes the save list down drops it, and whatever
+    /// closes the pause menu drops its answer, here too.
     /// </summary>
     public GameMenu ActiveMenu
     {
@@ -452,6 +487,10 @@ public class DungeonScene : Scene
             _activeMenu = value;
             if (value != GameMenu.Inventory)
                 _leaveArmed = false;
+            if (value != GameMenu.Saves)
+                _saves = null;
+            if (value is not (GameMenu.Pause or GameMenu.Saves))
+                _answer = null;
         }
     }
 
@@ -471,7 +510,30 @@ public class DungeonScene : Scene
     private bool _leaveArmed;
     public Vector2 MousePos => _mousePos;
     public bool PauseMenuOpen => ActiveMenu == GameMenu.Pause;
+
+    /// <summary>Whether the save list is up, in the pause menu's place.</summary>
+    public bool SavesOpen => ActiveMenu == GameMenu.Saves;
+
     public bool AnyMenuOpen => ActiveMenu != GameMenu.None;
+
+    /// <summary>The save list while it is up (<see cref="GameMenu.Saves"/>), or null.</summary>
+    internal SlotMenu? SaveList => _saves;
+
+    /// <summary>What the pause menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>), or why 2 saved nothing — until the next key or until the menu closes; null for nothing.</summary>
+    internal string? MenuAnswer => _answer;
+
+    /// <summary>Whether this session has a title to quit to and slots to save into (<see cref="ISaveHost.HasTitle"/>): a dev-override session has neither.</summary>
+    internal bool HasTitle => _host.HasTitle;
+
+    /// <summary>
+    /// Whether the campaign can be saved by hand now: the autosave's safe point
+    /// (<see cref="SaveGame.IsSafePoint"/>) — the party's own turn with nothing in
+    /// flight, never while the enemies take their turn or its banner is up — with
+    /// no stair's fade running and the run not over. Off it, 2 on the pause menu
+    /// answers <see cref="PauseMenu.SaveOnYourTurn"/> and saves nothing; the host
+    /// asks the safe point again when it writes.
+    /// </summary>
+    internal bool CanSaveNow => !Transiting && _endedRun is null && SaveGame.IsSafePoint(_campaign);
     public float LastBankedMovement { get; private set; }
 
     /// <summary>True while a stair's fade runs, either side of the swap, or once the run's summary has been left for the screen between runs: presses are ignored.</summary>
@@ -1378,14 +1440,17 @@ public class DungeonScene : Scene
         // never machine-gun while held. Every press below does nothing while a
         // stair's fade runs (Transiting); the releases above never wait on it.
         //
-        // Number keys, 1 to HighestSlotKey, all through one routed handler
+        // Every key press, once more, through one handler with no key list
+        // (AnyKey): while the save list is up it is the list's, every key but ESC
+        // (RouteWhileSaving), so an ask takes exactly the next key. Otherwise the
+        // number keys, 1 to HighestSlotKey, go on to one routed handler
         // (NumberKey): they equip bag slots while the bag is open, pick a
-        // pause-menu option while it is, and select party members otherwise.
-        for (int digit = 1; digit <= HighestSlotKey; digit++)
-        {
-            int pressed = digit;
-            input.SubscribeToKeyPressed(_ => NumberKey(pressed), Keys.D0 + pressed);
-        }
+        // pause-menu option while it is, and select party members otherwise. The
+        // number keys have no subscription of their own: beside this one, the key
+        // that opens the list, or the one that saves from it and closes it, would be
+        // read twice — once by the menu, once by the list. Every other key below
+        // already does nothing behind a menu (AnyMenuOpen).
+        input.SubscribeToKeyPressed(e => AnyKey(e.Key));
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) CycleActiveCharacter(); }, Keys.Tab);
 
         // Space ends the turn and nothing else; ENTER is routed by the menu open
@@ -1459,25 +1524,126 @@ public class DungeonScene : Scene
     internal const int HighestSlotKey = 9;
 
     /// <summary>
+    /// Every key press, once (<see cref="WireInput"/>): while the save list is up,
+    /// the list's (<see cref="SaveListKey"/>); otherwise a number key goes on to
+    /// <see cref="NumberKey"/>. Any key clears what the pause menu answered — it
+    /// stays until the next key — before the key does anything else. Internal, so a
+    /// scene built with no window can be walked key by key through its menus.
+    /// </summary>
+    internal void AnyKey(Keys key)
+    {
+        if (Transiting) return;
+        if (ActiveMenu is GameMenu.Pause or GameMenu.Saves)
+            _answer = null;
+        if (ActiveMenu == GameMenu.Saves && _saves is { } list)
+        {
+            SaveListKey(list, key);
+            return;
+        }
+        if (key >= Keys.D1 && key <= Keys.D0 + HighestSlotKey)
+            NumberKey(key - Keys.D0);
+    }
+
+    /// <summary>
+    /// Where a key goes while the save list is up: to the list, every key but ESC,
+    /// which is the game's — it asks <see cref="HandleEscape"/>, which answers an
+    /// ask no and otherwise goes back to the menu. So the turn's keys, the bag's,
+    /// the stairs' and the number keys are the list's there, and G, Tab, I, E or
+    /// Space each answer an ask no, as every key but ENTER does on the title and
+    /// between runs. Pure but for the list it hands the key to.
+    /// </summary>
+    /// <returns>What the key did to the list; <see cref="SlotStep.None"/> for ESC, which is not the list's here.</returns>
+    internal static SlotStep RouteWhileSaving(SlotMenu list, Keys key)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        return key == Keys.Escape ? SlotStep.None : list.Press(key);
+    }
+
+    /// <summary>
+    /// A key on the save list (<see cref="RouteWhileSaving"/>). A slot chosen — an
+    /// empty one at once, one that holds anything once its ask is answered ENTER —
+    /// closes the list back to the pause menu, and the host saves into it at the
+    /// frame's end and tells the menu how it went (<see cref="SlotSaved"/>).
+    /// </summary>
+    private void SaveListKey(SlotMenu list, Keys key)
+    {
+        var asked = list.Asking;
+        var step = RouteWhileSaving(list, key);
+        if (asked is not null && step != SlotStep.Chosen)
+            Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken ({key})");
+        else if (step == SlotStep.Asking && list.Asking is { } asking)
+            Log.Info($"[Save] Saving into {SaveSlots.Label(asking.Number)}, which holds {(asking.State == SlotState.Readable ? "a save" : "a save that cannot be read")}? - ENTER to confirm, any other key to keep it");
+        if (list.Said is { } said)
+            Log.Info($"[Save] {said}");
+        if (step != SlotStep.Chosen || list.Chosen is not { } slot)
+            return;
+
+        ActiveMenu = GameMenu.Pause;   // the list closes back to the menu, where the answer is drawn
+        Log.Info($"[Save] Saving into {SaveSlots.Label(slot)} by hand");
+        _host.SaveToSlot(slot);
+    }
+
+    /// <summary>
+    /// What a save by hand came to, from the host once it is written at the frame's
+    /// end (<see cref="ISaveHost.SaveToSlot"/>): drawn inside the pause menu, under
+    /// its lines, until the next key or until the menu closes — never as a notice,
+    /// which is not drawn over a menu and would age out unseen behind it. With the
+    /// menu closed by then, only the log keeps it.
+    /// </summary>
+    /// <param name="notice">What the save came to: <c>SAVED TO SLOT 2</c>, or why not.</param>
+    internal void SlotSaved(string notice)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(notice);
+        if (ActiveMenu is GameMenu.Pause or GameMenu.Saves)
+            _answer = notice;
+    }
+
+    /// <summary>
     /// A number key, routed by the menu that is open (§4.4: the swap keys
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
     /// printed with that number into the hand — 1 is the hand itself — or, with
     /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
-    /// on the pause menu, 1 closes it and 2 saves and quits — the window closes,
-    /// and the game's close saves the run in progress, playing out the enemies'
-    /// turn first if the menu was opened during it (<see cref="CampaignBoot.SaveOnQuit"/>)
-    /// — and every other number does nothing (never a member selected behind the
-    /// menu); with no menu open, 1-4 select a party member. Behind any other menu —
-    /// the way out's "leave the dungeon?" among them — a number key does nothing at
-    /// all: it never selects a member behind a prompt. Nor during a stair's fade.
+    /// on the pause menu (<see cref="PauseMenu.Press"/>), 1 closes it, 2 opens the
+    /// save list on the party's own turn and otherwise says why not, and 3 quits to
+    /// the title — the host writes the autosave first, playing out the enemies' turn
+    /// if the menu was opened during it (<see cref="ISaveHost.QuitToTitle"/>) — or,
+    /// in a dev-override session, which has no title, closes the game, whose close
+    /// saves its scratch slot as ever; every other number does nothing there (never
+    /// a member selected behind the menu); with no menu open, 1-4 select a party
+    /// member. Behind any other menu — the way out's "leave the dungeon?" and the
+    /// save list among them — a number key does nothing at all: it never selects a
+    /// member behind a prompt. Nor during a stair's fade.
     /// </summary>
     private void NumberKey(int digit)
     {
         if (Transiting) return;
         if (PauseMenuOpen)
         {
-            if (digit == 1) ActiveMenu = GameMenu.None;
-            else if (digit == 2) _game.Close();
+            var (action, said) = PauseMenu.Press(digit, CanSaveNow, _host.HasTitle);
+            switch (action)
+            {
+                case PauseAction.Close:
+                    ActiveMenu = GameMenu.None;
+                    break;
+                case PauseAction.OpenSaves:
+                    var listing = _host.Slots();
+                    ActiveMenu = GameMenu.Saves;
+                    _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing));
+                    Log.Info("[Save] The save list: " + string.Join("; ", _saves.Rows.Select(row => $"{SaveSlots.Label(row.Number)} {row.State}")));
+                    break;
+                case PauseAction.Refuse:
+                    _answer = said;
+                    Log.Info($"[Save] {said}");
+                    break;
+                case PauseAction.QuitToTitle:
+                    Log.Info("[Run] QUIT TO TITLE");
+                    _host.QuitToTitle();
+                    break;
+                case PauseAction.QuitGame:
+                    Log.Info("[Run] QUIT GAME: a dev-override session has no title");
+                    _game.Close();
+                    break;
+            }
         }
         else if (InventoryOpen)
         {
@@ -1533,22 +1699,31 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
-    /// no — or opens the pause menu, whose 2 saves the run in progress and quits
-    /// (<see cref="DungeonHud.PauseQuitLine"/>). During a stair's fade, and once
+    /// no — or opens the pause menu (<see cref="PauseMenu"/>), whose 2 saves into a
+    /// slot and whose 3 quits to the title. On the save list it answers an ask no,
+    /// and otherwise goes back to the pause menu. During a stair's fade, and once
     /// the party is on its way to the screen between runs, it is swallowed:
     /// nothing opens over a floor being swapped. <strong>On a run's end it does
     /// nothing</strong> — the summary, and the defeat screen under it. The summary
-    /// is modal: ENTER is the one way on, and quitting is the screen between runs'
-    /// to offer. Nothing would be lost by a quit there — the run's end is saved
-    /// once the frame it ended in is over, the summary with it, and the window's
-    /// close saves again — but a pause menu over a run that has ended would offer
-    /// to save a run there is no longer any of. Always consumed, so the game never
-    /// quits behind the scene's back.
+    /// is modal: ENTER is the one way on, and the screen between runs opens the
+    /// menu. Nothing would be lost by a quit there — the run's end is saved once the
+    /// frame it ended in is over, the summary with it — but a pause menu over a run
+    /// that has ended would offer to save a run there is no longer any of. Always
+    /// consumed, so the game never quits behind the scene's back.
     /// </summary>
     public bool HandleEscape()
     {
         if (Transiting) return true;
-        if (ActiveMenu == GameMenu.RunSummary || _turns.Phase == TurnPhase.GameOver) return true;
+        if (ActiveMenu == GameMenu.RunSummary || _turns is { Phase: TurnPhase.GameOver }) return true;   // no floor open yet is no game over
+        if (ActiveMenu == GameMenu.Saves && _saves is { } list)
+        {
+            var asked = list.Asking;
+            if (list.Press(Keys.Escape) == SlotStep.Back)
+                ActiveMenu = GameMenu.Pause;   // back to the menu
+            else if (asked is not null)
+                Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken (Escape)");
+            return true;
+        }
         ActiveMenu = AnyMenuOpen ? GameMenu.None : GameMenu.Pause;
         return true;
     }

@@ -111,7 +111,7 @@ internal sealed class TitleMenu
     {
         ArgumentNullException.ThrowIfNull(listing);
         Listing = listing;
-        Count = Math.Max(1, listing.Slots.Count(slot => slot.Number != SaveSlots.Autosave && !slot.Beyond));
+        Count = SlotMenu.CountOf(listing);
         Cursor = (int)(ContinueOn ? TitleOption.Continue : TitleOption.NewCampaign);
     }
 

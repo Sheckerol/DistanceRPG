@@ -2,26 +2,32 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
-/// <summary>What a slot list is for: the title's LOAD GAME list. (Saving by hand, which the ruling asks for too, adds its own mode when it arrives.)</summary>
+/// <summary>What a slot list is for: the title's LOAD GAME list, or the menus' save list, which saving by hand opens.</summary>
 internal enum SlotMenuMode
 {
     /// <summary>Loading: every slot listed, a slot that holds something chosen to be loaded.</summary>
     Load,
+
+    /// <summary>Saving by hand: the autosave shown and never chosen, the manual slots to the count chosen to be saved into, asking before one that holds anything.</summary>
+    Save,
 }
 
 /// <summary>What one key press did to a slot list (<see cref="SlotMenu.Press"/>).</summary>
 internal enum SlotStep
 {
-    /// <summary>Nothing: a key the list does not answer, or a move with nowhere else to go.</summary>
+    /// <summary>Nothing: a key the list does not answer, a move with nowhere else to go, or a key that answered an ask no.</summary>
     None,
 
     /// <summary>The choice moved to another slot.</summary>
     Moved,
 
-    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or asks first.</summary>
+    /// <summary>A slot that holds something was chosen on the save list, which asks first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
+    Asking,
+
+    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or asks first; or saves into it.</summary>
     Chosen,
 
-    /// <summary>A slot that holds nothing was asked for, and the list says so (<see cref="SlotMenu.Said"/>).</summary>
+    /// <summary>A slot the list cannot take was asked for, and the list says so (<see cref="SlotMenu.Said"/>).</summary>
     Refused,
 
     /// <summary>ESC: the list goes, and its owner's options come back.</summary>
@@ -31,7 +37,8 @@ internal enum SlotStep
 /// <summary>
 /// A list of the save folder's slots to choose one from (the user's ruling of
 /// 2026-09-25 on the save model, R2(d)): pure — keys in, a step out — so every
-/// key is tested (<c>TitleTests</c>), and only the drawing is the screen's.
+/// key is tested (<c>TitleTests</c>, <c>SaveMenuTests</c>), and only the drawing
+/// is the screen's.
 /// <para>
 /// <strong>Load mode</strong>, the title's LOAD GAME: every slot the listing
 /// holds, in number order — <c>AUTOSAVE</c>, <c>SLOT 1</c> to the count, then any
@@ -42,6 +49,20 @@ internal enum SlotStep
 /// that holds files none of which reads can be chosen: its load sets them aside
 /// and brings nothing back, and the title says so. The list decides nothing about
 /// the autosave: whether loading a slot sets it aside first is its owner's ask.
+/// </para>
+/// <para>
+/// <strong>Save mode</strong>, the menus' SAVE GAME: the autosave's row, shown
+/// and never chosen — it saves itself — then the manual slots 1 to the count; a
+/// slot beyond the count keeps its save for loading and is never offered here. W/S
+/// or the arrows move over the manual slots, round the ends; a digit takes its
+/// slot and ENTER the one chosen. An empty slot is chosen at once. One that holds
+/// anything asks first (<see cref="Asking"/>, R2(d): "saving into an occupied slot
+/// asks before overwriting") — over a save that reads, whether to save over it;
+/// over one that cannot be read, whether to set it aside and save there — and
+/// <strong>only ENTER says yes</strong>: the slot's digit again, N, ESC and every
+/// other key say no and are spent, as on the title. 0 and a digit above the count
+/// are refused, saying why. The choice starts on the first empty slot, so an
+/// ENTER pressed without looking saves over nothing; with none empty, on slot 1.
 /// </para>
 /// </summary>
 internal sealed class SlotMenu
@@ -55,12 +76,35 @@ internal sealed class SlotMenu
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
         Mode = mode;
         Count = count;
-        Rows = listing.Slots.OrderBy(slot => slot.Number).ToList();
+        Rows = listing.Slots
+            .Where(slot => mode == SlotMenuMode.Load || !slot.Beyond)
+            .OrderBy(slot => slot.Number)
+            .ToList();
+
+        if (mode == SlotMenuMode.Save)
+        {
+            // The first empty slot, so an ENTER pressed without looking saves over
+            // nothing; with none, the first slot that can be saved into.
+            int empty = FirstRow(row => Choosable(row) && row.State == SlotState.Empty);
+            Cursor = empty >= 0 ? empty : FirstRow(Choosable);
+            return;
+        }
 
         // The choice starts on the most recent save, and failing that on the first
         // slot that holds anything; with nothing anywhere, on none.
         int newest = listing.Newest is { } found ? IndexOf(found.Number) : -1;
         Cursor = newest >= 0 ? newest : Next(-1, +1);
+    }
+
+    /// <summary>
+    /// How many manual slots <paramref name="listing"/> offers: the ones it lists up
+    /// to the count — every manual slot to the count is listed, the empty ones
+    /// included — never fewer than one.
+    /// </summary>
+    internal static int CountOf(SaveListing listing)
+    {
+        ArgumentNullException.ThrowIfNull(listing);
+        return Math.Max(1, listing.Slots.Count(slot => slot.Number != SaveSlots.Autosave && !slot.Beyond));
     }
 
     /// <summary>What the list is for.</summary>
@@ -69,10 +113,10 @@ internal sealed class SlotMenu
     /// <summary>How many manual slots there are.</summary>
     public int Count { get; }
 
-    /// <summary>The slots, top to bottom: the autosave, the manual slots to the count, then any beyond it that hold a save.</summary>
+    /// <summary>The slots, top to bottom: the autosave, the manual slots to the count, then — loading — any beyond it that hold a save.</summary>
     public IReadOnlyList<SlotEntry> Rows { get; }
 
-    /// <summary>The index of the row chosen now — always one that holds something — or -1 when no slot holds anything.</summary>
+    /// <summary>The index of the row chosen now — always one a key can take: loading, one that holds something; saving, a manual slot — or -1 when there is none.</summary>
     public int Cursor { get; private set; }
 
     /// <summary>The slot the last key chose, by number, or null: set by a <see cref="SlotStep.Chosen"/> step, cleared by the next key.</summary>
@@ -81,15 +125,28 @@ internal sealed class SlotMenu
     /// <summary>What the list says under itself — <c>SLOT 2 IS EMPTY</c> — until the next key; null for nothing.</summary>
     public string? Said { get; private set; }
 
+    /// <summary>The slot the save list is asking about — whether to save over it, or set it aside and save there — until the next key, which answers; null for no ask.</summary>
+    public SlotEntry? Asking { get; private set; }
+
     /// <summary>
-    /// One key press, once: W/S and the arrows move, a digit or ENTER chooses,
-    /// ESC goes back (<see cref="SlotStep"/>). Every key first clears what the list
-    /// said and what it chose.
+    /// One key press, once. An ask takes it first: ENTER says yes and chooses the
+    /// slot asked about; any other key says no and is spent. Then W/S and the
+    /// arrows move, a digit or ENTER chooses, ESC goes back (<see cref="SlotStep"/>).
+    /// Every key first clears what the list said and what it chose.
     /// </summary>
     public SlotStep Press(Keys key)
     {
         Said = null;
         Chosen = null;
+        if (Asking is { } asked)
+        {
+            Asking = null;
+            if (key is not (Keys.Enter or Keys.KeyPadEnter))
+                return SlotStep.None;   // no, and spent
+            Chosen = asked.Number;
+            return SlotStep.Chosen;
+        }
+
         switch (key)
         {
             case Keys.Escape:
@@ -105,6 +162,12 @@ internal sealed class SlotMenu
         if (Digit(key) is not { } digit)
             return SlotStep.None;
         int row = IndexOf(digit);
+        if (Mode == SlotMenuMode.Save)
+        {
+            if (digit == SaveSlots.Autosave)
+                return Refuse(SlotText.AutosaveSavesItself);
+            return row >= 0 ? Take(row) : Refuse(SlotText.NotOffered(digit, Count));
+        }
         return row >= 0 && Rows[row].State != SlotState.Empty ? Take(row) : Refuse(SlotText.IsEmpty(digit));
     }
 
@@ -116,6 +179,10 @@ internal sealed class SlotMenu
     /// would otherwise load slot 2.
     /// </summary>
     internal static int? Digit(Keys key) => key is >= Keys.D0 and <= Keys.D9 ? key - Keys.D0 : null;
+
+    /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; saving, a manual slot, the empty ones included.</summary>
+    private bool Choosable(SlotEntry row)
+        => Mode == SlotMenuMode.Save ? row.Number != SaveSlots.Autosave : row.State != SlotState.Empty;
 
     private SlotStep Move(int step)
     {
@@ -129,7 +196,13 @@ internal sealed class SlotMenu
     private SlotStep Take(int row)
     {
         Cursor = row;
-        Chosen = Rows[row].Number;
+        var entry = Rows[row];
+        if (Mode == SlotMenuMode.Save && entry.State != SlotState.Empty)
+        {
+            Asking = entry;   // it holds something: the next key answers
+            return SlotStep.Asking;
+        }
+        Chosen = entry.Number;
         return SlotStep.Chosen;
     }
 
@@ -147,7 +220,16 @@ internal sealed class SlotMenu
         return -1;
     }
 
-    /// <summary>The next row from <paramref name="from"/> in <paramref name="step"/>'s direction that holds something, round the ends; <paramref name="from"/> itself when no other does; -1 when none does.</summary>
+    /// <summary>The first row <paramref name="match"/> takes, or -1.</summary>
+    private int FirstRow(Func<SlotEntry, bool> match)
+    {
+        for (int i = 0; i < Rows.Count; i++)
+            if (match(Rows[i]))
+                return i;
+        return -1;
+    }
+
+    /// <summary>The next row from <paramref name="from"/> in <paramref name="step"/>'s direction that a key can take (<see cref="Choosable"/>), round the ends; <paramref name="from"/> itself when no other can; -1 when none can.</summary>
     private int Next(int from, int step)
     {
         int count = Rows.Count;
@@ -158,9 +240,9 @@ internal sealed class SlotMenu
         for (int moved = 0; moved < count; moved++)
         {
             at = ((at + direction) % count + count) % count;
-            if (Rows[at].State != SlotState.Empty)
+            if (Choosable(Rows[at]))
                 return at;
         }
-        return from >= 0 && from < count && Rows[from].State != SlotState.Empty ? from : -1;
+        return from >= 0 && from < count && Choosable(Rows[from]) ? from : -1;
     }
 }

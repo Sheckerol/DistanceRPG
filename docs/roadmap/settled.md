@@ -1462,13 +1462,15 @@ it. Six of them bent a line of the phase doc rather than fill a silence; those
 are marked **bends the phase doc**, each with why it needs no ruling, or that it
 is the user's. Four rulings were the user's to make — the dice on a reload, the
 save model, where content's truth lives, and the class baselines, which was also
-one of the six bends — and each shipped provisionally. **Three are ruled**
+one of the six bends — and each shipped provisionally. **All four are ruled**
 (superseded by the user's rulings, 2026-09-25, below): content's truth is the
 JSON, and the class baselines are a section of `weapons.json`, which withdraws
-that bend; and the dice stay the visit's own, seeded and saved. **The save
-model**, the fourth, the user ruled the same day, and this pass records it as it
-is built: until then its entry below says what ships, and open-questions.md the
-alternatives it shipped beside.
+that bend; the dice stay the visit's own, seeded and saved; and **the save
+model**, the fourth, is the user's R2 — a title screen, one autosave slot and
+manual slots whose count is a `tuning.json` key — built in three steps and now
+whole (R2, below), its entry below superseded. Three choices of its building ship
+provisionally, the user's to rule, and open-questions.md sets out their
+alternatives.
 
 ### The user's ruling on content (2026-09-25)
 
@@ -1622,12 +1624,12 @@ declared as `tuning.json` keys ahead of it — so both are written here whole. R
 and R2 change the game, and each is written here as it is built. R3 is, both
 halves: every number of a content file has a range (R3(a), below), and every
 count of a save has its ceiling and its fields are checked against each other
-(R3(b), below). R2 is built in three steps, and its first two are written
-below: the save folder's slots, a save's time, the slot count, and what a write
-never costs (R2, the folder); and the title screen, with CONTINUE, NEW CAMPAIGN,
-LOAD GAME and QUIT (R2, the title). Saving by hand is still to come, and until it
-is, the entry below that R2 supersedes — the save model — says what else the
-player meets.
+(R3(b), below). R2 is built in three steps, each written below: the save
+folder's slots, a save's time, the slot count, and what a write never costs (R2,
+the folder); the title screen, with CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT
+(R2, the title); and saving by hand, with the menus that leave play by the title
+(R2, saving by hand). The entry below that R2 supersedes — the save model — is
+superseded whole.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -2199,6 +2201,9 @@ player meets.
     QUIT` still closes the game, until saving by hand gives both screens their
     menu. The developer tooling stays as it was: `DISTANCERPG_DUNGEON`,
     `DISTANCERPG_SEED` and their scratch slot, `--new-campaign`, `--write-data`.
+    (Superseded by saving by hand, below: ESC between runs opens the menu —
+    `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU` — and both screens leave
+    play by its `3  QUIT TO TITLE`.)
   - **The save's word can now name three files** (the entry on the save's word,
     below): a manual slot's save set aside as its backup resumes, and the
     autosave's two making room. The common case — a slot's campaign making room
@@ -2212,7 +2217,117 @@ player meets.
     resumed floor's banner exactly at the two-thirds line it keeps above, and
     shortening the notices (the folder named once) is a change to every
     set-aside notice; both are left for the step that brings saving by hand,
-    which measures the word again.
+    which measures the word again. (Measured, and the ceiling kept: saving by
+    hand, below.)
+- **R2, saving by hand — SAVE GAME, and QUIT TO TITLE.** The ruling's third part:
+  "a manual save can be made at ANY SAFE POINT: from the pause menu on the
+  player's own turn during a run, or on the between-runs screen — never while
+  enemies are moving", "saving into an occupied slot asks before overwriting",
+  and what becomes of the old ways out of play (R2(e)). Built on the folder and
+  the title above:
+  - **One menu, both screens with a campaign in play**: ESC in a dungeon opens
+    the pause menu, and ESC between runs now opens the same menu over the hub,
+    the hub dimmed under it — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE`
+    (`PauseMenu`) — and under the options, as ever, `PROGRESS SAVES AT EVERY
+    TURN`: the autosave goes on saving itself, whatever is saved by hand. The
+    menu's two lines sit under its last option, however many there are, where
+    they had sat at a fixed height a third option would have landed on. Between
+    runs the hub's keys line gives way to the menu's while it is up, and ESC never
+    quits there any more.
+  - **SAVE GAME only at a safe point, the autosave's**: in a dungeon the party's
+    own turn with nothing in flight — never while the enemies move or their
+    turn's banner is up, never on a run's summary or during a stair's fade;
+    between runs always. Off one the option is dimmed and 2 answers `SAVE ON YOUR
+    OWN TURN`, saving nothing; the host asks the safe point again when it writes,
+    at the frame's end like every save.
+  - **The save list** stands in the options' place, laid out as the title's list
+    is: `AUTOSAVE - ... - SAVES ITSELF`, shown and never chosen, then `SLOT 1` to
+    the count — never a slot beyond it, which keeps its save for loading. It
+    starts on the first empty slot, so an ENTER pressed without looking saves
+    over nothing. A digit, or ENTER on the chosen row, saves into an empty slot at
+    once; one that holds a save asks — `SLOT 2 HOLDS BETWEEN RUNS - 2 RUNS -
+    2026-09-24 20:10` / `ENTER: SAVE OVER IT - ESC: NO` — the save it held becoming
+    the slot's backup, one save deep, as every write's does; one whose save cannot
+    be read asks `SLOT 3 CANNOT BE READ` (`- ITS BACKUP IS KEPT` when the backup
+    reads) / `ENTER: SET IT ASIDE AND SAVE HERE - ESC: NO`. **Only ENTER says
+    yes**, as on the title: the slot's digit again, N, ESC and every other key say
+    no and are spent. 0 answers `THE AUTOSAVE SAVES ITSELF`, and a digit above
+    the count `SLOT 5 IS BEYOND THE 3 SLOTS`.
+  - **What is set aside is the files' to decide, never the list's**: a save by
+    hand goes through the one door every write does (`CampaignBoot.SaveTo`, then
+    `Save`), whose guard sets aside a `campaign.json` the codec refuses — and such
+    a backup a replace would rotate away — whatever the list said: a slot whose
+    save cannot be read has it set aside as `slot-n/campaign.unreadable-N.json`,
+    never deleted, the new save moved into place and a backup that reads left
+    untouched, even when a list read before the save broke called the slot
+    readable.
+  - **The answer is drawn inside the menu, never as a notice**: the list closes
+    back to the menu, which says under its lines how the save went — `SAVED TO
+    SLOT 2` in green, then each file the save set aside first, where, and how to
+    try it again; `SLOT 2 COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE
+    LOG` in orange, a slot whose store refuses its writes this session answering
+    with why — until the next key or until the menu closes. A notice is not drawn
+    over a menu and ages while hidden, so it would time out unseen.
+  - **Every key is the menu's while it is up, in both screens**: between runs 1,
+    2 and 3 act and every other key does nothing — ENTER, W/S and the arrows never
+    reach the dungeon list, so nothing descends behind the menu — and with the
+    list up every key but ESC is the list's. In the dungeon, which binds its keys
+    one by one, one catch-all handler hands the list every key but ESC while it
+    is up, so G, Tab, I, E and Space answer an ask no, as every key but ENTER
+    does on the title. The number keys reach their menu, their bag and their
+    members through that catch-all too, and only while the list is not up —
+    **bends the plan, needs no ruling**: kept on subscriptions of their own
+    beside it, the key that opens the list, or the one that saves from it and
+    closes it, would be read twice. ESC answers an ask no, then goes back from the
+    list to the menu, then closes the menu.
+  - **QUIT TO TITLE — this pass's decision on R2(e)**: from either menu, the host
+    writes the autosave through the window close's own door — an enemies' turn in
+    flight played out first on the playing scene's own step, the resume marker
+    cleared, a quit that cannot save leaving `campaign.unsaved`, which the title
+    says at once — then drops the campaign, so a close from the title saves
+    nothing, re-arms that once-only door for the next campaign, and shows the
+    title, the slots listed afresh. The game quits from the title (QUIT, ESC) or
+    by the window's close button from anywhere, which saves the campaign in play
+    first. There is no QUIT GAME in a session with a title, and no LOAD in the
+    pause menu: the title is the one place a campaign is chosen, two keys away. A
+    second press while the screen fades to the title finds no campaign in play and
+    does nothing.
+  - **A dev-override session has no title and saves apart**: its menu's 3 reads
+    `3  QUIT GAME` — the window's close, saving its scratch slot as ever — and its
+    2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`; the host refuses a
+    save by hand outright in a session with no slots, whatever asked, so no path
+    puts a scratch campaign in a player's slot.
+  - **What replaced what (R2(e))**: N, then N → the title's NEW CAMPAIGN (R2, the
+    title); ESC-save-and-quit between runs → ESC MENU, with SAVE GAME and QUIT TO
+    TITLE; the pause menu's `2  SAVE AND QUIT` → `2  SAVE GAME` and `3  QUIT TO
+    TITLE`; resume-on-launch → the title's CONTINUE. The developer tooling is
+    unchanged: `DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED` and their scratch slot,
+    `--new-campaign`, `--write-data`.
+  - **Three choices ship provisionally, the user's to rule**, each with its
+    alternatives in open-questions.md: the deposit's numbers as six keys of their
+    own (USER DECISION 1; R4's keys, above); a campaign loaded from a manual slot
+    autosaving into the one autosave slot, a load over a different autosave
+    asking and then setting it aside (USER DECISION 2; R2, the title); and NEW
+    CAMPAIGN over a held autosave setting it aside rather than saving over it
+    (USER DECISION 3).
+  - **The save's word, measured again, and its ceiling kept at fourteen rows**:
+    the rarest word — a manual slot resumed from its backup under changed
+    numbers, its save set aside with a long reason, the autosave's crashed save and
+    its backup set aside to make room — takes fifteen rows in the player's own
+    save folder under a five-letter user name, and eighteen under a twenty-letter
+    one. Fifteen would put a resumed floor's banner exactly on the two-thirds line
+    it keeps above, with no slack, and would still cut the longer name's word;
+    naming the folder once would reword every set-aside notice, for a case that
+    needs five rare things at once. Past the ceiling the rows are cut and counted
+    (`+1 MORE - SEE THE LOG`), and the log has every word.
+  - **A failed autosave's notice can outlive the quit that saved**: a save that
+    fails is said on the next screen until a later save through the game's own
+    door goes through, which takes it back; the quit's save goes through the
+    quit's door, which takes nothing back, so after QUIT TO TITLE the title can
+    still say an earlier autosave failed when the quit's own save went through.
+    The log says which went through. Taking it back there would give the quit's
+    door a second way to withdraw a failure's word, a change to the rule above
+    that the step leaves for its review.
 
 ### The numbers: `tuning.json`
 
@@ -2465,14 +2580,17 @@ player meets.
   floor banner. A `campaign.resuming` marker guards a resume, NEW CAMPAIGN asks
   twice, `--new-campaign` sets the save and its backup aside and saves the new
   campaign at once, and the dev overrides play in a scratch slot that never
-  touches the campaign. The alternatives are in open-questions.md. (Being
-  superseded by the user's ruling, 2026-09-25, as it is built: the save folder
-  is the autosave slot now, beside manual slots whose count is `tuning.json`'s,
-  and every save carries its time — R2, the folder, above; and the game opens on
-  a title screen — CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT — in place of resuming
-  at launch and of NEW CAMPAIGN's N-then-N between runs — R2, the title, above.
-  Until saving by hand arrives, the rest of this entry says what the player
-  meets.)
+  touches the campaign. The alternatives were in open-questions.md. (Superseded
+  by the user's ruling, 2026-09-25, whole — R2, above: the save folder is the
+  autosave slot, beside manual slots whose count is `tuning.json`'s, and every
+  save carries its time (R2, the folder); the game opens on a title screen —
+  CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT — in place of resuming at launch and of
+  NEW CAMPAIGN's N-then-N between runs (R2, the title); and the player saves by
+  hand into a slot at any safe point, and leaves play by the menus' QUIT TO
+  TITLE, in place of the pause menu's save-and-quit and ESC's between runs
+  (R2, saving by hand). What still stands of it: saves in the player's data
+  folder, the autosave's triggers, the resume marker, `--new-campaign` and the
+  dev overrides' scratch slot.)
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
@@ -2516,7 +2634,8 @@ player meets.
   alone. (Superseded by the user's ruling, 2026-09-25, in how many files: a load
   of a manual slot can set three aside, the title shows the save's word whole
   too, and the rarest such word reaches the ceiling in an ordinary save folder —
-  R2, the title, above.)
+  R2, the title, above — and runs a row past it, measured when saving by hand
+  was built, which kept the ceiling: R2, saving by hand, above.)
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are

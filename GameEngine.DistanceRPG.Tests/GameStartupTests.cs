@@ -208,11 +208,12 @@ public class GameStartupTests
         Assert.Equal(["DungeonHud.Render"], Callers(drawNotices));
 
         // The title is the first scene's door (S6): the launch shows it unless a dev
-        // override or --new-campaign skips it, and a load that brings nothing back
-        // shows it again; nothing else does. (A title asked for mid-fade is shown
-        // by a lambda of ShowTitle's own, once the fade is done.)
+        // override or --new-campaign skips it, a load that brings nothing back shows
+        // it again, and leaving play shows it (S7's QUIT TO TITLE, the autosave
+        // written first); nothing else does. (A title asked for mid-fade is shown by
+        // a lambda of ShowTitle's own, once the fade is done.)
         var showTitle = typeof(DistanceRpgGame).GetMethod("ShowTitle", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot"], Callers(showTitle).Where(caller => !caller.Contains('<')));
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.QuitToTitle"], Callers(showTitle).Where(caller => !caller.Contains('<')));
         var bootCampaign = typeof(DistanceRpgGame).GetMethod("BootCampaign", BindingFlags.NonPublic | BindingFlags.Instance)!;
         Assert.Equal(1, Mentions(bootCampaign, showTitle));
         Assert.Equal(["TitleScene..ctor"], Callers(typeof(TitleMenu).GetConstructor([typeof(SaveListing)])!));
@@ -447,8 +448,9 @@ public class GameStartupTests
         // 1f: a save is written at the end of the frame a run's end asked for it
         // in — never inside the turn system's raise that ended the run — when NEW
         // CAMPAIGN begins one, on the title or by --new-campaign at launch
-        // (BeginNewCampaign, S6), and on quitting, which every close arrives
-        // at (OnClosing): through the quit's own door, which settles the enemies'
+        // (BeginNewCampaign, S6), by hand into a slot (CampaignBoot.SaveTo, S7),
+        // and on leaving play, by the window's close (OnClosing) or the menus' QUIT
+        // TO TITLE (S7): through the quit's own door, which settles the enemies'
         // turn first when a run is in progress and then saves (CampaignBoot.SaveOnQuit,
         // Phase 5.8) — between runs as well since the audit's pass, so a quit that
         // cannot save leaves its marker for the title however it came. The
@@ -458,7 +460,7 @@ public class GameStartupTests
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
-        Assert.Equal(["CampaignBoot.SaveOnQuit", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        Assert.Equal(["CampaignBoot.SaveOnQuit", "CampaignBoot.SaveTo", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
         Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.WriteRequestedSave"],
             Callers(Method(typeof(DistanceRpgGame), "Save")));
@@ -472,7 +474,7 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ClearUnsaved))));
         Assert.Equal(["CampaignBoot.Abandon", "DistanceRpgGame.ShowTitle"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
-        Assert.Equal(["DistanceRpgGame.OnClosing"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
+        Assert.Equal(["DistanceRpgGame.OnClosing", "DistanceRpgGame.QuitToTitle"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
 
         // A run's end only asks: the handler the campaign's RunEnded calls writes nothing.
         var asks = Method(typeof(DistanceRpgGame), "SaveAtTheRunsEnd");
@@ -610,11 +612,24 @@ public class GameStartupTests
             Assert.DoesNotContain(Instructions(Body(asking)!), i => i.Token != 0 && Resolve(asking, i.Token) is { } target
                 && (target.DeclaringType == typeof(CampaignBoot) || target.DeclaringType == typeof(SaveStore) || target.Name == "Save"));
 
-        // The pause menu's 2 closes the window, and the close is where the quit saves.
-        // (The call binds to the window's original declaration of Close, which
-        // reflection on the game's type would hand back as its override.)
+        // A dev-override session's pause menu has no title to quit to: its 3  QUIT
+        // GAME closes the window, and the close is where the quit saves, into the
+        // session's scratch slot. (The call binds to the window's original declaration
+        // of Close, which reflection on the game's type would hand back as its
+        // override.)
         var close = typeof(GameEngine.Core.Game).GetMethod("Close", Type.EmptyTypes)!.GetBaseDefinition();
         Assert.Contains("DungeonScene.NumberKey", Callers(close));
+
+        // Every other session's 3  QUIT TO TITLE (S7) — the pause menu's and the
+        // menu's between runs — asks the host, which writes the autosave through
+        // the close's own door before it shows the title.
+        var quitToTitle = typeof(ISaveHost).GetMethod(nameof(ISaveHost.QuitToTitle))!;
+        Assert.Equal(["BetweenRunsScene.MenuKey", "DungeonScene.NumberKey"], Callers(quitToTitle));
+        var hostQuits = game.GetMethod(nameof(DistanceRpgGame.QuitToTitle))!;
+        var inQuit = CallsIn(hostQuits).ToList();
+        int savedOnQuit = inQuit.FindIndex(called => Same(called, game.GetMethod("SaveOnQuit", Declared)!));
+        int titled = inQuit.FindIndex(called => Same(called, game.GetMethod("ShowTitle", Declared)!));
+        Assert.True(savedOnQuit >= 0 && savedOnQuit < titled, "QuitToTitle shows the title before it writes the autosave");
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -333,9 +334,10 @@ public sealed class BetweenRunsHudTests : IDisposable
     {
         // 1f, and the user's ruling of 2026-09-25 on the save model, R2(e): the
         // screen between runs names the keys that choose and descend, and ESC, which
-        // saves the campaign and quits. NEW CAMPAIGN is the title's now, so no key
-        // here begins one, and the line names none.
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS", BetweenRunsHud.KeysLine);
+        // opens the menu — where the campaign is saved by hand and play is left for
+        // the title. NEW CAMPAIGN is the title's now, so no key here begins one, and
+        // the line names none.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU", BetweenRunsHud.KeysLine);
         Assert.DoesNotContain("NEW CAMPAIGN", BetweenRunsHud.KeysLine, StringComparison.Ordinal);
 
         // The keys stand along the bottom in their grey.
@@ -352,5 +354,101 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.ResumedFromBackup])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.TuningChanged])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"));
+    }
+
+    [Fact]
+    public void TheMenuBetweenRunsSavesAndQuitsToTheTitle()
+    {
+        // The user's ruling of 2026-09-25 on the save model, R2(d) and R2(e): between
+        // runs is a safe point, and ESC there opens the dungeon's pause menu over the
+        // hub — 1 CLOSE, 2 SAVE GAME, 3 QUIT TO TITLE — its keys line in the hub's
+        // keys' place while it is up, and nothing along the bottom while the save list
+        // is, whose own keys are under it.
+        Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT TO TITLE - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: true));
+        Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT GAME - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: false));
+        Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine());
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: true), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true));
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: false), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true, hasTitle: false));
+        Assert.Equal(("", DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true, saves: true));
+        foreach (string line in new[] { BetweenRunsHud.MenuKeysLine(hasTitle: true), BetweenRunsHud.MenuKeysLine(hasTitle: false) })
+        {
+            Assert.Matches("^[A-Z0-9 /-]+$", line);
+            Assert.True(line.Length * 6f * BetweenRunsHud.KeysLineScale <= 1280f - 40f, line);
+        }
+
+        // Where a key goes, walked key by key: with the menu up, ENTER, W, S and the
+        // arrows are the menu's — which does nothing with them, so nothing descends
+        // behind it — as every other key is; with the save list up, every key is the
+        // list's, ENTER among them; ESC is always the game's, which asks HandleEscape.
+        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.N, Keys.Space })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Menu, BetweenRunsScene.Route(menu: true, saves: false, key));
+        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.D0, Keys.D1, Keys.N, Keys.G })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Saves, BetweenRunsScene.Route(menu: true, saves: true, key));
+        foreach (var key in new[] { Keys.Enter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D2, Keys.N })
+            Assert.Equal(BetweenRunsScene.KeyRoute.List, BetweenRunsScene.Route(menu: false, saves: false, key));
+        foreach (var (menu, saves) in new[] { (false, false), (true, false), (true, true) })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(menu, saves, Keys.Escape));
+
+        // Walked through the screen itself, built with no window over a new campaign,
+        // the tutorial chosen: its host records what it is asked for.
+        var at = new DateTimeOffset(2026, 9, 24, 18, 10, 0, TimeSpan.Zero);
+        var saved = new SlotEntry(2, SlotState.Readable, new SlotHeader(at, 2, null, null, null), Unfinished: false, Beyond: false, AheadOfClock: false, SameAsAutosave: false);
+        var listing = new SaveListing([.. Enumerable.Range(0, 4).Select(n => n == 2 ? saved
+            : new SlotEntry(n, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false, SameAsAutosave: false))], []);
+        var host = new RecordingHost(listing);
+        var scene = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), host, shownWhole: 0);
+        Assert.Equal((0, false), (scene.Chosen, scene.MenuOpen));
+        Assert.True(scene.HandleEscape());
+        Assert.True(scene.MenuOpen);
+        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down })
+            scene.OnKey(key);
+        Assert.Equal((0, true, 0), (host.Descended.Count, scene.MenuOpen, scene.Chosen));   // nothing descended, or moved, behind the menu
+
+        // 2 opens the save list — between runs is always a safe point — and ENTER on
+        // its first empty slot saves there at once: the list closes back to the menu,
+        // and what the save came to is drawn inside it, green, over the hub, clear of
+        // the keys line along the bottom of a 720-pixel window, until the next key.
+        scene.OnKey(Keys.D2);
+        Assert.Equal((1, SlotMenuMode.Save), (host.SlotsListed, scene.SaveList!.Mode));
+        var listRows = DungeonHud.PauseMenuLayout(1280f, 720f, PauseMenu.Options(hasTitle: true), true, null, scene.SaveList, Dungeons, TimeZoneInfo.Utc);
+        Assert.True(listRows.Max(row => row.Bottom) <= 720f - BetweenRunsHud.KeysLineFromBottom, "the save list runs into the keys line");
+        scene.OnKey(Keys.Enter);
+        Assert.Equal([1], host.SavedTo);
+        Assert.Equal((true, (SlotMenu?)null), (scene.MenuOpen, scene.SaveList));
+        scene.SlotSaved(CampaignBoot.SavedTo(1));
+        Assert.Equal("SAVED TO SLOT 1", scene.MenuAnswer);
+        var menuRows = DungeonHud.PauseMenuLayout(1280f, 720f, PauseMenu.Options(hasTitle: true), true, scene.MenuAnswer, scene.SaveList, Dungeons, TimeZoneInfo.Utc);
+        Assert.Contains(menuRows, row => row.Text == "SAVED TO SLOT 1" && row.Color == DungeonHud.Green);
+        Assert.True(menuRows.Max(row => row.Bottom) <= 720f - BetweenRunsHud.KeysLineFromBottom, "the menu runs into the keys line");
+        scene.OnKey(Keys.X);
+        Assert.Null(scene.MenuAnswer);
+
+        // ESC goes list, then menu, then closed — answering the list's ask no first.
+        scene.OnKey(Keys.D2);
+        scene.OnKey(Keys.D2);
+        Assert.Equal(2, scene.SaveList!.Asking!.Number);   // slot 2 holds a save: it asks
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((true, (SlotEntry?)null), (scene.SaveList is not null, scene.SaveList?.Asking));
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((true, (SlotMenu?)null), (scene.MenuOpen, scene.SaveList));
+        Assert.True(scene.HandleEscape());
+        Assert.False(scene.MenuOpen);
+        Assert.Equal([1], host.SavedTo);   // the ask answered no saved nothing
+
+        // Closed, the hub is the hub again: ENTER descends.
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(["tutorial"], host.Descended);
+
+        // 3 leaves play for the title, through the host, and the screen is on its way
+        // out: nothing after it is read.
+        var leaving = new RecordingHost(listing);
+        var quitting = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), leaving, shownWhole: 0);
+        quitting.HandleEscape();
+        quitting.OnKey(Keys.D3);
+        Assert.Equal(1, leaving.QuitsToTitle);
+        quitting.OnKey(Keys.D2);
+        quitting.OnKey(Keys.Enter);
+        Assert.Equal((0, 0), (leaving.SlotsListed, leaving.Descended.Count));
+        Assert.True(quitting.HandleEscape());
     }
 }

@@ -12,8 +12,10 @@ namespace GameEngine.DistanceRPG;
 /// badges, the stairs' labels and the cue at the one underfoot, what lies on the
 /// floor (a corpse's drop, or a weapon the party put down), the click and aim
 /// cues, floating combat text, the end-of-turn banner, the inventory panel and
-/// its "leave" (X, then the slot), the pause menu — save and quit, and that the
-/// run saves itself — and the way out's prompt with what leaving now means, the
+/// its "leave" (X, then the slot), the pause menu — close, save into a slot by
+/// hand, quit to the title, and that the run saves itself, the save list in its
+/// options' place (<see cref="PauseMenuLayout"/>, which the screen between runs
+/// draws too) — and the way out's prompt with what leaving now means, the
 /// stairs' fade and the banner over it (the floor reached, the trade on the boss
 /// floor, the boss's fall, <c>RESUMED</c> over a floor a save brought back), and
 /// the run's end —
@@ -469,8 +471,8 @@ public sealed class DungeonHud
         if (scene.InventoryOpen)
             DrawInventory(w, h, active, turns, scene.LeaveArmed);
 
-        if (scene.PauseMenuOpen)
-            DrawMenu(w, h);
+        if (scene.PauseMenuOpen || scene.SavesOpen)
+            DrawMenu(w, h, scene);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
             DrawConfirmLeave(w, h, scene.Visit);
@@ -717,8 +719,8 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The question the way out asks before the party leaves, with the keys
-    /// that answer it — never a number key, since 2 on the pause menu is the
-    /// exit from the game.
+    /// that answer it — never a number key, since the pause menu's number keys
+    /// save the game and leave play for the title.
     /// </summary>
     internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
 
@@ -820,10 +822,10 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to
-    /// the between-runs screen, and ESC does nothing there — quitting is the
-    /// screen between runs' to offer. What the run wrote is saved once the frame
-    /// it ended in is over, the summary with it, so the screen between runs shows
-    /// it again when the campaign is next loaded from the title.
+    /// the between-runs screen, and ESC does nothing there — leaving play is the
+    /// menu's to offer, and the screen between runs opens it. What the run wrote is
+    /// saved once the frame it ended in is over, the summary with it, so the screen
+    /// between runs shows it again when the campaign is next loaded from the title.
     /// </summary>
     internal const string ContinueHint = "ENTER TO CONTINUE";
 
@@ -1358,38 +1360,159 @@ public sealed class DungeonHud
         return $"LEFT {weapon.Name.ToUpperInvariant()} HERE";
     }
 
-    /// <summary>
-    /// The pause menu's second option (1f, Phase 5.8): the run in progress is
-    /// saved and the game quits. Opened during the enemies' turn, the menu leaves
-    /// the turn running behind it, and the quit plays it out to the next player
-    /// turn before saving — the turn the player would have met. CONTINUE on the
-    /// title, the next time the game opens, resumes the run there: the same floor,
-    /// turn and positions.
-    /// </summary>
-    internal const string PauseQuitLine = "2  SAVE AND QUIT";
+    // ── The menu: the pause menu, and the same menu between runs ─────────────
 
-    /// <summary>What the pause menu says under its options (1f): there is no save to make by hand, since the run saves itself at every turn's start and every arrival.</summary>
+    /// <summary>What the menu says under its options (1f): the run saves itself at every turn's start and every arrival, whatever is saved by hand.</summary>
     internal const string PauseSavesLine = "PROGRESS SAVES AT EVERY TURN";
 
-    /// <summary>The pause menu's options, top to bottom, each with the number key that takes it.</summary>
-    internal static IReadOnlyList<string> PauseMenuOptions() => ["1  CLOSE", PauseQuitLine];
+    /// <summary>The menu's title, over its options and over the save list alike.</summary>
+    internal const string PausedTitle = "PAUSED";
+
+    /// <summary>Under the menu's options and its line: ESC closes it.</summary>
+    internal const string EscToClose = "ESC TO CLOSE";
+
+    /// <summary>A glyph's height at scale 1: the font is 5 x 7.</summary>
+    private const float GlyphHeight = 7f;
+
+    // The menu's block, laid out from its top: the title, the options a pitch
+    // apart from where they start, the two lines under the last option, and the
+    // answer under them — or, in the options' place, the save list and, under it,
+    // what it said or asks and its keys. The block sits where the menu always has,
+    // a little above the middle, and rises as far as it needs.
+    private const float MenuTitleScale = 4f;
+    private const float MenuOptionsTop = 66f;
+    private const float MenuOptionPitch = 40f;
+    private const float MenuOptionScale = 2f;
+    private const float MenuLineScale = 1.5f;
+    private const float MenuLinePitch = 24f;
+    private const float MenuAnswerGap = 30f;
+    private const float MenuAnswerPitch = 18f;
+    private const float MenuAnswerScale = 1.5f;
+    private const float MenuListGap = 30f;
+    private const float MenuKeysPitch = 22f;
+    internal const float MenuKeysScale = 1.6f;
+    private const float MenuCentredOffset = 90f;
+
+    /// <summary>The highest the menu's block rises, and the room it keeps along the bottom — clear of the dungeon's help line at <c>h - 24</c> and the hub's keys at <c>h - 28</c>.</summary>
+    internal const float MenuTopMargin = 16f;
+    internal const float MenuBottomMargin = 32f;
+
+    /// <summary>One row of the menu as a screen draws it: its text, how far down, its scale and colour, and where its left edge is — null for a row centred on the window.</summary>
+    internal readonly record struct MenuRow(string Text, float Y, float Scale, Vector4 Color, float? Left = null)
+    {
+        /// <summary>The row's width in pixels.</summary>
+        public float Width => Text.Length * GlyphAdvance * Scale;
+
+        /// <summary>Where the row's glyphs end, downward.</summary>
+        public float Bottom => Y + GlyphHeight * Scale;
+    }
 
     /// <summary>
-    /// The pause menu: close it, or save and quit (<see cref="PauseMenuOptions"/>),
-    /// and under the options that the run saves itself (<see cref="PauseSavesLine"/>).
-    /// Stopping resurrection is the boss's doing (§4.3), and nothing else's — the
-    /// dev switch that stood in for it went when the boss arrived — so what the
-    /// dungeon has become is the floor line's to say (<see cref="FloorLine"/>).
+    /// The menu, row by row, in a window <paramref name="w"/> by <paramref name="h"/>
+    /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)): the pause
+    /// menu, and the same menu over the hub between runs (<see cref="PauseMenu"/>).
+    /// <list type="bullet">
+    /// <item><strong>The options</strong> under <see cref="PausedTitle"/>, a pitch
+    /// apart — <see cref="PauseMenu.SaveLine"/> dimmed where nothing can be saved by
+    /// hand (<paramref name="canSave"/>), 2 then saying why — and <strong>their two
+    /// lines under the last of them</strong>, however many there are:
+    /// <see cref="PauseSavesLine"/>, then <see cref="EscToClose"/>. Then the answer
+    /// (<paramref name="answer"/>) — what a save by hand came to, or why 2 saved
+    /// nothing — wrapped as a notice is, green for a save that went through and
+    /// orange otherwise (<see cref="AnswerColor"/>), inside the menu: a notice is
+    /// never drawn over a menu, and would age out unseen behind it.</item>
+    /// <item><strong>The save list in the options' place</strong>
+    /// (<paramref name="list"/>): the title stays, the slots are laid out as the
+    /// title lays its list (<see cref="TitleHud.SlotRows"/>), and under them what
+    /// the list said, then its keys — or its ask's two rows in their place, in
+    /// yellow, as on the title.</item>
+    /// </list>
+    /// The block sits where the menu always has, a little above the middle, and
+    /// rises as far as it needs to end clear of the line along the bottom — never
+    /// above <see cref="MenuTopMargin"/> — so ten slots, each with its markers' row,
+    /// fit a 720-pixel window. Pure, so what is drawn is tested
+    /// (<c>SaveMenuTests</c>); only the drawing is not.
     /// </summary>
-    private void DrawMenu(int w, int h)
+    /// <param name="w">The window's width, in pixels.</param>
+    /// <param name="h">The window's height, in pixels.</param>
+    /// <param name="options">The menu's options, top to bottom (<see cref="PauseMenu.Options"/>).</param>
+    /// <param name="canSave">Whether 2 can save now: a safe point, in a session with slots.</param>
+    /// <param name="answer">What the menu answers under its lines, or null for nothing.</param>
+    /// <param name="list">The save list while it is up, in the options' place; null for the options.</param>
+    /// <param name="dungeons">The content's dungeons, whose names the slot rows read.</param>
+    /// <param name="zone">The player's time zone, which a save's time is shown in.</param>
+    internal static IReadOnlyList<MenuRow> PauseMenuLayout(float w, float h, IReadOnlyList<string> options, bool canSave, string? answer,
+        SlotMenu? list, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
-        float top = h / 2f - 90f;
-        DrawCentered(w, top, "PAUSED", 4f, Cyan);
-        var options = PauseMenuOptions();
-        for (int i = 0; i < options.Count; i++)
-            DrawCentered(w, top + 66f + i * 40f, options[i], 2f, White);
-        DrawCentered(w, top + 132f, PauseSavesLine, 1.5f, Grey);
-        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(dungeons);
+        ArgumentNullException.ThrowIfNull(zone);
+
+        // Laid out from a top of 0, then moved down to where the block sits.
+        var rows = new List<MenuRow> { new(PausedTitle, 0f, MenuTitleScale, Cyan) };
+        if (list is null)
+        {
+            for (int i = 0; i < options.Count; i++)
+                rows.Add(new MenuRow(options[i], MenuOptionsTop + i * MenuOptionPitch, MenuOptionScale,
+                    options[i] == PauseMenu.SaveLine && !canSave ? DarkGrey : White));
+            float lines = MenuOptionsTop + options.Count * MenuOptionPitch;
+            rows.Add(new MenuRow(PauseSavesLine, lines, MenuLineScale, Grey));
+            rows.Add(new MenuRow(EscToClose, lines + MenuLinePitch, MenuLineScale, Grey));
+            if (answer is not null)
+            {
+                var color = AnswerColor(answer);
+                float y = lines + MenuLinePitch + MenuAnswerGap;
+                foreach (string row in NoticeText.Wrap(answer))
+                {
+                    rows.Add(new MenuRow(row, y, MenuAnswerScale, color));
+                    y += MenuAnswerPitch;
+                }
+            }
+        }
+        else
+        {
+            var slots = TitleHud.SlotRows(list, w, MenuOptionsTop, dungeons, zone);
+            rows.AddRange(slots.Select(row => new MenuRow(row.Text, row.Y, row.Scale, row.Color, row.Left)));
+            float under = (slots.Count > 0 ? slots[^1].Y : MenuOptionsTop) + MenuListGap;
+            if (list.Asking is { } asked)
+            {
+                var (what, keys) = SlotText.AskAbout(asked, dungeons, zone);
+                rows.Add(new MenuRow(what, under, MenuKeysScale, Yellow));
+                rows.Add(new MenuRow(keys, under + MenuKeysPitch, MenuKeysScale, Yellow));
+            }
+            else
+            {
+                if (list.Said is { } said)
+                    rows.Add(new MenuRow(said, under, MenuKeysScale, Orange));
+                rows.Add(new MenuRow(SlotText.SaveKeysLine, under + MenuKeysPitch, MenuKeysScale, Grey));
+            }
+        }
+
+        float bottom = rows.Max(row => row.Bottom);
+        float top = MathF.Max(MenuTopMargin, MathF.Min(h / 2f - MenuCentredOffset, h - MenuBottomMargin - bottom));
+        return rows.Select(row => row with { Y = row.Y + top }).ToList();
+    }
+
+    /// <summary>The answer's colour: green for a save by hand that went through (<see cref="CampaignBoot.SavedTo"/>), the warning's orange for one that did not, or for 2 saying why it saved nothing.</summary>
+    internal static Vector4 AnswerColor(string answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        return answer.StartsWith(CampaignBoot.SavedPrefix, StringComparison.Ordinal) ? Green : Orange;
+    }
+
+    /// <summary>
+    /// The pause menu (<see cref="PauseMenuLayout"/>): its options, or the save list
+    /// in their place, and what a save by hand came to. Stopping resurrection is the
+    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for it
+    /// went when the boss arrived — so what the dungeon has become is the floor
+    /// line's to say (<see cref="FloorLine"/>).
+    /// </summary>
+    private void DrawMenu(int w, int h, DungeonScene scene)
+    {
+        bool hasTitle = scene.HasTitle;
+        foreach (var row in PauseMenuLayout(w, h, PauseMenu.Options(hasTitle), scene.CanSaveNow && hasTitle, scene.MenuAnswer, scene.SaveList,
+                     GameContent.Current.Dungeons, TimeZoneInfo.Local))
+            _text.DrawText(row.Text, row.Left ?? w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────

@@ -21,6 +21,12 @@ restore saved states afterwards.
 `Logic/Save/` — the gameplay types must not carry serialization attributes, or
 `Logic/` stops being clean.
 
+Where the saves live, how many there are, when one is taken and how a player
+gets back to one is settled.md's (the user's ruling of 2026-09-25 on the save
+model, R2): a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT;
+one autosave slot that saves itself at every safe point; and manual slots, saved
+into by hand at a safe point, whose count is `tuning.json`'s `SaveSlots`.
+
 Round-trip test: save, reload, and assert that a fixed sequence of turns
 produces an identical world state — in the shipped game too, since its dice are
 the visit's own, seeded and saved (the user's ruling of 2026-09-25, settled.md).

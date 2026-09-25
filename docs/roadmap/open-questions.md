@@ -114,32 +114,6 @@ third, and then nothing" rather than move the code toward the shorter sentence:
 an entry that refused to fire at all below its trigger would be a new rule, and
 it would contradict the one §3.1 already settled.
 
-## How the campaign is saved (§5.1, §5.2)
-
-The phase doc says what a save holds and in what format, and nothing of where
-it lives, how many there are, when one is taken, or how a player gets back.
-
-**Shipped provisionally:** one campaign and one slot, in the player's data
-folder, with no manual save: the game saves itself at every safe point — a
-run's entry, every player turn's start, every floor arrival, a run's end, NEW
-CAMPAIGN — and on every quit. A quit that finds the enemies taking their turn
-plays it out to the next player turn first, on the game's fixed logic step, and
-saves that. A launch resumes the campaign where it stood, between runs or in the
-dungeon mid-run, guarded by a `campaign.resuming` marker that sets aside a save
-whose resume crashed the game; a save that fails is said at once, and a quit
-that cannot save leaves a `campaign.unsaved` marker, so the next launch says
-that what it resumes is from before that quit. NEW CAMPAIGN is N, then N,
-between runs, and `--new-campaign` sets the old campaign aside at launch. The
-dev overrides (`DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED`) play in a scratch slot
-of their own and never touch the campaign.
-
-**This is a design the doc left open, so it is the user's to decide.** The
-alternatives: manual save slots beside the autosave; a quit during the enemies'
-turn saving the turn's start instead, which loses the moves the player made that
-turn; a title screen with CONTINUE and NEW in place of resuming at launch; and
-dev overrides that apply only when no save exists. settled.md's Phase 5
-implementation pass records the ruling.
-
 ## Whether a variant may name its own statline (§5.6) — REWORK DECISION 1
 
 The user's ruling of 2026-09-25 made the weapon types a section of
@@ -291,3 +265,68 @@ parity (or move with the parity list amended, the golden file not pinning
 them); or move only the ones no design doc fixes — the enemy's hit points, mana
 and movement, and the healer's odds. settled.md's Phase 5 implementation pass
 records the ruling.
+
+## Whether the deposit's numbers are six keys or three (§6.1, §6.2) — USER DECISION 1
+
+The user's ruling of 2026-09-25 on what a deposit costs (R4, settled.md) fixed
+the rule — a weapon's wear capacity starts at 30 and rises a point for every
+full bar of wear cashed in, an enchantment slot opens every 5 capacity, and
+attaching enchantment *n* needs a free slot and a deposit of at least
+30 + 5(*n* − 1) — and that its numbers live in `tuning.json`. How many keys hold
+them the ruling left to the build.
+
+**Shipped provisionally: each number its own key**, in the Enchanter group and
+read by nothing until Phase 6a builds the enchanter — `WearCapacityPerBar`,
+`FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
+`FirstEnchantmentWear` and `EnchantmentWearStep` — and a weapon's starting
+capacity `StartingPool`, the Phase 2 pass's one key for every pool's first bar,
+not split from it. So any one number can move alone.
+
+**This decides what one edit to `tuning.json` can move, so it is the user's to
+decide.** The alternatives: tie them — slot *n* opens at, and attaching
+enchantment *n* costs, `StartingPool + SlotCapacityStep × (n − 1)`: three keys,
+so the slots and the price cannot drift apart, nor from the capacity a weapon
+starts at; or split a weapon's starting capacity into a key of its own,
+un-ruling the Phase 2 pass's one key. settled.md's Phase 5 implementation pass
+records the ruling.
+
+## Where a campaign loaded from a manual slot autosaves (the save model, R2) — USER DECISION 2
+
+The user's ruling of 2026-09-25 on the save model (R2, settled.md) gives the
+game one autosave slot, "that keeps saving on its own exactly where the game
+autosaves today", beside manual slots saved by hand. It does not say where a
+campaign loaded from a manual slot autosaves.
+
+**Shipped provisionally: into the one autosave slot**, R2(b) read literally:
+load slot 2 and play, and the autosaves follow slot 2's campaign into the
+autosave slot, while slot 2 changes only when saved into by hand. Nothing is lost
+to it silently. Left at that, the autosave slot's own campaign — for a player who
+never saved by hand, their only copy — would be the backup after the first
+autosave and gone after the second, so a load of a manual slot while the
+autosave slot holds any other save asks first — `LOADING SLOT 2 SETS THE
+AUTOSAVE ASIDE - ...` / `AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and,
+once slot 2's campaign has come back, sets the autosave's save and backup aside
+(`campaign.replaced-N.json`, or `unreadable` or `crashed` as a load would name
+them), never deleted. A slot holding the autosave's own save asks nothing.
+
+**This decides what a manual slot is, so it is the user's to decide.** The
+alternative: a loaded manual slot autosaves into itself, the autosave slot kept
+for the last campaign begun or continued there — no ask and no file set aside,
+but a manual slot is then written by the game, and not by hand alone.
+settled.md's Phase 5 implementation pass records the ruling.
+
+## What NEW CAMPAIGN does to a held autosave (the save model, R2) — USER DECISION 3
+
+The ruling asks NEW CAMPAIGN to "confirm before it can overwrite anything, and
+say what it will do". It does not say what becomes of the campaign in the
+autosave slot.
+
+**Shipped provisionally: it asks, then sets the autosave's save and backup
+aside** as `campaign.abandoned-N.json` — never deleted, renamed back to try again
+— as `--new-campaign` does, so nothing of the old campaign can come back as the
+new one's. The manual slots are untouched.
+
+**This decides whether starting over can lose a campaign, so it is the user's
+to decide.** The alternative: it asks, then saves over the autosave, the old save
+kept one save deep as the backup and then gone. settled.md's Phase 5
+implementation pass records the ruling.

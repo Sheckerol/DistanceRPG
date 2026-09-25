@@ -40,7 +40,7 @@ public class SaveInventoryTests
             new("_lockedUntilRun", Kept.Saved, "campaign.locks[] = LockedInOrder, an early offer's rewrite as it stands"),
             new("_cleared", Kept.Saved, "campaign.cleared[] = ClearedInOrder"),
             new("_retired", Kept.Saved, "campaign.retired[] = RetiredInOrder"),
-            new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a relaunch"),
+            new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a save and a load"),
             new("Visit", Kept.Saved, "campaign.visit: the Run group and every visited floor, or null between runs"),
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
@@ -309,6 +309,8 @@ public class SaveInventoryTests
             new("_cameraDistance", Kept.NotSaved, "presentation: the camera's zoom"),
             new("_activeMenu", Kept.NotSaved, "a menu: a save is never taken on the run's summary, and a resume opens on none"),
             new("_leaveArmed", Kept.NotSaved, "a menu: the bag's X, disarmed whenever the bag is not open"),
+            new("_saves", Kept.NotSaved, "a menu: the save list, in the pause menu's place while it is up, read afresh from the slots each time it opens"),
+            new("_answer", Kept.NotSaved, "a menu: what the pause menu answers under its lines, until the next key or until the menu closes"),
             new("LastBankedMovement", Kept.NotSaved, "presentation: the END OF TURN banner's figure"),
             new("HoveredEnemy", Kept.NotSaved, "presentation: the hover, refreshed every frame"),
             new("HoveredMember", Kept.NotSaved, "presentation: the hover"),
@@ -327,13 +329,17 @@ public class SaveInventoryTests
         ],
         [typeof(BetweenRunsScene)] =
         [
+            new("_game", Kept.NotSaved, "wiring: the game window, whose close a dev-override session's QUIT GAME is"),
             new("_campaign", Kept.Derived, "the campaign the save restores — the scene is a view of it"),
             new("_host", Kept.NotSaved, "wiring: the game"),
             new("_hud", Kept.NotSaved, "presentation: the HUD, built with the scene"),
-            new("_listings", Kept.Derived, "the campaign's list (CampaignState.Listings), read when the screen opens"),
-            new("_chosen", Kept.NotSaved, "a relaunch opens on the campaign's default choice, as every return from a run does"),
+            new("_listings", Kept.Derived, "the campaign's list (CampaignState.Listings), read when the screen is made"),
+            new("_chosen", Kept.NotSaved, "a load opens on the campaign's default choice, as every return from a run does"),
             new("_leaving", Kept.NotSaved, "the screen is on its way out: never a save point's concern"),
-            new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a relaunch has its own to say"),
+            new("_menu", Kept.NotSaved, "a menu: the one ESC opens over the hub, closed on every showing"),
+            new("_saves", Kept.NotSaved, "a menu: the save list, in the menu's options' place while it is up, read afresh from the slots each time it opens"),
+            new("_answer", Kept.NotSaved, "a menu: what the menu answers under its lines, until the next key or until the menu closes"),
+            new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a load has its own to say"),
         ],
     };
 

@@ -33,8 +33,11 @@ GameEngine.DistanceRPG/         # Game executable
   TitleScene.cs                 # The first scene: CONTINUE / NEW CAMPAIGN / LOAD GAME / QUIT (TitleHud,
                                 # TitleText; SlotMenu and SlotText, the slot list)
   SaveSlots.cs                  # The save folder's slots: its campaign.json is the autosave, slot-n/ the
-                                # manual slots (SaveStore one slot, SaveListing what each holds, CampaignBoot
-                                # a slot's load and every write)
+                                # manual slots, written only by a save by hand (SaveStore one slot,
+                                # SaveListing what each holds, CampaignBoot a slot's load and every write)
+  PauseMenu.cs                  # The menu ESC opens in play, both scenes': 1 CLOSE, 2 SAVE GAME (the save
+                                # list, SlotMenu's save mode, at a safe point), 3 QUIT TO TITLE (IRunHost.cs'
+                                # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions

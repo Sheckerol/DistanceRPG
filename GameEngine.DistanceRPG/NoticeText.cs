@@ -49,13 +49,16 @@ internal static class NoticeText
     /// about seven to ten rows in the player's own save folder. Its rarest — a
     /// manual slot resumed from its backup under other numbers, its save set aside
     /// with a long reason, and the autosave's crashed save and its backup set aside
-    /// to make room — takes about fourteen, the ceiling itself (Phase 5.S6), and
-    /// about fifteen with a longer user name in the path (S6's review). Past it
-    /// the rows are cut like any others, and the log has every word; with
-    /// <see cref="MaxRows"/> after them and the row that counts the rest, the
-    /// dungeon list still clears a 720-pixel window, and so does a resumed floor's
-    /// banner, which moves down under them (<see cref="DungeonHud.BannerLine"/>).
-    /// settled.md's entry on the save's word records the ceiling and why.
+    /// to make room — measured fifteen rows under a five-letter user name, one past
+    /// the ceiling, and eighteen under a twenty-letter one (Phase 5.S7). The
+    /// ceiling is kept: fifteen would put a resumed floor's banner exactly on the
+    /// two-thirds line it keeps above, with no slack, and still cut the longer
+    /// name's word. Past it the rows are cut like any others, and the log has every
+    /// word; with <see cref="MaxRows"/> after them and the row that counts the rest,
+    /// the dungeon list still clears a 720-pixel window, and so does a resumed
+    /// floor's banner, which moves down under them (<see cref="DungeonHud.BannerLine"/>).
+    /// settled.md's entry on the save's word, and R2's on saving by hand, record the
+    /// ceiling and why.
     /// </summary>
     public const int MaxWholeRows = 14;
 

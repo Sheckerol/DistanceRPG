@@ -1160,26 +1160,27 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
-    public void ThePauseMenuSavesAndQuits_AndSaysItAutosaves()
+    public void ThePauseMenuSavesToASlot_AndQuitsToTheTitle()
     {
         // 1f, 1i (Phase 5.8; Phase 5.5's ThePauseMenuSaysARunInProgressIsNotSavedYet
-        // until the run in progress was saved): the pause menu's quit saves the run
-        // and quits, and a relaunch resumes it where it stood. Under the options the
-        // menu says there is nothing to save by hand: the run saves itself at every
-        // turn's start and every arrival.
-        Assert.Equal("2  SAVE AND QUIT", DungeonHud.PauseQuitLine);
-        Assert.Equal(["1  CLOSE", DungeonHud.PauseQuitLine], DungeonHud.PauseMenuOptions());
+        // until the run in progress was saved), and the user's ruling of 2026-09-25
+        // on the save model, R2(d) and R2(e): the pause menu saves the campaign by
+        // hand into a slot, and leaves play for the title — the autosave written
+        // first — where CONTINUE resumes the run where it stood. Under the options the
+        // menu still says the run saves itself at every turn's start and every
+        // arrival, whatever is saved by hand.
+        Assert.Equal(["1  CLOSE", "2  SAVE GAME", "3  QUIT TO TITLE"], PauseMenu.Options(hasTitle: true));
         Assert.Equal("PROGRESS SAVES AT EVERY TURN", DungeonHud.PauseSavesLine);
 
         // Each option leads with the number key that takes it — 1 closes the menu,
-        // 2 saves and quits — and nothing on it says a quit loses the run any more,
-        // or calls it an exit that saves nothing.
-        var options = DungeonHud.PauseMenuOptions();
+        // 2 saves into a slot, 3 quits to the title — and nothing on it says a quit
+        // loses the run any more, or calls it an exit that saves nothing.
+        var options = PauseMenu.Options(hasTitle: true);
         for (int i = 0; i < options.Count; i++)
             Assert.StartsWith($"{i + 1}  ", options[i], StringComparison.Ordinal);
         Assert.DoesNotContain(options, option => option.Contains("EXIT GAME", StringComparison.Ordinal));
         Assert.DoesNotContain(options.Append(DungeonHud.PauseSavesLine), line => line.Contains("NOT SAVED", StringComparison.Ordinal));
-        Assert.Contains("SAVE", DungeonHud.PauseQuitLine, StringComparison.Ordinal);
+        Assert.Contains("SAVE", PauseMenu.SaveLine, StringComparison.Ordinal);
 
         // Every line of the menu fits the font: capitals, digits, spaces, dashes.
         Assert.All(options.Append(DungeonHud.PauseSavesLine), line => Assert.Matches("^[A-Z0-9 -]+$", line));
@@ -1188,10 +1189,10 @@ public sealed class HudTextTests : IDisposable
     [Fact]
     public void AResumedVisitSaysSo_WithItsNotices()
     {
-        // 1f, 1i: a launch that resumes a run in progress opens on the floor the
-        // save stood on, with RESUMED over the floor banner — where the screen
-        // between runs says CAMPAIGN RESUMED — and the launch's notices over it:
-        // the save's word whole, as the screen between runs shows it (S8's
+        // 1f, 1i: a load from the title that resumes a run in progress opens on the
+        // floor the save stood on, with RESUMED over the floor banner — where the
+        // screen between runs says CAMPAIGN RESUMED — and the load's notices over
+        // it: the save's word whole, as the screen between runs shows it (S8's
         // review), then what the data files raised, capped as every screen caps
         // it (1h). The plain CAMPAIGN RESUMED is the banner's own word there, so it
         // is not said twice; resumed from the backup, the notice says so. Built
@@ -1481,11 +1482,19 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(204f, DungeonScene.BudgetBeforeMire(back, TurnPhase.Player, tuning));
     }
 
-    /// <summary>The host of a scene that is built and read, never played: none of its runs ever ends, and it never saves.</summary>
+    /// <summary>The host of a scene that is built and read, never played: none of its runs ever ends, it never saves, and it is never left.</summary>
     private sealed class NoRunHost : IRunHost
     {
         public void RunOver() => throw new InvalidOperationException("A scene built to be read is never played to its end.");
 
         public void RequestSave() => throw new InvalidOperationException("A scene built to be read is never played, so it never asks for a save.");
+
+        public SaveListing Slots() => throw new InvalidOperationException("A scene built to be read is never played, so its menu never lists the slots.");
+
+        public void SaveToSlot(int slot) => throw new InvalidOperationException("A scene built to be read is never played, so it never saves by hand.");
+
+        public void QuitToTitle() => throw new InvalidOperationException("A scene built to be read is never played, so it is never left.");
+
+        public bool HasTitle => throw new InvalidOperationException("A scene built to be read is never played, so its menu never asks.");
     }
 }

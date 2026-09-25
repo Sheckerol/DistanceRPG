@@ -183,25 +183,41 @@ public sealed class TitleHud : IDisposable
     }
 
     /// <summary>
-    /// The load list: its heading where the notices stand, then each slot's rows
-    /// (<see cref="SlotText.Rows"/>) as one left-aligned block centred on its
-    /// widest row — the chosen slot's row marked and in yellow, an empty slot or
-    /// one beyond the count dimmed, every markers' row in grey and indented under
-    /// its slot.
+    /// The load list: its heading where the notices stand, then its slots
+    /// (<see cref="SlotRows"/>) from <see cref="ListTop"/> down.
     /// </summary>
     private static IEnumerable<TitleRow> ListRows(SlotMenu list, float width, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
         yield return new TitleRow(TitleText.LoadGame, NoticeTop, ListHeadingScale, DungeonHud.Grey);
+        foreach (var row in SlotRows(list, width, ListTop, dungeons, zone))
+            yield return row;
+    }
 
+    /// <summary>
+    /// A slot list's rows, the title's load list and the menus' save list alike:
+    /// each slot's rows (<see cref="SlotText.Rows"/>, in the list's mode) as one
+    /// left-aligned block centred on its widest row in a window
+    /// <paramref name="width"/> wide, from <paramref name="top"/> down — a slot a
+    /// row, its markers' row just under it in grey and indented, and the next slot
+    /// a pitch under that. The chosen slot's row is marked <c>&gt; ... &lt;</c> and
+    /// in yellow; a slot no key can take is dimmed — loading, an empty slot or one
+    /// beyond the count; saving, the autosave, which saves itself — and every other
+    /// is white, an empty slot on the save list among them, since it is where a save
+    /// goes first.
+    /// </summary>
+    internal static IReadOnlyList<TitleRow> SlotRows(SlotMenu list, float width, float top, DungeonCatalogue dungeons, TimeZoneInfo zone)
+    {
+        ArgumentNullException.ThrowIfNull(list);
         var block = new List<(string Text, Vector4 Color, bool Marker)>();
         for (int i = 0; i < list.Rows.Count; i++)
         {
             var entry = list.Rows[i];
-            var texts = SlotText.Rows(entry, list.Count, dungeons, zone);
+            var texts = SlotText.Rows(entry, list.Count, dungeons, zone, list.Mode);
             bool chosen = i == list.Cursor;
-            var color = chosen ? DungeonHud.Yellow
-                : entry.State == SlotState.Empty || entry.Beyond ? DungeonHud.DarkGrey
-                : DungeonHud.White;
+            bool dimmed = list.Mode == SlotMenuMode.Save
+                ? entry.Number == SaveSlots.Autosave
+                : entry.State == SlotState.Empty || entry.Beyond;
+            var color = chosen ? DungeonHud.Yellow : dimmed ? DungeonHud.DarkGrey : DungeonHud.White;
             block.Add((chosen ? $"> {texts[0]} <" : Unmarked + texts[0], color, false));
             foreach (string marker in texts.Skip(1))
                 block.Add((MarkerIndent + marker, DungeonHud.Grey, true));
@@ -209,14 +225,16 @@ public sealed class TitleHud : IDisposable
 
         int widest = block.Select(row => row.Text.Length).DefaultIfEmpty(0).Max();
         float left = MathF.Max(SideMargin, width / 2f - widest * GlyphAdvance * SlotText.Scale / 2f);
-        float y = ListTop;
+        var rows = new List<TitleRow>(block.Count);
+        float y = top;
         for (int i = 0; i < block.Count; i++)
         {
             var row = block[i];
-            yield return new TitleRow(row.Text, y, SlotText.Scale, row.Color, left);
+            rows.Add(new TitleRow(row.Text, y, SlotText.Scale, row.Color, left));
             bool markerNext = i + 1 < block.Count && block[i + 1].Marker;
             y += markerNext ? MarkerOffset : SlotPitch;
         }
+        return rows;
     }
 
     /// <summary>The screen: every row <see cref="Layout"/> lays out, over the black the game clears to.</summary>
