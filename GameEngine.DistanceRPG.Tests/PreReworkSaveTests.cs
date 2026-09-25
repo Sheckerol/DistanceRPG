@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using GameEngine.DistanceRPG.Logic;
 
@@ -41,12 +42,37 @@ public class PreReworkSaveTests
     private static string TextOf(string name) => File.ReadAllText(PathOf(name));
 
     /// <summary>
-    /// The tuning the saves were played under, as the current reader reads
-    /// <see cref="PlayedTuning"/>: strictly, as the game reads its built-in copy —
-    /// the file names every key, as the master copy does, so nothing under it is
-    /// taken from anywhere else.
+    /// The keys added since <c>febe036</c>, which <see cref="PlayedTuning"/> is
+    /// frozen before and so lacks — each one no rule of play reads, and so none a
+    /// save's hash covers: what a deposit costs, the user's ruling of 2026-09-25,
+    /// declared ahead of Phase 6a's enchanter.
     /// </summary>
-    private static TuningRead ReadPlayedTuning() => TuningJson.ReadBuiltIn(TextOf(PlayedTuning));
+    private static readonly string[] KeysSinceTheSaves =
+    [
+        nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
+        nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
+    ];
+
+    /// <summary>
+    /// The tuning the saves were played under, as the current reader reads
+    /// <see cref="PlayedTuning"/>: over the shipped tuning, as the game reads a
+    /// copy beside it, since the file is frozen and predates the keys no rule of
+    /// play reads (<see cref="TuningKey.Played"/>). Those are the only keys it
+    /// lacks — asserted on every read — so every number a save's hash covers is
+    /// the file's own, and nothing under it is taken from anywhere else.
+    /// </summary>
+    private static TuningRead ReadPlayedTuning()
+    {
+        string text = TextOf(PlayedTuning);
+        using (var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }))
+        {
+            var named = document.RootElement.EnumerateObject().Select(key => key.Name).ToHashSet(StringComparer.Ordinal);
+            var lacking = TuningSchema.Keys.Where(key => !named.Contains(key.Name)).ToList();
+            Assert.Equal(KeysSinceTheSaves, lacking.Select(key => key.Name));
+            Assert.All(lacking, key => Assert.False(key.Played, $"{key.Name} is played, and the saves' tuning has no number for it"));
+        }
+        return TuningJson.Read(text, ShippedContent.Tuning);
+    }
 
     /// <summary>Whether any number <paramref name="now"/> holds is not the number the saves were played under.</summary>
     private static bool NumbersMoved(Tuning now) => TuningValues.Moved(ReadPlayedTuning().Tuning, now).Length > 0;

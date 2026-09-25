@@ -174,7 +174,14 @@ public static class ContentValidator
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
 
-    /// <summary>A Light-forged unique trades forged depth for souls: <c>signature xn</c> buys <c>5 - n</c> enchantments (§1.5).</summary>
+    /// <summary>
+    /// A Light-forged unique trades forged depth for souls: <c>signature xn</c> buys
+    /// <c>5 - n</c> enchantments (§1.5). A rule of the unique table, which decides
+    /// what a unique arrives with — never <see cref="Tuning.EnchantmentSlots"/>, the
+    /// most the enchanter lets a weapon hold: both are the docs' five, and they mean
+    /// different things, so moving the key moves the enchanter's ceiling and never
+    /// the unique table's shape (settled.md, the user's ruling of 2026-09-25).
+    /// </summary>
     private const int LightShapeSlots = 5;
 
     /// <summary>The floor of the Light shape: at x1 the weapon is the variant it derives from.</summary>
@@ -183,9 +190,11 @@ public static class ContentValidator
     /// <summary>
     /// The most enchantments any weapon arrives carrying (§1.5): the Light
     /// shape at its floor, which spends the last stack there is to spend. The
-    /// enchanter builds on to five from there (§6.2); nothing drops with more.
+    /// enchanter builds on from there, to <see cref="Tuning.EnchantmentSlots"/>
+    /// (§6.2); nothing drops with more. It is the floor of that key's clamp, so no
+    /// <c>tuning.json</c> can hold a weapon to fewer slots than it arrives filling.
     /// </summary>
-    private const int MostArrivingEnchantments = LightShapeSlots - LightShapeFloor;
+    internal const int MostArrivingEnchantments = LightShapeSlots - LightShapeFloor;
 
     /// <summary>The tier that makes a catalogue enchantment an artifact's: the only place a drop starts above tier 1.</summary>
     private const int ArtifactTier = 3;

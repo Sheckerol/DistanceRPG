@@ -112,14 +112,18 @@ public static class TuningJson
     /// <c>Key=value</c> line per scalar and per table entry (every member of an
     /// enum table, every id <c>ApplyPercent</c> names), invariant integers,
     /// <c>true</c>/<c>false</c>, lines sorted ordinally. So a file's formatting,
-    /// key order and comments never move it, and any value does — a number the
-    /// master copy ships, changed by a new build, included. A save stores this,
-    /// never the values.
+    /// key order and comments never move it, and any value a rule of play reads
+    /// does — a number the master copy ships, changed by a new build, included.
+    /// A key declared ahead of its reader (<see cref="TuningKey.Played"/> false —
+    /// the Enchanter's, until Phase 6a) is left out: a save's hash answers "are
+    /// these the numbers it was played under?", and a number nothing plays is none
+    /// it was played under. So turning one never says the numbers changed, and
+    /// declaring one moves no save's hash. A save stores this, never the values.
     /// </summary>
     public static string Hash(Tuning tuning)
     {
         ArgumentNullException.ThrowIfNull(tuning);
-        var lines = Values(tuning).Select(v => $"{v.Name}={v.Value}").Order(StringComparer.Ordinal);
+        var lines = Values(tuning, TuningSchema.Keys.Where(key => key.Played)).Select(v => $"{v.Name}={v.Value}").Order(StringComparer.Ordinal);
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines)));
         return Convert.ToHexStringLower(digest, 0, 8);
     }
@@ -128,23 +132,24 @@ public static class TuningJson
     /// Every number <paramref name="tuning"/> holds that <paramref name="builtIn"/>
     /// does not, in the file's order, as <c>MovementBudget 200</c> or
     /// <c>PerStack.Block 4</c>: what a file changed from the built-in copy, for
-    /// the log. A key set to the built-in number is not a change.
+    /// the log. A key set to the built-in number is not a change. Every key is
+    /// walked, a key no rule plays yet included: the file changed it all the same.
     /// </summary>
     internal static IReadOnlyList<string> Overrides(Tuning tuning, Tuning builtIn)
     {
         ArgumentNullException.ThrowIfNull(tuning);
         ArgumentNullException.ThrowIfNull(builtIn);
-        var was = Values(builtIn).ToDictionary(v => v.Name, v => v.Value, StringComparer.Ordinal);
-        return Values(tuning)
+        var was = Values(builtIn, TuningSchema.Keys).ToDictionary(v => v.Name, v => v.Value, StringComparer.Ordinal);
+        return Values(tuning, TuningSchema.Keys)
             .Where(v => !was.TryGetValue(v.Name, out string? before) || before != v.Value)
             .Select(v => $"{v.Name} {v.Value}")
             .ToList();
     }
 
-    /// <summary>Every value the tuning holds, keyed as the hash and the overrides name it: <c>MovementBudget</c>, <c>PerStack.Block</c>.</summary>
-    private static IEnumerable<(string Name, string Value)> Values(Tuning tuning)
+    /// <summary>Every value the tuning holds under <paramref name="keys"/>, keyed as the hash and the overrides name it: <c>MovementBudget</c>, <c>PerStack.Block</c>.</summary>
+    private static IEnumerable<(string Name, string Value)> Values(Tuning tuning, IEnumerable<TuningKey> keys)
     {
-        foreach (var key in TuningSchema.Keys)
+        foreach (var key in keys)
         {
             switch (key)
             {
@@ -335,8 +340,11 @@ public static class TuningJson
         /// <summary>
         /// A name no key has: ignored, with a warning that points at the key the
         /// reader meant (1g) — the phase that brings one of §5.3's keys still to
-        /// come, the code's name for a doc's spelling and why, or the key a typo is
-        /// nearest — and never read as that key.
+        /// come (<c>WearPerHit</c>, <c>GraftBaseChance</c> and the Consumables'),
+        /// the code's name for a doc's spelling and why (a placeholder the user's
+        /// ruling of 2026-09-25 replaced among them: <c>WearCapacityLadder</c> is
+        /// <c>WearCapacityPerBar</c>), or the key a typo is nearest — and never
+        /// read as that key.
         /// </summary>
         private Tuning Unknown(Tuning tuning, string name)
         {

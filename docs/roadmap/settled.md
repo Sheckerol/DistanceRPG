@@ -1616,11 +1616,12 @@ a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT, one autosave
 slot, and manual slots whose count is a `tuning.json` key; **R3**, raw JSON —
 "since we are storing in raw json we should probably not trust the fields", so
 every number of a content file gets a range, and a save's fields are checked
-against each other; and **R4**, what a deposit costs. R1 and R4 build nothing —
-R1 keeps what shipped, and R4 is Phase 6a's to build — so both are written here
-whole. R3 and R2 change the game, and each is written here as it is built;
-until then, the entries below that they supersede — whether a content file's
-numbers have bounds, and the save model — say what ships.
+against each other; and **R4**, what a deposit costs. R1 and R4 change no rule
+of play — R1 keeps what shipped, and R4 is Phase 6a's to build, its numbers
+declared as `tuning.json` keys ahead of it — so both are written here whole. R3
+and R2 change the game, and each is written here as it is built; until then, the
+entries below that they supersede — whether a content file's numbers have
+bounds, and the save model — say what ships.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -1633,7 +1634,8 @@ numbers have bounds, and the save model — say what ships.
   actor and the attack's ordinal instead stays not taken. The question leaves
   open-questions.md.
 - **R4 — what a deposit costs.** Recorded for Phase 6a, which builds the
-  enchanter: nothing of it is code yet. The user's rule:
+  enchanter: nothing of it is played yet — its numbers are `tuning.json` keys
+  (below), which no rule reads until then. The user's rule:
   - A weapon's `WearCapacity` starts at **30**: `StartingPool`, the one bar
     every pool opens on (the Phase 2 pass above), which the graft formula spells
     `StartingWearCapacity`.
@@ -1711,11 +1713,62 @@ numbers have bounds, and the save model — say what ships.
      had a head start shorten the climb by what the weapon was handed (§1.5,
      §3.1, §6.2), and each of those passages is qualified where it stands, as
      is the entry above on a `Light` artifact's souls.
-- **Every number of R4 but its start, which is `StartingPool`'s already, becomes
-  a `tuning.json` key of the Enchanter group** (Phase 5.S2), by the user's
-  standing preference that a number the user may revisit lives in the file.
-  They replace the `WearCapacityLadder` and `EnchantmentWearCost` placeholders;
-  `WearPerHit` and `GraftBaseChance` wait with their Phase 6a readers as before.
+- **Every number of R4 but its start, which is `StartingPool`'s already, is a
+  `tuning.json` key of the Enchanter group**, by the user's standing preference
+  that a number the user may revisit lives in the file: `WearCapacityPerBar`
+  (the capacity a full bar cashed adds), `FirstSlotCapacity` and
+  `SlotCapacityStep` (slot n opens at `FirstSlotCapacity + SlotCapacityStep ×
+  (n − 1)`), `EnchantmentSlots` (the most enchantments a weapon holds), and
+  `FirstEnchantmentWear` and `EnchantmentWearStep` (attaching #n needs a deposit
+  of at least `FirstEnchantmentWear + EnchantmentWearStep × (n − 1)`). They
+  replace the `WearCapacityLadder` and `EnchantmentWearCost` placeholders: a file
+  naming either is told it is no key and pointed at the key that took its place.
+  `WearPerHit` and `GraftBaseChance` are not R4's numbers, and wait with their
+  Phase 6a readers as before.
+  - **Each number its own key — how they split is provisional, the user's to
+    rule.** Apart, any one number moves alone, and a weapon's starting capacity
+    stays `StartingPool`, the Phase 2 pass's one key for every pool. The
+    alternatives: tie them — slot n opening at, and enchantment #n costing,
+    `StartingPool + SlotCapacityStep × (n − 1)`, three keys, so the slots and the
+    price can drift neither apart nor from the start — or split the start into a
+    key of its own, un-ruling the Phase 2 pass. Apart, the slots and the price
+    agree at the ruled numbers and part only if tuned apart (consequence 4,
+    above). It goes to open-questions.md with the save model's own choices, once
+    that is built.
+  - **The clamps**, each the whole check a file's number gets:
+    `WearCapacityPerBar` 0–1000 — 0 freezes capacity, a dial rather than an
+    error, and 1000 is where the file's magnitudes clamp; `FirstSlotCapacity`
+    1–10000, a capacity, so `StartingPool`'s range; `SlotCapacityStep` 0–10000,
+    0 opening every slot at once; `EnchantmentSlots` 3–10 — never fewer than a
+    weapon already arrives with, the floor read off
+    `ContentValidator.MostArrivingEnchantments` (the Nameless Knife's three) and
+    never written as 3, so no `tuning.json` can declare a weapon over its own
+    slot count, and at most twice the docs' five until Phase 6a sees a weapon
+    carry more; `FirstEnchantmentWear` 1–10000 — never free, since a weapon
+    never fought with is never enchanted (§6.1); `EnchantmentWearStep` 0–10000,
+    0 pricing every enchantment as the first.
+  - **Keys ahead of their reader: validated, and outside the hash until they
+    play.** Each is `TuningKey.Played = false`, and is read exactly as every
+    key: the built-in copy must name it with a whole number, a copy beside the
+    exe merges it, clamps it and warns, a doc's spelling is pointed at it, and
+    the log names it among the numbers a file changed. But the save's tuning
+    hash walks the played keys alone. A save's hash answers "are these the
+    numbers it was played under?", and a number nothing plays is none it was
+    played under — so turning one never says THE NUMBERS HAVE CHANGED on a
+    resume, and adding the six moved no save's hash: the saves written before
+    the rework still hash as the tuning they were played under — their frozen
+    tuning file, read over the master, lacks these six keys and no other. No
+    `ContentValidator.ValidateTuning` rule: it holds what a reader
+    needs of a `Tuning` built in code, and nothing reads these. Phase 6a flips
+    each to played as it reads it, with the save's version 2.
+  - **The docs' five is two numbers, kept apart on purpose.** `EnchantmentSlots`
+    is how many enchantments the enchanter lets a weapon hold; the Light shape's
+    five — `ContentValidator.LightShapeSlots`, a rule constant: `signature ×n`
+    buys `5 − n` souls (§1.5) — decides what a unique *arrives* with. They agree
+    at five by the docs and mean different things: moving the key moves the
+    enchanter's ceiling and never the unique table's shape, and the key's floor,
+    `MostArrivingEnchantments` — the Light shape at its floor, `LightShapeSlots −
+    LightShapeFloor` — keeps the two from contradicting.
 
 ### The numbers: `tuning.json`
 
@@ -1724,7 +1777,9 @@ numbers have bounds, and the save model — say what ships.
   made it an integer reciprocal), and never an alias — §5.3's spellings are
   unknown keys whose warning points at the key. `MovementBudget` is the 160 the
   Phase 2 pass named, in logic units, and the party's refill, its bank's cap and
-  the enemies' cost scale read it.
+  the enemies' cost scale read it. (Superseded by the user's ruling of
+  2026-09-25 on the deposit, in its count: six more keys came with it, the
+  Enchanter's — R4's keys, above.)
 - **`OverhealPerWard` is the key, and `OverhealPerWardLevel` is the other
   spelling of it.** The Overheal entry above calls its rate
   `OverhealPerWardLevel`; §5.3 and the provisional-numbers batch call the same
@@ -1766,7 +1821,12 @@ numbers have bounds, and the save model — say what ships.
   value — a number the master copy ships, changed by a new build, included —
   does. (Superseded by the user's ruling, 2026-09-25, in its example: this read
   "a compiled default a new build changed". The hash covers the same values it
-  did, so a save written before the ruling still hashes as its tuning.)
+  did, so a save written before the ruling still hashes as its tuning. And by
+  the user's ruling of the same day on the deposit, in its reach: the values
+  hashed are those of every key a rule of play reads. A key declared ahead of
+  its reader — the Enchanter's six, until Phase 6a — is left out, so turning one
+  never says the numbers changed, and declaring them moved no save's hash: R4's
+  keys, above.)
 - **The `…Percent` key names — bends the phase doc** (§5.3 fixes
   `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
   `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
@@ -1790,8 +1850,12 @@ numbers have bounds, and the save model — say what ships.
   `ManaPotionPercent` and `FarmYieldPerClear` with theirs. (Superseded by the
   user's ruling, 2026-09-25, in the Enchanter's half: what a deposit costs is
   ruled — R4, above — so no open question holds `EnchantmentWearCost`, and there
-  is no ladder for `WearCapacityLadder` to hold. The ruling's numbers take the
-  two placeholders' place as keys of the Enchanter group (Phase 5.S2);
+  is no ladder for `WearCapacityLadder` to hold. The ruling's six numbers have
+  taken the two placeholders' place as keys of the Enchanter group, in the file
+  ahead of their reader: the one exception to this entry's rule, since the user
+  keeps a number they may revisit in the file, and a safe one, since nothing
+  plays them and the save's hash leaves them out (R4's keys, above). A file
+  naming either placeholder is pointed at the key that took its place.
   `WearPerHit` and `GraftBaseChance` still wait with their Phase 6a readers.)
 
 ### The content files
@@ -1994,3 +2058,10 @@ numbers have bounds, and the save model — say what ships.
   migration step, with the four Consumables keys. Every row is a named-field
   object, so each is an addition and a step, never a reshaping. And PHASE6-223,
   the campaign as the save's outer document, shipped in Phase 5.4 (above).
+  (Superseded by the user's ruling, 2026-09-25, in the Enchanter's keys: six of
+  them, what a deposit costs, are in `tuning.json` already, read by nothing and
+  outside the save's hash (R4's keys, above). 6a flips each to played as it
+  reads it, adds `WearPerHit` and `GraftBaseChance`, the two still to come, with
+  their readers, and saves beside `wear` and `wearCapacity` the capacity's
+  progress toward its next point, which carries from one deposit to the next
+  (§6.7).)

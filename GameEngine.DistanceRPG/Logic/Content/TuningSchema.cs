@@ -3,10 +3,13 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <summary>
 /// The groups <c>tuning.json</c> is laid out under: §5.3's ten, in §5.3's order
 /// (S:80-91), then the three groups of keys its starting set does not list, which
-/// sit beside it. <see cref="Enchanter"/> and <see cref="Consumables"/> hold no key
-/// yet: their keys arrive with the readers Phases 6a and 6b build
-/// (<see cref="TuningSchema.Deferred"/>), and the file carries each as a heading
-/// naming them, so §5.3's one screen stays whole.
+/// sit beside it. <see cref="Consumables"/> holds no key yet: its keys arrive with
+/// the readers Phase 6b builds (<see cref="TuningSchema.Deferred"/>).
+/// <see cref="Enchanter"/> holds what a deposit costs, the user's ruling of
+/// 2026-09-25, as keys no rule of play reads until Phase 6a builds the enchanter
+/// (<see cref="TuningKey.Played"/>); its other two keys arrive with their Phase 6a
+/// readers. The file's heading for each group names the keys still to come, so
+/// §5.3's one screen stays whole.
 /// </summary>
 public enum TuningGroup
 {
@@ -33,7 +36,23 @@ public enum TuningGroup
 /// comment above it in <c>tuning.json</c>, the master copy: a second copy of
 /// that prose here would drift from it.
 /// </summary>
-public abstract record TuningKey(string Name, TuningGroup Group);
+public abstract record TuningKey(string Name, TuningGroup Group)
+{
+    /// <summary>
+    /// Whether a rule of play reads this key. True for every key but one declared
+    /// ahead of its reader: a number the user has ruled and wants in the file
+    /// before the code that plays it exists — what a deposit costs, until Phase 6a
+    /// builds the enchanter. Such a key is read exactly as every key — the
+    /// built-in copy must name it with a whole number, a copy beside the game
+    /// merges it, clamps it and warns — and the log names it among the numbers a
+    /// file changed (<see cref="TuningJson.Read"/>). But a save's hash leaves it out
+    /// (<see cref="TuningJson.Hash"/>): the hash asks "are these the numbers the
+    /// campaign was played under?", and a number nothing plays is none it was
+    /// played under, so turning one never says the numbers changed. The change
+    /// that gives it a reader sets it true.
+    /// </summary>
+    public bool Played { get; init; } = true;
+}
 
 /// <summary>A whole-number key and its clamp range: a value outside [<paramref name="Min"/>, <paramref name="Max"/>] is brought to the bound, with a warning.</summary>
 public sealed record IntKey(string Name, TuningGroup Group, int Min, int Max,
@@ -67,7 +86,8 @@ public sealed record TableKey(string Name, TuningGroup Group, int Min, int Max,
 /// its group and its clamp range, and typed get/set delegates — no reflection at
 /// runtime. It holds no number the game plays: those are the file's. The
 /// readers (<see cref="TuningJson.ReadBuiltIn"/>, <see cref="TuningJson.Read"/>)
-/// clamp against it, the hash walks it, and a test holds it to the record key
+/// clamp against it, the hash walks the keys a rule of play reads
+/// (<see cref="TuningKey.Played"/>), and a test holds it to the record key
 /// for key, so a property added to <see cref="Tuning"/> without a key here
 /// fails the build's tests.
 /// <para>
@@ -85,16 +105,20 @@ public static class TuningSchema
     public static IReadOnlyList<TuningKey> Keys { get; } = BuildKeys();
 
     /// <summary>
-    /// The two §5.3 groups whose keys wait for the phase that reads them — a key
-    /// with no reader is a dial wired to nothing (bend (e)) — each with the phase
-    /// and the keys it will bring. The file carries both as headings naming them.
-    /// <c>EnchantmentWearCost</c> sits on open-questions.md's deposit question,
-    /// which Phase 6a decides; nothing here decides it.
+    /// The §5.3 keys that wait for the phase that reads them — a key with no
+    /// reader is a dial wired to nothing (bend (e)) — by group, each with the
+    /// phase and the keys it will bring. The file's headings name them. What a
+    /// deposit costs is the one exception: the user ruled its numbers on
+    /// 2026-09-25 and keeps a number they may revisit in the file, so its six are
+    /// <see cref="TuningGroup.Enchanter"/> keys already, declared ahead of their
+    /// reader (<see cref="TuningKey.Played"/> false). <c>WearPerHit</c> and
+    /// <c>GraftBaseChance</c> are not the ruling's numbers, and wait here with
+    /// their Phase 6a readers.
     /// </summary>
     public static IReadOnlyDictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)> Deferred { get; } =
         new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>
         {
-            [TuningGroup.Enchanter] = ("Phase 6a", ["WearPerHit", "WearCapacityLadder", "EnchantmentWearCost", "GraftBaseChance"]),
+            [TuningGroup.Enchanter] = ("Phase 6a", ["WearPerHit", "GraftBaseChance"]),
             [TuningGroup.Consumables] = ("Phase 6b", ["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"]),
         };
 
@@ -106,7 +130,11 @@ public static class TuningSchema
     /// the code's is the key: never aliases — two answers to one question — but
     /// the warning's pointer at the key the reader meant (1g). §5.3's own
     /// <c>DotManaPerDamage</c>, <c>UniqueChanceCeiling</c> and <c>UniqueChanceK</c>
-    /// and the rejected float form are the ones a designer reading the doc types.
+    /// and the rejected float form are the ones a designer reading the doc types;
+    /// <c>WearCapacityLadder</c> and <c>EnchantmentWearCost</c> are the two
+    /// placeholders the user's ruling of 2026-09-25 on the deposit replaced, which
+    /// the docs named before it. Each why is shown on screen, in the HUD's font,
+    /// so none has an apostrophe.
     /// </summary>
     private static readonly IReadOnlyDictionary<string, (string Key, string? Why)> Aliases =
         new Dictionary<string, (string Key, string? Why)>(StringComparer.OrdinalIgnoreCase)
@@ -119,6 +147,8 @@ public static class TuningSchema
             ["StartingWearCapacity"] = (nameof(Tuning.StartingPool), "the one bar for HP, mana and wear capacity alike"),
             ["MaxDistance"] = (nameof(Tuning.MovementBudget), null),
             ["DummyResurrectTurns"] = (nameof(Tuning.ResurrectTurnsBase), null),
+            ["WearCapacityLadder"] = (nameof(Tuning.WearCapacityPerBar), "as the user ruled on 2026-09-25: a point of capacity a full bar, never an authored ladder"),
+            ["EnchantmentWearCost"] = (nameof(Tuning.FirstEnchantmentWear), "attaching enchantment n needs FirstEnchantmentWear + EnchantmentWearStep x (n - 1)"),
         };
 
     /// <summary>The key named <paramref name="name"/> exactly (ordinal: a key's case is part of its name), or null.</summary>
@@ -252,6 +282,21 @@ public static class TuningSchema
         Int(nameof(Tuning.DeathXpLossPercent), TuningGroup.Dungeon, 0, 100, t => t.DeathXpLossPercent, (t, v) => t with { DeathXpLossPercent = v }),
         Int(nameof(Tuning.StairGatherTiles), TuningGroup.Dungeon, 1, 50, t => t.StairGatherTiles, (t, v) => t with { StairGatherTiles = v }),
 
+        // Enchanter (§6.1, §6.2) — what a deposit costs, the user's ruling of 2026-09-25:
+        // keys ahead of their reader, Phase 6a's enchanter, so no rule plays one yet.
+        // A capacity's range is StartingPool's, the bar it opens on; a step may be 0
+        // (every slot open at once, every enchantment priced as the first); a bar
+        // adds at most what a magnitude clamps at. A weapon holds no fewer slots than
+        // it arrives filling, and at most twice the docs' five until Phase 6a sees a
+        // weapon carry more.
+        Unplayed(Int(nameof(Tuning.WearCapacityPerBar), TuningGroup.Enchanter, 0, 1000, t => t.WearCapacityPerBar, (t, v) => t with { WearCapacityPerBar = v })),
+        Unplayed(Int(nameof(Tuning.FirstSlotCapacity), TuningGroup.Enchanter, 1, 10000, t => t.FirstSlotCapacity, (t, v) => t with { FirstSlotCapacity = v })),
+        Unplayed(Int(nameof(Tuning.SlotCapacityStep), TuningGroup.Enchanter, 0, 10000, t => t.SlotCapacityStep, (t, v) => t with { SlotCapacityStep = v })),
+        Unplayed(Int(nameof(Tuning.EnchantmentSlots), TuningGroup.Enchanter, ContentValidator.MostArrivingEnchantments, 10,
+            t => t.EnchantmentSlots, (t, v) => t with { EnchantmentSlots = v })),
+        Unplayed(Int(nameof(Tuning.FirstEnchantmentWear), TuningGroup.Enchanter, 1, 10000, t => t.FirstEnchantmentWear, (t, v) => t with { FirstEnchantmentWear = v })),
+        Unplayed(Int(nameof(Tuning.EnchantmentWearStep), TuningGroup.Enchanter, 0, 10000, t => t.EnchantmentWearStep, (t, v) => t with { EnchantmentWearStep = v })),
+
         // Inventory (§4.4)
         Int(nameof(Tuning.PartyCarrySlots), TuningGroup.Inventory, GameConstants.PartySize, GameConstants.PartySize * GameConstants.MaxInventorySlots,
             t => t.PartyCarrySlots, (t, v) => t with { PartyCarrySlots = v }),
@@ -273,6 +318,9 @@ public static class TuningSchema
 
     private static IntKey Int(string name, TuningGroup group, int min, int max, Func<Tuning, int> get, Func<Tuning, int, Tuning> set)
         => new(name, group, min, max, get, set);
+
+    /// <summary><paramref name="key"/>, declared ahead of its reader: read and clamped as every key, outside a save's hash until a rule plays it (<see cref="TuningKey.Played"/>).</summary>
+    private static IntKey Unplayed(IntKey key) => key with { Played = false };
 
     /// <summary>
     /// A table keyed by an enum's members, read as the game reads it: every

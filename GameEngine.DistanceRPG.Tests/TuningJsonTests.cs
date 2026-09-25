@@ -361,13 +361,15 @@ public class TuningJsonTests
     {
         // PHASE5-038, -039: "tuning.json holds scalars only" — a table is named
         // scalars, and a list is never a value: not as a table, not as a key, not
-        // as a table's entry, and not §5.3's ladder, whose key waits for Phase 6a.
+        // as a table's entry, and not §5.3's ladder, which the user's ruling of
+        // 2026-09-25 replaced with a point of capacity a full bar: the name points
+        // at the key that took its place.
         var table = TuningJson.Read("""{ "PerStack": [1] }""", BuiltIn);
         Assert.Contains("PerStack is a list", Assert.Single(table.Warnings));
         Assert.Empty(TuningValues.Moved(BuiltIn, table.Tuning));
 
         var ladder = TuningJson.Read("""{ "WearCapacityLadder": [30, 40, 55] }""", BuiltIn);
-        Assert.Contains("WearCapacityLadder is not a key yet", Assert.Single(ladder.Warnings));
+        Assert.Contains("WearCapacityLadder is not a key - ignored; the key is WearCapacityPerBar, ", Assert.Single(ladder.Warnings));
         Assert.Empty(TuningValues.Moved(BuiltIn, ladder.Tuning));
 
         var key = TuningJson.Read("""{ "MovementBudget": [160] }""", BuiltIn);
@@ -443,9 +445,10 @@ public class TuningJsonTests
         // PHASE5-080: every knob "gathered in one place ... seeing them on one
         // screen is how those get resolved". The shipped file — the master copy,
         // hand-kept — names every key once, under §5.3's ten groups in §5.3's
-        // order (S:80-91) — the two whose keys wait for Phase 6 as headings naming
-        // them — then the three beside it, each key under the comment that says
-        // what it is; and it reads, strictly, with nothing to warn about.
+        // order (S:80-91) — the two with keys still to come in Phase 6 under
+        // headings naming them — then the three beside it, each key under the
+        // comment that says what it is; and it reads, strictly, with nothing to
+        // warn about.
         string text = ShippedData.Texts.Tuning!;
         Assert.Empty(TuningJson.ReadBuiltIn(text).Warnings);
         Assert.DoesNotContain('\r', text);
@@ -462,7 +465,7 @@ public class TuningJsonTests
         Assert.Equal(
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops"],
             Enum.GetNames<TuningGroup>());
-        Assert.Contains("/* ---- Enchanter - Phase 6a: WearPerHit, WearCapacityLadder, EnchantmentWearCost, GraftBaseChance ---- */", headings);
+        Assert.Contains("/* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */", headings);
         Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
@@ -552,7 +555,9 @@ public class TuningJsonTests
         // PHASE5-081 (A10): a save asks one question — "are these the same
         // numbers?" — so the hash is of the values the game plays: formatting,
         // order, comments, and naming a key at its default never move it; any one
-        // number moved by one does, every such move to a hash of its own.
+        // number a rule plays moved by one does, every such move to a hash of its
+        // own. A key no rule plays yet (Played false) is no number a campaign was
+        // played under: moving it leaves the hash where it was.
         string shipped = TuningJson.Hash(BuiltIn);
         Assert.Matches("^[0-9a-f]{16}$", shipped);
 
@@ -581,28 +586,90 @@ public class TuningJsonTests
         Assert.Equal(shipped, TuningJson.Hash(TuningJson.ReadBuiltIn(bare).Tuning));
 
         var hashes = new List<string> { shipped };
+        int unplayed = 0;
+        void Moved(TuningKey key, Tuning tuning)
+        {
+            string hash = TuningJson.Hash(tuning);
+            if (key.Played)
+            {
+                hashes.Add(hash);
+                return;
+            }
+            Assert.Equal(shipped, hash);
+            unplayed++;
+        }
         foreach (var key in TuningSchema.Keys)
         {
             switch (key)
             {
                 case IntKey k:
                     int value = k.Get(BuiltIn);
-                    hashes.Add(TuningJson.Hash(k.Set(BuiltIn, value + 1 <= k.Max ? value + 1 : value - 1)));
+                    Moved(k, k.Set(BuiltIn, value + 1 <= k.Max ? value + 1 : value - 1));
                     break;
                 case BoolKey k:
-                    hashes.Add(TuningJson.Hash(k.Set(BuiltIn, !k.Get(BuiltIn))));
+                    Moved(k, k.Set(BuiltIn, !k.Get(BuiltIn)));
                     break;
                 case TableKey k:
                     foreach (var (member, entry) in k.Get(BuiltIn))
                     {
                         var moved = new Dictionary<string, int>(k.Get(BuiltIn)) { [member] = entry + 1 <= k.Max ? entry + 1 : entry - 1 };
-                        hashes.Add(TuningJson.Hash(k.Set(BuiltIn, moved)));
+                        Moved(k, k.Set(BuiltIn, moved));
                     }
                     break;
             }
         }
         Assert.True(hashes.Count > 100);
         Assert.Equal(hashes.Count, hashes.Distinct(StringComparer.Ordinal).Count());
+        Assert.True(unplayed > 0, "no key a rule does not play was moved");
+    }
+
+    [Fact]
+    public void AKeyNoRulePlaysNeverMovesTheHash()
+    {
+        // A key declared ahead of its reader (Played false: what a deposit costs,
+        // the user's ruling of 2026-09-25, until Phase 6a builds the enchanter) is
+        // no number a campaign was played under. A file turning one to either end
+        // of its clamp leaves the tuning's hash where it was — read alone, and as
+        // the game loads it beside the shipped content — while the log's overrides
+        // still name it, since the file changed it all the same.
+        string shipped = TuningJson.Hash(BuiltIn);
+        var unplayed = TuningSchema.Keys.Where(k => !k.Played).Select(k => Assert.IsType<IntKey>(k)).ToList();
+        Assert.NotEmpty(unplayed);
+        foreach (var k in unplayed)
+        {
+            foreach (int end in new[] { k.Min, k.Max })
+            {
+                string file = $$"""{ "{{k.Name}}": {{end}} }""";
+                string[] changed = end == k.Get(BuiltIn) ? [] : [$"{k.Name} {Text(end)}"];
+
+                var read = TuningJson.Read(file, BuiltIn);
+                Assert.Empty(read.Warnings);
+                Assert.Equal(end, k.Get(read.Tuning));
+                Assert.Equal(shipped, TuningJson.Hash(read.Tuning));
+                Assert.Equal(changed, read.Overrides);
+
+                var load = ShippedData.Load(ShippedData.Texts with { Tuning = file });
+                Assert.Null(load.Error);
+                Assert.Empty(load.Notices);
+                Assert.Equal(end, k.Get(load.Content!.Tuning));
+                Assert.Equal(shipped, TuningJson.Hash(load.Content.Tuning));
+                Assert.Equal(changed, load.TuningOverrides);
+            }
+        }
+
+        // So a campaign saved under the shipped numbers resumes under a file that
+        // turns every such key at once with nothing to say — never THE NUMBERS
+        // HAVE CHANGED — while one number a rule plays, moved beside them, says it.
+        string everyKey = "{ " + string.Join(", ", unplayed.Select(k => $"\"{k.Name}\": {Text(k.Get(BuiltIn) < k.Max ? k.Max : k.Min)}")) + " }";
+        var turned = TuningJson.Read(everyKey, BuiltIn);
+        Assert.Equal(unplayed.Count, turned.Overrides.Count);
+        SaveFile saved;
+        using (TestContent.Use())
+            saved = SaveGame.Capture(CampaignState.Start(GameContent.Current));
+        using (TestContent.Use(tuning: turned.Tuning))
+            Assert.False(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
+        using (TestContent.Use(tuning: turned.Tuning with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) }))
+            Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
     }
 
     [Fact]

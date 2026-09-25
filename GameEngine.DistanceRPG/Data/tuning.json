@@ -253,9 +253,46 @@
   /* How near the stairs, in whole tiles, every living member must stand for the party to take them. */
   "StairGatherTiles": 3,
 
-  /* ---- Enchanter - Phase 6a: WearPerHit, WearCapacityLadder, EnchantmentWearCost, GraftBaseChance ---- */
-  /* No key yet: these arrive with the Phase 6a code that reads them, since a key nothing reads
-     would be a dial wired to nothing. */
+  /* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */
+  /* What a deposit costs at the enchanter, as the user ruled on 2026-09-25: a weapon's wear
+     capacity opens on StartingPool and grows as full bars of wear are cashed, its enchantment slots
+     open along that capacity, and attaching each enchantment needs a deposit of its own size. The
+     user keeps a number they may revisit in this file, so the six keys below are here before the
+     Phase 6a enchanter that reads them, and nothing reads them until then: each is read, clamped
+     and warned like every other key, and a save's hash leaves them out, so turning one never says
+     the numbers have changed. WearPerHit and GraftBaseChance are not keys yet: they arrive with
+     the Phase 6a code that reads them. */
+
+  /* The capacity a full bar's worth of cashed wear adds, the bar being the capacity at the time:
+     cashing 30 lifts a fresh 30 to 31, then 31 more lifts it to 32, with no top. The progress
+     carries - a deposit short of a full bar still counts toward the next point, and what one cashes
+     past a bar starts the next - and it grows alike whichever service the deposit bought. 0 freezes
+     capacity. */
+  "WearCapacityPerBar": 1,
+
+  /* The capacity a weapon's first enchantment slot opens at: slot n opens at FirstSlotCapacity +
+     SlotCapacityStep x (n - 1), so at 30, 35, 40, 45 and 50. What a weapon arrives with fills its
+     slots from the first, so a fresh staff's innate holds slot 1. */
+  "FirstSlotCapacity": 30,
+
+  /* The capacity between one enchantment slot and the next, above. 0 opens every slot at once. */
+  "SlotCapacityStep": 5,
+
+  /* The most enchantments a weapon holds: the fifth slot is the last. Never fewer than 3, the most
+     a weapon arrives carrying (a Light unique's souls) - a lower number is raised to 3, with a
+     warning. */
+  "EnchantmentSlots": 5,
+
+  /* The least a deposit must cash to attach a weapon's first enchantment: attaching enchantment n
+     needs a free slot and a deposit of at least FirstEnchantmentWear + EnchantmentWearStep x
+     (n - 1), so 30, 35, 40, 45 and 50. A deposit still spends the whole pool, and capacity above
+     the price is breathing room: at capacity 35 with no enchantment, cashing 30 attaches the
+     first. */
+  "FirstEnchantmentWear": 30,
+
+  /* How much more wear each later enchantment needs than the one before, above. 0 prices every one
+     as the first. */
+  "EnchantmentWearStep": 5,
 
   /* ---- Inventory ---- */
 

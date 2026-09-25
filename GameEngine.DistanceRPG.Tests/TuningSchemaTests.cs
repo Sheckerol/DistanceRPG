@@ -234,7 +234,8 @@ public class TuningSchemaTests
         // PHASE5-046–070, -075: §5.3's starting set, each by its code spelling
         // (the units-in-the-name rule, bend (a)), in its §5.3 group; "per-stack
         // values" are PerStack and "MaxForged overrides" MaxForged; and the ten
-        // groups in §5.3's order, then the three beside it.
+        // groups in §5.3's order, then the three beside it. The Enchanter's are
+        // what a deposit costs, as the user ruled on 2026-09-25 (§5.3's row).
         (TuningGroup Group, string[] Keys)[] starting =
         [
             (Economy, [nameof(Tuning.MovementUnitsPerMana), nameof(Tuning.MovementBudget), nameof(Tuning.StartingPool)]),
@@ -246,6 +247,7 @@ public class TuningSchemaTests
             (Uniques, [nameof(Tuning.UniqueChanceCeilingPercent), nameof(Tuning.UniqueChanceMidpoint), nameof(Tuning.UniqueChanceKPercent)]),
             (Dungeon, [nameof(Tuning.BossFloorMin), nameof(Tuning.BossFloorMax), nameof(Tuning.BossStackOffset),
                 nameof(Tuning.CooldownRunsPerFloor), nameof(Tuning.MercyFloor), nameof(Tuning.DeathXpLossPercent)]),
+            (Enchanter, RulingsEnchanterKeys),
             (Inventory, [nameof(Tuning.PartyCarrySlots)]),
         ];
         foreach (var (group, keys) in starting)
@@ -257,10 +259,12 @@ public class TuningSchemaTests
         var groups = TuningSchema.Keys.Select(k => k.Group).ToArray();
         Assert.Equal(groups.Order(), groups);   // the file's order is the groups' order
 
-        // The eight 6a/6b keys wait for their readers (bend (e)): no key and no
-        // property, listed under their group with the phase that brings them.
+        // The six 6a/6b keys still to come wait for their readers (bend (e)): no
+        // key and no property, listed under their group with the phase that
+        // brings them. The Enchanter's six the ruling made keys ahead of their
+        // reader are each a property, and no rule plays one.
         Assert.Equal("Phase 6a", TuningSchema.Deferred[Enchanter].Phase);
-        Assert.Equal(["WearPerHit", "WearCapacityLadder", "EnchantmentWearCost", "GraftBaseChance"], TuningSchema.Deferred[Enchanter].Keys.ToArray());
+        Assert.Equal(["WearPerHit", "GraftBaseChance"], TuningSchema.Deferred[Enchanter].Keys.ToArray());
         Assert.Equal("Phase 6b", TuningSchema.Deferred[Consumables].Phase);
         Assert.Equal(["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"], TuningSchema.Deferred[Consumables].Keys.ToArray());
         Assert.Equal([Enchanter, Consumables], TuningSchema.Deferred.Keys.Order());
@@ -269,12 +273,72 @@ public class TuningSchemaTests
             Assert.Null(TuningSchema.Find(name));
             Assert.Null(typeof(Tuning).GetProperty(name));
         }
-        Assert.DoesNotContain(TuningSchema.Keys, k => k.Group is Enchanter or Consumables);
+        foreach (string name in RulingsEnchanterKeys)
+        {
+            Assert.NotNull(typeof(Tuning).GetProperty(name));
+            Assert.False(Key(name).Played, $"{name} is played");
+        }
+        Assert.DoesNotContain(TuningSchema.Keys, k => k.Group is Consumables);
 
         // What each key is set to is tuning.json's to say: the one derivation a
         // doc fixes — the divisor off the budget, W:774 — is pinned where its
         // test is (MovementBudgetTests; ShippedDataTests lists every such pin),
         // and no other number of the master is pinned here.
+    }
+
+    /// <summary>
+    /// What a deposit costs, as the user ruled on 2026-09-25, in the file's order:
+    /// the capacity a full bar of cashed wear adds, the capacity the first slot
+    /// opens at and the step to the next, the most enchantments a weapon holds,
+    /// and the wear attaching the first needs and the step to the next. A
+    /// weapon's capacity opens on StartingPool, which is not among them.
+    /// </summary>
+    private static readonly string[] RulingsEnchanterKeys =
+    [
+        nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
+        nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
+    ];
+
+    [Fact]
+    public void TheRulingsEnchanterNumbersAreKeys_ReadByNothingYet()
+    {
+        // R4, the user's ruling of 2026-09-25: every number of what a deposit
+        // costs is a tuning.json key of the Enchanter group, each its own, so any
+        // one can move alone — declared ahead of Phase 6a's enchanter, which reads
+        // them. Until then no rule of play reads one (Played false), and each is a
+        // key like any other: a property, the only number its Set moves, and the
+        // master's number inside its clamp. What the master sets each to is its own
+        // to say (REWORK DECISION 3), so no value is asserted here.
+        var enchanter = TuningSchema.Keys.Where(k => k.Group == Enchanter).ToArray();
+        Assert.Equal(RulingsEnchanterKeys, enchanter.Select(k => k.Name));
+        foreach (var key in enchanter)
+        {
+            var k = Assert.IsType<IntKey>(key);
+            Assert.False(k.Played, $"{k.Name} is played");
+            int value = k.Get(BuiltIn);
+            Assert.InRange(value, k.Min, k.Max);
+            Assert.Equal([k.Name], TuningValues.Moved(BuiltIn, k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1)));
+        }
+
+        // The Enchanter's two numbers that are not the ruling's still wait with
+        // their Phase 6a readers; the two placeholders the ruling replaced are no
+        // longer keys to come but point at the keys that took their place, in
+        // words the HUD's font can draw; and the graft formula's
+        // StartingWearCapacity is still StartingPool, the bar a capacity opens on.
+        Assert.Equal(("Phase 6a", "Phase 6a"), (TuningSchema.DeferredPhase("WearPerHit"), TuningSchema.DeferredPhase("GraftBaseChance")));
+        foreach (var (placeholder, key) in new[] { ("WearCapacityLadder", nameof(Tuning.WearCapacityPerBar)), ("EnchantmentWearCost", nameof(Tuning.FirstEnchantmentWear)) })
+        {
+            Assert.Null(TuningSchema.DeferredPhase(placeholder));
+            var alias = TuningSchema.Alias(placeholder);
+            Assert.Equal(key, alias?.Key);
+            Assert.Matches(@"^[A-Za-z0-9 .,:_!?()/<>\[\]+=#*-]+$", alias?.Why ?? "");
+        }
+        Assert.Equal(nameof(Tuning.StartingPool), TuningSchema.Suggest("StartingWearCapacity"));
+
+        // EnchantmentSlots never holds a weapon to fewer slots than it arrives
+        // filling: its clamp starts at the most any weapon arrives carrying, read
+        // off the validator's own constant, so the two cannot drift apart.
+        Assert.Equal(ContentValidator.MostArrivingEnchantments, ((IntKey)Key(nameof(Tuning.EnchantmentSlots))).Min);
     }
 
     [Fact]

@@ -391,6 +391,59 @@ public sealed record Tuning
     /// </summary>
     public int StairGatherTiles { get; init; }
 
+    // ---- Enchanter (Phase 6a; the user's ruling of 2026-09-25) ----
+    // What a deposit costs (§6.1, §6.2): how a weapon's wear capacity grows, where
+    // its enchantment slots open, and how much wear attaching each enchantment
+    // needs. The user ruled the numbers and keeps each in tuning.json, so they are
+    // keys ahead of their reader: no rule of play reads one until Phase 6a builds
+    // the enchanter, and until then a save's hash leaves them out
+    // (TuningKey.Played). A weapon's capacity opens on StartingPool, the one bar
+    // every pool opens on, which stays one key.
+
+    /// <summary>
+    /// The capacity a full bar's worth of cashed wear adds to a weapon's
+    /// <c>WearCapacity</c> (§6.1): the bar is the capacity at the time, and the
+    /// progress carries — a deposit short of a full bar still counts toward the
+    /// next point, and what one cashes past a bar starts the next. The growth is
+    /// the same whichever service the deposit bought (§6.4). 0 freezes capacity.
+    /// No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int WearCapacityPerBar { get; init; }
+
+    /// <summary>
+    /// The capacity a weapon's first enchantment slot opens at (§6.2): slot n opens
+    /// at <c>FirstSlotCapacity + SlotCapacityStep × (n − 1)</c>, up to
+    /// <see cref="EnchantmentSlots"/>. What a weapon arrives with fills its slots
+    /// from the first. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int FirstSlotCapacity { get; init; }
+
+    /// <summary>The capacity between one enchantment slot and the next (<see cref="FirstSlotCapacity"/>); 0 opens every slot at once. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    public int SlotCapacityStep { get; init; }
+
+    /// <summary>
+    /// The most enchantments the enchanter lets a weapon hold: the docs' five
+    /// (§6.2), the last slot. Never fewer than a weapon arrives carrying — the
+    /// key's clamp starts at <see cref="ContentValidator.MostArrivingEnchantments"/>,
+    /// so no <c>tuning.json</c> can hold a weapon to fewer slots than its own
+    /// souls fill. Not the five of §1.5's Light shape, which decides what a unique
+    /// arrives with and stays a rule constant: the two agree by the docs and mean
+    /// different things. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int EnchantmentSlots { get; init; }
+
+    /// <summary>
+    /// The least wear a deposit must cash to attach a weapon's first enchantment
+    /// (§6.2): attaching enchantment #n needs a free slot and a deposit of at least
+    /// <c>FirstEnchantmentWear + EnchantmentWearStep × (n − 1)</c>. A deposit still
+    /// spends the whole pool (§6.1), and capacity above the price is breathing
+    /// room. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int FirstEnchantmentWear { get; init; }
+
+    /// <summary>How much more wear each later enchantment needs than the one before (<see cref="FirstEnchantmentWear"/>); 0 prices every one as the first. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    public int EnchantmentWearStep { get; init; }
+
     // ---- Inventory (§4.4) ----
 
     /// <summary>

@@ -72,3 +72,9 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   copy the build embeds as the fallback (the user's ruling of 2026-09-25). Never
   add a C# copy of a JSON value: the load validates the code catalogues against
   the JSON instead. Nothing the golden tests pin may go in `tuning.json`.
+- A `tuning.json` key arrives with the code that reads it — except a number the
+  user has ruled and wants in the file first (the Enchanter group's, until Phase
+  6a): declare it in `TuningSchema` with `Played = false`, and it is read,
+  clamped and warned like every key but left out of the save's tuning hash, so
+  turning it never says the numbers changed. The change that gives it a reader
+  sets it played.

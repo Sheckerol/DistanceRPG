@@ -204,6 +204,20 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   movement budget and the cast costs, and turning `MovementBudget` leaves it
   where it was — so a longer budget also banks more mana a turn. Its comment
   gives the formula to re-derive it by hand.
+- **The Enchanter's keys play nothing yet**: `WearCapacityPerBar`,
+  `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
+  `FirstEnchantmentWear` and `EnchantmentWearStep` are what a deposit at the
+  enchanter costs, as the user ruled on 2026-09-25 — how a weapon's wear
+  capacity grows, where its enchantment slots open, and the wear attaching each
+  enchantment needs (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2). The
+  enchanter arrives in Phase 6a, and until then turning one changes nothing in
+  play. Each is still checked like every key — `"EnchantmentSlots": 0` is
+  taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0 IS BELOW 3 - USING 3` —
+  and the log lists it among the numbers the file changed; but a save's record
+  of the numbers it was played under leaves them out, so turning one never says
+  `THE NUMBERS HAVE CHANGED` when a campaign resumes. The docs' older
+  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
+  either is told which key took its place.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`
