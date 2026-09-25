@@ -1,3 +1,4 @@
+using System.Reflection;
 using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG.Tests;
@@ -199,6 +200,80 @@ public class DungeonSeedTests
             Assert.Equal(
                 Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 21), 5, 39)),
                 Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 19), 34, 54)));
+        }
+    }
+
+    [Fact]
+    public void TheDiceComeOffTheirOwnStream()
+    {
+        // Phase 5.7 (1c, USER DECISION 1): the visit's d20 is a stream family of
+        // its own — draw n is the first roll of SplitMix32(mapSeed ^ DiceSalt ^ n ×
+        // DiceMix), a stream per draw, so the die's position is one integer a save
+        // holds — on two new constants, written out here as literals so this pins
+        // the formula rather than restating the code.
+        Assert.Equal((0x7FEB352DL, 0x846CA68BL), (DungeonState.DiceSalt, DungeonState.DiceMix));
+        foreach (long seed in new[] { GoldenSeed, 0L, uint.MaxValue })
+            foreach (int draw in new[] { 0, 1, 2, 4095, 4096 })
+                Assert.Equal(Fingerprint(new Mulberry32(FarmLadder.SplitMix32(seed ^ 0x7FEB352D ^ (draw * 0x846CA68BL)))),
+                    Fingerprint(DungeonState.DiceStream(seed, draw)));
+
+        // Each odd and 32-bit — the mix odd, so no two of the first 2^32 draws share
+        // a composed seed — and neither a value any other salt or mix in Logic holds,
+        // every one of them found by reflection, the private ones included.
+        var constants = TestIl.Types(typeof(Floor).Assembly)
+            .Where(t => t.Namespace == typeof(Floor).Namespace)
+            .SelectMany(t => t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(f => f.IsLiteral && (f.Name.EndsWith("Salt", StringComparison.Ordinal) || f.Name.EndsWith("Mix", StringComparison.Ordinal)))
+            .Select(f => (Name: $"{f.DeclaringType!.Name}.{f.Name}", Value: Convert.ToInt64(f.GetRawConstantValue())))
+            .ToArray();
+        Assert.Contains(constants, c => c.Name == $"{nameof(DungeonState)}.{nameof(DungeonState.FloorSalt)}");   // the scan finds the salts it guards
+        foreach (long dice in new[] { DungeonState.DiceSalt, DungeonState.DiceMix })
+        {
+            Assert.InRange(dice, 1L, uint.MaxValue);
+            Assert.Equal(1, dice & 1);
+            Assert.Single(constants, c => c.Value == dice);
+        }
+
+        // No draw a visit can plausibly roll is a stream anything else rolls on: dice
+        // draws 0 to 4096 coincide with no drop, revival or boss-drop stream of any
+        // floor a boss can sit on, over the domain the Phase 3 and 4 families are
+        // verified on — drops to spawn 128, revivals to spawn and cycle 64. Every
+        // family here is SplitMix32 over the map seed XORed with a term of its own,
+        // so the check holds whatever the map seed; the dice are keyed by the
+        // visit's seed, the rest by each floor's.
+        const int Draws = 4096;
+        int floors = GameContent.Current.Tuning.BossFloorMax;
+        Assert.Equal(10, floors);
+        foreach (long seed in new[] { GoldenSeed, 0L })
+        {
+            var finalized = new Dictionary<ulong, string>();
+            void Finalized(Mulberry32 stream, string name)
+            {
+                ulong print = Fingerprint(stream);
+                if (!finalized.TryAdd(print, name))
+                    Assert.Fail($"{name} is the same stream as {finalized[print]}");
+            }
+            for (int n = 0; n < floors; n++)
+            {
+                long floorSeed = DungeonState.FloorSeed(seed, n);
+                for (int spawn = 0; spawn <= 128; spawn++)
+                    Finalized(LootTable.StreamFor(floorSeed, spawn), $"drop: floor {n}, spawn {spawn}");
+                for (int spawn = 0; spawn <= 64; spawn++)
+                    for (int cycle = 0; cycle <= 64; cycle++)
+                        Finalized(FarmLadder.ReviveStream(floorSeed, spawn, cycle), $"revival: floor {n}, spawn {spawn}, cycle {cycle}");
+                Finalized(BossLoot.StreamFor(floorSeed), $"boss drop: floor {n}");
+            }
+            for (int draw = 0; draw <= Draws; draw++)
+                Finalized(DungeonState.DiceStream(seed, draw), $"dice: draw {draw}");
+            Assert.Equal(floors * (129 + 65 * 65 + 1) + Draws + 1, finalized.Count);
+
+            // Far outside, at draw 34,430, the die meets floor index 8 / spawn 50 /
+            // cycle 2's revival roll: a d20 and a revival sharing a number, which
+            // breaks nothing and exploits nothing — the sharing settled.md's Phase 4
+            // pass accepts for the families beside it. Pinned so the record stays true.
+            Assert.Equal(
+                Fingerprint(DungeonState.DiceStream(seed, 34_430)),
+                Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 8), 50, 2)));
         }
     }
 

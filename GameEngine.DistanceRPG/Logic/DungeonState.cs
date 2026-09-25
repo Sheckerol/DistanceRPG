@@ -485,7 +485,10 @@ public enum StairRefusal
 /// a named salt exactly as <see cref="EnemyPlacer"/> derives its own, never a
 /// continuation of another and never <c>Random.Shared</c>. The salts are
 /// compiled constants and never tuning keys: they decide dungeon layout, which
-/// is the golden set's neighbour.
+/// is the golden set's neighbour. The visit's d20 is one of them
+/// (<see cref="RollD20"/>): each draw a stream of its own, keyed by how many the
+/// visit has rolled before it (<see cref="DiceRolled"/>), which a save keeps — so
+/// a reload rolls exactly the dice play without one would have rolled.
 /// </para>
 /// <para>
 /// <strong>And what the run's end reads</strong> (§4.4): the party's XP as it
@@ -514,6 +517,24 @@ public sealed class DungeonState
     /// salt in the tree. One stream per visit, drawn once per visit at entry.
     /// </summary>
     public const long BossSalt = 0x165667B1;
+
+    /// <summary>
+    /// The visit's d20 splitter (<see cref="DiceStream"/>): odd, 32-bit —
+    /// splitmix32's first multiplier — and distinct from every other salt and mix
+    /// in the tree, checked against every drop, revival and boss-drop stream of
+    /// the floors a boss can sit on (Phase 5.7's collision check, pinned by
+    /// <c>DungeonSeedTests</c>). A compiled constant like every salt: it decides
+    /// what a seed rolls, so it is parity's and never a tuning key.
+    /// </summary>
+    public const long DiceSalt = 0x7FEB352D;
+
+    /// <summary>
+    /// The per-draw term of <see cref="DiceStream"/>, multiplied by the draw's
+    /// index: odd — splitmix32's second multiplier — so no two of the first 2³²
+    /// draws share a composed seed, and each draw is its own seeded stream rather
+    /// than a position in a running one.
+    /// </summary>
+    internal const long DiceMix = 0x846CA68B;
 
     // The turn the visit's clock stood at when the last floor's system handed it
     // back: what Turn reads while no system is open, and what the next one opens on.
@@ -634,6 +655,47 @@ public sealed class DungeonState
     public int BossDefeatedAtTurn { get; private set; } = -1;
 
     /// <summary>
+    /// How many d20s the visit's own die has rolled (<see cref="RollD20"/>): the
+    /// die's whole position, one integer, and the one stream position a save
+    /// holds — every other stream in <c>Logic/</c> is fresh per use and keyed by a
+    /// counter the rows already carry. 0 at <see cref="Enter"/>; a load hands back
+    /// the saved count, so the next roll after a reload is the roll play without
+    /// the reload would have made next. A die injected into
+    /// <see cref="OpenTurns"/> in its place moves nothing here.
+    /// </summary>
+    public int DiceRolled { get; private set; }
+
+    /// <summary>
+    /// The visit's own d20 (USER DECISION 1 of Phase 5, provisional: seeded and
+    /// saved): draw <see cref="DiceRolled"/> of the visit's dice stream,
+    /// <c>DiceStream(MapSeed, DiceRolled).NextInt(1, 20)</c>, and count it. What
+    /// every floor's system rolls when <see cref="OpenTurns"/> is handed no die —
+    /// the swings, the reactions, the casts, the enemies' beats — so the dice a
+    /// visit rolls are a pure function of its map seed and how many it has rolled,
+    /// and a reload rolls on from exactly there: no reload-to-reroll. One counter
+    /// for the whole visit, on every floor: the stairs move the party and never
+    /// the die. The price, stated with the decision: a turn replayed after the
+    /// process is killed past its autosave knows its next draws.
+    /// </summary>
+    /// <returns>A natural roll, 1 to 20, each face equally likely.</returns>
+    public int RollD20() => DiceStream(MapSeed, DiceRolled++).NextInt(1, 20);
+
+    /// <summary>
+    /// The stream draw <paramref name="draw"/> of the visit seeded
+    /// <paramref name="mapSeed"/> rolls on:
+    /// <c>SplitMix32(mapSeed ^ DiceSalt ^ draw × DiceMix)</c>, finalized as every
+    /// counter-keyed stream here is (<see cref="FarmLadder.SplitMix32"/>), since a
+    /// draw is the first output of its own fresh stream — the house convention
+    /// (a stream per index, never a skip-ahead through one), which is what makes
+    /// the die's position one integer a save can hold. Keyed by the visit's map
+    /// seed, not a floor's: the die is the visit's, whatever floor it is rolled on.
+    /// </summary>
+    /// <param name="mapSeed">The visit's map seed.</param>
+    /// <param name="draw">The 0-based index of the draw: how many the visit had rolled before it.</param>
+    internal static Mulberry32 DiceStream(long mapSeed, int draw)
+        => new(FarmLadder.SplitMix32(mapSeed ^ DiceSalt ^ (draw * DiceMix)));
+
+    /// <summary>
     /// Raised on every transit, either way, once every member stands on the
     /// floor reached and before its turn system opens: §6.7's "reaching a new
     /// floor" signal on the floor-transit path. Entering the dungeon is not a
@@ -741,9 +803,10 @@ public sealed class DungeonState
     /// already built (the visited ones restored, <see cref="Floor.Restore"/>; the
     /// rest generated from the seed, the depth and the promise), the floor the
     /// party is on and the deepest it has reached, the clock, the boss's death,
-    /// the party's XP at the door, this turn's counters, and the spoils — the very
-    /// weapons now in the bags and on the floors. The one door a visit comes back
-    /// through: internal, beside <see cref="Enter"/>.
+    /// the party's XP at the door, this turn's counters, the spoils — the very
+    /// weapons now in the bags and on the floors — and how many d20s the visit's
+    /// own die has rolled, so it rolls on from there. The one door a visit comes
+    /// back through: internal, beside <see cref="Enter"/>.
     /// <para>
     /// <strong>It opens nothing, places nobody and rolls nothing.</strong> No
     /// system is open (<see cref="Turns"/> is null): whoever plays the floor opens
@@ -766,14 +829,17 @@ public sealed class DungeonState
     /// <param name="bossDefeatedAtTurn">The turn it fell, or -1 while it stands.</param>
     /// <param name="carry">This turn's counters, or null for none: only this turn's, since a carry from an earlier one is dead weight.</param>
     /// <param name="spoils">The spoils in the order taken, each the very weapon where it now is.</param>
+    /// <param name="diceRolled">How many d20s the visit's own die had rolled (<see cref="DiceRolled"/>): where it rolls on from.</param>
     /// <exception cref="ArgumentException">
     /// The floors are not the dungeon's depth, out of order, or visited other than
     /// down to the deepest; the floor or the deepest is out of the dungeon; the
     /// boss's death names no turn it could have been; the carry is another turn's;
     /// or a spoil is null or listed twice.
     /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">The depth is below one floor, or the promise, the clock or the die's count is negative.</exception>
     internal static DungeonState Restore(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, XpSnapshot entrySnapshot, Floor[] floors,
-        int floorIndex, int deepestFloorIndex, int turn, bool bossDefeated, int bossDefeatedAtTurn, TurnCarry? carry, IReadOnlyList<Weapon> spoils)
+        int floorIndex, int deepestFloorIndex, int turn, bool bossDefeated, int bossDefeatedAtTurn, TurnCarry? carry, IReadOnlyList<Weapon> spoils,
+        int diceRolled)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(entrySnapshot);
@@ -782,6 +848,7 @@ public sealed class DungeonState
         ArgumentOutOfRangeException.ThrowIfLessThan(bossFloor, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(promisedStacks);
         ArgumentOutOfRangeException.ThrowIfNegative(turn);
+        ArgumentOutOfRangeException.ThrowIfNegative(diceRolled);
         if (floors.Length != bossFloor)
             throw new ArgumentException($"{floors.Length} floors for a boss on floor {bossFloor}: a visit holds every floor down to its boss.", nameof(floors));
         if (floorIndex < 0 || floorIndex > deepestFloorIndex || deepestFloorIndex >= bossFloor)
@@ -823,6 +890,7 @@ public sealed class DungeonState
             DeepestFloorIndex = deepestFloorIndex,
             BossDefeated = bossDefeated,
             BossDefeatedAtTurn = bossDefeatedAtTurn,
+            DiceRolled = diceRolled,
         };
         visit._turn = turn;
         visit._carry = carry;
@@ -884,7 +952,8 @@ public sealed class DungeonState
     /// <para>
     /// It opens at <see cref="Turn"/> in the player phase, with this turn's
     /// counters from the floors already stood on in it (<see cref="TurnCarry"/>),
-    /// the floor's own seed for its drops and revivals, the floor's
+    /// the floor's own seed for its drops and revivals, the visit's own die
+    /// unless it is handed another (<see cref="RollD20"/>), the floor's
     /// <see cref="Floor.Boss"/> — if it has one — rostered as the boss, and
     /// resurrection off once the boss is dead. The visit hears the boss's death
     /// on that system before anyone else does and records it
@@ -904,7 +973,12 @@ public sealed class DungeonState
     /// </para>
     /// </summary>
     /// <param name="party">The members, in roster order — the same list every call of the visit is handed.</param>
-    /// <param name="rollD20">The d20 the system rolls; its own fair die when omitted.</param>
+    /// <param name="rollD20">
+    /// The d20 the system rolls. Omitted, it is the visit's own
+    /// (<see cref="RollD20"/>), whose position a save keeps — never
+    /// <c>Random.Shared</c>, which no save could reproduce. A die handed in
+    /// (a test's, a scene's own) rolls instead, and moves the visit's die not at all.
+    /// </param>
     /// <exception cref="InvalidOperationException">A system is already open on this floor: only the stairs close one.</exception>
     public TurnSystem OpenTurns(IReadOnlyList<PartyMemberState> party, Func<int>? rollD20 = null)
     {
@@ -914,7 +988,7 @@ public sealed class DungeonState
                 $"Floor {Current.Index + 1}'s turn system is already open: a floor is opened once per arrival, and only the stairs close it.");
 
         var floor = Current;
-        var turns = new TurnSystem(floor.Map.Grid, party, floor.Enemies, rollD20, floor.Seed,
+        var turns = new TurnSystem(floor.Map.Grid, party, floor.Enemies, rollD20 ?? RollD20, floor.Seed,
             firstTurn: _turn, carry: _carry, boss: floor.Boss)
         {
             ResurrectionActive = !BossDefeated,

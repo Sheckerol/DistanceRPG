@@ -144,8 +144,9 @@ public sealed record ClawbackDto(string MemberId, string Pool, int Before, int A
 /// <summary>
 /// The visit in progress (<see cref="DungeonState"/>): §5.1's Run group — the
 /// map seed, the floor the party is on, the turn, the party's XP at the door —
-/// with everything else a load must use as it was rather than work out again,
-/// and every floor the party has stood on. Maps are never here (§5.1: "they
+/// with everything else a load must use as it was rather than work out again —
+/// the depth, the promise, where the visit's die stands — and every floor the
+/// party has stood on. Maps are never here (§5.1: "they
 /// regenerate from <c>floorSeed(n)</c>"): a load builds every floor's terrain
 /// from <see cref="MapSeed"/>, stands the saved rows on the visited ones, and
 /// places enemies only on the floors nobody has reached (§5.1's "place enemies
@@ -172,8 +173,16 @@ public sealed record ClawbackDto(string MemberId, string Pool, int Before, int A
 /// </param>
 /// <param name="Carry">The counters of the turn in progress (<see cref="TurnCarry"/>), this turn's only, in one canonical order; null when there are none.</param>
 /// <param name="Floors">Every visited floor, index 0 first, down to <see cref="DeepestFloorIndex"/>.</param>
+/// <param name="DiceRolled">
+/// How many d20s the visit's own die has rolled (<see cref="DungeonState.DiceRolled"/>):
+/// the die's position, the one stream position a save holds — so the next roll
+/// after a load is the roll play without the load would have made next, and a
+/// reload is never a reroll. Appended by Phase 5.7, with its default: a document
+/// written before it reads as a die not yet rolled.
+/// </param>
 public sealed record VisitDto(string DungeonId, long MapSeed, int BossFloor, int PromisedStacks, int FloorIndex, int DeepestFloorIndex, int Turn,
-    bool BossDefeated, int BossDefeatedAtTurn, XpSnapshotDto EntrySnapshot, IReadOnlyList<SpoilDto> Spoils, CarryDto? Carry, IReadOnlyList<FloorDto> Floors);
+    bool BossDefeated, int BossDefeatedAtTurn, XpSnapshotDto EntrySnapshot, IReadOnlyList<SpoilDto> Spoils, CarryDto? Carry, IReadOnlyList<FloorDto> Floors,
+    int DiceRolled = 0);
 
 /// <summary>
 /// One visited floor (§5.1's per-floor group): what a visit changed there, and

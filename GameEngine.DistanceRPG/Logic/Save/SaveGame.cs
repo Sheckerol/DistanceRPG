@@ -28,11 +28,27 @@ public sealed record LoadedCampaign(CampaignState Campaign, bool TuningChanged, 
 /// dungeons and the last run's summary, which is already a whole save (§6.7: "a
 /// save with no dungeon in progress is now a valid state") — and <strong>at any
 /// safe point of a visit</strong> (<see cref="IsSafePoint"/>), the visit inside
-/// it: §5.1's Run group and every floor the party has stood on.
+/// it: §5.1's Run group and every floor the party has stood on. A quit that
+/// finds none is settled to the next one first (<see cref="SettleToSafePoint"/>),
+/// one fixed logic step at a time (<see cref="LogicStepSeconds"/>).
 /// </para>
 /// </summary>
 public static class SaveGame
 {
+    /// <summary>
+    /// The one step the logic clock takes, in seconds: every settle
+    /// (<see cref="SettleToSafePoint"/>) steps it, and live play is to step the
+    /// same one — from Phase 5.8 the scene's fixed clock runs whole steps of it,
+    /// a remainder carried and never stepped — so the state a settle saves is the
+    /// state the player would have met, at any frame rate, and a fixed sequence of
+    /// turns is the same world however its frames fell. At
+    /// <see cref="GameConstants.EnemySpeed"/> an enemy moves 1.25 logic units a
+    /// step, so the scene's tile-crossing sighting samples every tile a walk
+    /// crosses; at 60 Hz two steps a frame move an enemy as smoothly as the
+    /// frame's own step does, with no interpolation.
+    /// </summary>
+    public const float LogicStepSeconds = 1f / 120f;
+
     /// <summary>
     /// Whether <paramref name="campaign"/> can be saved as it stands (1f): between
     /// runs; in a visit with no floor's system open — right after the entry, or
@@ -47,6 +63,65 @@ public static class SaveGame
         if (campaign.Visit is not { } visit || visit.Turns is not { } turns)
             return true;
         return turns.Phase == TurnPhase.Player && !turns.Events.Running;
+    }
+
+    /// <summary>
+    /// Step <paramref name="campaign"/> to its next safe point (1f), for a quit
+    /// that finds none: the enemies' turn in flight — its banner, their walks,
+    /// their beats — is played out, one <see cref="LogicStepSeconds"/> step at a
+    /// time, to the next player turn, and only then is anything written. A
+    /// campaign already at a safe point takes no step. A settle in which the
+    /// enemies wipe the party ends the run in <c>Logic/</c> as play would (the
+    /// visit's <see cref="DungeonState.Wiped"/> →
+    /// <see cref="CampaignState.EndRun"/>), which leaves a campaign between runs:
+    /// safe, the run's result recorded, and nothing of the visit to save.
+    /// <para>
+    /// <strong>The step is the caller's.</strong> The game's (Phase 5.8) is the
+    /// scene's own — one <see cref="TurnSystem.Update"/> of
+    /// <see cref="LogicStepSeconds"/> plus the enemy-phase sighting the scene
+    /// feeds back (<see cref="TurnSystem.NotifyEnemyVisible"/> on a tile
+    /// crossing, which decides whose zones may react) — so the settle takes
+    /// exactly the steps play would have taken, on the visit's own die, and saves
+    /// the turn the player would have met. Handed a step, the settle calls it and
+    /// never <see cref="TurnSystem.Update"/> itself; handed none, it steps
+    /// <see cref="TurnSystem.Update"/> alone, as a <c>Logic/</c> test steps the
+    /// live side it compares with.
+    /// </para>
+    /// <para>
+    /// <paramref name="maxSteps"/> bounds a bug, not a game: the default is
+    /// nearly half an hour of game time, and no enemy phase comes near it. And a
+    /// system that no step can bring to its player turn is refused at once
+    /// rather than stepped to the bound: a raise in flight, which only the code
+    /// inside it can finish — a settle never steps a system from inside its own
+    /// cascade — and a game already over whose run nothing has ended.
+    /// </para>
+    /// </summary>
+    /// <param name="campaign">The campaign to settle.</param>
+    /// <param name="step">One fixed logic step, as the game takes it; null steps the open system's <see cref="TurnSystem.Update"/> by <see cref="LogicStepSeconds"/>.</param>
+    /// <param name="maxSteps">The most steps taken before the settle gives up.</param>
+    /// <returns>
+    /// True once the campaign is at a safe point (<see cref="IsSafePoint"/>) — at
+    /// once when it already was; false when it is not, and the steps ran out or
+    /// no step can bring it to one: then nothing should be saved over the last
+    /// safe point's save.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxSteps"/> is negative.</exception>
+    public static bool SettleToSafePoint(CampaignState campaign, Action? step = null, int maxSteps = 200_000)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxSteps);
+
+        for (int taken = 0; !IsSafePoint(campaign); taken++)
+        {
+            var turns = campaign.Visit!.Turns!;   // off a safe point there is a visit, and a system open on it
+            if (taken == maxSteps || turns.Events.Running || turns.Phase == TurnPhase.GameOver)
+                return false;
+            if (step is null)
+                turns.Update(LogicStepSeconds);
+            else
+                step();
+        }
+        return true;
     }
 
     /// <summary>

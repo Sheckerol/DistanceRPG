@@ -129,7 +129,13 @@ public class VisitSaveTests
     /// Mired, and A, mid-turn, has two attacks spent and Poison on it. Fog explored
     /// on every floor. The save point is floor 4 (index 3), turn 10.
     /// </summary>
-    internal static VisitScript Flagship()
+    /// <param name="die">
+    /// The d20 every floor opens with, <see cref="VisitScript.Ten"/> when omitted.
+    /// Everything pinned here is pinned on tens, so a die handed in must roll tens
+    /// up to the save point — as Phase 5.7's determinism tests' does, which varies
+    /// only after it.
+    /// </param>
+    internal static VisitScript Flagship(Func<int>? die = null)
     {
         // A party that has earned something before it steps in, so what it held at
         // the door is not what it holds now, nor nothing.
@@ -137,7 +143,7 @@ public class VisitSaveTests
         campaign.Party[0].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 40));
         campaign.Party[2].Credit(new XpCredit(XpPool.Health, null, 9));
         campaign.Party[3].Credit(new XpCredit(XpPool.Mana, null, 12));
-        var script = VisitScript.Enter(campaign, "spear_hall", FiveDeep);
+        var script = VisitScript.Enter(campaign, "spear_hall", FiveDeep, die);
         var visit = script.Visit;
         Assert.Equal((5, 1), (visit.BossFloor, visit.PromisedStacks));
 

@@ -34,17 +34,26 @@ internal sealed class VisitScript
 
     private const float Step = 1f / 30f;
 
-    public VisitScript(CampaignState campaign, Func<int>? die = null)
+    /// <param name="campaign">The campaign whose visit the script plays.</param>
+    /// <param name="die">The d20 every floor the script opens rolls; <see cref="Ten"/> when omitted.</param>
+    /// <param name="visitsOwnDie">
+    /// Open every floor with no die at all, so it rolls the visit's own
+    /// (<see cref="DungeonState.RollD20"/>) — the die a save keeps the position of
+    /// (Phase 5.7). Not beside <paramref name="die"/>.
+    /// </param>
+    public VisitScript(CampaignState campaign, Func<int>? die = null, bool visitsOwnDie = false)
     {
         ArgumentNullException.ThrowIfNull(campaign);
+        if (visitsOwnDie && die is not null)
+            throw new ArgumentException("A script's floors roll an injected die or the visit's own, never both.", nameof(die));
         Campaign = campaign;
-        Die = die ?? Ten;
+        Die = visitsOwnDie ? null : die ?? Ten;
     }
 
     public CampaignState Campaign { get; }
 
-    /// <summary>The d20 every floor this script opens rolls.</summary>
-    public Func<int> Die { get; }
+    /// <summary>The d20 every floor this script opens rolls, handed to <see cref="DungeonState.OpenTurns"/>: null hands none, and the floor rolls the visit's own.</summary>
+    public Func<int>? Die { get; }
 
     public DungeonState Visit => Campaign.Visit ?? throw new InvalidOperationException("No visit is in progress.");
 
@@ -71,10 +80,10 @@ internal sealed class VisitScript
     // ── Entering, and opening a floor ────────────────────────────────────────
 
     /// <summary>Enter <paramref name="dungeonId"/> on <paramref name="seed"/>, open its first floor and arrive on it.</summary>
-    public static VisitScript Enter(CampaignState campaign, string dungeonId, long seed, Func<int>? die = null)
+    public static VisitScript Enter(CampaignState campaign, string dungeonId, long seed, Func<int>? die = null, bool visitsOwnDie = false)
     {
         campaign.Enter(dungeonId, seed);
-        var script = new VisitScript(campaign, die);
+        var script = new VisitScript(campaign, die, visitsOwnDie);
         script.Open();
         return script;
     }
@@ -231,17 +240,19 @@ internal sealed class VisitScript
 
     /// <summary>
     /// End the turn and run the enemies' to the next player phase, at the
-    /// suite's 1/30 s step. The turn's end resets the sight to where the party
+    /// suite's 1/30 s step unless another is named — the logic clock's own
+    /// (<see cref="SaveGame.LogicStepSeconds"/>) for a script that must play as
+    /// the game plays. The turn's end resets the sight to where the party
     /// stands, as the scene's does.
     /// </summary>
-    public void EndTurn()
+    public void EndTurn(float step = Step)
     {
         var turns = Turns;
         turns.EndTurn();
         Floor.Fog.ResetVisibility();
         Look();
-        for (float t = 0f; t < TurnSeconds && turns.Phase is not (TurnPhase.Player or TurnPhase.GameOver); t += Step)
-            turns.Update(Step);
+        for (float t = 0f; t < TurnSeconds && turns.Phase is not (TurnPhase.Player or TurnPhase.GameOver); t += step)
+            turns.Update(step);
         Assert.Equal(TurnPhase.Player, turns.Phase);
     }
 

@@ -241,10 +241,14 @@ public sealed class TurnSystem
     // given, Floor.Seed, which the visit hands over. The revival ladder (§3.2)
     // is drawn on mapSeed ^ FarmLadder.ReviveSalt, per enemy and per cycle, so
     // this is the one thing that makes a farm replay identically after a reload.
-    // It is NOT allowed to fall back to Random.Shared the way _rollD20 does: a
-    // die roll nobody saved may differ between a session and its reload, and a
-    // dummy's statline may not. A fixture that never revives anything can leave
-    // it at 0, which is a seed like any other.
+    // It never falls back to Random.Shared, and in a visit neither does the die:
+    // DungeonState.OpenTurns hands every floor it opens the visit's own d20
+    // (DungeonState.RollD20) unless a die is injected, and the save keeps that
+    // die's position (DiceRolled), so a reload rolls on exactly where the session
+    // left off — the dice as well as the ladder. Only a bare fixture that passes
+    // no die and opens no visit meets _rollD20's unsaved Random.Shared fallback
+    // below. A fixture that never revives anything can leave this at 0, which is
+    // a seed like any other.
     private readonly long _mapSeed;
 
     /// <param name="mapSeed">

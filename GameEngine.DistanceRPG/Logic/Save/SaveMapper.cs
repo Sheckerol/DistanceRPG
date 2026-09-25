@@ -51,8 +51,9 @@ internal static class SaveMapper
     /// <summary>
     /// The visit in progress (§5.1's Run group): the values a load uses as they
     /// are, the party's XP at the door, where each spoil is, this turn's counters
-    /// in their canonical order, and every floor down to the deepest the party has
-    /// stood on — floors are adjacent only, so that is every visited floor.
+    /// in their canonical order, every floor down to the deepest the party has
+    /// stood on — floors are adjacent only, so that is every visited floor — and
+    /// how many d20s the visit's own die has rolled.
     /// </summary>
     /// <param name="visit">The visit, at a safe point.</param>
     /// <param name="party">The members, in roster order: the members the visit is being made by.</param>
@@ -84,7 +85,8 @@ internal static class SaveMapper
             Snapshot(visit.EntrySnapshot),
             visit.Spoils.Select((spoil, i) => SpoilOf(spoil, i, party, visit)).ToArray(),
             Carry(visit.CurrentCarry(), party, visit),
-            floors);
+            floors,
+            visit.DiceRolled);
     }
 
     /// <summary>
@@ -554,7 +556,8 @@ internal static class SaveMapper
     /// floor below the deepest reached generated from the seed, the depth and the
     /// promise as an entry would (<see cref="Floor.Generate"/>) — placing enemies
     /// only there, the floors nobody has stood on — and then the spoils and the
-    /// turn's counters, resolved against the bags and floors now rebuilt.
+    /// turn's counters, resolved against the bags and floors now rebuilt; and the
+    /// visit's die at the count it had rolled, so it rolls on from there.
     /// </summary>
     private static DungeonState Visit(VisitDto row, GameContent content, PartyMemberState[] party, string at)
     {
@@ -564,6 +567,7 @@ internal static class SaveMapper
             throw new SaveFormatException($"{at}.bossFloor", $"{row.BossFloor} is no boss floor: a boss waits on floor 1 to {DeepestBossFloor}");
         NotNegative(row.PromisedStacks, $"{at}.promisedStacks");
         NotNegative(row.Turn, $"{at}.turn");
+        NotNegative(row.DiceRolled, $"{at}.diceRolled");
         if (row.DeepestFloorIndex < 0 || row.DeepestFloorIndex >= row.BossFloor)
             throw new SaveFormatException($"{at}.deepestFloorIndex",
                 $"{row.DeepestFloorIndex} is no floor of a dungeon {row.BossFloor} deep: a floor index runs 0 to {row.BossFloor - 1}");
@@ -594,7 +598,7 @@ internal static class SaveMapper
         var carry = row.Carry is { } counters ? Carry(counters, party, floors, row, $"{at}.carry") : null;
 
         return DungeonState.Restore(def, row.MapSeed, row.BossFloor, row.PromisedStacks, snapshot, floors, row.FloorIndex, row.DeepestFloorIndex,
-            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils);
+            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils, row.DiceRolled);
     }
 
     /// <summary>The party's XP at the door: the party's members, each once, in roster order, every pool a count play could have written.</summary>
