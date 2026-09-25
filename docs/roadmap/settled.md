@@ -1805,9 +1805,11 @@ supersedes — the save model — says what ships.
     detail now in the range rule's form, naming the field and the whole range:
     `RuleBossStatline` (`boss.maxHp 0 is outside 1 to 10000 - …`, and
     `boss.movementBudget` alike; a boss that is missing keeps `names no boss`),
-    `RuleBossFloorRange` (`bossFloorMin 0 is outside 1 to 99 - …`; an inverted
-    range `bossFloorMax 3 is below bossFloorMin 5`, an end the dungeon leaves to
-    the tuning named as its key, `tuning.json BossFloorMin 5`),
+    `RuleBossFloorRange` (`bossFloorMin 0 is outside 1 to 99 - …`, and a
+    `bossFloorMax` below 1 alike; an inverted range `bossFloorMax 3 is below
+    bossFloorMin 5`, an end the dungeon leaves to the tuning named as its key,
+    `tuning.json BossFloorMin 5` — asked only once both ends lie in range, so an
+    inversion is never how a floor out of range is named),
     `RuleBossInnateStackable` (`boss.innate.Brace 0 is outside 1 to 53 - …`; a
     member that never stacks breaks no range, and keeps its detail), and the
     forge's two, which keep both ends of a forged count: a class row's
@@ -1820,11 +1822,16 @@ supersedes — the save model — says what ships.
     on the first variant that plays it; a weapon's statline as composed, its
     shape's measured dimensions and its enchantments' tiers once its row's
     checks pass; a boss's numbers after its own rules; and a pinned boss floor
-    **straight after `RuleBossFloorRange`, before the retiring rule and the farm's
-    read the floor**, so a floor out of range is named as one whatever the tuning:
-    a dungeon pinned to floor 500 is the range rule's, where it had been
-    `RuleBossPaysLessThanTheFarm`'s, and `TuningFit` raises no offset for a floor
-    past the top and says nothing about it. What a variant `adds` the reader asks
+    **once `RuleBossFloorRange` has kept the 1 of each end, and before it asks
+    whether the range inverts or the retiring rule and the farm's read the
+    floor**, so a floor out of range is named as one, with the whole range,
+    whatever the tuning or the other end: a dungeon pinned to floor 500 is the
+    range rule's, where it had been `RuleBossPaysLessThanTheFarm`'s; a
+    `bossFloorMin` of 150 beside the tuning's deeper end is the range rule's too,
+    never `tuning.json BossFloorMax 10 is below bossFloorMin 150`; a
+    `bossFloorMax` of 0 is `bossFloorMax 0 is outside 1 to 99 - …`, never below
+    the other end; and `TuningFit` raises no offset for a floor past the top and
+    says nothing about it. What a variant `adds` the reader asks
     as it reads it, before summing it onto the class's baseline: summed, a raw
     `-1` would read as a composed stack one short, a `0` on a baseline modifier
     would add nothing in silence, and the largest whole number would wrap — so the

@@ -200,13 +200,15 @@ internal static class ContentBounds
     /// <see cref="TuningFit"/> can always serve: at <c>AcquiredHeadroom</c>'s clamp
     /// floor a farm banks 2, so floor 99 needs an offset of 98, inside
     /// <c>BossStackOffset</c>'s clamp (the suite asserts it off the schema).
-    /// Asked straight after the rule that keeps the 1, before anything reads the
-    /// floor, so a floor out of range is named as one whatever the tuning.
+    /// Asked once the rule that keeps the 1 has asked it of both ends, and before
+    /// that rule asks whether the range inverts or anything else reads the floor,
+    /// so a floor out of range is named as one, with the whole range, whatever the
+    /// tuning or the other end — never as a range that inverts.
     /// </summary>
     internal static NumberBound BossFloorMin { get; } = new(DungeonsJson.FileName, "bossFloorMin", 1, DeepestBossFloor, FloorWhy,
         KeptBy: ContentValidator.RuleBossFloorRange);
 
-    /// <summary>A pinned boss floor, the deeper end: kept as the shallower one is.</summary>
+    /// <summary>A pinned boss floor, the deeper end: kept as the shallower one is, its 1 the boss floor range's rule's and its top the range rule's, both asked before the range is asked whether it inverts.</summary>
     internal static NumberBound BossFloorMax { get; } = BossFloorMin with { Field = "bossFloorMax" };
 
     /// <summary>A boss's hit points: <see cref="ContentValidator.RuleBossStatline"/> keeps the 1, and no pool opens on a bigger bar.</summary>

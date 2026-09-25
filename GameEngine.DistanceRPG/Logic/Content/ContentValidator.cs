@@ -72,8 +72,10 @@ public static class ContentValidator
     /// (§5.4). A rule that bounded a field before the ruling keeps the end it owns,
     /// its detail now in this rule's form, and this is asked after it: of a class
     /// row once the row's own checks pass, of a weapon once its row's do, of a
-    /// pinned boss floor straight after <see cref="RuleBossFloorRange"/> and before
-    /// anything reads the floor, and of a boss after its own rules. What a variant
+    /// pinned boss floor once <see cref="RuleBossFloorRange"/> has kept the 1 of
+    /// each end, and before that rule asks whether the range inverts or anything
+    /// else reads the floor, so an inversion is never how a floor out of range is
+    /// named; and of a boss after its own rules. What a variant
     /// adds is asked by the reader, as it is read and before it is summed
     /// (<see cref="WeaponsJson"/>). A number is always its own file's to fix, so a
     /// built-in copy out of range is the master's (<c>StartupErrorScene.ClosingLine</c>).
@@ -666,10 +668,12 @@ public static class ContentValidator
     /// <item><strong>The boss can wield something</strong>: its drop table has a
     /// class an enemy fields.</item>
     /// <item><strong>The boss floor range</strong>, pinned or the tuning's,
-    /// starts at floor 1 and is not inverted; <strong>a pinned floor is no
-    /// deeper than any tuning can name</strong> (<see cref="RuleNumberInRange"/>,
-    /// <see cref="ContentBounds.BossFloorMin"/>), asked straight after, before
-    /// anything reads the floor; a retiring dungeon pins it —
+    /// starts at floor 1 at either end; <strong>a pinned floor is no deeper
+    /// than any tuning can name</strong> (<see cref="RuleNumberInRange"/>,
+    /// <see cref="ContentBounds.BossFloorMin"/>), asked next; and the range is
+    /// not inverted, asked last of the three, so an inversion is only ever of
+    /// two floors in range — all before anything else reads the floor; a
+    /// retiring dungeon pins it —
     /// the tutorial's two floors are the enchanter's mana budget, not a roll —
     /// and <strong>its deepest floor pays less than the farm banks</strong>
     /// (<see cref="RuleBossPaysLessThanTheFarm"/>): the tuning's own range is
@@ -738,21 +742,26 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleBossWieldsAClass,
                     $"{string.Join(", ", table)} carry {theme}, and no enemy fields any of them");
 
-            // The range starts at floor 1 and never inverts; then a floor the
-            // dungeon pins is no deeper than any tuning names — straight after,
-            // before the retiring rule or the farm's reads the floor, so a floor
-            // out of range is named as one whatever the tuning.
+            // Each end of the range starts at floor 1 — the 1 RuleBossFloorRange
+            // keeps, its detail the range rule's form; then a floor the dungeon
+            // pins is no deeper than any tuning names; and only then is the range
+            // asked whether it inverts, so an inversion is only ever of two floors
+            // in range, and a floor out of range is named as one, with the whole
+            // range, whatever the tuning or the other end. All of it before the
+            // retiring rule or the farm's reads the floor.
             var (min, max) = tables.BossFloorRange(def);
+            string minEnd = FloorEnd(def.BossFloorMin, ContentBounds.BossFloorMin, nameof(Tuning.BossFloorMin));
+            string maxEnd = FloorEnd(def.BossFloorMax, ContentBounds.BossFloorMax, nameof(Tuning.BossFloorMax));
             if (min < 1)
-                throw new ContentException(def.Id, RuleBossFloorRange,
-                    ContentBounds.Detail(ContentBounds.BossFloorMin, FloorEnd(def.BossFloorMin, ContentBounds.BossFloorMin, nameof(Tuning.BossFloorMin)), min));
-            if (max < min)
-                throw new ContentException(def.Id, RuleBossFloorRange,
-                    $"{FloorEnd(def.BossFloorMax, ContentBounds.BossFloorMax, nameof(Tuning.BossFloorMax))} {max} is below {FloorEnd(def.BossFloorMin, ContentBounds.BossFloorMin, nameof(Tuning.BossFloorMin))} {min}");
+                throw new ContentException(def.Id, RuleBossFloorRange, ContentBounds.Detail(ContentBounds.BossFloorMin, minEnd, min));
+            if (max < 1)
+                throw new ContentException(def.Id, RuleBossFloorRange, ContentBounds.Detail(ContentBounds.BossFloorMax, maxEnd, max));
             if (def.BossFloorMin is { } pinnedMin)
                 RequireInRange(def.Id, ContentBounds.BossFloorMin, pinnedMin, ContentBounds.BossFloorMin.Field);
             if (def.BossFloorMax is { } pinnedMax)
                 RequireInRange(def.Id, ContentBounds.BossFloorMax, pinnedMax, ContentBounds.BossFloorMax.Field);
+            if (max < min)
+                throw new ContentException(def.Id, RuleBossFloorRange, $"{maxEnd} {max} is below {minEnd} {min}");
             if (def.RetiresOnClear && (def.BossFloorMin is null || def.BossFloorMin != def.BossFloorMax))
                 throw new ContentException(def.Id, RuleRetiringDungeonPinsItsFloor,
                     $"floors {def.BossFloorMin?.ToString() ?? "unpinned"} to {def.BossFloorMax?.ToString() ?? "unpinned"}");

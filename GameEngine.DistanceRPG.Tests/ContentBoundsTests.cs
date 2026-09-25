@@ -237,6 +237,17 @@ public class ContentBoundsTests
         return DataTexts.InRow(text, "tutorial", $"\"bossFloorMax\": {tutorial.BossFloorMax},", $"\"bossFloorMax\": {max},");
     }
 
+    /// <summary>The Spear Hall, which pins neither end in the master, pinned at <paramref name="min"/> and <paramref name="max"/>: an end left null reads the tuning's, as the master's both do.</summary>
+    private static string SpearHallPinned(int? min, int? max)
+    {
+        string text = Shipped.Dungeons!;
+        if (min is { } shallower)
+            text = DataTexts.InRow(text, "spear_hall", "\"bossFloorMin\": null,", $"\"bossFloorMin\": {shallower},");
+        if (max is { } deeper)
+            text = DataTexts.InRow(text, "spear_hall", "\"bossFloorMax\": null,", $"\"bossFloorMax\": {deeper},");
+        return text;
+    }
+
     /// <summary>A case for each numbered row: every number is read off the master, never written here.</summary>
     private static IEnumerable<Case> Cases()
     {
@@ -289,8 +300,11 @@ public class ContentBoundsTests
             }
 
         // Row 10: the tutorial pinned v..v — its floor RuleBossFloorRange's, its top
-        // the range rule's, asked of the shallower end first.
+        // the range rule's, asked of the shallower end first; and the deeper end
+        // alone, the Spear Hall pinned from the first floor to v — its floor the
+        // boss floor range's too, never a range that inverts.
         yield return new(ContentBounds.BossFloorMin, "tutorial", "bossFloorMin", v => WithDungeons(TutorialPinned(v, v)));
+        yield return new(ContentBounds.BossFloorMax, "spear_hall", "bossFloorMax", v => WithDungeons(SpearHallPinned(ContentBounds.BossFloorMin.Min, v)));
 
         // Rows 11-13: the golem's statline and its innate Block, each floor the rule's that kept it.
         string dungeons = Shipped.Dungeons!;
@@ -312,11 +326,10 @@ public class ContentBoundsTests
         // the file, the entry, the field, the number and the whole range — under the
         // range rule, or, for the end an older rule keeps, under that rule, its detail
         // in the same form.
-        // Every row has its case here but three: the forged counts', both ends of
-        // which an older rule keeps (TheBaselineAndTheRaisesKeepTheirRules), and the
-        // deeper floor's, whose ends are asked below.
+        // Every row has its case here but two: the forged counts', both ends of
+        // which an older rule keeps (TheBaselineAndTheRaisesKeepTheirRules).
         var cases = Cases().ToList();
-        Assert.Equal(ContentBounds.All.Except([ContentBounds.Baseline, ContentBounds.Forged, ContentBounds.BossFloorMax]).Select(row => row.Field).Order(StringComparer.Ordinal),
+        Assert.Equal(ContentBounds.All.Except([ContentBounds.Baseline, ContentBounds.Forged]).Select(row => row.Field).Order(StringComparer.Ordinal),
             cases.Select(c => c.Row.Field).Distinct().Order(StringComparer.Ordinal));
         foreach (var c in cases)
         {
@@ -341,21 +354,50 @@ public class ContentBoundsTests
         });
         Assert.Equal(Enchantment.UniqueTier, soul.Content!.Weapons.Instantiate("flensing_knife_unique").Enchantments[0].Tier);
 
-        // The deeper end alone: the Spear Hall pins only its bossFloorMax, reading
-        // the shallower from the tuning. At the deepest it plays; past it the range
-        // rule names that end. Its floor is the boss floor range's, as a range that
-        // inverts: pinned 1..0.
-        string SpearHallMax(int v) => DataTexts.InRow(Shipped.Dungeons!, "spear_hall", "\"bossFloorMax\": null,", $"\"bossFloorMax\": {v},");
-        Assert.Null(ShippedData.Load(Shipped with { Dungeons = SpearHallMax(ContentBounds.BossFloorMax.Max) }).Error);
-        var deeper = Fails(Shipped with { Dungeons = SpearHallMax(ContentBounds.BossFloorMax.Max + 1) });
-        Assert.Equal((DungeonsJson.FileName, false, "spear_hall", ContentValidator.RuleNumberInRange), Stamp(deeper));
-        Assert.Equal(Outside(ContentBounds.BossFloorMax, "bossFloorMax", ContentBounds.BossFloorMax.Max + 1), deeper.Detail);
-        var inverted = Fails(Shipped with { Dungeons = TutorialPinned(1, 0) });
-        Assert.Equal((DungeonsJson.FileName, false, "tutorial", ContentValidator.RuleBossFloorRange), Stamp(inverted));
-        Assert.Equal("bossFloorMax 0 is below bossFloorMin 1", inverted.Detail);
-        var belowTheTuning = Fails(Shipped with { Dungeons = SpearHallMax(0) });
-        Assert.Equal((DungeonsJson.FileName, false, "spear_hall", ContentValidator.RuleBossFloorRange), Stamp(belowTheTuning));
-        Assert.Equal($"bossFloorMax 0 is below tuning.json BossFloorMin {ShippedContent.Tuning.BossFloorMin}", belowTheTuning.Detail);
+        // One end pinned and the other the tuning's: the Spear Hall pinning its
+        // bossFloorMax alone, or its bossFloorMin alone. At the deepest it plays; one
+        // floor outside the range, the end it pins is named out of range with the
+        // whole range — below the first floor the boss floor range's rule, past the
+        // deepest the range rule — and never as a range inverted against the
+        // tuning's other end.
+        var tuning = ShippedContent.Tuning;
+        Assert.Null(ShippedData.Load(Shipped with { Dungeons = SpearHallPinned(null, ContentBounds.BossFloorMax.Max) }).Error);
+        foreach (var (row, pinned, v, rule) in new[]
+        {
+            (ContentBounds.BossFloorMax, SpearHallPinned(null, ContentBounds.BossFloorMax.Max + 1), ContentBounds.BossFloorMax.Max + 1, ContentValidator.RuleNumberInRange),
+            (ContentBounds.BossFloorMax, SpearHallPinned(null, ContentBounds.BossFloorMax.Min - 1), ContentBounds.BossFloorMax.Min - 1, ContentValidator.RuleBossFloorRange),
+            (ContentBounds.BossFloorMin, SpearHallPinned(ContentBounds.BossFloorMin.Max + 1, null), ContentBounds.BossFloorMin.Max + 1, ContentValidator.RuleNumberInRange),
+        })
+        {
+            var outside = Fails(Shipped with { Dungeons = pinned });
+            Assert.Equal((DungeonsJson.FileName, false, "spear_hall", rule), Stamp(outside));
+            Assert.Equal(Outside(row, row.Field, v), outside.Detail);
+        }
+
+        // Both ends pinned, the deeper below the first floor: out of range as well,
+        // never a range that inverts.
+        var belowTheFirst = Fails(Shipped with { Dungeons = TutorialPinned(ContentBounds.BossFloorMin.Min, ContentBounds.BossFloorMax.Min - 1) });
+        Assert.Equal((DungeonsJson.FileName, false, "tutorial", ContentValidator.RuleBossFloorRange), Stamp(belowTheFirst));
+        Assert.Equal(Outside(ContentBounds.BossFloorMax, "bossFloorMax", ContentBounds.BossFloorMax.Min - 1), belowTheFirst.Detail);
+
+        // An inverted range is two floors in range the wrong way round, and the boss
+        // floor range's rule names it so, an end the dungeon leaves to the tuning
+        // named as its key: both ends pinned; the shallower pinned past the tuning's
+        // deeper; the deeper pinned short of a tuning's shallower.
+        int first = ContentBounds.BossFloorMin.Min;
+        foreach (var (entry, texts, detail) in new[]
+        {
+            ("tutorial", Shipped with { Dungeons = TutorialPinned(first + 1, first) }, $"bossFloorMax {first} is below bossFloorMin {first + 1}"),
+            ("spear_hall", Shipped with { Dungeons = SpearHallPinned(tuning.BossFloorMax + 1, null) },
+                $"tuning.json BossFloorMax {tuning.BossFloorMax} is below bossFloorMin {tuning.BossFloorMax + 1}"),
+            ("spear_hall", Shipped with { Tuning = $$"""{ "{{nameof(Tuning.BossFloorMin)}}": {{first + 1}} }""", Dungeons = SpearHallPinned(null, first) },
+                $"bossFloorMax {first} is below tuning.json BossFloorMin {first + 1}"),
+        })
+        {
+            var inverted = Fails(texts);
+            Assert.Equal((DungeonsJson.FileName, false, entry, ContentValidator.RuleBossFloorRange), Stamp(inverted));
+            Assert.Equal(detail, inverted.Detail);
+        }
 
         // Row 10's top holds the fit to its reason: at AcquiredHeadroom's clamp
         // floor a farm banks FarmBanks of it, and BossStackOffset's clamp reaches
