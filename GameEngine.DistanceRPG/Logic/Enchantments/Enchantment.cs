@@ -77,7 +77,8 @@ public enum TargetSide
 }
 
 /// <summary>
-/// One row of §5.7 <c>enchantments.json</c>. An entry quotes a flat
+/// One row of the game's §5.7 enchantment catalogue
+/// (<see cref="EnchantmentDefinitions"/>). An entry quotes a flat
 /// <see cref="Trigger"/> cost or applies a status (<see cref="Applies"/>),
 /// never both: a status applier prices its trigger off the levels it applies,
 /// so a flat cost would decay into free. <see cref="Unique"/> says one thing

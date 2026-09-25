@@ -98,9 +98,9 @@ internal static class JsonText
 /// <para>
 /// Every failure is a <see cref="ContentException"/> under
 /// <see cref="ContentValidator.RuleFileShape"/> (or the rule a caller names,
-/// such as <see cref="ContentValidator.RuleUnknownEffect"/>), naming the entry
+/// such as <see cref="ContentValidator.RuleUnknownId"/>), naming the entry
 /// and carrying the detail <c>file: path: problem</c> — the path in the file's
-/// own terms (<c>enchantments[4].lock</c>) — so the failure says where it is
+/// own terms (<c>weapons[4].damage</c>) — so the failure says where it is
 /// even before the load stamps its file on it. Enum values are the C# member
 /// names, exactly (an ordinal, a case changed or a number are refused), and a
 /// near miss says which name it is near.

@@ -498,8 +498,9 @@ public class CampaignSaveTests
         Assert.Equal(campaign.SeenInOrder, restored.SeenInOrder);
         Assert.All(campaign.SeenInOrder, id => Assert.True(restored.HasSeen(id), id));
 
-        // ...and so it does under an enchantments.json whose entries run in the
-        // opposite order: an id means its entry wherever the file puts it.
+        // ...and so it does under a catalogue whose entries run in the opposite
+        // order (a code edit, simulated): an id means its entry wherever the
+        // catalogue puts it.
         var reversed = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Reverse().ToArray());
         using (TestContent.Use(enchantments: reversed))
         {
@@ -735,7 +736,7 @@ public class CampaignSaveTests
     {
         // PHASE5-094's other half: "reordering a file is then free and appending
         // to one costs nothing". The same save, restored under a weapons.json and
-        // an enchantments.json whose entries run backwards, is the same campaign
+        // an enchantment catalogue whose entries run backwards, is the same campaign
         // item for item — every weapon its own row, every entry its own soul — as
         // the document it writes shows.
         var campaign = NewCampaign();

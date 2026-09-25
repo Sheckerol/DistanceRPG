@@ -46,8 +46,8 @@ public class StartupErrorTests
             "FILE: RESTRICTED.JSON",
             "ENTRY: BLOK",
             "RULE: ID DOES NOT RESOLVE TO A MODIFIER OR AN ENCHANTMENT",
-            "DETAIL: NOT A MODIFIER, NOR AN ENCHANTMENT IN ENCHANTMENTS.JSON",
-            "  - DID YOU MEAN BLOCK?",
+            "DETAIL: NOT A MODIFIER, NOR AN ENCHANTMENT IN THE GAME'S",
+            "  CATALOGUE - DID YOU MEAN BLOCK?",
             "TUNING.JSON CHANGES 1 NUMBER: MOVEMENTBUDGET 200",
             "FIX THE FILE AND START AGAIN - ESC QUITS",
         ], lines);
@@ -94,23 +94,23 @@ public class StartupErrorTests
         Assert.Equal(["DistanceRpgGame.LoadData", "StartupErrorScene..ctor"], Callers(lines));
 
         // And the screen it builds holds the failure's lines and, under them, the
-        // load's notices — here, that no enchantments.json was found, which is what
-        // the relations beside it broke: the built-in elements, against a
-        // restricted.json that opposes shocking to flaming as well as cold.
+        // load's notices — here, that no weapons.json was found, which is what the
+        // relations beside it broke: the built-in weapons, against a
+        // restricted.json that groups Push with Block.
         var shipped = DataTexts.Shipped;
         var load = ContentFiles.Load(shipped with
         {
-            Enchantments = null,
-            Restricted = DataTexts.Edit(shipped.Restricted!, "[\"flaming\", \"cold\"]", "[\"flaming\", \"cold\", \"shocking\"]"),
+            Weapons = null,
+            Restricted = DataTexts.Edit(shipped.Restricted!, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],"),
         });
         var scene = new StartupErrorScene(game: null!, load.Error!, load.TuningOverrides, load.Notices);
         Assert.Equal(StartupErrorScene.Lines(load.Error!, load.TuningOverrides), scene.Rows);
-        Assert.Equal("FILE: ENCHANTMENTS.JSON (COMPILED)", scene.Rows[1]);
-        Assert.Equal("ENTRY: FLAMING", scene.Rows[2]);
-        Assert.Contains("IN RESTRICTED.JSON EXCLUDES", string.Join(" ", scene.Rows.Select(row => row.Trim())));
-        Assert.Equal(["enchantments.json is missing - the built-in enchantments are playing"], load.Notices);
+        Assert.Equal("FILE: WEAPONS.JSON (COMPILED)", scene.Rows[1]);
+        Assert.Equal("ENTRY: ARMING_SWORD", scene.Rows[2]);
+        Assert.Contains("RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]", string.Join(" ", scene.Rows.Select(row => row.Trim())));
+        Assert.Equal(["weapons.json is missing - the built-in weapons are playing"], load.Notices);
         Assert.Equal(NoticeText.Rows(load.Notices), scene.NoticeRows);
-        Assert.Equal(["ENCHANTMENTS.JSON IS MISSING - THE BUILT-IN ENCHANTMENTS ARE", "  PLAYING"], scene.NoticeRows);
+        Assert.Equal(["WEAPONS.JSON IS MISSING - THE BUILT-IN WEAPONS ARE PLAYING"], scene.NoticeRows);
         Assert.Empty(new StartupErrorScene(game: null!, load.Error!, load.TuningOverrides).NoticeRows);
     }
 }

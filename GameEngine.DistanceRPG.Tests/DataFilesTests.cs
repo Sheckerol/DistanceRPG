@@ -25,9 +25,9 @@ public class DataFilesTests
         }
     }
 
-    /// <summary>The data files the edge reads, in §5.4's order: the tuning, then the five content files — the relations, the enchantments, the weapons, the dungeons, the roster.</summary>
+    /// <summary>The data files the edge reads, in the load order: the tuning, then the three content files — the relations, the weapons, the dungeons.</summary>
     private static readonly string[] FilesRead =
-        [TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName, PartyJson.FileName];
+        [TuningJson.FileName, RestrictedJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName];
 
     [Fact]
     public void ReadsWhatIsBesideTheExecutable_AndNothingThatIsAbsent()
@@ -43,7 +43,7 @@ public class DataFilesTests
             Assert.Equal(FilesRead.Select(name => $"[Data] {Path.Combine(folder, name)} is missing - the built-in one plays"), report);
 
             // A tuning.json alone: read whole, reported by its path in that folder,
-            // and the five content files looked for and reported missing — the
+            // and the three content files looked for and reported missing — the
             // compiled records play for them.
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             report.Clear();
@@ -83,10 +83,8 @@ public class DataFilesTests
             Assert.Collection(report,
                 line => Assert.StartsWith($"[Data] {path} could not be read (", line, StringComparison.Ordinal),
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, RestrictedJson.FileName)}", line),
-                line => Assert.Equal($"[Data] Read {Path.Combine(folder, EnchantmentsJson.FileName)}", line),
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, WeaponsJson.FileName)}", line),
-                line => Assert.Equal($"[Data] Read {Path.Combine(folder, DungeonsJson.FileName)}", line),
-                line => Assert.Equal($"[Data] Read {Path.Combine(folder, PartyJson.FileName)}", line));
+                line => Assert.Equal($"[Data] Read {Path.Combine(folder, DungeonsJson.FileName)}", line));
 
             var load = ContentFiles.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
@@ -139,11 +137,65 @@ public class DataFilesTests
             Assert.Equal(FilesRead.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
             Assert.Equal(Encoding.UTF8.GetBytes(written.Tuning!), File.ReadAllBytes(path));
             Assert.Equal(Encoding.UTF8.GetBytes(written.Restricted!), File.ReadAllBytes(Path.Combine(target, RestrictedJson.FileName)));
-            Assert.Equal(Encoding.UTF8.GetBytes(written.Enchantments!), File.ReadAllBytes(Path.Combine(target, EnchantmentsJson.FileName)));
             Assert.Equal(Encoding.UTF8.GetBytes(written.Weapons!), File.ReadAllBytes(Path.Combine(target, WeaponsJson.FileName)));
             Assert.Equal(Encoding.UTF8.GetBytes(written.Dungeons!), File.ReadAllBytes(Path.Combine(target, DungeonsJson.FileName)));
-            Assert.Equal(Encoding.UTF8.GetBytes(written.Party!), File.ReadAllBytes(Path.Combine(target, PartyJson.FileName)));
             Assert.Equal(written, DataFiles.Read(target));
+        });
+    }
+
+    [Fact]
+    public void ARetiredFileBesideTheGameIsSaid_AndNotRead()
+    {
+        // The content rework (1c): the starting party and the enchantment catalogue
+        // are code, by the user's ruling of 2026-09-25, so a party.json left beside
+        // the game — a playtester's edited copy, say — is never read. The edge
+        // names it, and the log gives its path; the load says it is no longer read,
+        // and where the party lives now; and the party that plays is the code's.
+        InTempFolder(folder =>
+        {
+            DataFiles.Write(folder, ContentFiles.WriteDefaults());
+            string party = Path.Combine(folder, "party.json");
+            File.WriteAllText(party, """{ "members": [{ "id": "A", "name": "Edited", "stats": { "STR": 4, "DEX": 3, "CON": 2, "INT": 1 } }] }""");
+            var report = new List<string>();
+            var texts = DataFiles.Read(folder, report.Add);
+
+            Assert.Equal(["party.json"], texts.Retired);
+            Assert.Equal(
+            [
+                .. FilesRead.Select(name => $"[Data] Read {Path.Combine(folder, name)}"),
+                $"[Data] {party}: party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
+            ], report);
+
+            var load = ContentFiles.Load(texts);
+            Assert.Null(load.Error);
+            Assert.Equal(["party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)"], load.Notices);
+            Assert.Equal("PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE (LOGIC/CONTENT/STARTINGPARTY.CS)",
+                string.Join(" ", NoticeText.Rows(load.Notices).Select(row => row.Trim())));
+            Assert.Equal(StartingParty.Data.Members, load.Content!.Party.All);
+            Assert.Empty(load.TuningOverrides);
+
+            // Never read, so never unreadable: a copy an editor holds open is named
+            // all the same. The catalogue's retired file is said the same way, and
+            // both in the order the edge looks, beside the four it reads.
+            File.WriteAllText(Path.Combine(folder, "enchantments.json"), "not even JSON");
+            report.Clear();
+            using (new FileStream(party, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                texts = DataFiles.Read(folder, report.Add);
+            Assert.Equal(["enchantments.json", "party.json"], texts.Retired);
+            Assert.Null(texts.Unreadable);
+            Assert.Equal(FilesRead.Length + 2, report.Count);
+            Assert.Equal(
+            [
+                "enchantments.json is no longer read - the enchantment catalogue is in the code (Logic/Enchantments/EnchantmentDefinitions.cs)",
+                "party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
+            ], ContentFiles.Load(texts).Notices);
+
+            // And with neither there, nothing is said of them at all.
+            File.Delete(party);
+            File.Delete(Path.Combine(folder, "enchantments.json"));
+            report.Clear();
+            Assert.Null(DataFiles.Read(folder, report.Add).Retired);
+            Assert.Equal(FilesRead.Select(name => $"[Data] Read {Path.Combine(folder, name)}"), report);
         });
     }
 

@@ -454,7 +454,7 @@ public class ProgressionStateTests
     public void From_RejectsARosterEntryThatNamesAMissingWeapon()
     {
         // From trusts its def, and the loader is what makes that safe: a typo in
-        // party.json is a ContentException naming the member and the rule, raised
+        // the starting party is a ContentException naming the member and the rule, raised
         // before anything spawns -- never a KeyNotFoundException halfway through
         // building the party, with two members on the floor and two not.
         var typo = new PartyData(ShippedContent.Party.Members

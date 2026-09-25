@@ -14,7 +14,10 @@ namespace GameEngine.DistanceRPG;
 /// <para>
 /// Every file read, looked for and not found, or found and not readable, is
 /// reported with its full path. That is how a playtester finds the copy to edit,
-/// and how a log says which file a game ran under.
+/// and how a log says which file a game ran under. So is a file the game no
+/// longer reads that is found there anyway — <c>enchantments.json</c>,
+/// <c>party.json</c> (<see cref="ContentFiles.Retired"/>) — which is looked for,
+/// never read.
 /// </para>
 /// </summary>
 internal static class DataFiles
@@ -22,16 +25,22 @@ internal static class DataFiles
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// The data files in <paramref name="directory"/>, in §5.4's order. Each is
+    /// The data files in <paramref name="directory"/>, in the load order. Each is
     /// null when it is not there, or when it is there and could not be read. An
     /// unreadable file is also listed in <see cref="ContentTexts.Unreadable"/>
     /// with the reason (<see cref="Why"/>), so the screen can say what happened
     /// instead of calling it missing. Each file read, missed or unreadable is
     /// reported to <paramref name="report"/> with its full path, and an
-    /// unreadable one with the whole error too: all six — <c>tuning.json</c>,
-    /// then the five content files, <c>restricted.json</c>,
-    /// <c>enchantments.json</c>, <c>weapons.json</c>, <c>dungeons.json</c> and
-    /// <c>party.json</c>.
+    /// unreadable one with the whole error too: all four — <c>tuning.json</c>,
+    /// then the three content files, <c>restricted.json</c>, <c>weapons.json</c>
+    /// and <c>dungeons.json</c>.
+    /// <para>
+    /// Then the files the game no longer reads (<see cref="ContentFiles.Retired"/>)
+    /// are looked for, in ordinal order, and never opened: each one there is listed
+    /// in <see cref="ContentTexts.Retired"/>, for the load to say, and reported
+    /// with its full path. One that is not there is not reported at all — the game
+    /// has not looked for it since it stopped being read.
+    /// </para>
     /// </summary>
     public static ContentTexts Read(string directory, Action<string>? report = null)
     {
@@ -39,13 +48,22 @@ internal static class DataFiles
         var unreadable = new Dictionary<string, string>(StringComparer.Ordinal);
         string? tuning = ReadOne(directory, TuningJson.FileName, unreadable, report);
         string? restricted = ReadOne(directory, RestrictedJson.FileName, unreadable, report);
-        string? enchantments = ReadOne(directory, EnchantmentsJson.FileName, unreadable, report);
         string? weapons = ReadOne(directory, WeaponsJson.FileName, unreadable, report);
         string? dungeons = ReadOne(directory, DungeonsJson.FileName, unreadable, report);
-        string? party = ReadOne(directory, PartyJson.FileName, unreadable, report);
-        return new ContentTexts(Tuning: tuning, Restricted: restricted, Enchantments: enchantments,
-            Weapons: weapons, Dungeons: dungeons, Party: party,
-            Unreadable: unreadable.Count == 0 ? null : unreadable);
+
+        var retired = new List<string>();
+        foreach (var (name, notice) in ContentFiles.Retired.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            string path = Path.Combine(directory, name);
+            if (!File.Exists(path))
+                continue;
+            report?.Invoke($"[Data] {path}: {notice}");
+            retired.Add(name);
+        }
+
+        return new ContentTexts(Tuning: tuning, Restricted: restricted, Weapons: weapons, Dungeons: dungeons,
+            Unreadable: unreadable.Count == 0 ? null : unreadable,
+            Retired: retired.Count == 0 ? null : retired);
     }
 
     /// <summary>
@@ -83,16 +101,14 @@ internal static class DataFiles
             : $"[Data] {path} changes {overrides.Count} {(overrides.Count == 1 ? "number" : "numbers")}: {string.Join(", ", overrides)}";
     }
 
-    /// <summary>Each file's name and text, in §5.4's order.</summary>
+    /// <summary>Each file's name and text, in the load order.</summary>
     private static IEnumerable<(string Name, string? Text)> Files(ContentTexts texts)
     {
         var names = ContentFiles.FileNames;
         yield return (names[0], texts.Tuning);
         yield return (names[1], texts.Restricted);
-        yield return (names[2], texts.Enchantments);
-        yield return (names[3], texts.Weapons);
-        yield return (names[4], texts.Dungeons);
-        yield return (names[5], texts.Party);
+        yield return (names[2], texts.Weapons);
+        yield return (names[3], texts.Dungeons);
     }
 
     /// <summary>

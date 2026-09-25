@@ -2,13 +2,17 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The well-formedness checks content must pass before anything reads it
-/// (§5.4–§5.9). The relations are validated first because they are the
-/// predicates everything after them is checked against; the enchantments next,
-/// because the weapons name them; then the weapons; then the dungeons, whose
-/// themes name modifiers and whose drop tables are computed over the weapons;
-/// the roster last, because it names specific weapons. Every failure throws a
-/// <see cref="ContentException"/> naming the entry and the rule; the first
+/// (§5.4–§5.9). The enchantment catalogue is checked first, on its own — it is
+/// the game's code, reference data by the user's ruling of 2026-09-25, and
+/// needs nothing else; then the relations, because they are the predicates
+/// everything after them is checked against, and the catalogue against them;
+/// then the weapons, which name enchantments; then the dungeons, whose themes
+/// name modifiers and whose drop tables are computed over the weapons; the
+/// starting party last, because it names specific weapons. Every failure throws
+/// a <see cref="ContentException"/> naming the entry and the rule; the first
 /// failure aborts, in a fixed check order, so the report is deterministic.
+/// (§5.7's "every effect reference resolves to an EffectKind" holds by
+/// construction: a catalogue row's effect is typed.)
 /// </summary>
 public static class ContentValidator
 {
@@ -20,9 +24,6 @@ public static class ContentValidator
     /// new invariant: the record it reads to is checked by every rule below.
     /// </summary>
     public const string RuleFileShape = "a content file is well-formed JSON of its documented shape";
-
-    /// <summary>§5.7's "every effect reference resolves to an EffectKind" (S:280): an entry names its behaviour, and a name that is no kind would fire nothing — "a typo is not a silent no-op". Checked as <c>enchantments.json</c> is read, since the reader resolves the name.</summary>
-    public const string RuleUnknownEffect = "every effect reference resolves to an EffectKind";
 
     public const string RuleUnknownId = "id does not resolve to a modifier or an enchantment";
     public const string RuleModifierRelationIds = "a modifier relation may only name modifier ids";
@@ -368,12 +369,14 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.9 checks on <c>party.json</c>, run last because a member names
-    /// weapons: the roster is exactly <see cref="GameConstants.PartySize"/>
-    /// long, no id is declared twice, every spread is a permutation of 1–4
-    /// (§2.1, and §5.7's list — "free to check and silently wrong if it
-    /// drifts"), a member's weapons fit their inventory and resolve in the
-    /// catalogue, and somebody in the party is a caster.
+    /// The §5.9 checks on the starting party — code (<see cref="StartingParty"/>),
+    /// by the user's ruling of 2026-09-25 — run last because a member names
+    /// weapons, at a stage the load stamps <c>weapons.json</c>, the one file an
+    /// edit to could break it: the roster is exactly
+    /// <see cref="GameConstants.PartySize"/> long, no id is declared twice, every
+    /// spread is a permutation of 1–4 (§2.1, and §5.7's list — "free to check and
+    /// silently wrong if it drifts"), a member's weapons fit their inventory and
+    /// resolve in the catalogue, and somebody in the party is a caster.
     /// <para>
     /// The size check is the one that would otherwise fail silently: the scene
     /// spawns over the tiles it found for its own colour capacity, so a fifth
@@ -585,9 +588,9 @@ public static class ContentValidator
     /// the same id. <paramref name="knownIds"/> is every modifier and enchantment
     /// id content may name. (The "every forgedOnly id is forged on at least one
     /// weapon" check needs the weapon list and lives with the weapon checks.)
-    /// An id that resolves to nothing is checked against the enchantment ids
-    /// <c>enchantments.json</c> declared, so its detail names that file, and the
-    /// id it is nearest when it is a typo of one.
+    /// An id that resolves to nothing is checked against the enchantment ids of
+    /// the game's catalogue (<see cref="EnchantmentDefinitions"/>), so its detail
+    /// says so, and names the id it is nearest when it is a typo of one.
     /// </summary>
     public static void ValidateRestricted(RestrictedData data, IReadOnlySet<string> knownIds)
     {
@@ -747,10 +750,15 @@ public static class ContentValidator
     /// fires once, a percentage of the blow — so none of them is asked. It is
     /// the row that is checked, not what a §5.3 dial may lay over it
     /// (<see cref="Tuning.ArcanePotency"/> does for the one id it names): a
-    /// file has to state the magnitude it ships with, or content and tuning
+    /// row has to state the magnitude it ships with, or content and tuning
     /// disagree silently about what an entry is worth. The dial being keyed by
     /// id is what keeps this rule meaning something: every row it checks that no
     /// dial names is a row the game reads the magnitude from.
+    /// </para>
+    /// <para>
+    /// The game's catalogue is code (<see cref="EnchantmentDefinitions"/>), so the
+    /// load asks this first and on its own, stamping no file: no data file can
+    /// break a rule here, only a code edit, which the suite catches first.
     /// </para>
     /// </summary>
     public static void ValidateEnchantments(EnchantmentsData data)
@@ -783,8 +791,8 @@ public static class ContentValidator
         // The drop pool is an ordered id list held in code (§3.1), so that
         // appending a catalogue entry cannot silently re-index what an
         // already-saved dummy drops. The cost of holding it there is that it can
-        // name something the file does not: refused here, the way every other
-        // dangling reference is, rather than throwing at the first drop rolled.
+        // name something the catalogue does not: refused here, the way every
+        // other dangling reference is, rather than throwing at the first drop rolled.
         foreach (var id in LootTable.DropPool)
             if (!seen.Contains(id))
                 throw new ContentException(id, RuleDropPoolResolves);
@@ -797,8 +805,9 @@ public static class ContentValidator
     /// <c>neverRolled</c> names nothing but unique entries — so declaring one
     /// and forgetting the other aborts startup rather than letting a unique
     /// appear in the enchanter's catalogue. <see cref="EnchantmentCatalogue"/>
-    /// runs this itself as well, at the enchantments' stage of the load; the
-    /// detail names <c>restricted.json</c>, the other file of the two.
+    /// runs this itself as well, at <c>restricted.json</c>'s stage of the load:
+    /// the flag is the code's (<see cref="EnchantmentDefinitions"/>), so the file
+    /// to fix is <c>restricted.json</c>, and the detail names it.
     /// </summary>
     public static void ValidateNeverRolled(EnchantmentsData data, RestrictedData restricted)
     {
@@ -823,8 +832,9 @@ public static class ContentValidator
     /// <paramref name="restricted"/> oppose every element to exactly one other,
     /// both ways. Returns the chart it validated — each type to the one that
     /// opposes it — for the catalogue to answer the type-chart step with. Run at
-    /// the enchantments' stage of the load, so a pair the groups get wrong names
-    /// <c>restricted.json</c> in its detail.
+    /// <c>restricted.json</c>'s stage of the load — the elements are the code's,
+    /// the pairs the file's — so a pair the groups get wrong is stamped with that
+    /// file and names its <c>excludes</c> in the detail.
     /// </summary>
     public static IReadOnlyDictionary<DamageType, DamageType> ValidateOpposition(EnchantmentsData data, RestrictedData restricted)
     {
@@ -1454,9 +1464,9 @@ public static class ContentValidator
 
     /// <summary>
     /// Every id in <paramref name="ids"/> is a modifier or an enchantment. The
-    /// detail names the file the enchantment ids come from — the relations are
-    /// checked against it — and the known id a typo is nearest, walked in ordinal
-    /// order so the one suggested is the same every run.
+    /// detail says where the enchantment ids come from — the game's catalogue,
+    /// which is code — and names the known id a typo is nearest, walked in
+    /// ordinal order so the one suggested is the same every run.
     /// </summary>
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)
     {
@@ -1465,7 +1475,7 @@ public static class ContentValidator
             {
                 string? near = TuningSchema.Nearest(id, knownIds.Order(StringComparer.Ordinal));
                 throw new ContentException(id, RuleUnknownId,
-                    $"not a modifier, nor an enchantment in {EnchantmentsJson.FileName}" + (near is null ? "" : $" - did you mean {near}?"));
+                    "not a modifier, nor an enchantment in the game's catalogue" + (near is null ? "" : $" - did you mean {near}?"));
             }
     }
 

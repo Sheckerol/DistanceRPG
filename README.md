@@ -43,7 +43,7 @@ with `RESUMED` over the floor banner (see [Saves](#saves)).
 | --- | --- |
 | W/S / arrows | Choose a dungeon (a locked one shows its countdown and is skipped) |
 | Enter | Descend into the chosen dungeon |
-| N, then N | New campaign: the party from `party.json`, nothing played. It asks first, and replaces the saved campaign; any other key after the first N keeps it |
+| N, then N | New campaign: the starting party (`Logic/Content/StartingParty.cs`), nothing played. It asks first, and replaces the saved campaign; any other key after the first N keeps it |
 | Esc | Save the campaign and quit (with NEW CAMPAIGN asked, Esc only answers no) |
 
 | In a dungeon | Action |
@@ -199,10 +199,10 @@ every key.
 
 ## The content files
 
-Five content files sit beside `tuning.json` (`docs/roadmap/phase-5-save.md`
-§5.4–§5.9): `restricted.json`, `enchantments.json`, `weapons.json`,
-`dungeons.json` and `party.json`. They are read once, when the game starts, in
-that order, and everything in them is named by a stable string id.
+Three content files sit beside `tuning.json` (`docs/roadmap/phase-5-save.md`
+§5.4–§5.9): `restricted.json`, `weapons.json` and `dungeons.json`. They are read
+once, when the game starts, in that order, after the game's own catalogues, and
+everything in them is named by a stable string id.
 
 - **`restricted.json`** holds the relations: what may sit together on a weapon
   and what may be rolled, for modifiers and enchantments alike. `excludes` is a
@@ -214,10 +214,19 @@ that order, and everything in them is named by a stable string id.
   enchantment in either stops the game.
   A relation is an edit here, never a rebuild: take the crit riders' group
   (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
-- **`enchantments.json`** holds the catalogue and the unique souls, one entry
-  each, every entry naming all eleven fields. `effect` names the behaviour — one
-  of the game's `EffectKind` names, since the behaviour itself is code — so a new
-  entry of an existing kind is a data edit.
+- **The enchantment catalogue and the unique souls are code**
+  (`Logic/Enchantments/EnchantmentDefinitions.cs`); so is the starting party
+  (`Logic/Content/StartingParty.cs`) — a change to either is a rebuild, and a new
+  campaign starts with the party the code names (a saved campaign keeps the party
+  it started with). Both are still checked when the game starts, against the
+  files beside it. The catalogue's dialled numbers — the `applyPercent` of
+  `flaming`, `cold`, `shocking`, `acidic` and `serrated`, and `arcane`'s
+  `potency` — are `tuning.json`'s `ApplyPercent` and `ArcanePotency`: turn them
+  there. `enchantments.json` and `party.json` are no longer read: a build
+  removes the old copies beside the exe (an edit in one is lost with it), and a
+  copy found there anyway is named on screen as no longer read
+  (`PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE
+  (LOGIC/CONTENT/STARTINGPARTY.CS)`), its path in the log.
 - **`weapons.json`** holds every weapon: the thirty-two variants (eight classes
   of four) and the uniques, each with its statline (`range`, `damage`, `cost`,
   `manaCost`), its forged spread (`"forged": { "Block": 1, "Push": 1 }`), the
@@ -234,15 +243,9 @@ that order, and everything in them is named by a stable string id.
   drops is computed from its theme and `restricted.json`, so taking `Brace` out
   of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
   with no edit to this file.
-- **`party.json`** holds the four who start a campaign: `id`, `name`, `stats`
-  (`STR`, `DEX`, `CON` and `INT`, the numbers 1 to 4 in some order),
-  `startingWeaponId` and `bagWeaponIds`. A campaign starts with the party this
-  file names, and a saved campaign keeps the party it started with: to play an
-  edited roster — two members' `stats` swapped, say — start a new campaign
-  (N, then N, between runs, or `--new-campaign` at launch).
 - **A row marked `/* provisional */`** after its id is one the docs did not fix
-  — the four dungeons beside the tutorial and their bosses, the three unnamed
-  uniques, `aegis` and `burning` — a first guess, expected to move after play.
+  — the four dungeons beside the tutorial and their bosses, and the three
+  unnamed uniques — a first guess, expected to move after play.
 - **Edit the copies beside the exe** (`bin/Debug/net10.0/`), as with
   `tuning.json`: the ones in `GameEngine.DistanceRPG/Data/` are generated from
   `Logic/Content/ContentDefaults.cs` and pinned by `ShippedDataTests`. The file
@@ -255,33 +258,28 @@ that order, and everything in them is named by a stable string id.
   such as `"Riposte": ["Blok"]` shows `RESTRICTED.JSON`, `BLOK` and `ID DOES NOT
   RESOLVE TO A MODIFIER OR AN ENCHANTMENT - DID YOU MEAN BLOCK?`. A field the game
   does not know, a value of the wrong kind, or a file that is not JSON is refused
-  the same way, naming the path in the file (`enchantments[8].effect`). Comments
+  the same way, naming the path in the file (`dungeons[1].boss.maxHp`). Comments
   and trailing commas are fine.
-- **What is reported first**: the files load in the order tuning, relations,
-  enchantments, weapons, dungeons, roster, and the first check to fail is the one
-  shown. Each file's shape is checked before anything reads it, and
-  `enchantments.json`'s shape comes before `restricted.json`'s own rules, because
-  those check the relations' ids against the enchantments'. A later file's
-  mistake never hides an earlier one's: a typo in `party.json` waits behind a
-  broken relation. When a file beside a built-in record breaks it, the screen
-  marks the built-in one `(COMPILED)`. A `restricted.json` edit that breaks the
-  enchantments names `restricted.json` in the detail, and one that makes a weapon
-  illegal names both the weapon and the relation that refused it, for modifiers
-  and enchantments alike: add `["Push", "Block"]` to `excludes` and the game
-  opens on `WEAPONS.JSON`, `ARMING_SWORD`, and a detail ending
-  `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`.
+- **What is reported first**: the load runs in the order the game's catalogues,
+  tuning, relations, weapons, dungeons, the starting party, and the first check
+  to fail is the one shown. Each file's shape is checked before anything reads
+  it. A later file's mistake never hides an earlier one's: a typo in
+  `dungeons.json` waits behind a broken relation. When a file beside a built-in
+  record breaks it, the screen marks the built-in one `(COMPILED)`. A
+  `restricted.json` edit that breaks the enchantment catalogue — `neverRolled`
+  without `burning`, say — stops on `RESTRICTED.JSON` itself, the file to fix,
+  and one that makes a weapon illegal names both the weapon and the relation that
+  refused it, for modifiers and enchantments alike: add `["Push", "Block"]` to
+  `excludes` and the game opens on `WEAPONS.JSON`, `ARMING_SWORD`, and a detail
+  ending `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`. A
+  `weapons.json` that renames a weapon only the starting party names — A's
+  `weakspot_stiletto`, C's `great_axe` — stops on `WEAPONS.JSON` too, naming the
+  member.
 - **A missing file plays the built-in one, and says so**: delete
-  `enchantments.json` and the game plays the built-in catalogue, with
-  `ENCHANTMENTS.JSON IS MISSING - THE BUILT-IN ENCHANTMENTS ARE PLAYING` under the
-  title and the path it looked in in the log. The same goes for every content
-  file.
-- **Some numbers are `tuning.json`'s**: the `applyPercent` of `flaming`, `cold`,
-  `shocking`, `acidic` and `serrated`, and `arcane`'s `potency`, are set by
-  `tuning.json` (`ApplyPercent`, `ArcanePotency`), and the file marks each with
-  `/* tuning.json ... sets this */`. An edit to one in `enchantments.json` cannot
-  take effect, so the game says `ENCHANTMENTS.JSON FLAMING.APPLYPERCENT 30 IS
-  OVERRIDDEN BY TUNING.JSON APPLYPERCENT.FLAMING 20`. Turn the dial instead.
-- `--write-data <folder>` writes all six files: `tuning.json` and the five
+  `weapons.json` and the game plays the built-in weapons, with
+  `WEAPONS.JSON IS MISSING - THE BUILT-IN WEAPONS ARE PLAYING` under the title
+  and the path it looked in in the log. The same goes for every content file.
+- `--write-data <folder>` writes all four files: `tuning.json` and the three
   content files. Run on the folder beside the exe it resets every edited copy;
   `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped ones after a
   change to `ContentDefaults.cs`.

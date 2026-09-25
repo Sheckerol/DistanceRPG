@@ -368,7 +368,7 @@ internal static class SaveMapper
         return member;
     }
 
-    /// <summary>A spread as saved: every stat a divisor the §2.1 table can use, and never re-asked the permutation rule, which is the roster file's.</summary>
+    /// <summary>A spread as saved: every stat a divisor the §2.1 table can use, and never re-asked the permutation rule, which is the roster's.</summary>
     private static InnateStats Stats(StatsDto? stats, string at)
     {
         var row = Required(stats, at);

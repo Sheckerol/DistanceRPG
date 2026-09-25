@@ -60,7 +60,7 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// §5.1's serialisation would churn for nothing. The set is kept for lookups and
 /// <see cref="SeenInOrder"/> is the only view of it anyone iterates, draws over
 /// or saves. The party is handed out the same way, as a list in roster order
-/// (<see cref="Party"/>) whose order is the roster file's and never a hash's,
+/// (<see cref="Party"/>) whose order is the roster's and never a hash's,
 /// and so are the run's-end records below — the locks, the cleared set and the
 /// retired set — each as an ordinal-sorted view (<see cref="LockedInOrder"/>,
 /// <see cref="ClearedInOrder"/>, <see cref="RetiredInOrder"/>).
@@ -124,7 +124,7 @@ public sealed class CampaignState
 
     /// <summary>
     /// A new campaign (§2.1, §5.9): the roster of <paramref name="content"/> built
-    /// once, in file order — each member by <see cref="PartyMemberState.From"/>,
+    /// once, in roster order — each member by <see cref="PartyMemberState.From"/>,
     /// colour by position — and everything they carry met at once (§3.3: the
     /// loadout enters the party's hands the moment it is handed over). Built
     /// once for the whole campaign: every visit is made by these same members,

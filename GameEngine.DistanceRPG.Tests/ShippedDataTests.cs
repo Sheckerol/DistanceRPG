@@ -22,11 +22,11 @@ public class ShippedDataTests
 
     private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
-    /// <summary>Every file the generator writes, by name, in §5.4's order.</summary>
+    /// <summary>Every file the generator writes, by name, in the load order.</summary>
     private static IEnumerable<(string Name, string Text)> Generated()
     {
         var texts = ContentFiles.WriteDefaults();
-        string?[] all = [texts.Tuning, texts.Restricted, texts.Enchantments, texts.Weapons, texts.Dungeons, texts.Party];
+        string?[] all = [texts.Tuning, texts.Restricted, texts.Weapons, texts.Dungeons];
         for (int i = 0; i < all.Length; i++)
             if (all[i] is { } text)
                 yield return (ContentFiles.FileNames[i], text);
@@ -38,9 +38,10 @@ public class ShippedDataTests
         // PHASE5-080: the file that puts every number on one screen is the one
         // the game ships, and it is exactly what the generator writes from the
         // compiled content — so the two can never tell different stories. All
-        // six: the tuning and the five content files.
+        // four: the tuning and the three content files (the enchantment catalogue
+        // and the starting party are code, and ship no file).
         var generated = Generated().ToList();
-        Assert.Equal([TuningJson.FileName, RestrictedJson.FileName, EnchantmentsJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName, PartyJson.FileName],
+        Assert.Equal([TuningJson.FileName, RestrictedJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName],
             generated.Select(file => file.Name));
         foreach (var (name, text) in generated)
         {
@@ -76,7 +77,7 @@ public class ShippedDataTests
     [Fact]
     public void TheGeneratorWritesWhatTheGameReads()
     {
-        // The generator's six files, loaded as the game loads them, are the
+        // The generator's four files, loaded as the game loads them, are the
         // compiled content with nothing to say: no file missing, no number fitted
         // or overridden, no failure — and each reads back to the record it was
         // written from, which writes out again as the very same text (1h: "read
@@ -88,19 +89,18 @@ public class ShippedDataTests
         Assert.Empty(load.TuningOverrides);
 
         Assert.Equal(texts.Restricted, RestrictedJson.Write(RestrictedJson.Read(texts.Restricted!)));
-        Assert.Equal(texts.Enchantments, EnchantmentsJson.Write(EnchantmentsJson.Read(texts.Enchantments!), ShippedContent.Tuning));
         Assert.Equal(texts.Weapons, WeaponsJson.Write(WeaponsJson.Read(texts.Weapons!)));
         Assert.Equal(texts.Dungeons, DungeonsJson.Write(DungeonsJson.Read(texts.Dungeons!)));
-        Assert.Equal(texts.Party, PartyJson.Write(PartyJson.Read(texts.Party!)));
         Assert.Equal(texts.Tuning, TuningJson.Write(TuningJson.Read(texts.Tuning).Tuning));
 
         // The content the files load is the compiled content, catalogue for
-        // catalogue: the same rows, in the same order, written the same way.
+        // catalogue: the same rows, in the same order, written the same way — and
+        // beside it the game's own catalogue and starting party, the code's rows.
         var content = load.Content!;
         Assert.Equal(WeaponsJson.Write(ShippedContent.Weapons), WeaponsJson.Write(ShippedContent.Weapons with { Weapons = content.Weapons.All }));
         Assert.Equal(DungeonsJson.Write(ShippedContent.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
-        Assert.Equal(PartyJson.Write(ShippedContent.Party), PartyJson.Write(new PartyData(content.Party.All)));
-        Assert.Equal(ShippedContent.Enchantments.Enchantments, content.Enchantments.All);
+        Assert.Equal(StartingParty.Data.Members, content.Party.All);
+        Assert.Equal(EnchantmentDefinitions.Data.Enchantments, content.Enchantments.All);
         Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(content.Tuning));
     }
 
@@ -109,15 +109,17 @@ public class ShippedDataTests
     {
         // A designer tuning the copy beside the game can tell a guessed row from
         // one the docs fixed, as tuning.json's "Provisional:" descriptions mark a
-        // number: every id ContentDefaults marks provisional — the shielding entry
-        // and Burning, the three unnamed uniques, the four dungeons beside the
-        // tutorial and their bosses — is followed by /* provisional */ in its
-        // file, and no other row is. The note is a comment: every file still
-        // reads back to its record (TheGeneratorWritesWhatTheGameReads).
+        // number: every id ContentDefaults marks provisional — the three unnamed
+        // uniques, the four dungeons beside the tutorial and their bosses — is
+        // followed by /* provisional */ in its file, and no other row is. The note
+        // is a comment: every file still reads back to its record
+        // (TheGeneratorWritesWhatTheGameReads). (The catalogue's own guesses — the
+        // shielding entry's id, Burning's lock — are code, and say so in their
+        // comments in EnchantmentDefinitions.)
         var texts = ContentFiles.WriteDefaults();
         var marked = new List<string>();
         var rows = new List<string>();
-        foreach (string? text in new[] { texts.Restricted, texts.Enchantments, texts.Weapons, texts.Dungeons, texts.Party })
+        foreach (string? text in new[] { texts.Restricted, texts.Weapons, texts.Dungeons })
         {
             foreach (Match row in Regex.Matches(text!, "\"id\": \"([^\"]+)\",?( /\\* provisional \\*/)?\n"))
             {

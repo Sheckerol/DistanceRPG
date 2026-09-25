@@ -12,8 +12,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// reader (<see cref="JsonShape"/>): every key is required, nothing else may sit
 /// beside them, and every id is a string. Whether an id resolves, a group
 /// excludes itself or a <c>requires</c> loops is the validator's
-/// (<see cref="ContentValidator.ValidateRestricted"/>), run by the load right
-/// after the enchantments have parsed, since the ids it checks include theirs.
+/// (<see cref="ContentValidator.ValidateRestricted"/>), run by the load at the
+/// relations' stage, against every modifier and every id of the game's
+/// enchantment catalogue (<see cref="EnchantmentDefinitions"/>, code).
 /// <para>
 /// Groups are lists rather than pairs (§5.5): a group is one line, and the
 /// loader closes it into its directed exclusions both ways
@@ -130,14 +131,14 @@ public static class RestrictedJson
             + "bow would be a cap where there was none. Each must be a modifier forged on some weapon; an enchantment "
             + "here stops the game.",
         ["neverRolled"] = "Never granted by any roll, and never copied - an economy rule: the unique enchantments. Every "
-            + "entry enchantments.json marks unique is here, and nothing else is.",
+            + "enchantment the game's catalogue marks unique is here, and nothing else is.",
     };
 
     private static readonly string[] Header =
     [
         "restricted.json - what may sit together on a weapon, and what may be rolled, for modifiers and",
         "enchantments alike. An id is a modifier's name (Block, CritWindow) or an enchantment's id from",
-        "enchantments.json (flaming, burning); kind and forgedOnly name modifiers alone.",
+        "the game's enchantment catalogue (flaming, burning); kind and forgedOnly name modifiers alone.",
         "",
         "Read once, when the game starts, and checked before anything else is: an id that names nothing, a",
         "group naming an id twice, a requires that loops or that asks for what the same id excludes stops",

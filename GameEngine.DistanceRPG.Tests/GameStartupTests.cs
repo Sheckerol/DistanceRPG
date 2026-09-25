@@ -243,14 +243,16 @@ public class GameStartupTests
     }
 
     [Fact]
-    public void TheWriteDataCommandWritesTheSixFiles()
+    public void TheWriteDataCommandWritesTheDataFiles()
     {
         // DistanceRPG --write-data <folder> regenerates everything the tests pin
-        // (USER DECISION 3): the tuning and the five content files, each the
+        // (USER DECISION 3): the tuning and the three content files, each the
         // generator's text byte for byte — UTF-8, no byte order mark, "\n" line
-        // ends — each reported by its full path, and nothing else in the folder.
-        // Run into a temp folder of its own, so no real folder is touched; a game
-        // started beside what it wrote plays the compiled content, saying nothing.
+        // ends — each reported by its full path, and nothing else in the folder:
+        // the enchantment catalogue and the starting party are code, and have no
+        // file. Run into a temp folder of its own, so no real folder is touched; a
+        // game started beside what it wrote plays the compiled content, saying
+        // nothing.
         var folder = Directory.CreateTempSubdirectory("distancerpg-");
         try
         {
@@ -259,8 +261,8 @@ public class GameStartupTests
             Program.WriteData(target, report.Add);
 
             var generated = ContentFiles.WriteDefaults();
-            string?[] texts = [generated.Tuning, generated.Restricted, generated.Enchantments, generated.Weapons, generated.Dungeons, generated.Party];
-            Assert.Equal(6, ContentFiles.FileNames.Count);
+            string?[] texts = [generated.Tuning, generated.Restricted, generated.Weapons, generated.Dungeons];
+            Assert.Equal(4, ContentFiles.FileNames.Count);
             Assert.Equal(ContentFiles.FileNames.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
             for (int i = 0; i < texts.Length; i++)
             {

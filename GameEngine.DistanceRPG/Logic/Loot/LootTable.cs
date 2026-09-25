@@ -134,13 +134,14 @@ public static class LootTable
     /// order held here in code (<see cref="DropOrder"/> filters it per class).
     /// <para>
     /// <strong>Deliberately not <see cref="EnchantmentCatalogue.Rollable"/>,
-    /// which is file order.</strong> Appending an entry to
-    /// <c>enchantments.json</c> would re-map every index of a content-ordered
-    /// list, so an already-saved, not-yet-collected dummy would silently start
-    /// dropping a different weapon — the hazard <see cref="EnemyPlacer"/> already
-    /// refuses for its own draw ("adding a weapon re-rolls nobody"). Here a new
-    /// entry is a deliberate one-line edit at the end of this list, and until it
-    /// is made the entry simply never drops.
+    /// which is the catalogue's order.</strong> Appending an entry to the
+    /// catalogue (<see cref="EnchantmentDefinitions"/>) would re-map every index
+    /// of a content-ordered list, so an already-saved, not-yet-collected dummy
+    /// would silently start dropping a different weapon — the hazard
+    /// <see cref="EnemyPlacer"/> already refuses for its own draw ("adding a
+    /// weapon re-rolls nobody"). Here a new entry is a deliberate one-line edit
+    /// at the end of this list, and until it is made the entry simply never
+    /// drops.
     /// </para>
     /// <para>
     /// §3.3's four remaining entries were appended here when they shipped, which

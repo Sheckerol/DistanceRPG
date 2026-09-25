@@ -1,14 +1,16 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The loaded enchantment entries (§5.7), keyed by stable string id and kept in
-/// file order, with <see cref="Tuning.ApplyPercent"/> laid over each entry's
-/// own percentage and <see cref="Tuning.ArcanePotency"/> over the magnitude of
-/// the one id it names, and the attunement chart (§1.4) read off the relations
-/// the elements sit in: four types in two opposed pairs, never a matrix. Beside
-/// the entries it holds the two relations the file keeps for enchantments
-/// (§5.5): <see cref="NeverRolled"/>, the ids no roll grants — the unique
-/// souls, cross-checked against the <c>unique</c> flag on load — and the
+/// The loaded enchantment entries (§5.7) — the rows of the game's catalogue,
+/// which is code (<see cref="EnchantmentDefinitions"/>) — keyed by stable string
+/// id and kept in the catalogue's order, with <see cref="Tuning.ApplyPercent"/>
+/// laid over each entry's own percentage and <see cref="Tuning.ArcanePotency"/>
+/// over the magnitude of the one id it names, and the attunement chart (§1.4)
+/// read off the relations the elements sit in: four types in two opposed pairs,
+/// never a matrix. Beside the entries it holds the two relations
+/// <c>restricted.json</c> keeps for enchantments (§5.5):
+/// <see cref="NeverRolled"/>, the ids no roll grants — the unique souls,
+/// cross-checked against the <c>unique</c> flag on load — and the
 /// enchantment-keyed <c>requires</c> rows (<see cref="Prerequisites"/>), a
 /// lingering element's element. Phase 1 shipped the eight innates — the four
 /// staff effects and the four wand elements — Vampiric, and the nine unique
@@ -65,7 +67,7 @@ public sealed class EnchantmentCatalogue
                 _requires[id] = needs.ToArray();
     }
 
-    /// <summary>Every entry, in file order.</summary>
+    /// <summary>Every entry, in the catalogue's order.</summary>
     public IReadOnlyList<EnchantmentDef> All { get; }
 
     /// <summary>The ids content may name: what the relations file is checked against.</summary>
@@ -79,13 +81,13 @@ public sealed class EnchantmentCatalogue
     public IReadOnlySet<string> NeverRolled { get; }
 
     /// <summary>
-    /// Everything not in <see cref="NeverRolled"/>, in file order: the entries a
-    /// grant may consider, which is a wider set than the entries a grant may
-    /// hand out.
+    /// Everything not in <see cref="NeverRolled"/>, in the catalogue's order: the
+    /// entries a grant may consider, which is a wider set than the entries a
+    /// grant may hand out.
     /// <para>
     /// <strong>It is not itself a grantable pool.</strong> A drop draws from
     /// <see cref="LootTable.DropOrder"/>, which starts from a code-fixed order
-    /// (file order re-indexes on every append) and then filters out the entries
+    /// (the catalogue's re-indexes on every append) and then filters out the entries
     /// that cannot work on what they would land on: a declared-inert kind, and a
     /// kind whose only behaviour sits on an event that class never raises. Both
     /// of those live here — <c>echoing</c> fires nothing at all, <c>aegis</c>

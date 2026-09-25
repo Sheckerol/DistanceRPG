@@ -24,8 +24,8 @@ internal static class ShippedContent
     /// <summary>The relations the game ships (<c>restricted.json</c>).</summary>
     public static RestrictedData Restricted => ContentDefaults.Restricted;
 
-    /// <summary>The enchantment catalogue and its unique souls.</summary>
-    public static EnchantmentsData Enchantments => ContentDefaults.Enchantments;
+    /// <summary>The enchantment catalogue and its unique souls: code, reference data (<see cref="EnchantmentDefinitions"/>).</summary>
+    public static EnchantmentsData Enchantments => EnchantmentDefinitions.Data;
 
     /// <summary>The weapons the game ships (<c>weapons.json</c>).</summary>
     public static WeaponsData Weapons => ContentDefaults.Weapons;
@@ -33,8 +33,8 @@ internal static class ShippedContent
     /// <summary>The dungeons the game ships (<c>dungeons.json</c>).</summary>
     public static DungeonsData Dungeons => ContentDefaults.Dungeons;
 
-    /// <summary>The starting party.</summary>
-    public static PartyData Party => ContentDefaults.Party;
+    /// <summary>The starting party: code, reference data (<see cref="StartingParty"/>).</summary>
+    public static PartyData Party => StartingParty.Data;
 
     /// <summary>The movement budget a member starts a turn with, in logic units: the shipped tuning's <c>MovementBudget</c>.</summary>
     public static float Budget => GameConstants.MaxDistance;

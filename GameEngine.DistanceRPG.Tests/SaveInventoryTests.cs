@@ -61,7 +61,7 @@ public class SaveInventoryTests
         [
             new("Id", Kept.Saved, "id: the roster's stable id"),
             new("ColorIndex", Kept.Saved, "colorIndex"),
-            new("Stats", Kept.Saved, "stats: the save's spread, never re-read from party.json"),
+            new("Stats", Kept.Saved, "stats: the save's spread, never re-read from the starting party"),
             new("WeaponXp", Kept.Saved, "weaponXp by class name, zeros left out — never by position"),
             new("HpXp", Kept.Saved, "hpXp"),
             new("ManaXp", Kept.Saved, "manaXp"),

@@ -74,7 +74,7 @@ public sealed record LockDto(string DungeonId, int LockedUntilRun);
 
 /// <summary>
 /// One party member (§5.1's Party group): who it is, the spread it was built
-/// with — the save's own, never re-read from <c>party.json</c> — its three XP
+/// with — the save's own, never re-read from the starting party — its three XP
 /// pools, its body, what it carries and where its turn's movement stands.
 /// </summary>
 /// <param name="Id">The roster's stable id.</param>

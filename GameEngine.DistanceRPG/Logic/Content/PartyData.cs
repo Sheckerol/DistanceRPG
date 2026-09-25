@@ -1,13 +1,12 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// One row of §5.9 <c>party.json</c>: who a starting party member is and what
-/// they open the game holding. A starting loadout is content, not a constant —
-/// which member gets which permutation is "a first guess" the doc expects to
-/// move after playing (§2.1), so it has to be a data edit rather than a code
-/// one. Phase 2 ships the compiled instance
-/// (<see cref="ContentDefaults.Party"/>) — Phase 1's pattern, this phase's
-/// roster; Phase 5 adds only deserialisation.
+/// One member of the §5.9 starting party (<see cref="StartingParty"/>): who a
+/// starting party member is and what they open the game holding. Reference data,
+/// in code by the user's ruling of 2026-09-25, which reverses §5.9's "a starting
+/// loadout is content, not a constant": which member gets which permutation is
+/// still "a first guess" the doc expects to move after playing (§2.1), and moving
+/// it is an edit to <see cref="StartingParty"/> and a rebuild.
 /// </summary>
 /// <param name="Id">The stable string id a save refers to the member by.</param>
 /// <param name="Name">The display name.</param>
@@ -21,5 +20,5 @@ namespace GameEngine.DistanceRPG.Logic;
 public sealed record PartyMemberDef(
     string Id, string Name, InnateStats Stats, string StartingWeaponId, IReadOnlyList<string> BagWeaponIds);
 
-/// <summary>The §5.9 <c>party.json</c> shape: the starting roster in file order, which is the order members are spawned in.</summary>
+/// <summary>The §5.9 starting roster, in its order, which is the order members are spawned in.</summary>
 public sealed record PartyData(IReadOnlyList<PartyMemberDef> Members);

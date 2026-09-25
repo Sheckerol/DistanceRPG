@@ -26,7 +26,7 @@ public sealed class PartyMemberState : ActorState
     /// The spread comes off the def, which is the whole point: a member built
     /// any other way carries <see cref="InnateStats.None"/> and divides every
     /// threshold by 1, so the §2.1 table would exist and do nothing. The
-    /// starting weapon is slot 0 and the bag follows it in file order, each
+    /// starting weapon is slot 0 and the bag follows it in the def's order, each
     /// instantiated fresh — two members carrying the same id carry two weapons.
     /// </para>
     /// <para>
@@ -70,7 +70,7 @@ public sealed class PartyMemberState : ActorState
     /// public way to set a spread.
     /// <para>
     /// The spread is taken as saved and never asked the §2.1 permutation rule,
-    /// which is the roster file's: a member's spread is fixed at creation, and
+    /// which is the roster's: a member's spread is fixed at creation, and
     /// this is the same member coming back.
     /// </para>
     /// </summary>

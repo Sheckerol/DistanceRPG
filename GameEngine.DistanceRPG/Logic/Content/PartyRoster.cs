@@ -2,10 +2,10 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The loaded starting roster (§5.9), keyed by stable string id and kept in
-/// file order — the same shape as <see cref="WeaponCatalogue"/>, because a
-/// roster is content by the same argument. File order is spawn order, so a
-/// party is built by walking <see cref="All"/>; nothing reads a member by
-/// position in an array of constants any more.
+/// the roster's order — the same shape as <see cref="WeaponCatalogue"/>. The
+/// roster's order is spawn order, so a party is built by walking
+/// <see cref="All"/>; nothing reads a member by position in an array of
+/// constants any more.
 /// </summary>
 public sealed class PartyRoster
 {
@@ -22,7 +22,7 @@ public sealed class PartyRoster
                 throw new ContentException(member.Id, ContentValidator.RuleDuplicateId);
     }
 
-    /// <summary>Every member, in file order.</summary>
+    /// <summary>Every member, in the roster's order.</summary>
     public IReadOnlyList<PartyMemberDef> All { get; }
 
     public PartyMemberDef this[string id]

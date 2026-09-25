@@ -14,7 +14,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <para>
 /// <strong>Everything content is an id, everything code is a name</strong>: a
 /// weapon is named everywhere by its <c>id</c>, an enchantment it arrives with
-/// by the id <c>enchantments.json</c> gives it, and a modifier in its forged
+/// by the id the game's enchantment catalogue gives it (code:
+/// <see cref="EnchantmentDefinitions"/>), and a modifier in its forged
 /// spread by its <see cref="ModifierType"/> name, exactly — a name that is no
 /// modifier is an id that resolves to nothing
 /// (<see cref="ContentValidator.RuleUnknownId"/>). <c>class</c>, <c>role</c> and a
@@ -233,24 +234,24 @@ public static class WeaponsJson
         "weapons.json - every weapon: the thirty-two variants, four to each of the eight classes, then",
         "the uniques.",
         "",
-        "Read once, when the game starts, after restricted.json and enchantments.json. A weapon is",
-        "checked, never clamped: a spread restricted.json does not allow, a modifier forged past its",
-        "limit, a unique that is not its variant raised, or a field the game does not know stops the",
-        "game on a screen naming the file, the weapon and the rule - and, when a relation refused it,",
-        "that restricted.json relation. Every weapon names all thirteen fields; comments and trailing",
-        "commas are fine. A weapon is an edit here, never a rebuild: start the game again to play it.",
+        "Read once, when the game starts, after restricted.json. A weapon is checked, never clamped: a",
+        "spread restricted.json does not allow, a modifier forged past its limit, a unique that is not",
+        "its variant raised, or a field the game does not know stops the game on a screen naming the",
+        "file, the weapon and the rule - and, when a relation refused it, that restricted.json relation.",
+        "Every weapon names all thirteen fields; comments and trailing commas are fine. A weapon is an",
+        "edit here, never a rebuild: start the game again to play it.",
         "",
-        "id: what everything names the weapon by - party.json, a drop, a save. name: what the screen",
-        "calls it. class: Dagger, Sword, Spear, Axe, Ranged, Throwing, Staff or Wand. role: a martial",
-        "variant's - Efficiency, Purity, Control or Support - or null for a caster or a unique. range:",
-        "the reach, in logic units (32 a tile). damage: a hit, before modifiers. cost: the movement an",
-        "attack or a cast takes. manaCost: the mana a cast takes, 0 for a martial weapon. forged: the",
-        "modifiers it is forged with, each to its stack count - a class's baseline is what its four",
-        "variants share, so re-basing a class is an edit to all four. enchantments: what it arrives",
-        "with, in order, each an id from enchantments.json with its tier (1 when left out). shape: a",
-        "wand's area - Blast (radius, targetReach), Cone (length, angleDegrees), Beam (length, width) or",
-        "Nova (radius), in logic units - or null. unique: its variant with one modifier raised to x3,",
-        "carrying a soul. derivedFrom: the variant a unique is made from, or null.",
+        "id: what everything names the weapon by - the starting party (code), a drop, a save. name: what",
+        "the screen calls it. class: Dagger, Sword, Spear, Axe, Ranged, Throwing, Staff or Wand. role: a",
+        "martial variant's - Efficiency, Purity, Control or Support - or null for a caster or a unique.",
+        "range: the reach, in logic units (32 a tile). damage: a hit, before modifiers. cost: the",
+        "movement an attack or a cast takes. manaCost: the mana a cast takes, 0 for a martial weapon.",
+        "forged: the modifiers it is forged with, each to its stack count - a class's baseline is what",
+        "its four variants share, so re-basing a class is an edit to all four. enchantments: what it",
+        "arrives with, in order, each an id from the game's enchantment catalogue with its tier (1 when",
+        "left out). shape: a wand's area - Blast (radius, targetReach), Cone (length, angleDegrees), Beam",
+        "(length, width) or Nova (radius), in logic units - or null. unique: its variant with one",
+        "modifier raised to x3, carrying a soul. derivedFrom: the variant a unique is made from, or null.",
         "",
         "arming_sword (what a dummy holds) and staff_of_renewal (a crowded room's healer) are named by",
         "the game's code and must be here. A weapon whose id is marked provisional is a first guess the",

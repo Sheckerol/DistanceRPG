@@ -17,32 +17,37 @@ internal sealed record ContentSource<T>(string File, T? Data, ContentException? 
 }
 
 /// <summary>
-/// The loaded content singletons, built in the §5.4 load order — tuning, then
-/// the relations everything after them is checked against, then the
-/// enchantments the weapons name, then the weapons, then the dungeons whose
-/// themes name modifiers and whose drop tables are computed over the weapons,
-/// then the roster that names weapons — and validated on the way in: invalid
+/// The loaded content singletons, built in the load order — the game's own
+/// enchantment catalogue, checked on its own; then the tuning; then the
+/// relations everything after them is checked against, and the catalogue
+/// against them; then the weapons; then the dungeons whose themes name
+/// modifiers and whose drop tables are computed over the weapons; then the
+/// starting party, which names weapons — and validated on the way in: invalid
 /// content throws <see cref="ContentException"/>, stamped with the file whose
-/// stage broke, and the game does not start (it says why on screen).
-/// The compiled defaults are what <see cref="Current"/> opens on; the game's
-/// startup reads the data files once (<see cref="ContentFiles.Load"/>) and makes
-/// what they load current before anything is built from it. Nothing here
-/// instantiates a <see cref="Weapon"/>, so the static initialiser cannot cycle
-/// through a weapon reading its own modifiers — the roster's weapon ids are
-/// checked against catalogue membership, never by building one, and the
+/// stage broke, and the game does not start (it says why on screen). The
+/// enchantment catalogue (<see cref="EnchantmentDefinitions"/>) and the starting
+/// party (<see cref="StartingParty"/>) are code — reference data, by the user's
+/// ruling of 2026-09-25 — handed to the load as data and checked like any
+/// content; the relations, the weapons and the dungeons are read from their
+/// files. The compiled defaults are what <see cref="Current"/> opens on; the
+/// game's startup reads the data files once (<see cref="ContentFiles.Load"/>)
+/// and makes what they load current before anything is built from it. Nothing
+/// here instantiates a <see cref="Weapon"/>, so the static initialiser cannot
+/// cycle through a weapon reading its own modifiers — the roster's weapon ids
+/// are checked against catalogue membership, never by building one, and the
 /// dungeons' tables read weapon rows, never items.
 /// </summary>
 public sealed class GameContent
 {
     /// <summary>
-    /// The content the game is running under: the compiled defaults until the
-    /// game's startup makes the data files' content current, once, through
-    /// <see cref="Use"/> — read once, never hot-reloaded (§5.3) — and otherwise
-    /// swapped only by tests.
+    /// The content the game is running under: the compiled defaults, with the
+    /// code's catalogue and starting party, until the game's startup makes the
+    /// data files' content current, once, through <see cref="Use"/> — read once,
+    /// never hot-reloaded (§5.3) — and otherwise swapped only by tests.
     /// </summary>
     public static GameContent Current { get; private set; } =
-        Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons,
-            ContentDefaults.Party, ContentDefaults.Dungeons);
+        Load(ContentDefaults.Tuning, ContentDefaults.Restricted, EnchantmentDefinitions.Data, ContentDefaults.Weapons,
+            StartingParty.Data, ContentDefaults.Dungeons);
 
     /// <summary>The §5.3 scalars this content was loaded under.</summary>
     public Tuning Tuning { get; }
@@ -50,7 +55,7 @@ public sealed class GameContent
     /// <summary>The §1.1 table and relations.</summary>
     public ModifierRules Modifiers { get; }
 
-    /// <summary>The §5.7 catalogue.</summary>
+    /// <summary>The §5.7 catalogue: the code's rows (<see cref="EnchantmentDefinitions"/>), with the tuning's dials laid over them.</summary>
     public EnchantmentCatalogue Enchantments { get; }
 
     /// <summary>The §5.6 catalogue.</summary>
@@ -59,7 +64,7 @@ public sealed class GameContent
     /// <summary>The §5.8 dungeons, and the drop tables their themes compute.</summary>
     public DungeonCatalogue Dungeons { get; }
 
-    /// <summary>The §5.9 starting roster.</summary>
+    /// <summary>The §5.9 starting roster: the code's (<see cref="StartingParty"/>).</summary>
     public PartyRoster Party { get; }
 
     private GameContent(Tuning tuning, ModifierRules modifiers, EnchantmentCatalogue enchantments, WeaponCatalogue weapons,
@@ -75,13 +80,14 @@ public sealed class GameContent
 
     /// <summary>
     /// Validate and build in load order, without making the result current: the
-    /// scalars first, then the relations against every modifier and enchantment
-    /// id, the enchantments on their own and against the relations (opposition),
-    /// the weapons against all three, the dungeons against the relations and the
+    /// enchantment catalogue on its own, the scalars, then the relations against
+    /// every modifier and every enchantment id the catalogue has, and the
+    /// catalogue against the relations (opposition, the unique souls), the
+    /// weapons against all three, the dungeons against the relations and the
     /// weapons their tables are computed from, and the roster last, against the
-    /// weapon catalogue it names and the carry its bags must fit. The records
-    /// are wrapped as built in code and handed to the staged load, which checks
-    /// them in exactly this order.
+    /// weapon catalogue it names and the carry its bags must fit. The file
+    /// records are wrapped as built in code and handed to the staged load, which
+    /// checks them in exactly this order.
     /// <para>
     /// Everything after the tuning is built from this call's own locals and
     /// never from <see cref="Current"/>: this runs inside <c>Current</c>'s own
@@ -89,12 +95,18 @@ public sealed class GameContent
     /// test's swap it is the content being replaced.
     /// </para>
     /// </summary>
+    /// <param name="enchantments">
+    /// The enchantment catalogue: the game's own is code
+    /// (<see cref="EnchantmentDefinitions.Data"/>); a test hands another to
+    /// simulate a code edit — an appended row, a reversed order, a broken one.
+    /// </param>
     /// <param name="party">
-    /// The §5.9 roster; the compiled default when a caller has no opinion, which
-    /// is every caller that is not exercising the roster itself.
+    /// The §5.9 roster; the code's (<see cref="StartingParty.Data"/>) when a
+    /// caller has no opinion, which is every caller that is not exercising the
+    /// roster itself.
     /// </param>
     /// <param name="dungeons">The §5.8 dungeons; the compiled default when a caller has no opinion.</param>
-    /// <exception cref="ContentException">Something is not well formed; the entry and the rule are named, and the file whose stage broke (every record here is one built in code, so each is marked <see cref="ContentException.Compiled"/>).</exception>
+    /// <exception cref="ContentException">Something is not well formed; the entry and the rule are named, and the file whose stage broke (every file record here is one built in code, so each is marked <see cref="ContentException.Compiled"/>). A catalogue broken on its own names no file.</exception>
     public static GameContent Load(Tuning tuning, RestrictedData restricted, EnchantmentsData enchantments, WeaponsData weapons,
         PartyData? party = null, DungeonsData? dungeons = null)
     {
@@ -102,50 +114,57 @@ public sealed class GameContent
         ArgumentNullException.ThrowIfNull(restricted);
         ArgumentNullException.ThrowIfNull(enchantments);
         ArgumentNullException.ThrowIfNull(weapons);
-        return Load(tuning,
+        return Load(tuning, enchantments,
             ContentSource<RestrictedData>.Built(RestrictedJson.FileName, restricted),
-            ContentSource<EnchantmentsData>.Built(EnchantmentsJson.FileName, enchantments),
             ContentSource<WeaponsData>.Built(ContentFiles.WeaponsFileName, weapons),
             ContentSource<DungeonsData>.Built(ContentFiles.DungeonsFileName, dungeons ?? ContentDefaults.Dungeons),
-            ContentSource<PartyData>.Built(ContentFiles.PartyFileName, party ?? ContentDefaults.Party));
+            party ?? StartingParty.Data);
     }
 
     /// <summary>
-    /// The staged load (1h): each file's record — or the failure that stopped it
-    /// parsing — validated and built in §5.4's order, the first stage to break
-    /// being the failure reported, stamped with its file
-    /// (<see cref="ContentException.In"/>). The tuning is checked first; then
-    /// seven stages, each reporting its own file's parse failure before anything
-    /// reads the record:
+    /// The staged load (1h): the code's enchantment catalogue checked on its
+    /// own, then each file's record — or the failure that stopped it parsing —
+    /// validated and built in the load order, the first stage to break being
+    /// the failure reported, stamped with its file
+    /// (<see cref="ContentException.In"/>). The catalogue comes first and names
+    /// no file: it is the game's own code, which no data file edits, so a
+    /// failure there is a code edit's, and the suite catches it before a
+    /// playtester can. Then the tuning; then five stages, each reporting its own
+    /// file's parse failure before anything reads the record:
     /// <list type="number">
     /// <item><c>restricted.json</c>'s shape;</item>
-    /// <item><c>enchantments.json</c>'s shape;</item>
-    /// <item><c>restricted.json</c>'s semantics — its own checks and the
-    /// modifier rules — which come after the enchantments have parsed, because
-    /// the ids it checks include theirs. So a shape failure in
-    /// <c>enchantments.json</c> is reported before a semantic one in
-    /// <c>restricted.json</c>: the stated rule, not an accident;</item>
-    /// <item><c>enchantments.json</c>'s semantics: the catalogue, against the relations;</item>
+    /// <item><c>restricted.json</c>'s semantics — its own checks, its ids against
+    /// every modifier and every enchantment the catalogue has, and the modifier
+    /// rules — and then the catalogue against the relations: the opposition
+    /// chart its elements form, and its unique souls against
+    /// <c>neverRolled</c>. The catalogue is code, so <c>restricted.json</c> is
+    /// the file to fix, and the failure is stamped with it;</item>
     /// <item><c>weapons.json</c>'s shape, then its semantics;</item>
     /// <item><c>dungeons.json</c>'s;</item>
-    /// <item><c>party.json</c>'s.</item>
+    /// <item>the starting party, which is code, against the weapons it names:
+    /// stamped <c>weapons.json</c>, with that file's compiled flag, since the one
+    /// party failure a data file can cause is a <c>weapons.json</c> that renames
+    /// a weapon only the roster names.</item>
     /// </list>
     /// A syntax error in a later file therefore never pre-empts a semantic error
     /// in an earlier one, and a check that reads another file than its stage's
     /// names that file in its detail. With every record in hand (the public
-    /// overload) stages 1 and 2 pass, and the checks run in exactly the order
-    /// they always have.
+    /// overload) stage 1 passes, and the checks run in exactly this order.
     /// </summary>
-    /// <exception cref="ContentException">The first stage to break, stamped with its file.</exception>
-    internal static GameContent Load(Tuning tuning, ContentSource<RestrictedData> restricted, ContentSource<EnchantmentsData> enchantments,
-        ContentSource<WeaponsData> weapons, ContentSource<DungeonsData> dungeons, ContentSource<PartyData> party)
+    /// <exception cref="ContentException">The first stage to break, stamped with its file; the catalogue's own, unstamped.</exception>
+    internal static GameContent Load(Tuning tuning, EnchantmentsData enchantments, ContentSource<RestrictedData> restricted,
+        ContentSource<WeaponsData> weapons, ContentSource<DungeonsData> dungeons, PartyData party)
     {
         ArgumentNullException.ThrowIfNull(tuning);
-        ArgumentNullException.ThrowIfNull(restricted);
         ArgumentNullException.ThrowIfNull(enchantments);
+        ArgumentNullException.ThrowIfNull(restricted);
         ArgumentNullException.ThrowIfNull(weapons);
         ArgumentNullException.ThrowIfNull(dungeons);
         ArgumentNullException.ThrowIfNull(party);
+
+        // (0) The code catalogue on its own: the game's own rows, which no file
+        // edits, so the failure names no file.
+        ContentValidator.ValidateEnchantments(enchantments);
 
         // A file's tuning never fails here — it is clamped as it is read and
         // fitted to the content — so this is the refusal for a tuning built in
@@ -153,34 +172,33 @@ public sealed class GameContent
         ContentValidator.ValidateTuning(tuning);
 
         var restrictedData = Shape(restricted);         // (1)
-        var enchantmentsData = Shape(enchantments);     // (2)
-
-        var modifiers = Stage(restricted, () =>         // (3)
+        var (modifiers, enchantmentCatalogue) = Stage(restricted, () =>   // (2)
         {
             var knownIds = new HashSet<string>(ModifierRules.ModifierIds, StringComparer.Ordinal);
-            knownIds.UnionWith(enchantmentsData.Enchantments.Select(e => e.Id));
+            knownIds.UnionWith(enchantments.Enchantments.Select(e => e.Id));
             ContentValidator.ValidateRestricted(restrictedData, knownIds);
-            return new ModifierRules(tuning, restrictedData);
+            var rules = new ModifierRules(tuning, restrictedData);
+
+            // Then the catalogue against the relations: it runs ValidateEnchantments
+            // again, then ValidateOpposition for its chart and ValidateNeverRolled
+            // for its souls, both answered by restricted.json.
+            return (rules, new EnchantmentCatalogue(enchantments, tuning, restrictedData));
         });
 
-        var enchantmentCatalogue = Stage(enchantments, () =>   // (4): runs ValidateEnchantments, then ValidateOpposition for its chart
-            new EnchantmentCatalogue(enchantmentsData, tuning, restrictedData));
-
-        var weaponsData = Shape(weapons);               // (5)
+        var weaponsData = Shape(weapons);               // (3)
         var weaponCatalogue = Stage(weapons, () =>
         {
             ContentValidator.ValidateWeapons(weaponsData, modifiers, restrictedData, enchantmentCatalogue);
             return new WeaponCatalogue(weaponsData, enchantmentCatalogue);
         });
 
-        var dungeonsData = Shape(dungeons);             // (6): computes the tables from these locals, then runs ValidateDungeons against them
+        var dungeonsData = Shape(dungeons);             // (4): computes the tables from these locals, then runs ValidateDungeons against them
         var dungeonCatalogue = Stage(dungeons, () => new DungeonCatalogue(dungeonsData, modifiers, weaponCatalogue, tuning));
 
-        var partyData = Shape(party);                   // (7): last, since a member names weapons
-        var roster = Stage(party, () =>
+        var roster = Stage(weapons, () =>               // (5): last, since a member names weapons — stamped weapons.json
         {
-            ContentValidator.ValidateParty(partyData, weaponCatalogue, tuning);
-            return new PartyRoster(partyData);
+            ContentValidator.ValidateParty(party, weaponCatalogue, tuning);
+            return new PartyRoster(party);
         });
 
         return new GameContent(tuning, modifiers, enchantmentCatalogue, weaponCatalogue, dungeonCatalogue, roster);
