@@ -722,7 +722,7 @@ public sealed class BossLootTests : IDisposable
             foreach (var cls in AllEight)
             {
                 var variants = Weapons.KindOf(cls) == WeaponKind.Caster
-                    ? LootTable.CasterVariants[cls].Select(id => Weapons[id]).ToArray()
+                    ? Weapons.Class(cls).DropOrder!.Select(id => Weapons[id]).ToArray()
                     : Enum.GetValues<VariantRole>().Select(role => Weapons.Variant(cls, role)).ToArray();
                 bool allTake = true;
                 foreach (var variant in variants)

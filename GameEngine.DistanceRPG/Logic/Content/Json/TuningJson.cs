@@ -34,7 +34,8 @@ public sealed record TuningRead(Tuning Tuning, IReadOnlyList<string> Warnings, I
 /// a list, a null — warns and keeps the built-in number, since ratios are
 /// integer divisors; a value out of range clamps to the bound and warns. Nothing
 /// there throws on anything a file can say: malformed JSON plays the built-in
-/// numbers and says which line.</item>
+/// numbers and says which line, and a blank file plays them and says it is
+/// empty.</item>
 /// <item><strong>Consistent within itself</strong>: three relational clamps run
 /// after the keys, in this order — <see cref="Tuning.BossFloorMax"/> is raised to
 /// <see cref="Tuning.BossFloorMin"/>; <see cref="Tuning.PartyCarrySlots"/> is
@@ -84,20 +85,26 @@ public static class TuningJson
 
     /// <summary>
     /// Read a <c>tuning.json</c>'s text over <paramref name="builtIn"/>, the
-    /// built-in copy's tuning. Null — no file — and a file with nothing in it are
-    /// the built-in numbers, with no warning (the missing-file notice is
-    /// <see cref="ContentFiles"/>'s, which every data file gets alike). Never
-    /// throws on anything the text says.
+    /// built-in copy's tuning. Null — no file — is the built-in numbers, with no
+    /// warning: the missing-file notice is <see cref="ContentFiles"/>'s, which
+    /// every data file gets alike. A file with nothing in it — blank, as an
+    /// editor that crashed while saving leaves one — is the built-in numbers too,
+    /// and says so (<see cref="EmptyWarning"/>): a playtester whose numbers were wiped
+    /// must not be told the file changes nothing, as if it were a copy with no
+    /// edits. Never throws on anything the text says.
     /// </summary>
     public static TuningRead Read(string? text, Tuning builtIn)
     {
         ArgumentNullException.ThrowIfNull(builtIn);
-        if (string.IsNullOrWhiteSpace(text))
+        if (text is null)
             return new TuningRead(builtIn, [], []);
         var reading = new Reading(builtIn, strict: false);
         var tuning = reading.Read(text);
         return new TuningRead(tuning, reading.Warnings, Overrides(tuning, builtIn));
     }
+
+    /// <summary>The warning a blank <c>tuning.json</c> beside the game raises: it plays the built-in numbers, as a missing one does, and is not missing.</summary>
+    internal const string EmptyWarning = Prefix + "the file is empty - the built-in numbers are playing";
 
     /// <summary>
     /// Whether two tunings are the same numbers (S:99-107): the first 16 lowercase
@@ -187,6 +194,7 @@ public static class TuningJson
             {
                 if (strict)
                     throw Gap(FileName, JsonShape.Top, "the file is empty");
+                _warnings.Add(EmptyWarning);
                 return under;
             }
 

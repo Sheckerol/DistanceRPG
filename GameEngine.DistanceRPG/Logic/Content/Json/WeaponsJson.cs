@@ -13,8 +13,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// (<c>melee</c>, <c>ranged</c> or <c>caster</c>), <c>stats</c> (the
 /// <see cref="Stat"/> names it levels on), <c>signature</c> (a modifier, or
 /// null), <c>baseline</c> (modifiers to stack counts) and the statline —
-/// <c>range</c>, <c>damage</c>, <c>cost</c>, <c>manaCost</c>. Every member has a
-/// row, and nothing else does.</item>
+/// <c>range</c>, <c>damage</c>, <c>cost</c>, <c>manaCost</c> — and, on a caster's
+/// row, <c>dropOrder</c>: the ids of the variants its drop rolls between, in
+/// draw order (a field a row may leave out; the validator wants it on a caster
+/// and nowhere else). Every member has a row, and nothing else does.</item>
 /// <item><c>variants</c> — a list of the weapons a drop or a dummy carries:
 /// <c>id</c>, <c>name</c>, <c>class</c>, <c>role</c>, <c>adds</c> (the modifiers
 /// it adds to its class's baseline), <c>enchantments</c> and <c>shape</c>; and,
@@ -40,7 +42,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// Read from the text a caller hands in (<c>Logic/</c> never touches the disk)
 /// by the strict shared reader (<see cref="JsonShape"/>): every field is
 /// required — <c>role</c>, <c>signature</c> and <c>shape</c> may be null — but a
-/// variant's statline, and nothing else may sit beside them.
+/// variant's statline and a class's drop order, and nothing else may sit beside
+/// them.
 /// <strong>Everything content is an id, everything code is a name</strong>: a
 /// weapon is named everywhere by its <c>id</c>, an enchantment it arrives with by
 /// the id the game's enchantment catalogue gives it (code:
@@ -94,8 +97,11 @@ public static class WeaponsJson
 
     private static readonly string[] Sections = [ClassesName, VariantsName, UniquesName];
 
-    /// <summary>A class row's fields, in the record's order: the order the file holds them in, and the order a missing one is looked for.</summary>
-    private static readonly string[] ClassFields = ["kind", "stats", "signature", "baseline", "range", "damage", "cost", "manaCost"];
+    /// <summary>A class row's fields, in the record's order: the order the file holds them in, and the order a missing one is looked for — all but the last required, and the drop order a caster's row names.</summary>
+    private static readonly string[] ClassFields = ["kind", "stats", "signature", "baseline", "range", "damage", "cost", "manaCost", DropOrderName];
+
+    /// <summary>A caster row's drop order (<see cref="WeaponClassDef.DropOrder"/>): the one class field a row may leave out, since a martial row names none.</summary>
+    private const string DropOrderName = "dropOrder";
 
     /// <summary>A variant's fields: the required seven in the order they are looked for, then the statline it may name as its own.</summary>
     private static readonly string[] VariantFields = ["id", "name", "class", "role", "adds", "enchantments", "shape", "range", "damage", "cost", "manaCost"];
@@ -206,7 +212,14 @@ public static class WeaponsJson
         return rows.Select(row => row!).ToArray();
     }
 
-    /// <summary>One class's row: every field required, a signature that may be null, and a kind that is one of the three words.</summary>
+    /// <summary>
+    /// One class's row: every field required but the drop order, a signature that
+    /// may be null, and a kind that is one of the three words. A drop order left
+    /// out, or written as null, is none — what a martial row has; whether the
+    /// class should have one is the validator's
+    /// (<see cref="ContentValidator.RuleCasterVariantPool"/>), which sees records
+    /// built in code too.
+    /// </summary>
     private static WeaponClassDef ClassRow(JsonShape shape, JsonElement value, string path, WeaponClass cls)
     {
         string entry = cls.ToString();
@@ -236,7 +249,10 @@ public static class WeaponsJson
             Range: shape.Int(Get("range"), At("range"), entry),
             Damage: shape.Int(Get("damage"), At("damage"), entry),
             Cost: shape.Int(Get("cost"), At("cost"), entry),
-            ManaCost: shape.Int(Get("manaCost"), At("manaCost"), entry));
+            ManaCost: shape.Int(Get("manaCost"), At("manaCost"), entry),
+            DropOrder: shape.Optional(row, DropOrderName) is { ValueKind: not JsonValueKind.Null } order
+                ? shape.Ids(order, At(DropOrderName), entry, "a list of the ids of the variants its drop rolls between")
+                : null);
     }
 
     /// <summary>

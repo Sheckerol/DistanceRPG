@@ -8,8 +8,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// The weapon types are a section of <c>weapons.json</c> (the content rework, 1d;
 /// the user's ruling of 2026-09-25, "weapon types ... fully in json", which rules
 /// Phase 5 USER DECISION 4): each of the eight classes is a row — the kind it
-/// plays as, the stats it levels on, its signature, its baseline and its
-/// statline — and every question the game asks a class is a read of the rows.
+/// plays as, the stats it levels on, its signature, its baseline, its statline
+/// and, for a caster, the order its drop rolls its variants in (the rework's
+/// audit) — and every question the game asks a class is a read of the rows.
 /// Re-basing a class is one edit to its row; a number a variant names as its own
 /// is its alone (REWORK DECISION 1); a row's kind and stats are what plays; and a
 /// row missing or misshapen stops the game naming <c>weapons.json</c>, the class
@@ -228,6 +229,61 @@ public class WeaponClassTests
         }
     }
 
+    /// <summary>The Staff row's drop order as the shipped file writes it, whatever its ids: the one line the edits below change.</summary>
+    private static string StaffDropOrder(string text)
+    {
+        var order = System.Text.RegularExpressions.Regex.Matches(text, "\"dropOrder\": \\[[^\\]]*\"staff_of_[^\\]]*\\]");
+        Assert.True(order.Count == 1, $"the Staff row's dropOrder is in the text {order.Count} times, not once");
+        return order[0].Value;
+    }
+
+    /// <summary>A fifth staff, written as a variant of the file's own, after the Staff of Mire.</summary>
+    private static string WithAFifthStaff(string text) => DataTexts.Edit(text,
+        "\"enchantments\": [{ \"id\": \"mire\" }], \"shape\": null\n    },",
+        "\"enchantments\": [{ \"id\": \"mire\" }], \"shape\": null\n    },\n    {\n      \"id\": \"staff_of_embers\",\n"
+        + "      \"name\": \"Staff of Embers\", \"class\": \"Staff\", \"role\": null, \"adds\": {},\n"
+        + "      \"enchantments\": [{ \"id\": \"poison\" }], \"shape\": null\n    },");
+
+    [Fact]
+    public void ACastersRowIsItsBaselineAndItsDropOrder()
+    {
+        // The rework's audit: what a caster's row carries plays, as a martial row's
+        // does. Its baseline is its own — the load asks it what it asks any baseline
+        // and no longer holds it to Resonant x1 — so the Staff row forging Block
+        // beside its Resonant re-bases every staff, the uniques made from them too,
+        // and loads with nothing to say.
+        string[] staves = ["staff_of_renewal", "staff_of_warding", "staff_of_blight", "staff_of_mire", "rotwood", "staff_of_renewal_unique"];
+        var shipped = ShippedContent.Content.Weapons;
+        Assert.Equal(staves, shipped.All.Where(w => w.Class == Staff).Select(w => w.Id));
+        var blocking = Plays(DataTexts.InClass(ShippedWeapons, Staff, "\"baseline\": { \"Resonant\": 1 }", "\"baseline\": { \"Resonant\": 1, \"Block\": 1 }")).Weapons;
+        Assert.All(staves, id => Assert.Equal(
+            shipped[id].Forged.Append(new(Block, 1)).OrderBy(f => f.Key),
+            blocking[id].Forged.OrderBy(f => f.Key)));
+        Assert.All(blocking.All.Where(w => w.Class != Staff),
+            w => Assert.Equal(shipped[w.Id].Forged.OrderBy(f => f.Key), w.Forged.OrderBy(f => f.Key)));   // the Wand's Resonant stays alone
+
+        // Its drop order is its own too — weapons.json's, where it was a list in
+        // code: a fifth staff written into the variants and ordered after the four
+        // is one the draw can land on, with no code edit.
+        string order = StaffDropOrder(ShippedWeapons);
+        string ordered = DataTexts.InClass(WithAFifthStaff(ShippedWeapons), Staff, order, order[..^1] + ", \"staff_of_embers\"]");
+        var five = Plays(ordered).Weapons;
+        Assert.Equal("staff_of_embers", five.Class(Staff).DropOrder![^1]);
+        Assert.Equal(shipped.Class(Staff).DropOrder!.Count + 1, LootTable.VariantCount(five, Staff));
+        Assert.Equal("staff_of_embers", LootTable.VariantOf(five, Staff, LootTable.VariantCount(five, Staff) - 1).Id);
+
+        // A staff the order leaves out is a variant that never drops, not a fault:
+        // written in and not ordered, it loads and the draw is as it was; and a
+        // shipped staff taken out of the order loads, and drops no more.
+        var unordered = Plays(WithAFifthStaff(ShippedWeapons)).Weapons;
+        Assert.Equal(shipped.Class(Staff).DropOrder, unordered.Class(Staff).DropOrder);
+        Assert.Contains(unordered["staff_of_embers"], unordered.ByClass(Staff));
+        var noMire = Plays(DataTexts.InClass(ShippedWeapons, Staff, order, order.Replace(", \"staff_of_mire\"", "", StringComparison.Ordinal))).Weapons;
+        Assert.DoesNotContain("staff_of_mire", noMire.Class(Staff).DropOrder!);
+        Assert.Equal(shipped.Class(Staff).DropOrder!.Count - 1, LootTable.VariantCount(noMire, Staff));
+        Assert.Contains(noMire["staff_of_mire"], noMire.ByClass(Staff));
+    }
+
     [Fact]
     public void AClassRowMissingOrMisshapenStopsTheGame()
     {
@@ -267,8 +323,20 @@ public class WeaponClassTests
             // A martial row with no signature, and a Dagger baseline without CritWindow.
             (DataTexts.InClass(ShippedWeapons, Sword, "\"signature\": \"Block\"", "\"signature\": null"), "Sword", ContentValidator.RuleClassBaseline),
             (DataTexts.InClass(ShippedWeapons, Dagger, "\"CritWindow\": ", "\"Pin\": "), "Dagger", ContentValidator.RuleClassBaseline),
-            // A caster row naming a signature.
+            // A caster row naming a signature, or forging nothing — a caster's two
+            // axes are a modifier and its innate — and a staff forged with more
+            // than its class's baseline.
             (DataTexts.InClass(ShippedWeapons, Staff, "\"signature\": null", "\"signature\": \"Resonant\""), "Staff", ContentValidator.RuleCasterForged),
+            (DataTexts.InClass(ShippedWeapons, Staff, "\"baseline\": { \"Resonant\": 1 }", "\"baseline\": {}"), "Staff", ContentValidator.RuleCasterForged),
+            (DataTexts.InRow(ShippedWeapons, "staff_of_warding", "\"adds\": {}", "\"adds\": { \"Block\": 1 }"), "staff_of_warding", ContentValidator.RuleCasterForged),
+            // A caster's drop order: left out; not a list; naming a wand, a staff
+            // unique, or a staff twice; and a martial row naming one at all.
+            (DataTexts.InClass(ShippedWeapons, Staff, ",\n      " + StaffDropOrder(ShippedWeapons), ""), "Staff", ContentValidator.RuleCasterVariantPool),
+            (DataTexts.InClass(ShippedWeapons, Staff, StaffDropOrder(ShippedWeapons), "\"dropOrder\": \"staff_of_renewal\""), "Staff", ContentValidator.RuleFileShape),
+            (DataTexts.InClass(ShippedWeapons, Staff, "\"staff_of_renewal\", ", "\"staff_of_renewal\", \"wand_of_the_blast\", "), "wand_of_the_blast", ContentValidator.RuleCasterVariantPool),
+            (DataTexts.InClass(ShippedWeapons, Staff, "\"staff_of_renewal\", ", "\"staff_of_renewal\", \"rotwood\", "), "rotwood", ContentValidator.RuleCasterVariantPool),
+            (DataTexts.InClass(ShippedWeapons, Staff, "\"staff_of_renewal\", ", "\"staff_of_renewal\", \"staff_of_renewal\", "), "staff_of_renewal", ContentValidator.RuleCasterVariantPool),
+            (DataTexts.InClass(ShippedWeapons, Dagger, "\"signature\": \"CritWindow\"", "\"signature\": \"CritWindow\", \"dropOrder\": [\"flensing_knife\"]"), "Dagger", ContentValidator.RuleCasterVariantPool),
             // Every Spear variant gone — and Hoplite's Wall, made from the Phalanx
             // Spear, with them, or the reader refuses it first for deriving from
             // nothing: the placer draws spearmen, so the class must field one.

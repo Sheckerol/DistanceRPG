@@ -37,23 +37,35 @@ public sealed record WeaponDef(
 /// (the content rework, 1d; the user's ruling of 2026-09-25: the weapon types
 /// are JSON): what a class carries as data — the kind it plays as, the stats it
 /// levels on, the modifier it is named for, the baseline every weapon of it is
-/// forged with, and the statline its variants share. The class itself is code
-/// (<see cref="WeaponClass"/>): what a staff and a wand <em>do</em>, where the
-/// placer and the caster drop order name it; its row is its numbers.
+/// forged with, the statline its variants share, and for a caster the order
+/// its drop rolls its variants in. The class itself is code
+/// (<see cref="WeaponClass"/>): what a staff and a wand <em>do</em>, and where
+/// the placer names it; its row is its data.
 /// </summary>
 /// <param name="Class">The class the row is for: every <see cref="WeaponClass"/> member has exactly one.</param>
 /// <param name="Kind">What the relations mean by kind (§1.1): melee, ranged or caster. Caster exactly for the Staff and the Wand, which the code casts with.</param>
 /// <param name="Stats">The stats the class levels on, the best of them governing (§2.2): one, or the Sword's two; never CON.</param>
 /// <param name="Signature">The modifier the class is named for (§1.2's class feature), which a Purity variant deepens and a dungeon's theme is drawn from (§4.3); null for a caster.</param>
-/// <param name="Baseline">What every weapon of the class is forged with (§1.2): the signature and one more, or a caster's <c>Resonant x1</c>.</param>
+/// <param name="Baseline">What every weapon of the class is forged with (§1.2): for a martial class the signature and one more; for a caster whatever its row forges — the shipped rows' <c>Resonant x1</c> — and a caster weapon carries it and nothing else.</param>
 /// <param name="Range">The reach its variants share, in logic units (32 per tile).</param>
 /// <param name="Damage">The damage its variants share.</param>
 /// <param name="Cost">The movement an attack or cast takes, before Light's discount.</param>
 /// <param name="ManaCost">The mana a cast takes, before Resonant's discount; 0 for a martial class.</param>
+/// <param name="DropOrder">
+/// A caster class's drop order (§3.1, §3.5): the ids of the variants a drop of
+/// it rolls between, in the order the draw indexes them — so a reorder of the
+/// file's <c>variants</c> moves no saved drop, and a variant the order leaves
+/// out never drops. Null for a martial class, whose drop draws a role
+/// (<see cref="VariantRole"/>). Checked at load under
+/// <see cref="ContentValidator.RuleCasterVariantPool"/>. The audit of the
+/// content rework (2026-09-25) moved it here from a list in code, which kept a
+/// C# copy of eight of the file's ids.
+/// </param>
 public sealed record WeaponClassDef(
     WeaponClass Class, WeaponKind Kind, IReadOnlyList<Stat> Stats, ModifierType? Signature,
     IReadOnlyDictionary<ModifierType, int> Baseline,
-    int Range, int Damage, int Cost, int ManaCost);
+    int Range, int Damage, int Cost, int ManaCost,
+    IReadOnlyList<string>? DropOrder = null);
 
 /// <summary>
 /// The §5.6 <c>weapons.json</c> content: the class rows, and the weapon rows —

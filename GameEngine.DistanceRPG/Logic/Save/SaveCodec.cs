@@ -153,7 +153,10 @@ public static class SaveCodec
     /// <summary>
     /// A parser's or a reader's failure as a refusal: where — the JSON path the
     /// reader was at, or the line of text a syntax error is on — and the
-    /// problem, without the position the reader appends to its message.
+    /// problem, without the position the reader appends to its message, on one
+    /// short line (<see cref="JsonShape.OneLine"/>): for a word it does not know
+    /// the reader quotes the rest of the file, and the notice a refused save gets
+    /// is shown whole.
     /// </summary>
     private static SaveFormatException Refusal(JsonException e)
     {
@@ -168,6 +171,6 @@ public static class SaveCodec
             if (cut > 0)
                 problem = problem[..cut];
         }
-        return new SaveFormatException(where, problem.Trim(), e);
+        return new SaveFormatException(where, JsonShape.OneLine(problem), e);
     }
 }

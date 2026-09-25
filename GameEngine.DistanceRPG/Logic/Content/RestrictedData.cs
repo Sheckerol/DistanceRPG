@@ -18,7 +18,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// or <see cref="CasterKind"/>. Absent means any kind.
 /// </param>
 /// <param name="ForgedOnly">Deepenable if already present, never added from zero (a safety rule).</param>
-/// <param name="NeverRolled">Never granted by any roll at all — the unique enchantments (an economy rule). Read by later phases' rolls.</param>
+/// <param name="NeverRolled">Never granted by any roll, and never copied — in the shipped file the unique enchantments (an economy rule). Enchantment ids alone; which ones is this file's to say, never held to the catalogue's <c>unique</c> flag, which pins a tier.</param>
 public sealed record RestrictedData(
     IReadOnlyList<string[]> Excludes,
     IReadOnlyDictionary<string, string[]> Requires,

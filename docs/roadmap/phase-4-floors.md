@@ -365,8 +365,9 @@ short of mana.
 ### Two floors deep
 
 The tutorial ignores the 5–10 roll: its boss sits on **floor 2**, fixed — as
-much as the enchanter's pool will hold. It is the one dungeon in the game with a
-hardcoded depth, and the special case earns itself twice over.
+much as the enchanter's pool will hold. It is the one dungeon with a fixed
+rather than rolled depth (`dungeons.json` pins both bounds to 2, §5.8), and the
+special case earns itself twice over.
 
 It teaches the complete loop in miniature — descend once, fight the boss,
 extract back through a single floor — so every dungeon mechanic is demonstrated

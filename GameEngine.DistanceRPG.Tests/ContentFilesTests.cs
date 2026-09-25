@@ -429,6 +429,60 @@ public class ContentFilesTests
     }
 
     [Fact]
+    public void AnEmptyTuningFileIsSaid_AndTheBuiltInNumbersPlay()
+    {
+        // The rework's audit: a tuning.json beside the game with nothing in it — 0
+        // bytes, or blanks, as an editor that crashed while saving leaves it —
+        // plays the built-in numbers, as a missing one does, and says so, as a
+        // missing, locked or broken one does: exactly one notice, and no number
+        // changed. It is not called missing: the file is there.
+        foreach (string blank in new[] { "", " \r\n\t\n" })
+        {
+            var load = ShippedData.Load(Shipped with { Tuning = blank });
+            Assert.Null(load.Error);
+            Assert.Equal(["tuning.json: the file is empty - the built-in numbers are playing"], load.Notices);
+            Assert.Empty(load.TuningOverrides);
+            TuningValues.Same(ShippedContent.Tuning, load.Content!.Tuning);
+        }
+    }
+
+    [Fact]
+    public void AMistypedWordInAContentFileIsSaidOnOneLine()
+    {
+        // The rework's audit: a word JSON does not know where a value goes — nul,
+        // tru, fals — made the reader quote the rest of the file, newlines and all,
+        // and the screen that stops the game drew that past its bottom edge. The
+        // detail is one line now, the word cut where the reader stopped, and the
+        // screen's rows are few: weapons.json with "shape": nul, and dungeons.json
+        // with "retiresOnClear": tru.
+        var nul = Fails(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "flensing_knife", "\"shape\": null", "\"shape\": nul") });
+        Assert.Equal((ContentFiles.WeaponsFileName, false, ContentFiles.WeaponsFileName, ContentValidator.RuleFileShape), Stamp(nul));
+        Assert.Matches(@"^weapons\.json: line \d+, column \d+: is not valid JSON \(nul\.\.\. is an invalid JSON literal\. Expected the literal null\)$", nul.Detail);
+
+        var tru = Fails(Shipped with { Dungeons = DataTexts.InRow(Shipped.Dungeons!, "tutorial", "\"retiresOnClear\": true", "\"retiresOnClear\": tru") });
+        Assert.Equal((ContentFiles.DungeonsFileName, false, ContentFiles.DungeonsFileName, ContentValidator.RuleFileShape), Stamp(tru));
+        Assert.EndsWith("(tru... is an invalid JSON literal. Expected the literal true)", tru.Detail);
+
+        foreach (var error in new[] { nul, tru })
+        {
+            Assert.DoesNotContain('\n', error.Detail!);
+            Assert.DoesNotContain('\r', error.Detail!);
+            var rows = StartupErrorScene.Lines(error, [], [error.File!]);
+            Assert.InRange(rows.Count, 6, 12);
+            Assert.All(rows, row => Assert.True(row.Length <= NoticeText.LineChars || row == rows[^1], row));
+            Assert.All(rows, row => Assert.DoesNotContain('\n', row));
+        }
+
+        // A word the reader quotes past the cap is cut at it, and marked.
+        var longWord = Fails(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "flensing_knife", "\"shape\": null", "\"shape\": " + new string('t', 40)) });
+        Assert.Contains($"({new string('t', JsonShape.MaxQuoted)}... is an invalid JSON literal. Expected the literal true)", longWord.Detail);
+
+        // A number mistyped says it on one short line already, and still does.
+        var tuned = ShippedData.Load(Shipped with { Tuning = """{ "MovementBudget": 16o }""" });
+        Assert.Equal(["tuning.json: line 1, column 23 is not valid JSON (o is an invalid end of a number. Expected a delimiter) - the built-in numbers are playing"], tuned.Notices);
+    }
+
+    [Fact]
     public void AFailureNamesItsFile()
     {
         // 1h: every stage stamps its failure with its file (ContentException.File),
@@ -472,14 +526,16 @@ public class ContentFilesTests
         // its detail.
         Assert.Contains(RestrictedJson.FileName, Fails(Shipped with { Restricted = elementsTangled }).Detail);
 
-        // One cross-file case: a restricted.json whose neverRolled forgets burning
-        // fails at restricted.json's stage — the unique flag is the code's and
-        // neverRolled the file's, one question asked where the catalogue is built
-        // against the relations — stamped restricted.json, the file to fix, its
-        // detail naming it.
-        var forgot = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", "]") });
-        Assert.Equal((RestrictedJson.FileName, false, "burning", ContentValidator.RuleUniqueNeverRolled), Stamp(forgot));
-        Assert.Equal("unique, but absent from neverRolled in restricted.json", forgot.Detail);
+        // One cross-file case: a restricted.json whose neverRolled names a modifier
+        // fails at restricted.json's stage — the id resolves, so the file's own
+        // checks pass it, and it is refused where the catalogue is built against
+        // the relations, since only the catalogue's entries are ever rolled —
+        // stamped restricted.json, the file to fix, its detail naming the row. (A
+        // neverRolled that forgets burning, which this case was until the rework's
+        // audit, plays: the relation is the file's alone, CodeCatalogueTests.)
+        var modifier = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"Push\"]") });
+        Assert.Equal((RestrictedJson.FileName, false, "Push", ContentValidator.RuleNeverRolledNamesEnchantments), Stamp(modifier));
+        Assert.Equal("'Push' is a modifier, and neverRolled lists enchantments alone - restricted.json neverRolled Push", modifier.Detail);
 
         // The relations', the dungeons' and the party's stages stamp theirs the same
         // way when they are handed to the staged load directly: records a file beside

@@ -40,8 +40,9 @@ of being right first time. Nothing about it can be reasoned to a value; it needs
 a session, a wand, and a floor of enemies. A constant like that being compiled
 in would be the single worst hardcode in the project.
 
-So: a **`tuning.json` beside the executable**, read once at startup into
-`GameConstants`, overriding the shipped file's numbers, which the game carries built in.
+So: a **`tuning.json` beside the executable**, read once at startup into the
+`Tuning` record (settled.md, Phase 5 pass), overriding the shipped file's
+numbers, which the game carries built in.
 
 ### What it must never contain
 
@@ -272,7 +273,7 @@ area shape, innate enchantment id, in three sections:
 
 | Section | Holds |
 | --- | --- |
-| `classes` | Each of the eight classes once, by name: its `kind` (melee, ranged or caster), the `stats` it levels on, its `signature` (none for a caster), its `baseline` — the modifiers every weapon of the class is forged with — and the statline its weapons share: `range`, `damage`, `cost`, `manaCost` |
+| `classes` | Each of the eight classes once, by name: its `kind` (melee, ranged or caster), the `stats` it levels on, its `signature` (none for a caster), its `baseline` — the modifiers every weapon of the class is forged with — and the statline its weapons share: `range`, `damage`, `cost`, `manaCost`; and, for the Staff and the Wand, its `dropOrder` — the variants a drop of the class rolls between, in the order the draw indexes them |
 | `variants` | The 32 weapons: each one's class, its role, the modifier it **adds** to its class's baseline (a caster variant has no role and adds none), the enchantments it arrives with (a staff's innate, by id) and a wand's area shape. A statline field a variant names plays instead of its class's |
 | `uniques` | Each artifact as the variant it derives from — whose class, statline and shape it takes — the modifier it **raises**, set to the count given (a caster unique raises none), and its enchantments |
 
@@ -286,7 +287,8 @@ caster. The loader composes each into the one weapon every other system reads.
 | A class casts exactly when it is the Staff or the Wand | The code casts with those two: a staff's innate is its cast, a wand's element and shape arrive when it drops | §1.3, §1.4 |
 | A class levels on one or more of STR, DEX and INT | CON levels no weapon: it is the body's pool, not a craft | §1.2, §2.2 |
 | No two classes share a signature | A dungeon's theme finds its class by its signature | §4.3 |
-| A martial class's baseline is its signature plus a second modifier; a caster class has no signature and a baseline of `Resonant ×1` alone | No weapon starts with fewer than two forged axes, and a caster's second is its enchantment | §1.2, §1.3 |
+| A martial class's baseline is its signature plus a second modifier; a caster class has no signature and a baseline of one modifier at least — the shipped rows' `Resonant ×1` — and every staff and wand is forged with it alone | No weapon starts with fewer than two forged axes, and a caster's second is its enchantment; which modifier is the row's, not the load's | §1.2, §1.3 |
+| A caster class orders the variants its drop rolls between — each its own, none twice — and a martial class orders none | A martial drop draws a role; a caster's draw indexes the order, so reordering `variants` moves no saved drop, and a variant the order leaves out never drops | §3.1, §3.5 |
 | Every forged spread is legal | `Allowed(t, kind, present)` | §1.1 |
 | Nothing forged too deep | `MaxForged` — `×3`, or `×1` for `Light`/`Resonant` | §1.1 |
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
@@ -333,23 +335,27 @@ must name every one, or the game does not start.
 
 **The `unique` flag says one thing only: the tier is pinned at 1** (§3.3). Its
 *roll-eligibility* lives in `restricted.json` under `neverRolled`, because that
-is the same question asked of `Charges` and belongs in the same place. The
-loader cross-checks the two and aborts if they disagree, so declaring one and
-forgetting the other is a startup error rather than a unique quietly appearing
-in the enchanter's catalogue.
+is the same question asked of `Charges` and belongs in the same place — and
+there alone: the loader checks only that `neverRolled` names the catalogue's
+enchantments, never that it matches the flag. (It cross-checked the two until
+the content rework's audit of 2026-09-25 found the cross-check a second copy of
+the relation in code, against the user's ruling — "if it lives in the code then
+changing the json loses all purpose": any edit to the list alone stopped the
+game.) The shipped file lists the nine souls; a soul it leaves out may be
+copied, and still drops nowhere, since the drop pool names none.
 
 **It is still validated at load**, first and on its own, as the file was: a code
 edit that breaks a rule stops the game on its screen, and the tests catch it
-before a playtester can. The checks that meet `restricted.json` — the unique
-souls against `neverRolled`, the elements' opposition — are that file's to fix,
-since it is the one a playtest edits, and a failure there names it.
+before a playtester can. The checks that meet `restricted.json` — `neverRolled`
+naming the catalogue's enchantments, the elements' opposition — are that file's
+to fix, since it is the one a playtest edits, and a failure there names it.
 
 | Check | Rule | From |
 | --- | --- | --- |
 | Trigger cost is **never zero** | No enchantment fires free, ever | §3.3 |
 | An entry quotes a flat trigger cost **or** applies a status, never both | A status applier prices off its level count, so a flat cost would decay into free | §3.5 |
 | Every innate stat spread is a permutation of 1–4 | Free to check, silently wrong if it drifts | §2.1 |
-| `unique` entries appear in `neverRolled` | One question, one answer, cross-checked | §5.5 |
+| `neverRolled` names the catalogue's enchantments alone | Only an enchantment is rolled or copied: a modifier there is a rule that silently does not apply | §5.5 |
 | Damage-type opposition is symmetric and total | Four types, two pairs, every type opposed by exactly one | §1.4 |
 | A lingering element names an element that exists | Searing is nothing without its `Flaming` | §1.5 |
 | Every effect reference resolves to an `EffectKind` — by construction: an entry's effect is typed | A typo is not a silent no-op | — |

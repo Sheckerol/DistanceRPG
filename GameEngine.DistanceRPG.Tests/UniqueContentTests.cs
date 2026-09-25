@@ -288,8 +288,8 @@ public class UniqueContentTests
     [Fact]
     public void UniqueSouls_AreNeverRolled_AndTierPinned()
     {
-        // The unique flag gates two things and nothing else: the tier is pinned at 1, and no roll grants
-        // the entry — the latter in restricted.json, cross-checked on load. Vampiric is the catalogue
+        // The unique flag pins the tier at 1 and does nothing else; that no roll grants a soul is the
+        // shipped restricted.json's neverRolled, which lists the nine. Vampiric is the catalogue
         // entry the dagger arrives with at tier 3: not unique, rollable, its tier its own. The catalogue
         // in file order: the eight innates, then the ordinary entries of §3.3's starting set — Vampiric,
         // Arcane, Shattering, the shielding entry and Echoing — then the nine souls in the table's order.
@@ -326,20 +326,37 @@ public class UniqueContentTests
             Martial("test_deep_soul", "tower_guard", [(Block, 3), (Push, 1)], ("sturdy", 3))] }))
             Assert.Equal(1, Assert.Single(TestWeapons.Get("test_deep_soul").Enchantments).Tier);
 
-        // The cross-check, both ways: a unique entry missing from neverRolled, a never-rolled id that is
-        // not unique, and a soul whose flag was dropped, each abort naming the entry.
-        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning,
+        // Which entries no roll grants is restricted.json's alone (the user's ruling of 2026-09-25): the load
+        // no longer holds neverRolled to the flag, which the rework's audit found to be a second copy of the
+        // relation in code. So a soul left out of neverRolled loads, rollable by the file's word and still
+        // pinned by its flag — and it drops nowhere even then, since the drop pool names no soul; and an entry
+        // that is no soul, put in, loads and leaves every drop. What the load refuses there is a modifier:
+        // nothing reads the list for one.
+        var burningLeft = TestContent.Load(ShippedContent.Tuning,
             ShippedContent.Restricted with { NeverRolled = Souls.Where(s => s != "burning").ToArray() },
+            ShippedContent.Enchantments, ShippedContent.Weapons);
+        Assert.Contains(burningLeft.Enchantments.Rollable, e => e.Id == "burning");
+        Assert.Equal(1, new Enchantment(burningLeft.Enchantments["burning"], 3).Tier);
+        Assert.DoesNotContain("burning", LootTable.DropPool);
+
+        using (TestContent.Use(ShippedContent.Restricted with { NeverRolled = [.. Souls, "flaming"] }))
+        {
+            Assert.DoesNotContain(GameContent.Current.Enchantments.Rollable, e => e.Id == "flaming");
+            Assert.All(Enum.GetValues<WeaponClass>(), cls => Assert.DoesNotContain("flaming", LootTable.DropOrder(cls)));
+        }
+        Assert.Contains("flaming", LootTable.DropOrder(WeaponClass.Dagger));   // the shipped file rolls it
+
+        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning,
+            ShippedContent.Restricted with { NeverRolled = [.. Souls, "Block"] },
             ShippedContent.Enchantments, ShippedContent.Weapons));
-        Assert.Equal(("burning", ContentValidator.RuleUniqueNeverRolled), (ex.EntryId, ex.Rule));
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning,
-            ShippedContent.Restricted with { NeverRolled = [.. Souls, "flaming"] },
-            ShippedContent.Enchantments, ShippedContent.Weapons));
-        Assert.Equal(("flaming", ContentValidator.RuleUniqueNeverRolled), (ex.EntryId, ex.Rule));
+        Assert.Equal(("Block", ContentValidator.RuleNeverRolledNamesEnchantments), (ex.EntryId, ex.Rule));
+
+        // And a soul whose flag a code edit dropped is caught where the flag is read, not at neverRolled,
+        // which does not ask it: the unique carrying it needs a soul.
         ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted,
             new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == "siphon" ? e with { Unique = false } : e).ToList()),
             ShippedContent.Weapons));
-        Assert.Equal(("siphon", ContentValidator.RuleUniqueNeverRolled), (ex.EntryId, ex.Rule));
+        Assert.Equal(("widowmaker", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
 
         // And a soul exists only on the uniques that carry it: content handing one to a variant is refused.
         ex = LoadEditing("tower_guard", w => w with { Enchantments = [new EnchantmentRef("sturdy")] });

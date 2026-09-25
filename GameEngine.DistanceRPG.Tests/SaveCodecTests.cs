@@ -210,6 +210,16 @@ public class SaveCodecTests
         string truncated = string.Join('\n', lines.Take(12));
         Assert.Equal("line 12", Refused(truncated).Where);
 
+        // A word the reader does not know, where a hand edit mistyped one: it
+        // quotes the rest of the file, and the refusal keeps the word alone, on
+        // one line — the notice a set-aside save gets is shown whole (the
+        // rework's audit, for the content files' same reader).
+        string mistyped = text.Replace("\"runCounter\": 2,", "\"runCounter\": tru,", StringComparison.Ordinal);
+        Assert.NotEqual(text, mistyped);
+        var literal = Refused(mistyped);
+        Assert.Equal("'tru...' is an invalid JSON literal. Expected the literal 'true'.", literal.Problem);
+        Assert.StartsWith("line ", literal.Where, StringComparison.Ordinal);
+
         // The right member holding the wrong kind of thing.
         (Action<JsonObject> Spoil, string Where)[] wrong =
         [

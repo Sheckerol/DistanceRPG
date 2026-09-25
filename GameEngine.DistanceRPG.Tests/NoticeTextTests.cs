@@ -43,6 +43,11 @@ public class NoticeTextTests
         var cut = NoticeText.Rows([word]);
         Assert.All(cut, row => Assert.InRange(row.Length, 1, NoticeText.LineChars));
         Assert.Equal(word, string.Concat(cut.Select(row => row.Trim())));
+
+        // Any whitespace separates words — a line break or a tab as much as a
+        // space — so no row ever holds one, whatever a reader's message carried
+        // (the rework's audit: a JSON reader quoting the rest of a file).
+        Assert.Equal(["WEAPONS.JSON: LINE 1 }, { IS NOT VALID"], NoticeText.Wrap("weapons.json: line 1\n    },\r\n\t{ is not valid\n"));
     }
 
     [Fact]

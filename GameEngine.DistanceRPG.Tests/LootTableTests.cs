@@ -81,12 +81,13 @@ public sealed class LootTableTests : IDisposable
     [Fact]
     public void AppendingAWeaponLeavesAnExistingSeedsDropUnchanged()
     {
-        // The variant draw is off Enum.GetValues<VariantRole>().Length and never
-        // off ByClass(...).Count, which is file order and a content-driven
-        // length: the rule EnemyPlacer already states ("adding a weapon re-rolls
+        // The variant draw is off Enum.GetValues<VariantRole>().Length for a
+        // martial class and off its row's drop order for a caster, and never off
+        // ByClass(...).Count, which is file order and a content-driven length:
+        // the rule EnemyPlacer already states ("adding a weapon re-rolls
         // nobody"). A fifth staff is the case that would break a count read off
         // the catalogue, since the caster classes are the ones whose variants
-        // carry no role.
+        // carry no role — and one the Staff row does not order re-rolls nobody.
         var before = Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList();
         var martialBefore = Sweep("assassins_fang", defeatCount: 6, spawns: 16).Select(Describe).ToList();
 
@@ -109,10 +110,11 @@ public sealed class LootTableTests : IDisposable
         // The other half of the same rule, and the half a content-ordered draw
         // would fail: appending is not the only edit weapons.json takes.
         // A martial variant is found by its role, which is code; a caster's
-        // carries none, so the draw indexes LootTable.CasterVariants — an
-        // ordered id list held in code — rather than ByClass, which is file
-        // order. Swapping two staff rows would otherwise silently re-roll every
-        // saved, not-yet-collected caster dummy's drop.
+        // carries none, so the draw indexes the drop order its class row names —
+        // an ordered id list of its own in weapons.json — rather than ByClass,
+        // which is the file's order of its variants. Swapping two staff rows would
+        // otherwise silently re-roll every saved, not-yet-collected caster dummy's
+        // drop.
         var staves = Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList();
         var wands = Sweep("wand_of_the_blast", defeatCount: 6, spawns: 16, element: DamageType.Cold).Select(Describe).ToList();
         var order = GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id).ToList();
@@ -668,32 +670,72 @@ public sealed class LootTableTests : IDisposable
     }
 
     [Fact]
-    public void TheCasterVariantPoolNamesOnePerRoleAndResolves()
+    public void TheCasterDropOrderIsTheClassRows_AndResolves()
     {
-        // The caster half of the same trade: the count and the order are code's,
-        // so the pool holds exactly as many variants as a drop rolls between —
-        // a fifth would never be drawn and a fourth missing would put the draw
-        // out of range — and every id it names is a variant of its own class.
+        // The caster half of the same trade: the order a caster drop rolls its
+        // variants in is its class row's, in weapons.json (the rework's audit:
+        // it was a list in code, a copy of eight of the file's ids), and the
+        // draw's range is that order's length — never the file's count of the
+        // class's variants. Every id it names is a variant of its own class,
+        // once, and the draw's index is the order's; a martial row names none,
+        // its draw decoding a role.
+        var weapons = GameContent.Current.Weapons;
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
-            bool caster = GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster;
-            Assert.Equal(caster, LootTable.CasterVariants.ContainsKey(cls));
-            if (!caster) continue;
+            bool caster = weapons.KindOf(cls) == WeaponKind.Caster;
+            var order = weapons.Class(cls).DropOrder;
+            Assert.Equal(caster, order is not null);
+            if (!caster)
+            {
+                Assert.Equal(LootTable.Roles, LootTable.VariantCount(weapons, cls));
+                continue;
+            }
 
-            var order = LootTable.CasterVariants[cls];
-            Assert.Equal(Enum.GetValues<VariantRole>().Length, order.Count);
+            Assert.Equal(order!.Count, LootTable.VariantCount(weapons, cls));
             Assert.Equal(order.Distinct(StringComparer.Ordinal), order);
-            Assert.All(order, id => Assert.Contains(GameContent.Current.Weapons[id], GameContent.Current.Weapons.ByClass(cls)));
+            Assert.All(order, id => Assert.Contains(weapons[id], weapons.ByClass(cls)));
+            for (int i = 0; i < order.Count; i++)
+                Assert.Equal(order[i], LootTable.VariantOf(weapons, cls, i).Id);
         }
+    }
+
+    [Fact]
+    public void ACasterVariantDropsOnceItsClassOrdersIt_WithNoCodeEdit()
+    {
+        // The rework's audit: a staff added to weapons.json drops once the Staff
+        // row's drop order names it — an edit to the file, never to the code. The
+        // draw is over the order's length, so ordering a fifth is a deliberate
+        // edit to what every saved staff dummy's draw means (§5.6: "a deliberate,
+        // rare change rather than an ordinary edit"); a fifth the order leaves out
+        // re-rolls nobody (AppendingAWeaponLeavesAnExistingSeedsDropUnchanged).
+        var fifth = new WeaponDef(
+            Id: "staff_of_embers", Name: "Staff of Embers", Class: WeaponClass.Staff, Role: null,
+            Range: 100, Damage: 0, Cost: 40, ManaCost: 20,
+            Forged: new Dictionary<ModifierType, int> { [ModifierType.Resonant] = 1 },
+            Enchantments: [new EnchantmentRef("poison")], Shape: null, Unique: false, DerivedFrom: null);
+
+        using var _ = TestContent.UsePremise(weapons: w => w with
+        {
+            Classes = w.Classes.Select(row => row.Class == WeaponClass.Staff ? row with { DropOrder = [.. row.DropOrder!, fifth.Id] } : row).ToList(),
+            Weapons = [.. w.Weapons, fifth],
+        });
+
+        Assert.Equal(5, LootTable.VariantCount(GameContent.Current.Weapons, WeaponClass.Staff));
+        var dropped = Sweep("staff_of_blight", defeatCount: 0, spawns: 64)
+            .Where(d => !d.WasUniqueRoll)
+            .Select(d => d.Weapon.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(fifth.Id, dropped);
+        Assert.Equal(5, dropped.Count);
     }
 
     [Fact]
     public void ACasterClassShortOfAVariantIsRefusedAtLoad()
     {
-        // The draw is code-fixed at four, so a file with three staves would put
-        // roughly one drop in four out of range — an exception deep inside a
-        // collection rather than at load. Refused here instead, the way the drop
-        // pool's own dangling ids are.
+        // The draw indexes the Staff row's drop order, so a file that loses a
+        // staff the order still names would put roughly one drop in four on a row
+        // that is not there — an exception deep inside a collection rather than at
+        // load. Refused here instead, the way the drop pool's own dangling ids are.
         var before = GameContent.Current;
         var threeStaves = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList() };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: threeStaves));

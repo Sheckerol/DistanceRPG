@@ -32,10 +32,10 @@ public class DungeonContentTests
     /// <summary>A weapon row's forged spread as a set: what a drop carries the moment it is made.</summary>
     private static ModifierSet Spread(WeaponDef def) => ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
 
-    /// <summary>The variants a drop of <paramref name="cls"/> rolls between: one per role for a martial class, the code-fixed list for a caster.</summary>
+    /// <summary>The variants a drop of <paramref name="cls"/> rolls between: one per role for a martial class, the drop order its class row names for a caster.</summary>
     private static IEnumerable<WeaponDef> DropVariants(WeaponClass cls)
         => Weapons.KindOf(cls) == WeaponKind.Caster
-            ? LootTable.CasterVariants[cls].Select(id => Weapons[id])
+            ? Weapons.Class(cls).DropOrder!.Select(id => Weapons[id])
             : Enum.GetValues<VariantRole>().Select(role => Weapons.Variant(cls, role));
 
     /// <summary>Whether <paramref name="variant"/> as it drops takes <paramref name="theme"/> as a forged graft.</summary>

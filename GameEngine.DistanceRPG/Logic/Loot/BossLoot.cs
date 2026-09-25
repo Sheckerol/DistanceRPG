@@ -140,7 +140,7 @@ public static class BossLoot
         var dropClass = drawn ?? Classes.First(table.Contains);
 
         // (2) and (3): the drop's own steps, exactly as any drop takes them.
-        var variant = LootTable.VariantOf(catalogue, dropClass, rng.NextInt(0, LootTable.Roles - 1));
+        var variant = LootTable.VariantOf(catalogue, dropClass, rng.NextInt(0, LootTable.VariantCount(catalogue, dropClass) - 1));
         var (element, rolled) = LootTable.RollInnate(dropClass, rng);
 
         // (4) The graft, forged at construction: chosen, not rolled.

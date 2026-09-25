@@ -122,9 +122,11 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// whatever was asked (§3.3). The pin is applied where the tier is stored
     /// and again where it is read, so no path lifts it: not a content row
     /// asking for tier 3, not a <c>with</c> copy, not a later transfer or
-    /// service. It is one of the two doors the <see cref="Unique"/> flag
-    /// closes, and the only one on this type; the other is <c>neverRolled</c>,
-    /// beside the catalogue (<see cref="EnchantmentCatalogue.Rollable"/>).
+    /// service. It is the one door the <see cref="Unique"/> flag closes. Whether
+    /// an entry is rolled or copied is another door, <c>restricted.json</c>'s
+    /// <c>neverRolled</c>, beside the catalogue
+    /// (<see cref="EnchantmentCatalogue.Rollable"/>), and the flag does not
+    /// answer for it.
     /// </summary>
     public int Tier
     {

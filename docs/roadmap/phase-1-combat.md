@@ -217,8 +217,9 @@ a better lesson than the number quietly having been smaller all along.
 
 **Keeping the arms race in content rather than in constants is also what keeps
 it in the data files** (§5.5). A counter is an entry someone adds: a relation or
-a weapon in the data files, an enchantment in the catalogue (§5.7) — never a
-rebalance of a constant, which is a recompile and an argument.
+a weapon in the data files, an enchantment in the catalogue (§5.7) (code since
+the user's ruling of 2026-09-25, so a new one is a rebuild) — never a rebalance
+of a `tuning.json` number, which reaches everyone silently and is an argument.
 
 **This is what forces the attack resolver to return a result rather than write
 one.** Damage is not a number the attacker computes and applies; it is a value

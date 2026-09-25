@@ -67,14 +67,17 @@ public class WeaponsJsonTests
 
         // Three sections (the content rework, 1d; Phase 5 USER DECISION 4, ruled):
         // the classes, by their C# names, every one in the enum's order, each
-        // naming all eight of a class's fields in the record's order; the
+        // naming all eight of a class's fields in the record's order — and a
+        // caster's its drop order after them (the rework's audit); the
         // variants, each naming the seven every variant names, and a statline
         // field only where it plays its own; the uniques, each naming its five.
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
         Assert.Equal(["classes", "variants", "uniques"], document.RootElement.EnumerateObject().Select(member => member.Name));
         var classes = document.RootElement.GetProperty("classes").EnumerateObject().ToList();
         Assert.Equal(Enum.GetNames<WeaponClass>(), classes.Select(member => member.Name));
-        Assert.All(classes, member => Assert.Equal(ClassFields, member.Value.EnumerateObject().Select(field => field.Name)));
+        Assert.All(classes, member => Assert.Equal(
+            data.ClassOf(Enum.Parse<WeaponClass>(member.Name))!.Kind == WeaponKind.Caster ? [.. ClassFields, "dropOrder"] : ClassFields,
+            member.Value.EnumerateObject().Select(field => field.Name)));
         var variantRows = document.RootElement.GetProperty("variants").EnumerateArray().ToList();
         var uniqueRows = document.RootElement.GetProperty("uniques").EnumerateArray().ToList();
         Assert.All(variantRows, row => Assert.Equal(VariantFields.Take(7), row.EnumerateObject().Select(field => field.Name).Where(name => VariantFields.Take(7).Contains(name))));
@@ -106,9 +109,10 @@ public class WeaponsJsonTests
         Assert.Equal("flensing_knife", Row("flensing_knife_unique").GetProperty("derivedFrom").GetString());
         Assert.Null(Played("flensing_knife_unique").Role);
 
-        // The baselines are the rows': each class names its signature and a
-        // baseline of it and one other modifier — a caster Resonant x1 and no
-        // signature — as RuleClassBaseline and RuleCasterForged check, and it is
+        // The baselines are the rows': each martial class names its signature and a
+        // baseline of it and one other modifier, as RuleClassBaseline checks; a
+        // caster no signature, as RuleCasterForged checks, and the Resonant x1 its
+        // row forges (§1.3, §1.4, the rows' design rather than any rule's). Each is
         // exactly what the class's four variants share. The file loads, so it checked.
         var baselines = new Dictionary<WeaponClass, (ModifierType? Signature, ModifierType[] Baseline)>
         {

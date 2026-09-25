@@ -35,7 +35,13 @@ GameEngine.DistanceRPG/         # Game executable
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
+  ShippedData.cs                # Reads the embedded JSON masters: the built-in fallback, at the edge
+  Data/                         # The JSON MASTER COPIES, hand-kept: tuning.json, restricted.json,
+                                # weapons.json, dungeons.json — embedded in the build as the
+                                # fallback, and copied beside the exe for playtest edits
   Logic/                        # ENGINE-FREE gameplay core — no OpenTK/engine types allowed
+    Content/                    # Loading and validating the data files; StartingParty.cs (code)
+    Enchantments/               # EnchantmentDefinitions.cs: the enchantment catalogue (code)
     Mulberry32.cs               # JS-bit-identical RNG (map seeds must reproduce)
     MapGenerator.cs             # Rooms + greedy-MST corridors (RNG call order is load-bearing)
     Pathfinder.cs               # A*, octile heuristic, JS-identical heap tie-breaking
@@ -58,3 +64,11 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   the presentation boundary via `WorldSpace`.
 - Changes to MapGenerator/Mulberry32/Pathfinder must keep the golden tests
   green — they guarantee parity with the original game.
+- Behaviour and reference data (the modifiers, the enchantment catalogue in
+  `Logic/Enchantments/EnchantmentDefinitions.cs`, the starting party in
+  `Logic/Content/StartingParty.cs`) live in code; the relations, the weapon
+  types, the weapons (the caster drop order included), the dungeons and the
+  tuning numbers live only in `GameEngine.DistanceRPG/Data/*.json`, the master
+  copy the build embeds as the fallback (the user's ruling of 2026-09-25). Never
+  add a C# copy of a JSON value: the load validates the code catalogues against
+  the JSON instead. Nothing the golden tests pin may go in `tuning.json`.

@@ -15,10 +15,16 @@
  * Wand cast, and no other class does. stats: the stats it levels on, the best of them counting -
  * STR, DEX or INT; CON levels no weapon. signature: the modifier the class is named for, which its
  * Purity variant deepens and a dungeon's theme is drawn from; null for a caster. baseline: the
- * modifiers every weapon of the class is forged with, each to its stack count - its signature and
- * one more, or a caster's Resonant x1 - so re-basing a class is one edit, here. range: the reach,
- * in logic units (32 a tile). damage: a hit, before modifiers. cost: the movement an attack or a
- * cast takes. manaCost: the mana a cast takes, 0 for a martial class.
+ * modifiers every weapon of the class is forged with, each to its stack count - a martial class's
+ * signature and one more; a caster's whatever the forge allows, one modifier at least, and every
+ * staff or wand carries it and nothing else - so re-basing a class is one edit, here. range: the
+ * reach, in logic units (32 a tile). damage: a hit, before modifiers. cost: the movement an attack
+ * or a cast takes. manaCost: the mana a cast takes, 0 for a martial class. dropOrder, on the Staff
+ * and the Wand alone: the ids of the variants a drop of the class rolls between, in the order the
+ * draw counts them - each a variant of that class, none twice. A staff or a wand it leaves out
+ * never drops: add one to variants, then to dropOrder. Reordering the variants below moves no
+ * drop; an edit to dropOrder moves what a dummy not yet collected in a saved campaign drops. A
+ * martial class draws one variant per role instead, and names no dropOrder.
  *
  * variants: what a drop or a dummy carries. id: what everything names the weapon by - the starting
  * party (code), a drop, a save. name: what the screen calls it. class: one of the classes above.
@@ -95,13 +101,15 @@
     "Staff": {
       "kind": "caster", "stats": ["INT"], "signature": null,
       "baseline": { "Resonant": 1 },
-      "range": 100, "damage": 0, "cost": 40, "manaCost": 20
+      "range": 100, "damage": 0, "cost": 40, "manaCost": 20,
+      "dropOrder": ["staff_of_renewal", "staff_of_warding", "staff_of_blight", "staff_of_mire"]
     },
     /* Wand (INT): Resonant x1 plus an element supplied when it drops; four shapes, in logic units. */
     "Wand": {
       "kind": "caster", "stats": ["INT"], "signature": null,
       "baseline": { "Resonant": 1 },
-      "range": 160, "damage": 8, "cost": 45, "manaCost": 20
+      "range": 160, "damage": 8, "cost": 45, "manaCost": 20,
+      "dropOrder": ["wand_of_the_blast", "wand_of_the_cone", "wand_of_the_beam", "wand_of_the_nova"]
     }
   },
 

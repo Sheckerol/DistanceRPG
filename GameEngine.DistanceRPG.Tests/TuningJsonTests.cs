@@ -41,15 +41,22 @@ public class TuningJsonTests
     {
         // PHASE5-041: no file at all is the built-in numbers, and so is a file that
         // names nothing — empty, blank, or an empty table with a comment on it.
-        // Nothing to warn about in any of them: the missing file's notice is the
-        // loader's, which every data file gets alike.
+        // Nothing to warn about in no file — the missing file's notice is the
+        // loader's, which every data file gets alike — nor in an empty table, a
+        // copy that changes nothing. A blank file does say so (the rework's
+        // audit): an editor that crashed while saving leaves one, and a playtester
+        // whose numbers were wiped must not be told the file changes none.
         foreach (string? text in new[] { null, "", "  \n", "{}", "/* nothing yet */ { }" })
         {
             var read = TuningJson.Read(text, BuiltIn);
-            Assert.Empty(read.Warnings);
+            if (text is not null && string.IsNullOrWhiteSpace(text))
+                Assert.Equal([TuningJson.EmptyWarning], read.Warnings);
+            else
+                Assert.Empty(read.Warnings);
             Assert.Empty(read.Overrides);
             TuningValues.Same(BuiltIn, read.Tuning);
         }
+        Assert.Equal("tuning.json: the file is empty - the built-in numbers are playing", TuningJson.EmptyWarning);
 
         // The loader adds the missing file's notice — and only for a missing one.
         // The other data files sit beside it, as they ship, so any notice is the

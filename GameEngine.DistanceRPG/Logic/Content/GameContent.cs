@@ -170,9 +170,9 @@ public sealed class GameContent
     /// <item><c>restricted.json</c>'s semantics — its own checks, its ids against
     /// every modifier and every enchantment the catalogue has, and the modifier
     /// rules — and then the catalogue against the relations: the opposition
-    /// chart its elements form, and its unique souls against
-    /// <c>neverRolled</c>. The catalogue is code, so <c>restricted.json</c> is
-    /// the file to fix, and the failure is stamped with it;</item>
+    /// chart its elements form, and <c>neverRolled</c> naming its entries alone.
+    /// The catalogue is code, so <c>restricted.json</c> is the file to fix, and
+    /// the failure is stamped with it;</item>
     /// <item><c>weapons.json</c>'s shape, then its semantics — its class rows
     /// first, which every weapon after them is read against;</item>
     /// <item><c>dungeons.json</c>'s;</item>
@@ -228,7 +228,7 @@ public sealed class GameContent
 
             // Then the catalogue against the relations: it runs ValidateEnchantments
             // again, then ValidateOpposition for its chart and ValidateNeverRolled
-            // for its souls, both answered by restricted.json.
+            // for the entries neverRolled names, both answered by restricted.json.
             return (rules, new EnchantmentCatalogue(enchantments, tuning, restrictedData));
         });
 

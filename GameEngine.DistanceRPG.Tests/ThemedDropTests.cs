@@ -132,7 +132,8 @@ public sealed class ThemedDropTests : IDisposable
         // the last index of the list in front of it: read off the stream here, so
         // this is a claim about the list and not about which way a draw fell.
         var rng = LootTable.StreamFor(3, 0);
-        Assert.Equal("staff_of_blight", LootTable.CasterVariants[Staff][rng.NextInt(0, LootTable.Roles - 1)]);
+        var staves = GameContent.Current.Weapons;
+        Assert.Equal("staff_of_blight", staves.Class(Staff).DropOrder![rng.NextInt(0, LootTable.VariantCount(staves, Staff) - 1)]);
         Assert.True(FarmLadder.RollsAStack(rng));
         double d = rng.NextDouble();
         Assert.Equal(2, (int)Math.Floor(d * 3));   // the last of three

@@ -73,8 +73,11 @@
      a bow worse. */
   "forgedOnly": ["Charges"],
 
-  /* Never granted by any roll, and never copied - an economy rule: the unique enchantments. Every
-     enchantment the game's catalogue marks unique is here, and nothing else is: the load holds the
-     catalogue's unique flag and this list together. */
+  /* Never granted by any roll, and never copied - an economy rule: the unique enchantments, each
+     of which exists only on the unique that carries it. Enchantments alone: a modifier here stops
+     the game. This list alone says what is never rolled - the catalogue's unique flag only pins a
+     soul's tier - so an enchantment added here stops dropping, and a soul taken out may be copied
+     (a soul drops nowhere either way: the drops draw from a fixed list of the catalogue's entries
+     that names none). */
   "neverRolled": ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"]
 }

@@ -106,7 +106,12 @@ public static class LootTable
     /// </summary>
     private const int NoNature = InnateStats.Low;
 
-    /// <summary>The variants a drop rolls between, counted off the code-fixed enum and never off the catalogue's length (see <see cref="StreamFor"/>). The boss's drop draws its variant over the same count (<see cref="BossLoot"/>).</summary>
+    /// <summary>
+    /// The variants a martial drop rolls between, counted off the code-fixed enum
+    /// and never off the catalogue's length (see <see cref="StreamFor"/>); a
+    /// caster's are its class row's drop order (<see cref="VariantCount"/>). The
+    /// boss's drop draws its variant the same way (<see cref="BossLoot"/>).
+    /// </summary>
     internal static readonly int Roles = Enum.GetValues<VariantRole>().Length;
 
     /// <summary>The four elements a wand's drop rolls between, in <see cref="DamageType"/> order: a code-fixed count, for the same reason.</summary>
@@ -163,45 +168,6 @@ public static class LootTable
         "arcane", "shattering",                      // §3.3's damage entry and its crit entry: both fire at step 4 of any hit
         "aegis", "echoing",                          // filtered out below — a compiled defender step, and a declared-inert kind
     ];
-
-    /// <summary>
-    /// The variants a caster class's drop rolls between, in a fixed order held
-    /// here in code — the caster half of the rule <see cref="DropPool"/> follows
-    /// for the enchantment draw.
-    /// <para>
-    /// <strong>A caster's variants carry no role</strong> — they vary by effect
-    /// and shape (§3.1), which is what
-    /// <see cref="ContentValidator.RuleRoleOnMartialOnly"/> says — so the draw
-    /// cannot decode to a <see cref="VariantRole"/> the way a martial one does,
-    /// and the only list left to index would be
-    /// <see cref="WeaponCatalogue.ByClass"/>, which is <em>file</em> order.
-    /// Swapping two rows of <c>weapons.json</c> would then silently re-roll
-    /// every saved, not-yet-collected caster dummy's drop — half of exactly what
-    /// §3.5's rule forbids, the other half being the append
-    /// <see cref="Roles"/> already covers. Naming them here makes the draw's
-    /// meaning code's, so a content reorder moves nothing and an append re-rolls
-    /// nobody.
-    /// </para>
-    /// <para>
-    /// <strong>Provisional: REWORK DECISION 2.</strong> The user's ruling of
-    /// 2026-09-25 makes <c>weapons.json</c> the master of every variant, and this
-    /// is a C# list of eight of its ids, kept for the stream's sake: a caster
-    /// variant added to the file drops only once it is named here. The
-    /// alternative, an append-only drop order carried on each caster class's row
-    /// in <c>weapons.json</c>, is set out in docs/roadmap/open-questions.md.
-    /// </para>
-    /// <see cref="ContentValidator.ValidateWeapons"/> refuses a caster class
-    /// that does not hold every variant named here, which is also what keeps the
-    /// draw in range: a file with three staves is refused at load, the way every
-    /// other dangling reference is, rather than throwing on roughly one drop in
-    /// four deep inside a collection.
-    /// </summary>
-    public static readonly IReadOnlyDictionary<WeaponClass, IReadOnlyList<string>> CasterVariants =
-        new Dictionary<WeaponClass, IReadOnlyList<string>>
-        {
-            [WeaponClass.Staff] = ["staff_of_renewal", "staff_of_warding", "staff_of_blight", "staff_of_mire"],
-            [WeaponClass.Wand] = ["wand_of_the_blast", "wand_of_the_cone", "wand_of_the_beam", "wand_of_the_nova"],
-        };
 
     /// <summary>
     /// The stream the dummy at <paramref name="spawnIndex"/> rolls its drop on:
@@ -265,8 +231,9 @@ public static class LootTable
     /// order and each drawn on <see cref="StreamFor"/>:
     /// <list type="number">
     /// <item>the <strong>variant</strong>, uniform over the code-fixed
-    /// <see cref="VariantRole"/> count — the class is the dummy's own and is read
-    /// back rather than rolled (§3.1);</item>
+    /// <see cref="VariantRole"/> count for a martial class and over its row's
+    /// drop order for a caster (<see cref="VariantCount"/>) — the class is the
+    /// dummy's own and is read back rather than rolled (§3.1);</item>
     /// <item>the <strong>innate enchantment</strong> — a staff's is fixed by its
     /// variant and draws nothing, a wand draws one of the four elements, and
     /// everything else rolls <see cref="Tuning.DropEnchantChancePercent"/> and,
@@ -305,9 +272,9 @@ public static class LootTable
         var rng = StreamFor(mapSeed, enemy.SpawnIndex);
 
         // (1) The variant, rolled fresh: the dummy fought with one of its class's
-        // four and drops another, so what it was holding says the class and
+        // variants and drops another, so what it was holding says the class and
         // nothing more (§3.1).
-        var variant = VariantOf(catalogue, cls, rng.NextInt(0, Roles - 1));
+        var variant = VariantOf(catalogue, cls, rng.NextInt(0, VariantCount(catalogue, cls) - 1));
 
         // (2) The entry it arrives with. A staff's is already on the def.
         var (element, rolled) = RollInnate(cls, rng);
@@ -356,30 +323,60 @@ public static class LootTable
     }
 
     /// <summary>
+    /// How many variants a drop of <paramref name="cls"/> rolls between — the
+    /// range of the pass's first draw: a martial class's one per role
+    /// (<see cref="Roles"/>, code-fixed), a caster's the length of its row's drop
+    /// order (<see cref="WeaponClassDef.DropOrder"/>, <c>weapons.json</c>'s). Four
+    /// for every shipped class, so the draw is the one it always was.
+    /// </summary>
+    internal static int VariantCount(WeaponCatalogue catalogue, WeaponClass cls)
+    {
+        ArgumentNullException.ThrowIfNull(catalogue);
+        return catalogue.KindOf(cls) == WeaponKind.Caster ? CasterDropOrder(catalogue, cls).Count : Roles;
+    }
+
+    /// <summary>
     /// The variant a draw of <paramref name="index"/> resolves to. A martial
     /// class decodes it as a <see cref="VariantRole"/>, which is how
     /// <see cref="EnemyPlacer"/> already reads its own draw; a caster's variants
-    /// carry no role — they vary by effect and shape (§3.1) — so the same
-    /// code-fixed draw indexes <see cref="CasterVariants"/>, an ordered id list
-    /// held in code. Either way both the <em>count</em> and the <em>order</em>
-    /// are fixed here rather than by the catalogue's, so appending a weapon
-    /// re-rolls nobody and reordering the file moves nobody. The boss's drop
-    /// decodes its own variant draw here too (<see cref="BossLoot"/>), which is
-    /// what keeps its table computed over the variants a drop can actually roll
-    /// (<see cref="DungeonCatalogue.ThemeClasses"/>).
+    /// carry no role — they vary by effect and shape (§3.1), which is what
+    /// <see cref="ContentValidator.RuleRoleOnMartialOnly"/> says — so the draw
+    /// indexes the drop order its class row names in <c>weapons.json</c>
+    /// (<see cref="WeaponClassDef.DropOrder"/>) and never
+    /// <see cref="WeaponCatalogue.ByClass"/>, which is the file's order of its
+    /// variants: swapping two staff rows there would otherwise silently re-roll
+    /// every saved, not-yet-collected caster dummy's drop, half of what §3.5's
+    /// rule forbids. So appending a weapon to the file re-rolls nobody and
+    /// reordering it moves nobody; a variant drops once its class's order names
+    /// it, and an edit to that order is a deliberate edit to what the draw means
+    /// (§5.6: "a deliberate, rare change rather than an ordinary edit"). The
+    /// boss's drop decodes its own variant draw here too (<see cref="BossLoot"/>),
+    /// which is what keeps its table computed over the variants a drop can
+    /// actually roll (<see cref="DungeonCatalogue.ThemeClasses"/>).
     /// </summary>
     internal static WeaponDef VariantOf(WeaponCatalogue catalogue, WeaponClass cls, int index)
     {
+        ArgumentNullException.ThrowIfNull(catalogue);
         if (catalogue.KindOf(cls) != WeaponKind.Caster)
             return catalogue.Variant(cls, (VariantRole)index);
 
-        var order = CasterVariants.TryGetValue(cls, out var named)
-            ? named
-            : throw new KeyNotFoundException($"{cls} is a caster class that {nameof(CasterVariants)} does not name; a drop rolls one of {Roles} variants.");
-        return order.Count == Roles
+        var order = CasterDropOrder(catalogue, cls);
+        return (uint)index < (uint)order.Count
             ? catalogue[order[index]]   // resolvable at load: ContentValidator.RuleCasterVariantPool
-            : throw new InvalidOperationException($"{cls}'s drop order names {order.Count} variants; a drop rolls one of {Roles}.");
+            : throw new ArgumentOutOfRangeException(nameof(index), index, $"{cls}'s drop order names {order.Count} variants.");
     }
+
+    /// <summary>
+    /// A caster class's drop order, from its row in the loaded weapons. A caster
+    /// class a drop can roll names one by validation
+    /// (<see cref="ContentValidator.RuleCasterVariantPool"/>); the throw is what
+    /// makes the unreachable case loud rather than quiet.
+    /// </summary>
+    private static IReadOnlyList<string> CasterDropOrder(WeaponCatalogue catalogue, WeaponClass cls)
+        => catalogue.Class(cls).DropOrder is { Count: > 0 } order
+            ? order
+            : throw new InvalidOperationException(
+                $"{cls} is a caster class whose row names no drop order; {nameof(ContentValidator)}.{nameof(ContentValidator.RuleCasterVariantPool)} refuses that at load.");
 
     /// <summary>
     /// The entry a drop arrives with (§3.1), the pass's second question, drawn on

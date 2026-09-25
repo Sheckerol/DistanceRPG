@@ -13,7 +13,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// own first — ids unique, a lock of at least one, no trigger of zero, a trigger
 /// or a status and never both, the drop pool resolving
 /// (<see cref="ContentValidator.ValidateEnchantments"/>) — and then against the
-/// relations, whose <c>neverRolled</c> must be exactly its unique souls and whose
+/// relations, whose <c>neverRolled</c> must name its entries alone and whose
 /// <c>excludes</c> must oppose its four elements in two pairs. Those two are
 /// <c>restricted.json</c>'s to fix, so a failure there is stamped with that file;
 /// a row broken here fails the suite (<c>CodeCatalogueTests</c>) before a

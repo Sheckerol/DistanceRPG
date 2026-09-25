@@ -98,14 +98,16 @@ internal static class NoticeText
     /// indented. Uncapped: <see cref="Rows"/> is what caps a list of notices.
     /// The HUD's font is capitals and has no backslash — it would draw a gap — so
     /// a backslash is drawn as a slash: a Windows path, such as a set-aside
-    /// save's, still reads as one, and Windows reads it the same.
+    /// save's, still reads as one, and Windows reads it the same. Any whitespace
+    /// separates words — a line break or a tab included — so no row ever holds
+    /// one: a notice is one line, wrapped here and nowhere else.
     /// </summary>
     internal static IReadOnlyList<string> Wrap(string notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
         var rows = new List<string>();
         var row = new StringBuilder();
-        foreach (string word in notice.Trim().ToUpperInvariant().Replace('\\', '/').Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string word in notice.ToUpperInvariant().Replace('\\', '/').Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
         {
             string rest = word;
             while (rest.Length > 0)

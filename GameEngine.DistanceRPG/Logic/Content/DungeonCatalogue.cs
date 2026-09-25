@@ -27,9 +27,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <para>
 /// A class's variants are read as <see cref="WeaponDef"/> spreads — a martial
 /// class's one per role through <see cref="WeaponCatalogue.Variant"/>, a
-/// caster's through <see cref="LootTable.CasterVariants"/> — each asked of the
-/// kind its class row gives it (<see cref="WeaponCatalogue.KindOf"/>), and never
-/// instantiated, so loading content still builds no <see cref="Weapon"/>.
+/// caster's through the drop order its class row names
+/// (<see cref="WeaponClassDef.DropOrder"/>) — each asked of the kind its class
+/// row gives it (<see cref="WeaponCatalogue.KindOf"/>), and never instantiated,
+/// so loading content still builds no <see cref="Weapon"/>.
 /// Every class is asked about every variant, because the variant is rolled
 /// after the class and a boss must never drop an ungrafted weapon.
 /// </para>
@@ -176,7 +177,7 @@ public sealed class DungeonCatalogue
     /// <summary>
     /// The variants a drop of <paramref name="cls"/> rolls between, as the loot
     /// table decodes its draw: a martial class's one per role, a caster's the
-    /// code-fixed <see cref="LootTable.CasterVariants"/> list. None for a class
+    /// drop order its class row names in <c>weapons.json</c>. None for a class
     /// the weapon file leaves out, which no boss can drop.
     /// </summary>
     private static IReadOnlyList<WeaponDef> DropVariants(WeaponClass cls, WeaponCatalogue weapons)
@@ -185,7 +186,7 @@ public sealed class DungeonCatalogue
             return [];
         if (weapons.KindOf(cls) != WeaponKind.Caster)
             return Roles.Select(role => weapons.Variant(cls, role)).ToArray();
-        return LootTable.CasterVariants.TryGetValue(cls, out var ids)
+        return weapons.Class(cls).DropOrder is { } ids
             ? ids.Select(id => weapons[id]).ToArray()
             : [];
     }

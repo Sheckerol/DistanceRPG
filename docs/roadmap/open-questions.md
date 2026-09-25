@@ -67,9 +67,11 @@ owner — should settle both entries then, and should settle what a class featur
 That filter is `DropOrder`'s own, and it is the only one of its kind in the
 tree: **`EnchantmentCatalogue.Rollable` is not a grantable pool.** Rollable is
 everything outside `neverRolled`, in the catalogue's order, so both `echoing`
-and `aegis` sit in it — and `neverRolled` cannot absorb them, since
-`ContentValidator.ValidateNeverRolled` cross-checks that set against the
-`unique` flag and neither entry is a unique soul. §6.4's enchanter, specified as
+and `aegis` sit in it — and the shipped `neverRolled` does not absorb them: it
+is the economy rule about souls, and neither entry is a unique soul. (Since the
+rework's audit the file could list them — `neverRolled` is `restricted.json`'s
+alone, no longer held to the `unique` flag — but "never copied" is not what an
+inert entry needs.) §6.4's enchanter, specified as
 offering `CampaignState.SeenInOrder` filtered against `NeverRolled`, would
 therefore offer `Echoing` — declared inert, reserving a lock of 20, able to fire
 nothing — and would be the only thing in the game that could. **It must apply
@@ -292,29 +294,40 @@ variant may name its `manaCost` — stricter to the docs' tables, at the cost of
 per-variant tweak becoming a new class. settled.md's Phase 5 implementation pass
 records the ruling.
 
-## Where the caster drop order lives (§3.5, §5.6) — REWORK DECISION 2
+## Whether an edit to the caster drop order may move a saved drop (§3.5, §5.6) — REWORK DECISION 2
 
-The ruling makes `weapons.json` the master of every variant, with no copy in
-code. `LootTable.CasterVariants` is one: a C# list of eight of its variant ids —
-which staves and wands a caster drop rolls between, and in what order. So a
-caster variant added to the JSON never drops without a code edit.
+Where the order lives is ruled: the ruling makes `weapons.json` the master of
+every variant, with no copy in code, so since the rework's audit the order a
+caster drop rolls its variants in is the file's — each caster class's row names
+its `dropOrder` (the Staff's four staves, the Wand's four wands). It had shipped
+as `LootTable.CasterVariants`, a C# list of the eight ids, so a caster variant
+added to the file never dropped without a code edit. The load checks the order:
+a caster class that fields variants names one, every id a variant of that class
+and none twice, and a martial class names none (`RuleCasterVariantPool`). A
+variant the order leaves out never drops; one appended to it drops.
 
-**Shipped provisionally: kept in code.** The drop's draw indexes the list, and
-§3.5 wants a saved, not-yet-collected dummy's drop never to move under a content
-edit: with the order held in code, a reorder of `weapons.json` re-rolls nobody.
-It is cross-checked at load — a caster class must hold every variant the list
-names (`RuleCasterVariantPool`) — and settled.md's ruling subsection names it as
-the one weapon-id list the code keeps.
+What is left is what an edit to the order may do. The draw is uniform over the
+order's length, and §3.5 wants a saved, not-yet-collected dummy's drop never to
+move under an ordinary content edit. Reordering the file's `variants` moves
+nothing, since the draw never reads the file's order. An edit to `dropOrder`
+itself — appending a staff, reordering the four, taking one out — does move
+the drops of that class's saved caster dummies.
 
-**This keeps a copy the ruling removes everywhere else, so it is the user's to
-decide.** The alternative: an explicit, append-only drop order carried in
-`weapons.json` — a `dropOrder` list on each caster class's row — cross-checked
-at load: every id a variant of that class, none twice, and a copy beside the exe
-keeping the built-in copy's order as its prefix, so an append re-rolls nobody. A
-new caster variant then drops with no code edit, at the cost of a stream order a
-hand edit can break — and an edit that reorders the master itself is caught by
-no load rule, only by review. settled.md's Phase 5 implementation pass records
-the ruling.
+**Shipped provisionally: any edit to the order plays**, a copy beside the exe's
+included, as the deliberate, rare change §5.6 already accepts for a fifth
+variant: the list says what it is for, beside the class it orders, and the
+header of `weapons.json` says what an edit to it moves.
+
+**This decides what a hand edit can do to a saved campaign, so it is the user's
+to decide.** The alternative: a copy beside the exe must keep the built-in
+copy's order as its prefix — refusing a reorder or a removal there, which moves
+the saved drops with nothing new to show for it, while still allowing an
+append. It narrows the hazard rather than closing it: an appended variant must
+take its share of a uniform draw from the others, so an append moves some saved
+drops too, and an edit to the master itself is caught by no load rule, only by
+review. (The rework's plan had offered that prefix as keeping an append from
+re-rolling anybody; no uniform draw can.) settled.md's Phase 5 implementation
+pass records the ruling.
 
 ## Which of the masters' values the tests pin (§5.3–§5.8) — REWORK DECISION 3
 
@@ -358,3 +371,57 @@ Three facts come with the choice, so that it is ruled on knowingly:
 The alternative: no literal at all — every test reads the master, the docs alone
 quote their numbers, and no master edit fails the suite. settled.md's Phase 5
 implementation pass records the ruling.
+
+## Whether the gameplay numbers still compiled are tuning numbers (§5.3)
+
+The user's ruling puts "numbers driving tuning" fully in JSON, and every
+`tuning.json` key now is: the `Tuning` record holds no value, and no key's
+number is written in C#. But some gameplay numbers never were keys, and are
+still compiled:
+
+- `GameConstants.DummyHp` 50 — a rank-and-file dummy's hit points (a boss's are
+  `dungeons.json`'s);
+- `GameConstants.MaxMana` 100 — the mana pool of an actor with no progression,
+  which is every enemy's (a member's is `StartingPool` and INT's);
+- `GameConstants.EnemyMove` 100 — an enemy's movement a turn, the counterpart of
+  the `MovementBudget` key, and the numerator of the scale an enemy's costs are
+  priced at (`EnemyMove / MovementBudget`);
+- `GameConstants.MinEnemiesForStaffHealer` 3 and `StaffHealerChance` 0.5 — when
+  a crowded room turns a dummy into a staff healer;
+- `CombatRules.OpposedDamagePercent` 150 — the attunement chart's ×1.5
+  (phase-1-weapons.md §1.4), beside its halving, the cast crit's doubling and
+  the fumble's, which `CombatRules` compiles the same way;
+- `Progression.DamagePerLevels` 2 and `MovementDiscountPerLevels` 3 — a
+  weapon level's `+floor(L / 2)` damage and `-1` movement per 3 levels
+  (phase-2-progression.md);
+- `EnemyPlacer.MaxEnemiesPerRoom` 4 — the most dummies a room is placed with.
+
+No document or ruling says whether these are tuning numbers or rules of the
+game. What bears on it:
+
+- **The docs fix some of them as rules**: the chart's ×1.5 and the level
+  effects are written in the design as the rule itself, not as a first guess to
+  tune, as `tuning.json`'s keys are.
+- **Three shape the placement stream.** `MaxEnemiesPerRoom` is on the suite's
+  list of seed-parity names (`TuningSchemaTests.NothingTheGoldenTestsPinIsAKey`
+  treats every constant of `EnemyPlacer` as one), and "nothing the golden tests
+  pin may ever go in" `tuning.json` (ROADMAP). `MinEnemiesForStaffHealer` and
+  `StaffHealerChance` decide whether a room's healer draw is taken at all, so
+  moving either shifts every draw after it on the floor. The golden file itself
+  pins no placement — the map generator's stream is what it pins — so this is
+  the suite's reading of the rule, not the golden data's.
+- **`StaffHealerChance` is a fraction**, and `tuning.json` holds whole numbers:
+  as a key it would be a percentage.
+- **A new key changes every save's tuning hash** once, so the first resume of
+  every campaign saved before it says `THE NUMBERS HAVE CHANGED`.
+
+**Shipped provisionally: they stay compiled**, as rules of the game rather than
+numbers a playtest turns, until ruled.
+
+**This decides what "numbers driving tuning" covers, so it is the user's to
+decide.** The alternatives: move them into `tuning.json` as keys, each with a
+range — all of them, or all but the placer's three, which stay compiled as seed
+parity (or move with the parity list amended, the golden file not pinning
+them); or move only the ones no design doc fixes — the enemy's hit points, mana
+and movement, and the healer's odds. settled.md's Phase 5 implementation pass
+records the ruling.

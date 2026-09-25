@@ -45,8 +45,8 @@ moves to someone whose pool already does (§6.5).
 
 ## 3.2 Repeat kills deepen the drop
 
-Dummies resurrect after 10 turns (`GameConstants.DummyResurrectTurns`) and
-already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
+Dummies resurrect after 10 turns (`tuning.json`'s `ResurrectTurnsBase`, 10
+shipped, §5.3) and already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
 defeat of the same dummy deepens the weapon it is carrying.
 
 Repeat kills never add a **new** enchantment. Farming buys depth in what the
@@ -350,8 +350,8 @@ simultaneously — which is honest, because that is exactly what it is.
 ### And it comes back sooner
 
 The roll decides *what* a revival grants; the count decides **how fast it
-happens**. Resurrection is 10 turns today (`GameConstants.DummyResurrectTurns`),
-and it shortens with every defeat:
+happens**. Resurrection is 10 turns today (`tuning.json`'s `ResurrectTurnsBase`,
+10 shipped, §5.3), and it shortens with every defeat:
 
 ```
 resurrectTurns(n) = max(3, 10 − n)
@@ -1322,9 +1322,10 @@ crit, on kill, on being hit, on cast. Phase 0's unified attack resolver is
 where hit/crit/kill all pass through, so this is one call site rather than the
 several it would have been before.
 
-Note `Weapon` is a `record` shared by reference from `GameConstants.Weapons`
-today, so dropped instances must be **copies**, never mutations of the shared
-table — both `ModifierSet` and the enchantment list should be immutable.
+Note a `Weapon` is shared by reference from the loaded catalogue
+(`GameContent.Weapons`, built from `weapons.json`, §5.6), so dropped instances
+must be **copies**, never mutations of the shared table — both `ModifierSet` and
+the enchantment list should be immutable.
 
 `PartyMemberState.MaxMana` subtracts the equipped item's total lock.
 

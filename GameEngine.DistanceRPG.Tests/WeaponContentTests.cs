@@ -583,7 +583,8 @@ public class WeaponContentTests
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));
 
-        // A caster forged on anything but Resonant x1, or with the wrong innate.
+        // A caster forged on anything but its class's baseline (the Staff row's
+        // Resonant x1), or with the wrong innate.
         ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, 1), (Block, 1)) });
         Assert.Equal(("staff_of_mire", ContentValidator.RuleCasterForged), (ex.EntryId, ex.Rule));
         ex = LoadWith("staff_of_mire", w => w with { Enchantments = [new EnchantmentRef("mire"), new EnchantmentRef("poison")] });

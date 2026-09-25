@@ -77,7 +77,21 @@ public static class ContentValidator
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
     public const string RuleLingerNamesElement = "a lingering element names an element that exists and the status it leaves";
     public const string RuleMagnitudeNamesAPotency = "an enchantment whose effect is its potency names one of at least one";
-    public const string RuleUniqueNeverRolled = "unique entries appear in neverRolled, and neverRolled names only unique entries";
+
+    /// <summary>
+    /// <c>neverRolled</c> names enchantments of the catalogue alone (§5.5): only an
+    /// enchantment is rolled or copied, and nothing reads the list for a
+    /// modifier, so a modifier there resolves — the id check passes it — and then
+    /// silently does not apply, the mirror of what <c>kind</c> and
+    /// <c>forgedOnly</c> refuse (<see cref="RuleModifierRelationIds"/>). Which
+    /// enchantments it names is <c>restricted.json</c>'s alone (the user's ruling
+    /// of 2026-09-25): the catalogue's <c>unique</c> flag pins a soul's tier and
+    /// is not asked here. It was, until the rework's audit — the load held
+    /// <c>neverRolled</c> to exactly the unique souls, a second copy of the
+    /// relation in code, so the file could only restate it.
+    /// </summary>
+    public const string RuleNeverRolledNamesEnchantments = "neverRolled names enchantments of the catalogue alone";
+
     public const string RuleDropPoolResolves = "every id the drop pool names resolves in the catalogue";
 
     public const string RuleEnchantmentsExcluded = "a weapon's enchantments never include two that exclude each other";
@@ -193,7 +207,25 @@ public static class ContentValidator
     public const string RuleForgedStackCount = "a forged stack count is at least one";
     public const string RuleMaxForged = "nothing is forged past MaxForged";
     public const string RuleTwoForgedAxes = "no weapon is forged with fewer than two modifiers";
-    public const string RuleCasterForged = "a caster is forged Resonant x1 and nothing else";
+
+    /// <summary>
+    /// A caster class names no signature and forges one modifier at least, and
+    /// every staff and wand is forged with its class's baseline and nothing else
+    /// (§1.3, §1.4). The signature: a caster has no role and so no Purity variant
+    /// to deepen one, and a dungeon's theme that found a caster class by it would
+    /// look there for the Purity variant its unique is made from. The one
+    /// modifier: a caster's two forged axes are a modifier
+    /// and its innate (§5.6: "no weapon starts with fewer than two forged axes, and
+    /// a caster's second is its enchantment"), which is what
+    /// <see cref="FewestFarmedEntries"/> counts. <em>Which</em> modifier is the
+    /// class row's alone — the shipped rows' <c>Resonant x1</c> is their design,
+    /// pinned as a design doc's value by the tests
+    /// (<c>WeaponClassTests.AClassRowIsWhatTheClassCarries</c>), never by this
+    /// rule, which held both rows to exactly <c>Resonant x1</c> until the rework's
+    /// audit found it a copy of their value. What else a baseline may hold is the
+    /// forge's to say, asked as it is of every baseline.
+    /// </summary>
+    public const string RuleCasterForged = "a caster class names no signature and forges one modifier at least, and every caster weapon is forged with its class's baseline alone";
     public const string RuleCasterInnate = "a caster carries exactly one innate enchantment";
     public const string RuleWandShape = "a wand carries an area shape and nothing else does";
     public const string RuleWandNoStatusApplier = "a wand carries no status-applying enchantment: an area cast names no target to land it on";
@@ -204,7 +236,22 @@ public static class ContentValidator
     public const string RuleEfficiencyAddsLight = "an Efficiency variant adds Light x1";
     public const string RulePurityDeepensBaseline = "a Purity variant deepens the class signature";
     public const string RuleForgedOnlyUnused = "every forgedOnly id is forged on at least one weapon";
-    public const string RuleCasterVariantPool = "a caster class holds every variant a drop rolls between";
+
+    /// <summary>
+    /// A caster class's row orders the variants its drop rolls between
+    /// (<see cref="WeaponClassDef.DropOrder"/>): a caster class that fields a
+    /// variant names a drop order, every id in it a variant of that class and
+    /// none twice; and a martial class's row names none, since its drop draws a
+    /// role. The draw indexes the order, so an id that is no variant of the class
+    /// would land a drop on a row that does not exist — refused at load, the way
+    /// the drop pool's own ids are, rather than on one drop in four deep inside a
+    /// collection — and one named twice would be drawn twice as often. A variant
+    /// the order leaves out never drops, which is not a fault: it is how a new
+    /// staff waits to be added to the drops. The order is <c>weapons.json</c>'s
+    /// since the rework's audit; it was a list in code, a copy of eight of the
+    /// file's ids.
+    /// </summary>
+    public const string RuleCasterVariantPool = "a caster class orders the variants its drop rolls between - its own variants, each once - and a martial class orders none";
     public const string RuleClassCarriesAUnique = "a class a drop can roll carries at least one unique";
     public const string RuleMartialVariantNoEnchantment = "a martial variant arrives carrying no enchantment of its own";
 
@@ -223,8 +270,7 @@ public static class ContentValidator
     /// <summary>
     /// A class row's kind is <c>caster</c> exactly for the Staff and the Wand: the
     /// code keys what a caster does on those two members — a staff's innate is its
-    /// cast, a wand's element and shape are supplied at instantiation, and the
-    /// caster drop order (<see cref="LootTable.CasterVariants"/>) names both — while
+    /// cast, a wand's element and shape are supplied at instantiation — while
     /// melee or ranged stays free for the six martial classes. A
     /// code-names-it-so-the-row-must-fit check, not a new invariant.
     /// </summary>
@@ -258,8 +304,7 @@ public static class ContentValidator
     /// which a floor's placement decodes its draw into. A compiled reference a
     /// <c>weapons.json</c> edit could otherwise orphan into a crash one construction
     /// deep, or one floor deep — the same kind of check as the drop pool's
-    /// (<see cref="RuleDropPoolResolves"/>) and the caster drop order's
-    /// (<see cref="RuleCasterVariantPool"/>), not a new invariant.
+    /// (<see cref="RuleDropPoolResolves"/>), not a new invariant.
     /// </summary>
     public const string RuleCodeNamedWeaponsExist = "every weapon the code names resolves: the default a dummy holds, the healer staff, and a variant of each class the placer draws";
 
@@ -907,30 +952,34 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.5/§5.7 cross-check (S:334-339, S:352): the <c>unique</c> flag says
-    /// the tier is pinned, <c>neverRolled</c> says no roll grants it, and the
-    /// two are one question — every unique entry is in <c>neverRolled</c>, and
-    /// <c>neverRolled</c> names nothing but unique entries — so declaring one
-    /// and forgetting the other aborts startup rather than letting a unique
-    /// appear in the enchanter's catalogue. <see cref="EnchantmentCatalogue"/>
-    /// runs this itself as well, at <c>restricted.json</c>'s stage of the load:
-    /// the flag is the code's (<see cref="EnchantmentDefinitions"/>), so the file
-    /// to fix is <c>restricted.json</c>, and the detail names it.
+    /// <c>neverRolled</c> against the catalogue (§5.5; <see cref="RuleNeverRolledNamesEnchantments"/>):
+    /// every id it names is an enchantment of the catalogue, in the file's order,
+    /// so the one reported is the same every run. <em>Which</em> enchantments no
+    /// roll grants is <c>restricted.json</c>'s alone — the relations live there
+    /// and nowhere else (the user's ruling of 2026-09-25: "if it lives in the
+    /// code then changing the json loses all purpose") — so the catalogue's
+    /// <c>unique</c> flag, which pins a soul's tier (<see cref="Enchantment.UniqueTier"/>),
+    /// is not asked. It was until the rework's audit, which found the load
+    /// holding <c>neverRolled</c> to exactly the unique souls: any edit to the
+    /// list alone stopped the game, so the file could only restate the code. (A
+    /// soul the file leaves out is rollable, and still drops nowhere: the drop
+    /// pool, <see cref="LootTable.DropPool"/>, names none.)
+    /// <see cref="EnchantmentCatalogue"/> runs this as it is built, at
+    /// <c>restricted.json</c>'s stage of the load, after the id check has passed
+    /// every id as a modifier or an enchantment: what is left to refuse is a
+    /// modifier, which nothing reads the list for.
     /// </summary>
     public static void ValidateNeverRolled(EnchantmentsData data, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(restricted);
 
-        var never = new HashSet<string>(restricted.NeverRolled, StringComparer.Ordinal);
-        foreach (var e in data.Enchantments)
-            if (e.Unique && !never.Contains(e.Id))
-                throw new ContentException(e.Id, RuleUniqueNeverRolled, $"unique, but absent from neverRolled in {RestrictedJson.FileName}");
-
-        var byId = data.Enchantments.ToDictionary(e => e.Id, StringComparer.Ordinal);
+        var ids = data.Enchantments.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var id in restricted.NeverRolled)
-            if (!byId.TryGetValue(id, out var e) || !e.Unique)
-                throw new ContentException(id, RuleUniqueNeverRolled, $"in neverRolled, but not a unique enchantment - {RestrictedJson.FileName} neverRolled names it");
+            if (!ids.Contains(id))
+                throw new ContentException(id, RuleNeverRolledNamesEnchantments, ModifierRules.ModifierIds.Contains(id)
+                    ? $"'{id}' is a modifier, and neverRolled lists enchantments alone - {RestrictedJson.FileName} neverRolled {id}"
+                    : $"'{id}' is no enchantment of the catalogue - {RestrictedJson.FileName} neverRolled {id}");
     }
 
     /// <summary>
@@ -989,8 +1038,9 @@ public static class ContentValidator
     /// (<see cref="ValidateClasses"/>): one row a class, a kind that casts exactly
     /// for the Staff and the Wand, the stats it levels on, a signature no other
     /// class has, a baseline the forge allows (asked what a weapon's spread is
-    /// asked, below), and a baseline of that signature and one more — or a
-    /// caster's <c>Resonant x1</c> and no signature. Then the weapon rows, each read as the
+    /// asked, below), and a baseline of that signature and one more — or, for a
+    /// caster, no signature, a baseline of one modifier at least, and a drop order
+    /// only a caster names. Then the weapon rows, each read as the
     /// kind its class row gives it: ids are unique; every
     /// enchantment a weapon names resolves; every forged stack count is at least
     /// one; every forged modifier is allowed
@@ -1002,8 +1052,8 @@ public static class ContentValidator
     /// the §1.1 table (<see cref="ModifierRules.NeverStacked"/>: Momentum,
     /// enchantment-only, and the reserved OnHitPoison), since a stack of one
     /// would change nothing; nothing is forged past <see cref="ModifierRules.MaxForged"/>;
-    /// a martial weapon is forged on at least two modifiers and a caster on
-    /// <c>Resonant x1</c> alone beside its one innate enchantment (a staff's
+    /// a martial weapon is forged on at least two modifiers and a caster on its
+    /// class's baseline alone beside its one innate enchantment (a staff's
     /// fixed status effect; a wand's element, supplied at instantiation); only
     /// wands carry a shape, no wand carries a status-applying enchantment (an
     /// area cast is aimed at a point and names no target to land one on), and
@@ -1027,9 +1077,10 @@ public static class ContentValidator
     /// And three the drop leans on (§3.1, §3.2), each refusing at load what
     /// would otherwise surface as a wrong weapon or an exception one collection
     /// deep: a class with variants carries at least one unique, for a won roll
-    /// to land on; a caster class holds every variant
-    /// <see cref="LootTable.CasterVariants"/> names, since the drop's draw
-    /// indexes that rather than the file's order; and a martial variant carries
+    /// to land on; a caster class that fields variants orders the ones its drop
+    /// rolls between on its row, each its own and none twice
+    /// (<see cref="RuleCasterVariantPool"/>), since the drop's draw indexes that
+    /// order rather than the file's; and a martial variant carries
     /// no enchantment of its own, so the one entry a drop attaches is the one it
     /// rolled. So do the two weapons the code names by id and the classes the
     /// placer draws, each of which must field a variant
@@ -1072,8 +1123,9 @@ public static class ContentValidator
         foreach (var def in data.Weapons)
         {
             var spread = Spread(def.Id, def.Forged, "");
-            var kind = (data.ClassOf(def.Class)
-                ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row")).Kind;
+            var row = data.ClassOf(def.Class)
+                ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row");
+            var kind = row.Kind;
 
             foreach (var reference in def.Enchantments)
                 if (!enchantments.TryGet(reference.Id, out _))
@@ -1144,8 +1196,13 @@ public static class ContentValidator
 
             if (kind == WeaponKind.Caster)
             {
-                if (!spread.Equals(ModifierSet.Of((ModifierType.Resonant, 1))))
-                    throw new ContentException(def.Id, RuleCasterForged, spread.ToString());
+                // A caster varies by what it casts and the shape it covers, never
+                // by its spread: every staff and wand is forged with its class's
+                // baseline, which the row alone writes (ValidateClasses has asked
+                // it), and nothing else.
+                var baseline = ModifierSet.Of(row.Baseline.Select(b => (b.Key, b.Value)).ToArray());
+                if (!spread.Equals(baseline))
+                    throw new ContentException(def.Id, RuleCasterForged, $"{spread}, and the {def.Class} baseline is {baseline}");
                 if (def.Role != null)
                     throw new ContentException(def.Id, RuleRoleOnMartialOnly, def.Role.ToString());
                 if ((def.Class == WeaponClass.Wand) != (def.Shape != null))
@@ -1200,9 +1257,16 @@ public static class ContentValidator
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
             var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
-            if (variants.Count == 0)
-                continue;   // a class the file gives no weapon is not malformed, only absent, unless the placer draws it (above)
             var row = data.ClassOf(cls)!;   // every class has its one row: ValidateClasses
+            if (variants.Count == 0)
+            {
+                // A class the file gives no weapon is not malformed, only absent,
+                // unless the placer draws it (above) — but a drop order there
+                // names weapons that are not.
+                if (row.DropOrder is { Count: > 0 } dangling)
+                    throw new ContentException(dangling[0], RuleCasterVariantPool, $"named by the {cls} drop order, and no {cls} variant has that id");
+                continue;
+            }
 
             // A class with variants is a class a drop can roll (§3.1), and §3.2's
             // unique roll is a ruling: a won draw always yields a unique of the
@@ -1215,17 +1279,24 @@ public static class ContentValidator
 
             if (row.Kind == WeaponKind.Caster)
             {
-                // Casters vary by effect and shape, not by role, so a drop's
-                // code-fixed draw indexes LootTable.CasterVariants rather than
-                // the file's order. Every id it names has to be here, or the
-                // draw lands on a row that does not exist: refused at load, the
-                // way the drop pool's ids already are, rather than throwing on
-                // one drop in four deep inside a collection.
-                if (!LootTable.CasterVariants.TryGetValue(cls, out var order))
-                    throw new ContentException(cls.ToString(), RuleCasterVariantPool, "the drop order names no variants for this class");
+                // Casters vary by effect and shape, not by role, so a drop's draw
+                // indexes the order the class row names (weapons.json's) rather
+                // than the file's order of its variants. Every id it names has to
+                // be a variant of the class, or the draw lands on a row that does
+                // not exist: refused at load, the way the drop pool's ids already
+                // are, rather than throwing on one drop in four deep inside a
+                // collection.
+                if (row.DropOrder is not { Count: > 0 } order)
+                    throw new ContentException(cls.ToString(), RuleCasterVariantPool,
+                        $"names no dropOrder, the order its drop rolls its variants in - a copy of {WeaponsJson.FileName} older than the order has none: delete it and the built-in weapons play, or run --write-data <exe folder>");
+                var ordered = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var id in order)
+                {
                     if (!variants.Any(v => v.Id == id))
-                        throw new ContentException(id, RuleCasterVariantPool, $"named by the {cls} drop order");
+                        throw new ContentException(id, RuleCasterVariantPool, $"named by the {cls} drop order, and no {cls} variant has that id");
+                    if (!ordered.Add(id))
+                        throw new ContentException(id, RuleCasterVariantPool, $"named twice by the {cls} drop order");
+                }
                 continue;
             }
 
@@ -1368,8 +1439,13 @@ public static class ContentValidator
     /// variant has its baseline asked all the same;</item>
     /// <item>a martial row's signature and baseline: a signature, and a baseline
     /// of exactly it and one other modifier (<see cref="RuleClassBaseline"/>); a
-    /// caster row's: no signature, and a baseline of <c>Resonant x1</c>
-    /// (<see cref="RuleCasterForged"/>).</item>
+    /// caster row's: no signature, and a baseline of one modifier at least
+    /// (<see cref="RuleCasterForged"/>) — which modifiers is the row's, the forge
+    /// having allowed them above;</item>
+    /// <item>a drop order on a caster's row alone
+    /// (<see cref="RuleCasterVariantPool"/>): a martial drop draws one variant per
+    /// role, so an order on a martial row is a list nothing reads. What a caster's
+    /// order names is asked with the weapons, whose ids it names.</item>
     /// </list>
     /// </summary>
     /// <param name="data">The class rows and the weapons.</param>
@@ -1420,13 +1496,17 @@ public static class ContentValidator
                 : string.Join(", ", row.Baseline.OrderBy(b => b.Key).Select(b => $"{b.Key} x{b.Value}"));
             if (castsWith)
             {
-                if (row.Signature is not null || row.Baseline.Count != 1 || row.Baseline.GetValueOrDefault(ModifierType.Resonant) != 1)
+                if (row.Signature is not null || row.Baseline.Count == 0)
                     throw new ContentException(entry, RuleCasterForged, $"signature {row.Signature?.ToString() ?? "none"}, baseline {spread}");
             }
             else if (row.Signature is not { } named || row.Baseline.Count != 2 || !row.Baseline.ContainsKey(named))
             {
                 throw new ContentException(entry, RuleClassBaseline, $"baseline is {spread}, signature {row.Signature?.ToString() ?? "none"}");
             }
+
+            if (!castsWith && row.DropOrder is not null)
+                throw new ContentException(entry, RuleCasterVariantPool,
+                    $"names a dropOrder, and a {cls} drop draws one variant per role - only the Staff and the Wand order theirs");
         }
     }
 

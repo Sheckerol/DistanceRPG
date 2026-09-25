@@ -51,10 +51,11 @@ public class RestrictedJsonTests
         Assert.Equal("ranged", read.Kind["Overwatch"]);
 
         // forgedOnly and neverRolled: arrays of ids, and kept apart — a safety rule
-        // and an economy rule. neverRolled is the nine unique souls: the code's
-        // catalogue marks them unique, and the load holds the list to exactly that
-        // (RuleUniqueNeverRolled), so these are the catalogue's, not a choice of
-        // the file's; the order they are listed in is the file's own.
+        // and an economy rule. The shipped neverRolled is the nine unique souls:
+        // the file's own choice, which the load no longer holds to the catalogue's
+        // unique flag (the rework's audit: the relation is this file's alone). A
+        // relation is no number, so a test that states one fails where it states
+        // it when an edit moves it (REWORK DECISION 3); here, as a set.
         Assert.Equal(["Charges"], read.ForgedOnly);
         string[] souls = ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"];
         Assert.Equal(souls.Order(StringComparer.Ordinal), read.NeverRolled.Order(StringComparer.Ordinal));

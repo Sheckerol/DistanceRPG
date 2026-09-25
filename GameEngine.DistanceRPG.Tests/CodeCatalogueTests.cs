@@ -39,9 +39,10 @@ public class CodeCatalogueTests
         Assert.Equal(22, rows.Count);
         ContentValidator.ValidateEnchantments(EnchantmentDefinitions.Data);   // does not throw
 
-        // The unique flag is on the nine souls and only on them — exactly the ids
-        // the shipped restricted.json never rolls: the flag is the code's, the
-        // relation the file's, and the load holds the two together.
+        // The unique flag is on the nine souls and only on them — the ids the
+        // shipped restricted.json never rolls. The flag is the code's and pins a
+        // tier; the relation is the file's alone, which the load no longer holds
+        // to the flag (the rework's audit), so this is the shipped file's choice.
         Assert.Equal(9, rows.Count(e => e.Unique));
         Assert.Equal(ShippedContent.Restricted.NeverRolled.Order(StringComparer.Ordinal),
             rows.Where(e => e.Unique).Select(e => e.Id).Order(StringComparer.Ordinal));
@@ -104,8 +105,8 @@ public class CodeCatalogueTests
         Assert.Equal("staff_of_nothing", bag.Detail);
 
         // And a weapons.json without staff_of_mire, D's bag staff, is refused at the
-        // weapons' stage first, for what the code needs of it — the caster drop
-        // order names it — before the party is asked.
+        // weapons' stage first — the Staff row's drop order still names it — before
+        // the party is asked.
         var noMire = Fails(Shipped with { Weapons = DataTexts.WithoutRow(Shipped.Weapons!, "staff_of_mire") });
         Assert.Equal((WeaponsJson.FileName, false, "staff_of_mire", ContentValidator.RuleCasterVariantPool), Stamp(noMire));
     }
@@ -129,17 +130,33 @@ public class CodeCatalogueTests
     [Fact]
     public void TheCatalogueAgainstTheRelationsIsRestrictedJsonsToFix()
     {
-        // PHASE5-141: the unique flag is the code's and neverRolled restricted.json's,
-        // and the load cross-checks the two. A neverRolled that forgets burning —
-        // a soul — stops the game stamped restricted.json, the file to fix, and
-        // its detail names it.
-        var forgot = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", "]") });
-        Assert.Equal((RestrictedJson.FileName, false, "burning", ContentValidator.RuleUniqueNeverRolled), Stamp(forgot));
-        Assert.Equal("unique, but absent from neverRolled in restricted.json", forgot.Detail);
+        // PHASE5-141, as the user's ruling leaves it: neverRolled is restricted.json's
+        // alone, and the catalogue's unique flag pins a tier and nothing else — the
+        // load asks only that neverRolled names the catalogue's enchantments. It
+        // held the two together until the rework's audit, which made any edit to
+        // the list alone stop the game. A neverRolled naming a modifier — which
+        // nothing reads it for — stops the game stamped restricted.json, the file
+        // to fix, and its detail names the row.
+        var modifier = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"Block\"]") });
+        Assert.Equal((RestrictedJson.FileName, false, "Block", ContentValidator.RuleNeverRolledNamesEnchantments), Stamp(modifier));
+        Assert.Equal("'Block' is a modifier, and neverRolled lists enchantments alone - restricted.json neverRolled Block", modifier.Detail);
 
-        // And the other way: neverRolled naming an entry that is no soul.
-        var notUnique = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"vampiric\"]") });
-        Assert.Equal((RestrictedJson.FileName, false, "vampiric", ContentValidator.RuleUniqueNeverRolled), Stamp(notUnique));
+        // An enchantment that is no soul, never rolled: it plays, and leaves the
+        // rollable entries — the file alone saying so (UniqueContentTests follows
+        // it out of the drops).
+        var vampiricKept = ShippedData.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"vampiric\"]") });
+        Assert.Null(vampiricKept.Error);
+        Assert.Empty(vampiricKept.Notices);
+        Assert.Contains("vampiric", vampiricKept.Content!.Enchantments.NeverRolled);
+        Assert.DoesNotContain(vampiricKept.Content.Enchantments.Rollable, e => e.Id == "vampiric");
+        Assert.False(vampiricKept.Content.Enchantments["vampiric"].Unique);
+
+        // And a soul the file forgets plays too, rollable by the catalogue's word
+        // and still pinned at tier 1 by its flag.
+        var burningLeft = ShippedData.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", "]") });
+        Assert.Null(burningLeft.Error);
+        Assert.Contains(burningLeft.Content!.Enchantments.Rollable, e => e.Id == "burning");
+        Assert.Equal(Enchantment.UniqueTier, new Enchantment(burningLeft.Content.Enchantments["burning"], 3).Tier);
 
         // PHASE5-140: the code's four elements, opposed in two pairs by
         // restricted.json's excludes. Flaming opposed by cold and shocking both

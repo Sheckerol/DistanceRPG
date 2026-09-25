@@ -453,9 +453,10 @@
 - **The tutorial is consumed by beating it**; every other dungeon is picked
   from the hub and repeatable. Rushing its boss permanently forfeits its themed
   drops, which is the game's central decision delivered once in miniature.
-- **The tutorial is two floors deep**, boss on floor 2 — the only hardcoded
-  depth in the game. Shortest run that demonstrates every dungeon mechanic, and
-  a fast turnaround into the hub since it cannot be replayed.
+- **The tutorial is two floors deep**, boss on floor 2 — the one dungeon with a
+  fixed rather than rolled depth (`dungeons.json` pins both bounds to 2, §5.8).
+  Shortest run that demonstrates every dungeon mechanic, and a fast turnaround
+  into the hub since it cannot be replayed.
 - **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
   its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
@@ -1225,7 +1226,9 @@
   enchantment in the catalogue — never a rebalance of a constant, which is a
   recompile and an argument. (Superseded by the user's ruling, 2026-09-25, in
   its example: the enchantment catalogue is code, so a new enchantment is a
-  rebuild — the Phase 5 pass below.)
+  rebuild — the Phase 5 pass below — and a rebalance of a number is a
+  `tuning.json` edit rather than a recompile; what makes it the worse tool is
+  that it reaches everyone silently.)
 
 ## Implementation pass — Phase 2 (innate stats and the three pools)
 
@@ -1499,16 +1502,57 @@ own:
   `staff_of_renewal`, a crowded room's healer (`EnemyPlacer.HealerWeaponId`) —
   named by behaviour, and each checked at load by `RuleCodeNamedWeaponsExist`,
   which also wants a variant of every class the placer draws.
-- `LootTable.CasterVariants`, the one weapon-id *list* the code keeps: which
-  staves and wands a caster drop rolls between, in an order held in code so that
-  a reorder of `weapons.json` re-rolls no saved caster dummy's drop (§3.5), and
-  checked at load (`RuleCasterVariantPool`). Provisional, as REWORK DECISION 2
-  below; its alternative is in open-questions.md.
 - `ContentValidator.CurrencyGroup` (`Light`, `Resonant`), the one coexistence
   rule the code keeps. Which modifiers can pay for a second soul (§1.5's combo
   platform) is what those two modifiers *do*, so it gates
   `RuleDependencyOnCurrency` from code; every relation *between* ids is
   `restricted.json`'s alone.
+
+(Superseded by the rework's audit, 2026-09-25: a third exception stood here,
+`LootTable.CasterVariants`, a C# list of eight `weapons.json` variant ids — which
+staves and wands a caster drop rolls between, and in what order. It is the
+`dropOrder` of the Staff and Wand rows now, below.)
+
+**The rework's audit (2026-09-25)** found three copies of a master value the
+ruling leaves no room for, and closed them the ruling's way:
+
+- **The caster drop order is `weapons.json`'s**: each caster class's row names
+  its `dropOrder`, the variants a drop of it rolls between, in the order the
+  draw indexes them. The draw is uniform over the order's length (four a class,
+  as ever, so no saved drop moved), and never over the file's order of its
+  variants, so reordering `variants` re-rolls nobody (§3.5). A caster variant the
+  order leaves out never drops, and one appended to it drops with no code edit.
+  The load checks it (`RuleCasterVariantPool`): a caster class that fields
+  variants names an order, every id one of its own variants and none twice, and
+  a martial class names none, since its drop draws a role. A copy of
+  `weapons.json` beside the exe from before has no order, and stops the game
+  saying to delete it or run `--write-data <exe folder>`, as the flat format's
+  copy does.
+- **`neverRolled` is `restricted.json`'s alone**: the load no longer holds it to
+  exactly the catalogue's unique souls, which made any edit to the list alone
+  stop the game. The `unique` flag pins a soul's tier and nothing else; the load
+  asks only that `neverRolled` names enchantments of the catalogue
+  (`RuleNeverRolledNamesEnchantments`: a modifier there is a relation nothing
+  reads). A soul taken out of the list may be copied and still drops nowhere —
+  the drop pool (`LootTable.DropPool`, the code's list of the catalogue's
+  entries a drop may carry) names none — and an entry put in stops dropping.
+- **A caster's baseline is its row's**: the load asks it what it asks any
+  baseline — the forge allows it — plus one modifier at least (a caster's two
+  axes are a modifier and its innate) and no signature, and holds every staff
+  and wand to it (`RuleCasterForged`); it no longer pins both caster rows to
+  exactly `Resonant ×1`. That value is the rows' design (§1.3, §1.4), pinned by
+  the tests as a design doc's value (REWORK DECISION 3), never by a load rule.
+
+It also made two failures of a file say so readably: a JSON reader's sentence is
+one short line (a word it does not know, `nul` or `tru`, had it quote the rest
+of the file into the screen that stops the game), and a blank `tuning.json`
+beside the exe plays the built-in numbers with the notice `TUNING.JSON: THE FILE
+IS EMPTY - THE BUILT-IN NUMBERS ARE PLAYING`, where it had played them silently.
+Whether the gameplay numbers still compiled — an enemy's hit points, mana and
+movement, the crowded-room healer's odds, the chart's ×1.5, the proficiency
+steps, the room cap — are tuning numbers the ruling moves into `tuning.json` is
+the user's to rule: open-questions.md sets it out, and they stay compiled until
+then.
 
 **The rework's own choices, shipped provisionally** — each labelled REWORK
 DECISION, never USER DECISION, which names Phase 5's list; open-questions.md
@@ -1520,9 +1564,13 @@ it:
   `cost` and `manaCost` given on a variant plays instead of its class's. The
   shipped file uses it only for the Staff of Renewal's 15 mana and the Staff of
   Mire's 25.
-- **REWORK DECISION 2 — the caster drop order stays in code**
-  (`LootTable.CasterVariants`, above), so a caster variant added to
-  `weapons.json` drops only once the list names it.
+- **REWORK DECISION 2 — any edit to the caster drop order plays.** The order
+  is `weapons.json`'s (the audit, above), and a copy beside the exe may reorder,
+  shorten or lengthen it; each moves what a saved, not-yet-collected caster
+  dummy of that class drops, as a fifth variant moves the placement (§5.6: "a
+  deliberate, rare change rather than an ordinary edit"). (Superseded by the
+  rework's audit, 2026-09-25: this decision was that the order stays in code, as
+  `LootTable.CasterVariants`; the ruling left no room for that copy.)
 - **REWORK DECISION 3 — the suite keeps as literals only the values a design
   doc fixes** — `MovementBudget` 160 and the `MovementUnitsPerMana` derived from
   it, §1.2–§1.4's class rows, statlines, spreads and wand shapes, §1.5's unique
@@ -1653,10 +1701,14 @@ it:
   in (`RuleBuiltInCopy`) — a the-build-carries-it check. `kind` and `forgedOnly`
   name modifiers alone, since only the modifier rules read them: an enchantment
   named in either would silently not apply, so it is refused under the existing
-  relation-id rule. (Superseded by the user's ruling, 2026-09-25: there were
-  three, the third an effect name resolving to a kind — `RuleUnknownEffect` —
-  which went with `enchantments.json`, since an entry's effect is now typed in
-  code.)
+  relation-id rule; and `neverRolled` names enchantments alone, the mirror of it
+  (`RuleNeverRolledNamesEnchantments`, since the rework's audit, which retired the
+  check holding `neverRolled` to the catalogue's unique souls). A caster class
+  orders its drop variants on its row (`RuleCasterVariantPool`, which checked a
+  list in code until the audit). (Superseded by the user's ruling, 2026-09-25:
+  there were three, the third an effect name resolving to a kind —
+  `RuleUnknownEffect` — which went with `enchantments.json`, since an entry's
+  effect is now typed in code.)
 - **"Naming both" is an explanation, not a check.** A weapon a relations edit
   makes illegal names the relation that refused it, read off the file in hand,
   asking the rules' own clauses in their order — for modifiers and enchantments

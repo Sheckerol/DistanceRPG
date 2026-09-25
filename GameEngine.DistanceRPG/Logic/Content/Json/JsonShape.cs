@@ -265,10 +265,27 @@ internal sealed class JsonShape
         _ => "nothing",
     };
 
+    /// <summary>The most characters of the text the reader stopped at that a reason quotes, before it is cut and marked with <see cref="Cut"/>.</summary>
+    internal const int MaxQuoted = 24;
+
+    /// <summary>What marks a quoted text as cut short.</summary>
+    private const string Cut = "...";
+
     /// <summary>
     /// Where a text that is not JSON stopped the reader, 1-based, and why, in
-    /// words a screen can show: the reader's own sentence without the position
-    /// it appends (said here as numbers), its quotes, or its full stop.
+    /// words a screen can show on one line: the reader's own sentence without the
+    /// position it appends (said here as numbers), its quotes, or its full stop.
+    /// <para>
+    /// The reader quotes the text it stopped at, and for a word it does not know —
+    /// <c>nul</c>, <c>tru</c>, <c>fals</c> — that quote runs to the end of the
+    /// file, newlines and all: a <c>"shape": nul</c> early in <c>weapons.json</c>
+    /// made a reason of every row after it, which the screen that stops the game
+    /// drew past its bottom edge. So the quoted text is kept to the word the
+    /// reader stopped at, at most <see cref="MaxQuoted"/> characters, and marked
+    /// where it was cut — <c>nul... is an invalid JSON literal. Expected the literal
+    /// null</c> — and whatever whitespace is left is one space, so the reason is
+    /// one line whatever the reader says.
+    /// </para>
     /// </summary>
     internal static (long Line, long Column, string Reason) SyntaxError(JsonException error)
     {
@@ -277,7 +294,46 @@ internal sealed class JsonShape
         int where = reason.IndexOf(" LineNumber:", StringComparison.Ordinal);
         if (where >= 0)
             reason = reason[..where];
-        reason = reason.Replace("'", "", StringComparison.Ordinal).Replace("\"", "", StringComparison.Ordinal).Trim().TrimEnd('.');
+        reason = OneLine(reason).Replace("'", "", StringComparison.Ordinal).Replace("\"", "", StringComparison.Ordinal);
+        reason = OneLine(reason).TrimEnd('.');
         return ((error.LineNumber ?? 0) + 1, (error.BytePositionInLine ?? 0) + 1, reason);
+    }
+
+    /// <summary>
+    /// A JSON reader's sentence as one short line, whatever file it read — a
+    /// content file's (<see cref="SyntaxError"/>) or a save's
+    /// (<c>SaveCodec</c>): the text it quotes kept to the word it stopped at
+    /// (<see cref="ShortenQuoted"/>), and every run of whitespace — a line break
+    /// included — one space.
+    /// </summary>
+    internal static string OneLine(string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+        return string.Join(' ', ShortenQuoted(reason).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>
+    /// <paramref name="reason"/>, the reader's sentence, with the text it quotes
+    /// at its start — <c>'…' is …</c> — kept to its first word, at most
+    /// <see cref="MaxQuoted"/> characters, and <see cref="Cut"/> where anything was
+    /// left out. A reason that quotes nothing is returned as it is.
+    /// </summary>
+    private static string ShortenQuoted(string reason)
+    {
+        const string Closes = "' is ";
+        if (!reason.StartsWith('\''))
+            return reason;
+        int close = reason.LastIndexOf(Closes, StringComparison.Ordinal);
+        if (close <= 0)
+            return reason;
+
+        string quoted = reason[1..close];
+        int end = quoted.IndexOfAny([' ', '\t', '\r', '\n', ',', ':', '}', ']']);   // the word ends where the text around it starts
+        string word = end > 0 ? quoted[..end] : quoted;
+        if (word.Length > MaxQuoted)
+            word = word[..MaxQuoted];
+        return word.Length == quoted.Length
+            ? reason
+            : $"'{word}{Cut}{reason[close..]}";
     }
 }

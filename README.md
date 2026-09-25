@@ -160,7 +160,11 @@ Every number the game is tuned by — the movement budget, the mana divisor, eac
 status's effect per level, what a stack of each modifier is worth, the farm's
 odds, the boss depths, the carry — sits in one file, `tuning.json`, grouped
 under the headings of `docs/roadmap/phase-5-save.md` §5.3 (and three of its own:
-Progression, Combat and Drops) with a comment on every key.
+Progression, Combat and Drops) with a comment on every key. A few gameplay
+numbers were never keys and are still compiled — an enemy's 50 hit points, 100
+mana and 100 movement, the crowded-room healer's odds, the chart's ×1.5, the
+proficiency steps, the room cap; whether they belong in `tuning.json` is open
+(`docs/roadmap/open-questions.md`).
 
 - **Where**: beside the executable — `GameEngine.DistanceRPG/bin/Debug/net10.0/tuning.json`
   after a Debug build. The log prints its full path at startup
@@ -181,7 +185,9 @@ Progression, Combat and Drops) with a comment on every key.
   file open and locked, or the folder does not let the game read it. The screen
   shows `TUNING.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN) - THE
   BUILT-IN NUMBERS ARE PLAYING` and does not call the file missing. The log has
-  the whole error.
+  the whole error. A file with nothing in it — as an editor that crashed while
+  saving can leave one — plays the built-in numbers too, and says
+  `TUNING.JSON: THE FILE IS EMPTY - THE BUILT-IN NUMBERS ARE PLAYING`.
 - **Name only what you change**: a key left out keeps its built-in number, so
   `{ "MovementBudget": 240 }` is a whole file. Comments and trailing commas are fine.
 - **A mistake costs a warning, never a crash**: an unknown key, a value out of
@@ -237,9 +243,13 @@ everything in them is named by a stable string id.
   list of groups (every id in a group excludes every other, both ways), `requires`
   maps an id to the ids it cannot exist without, `kind` limits a modifier to
   `melee`, `ranged` or `caster` (lower case), `forgedOnly` lists the modifiers
-  that can be deepened but never added, and `neverRolled` lists what no roll
-  grants (the unique souls). `kind` and `forgedOnly` are for modifiers only: an
-  enchantment in either stops the game.
+  that can be deepened but never added, and `neverRolled` lists the enchantments
+  no roll grants and no service copies (the unique souls, as shipped). `kind` and
+  `forgedOnly` are for modifiers only, and `neverRolled` for enchantments only:
+  the wrong sort of id in one stops the game. `neverRolled` is this file's alone —
+  the catalogue's unique flag only pins a soul's tier — so put `vampiric` in it
+  and it stops dropping; take a soul out and it may be copied (no drop carries a
+  soul either way).
   A relation is an edit here, never a rebuild: take the crit riders' group
   (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
 - **The enchantment catalogue and the unique souls are code**
@@ -265,7 +275,9 @@ everything in them is named by a stable string id.
     counting; never `CON`), its `signature` (the modifier it is named for, which
     its Purity variant deepens and a dungeon's theme is drawn from; `null` for a
     caster), its `baseline` (`{ "Block": 1, "Push": 1 }`: what every weapon of the
-    class is forged with) and the statline its weapons share (`range`, `damage`,
+    class is forged with — a martial class's signature and one more, a caster's
+    one modifier or more, `{ "Resonant": 1 }` as shipped, and every staff and
+    wand carries it alone) and the statline its weapons share (`range`, `damage`,
     `cost`, `manaCost`). Re-basing a class is one edit to its row: give the Dagger
     row `"damage": 17` and restart, and every dagger — the uniques made from them
     too — hits for 17. A class row left out, one the game cannot level or cast
@@ -273,6 +285,13 @@ everything in them is named by a stable string id.
     has), or one whose `baseline` the forge refuses (a stack of `0`, one past its
     forge limit, a modifier `restricted.json` keeps off the class's kind) stops the
     game naming `WEAPONS.JSON` and the class, whose row the baseline is written in.
+    The Staff and Wand rows also name their `dropOrder`: the variants a drop of
+    the class rolls between, in the order the draw counts them. A staff or wand
+    it leaves out never drops — add one to `variants`, then to the `dropOrder`,
+    and it drops with no rebuild. Reordering `variants` moves no drop; an edit to
+    a `dropOrder` moves what a dummy not yet collected in a saved campaign drops.
+    An id there that is no variant of the class, or one named twice, stops the
+    game.
   - `variants` lists the thirty-two weapons a drop or a dummy carries, each as its
     `class`, its `role` and the modifiers it `adds` to its class's baseline, with
     the enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier
@@ -294,7 +313,9 @@ everything in them is named by a stable string id.
   master so a build keeps it — opens the game on `THE GAME CANNOT START`, naming
   `WEAPONS.JSON` and `CLASSES` and saying the file predates the classes section:
   delete it and the built-in weapons play (the screen says the file is missing),
-  or run `--write-data <exe folder>` to write the current copy there.
+  or run `--write-data <exe folder>` to write the current copy there. A copy
+  from before the Staff and Wand rows named their `dropOrder` stops the game the
+  same way, naming `STAFF` and saying the same two ways out.
 - **`dungeons.json`** holds the dungeons the screen between runs lists: `theme`,
   `attunement` (a damage type, or `null`), `bossFloorMin`/`bossFloorMax` (`null`
   plays `tuning.json`'s range), the `boss` (its statline and `innate` modifiers)
@@ -337,7 +358,10 @@ everything in them is named by a stable string id.
   `NOT A MODIFIER, NOR AN ENCHANTMENT IN THE ENCHANTMENT CATALOGUE - DID YOU MEAN BLOCK?`.
   A field the game does not know, a value of the wrong kind, or a file that is
   not JSON is refused the same way, naming the path in the file
-  (`dungeons[1].boss.maxHp`). Comments and trailing commas are fine.
+  (`dungeons[1].boss.maxHp`) — or, for a file that is not JSON, the line, the
+  column and the word the reader stopped at, on one line
+  (`"shape": nul` reads `NUL... IS AN INVALID JSON LITERAL. EXPECTED THE LITERAL
+  NULL`). Comments and trailing commas are fine.
 - **What is reported first**: the load runs in the order the game's catalogues,
   tuning, relations, weapons, dungeons, the starting party, and the first check
   to fail is the one shown. Each file's shape is checked before anything reads
@@ -350,8 +374,9 @@ everything in them is named by a stable string id.
   exe to have broken it. Then the screen ends `THE BUILT-IN WEAPONS.JSON IS
   BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS`,
   since only fixing the master and rebuilding can mend it. A
-  `restricted.json` edit that breaks the enchantment catalogue — `neverRolled`
-  without `burning`, say — stops on `RESTRICTED.JSON` itself, the file to fix,
+  `restricted.json` edit that breaks the enchantment catalogue — an element
+  opposed by two, `["flaming", "cold", "shocking"]`, say — stops on
+  `RESTRICTED.JSON` itself, the file to fix,
   and one that makes a weapon illegal names both the weapon — or its class, where
   the relation refuses the class's baseline — and the relation that refused it,
   for modifiers and enchantments alike: add `["Push", "Block"]` to `excludes`,
