@@ -234,9 +234,10 @@ public class DungeonSeedTests
             Assert.Single(constants, c => c.Value == dice);
         }
 
-        // No draw a visit can plausibly roll is a stream anything else rolls on: dice
-        // draws 0 to 4096 coincide with no drop, revival or boss-drop stream of any
-        // floor a boss can sit on, over the domain the Phase 3 and 4 families are
+        // No draw a visit can plausibly roll is a stream anything else rolls on,
+        // under the shipped BossFloorMax: dice draws 0 to 4096 coincide with no
+        // drop, revival or boss-drop stream of any floor a boss can then sit on
+        // (indices 0 to 9), over the domain the Phase 3 and 4 families are
         // verified on — drops to spawn 128, revivals to spawn and cycle 64. Every
         // family here is SplitMix32 over the map seed XORed with a term of its own,
         // so the check holds whatever the map seed; the dice are keyed by the
@@ -274,6 +275,42 @@ public class DungeonSeedTests
             Assert.Equal(
                 Fingerprint(DungeonState.DiceStream(seed, 34_430)),
                 Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 8), 50, 2)));
+        }
+
+        // A tuning can dig deeper than the shipped ten: tuning.json clamps
+        // BossFloorMax at 99, so a tuning can put a boss as deep as floor index 98.
+        // Over every floor down to there, in the same domain, the dice meet exactly
+        // one other stream: floor index 58's revival roll for spawn 7, cycle 16 is
+        // dice draw 2801, and the 58 floors above it stay clean. The same harmless
+        // sharing as draw 34,430's, pinned the same way so the record stays true.
+        // The other families' meetings with one another are not asked here: past
+        // the 21st floor they meet too, accepted and pinned by
+        // PastTwentyOneFloors_TwoDummiesMayShareARevivalRoll.
+        int deepest = Assert.IsType<IntKey>(TuningSchema.Find(nameof(Tuning.BossFloorMax))).Max;
+        Assert.Equal(99, deepest);
+        foreach (long seed in new[] { GoldenSeed, 0L })
+        {
+            var dice = new Dictionary<ulong, int>();
+            for (int draw = 0; draw <= Draws; draw++)
+                dice.Add(Fingerprint(DungeonState.DiceStream(seed, draw)), draw);
+
+            var met = new List<string>();
+            void Against(Mulberry32 stream, string name)
+            {
+                if (dice.TryGetValue(Fingerprint(stream), out int draw))
+                    met.Add($"dice: draw {draw} is {name}");
+            }
+            for (int n = 0; n < deepest; n++)
+            {
+                long floorSeed = DungeonState.FloorSeed(seed, n);
+                for (int spawn = 0; spawn <= 128; spawn++)
+                    Against(LootTable.StreamFor(floorSeed, spawn), $"drop: floor {n}, spawn {spawn}");
+                for (int spawn = 0; spawn <= 64; spawn++)
+                    for (int cycle = 0; cycle <= 64; cycle++)
+                        Against(FarmLadder.ReviveStream(floorSeed, spawn, cycle), $"revival: floor {n}, spawn {spawn}, cycle {cycle}");
+                Against(BossLoot.StreamFor(floorSeed), $"boss drop: floor {n}");
+            }
+            Assert.Equal(new[] { "dice: draw 2801 is revival: floor 58, spawn 7, cycle 16" }, met);
         }
     }
 

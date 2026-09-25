@@ -521,10 +521,17 @@ public sealed class DungeonState
     /// <summary>
     /// The visit's d20 splitter (<see cref="DiceStream"/>): odd, 32-bit —
     /// splitmix32's first multiplier — and distinct from every other salt and mix
-    /// in the tree, checked against every drop, revival and boss-drop stream of
-    /// the floors a boss can sit on (Phase 5.7's collision check, pinned by
-    /// <c>DungeonSeedTests</c>). A compiled constant like every salt: it decides
-    /// what a seed rolls, so it is parity's and never a tuning key.
+    /// in the tree. Checked against every drop, revival and boss-drop stream of
+    /// the floors a boss can sit on under the shipped
+    /// <see cref="Tuning.BossFloorMax"/>, and clean there (Phase 5.7's collision
+    /// check, pinned by <c>DungeonSeedTests</c>). A tuning that digs deeper can
+    /// make a d20 and a revival share a number: the first 58 floors stay clean,
+    /// but floor index 58's revival roll for spawn 7, cycle 16 is dice draw 2801,
+    /// the one meeting in the checked domain on any floor <c>tuning.json</c>'s
+    /// clamp reaches (99). Harmless, like draw 34,430's meeting with floor index
+    /// 8's: the kind of sharing settled.md's Phase 4 pass accepts between the
+    /// floors' own streams. The test pins both. A compiled constant like every
+    /// salt: it decides what a seed rolls, so it is parity's and never a tuning key.
     /// </summary>
     public const long DiceSalt = 0x7FEB352D;
 
