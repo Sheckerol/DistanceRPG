@@ -208,13 +208,17 @@ every key.
 - Nothing the golden tests pin — the map generator, the random streams, the
   pathfinder — is in it, and a test keeps it that way.
 - **An edit to the master fails a test only where a design doc fixes the
-  number**: `MovementBudget` 160, and `MovementUnitsPerMana` 10 derived from it
+  value**: `MovementBudget` 160, and `MovementUnitsPerMana` 10 derived from it
   (`docs/roadmap/phase-1-weapons.md`'s `(160 − 40) / (8 + 3)`), fail
   `MovementBudgetTests.TheBudgetIsTheTuningsKey` by name, and the doc and the
-  derived key move with them. Every other number in it fails nothing: the tests
-  read it from the master, or stand on numbers of their own — give `PerStack`'s
-  `Block` 4, rebuild and run the suite, and it passes, the Bulwark absorbing 12
-  and its test saying so.
+  derived key move with them; and `FriendlyFireEnabled` turned on fails
+  `WandTests.FriendlyFire_OffByDefault_HalfWhenOn`, since the same doc ships
+  wands with friendly fire off until the wand placement scorer exists. Every
+  other number in it fails nothing: the tests read it from the master, or stand
+  on numbers of their own (`Premise`, in the test project: the numbers the
+  worked examples were written against, which most scenario suites play instead
+  of the master's) — give `PerStack`'s `Block` 4, rebuild and run the suite, and
+  it passes, the Bulwark absorbing 12 and its test saying so.
 
 ## The content files
 
@@ -316,8 +320,8 @@ everything in them is named by a stable string id.
   movement budget of 40 that test alone, its boss's floor 2 every test that
   plays the tutorial. Each doc moves with its pin. Every other number — a
   provisional boss's statline, say — fails nothing: the tests read it from the
-  master. A relation, an id or a row is no number, and a test that names one
-  fails where it names it.
+  master, or stand on numbers of their own (`Premise`). A relation, an id or a
+  row is no number, and a test that names one fails where it names it.
 - **Content is checked, never clamped.** A number out of range in `tuning.json`
   costs a warning; in a content file it is a broken rule, and the game does not
   start. It opens on `THE GAME CANNOT START` instead, naming the file, the entry,

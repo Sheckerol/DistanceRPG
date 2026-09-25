@@ -13,7 +13,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// scenario stands on the numbers it was written against — the wands' statline
 /// and shapes, Resonant's tenth, the element's trigger, the ally's share
 /// (<see cref="Premise"/>) — made current for each test, and tests here edit
-/// it, so the content collection holds it.
+/// it, so the content collection holds it. Of the master tuning's values, the one
+/// read here is the friendly-fire switch, which the docs fix off (REWORK DECISION 3).
 /// </summary>
 [Collection(TestContent.Collection)]
 public sealed class WandTests : IDisposable
@@ -348,7 +349,13 @@ public sealed class WandTests : IDisposable
     [Fact]
     public void FriendlyFire_OffByDefault_HalfWhenOn()
     {
-        // Off by default: the shape catches the far side alone, and an ally standing in it is untouched.
+        // Off by default: the master ships the switch off, as the docs fix it — "Wands ship in Phase 1 with the
+        // friendly-fire constant off. It flips on once the scorer exists" (phase-1-weapons.md L1062-1063,
+        // settled.md L134-136) — a value a design doc fixes, pinned here against the master (REWORK DECISION 3):
+        // an edit that turns it on fails by name, and the docs move with it.
+        Assert.False(ShippedContent.Tuning.FriendlyFireEnabled);
+
+        // And off, the shape catches the far side alone, and an ally standing in it is untouched.
         Assert.False(GameContent.Current.Tuning.FriendlyFireEnabled);
         Assert.Equal(50, GameContent.Current.Tuning.FriendlyFireAllyPercent);
         var grid = new int[20, 20];

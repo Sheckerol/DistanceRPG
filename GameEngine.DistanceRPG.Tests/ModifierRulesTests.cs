@@ -5,10 +5,15 @@ namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
 /// The modifier rules as the game loads them: the relations, and the numbers the
-/// rules read out of the tuning. Every number expected here is the master's — the
-/// tuning the game reads (<see cref="ShippedContent.Tuning"/>) — so a table edited
-/// in <c>tuning.json</c> moves what these expect with it: what is pinned is how
-/// the rules read and combine the numbers, never what the numbers are.
+/// rules read out of the tuning. No number expected here is a copy of the
+/// master's. Where a test leans on one, it reads it from the tuning the game
+/// reads (<see cref="ShippedContent.Tuning"/>); where the numbers are the test's
+/// subject — that the rules read them from the tuning, and how they combine them —
+/// the test moves them off the shipped ones, or states its own, over that tuning,
+/// so no test compares a shipped table with rules built from that same table,
+/// which a table kept in code would pass for as long as the two agreed. A table
+/// edited in <c>tuning.json</c> fails nothing here: what is pinned is how the
+/// rules read and combine the numbers, never what the numbers are.
 /// </summary>
 public class ModifierRulesTests
 {
@@ -17,6 +22,20 @@ public class ModifierRulesTests
 
     /// <summary>The tuning the game reads: the numbers the rules are expected to resolve.</summary>
     private static Tuning Shipped => ShippedContent.Tuning;
+
+    /// <summary>The rules over the shipped tuning with <paramref name="moves"/> made (<see cref="TuningValues.With"/>) and the shipped relations.</summary>
+    private static ModifierRules Over(params (string Name, int Value)[] moves)
+        => new(TuningValues.With(Shipped, moves), ShippedContent.Restricted);
+
+    /// <summary>A step off <paramref name="value"/> within [<paramref name="min"/>, <paramref name="max"/>]: one up, or one down at the ceiling — never the value itself.</summary>
+    private static int Step(int value, int min, int max) => value + 1 <= max ? value + 1 : Math.Max(min, value - 1);
+
+    /// <summary>A step off <paramref name="value"/> within the range the tuning's table <paramref name="table"/> clamps to.</summary>
+    private static int Step(string table, int value)
+    {
+        var key = (TableKey)TuningSchema.Find(table)!;
+        return Step(value, key.Min, key.Max);
+    }
 
     [Fact]
     public void ModifierType_HasTheTwentyThreeMembers_InDocOrder()
@@ -43,75 +62,76 @@ public class ModifierRulesTests
     }
 
     [Theory]
-    [InlineData(CritMultiplier, 0)]   // no stacks: the offset alone
-    [InlineData(CritMultiplier, 1)]
-    [InlineData(CritMultiplier, 8)]   // only a unique that raised CritMultiplier gets this deep
-    [InlineData(Charges, 1)]          // the shipped baseline: a thrower forged x1
-    [InlineData(Charges, 8)]          // a thrower worked to the top
-    [InlineData(CritMultiplier, 6)]   // forged x1 and fully worked: the multiplier's ceiling
-    [InlineData(Block, 3)]            // The Bulwark
-    [InlineData(Light, 5)]            // a maxed graft
-    [InlineData(Light, 6)]            // the Light ceiling
-    [InlineData(Resonant, 6)]         // the same ceiling for the same shape
-    [InlineData(CritWindow, 8)]
-    [InlineData(Brace, 0)]
-    public void Resolve_IsOffsetPlusPerStackTimesStacks(ModifierType t, int stacks)
-        => Assert.Equal(Shipped.Offset[t] + Shipped.PerStack[t] * stacks, Rules.Resolve(t, stacks));
-
-    [Theory]
-    [InlineData(Brace)]
-    [InlineData(Block)]
-    [InlineData(CritWindow)]
-    [InlineData(CritMultiplier)]
-    [InlineData(Cleave)]
-    [InlineData(Charges)]
-    [InlineData(Longshot)]
-    [InlineData(Light)]
-    [InlineData(Riposte)]
-    [InlineData(Push)]
-    [InlineData(Drag)]
-    [InlineData(Splitting)]
-    [InlineData(Overwatch)]
-    [InlineData(Opportunist)]
-    [InlineData(Rout)]
-    [InlineData(Pin)]
-    [InlineData(Softening)]
-    [InlineData(CritWeaken)]
-    [InlineData(CritSunder)]
-    [InlineData(BlockWeaken)]
-    [InlineData(OnHitPoison)]
-    [InlineData(Resonant)]
-    [InlineData(Momentum)]
-    public void PerStack_MatchesTheModifierTable(ModifierType t)
-        => Assert.Equal(Shipped.PerStack[t], Rules.PerStack(t));
+    // The modifier, the offset and the per-stack price the test lays over the shipped tuning for it — its
+    // own numbers, none of them the master's to say — the stacks, and what they resolve to, worked by hand.
+    [InlineData(CritMultiplier, 2, 3, 0, 2)]    // no stacks: the offset alone, whatever a stack is priced at
+    [InlineData(CritMultiplier, 2, 3, 1, 5)]    // the first stack on top of the offset
+    [InlineData(CritMultiplier, 2, 3, 8, 26)]   // only a unique that raised CritMultiplier gets this deep
+    [InlineData(Charges, 1, 2, 1, 3)]           // a thrower forged x1
+    [InlineData(Charges, 1, 2, 8, 17)]          // a thrower worked to the top
+    [InlineData(CritMultiplier, 2, 3, 6, 20)]   // forged x1 and fully worked
+    [InlineData(Block, 1, 4, 3, 13)]            // The Bulwark's depth
+    [InlineData(Light, 0, 7, 5, 35)]            // no offset: the price times the stacks — a maxed graft
+    [InlineData(Light, 0, 7, 6, 42)]            // the Light ceiling's depth
+    [InlineData(Resonant, 5, 0, 6, 5)]          // a stack priced at nothing adds nothing to the offset
+    [InlineData(CritWindow, 0, 2, 8, 16)]
+    [InlineData(Brace, 0, 0, 0, 0)]             // nothing at all
+    public void Resolve_IsOffsetPlusPerStackTimesStacks(ModifierType t, int offset, int perStack, int stacks, int expected)
+    {
+        // What Resolve sums is known without reading the master, so the sum is checked, not restated: an
+        // offset, a price and a depth the test states, and the total worked by hand.
+        Assert.Equal(expected, Over(($"Offset.{t}", offset), ($"PerStack.{t}", perStack)).Resolve(t, stacks));
+    }
 
     [Fact]
-    public void Offset_IsTheTuningsTable()
+    public void TheRulesReadEveryTableFromTheTuning_MemberByMember()
     {
+        // The rules keep no number of their own: what a stack of each modifier is worth, what it grants
+        // before its first stack, how deep it may be forged, and the headroom every acquired source shares
+        // are the tuning's (tuning.json's PerStack, Offset, MaxForged and AcquiredHeadroom). Checked as the
+        // tuning schema's tables are (TuningSchemaTests.EveryTableReadsAsTheGameReadsIt): a tuning built
+        // from the shipped one with one member of each table moved — a step within its range, so a number
+        // the shipped table does not give it — is read at the moved numbers for that member and at the
+        // built-in numbers for every other. Rules compared with the very tables they were built from would
+        // agree with a table kept in code for as long as the two matched; a moved member cannot be matched.
         foreach (var t in All)
-            Assert.Equal(Shipped.Offset[t], Rules.Offset(t));
+        {
+            var moved = (PerStack: Step(nameof(Tuning.PerStack), Shipped.PerStack[t]),
+                Offset: Step(nameof(Tuning.Offset), Shipped.Offset[t]),
+                MaxForged: Step(nameof(Tuning.MaxForged), Shipped.MaxForged[t]));
+            Assert.NotEqual((Shipped.PerStack[t], Shipped.Offset[t], Shipped.MaxForged[t]), moved);
+            var rules = Over(($"PerStack.{t}", moved.PerStack), ($"Offset.{t}", moved.Offset), ($"MaxForged.{t}", moved.MaxForged));
+            foreach (var other in All)
+                Assert.Equal(other == t ? moved : (Shipped.PerStack[other], Shipped.Offset[other], Shipped.MaxForged[other]),
+                    (rules.PerStack(other), rules.Offset(other), rules.MaxForged(other)));
+            Assert.Equal(Shipped.AcquiredHeadroom, rules.AcquiredHeadroom);   // a table's move is no headroom's
+        }
+
+        // The headroom, moved, is read as moved — and the tables are left as they were.
+        var headroomKey = (IntKey)TuningSchema.Find(nameof(Tuning.AcquiredHeadroom))!;
+        int headroom = Step(Shipped.AcquiredHeadroom, headroomKey.Min, headroomKey.Max);
+        Assert.NotEqual(Shipped.AcquiredHeadroom, headroom);
+        var roomier = Over((nameof(Tuning.AcquiredHeadroom), headroom));
+        Assert.Equal(headroom, roomier.AcquiredHeadroom);
+        Assert.All(All, t => Assert.Equal((Shipped.PerStack[t], Shipped.Offset[t], Shipped.MaxForged[t]),
+            (roomier.PerStack(t), roomier.Offset(t), roomier.MaxForged(t))));
     }
 
     [Fact]
     public void Cap_IsForgedPlusHeadroom_NoFlatTerm()
     {
-        int headroom = Shipped.AcquiredHeadroom;
-        Assert.Equal(headroom, Rules.AcquiredHeadroom);
+        // A cap is the forged count plus the acquired headroom and nothing else. The headroom is the test's
+        // own — 4, laid over the shipped tuning; the game's own is tuning.json's to say — so every ceiling
+        // below is worked by hand, for every modifier alike.
+        var rules = Over((nameof(Tuning.AcquiredHeadroom), 4));
         foreach (var t in All)
         {
-            Assert.Equal(3 + headroom, Rules.Cap(t, 3));     // Widowmaker's CritWindow x3
-            Assert.Equal(2 + headroom, Rules.Cap(t, 2));     // Assassin's Fang, the Purity dagger: one higher than its siblings
-            Assert.Equal(1 + headroom, Rules.Cap(t, 1));     // Flensing Knife: CritWindow and Light alike
-            Assert.Equal(headroom, Rules.Cap(t, 0));         // never forged: the headroom alone
-            Assert.Equal(100 + headroom, Rules.Cap(t, 100)); // nothing is capped
+            Assert.Equal(7, rules.Cap(t, 3));       // Widowmaker's CritWindow x3
+            Assert.Equal(6, rules.Cap(t, 2));       // Assassin's Fang, the Purity dagger: one higher than its siblings
+            Assert.Equal(5, rules.Cap(t, 1));       // Flensing Knife: CritWindow and Light alike
+            Assert.Equal(4, rules.Cap(t, 0));       // never forged: the headroom alone
+            Assert.Equal(104, rules.Cap(t, 100));   // nothing is capped
         }
-    }
-
-    [Fact]
-    public void MaxForged_IsTheTuningsTable()
-    {
-        foreach (var t in All)
-            Assert.Equal(Shipped.MaxForged[t], Rules.MaxForged(t));
     }
 
     [Fact]

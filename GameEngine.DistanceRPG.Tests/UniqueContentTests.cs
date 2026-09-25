@@ -497,10 +497,11 @@ public class UniqueContentTests
     // ── The named uniques, as the doc reads them ─────────────────────────────
 
     [Fact]
-    public void Widowmaker_CritsOn17_CapsAt8()
+    public void Widowmaker_CritWindowX3_CapsAtForgedPlusHeadroom()
     {
         // CritWindow x3: finds the gap three stacks' worth of window below the natural 20 (17+ as the doc
-        // prices a stack), and a ceiling of x3 plus the headroom above it — the window fully worked.
+        // prices a stack), and a ceiling of x3 plus the headroom above it — the window fully worked (x8,
+        // and 12+, as the doc prices the headroom and a stack).
         var widowmaker = TestWeapons.Get("widowmaker");
         Assert.Equal("CritWindow x3, CritMultiplier x1", widowmaker.Forged.ToString());
         int ThresholdAt(int stacks) => CombatRules.NaturalTwenty - (Shipped.Offset[CritWindow] + Shipped.PerStack[CritWindow] * stacks);
@@ -523,11 +524,12 @@ public class UniqueContentTests
     }
 
     [Fact]
-    public void Stormcrow_CritsOn19_LongshotX3()
+    public void Stormcrow_CritsOnTheLongbowsWindow_LongshotX3()
     {
-        // Longshot x3 and CritWindow x1 — the Longbow's window, not the stale ladder row: three stacks of
-        // Longshot a tile beyond the free tiles, so a bow's shot grows with the room, a crit multiplies all of
-        // it, and at knife range it is the bow it looks like.
+        // Longshot x3 and CritWindow x1 — the Longbow's window (19+ as the doc prices a stack), not the stale
+        // ladder row: three stacks of Longshot a tile beyond the free tiles (+3 a tile, as the doc prices them),
+        // so a bow's shot grows with the room, a crit multiplies all of it, and at knife range it is the bow it
+        // looks like.
         var stormcrow = TestWeapons.Get("stormcrow");
         Assert.Equal("CritWindow x1, Longshot x3", stormcrow.Forged.ToString());
         int threshold = CombatRules.NaturalTwenty - (Shipped.Offset[CritWindow] + Shipped.PerStack[CritWindow]);
@@ -545,7 +547,7 @@ public class UniqueContentTests
     }
 
     [Fact]
-    public void Bulwark_Absorbs9()
+    public void Bulwark_AbsorbsItsBlockStacks()
     {
         // Block x3 absorbs its three stacks times PerStack[Block] (9 as the doc prices a stack); worked to its
         // ceiling, x3 plus the headroom, it absorbs the ceiling's worth — the Bulwark's ceiling the combat doc quotes.
@@ -573,7 +575,7 @@ public class UniqueContentTests
     }
 
     [Fact]
-    public void Shieldbreaker_Ignores9()
+    public void Shieldbreaker_IgnoresItsSplittingStacks()
     {
         // Splitting x3 ignores three stacks' worth of the target's Block across the swing (9 as the doc prices
         // a stack): against the Bulwark's Block x3, stack for stack, what is left is what Block's price exceeds
@@ -598,7 +600,7 @@ public class UniqueContentTests
     }
 
     [Fact]
-    public void HoplitesWall_ThreeRetaliations()
+    public void HoplitesWall_BraceX3_RetaliatesItsWorthATurn()
     {
         // Brace x3: its value in retaliations a turn at full reach — three, as the doc prices a stack — and
         // the entry past them goes unanswered until the next turn, each paying Longshot's point at the fourth
@@ -632,7 +634,7 @@ public class UniqueContentTests
     }
 
     [Fact]
-    public void FeatheredDeath_FourThrows()
+    public void FeatheredDeath_ChargesX3_ThrowsItsWorthATurn()
     {
         // Charges x3: its value in throws a turn — the Offset's one plus a throw a stack, four as the doc prices
         // them — and not one more with movement to spare. How Charges is priced is the master's, and the count

@@ -21,12 +21,16 @@ namespace GameEngine.DistanceRPG.Tests;
 /// leans on a number of the masters reads it where the game does
 /// (<see cref="ShippedContent"/>), or stands on it as its own input
 /// (<see cref="Premise"/>), so an edit to any number of theirs fails nothing —
-/// bar the few a design doc fixes (REWORK DECISION 3), pinned as literals in the
-/// tests below, so an edit that moves one fails by name and its doc moves with it:
+/// bar the few values a design doc fixes (REWORK DECISION 3), pinned as literals in
+/// the tests below, so an edit that moves one fails by name and its doc moves with it:
 /// <list type="bullet">
 /// <item><c>MovementBudget</c> 160, and <c>MovementUnitsPerMana</c> 10 derived from
 /// it — phase-1-weapons.md L773-775, <c>(160 − 40) / (8 + 3)</c>:
 /// <see cref="MovementBudgetTests.TheBudgetIsTheTuningsKey"/>.</item>
+/// <item><c>FriendlyFireEnabled</c> false — phase-1-weapons.md L1062-1063, wands
+/// ship with the friendly-fire switch off until the placement scorer exists
+/// (settled.md L134-136):
+/// <see cref="WandTests.FriendlyFire_OffByDefault_HalfWhenOn"/>.</item>
 /// <item>The eight class rows, the thirty-two weapons' statlines and spreads, the
 /// staves' own mana and the wands' shapes — phase-1-weapons.md §1.2–§1.4 (the
 /// costs at L131-138, the staves at L642-647, the wands at L897-902):
