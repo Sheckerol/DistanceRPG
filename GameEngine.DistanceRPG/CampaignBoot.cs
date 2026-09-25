@@ -31,19 +31,21 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// <summary>
 /// The campaign's life on the disk, between the edge (<see cref="SaveStore"/>)
 /// and <c>Logic/</c>'s save document (<see cref="SaveGame"/>, <see cref="SaveCodec"/>):
-/// which campaign a launch plays (<see cref="Boot"/>), and a save that never
-/// throws (<see cref="Save"/>). Engine-free, so every case is tested on a
+/// which campaign a launch plays (<see cref="Boot"/>), a save that never
+/// throws (<see cref="Save"/>), and the save a quit takes mid-run
+/// (<see cref="SaveOnQuit"/>). Engine-free, so every case is tested on a
 /// temporary folder with no window; what it has to say goes to the caller as
 /// log lines (<c>report</c>) and as notices, and the game draws and logs them.
 /// <list type="bullet">
 /// <item><strong>Loading is resuming</strong> (1f, USER DECISION 2): a launch
-/// resumes <see cref="SaveStore.FileName"/>, and says so. A save that cannot be
-/// read — malformed, written by a newer build, naming content that is gone, or
-/// holding a run in progress, which this build cannot resume yet — is
-/// set aside, never deleted or written over, and the backup is tried, then a
-/// new campaign. A save whose resume crashed the game last time — the resume
-/// marker left behind — is set aside the same way. Every set-aside notice names
-/// the file's full path and ends <see cref="TryAgain"/>.</item>
+/// resumes <see cref="SaveStore.FileName"/>, and says so — between runs, or in
+/// the run in progress it holds, which the game resumes in the dungeon at the
+/// saved floor and turn (Phase 5.8). A save that cannot be read — malformed,
+/// written by a newer build, naming content that is gone — is set aside, never
+/// deleted or written over, and the backup is tried, then a new campaign. A save
+/// whose resume crashed the game last time — the resume marker left behind — is
+/// set aside the same way. Every set-aside notice names the file's full path and
+/// ends <see cref="TryAgain"/>.</item>
 /// <item><strong>A different tuning is said, and plays on</strong> (§5.3,
 /// PHASE5-084): "silently changing a saved game's rules underneath the player is
 /// the failure to avoid", so a campaign saved under other numbers resumes with
@@ -102,11 +104,12 @@ internal static class CampaignBoot
     /// </list>
     /// A restore that throws anything — a <see cref="SaveFormatException"/> or a
     /// fault — is logged whole and treated as unreadable, so a player is never
-    /// stuck on a crash at launch. So is a save holding a run in progress, until
-    /// Phase 5.8 resumes one in the dungeon (<see cref="TryResume"/>): a resumed
-    /// campaign is always between runs. A file that could not be read and cannot be
-    /// moved either is left where it is, and the store refuses every write this
-    /// session (<see cref="SaveStore.RefuseWrites"/>), so nothing takes its place.
+    /// stuck on a crash at launch. A campaign resumed with a run in progress comes
+    /// back with its visit (<see cref="CampaignState.Visit"/>), and the game plays
+    /// it on in the dungeon; a crash there is the marker's to catch. A file that
+    /// could not be read and cannot be moved either is left where it is, and the
+    /// store refuses every write this session (<see cref="SaveStore.RefuseWrites"/>),
+    /// so nothing takes its place.
     /// </summary>
     /// <param name="store">The launch's slot (<see cref="StoreFor"/>).</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a campaign is built and restored under it.</param>
@@ -233,18 +236,10 @@ internal static class CampaignBoot
     /// <summary>
     /// Read and restore the save, or the backup: true with the campaign, or false
     /// with why not in a few words (<see cref="WhyUnreadable"/>) — the whole error
-    /// in the log. A tuning that changed since is logged with both hashes.
-    /// <para>
-    /// A save holding a run in progress is refused as one that cannot be read,
-    /// until Phase 5.8 resumes a run in the dungeon. <c>Logic/</c> restores a
-    /// visit from Phase 5.6, but the game resumes a campaign only on the screen
-    /// between runs, and that screen cannot show a run in progress
-    /// (<see cref="BetweenRunsScene"/> refuses one), so resuming it would crash the
-    /// launch. This build never writes such a save (<see cref="Save"/> refuses a
-    /// visit), so only a file edited by hand or written by a later build gets
-    /// here. It is set aside whole, the run in it kept, and the backup is tried.
-    /// Phase 5.8 removes this refusal when it resumes the visit in the dungeon.
-    /// </para>
+    /// in the log. A tuning that changed since is logged with both hashes. A
+    /// campaign that comes back with a run in progress is resumed like any other:
+    /// the game plays its visit on in the dungeon (Phase 5.8), and the log says
+    /// where — the dungeon, the floor and the turn.
     /// </summary>
     private static bool TryResume(SaveStore store, bool backup, GameContent content, Action<string>? report,
         [NotNullWhen(true)] out LoadedCampaign? loaded, out string why)
@@ -255,11 +250,10 @@ internal static class CampaignBoot
             string text = (backup ? store.ReadBackup() : store.Read()) ?? throw new FileNotFoundException("The file went missing while it was being read.", path);
             var file = SaveCodec.Read(text);
             loaded = SaveGame.Restore(file, content);
-            if (loaded.Campaign.Visit is not null)
-                throw new SaveFormatException("campaign.visit",
-                    "a run in progress, which this build cannot resume yet. It resumes a campaign between runs only, so the file is set aside whole, the run in it kept");
             report?.Invoke($"[Save] Resumed {path}: run counter {loaded.Campaign.RunCounter}"
-                + (loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet"));
+                + (loaded.Campaign.Visit is { } visit
+                    ? $", a run in progress in {visit.Def.Id} on map seed {visit.MapSeed}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
+                    : loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet"));
             if (loaded.TuningChanged)
                 report?.Invoke($"[Save] {path} was saved under tuning {file.TuningHash} and the game plays under {TuningJson.Hash(content.Tuning)}: the numbers have changed, and the campaign plays on under the new ones");
             why = "";
@@ -333,19 +327,15 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// Save <paramref name="campaign"/> to <paramref name="store"/> — between runs,
-    /// which is all the game saves until Phase 5.8 brings the run in progress in —
-    /// with the tuning's hash, atomically. A text the save already holds is not
+    /// Save <paramref name="campaign"/> to <paramref name="store"/> at a safe point
+    /// (<see cref="SaveGame.IsSafePoint"/>) — between runs, or with the run in
+    /// progress in it (Phase 5.8): right after the entry, or in the player phase
+    /// with nothing in flight — with the tuning's hash and the scene's
+    /// <paramref name="view"/>, atomically. A text the save already holds is not
     /// written again, so the backup stays the save before it. Never throws: a write
     /// that fails — a full disk, a folder with no rights, a locked file, a campaign
-    /// that cannot be captured, a run in progress — is logged whole and comes back
-    /// as the notice to show, and the save on the disk is what it was.
-    /// <para>
-    /// <c>Logic/</c> can capture a visit at any safe point from Phase 5.6
-    /// (<see cref="SaveGame.Capture"/>); the game does not write one yet, since
-    /// nothing resumes it into the dungeon before 5.8, and a save holding a run the
-    /// game could only reopen between runs would strand it there.
-    /// </para>
+    /// that cannot be captured, the enemies mid-turn — is logged whole and comes
+    /// back as the notice to show, and the save on the disk is what it was.
     /// </summary>
     /// <returns>Null when saved, or the notice a failed write shows.</returns>
     internal static string? Save(SaveStore store, CampaignState campaign, ViewDto? view = null, Action<string>? report = null)
@@ -354,9 +344,6 @@ internal static class CampaignBoot
         ArgumentNullException.ThrowIfNull(campaign);
         try
         {
-            if (campaign.Visit is { } visit)
-                throw new InvalidOperationException(
-                    $"A visit to '{visit.Def.Id}' is in progress: the game saves a campaign between runs, and the run in progress is not saved yet.");
             string text = SaveCodec.Write(SaveGame.Capture(campaign, view));
             if (Holds(store, text))
             {
@@ -372,6 +359,66 @@ internal static class CampaignBoot
             report?.Invoke($"[Save] Could not write {store.SavePath} - the save there is kept: {error}");
             return WriteFailed(store.WritesRefused ?? SaveStore.Why(error, store.Folder, writing: true));
         }
+    }
+
+    /// <summary>
+    /// The save a quit takes (1f): the campaign settled to its next safe point,
+    /// then saved (<see cref="Save"/>) with the view as the scene has it once
+    /// settled. Every quit arrives here mid-run — the pause menu's
+    /// <c>2  SAVE AND QUIT</c> and the window's close button alike. A quit that
+    /// finds the enemies taking their turn — its banner, their walks, their beats
+    /// — plays it out to the next player turn first, one
+    /// <paramref name="step"/> at a time (<see cref="SaveGame.SettleToSafePoint"/>),
+    /// so what is saved is the turn the player would have met. A settle in which
+    /// the enemies wipe the party ends the run in <c>Logic/</c>, and the campaign
+    /// is saved between runs, the run's summary with it.
+    /// <para>
+    /// <strong>The step is the playing scene's own</strong>
+    /// (<c>DungeonScene.StepLogic</c>): one fixed logic step of the turn system
+    /// plus the enemy-phase sighting the scene feeds back, which decides whose
+    /// zones may react — the step live play takes, so the settle takes exactly
+    /// the steps play would have. <c>Logic/</c>'s own default step feeds back no
+    /// sighting and is a test's, never the game's: with no step, a campaign off a
+    /// safe point is not settled and not saved, and the last save stands.
+    /// </para>
+    /// </summary>
+    /// <param name="store">The launch's slot.</param>
+    /// <param name="campaign">The campaign being quit.</param>
+    /// <param name="view">What the playing scene shows once the settle is done — read then, since a turn's start re-decides the march and may hand the lead to a living member — or null for nothing to say.</param>
+    /// <param name="step">The playing scene's logic step; null when no scene is playing the visit, which leaves nothing to settle.</param>
+    /// <param name="report">Where the log lines go.</param>
+    /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, and the save on the disk kept; false when it never got to one, and nothing was written.</returns>
+    internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(campaign);
+        if (!SaveGame.IsSafePoint(campaign))
+        {
+            var visit = campaign.Visit!;   // off a safe point there is a visit, and a system open on it
+            if (step is null)
+            {
+                report?.Invoke($"[Save] Quitting {visit.Def.Name} during the enemies' turn ({visit.Turns!.Phase}) with no scene to play it out with - nothing is written, and {store.SavePath} keeps the last save");
+                return false;
+            }
+
+            report?.Invoke($"[Save] Quitting {visit.Def.Name} during the enemies' turn ({visit.Turns!.Phase}): playing it out to the next player turn before saving");
+            int steps = 0;
+            if (!SaveGame.SettleToSafePoint(campaign, () => { steps++; step(); }))
+            {
+                report?.Invoke($"[Save] The enemies' turn did not come round to the party's in {steps} steps - nothing is written, and {store.SavePath} keeps the last save");
+                return false;
+            }
+            report?.Invoke(campaign.Visit is { } settled
+                ? $"[Save] Played out in {steps} steps: player turn {settled.Turn} on floor {settled.FloorIndex + 1}"
+                : $"[Save] Played out in {steps} steps: the enemies wiped the party, and the run ended ({campaign.LastResult?.Outcome})");
+        }
+
+        // A view is the run's: a campaign between runs — a quit on the summary, or
+        // a settle that ended the run — has none to carry.
+        var viewNow = campaign.Visit is null ? null : view?.Invoke();
+        if (Save(store, campaign, viewNow, report) is { } failed)
+            report?.Invoke($"[Save] {failed}");
+        return true;
     }
 
     /// <summary>Whether the save on the disk is already <paramref name="text"/>; a save that cannot be read is written over as ever, through the replace that keeps it as the backup.</summary>

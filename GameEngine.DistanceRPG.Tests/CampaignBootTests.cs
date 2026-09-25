@@ -267,60 +267,308 @@ public class CampaignBootTests
     }
 
     [Fact]
-    public void ARunInProgressIsSetAside_UntilTheGameCanResumeIt()
+    public void AVisitInProgressResumesInTheDungeon()
     {
         InTempFolder(folder =>
         {
-            // Logic/ saves a visit at any safe point from Phase 5.6, but until 5.8 the
-            // game resumes a campaign only on the screen between runs, and that screen
-            // refuses a run in progress. So a campaign.json holding one — edited by
-            // hand, or written by a later build — is set aside like any save this
-            // build cannot resume, the run in it kept whole, and the backup is tried:
-            // never a crash at launch. (5.8 resumes it in the dungeon, and this test
-            // becomes that one.)
-            const string runInProgress = "campaign.visit: a run in progress, which this build cannot resume yet";
+            // 1f, Phase 5.8 (Phase 5.6's review's ARunInProgressIsSetAside_UntilTheGameCanResumeIt,
+            // its assertion reversed): the game saves the run in progress at every safe
+            // point, and a campaign.json holding one resumes with it — the dungeon, the
+            // floor and the turn the save's — for the game to play on in the dungeon.
+            // Nothing is set aside, and the run is never lost to a launch.
             var store = new SaveStore(folder);
             var campaign = NewCampaign();
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
-            Saved(store, campaign);
-            campaign.Enter("spear_hall", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
-            Assert.True(SaveGame.IsSafePoint(campaign));
-            string midRun = Text(campaign);
+            Saved(store, campaign);                             // between runs
+            campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+            Assert.True(SaveGame.IsSafePoint(campaign));        // right after the entry, no floor open yet
+            Saved(store, campaign);                             // the entry's own save, as BeginRun asks for it
+            string entered = store.Read()!;
+            var script = new VisitScript(campaign);
+            script.Open();
+            Assert.Equal(5, script.Visit.BossFloor);
+            script.Down();
+            script.EndTurn(SaveGame.LogicStepSeconds);          // a turn played out on the logic clock's own step
+            var view = new ViewDto("C", MarchingThisTurn: true);
+            Assert.Null(CampaignBoot.Save(store, campaign, view));   // a player turn's start: the game writes it
+            string midRun = store.Read()!;
             Assert.NotNull(JsonNode.Parse(midRun)!["campaign"]!["visit"]);
-            Assert.NotNull(CampaignBoot.Save(store, campaign));   // the game itself never writes one yet
-            store.Write(midRun);                                  // as a later build's autosave would: the save before it the backup
+            Assert.Equal(entered, store.ReadBackup());
 
             var log = new List<string>();
             var boot = Boot(store, log: log);
             Assert.True(boot.Resumed);
-            Assert.Null(boot.Campaign.Visit);   // between runs, as the screen it opens on needs
-            Assert.Equal(1, boot.Campaign.RunCounter);   // the backup: the campaign as the run began
+            var resumed = boot.Campaign.Visit;
+            Assert.NotNull(resumed);
+            Assert.Equal(("spear_hall", CampaignRuns.FiveDeep, 1, script.Visit.Turn), (resumed.Def.Id, resumed.MapSeed, resumed.FloorIndex, resumed.Turn));
+            Assert.Equal(1, script.Visit.Turn);
+            Assert.Null(resumed.Turns);   // the scene that plays it opens the floor, as an arrival does
+            Assert.Equal(view, boot.View);
+            Assert.Equal([BetweenRunsHud.Resumed], boot.Notices);
+            Assert.Equal(midRun, SaveCodec.Write(SaveGame.Capture(boot.Campaign, boot.View)));   // nothing lost, nothing re-derived
+            Assert.Equal(1, boot.Campaign.RunCounter);
             Assert.Equal(["tutorial"], boot.Campaign.RetiredInOrder);
-            string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
-            Assert.Equal(midRun, File.ReadAllText(aside));
-            Assert.Collection(boot.Notices,
-                notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
-                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({runInProgress})", aside));
-            Assert.DoesNotContain(log, line => line.StartsWith($"[Save] Resumed {store.SavePath}", StringComparison.Ordinal));
-            Assert.Contains(log, line => line.StartsWith($"[Save] {store.SavePath} could not be resumed", StringComparison.Ordinal)
-                && line.Contains("a run in progress", StringComparison.Ordinal));
+            Assert.Contains(log, line => line.StartsWith($"[Save] Resumed {store.SavePath}", StringComparison.Ordinal)
+                && line.Contains("a run in progress in spear_hall", StringComparison.Ordinal) && line.Contains("floor 2, turn 1", StringComparison.Ordinal));
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName, SaveStore.ResumingName], Files(folder));   // nothing set aside
+            Assert.True(store.WasResuming);   // cleared by the game once the resumed floor is up
             store.ClearResuming();
 
-            // A later build autosaves at every turn's start, so its backup holds a run
-            // too: both are set aside, each whole, and a new campaign begins.
-            File.WriteAllText(store.SavePath, midRun);
-            File.WriteAllText(store.BackupPath, midRun);
-            var fresh = Boot(store);
-            Assert.False(fresh.Resumed);
-            StateAssert.Equivalent(NewCampaign(), fresh.Campaign, "campaign");
-            string second = Path.Combine(store.Folder, "campaign.unreadable-2.json");
-            string third = Path.Combine(store.Folder, "campaign.unreadable-3.json");
-            Assert.Collection(fresh.Notices,
-                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
-                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({runInProgress})", second),
-                notice => SaysSetAside(notice, "campaign.bak.json", $"could not be read ({runInProgress})", third));
-            Assert.Equal((midRun, midRun), (File.ReadAllText(second), File.ReadAllText(third)));
-            Assert.Equal((false, false, false), (store.HasSave, store.HasBackup, store.WasResuming));
+            // It plays on: the floor opens caught up, as an arrival opens it, and the
+            // run goes on to its end like any other.
+            resumed.OpenTurns(boot.Campaign.Party, CampaignRuns.Ten);
+            Assert.Equal(RunOutcome.Retreat, CampaignRuns.Exit(boot.Campaign).Outcome);
+            Assert.Null(boot.Campaign.Visit);
+
+            // A save that cannot be read beside a backup holding a run: the save is set
+            // aside as ever, and the backup resumes in the dungeon — here the entry's
+            // own save, taken before the first floor was opened, so it carries no view
+            // and its floor is arrived on afresh.
+            File.WriteAllText(store.SavePath, "not a save");
+            var fromBackup = Boot(store);
+            Assert.True(fromBackup.Resumed);
+            Assert.Equal(("spear_hall", 0, 0, (TurnSystem?)null), (fromBackup.Campaign.Visit!.Def.Id, fromBackup.Campaign.Visit.FloorIndex,
+                fromBackup.Campaign.Visit.Turn, fromBackup.Campaign.Visit.Turns));
+            Assert.Null(fromBackup.View);
+            Assert.Equal(entered, SaveCodec.Write(SaveGame.Capture(fromBackup.Campaign)));
+            string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
+            Assert.Collection(fromBackup.Notices,
+                notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", store)})", aside));
+            store.ClearResuming();
+        });
+    }
+
+    [Fact]
+    public void QuittingMidEnemyTurnSavesTheNextPlayerTurn()
+    {
+        InTempFolder(folder =>
+        {
+            // 1f: a quit that finds the enemies taking their turn — the pause menu
+            // opened during it, or the window closed — plays it out to the next player
+            // turn on the playing scene's own step, then saves: the turn the player
+            // would have met. Here the lance is mid-stride towards A when the quit
+            // arrives, and its walk ends in blows, so dice are rolled on the way.
+            var store = new SaveStore(folder);
+            var view = new ViewDto("A", MarchingThisTurn: false);
+
+            // Live play, stepped at the logic clock's own step to the next player turn.
+            var live = ReloadDeterminismTests.MidWalk();
+            int rolledMidStride = live.Visit.DiceRolled;
+            int stepsToPlay = 0;
+            while (live.Turns.Phase != TurnPhase.Player && stepsToPlay < 200_000)
+            {
+                live.Turns.Update(SaveGame.LogicStepSeconds);
+                stepsToPlay++;
+            }
+            Assert.Equal(TurnPhase.Player, live.Turns.Phase);
+            Assert.True(live.Visit.DiceRolled > rolledMidStride);   // the lance's blows rolled the visit's own die on the way
+            string reached = SaveCodec.Write(SaveGame.Capture(live.Campaign, view));
+
+            // The quit: off a safe point nothing can be written as it stands — a notice,
+            // never a throw — so the quit's own door settles it with the step it is
+            // handed, calling it exactly as often as play stepped, reads the view once
+            // the turn has come round, and saves what live play reached.
+            var quitting = ReloadDeterminismTests.MidWalk();
+            Assert.False(SaveGame.IsSafePoint(quitting.Campaign));
+            Assert.NotNull(CampaignBoot.Save(store, quitting.Campaign));
+            Assert.False(store.HasSave);
+            int calls = 0;
+            var log = new List<string>();
+            Assert.True(CampaignBoot.SaveOnQuit(store, quitting.Campaign,
+                () =>
+                {
+                    Assert.Equal(TurnPhase.Player, quitting.Turns.Phase);   // the view is the settled turn's
+                    return view;
+                },
+                () =>
+                {
+                    calls++;
+                    quitting.Turns.Update(SaveGame.LogicStepSeconds);
+                }, log.Add));
+            Assert.Equal(stepsToPlay, calls);
+            Assert.Equal(reached, store.Read());
+            Assert.Contains(log, line => line.Contains($"Played out in {stepsToPlay} steps", StringComparison.Ordinal));
+
+            // The reboot is at that player turn, the view with it.
+            var boot = Boot(store);
+            Assert.True(boot.Resumed);
+            Assert.Equal(view, boot.View);
+            Assert.Equal(live.Visit.Turn, boot.Campaign.Visit!.Turn);
+            Assert.Equal(reached, SaveCodec.Write(SaveGame.Capture(boot.Campaign, boot.View)));
+            store.ClearResuming();
+
+            // With no step to play it out with — no scene playing the run — nothing
+            // is settled and nothing written: the last save stands. Logic's own
+            // default step is a test's, never the game's.
+            var unplayed = ReloadDeterminismTests.MidWalk();
+            Assert.False(CampaignBoot.SaveOnQuit(store, unplayed.Campaign, () => view, step: null));
+            Assert.Equal(reached, store.Read());
+            Assert.Equal(TurnPhase.EnemyMoving, unplayed.Turns.Phase);
+
+            // A step that never brings the turn round is given up on, and nothing is
+            // written either.
+            var stuck = ReloadDeterminismTests.MidWalk();
+            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => view, () => { }));
+            Assert.Equal(reached, store.Read());
+
+            // At a safe point already the quit takes no step and saves as it stands;
+            // a campaign between runs carries no view.
+            Assert.True(CampaignBoot.SaveOnQuit(store, live.Campaign, () => view with { ActiveMemberId = "B" },
+                () => throw new Xunit.Sdk.XunitException("a player turn needs no step")));
+            Assert.Equal("B", SaveCodec.Read(store.Read()!).View!.ActiveMemberId);
+            var between = NewCampaign();
+            Assert.True(CampaignBoot.SaveOnQuit(store, between, () => throw new Xunit.Sdk.XunitException("a campaign between runs has no view"), step: null));
+            Assert.Null(SaveCodec.Read(store.Read()!).View);
+        });
+    }
+
+    [Fact]
+    public void ASettleThatWipesThePartySavesTheCampaignBetweenRuns()
+    {
+        InTempFolder(folder =>
+        {
+            // A quit during the enemies' turn that ends with the party dead: the settle
+            // ends the run in Logic, as play would, and what is saved is the campaign
+            // between runs with the run's summary — no visit, and no view.
+            var store = new SaveStore(folder);
+            var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep, visitsOwnDie: true);
+            var lance = script.Row(10, "pinning_lance");
+            script.Walk("A", script.Beside(lance));
+            foreach (var member in script.Party)
+            {
+                member.Hp = 1;
+                if (member.Id != "A")
+                    member.ApplyStatus(StatusEffectType.Poison, null, 5);
+            }
+            var turns = script.Turns;
+            turns.EndTurn();
+            Assert.False(SaveGame.IsSafePoint(script.Campaign));
+
+            Assert.True(CampaignBoot.SaveOnQuit(store, script.Campaign,
+                () => throw new Xunit.Sdk.XunitException("a run that ended has no view"),
+                () => turns.Update(SaveGame.LogicStepSeconds)));
+            Assert.Null(script.Campaign.Visit);
+            var boot = Boot(store);
+            Assert.True(boot.Resumed);
+            Assert.Null(boot.Campaign.Visit);
+            Assert.Null(boot.View);
+            Assert.Equal(("spear_hall", RunOutcome.Death), (boot.Campaign.LastResult!.DungeonId, boot.Campaign.LastResult.Outcome));
+            store.ClearResuming();
+        });
+    }
+
+    [Fact]
+    public void TheViewComesBack()
+    {
+        InTempFolder(folder =>
+        {
+            // 1b, 1d: the view is what the scene decided and Logic never reads — the
+            // active member, and whether the turn was granted the march — and a save
+            // carries it back to the scene that resumes the turn.
+            var store = new SaveStore(folder);
+            var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep);
+            foreach (var view in new[] { new ViewDto("C", MarchingThisTurn: true), new ViewDto("B"), new ViewDto() })
+            {
+                Assert.Null(CampaignBoot.Save(store, script.Campaign, view));
+                var boot = Boot(store);
+                Assert.Equal(view, boot.View);
+                store.ClearResuming();
+            }
+
+            // A march granted stays granted: a turn has just begun, and nothing has
+            // been seen in it yet. One revoked stays revoked: the grant comes back from
+            // the view, and the sighting that revoked it from the turn's own counters,
+            // so the scene's march — granted and nothing live seen — is off again
+            // after the reload.
+            script.EndTurn(SaveGame.LogicStepSeconds);
+            var granted = new ViewDto("A", MarchingThisTurn: true);
+            Assert.False(script.Turns.AnyLiveEnemySeenThisTurn);   // the turn's start: nobody seen yet
+            Assert.Null(CampaignBoot.Save(store, script.Campaign, granted));
+            var calm = Boot(store);
+            store.ClearResuming();
+            Assert.True(calm.View!.MarchingThisTurn);
+            Assert.False(calm.Campaign.Visit!.OpenTurns(calm.Campaign.Party, CampaignRuns.Ten).AnyLiveEnemySeenThisTurn);
+
+            var sighted = script.Floor.Enemies.First(row => row.Alive);
+            script.Turns.NotifyEnemyVisible(sighted, true);   // a live enemy in sight, as the scene tells it: the march is revoked this turn
+            Assert.True(script.Turns.AnyLiveEnemySeenThisTurn);
+            Assert.Null(CampaignBoot.Save(store, script.Campaign, granted));
+            var revoked = Boot(store);
+            store.ClearResuming();
+            Assert.True(revoked.View!.MarchingThisTurn);
+            Assert.True(revoked.Campaign.Visit!.OpenTurns(revoked.Campaign.Party, CampaignRuns.Ten).AnyLiveEnemySeenThisTurn);
+
+            // The member the view names leads while it stands; a name no member has, a
+            // fallen member, or none, hands the lead to the first living one, as a
+            // turn's start does.
+            var party = revoked.Campaign.Party;
+            Assert.Equal(2, DungeonScene.ActiveIndexFor(party, "C"));
+            Assert.Equal(0, DungeonScene.ActiveIndexFor(party, null));
+            Assert.Equal(0, DungeonScene.ActiveIndexFor(party, "Z"));
+            party[0].Alive = false;
+            party[2].Alive = false;
+            Assert.Equal(1, DungeonScene.ActiveIndexFor(party, "C"));
+            Assert.Equal(1, DungeonScene.ActiveIndexFor(party, null));
+        });
+    }
+
+    [Fact]
+    public void AResumeKeepsTheTurnsSight_AStairArrivalResetsIt()
+    {
+        InTempFolder(folder =>
+        {
+            // 1b: what the party can see this turn is every box a living member has
+            // stood in since the turn began, and the pick and the march read it. A
+            // resume keeps it — the lance's room lit behind A, who has walked out into
+            // the corridor — and adds the boxes the party stands in; a stairs arrival
+            // lights only where the party stands.
+            var store = new SaveStore(folder);
+            var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep);
+            var lance = script.Row(10, "pinning_lance");
+            var (r, c) = Displacer.TileOf(lance);
+            script.Walk("A", (8, 40));
+            script.Look();
+            script.Walk("A", (10, 24));   // out of the room: a fog box's edge crossed
+            script.Look();
+            Assert.True(script.Floor.Fog.Visible[r, c]);
+            Assert.Null(CampaignBoot.Save(store, script.Campaign, new ViewDto("A")));
+
+            (int R, int C)[] Living(CampaignState campaign) => campaign.Party.Where(member => member.Alive).Select(Displacer.TileOf).ToArray();
+            bool[] Lit(FogState fog) => fog.Visible.Cast<bool>().ToArray();
+
+            var kept = Boot(store);
+            store.ClearResuming();
+            var floor = kept.Campaign.Visit!.Current;
+            var saved = Lit(floor.Fog);
+            var seen = floor.Fog.Seen.Cast<bool>().ToArray();
+            Assert.Equal(Lit(script.Floor.Fog), saved);
+            DungeonScene.LightArrival(floor.Fog, floor.FogBoxes.FogBoxes, Living(kept.Campaign), keepSight: true);
+            Assert.Equal(saved, Lit(floor.Fog));   // every tile the turn had lit, and the party's boxes were among them
+            Assert.True(floor.Fog.Visible[r, c]);
+            Assert.Equal(seen, floor.Fog.Seen.Cast<bool>());
+
+            // Only where the party stands, on a stairs arrival: the lance's room dark
+            // again, the explored memory as it was.
+            var fresh = new FogState(floor.Fog.Rows, floor.Fog.Cols);
+            foreach (var (tr, tc) in Living(kept.Campaign))
+                fresh.RevealAt(tr, tc, floor.FogBoxes.FogBoxes);
+            var reset = Boot(store);
+            store.ClearResuming();
+            var again = reset.Campaign.Visit!.Current;
+            DungeonScene.LightArrival(again.Fog, again.FogBoxes.FogBoxes, Living(reset.Campaign), keepSight: false);
+            Assert.Equal(Lit(fresh), Lit(again.Fog));
+            Assert.False(again.Fog.Visible[r, c]);
+            Assert.Equal(seen, again.Fog.Seen.Cast<bool>());
+
+            // A floor keeping its sight still lights a box a member stands in that was
+            // dark: the boxes the party stands in are added.
+            var dark = Boot(store);
+            store.ClearResuming();
+            var unlit = dark.Campaign.Visit!.Current;
+            unlit.Fog.ResetVisibility();
+            DungeonScene.LightArrival(unlit.Fog, unlit.FogBoxes.FogBoxes, Living(dark.Campaign), keepSight: true);
+            Assert.Equal(Lit(fresh), Lit(unlit.Fog));
         });
     }
 
@@ -590,13 +838,13 @@ public class CampaignBootTests
             CampaignRuns.DeepRetreat(campaign, "spear_hall");
             Saved(store, campaign);
 
-            // --new-campaign, and nothing saved before the game goes down: the new
-            // campaign's first run quit from the pause menu, which saves nothing
-            // mid-run, or a crash. The next launch is a new campaign, not the old
-            // one's backup brought back as though it were the new one's.
+            // --new-campaign, and nothing saved before the game goes down: a crash
+            // in the new campaign's first run before any save was written. The next
+            // launch is a new campaign, not the old one's backup brought back as
+            // though it were the new one's.
             var abandoned = Boot(store, new BootRequest(NewCampaign: true));
             Assert.False(abandoned.Resumed);
-            abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);   // its first run begun, then quit: nothing saved mid-run
+            abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);   // its first run begun, then down: nothing saved
             var next = Boot(store);
             Assert.False(next.Resumed);
             Assert.Empty(next.Notices);
@@ -605,7 +853,7 @@ public class CampaignBootTests
             Assert.Empty(next.Campaign.ClearedInOrder);
 
             // The game saves the new campaign at once (DistanceRpgGame.BootCampaign),
-            // so after the same quit the next launch resumes that campaign — the new
+            // so after the same crash the next launch resumes that campaign — the new
             // one, as it stood when its run began.
             var fresh = Boot(store, new BootRequest(NewCampaign: true));
             Saved(store, fresh.Campaign);
@@ -751,10 +999,12 @@ public class CampaignBootTests
             Assert.Equal((Text(campaign), previous), (store.Read(), store.ReadBackup()));
             Assert.Equal([$"[Save] Wrote {store.SavePath}"], log);
 
-            // A campaign mid-run is not saved yet (Phase 5.8): asked anyway, it is a
-            // notice and never a throw, and the save between runs is kept.
+            // A campaign mid-run is saved at a safe point (Phase 5.8), and asked off
+            // one — the turn ended, the enemies' turn under way — it is a notice and
+            // never a throw, and the save between runs is kept.
             string between = store.Read()!;
-            campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+            campaign.Enter("spear_hall", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten).EndTurn();
+            Assert.False(SaveGame.IsSafePoint(campaign));
             Assert.NotNull(CampaignBoot.Save(store, campaign));
             Assert.Equal((between, previous), (store.Read(), store.ReadBackup()));
         });

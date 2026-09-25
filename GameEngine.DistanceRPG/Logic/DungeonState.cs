@@ -983,8 +983,9 @@ public sealed class DungeonState
     /// <param name="rollD20">
     /// The d20 the system rolls. Omitted, it is the visit's own
     /// (<see cref="RollD20"/>), whose position a save keeps — never
-    /// <c>Random.Shared</c>, which no save could reproduce. A die handed in
-    /// (a test's, a scene's own) rolls instead, and moves the visit's die not at all.
+    /// <c>Random.Shared</c>, which no save could reproduce. A die handed in rolls
+    /// instead: a test's moves the visit's die not at all, and the game's scene
+    /// hands one that rolls the visit's own and notes each roll for its cues.
     /// </param>
     /// <exception cref="InvalidOperationException">A system is already open on this floor: only the stairs close one.</exception>
     public TurnSystem OpenTurns(IReadOnlyList<PartyMemberState> party, Func<int>? rollD20 = null)

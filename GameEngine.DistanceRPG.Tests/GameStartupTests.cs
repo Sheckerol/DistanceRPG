@@ -49,15 +49,16 @@ public class GameStartupTests
     public void TheStartupNoticesGoToTheFirstSceneAlone()
     {
         // What the data files raised reaches the screen through the first scene
-        // the game opens on (1h, 1i). That is the screen between runs, or a run
-        // that a dev override boots straight into. The load holds the notices.
-        // Each of the two methods that show a scene takes them and passes them
-        // straight into that scene's constructor, where the constructor's last
-        // argument is the notices. Nothing else takes them.
+        // the game opens on (1h, 1i). That is the screen between runs, a run that
+        // a dev override boots straight into, or — from Phase 5.8 — a run a save
+        // held, resumed in the dungeon (ResumeRun). The load holds the notices.
+        // Each of the methods that show a scene takes them and passes them
+        // straight into what that scene is built with, where the last argument is
+        // the notices. Nothing else takes them.
         var hold = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Hold))!;
         var take = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Take))!;
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(hold));
-        Assert.Equal(["DistanceRpgGame.BeginRun", "DistanceRpgGame.ShowBetweenRuns"], Callers(take));
+        Assert.Equal(["DistanceRpgGame.BeginRun", "DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns"], Callers(take));
         foreach (var (shows, scene) in new[] { ("ShowBetweenRuns", typeof(BetweenRunsScene)), ("BeginRun", typeof(DungeonScene)) })
         {
             var built = BuiltWithTheTake(shows, take);
@@ -65,6 +66,18 @@ public class GameStartupTests
             Assert.Equal(scene, built.DeclaringType);
             Assert.Equal("notices", built.GetParameters()[^1].Name);
         }
+
+        // A resumed run's notices ride with the save's view (ResumeView), which the
+        // scene's resuming constructor takes whole.
+        var resumeView = BuiltWithTheTake("ResumeRun", take);
+        Assert.True(resumeView is not null, "DistanceRpgGame.ResumeRun does not hand what it takes straight to a constructor");
+        Assert.Equal(typeof(ResumeView), resumeView.DeclaringType);
+        Assert.Equal("Notices", resumeView.GetParameters()[^1].Name);
+        Assert.Contains(typeof(DungeonScene).GetConstructors(),
+            ctor => ctor.GetParameters() is [.., { ParameterType: var last }] && last == typeof(ResumeView));
+        var resumeRun = typeof(DistanceRpgGame).GetMethod("ResumeRun", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Assert.Contains(Calls(Game), c => Same(c.From, resumeRun) && c.Op == OpCodes.Newobj
+            && c.Target.DeclaringType == typeof(DungeonScene) && c.Target.GetParameters()[^1].ParameterType == typeof(ResumeView));
 
         // Only once. The first scene is handed the notices, and every scene after
         // it (the next run, the screen between runs it returns to) gets none.
@@ -255,12 +268,15 @@ public class GameStartupTests
         // in — never inside the turn system's raise that ended the run — when NEW
         // CAMPAIGN is confirmed, or --new-campaign begins a campaign at launch
         // (BootCampaign, S5's review), and on quitting, which every close arrives
-        // at (OnClosing). The campaign a launch plays is decided at load, once.
-        // Read off the IL, so a save added anywhere else fails here.
+        // at (OnClosing): mid-run through the quit's own door, which settles the
+        // enemies' turn first and then saves (CampaignBoot.SaveOnQuit, Phase 5.8).
+        // The campaign a launch plays is decided at load, once. Read off the IL,
+        // so a save added anywhere else fails here.
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
-        Assert.Equal(["DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        Assert.Equal(["CampaignBoot.SaveOnQuit", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
         Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.NewCampaign", "DistanceRpgGame.SaveOnQuit", "DistanceRpgGame.WriteRequestedSave"],
             Callers(Method(typeof(DistanceRpgGame), "Save")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
@@ -278,5 +294,103 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.StoreFor"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
         Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Boot))));
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(Method(typeof(DistanceRpgGame), "BootCampaign")));
+    }
+
+    private const BindingFlags Declared = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+    /// <summary>Every method-typed operand in <paramref name="method"/>'s body that names <paramref name="target"/> — a call, or a delegate made of it (<c>ldftn</c>).</summary>
+    private static int Mentions(MethodBase method, MethodBase target)
+        => Instructions(Body(method)!).Count(i => i.Token != 0 && Resolve(method, i.Token) is { } named && Same(named, target));
+
+    [Fact]
+    public void OnlyTheSceneStepDrivesTheTurnSystem()
+    {
+        // 1c, S8: the turn system runs on the scene's fixed logic clock. Outside
+        // Logic/ it is stepped from one place — DungeonScene.StepLogic, one
+        // SaveGame.LogicStepSeconds step with the enemy-phase sighting the scene
+        // feeds back — and never on a frame's own time: the scene's Update steps the
+        // clock (LogicClock) and calls StepLogic, never TurnSystem.Update itself.
+        var update = typeof(TurnSystem).GetMethod(nameof(TurnSystem.Update))!;
+        var stepLogic = typeof(DungeonScene).GetMethod(nameof(DungeonScene.StepLogic), Declared)!;
+        var sceneUpdate = typeof(DungeonScene).GetMethod(nameof(DungeonScene.Update), Declared)!;
+        var outsideLogic = Calls(Game)
+            .Where(c => Same(c.Target, update) && Root(c.From.DeclaringType)!.Namespace != typeof(TurnSystem).Namespace)
+            .Select(c => $"{Root(c.From.DeclaringType)!.Name}.{c.From.Name}")
+            .Distinct()
+            .ToArray();
+        Assert.Equal(["DungeonScene.StepLogic"], outsideLogic);
+        Assert.Equal(0, Mentions(sceneUpdate, update));
+        Assert.Equal(1, Mentions(sceneUpdate, stepLogic));
+        Assert.Equal(1, Mentions(sceneUpdate, typeof(LogicClock).GetMethod(nameof(LogicClock.Steps))!));
+
+        // With the one step: the float StepLogic hands Update is LogicStepSeconds.
+        var il = Body(stepLogic)!;
+        var instructions = InstructionsAt(il).ToList();
+        int call = instructions.FindIndex(i => i.Token != 0 && Resolve(stepLogic, i.Token) is { } target && Same(target, update));
+        Assert.True(call > 0, "StepLogic does not call TurnSystem.Update");
+        Assert.Equal(OpCodes.Ldc_R4, instructions[call - 1].Op);
+        Assert.Equal(SaveGame.LogicStepSeconds, BitConverter.ToSingle(il, instructions[call - 1].At));
+
+        // And the step a quit settles with is that same step (S7's review, check 3):
+        // the game hands DungeonScene.StepLogic to the quit's own door, never Logic's
+        // default step, which feeds back no sighting.
+        var quit = typeof(DistanceRpgGame).GetMethod("SaveOnQuit", Declared)!;
+        Assert.Equal(1, Mentions(quit, stepLogic));
+        Assert.Equal(1, Mentions(quit, typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.SaveOnQuit), Declared)!));
+        Assert.Equal(0, Mentions(quit, typeof(SaveGame).GetMethod(nameof(SaveGame.SettleToSafePoint))!));
+        Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.SaveOnQuit), Declared)!));
+    }
+
+    [Fact]
+    public void TheSceneRollsTheVisitsOwnDie()
+    {
+        // USER DECISION 1 (provisional: seeded by the visit and saved), S7's review's
+        // check 1: every floor the scene opens rolls the scene's d20, and the scene's
+        // d20 is the visit's own (DungeonState.RollD20), whose position a save keeps —
+        // never Random.Shared, which would make a reload a reroll.
+        var sceneDie = typeof(DungeonScene).GetMethod("RollD20", Declared)!;
+        var visitDie = typeof(DungeonState).GetMethod(nameof(DungeonState.RollD20))!;
+        Assert.Equal(1, Mentions(sceneDie, visitDie));
+        Assert.DoesNotContain(Instructions(Body(sceneDie)!), i => i.Token != 0 && Resolve(sceneDie, i.Token)?.DeclaringType == typeof(Random));
+        Assert.Contains("DungeonScene.RollD20", Callers(visitDie));
+
+        // Both OpenTurns the scene makes — the first floor's and every stairs
+        // arrival's — hand it that die.
+        var open = typeof(DungeonState).GetMethod(nameof(DungeonState.OpenTurns))!;
+        foreach (string arrival in new[] { "Initialize", "TakeStairs" })
+        {
+            var method = typeof(DungeonScene).GetMethod(arrival, Declared)!;
+            Assert.Equal(1, Mentions(method, open));
+            Assert.Equal(1, Mentions(method, sceneDie));
+        }
+        Assert.Equal(["DungeonScene.Initialize", "DungeonScene.TakeStairs"], Callers(open).Where(caller => caller.StartsWith("DungeonScene.", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void TheRunAutosavesAtItsEntryItsTurnsAndItsArrivals()
+    {
+        // 1f: the run in progress is saved at every safe point a player would want
+        // to come back to — when it is entered (BeginRun), at every player turn's
+        // start and after every floor arrival, the first floor's included (the
+        // scene asks its host, IRunHost.RequestSave) — and always only asked for:
+        // the host writes it at the frame's end (WriteRequestedSave), never inside
+        // the turn system's raise that asked. Read off the IL.
+        var asks = typeof(IRunHost).GetMethod(nameof(IRunHost.RequestSave))!;
+        Assert.Equal(["DungeonScene.Initialize", "DungeonScene.OnPlayerTurnStarted", "DungeonScene.TakeStairs"], Callers(asks));
+        var wired = typeof(DungeonScene).GetMethod("WireTurnSystem", Declared)!;
+        Assert.Equal(1, Mentions(wired, typeof(DungeonScene).GetMethod("OnPlayerTurnStarted", Declared)!));
+
+        var game = typeof(DistanceRpgGame);
+        var request = game.GetMethod(nameof(DistanceRpgGame.RequestSave))!;
+        Assert.Equal(["DistanceRpgGame.BeginRun"], Callers(request));
+        foreach (var asking in new[] { request, game.GetMethod("BeginRun", Declared)! })
+            Assert.DoesNotContain(Instructions(Body(asking)!), i => i.Token != 0 && Resolve(asking, i.Token) is { } target
+                && (target.DeclaringType == typeof(CampaignBoot) || target.DeclaringType == typeof(SaveStore) || target.Name == "Save"));
+
+        // The pause menu's 2 closes the window, and the close is where the quit saves.
+        // (The call binds to the window's original declaration of Close, which
+        // reflection on the game's type would hand back as its override.)
+        var close = typeof(GameEngine.Core.Game).GetMethod("Close", Type.EmptyTypes)!.GetBaseDefinition();
+        Assert.Contains("DungeonScene.NumberKey", Callers(close));
     }
 }

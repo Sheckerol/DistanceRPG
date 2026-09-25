@@ -206,3 +206,95 @@ for both files, since the question is the same:
 Phase 5 brings the content files without adding a new kind of content rule, so
 it ships neither: whoever rules on this should add the rules, or the settled
 line, then.
+
+## What the d20 does across a reload (§5.2)
+
+§5.2 asks that "a fixed sequence of turns produces an identical world state"
+after a save and a reload, and says nothing of the dice. Every other random
+stream in `Logic/` is drawn fresh per use off the map seed and a counter the
+save already keeps (a dummy's revivals rolled, its defeats), so it replays by
+construction. The d20 is the one stream consumed a draw at a time, and until
+Phase 5.7 it was `Random.Shared` in the scene: a reload rerolled every die still
+to come.
+
+**Shipped provisionally: the visit's own die, seeded and saved.** Each draw is
+a stream of its own, keyed by the visit's map seed and how many the visit has
+rolled (`DungeonState.RollD20`, `DiceSalt`, `DiceMix`), and the count is saved
+(`diceRolled`). So a reload rolls exactly the dice play without one would have
+rolled, a reload is never a reroll, and §5.2's identical world holds in the
+shipped game and not only under a test's die (`ReloadDeterminismTests`).
+
+**The trade-off, stated.** With one counter for the whole visit, a player who
+kills the process after a turn's autosave replays that turn knowing the draws
+to come, and can reorder the turn's actions to route a known natural 20 to the
+swing that matters. The mitigation not taken is keying each draw by the turn,
+the actor and the attack's ordinal rather than one counter, which pins a roll to
+whoever makes it — a new stream family and a key per draw, for foresight it
+narrows but does not remove.
+
+**This fills a silence with a choice the player can feel, so it is the user's
+to decide.** The alternatives: keep it; key each draw by turn, actor and ordinal;
+or go back to `Random.Shared` — one line in `DungeonScene.RollD20`, the visit's
+die then serving the tests alone — so a reload is a reroll. settled.md's Phase 5
+implementation pass records the ruling.
+
+## How the campaign is saved (§5.1, §5.2)
+
+The phase doc says what a save holds and in what format, and nothing of where
+it lives, how many there are, when one is taken, or how a player gets back.
+
+**Shipped provisionally:** one campaign and one slot, in the player's data
+folder, with no manual save: the game saves itself at every safe point — a
+run's entry, every player turn's start, every floor arrival, a run's end, NEW
+CAMPAIGN — and on every quit. A quit that finds the enemies taking their turn
+plays it out to the next player turn first, on the game's fixed logic step, and
+saves that. A launch resumes the campaign where it stood, between runs or in the
+dungeon mid-run, guarded by a `campaign.resuming` marker that sets aside a save
+whose resume crashed the game. NEW CAMPAIGN is N, then N, between runs, and
+`--new-campaign` sets the old campaign aside at launch. The dev overrides
+(`DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED`) play in a scratch slot of their own
+and never touch the campaign.
+
+**This is a design the doc left open, so it is the user's to decide.** The
+alternatives: manual save slots beside the autosave; a quit during the enemies'
+turn saving the turn's start instead, which loses the moves the player made that
+turn; a title screen with CONTINUE and NEW in place of resuming at launch; and
+dev overrides that apply only when no save exists. settled.md's Phase 5
+implementation pass records the ruling.
+
+## Where content's truth lives (§5.4)
+
+§5.4 moves the content into five files and §5.3 the numbers into `tuning.json`,
+and neither says whether the files or the compiled content are the source the
+other follows. Something has to be, or the two drift.
+
+**Shipped provisionally: the compiled content (`ContentDefaults.cs`) is the
+source, and the six files are generated from it** (`--write-data`) and pinned
+byte for byte by `ShippedDataTests`. A designer edits the copies beside the exe
+to playtest, and a change worth keeping is ported into `ContentDefaults` and
+regenerated.
+
+**This decides who owns the data, so it is the user's to decide.** The
+alternative: the JSON as the source, embedded in the assembly as the compiled
+fallback, with `ContentDefaults` reading it — one source a designer edits
+directly, at the cost of the C# builders and the comments that derive every
+unique from its variant (`ContentDefaults.cs`). settled.md's Phase 5
+implementation pass records the ruling.
+
+## Whether class baselines are a section of `weapons.json` (§5.6)
+
+§5.6 opens: "The 32 weapons, the uniques, and the class baselines leave
+`Weapons.cs`." They did leave it, in Phase 1, for `ContentDefaults`; the
+question is the file's shape.
+
+**Shipped provisionally: derived, never a section.** Every variant row carries
+its whole forged spread, and a class's baseline is what its four variants share,
+checked at load (`RuleClassBaseline`, `RuleVariantDelta`). A spread has one
+source, so nothing can disagree with it — the reason §5.8 gives for computing a
+dungeon's drop table rather than writing one.
+
+**This bends a line of the phase doc, so it is the user's to decide.** The
+alternative: a `baselines` section, class to spread, with each variant written as
+its one added modifier — re-basing a class becomes one edit, at the cost of a
+second shape for a spread and a reader that composes the two. settled.md's Phase
+5 implementation pass records the ruling.

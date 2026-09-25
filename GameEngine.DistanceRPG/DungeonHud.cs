@@ -12,9 +12,11 @@ namespace GameEngine.DistanceRPG;
 /// badges, the stairs' labels and the cue at the one underfoot, what lies on the
 /// floor (a corpse's drop, or a weapon the party put down), the click and aim
 /// cues, floating combat text, the end-of-turn banner, the inventory panel and
-/// its "leave" (X, then the slot), the pause menu and the way out's prompt with
-/// what leaving now means, the stairs' fade and the banner over it (the floor
-/// reached, the trade on the boss floor, the boss's fall), and the run's end —
+/// its "leave" (X, then the slot), the pause menu — save and quit, and that the
+/// run saves itself — and the way out's prompt with what leaving now means, the
+/// stairs' fade and the banner over it (the floor reached, the trade on the boss
+/// floor, the boss's fall, <c>RESUMED</c> over a floor a save brought back), and
+/// the run's end —
 /// its summary, over the defeat screen when the party wiped, in the lines the
 /// between-runs screen repeats above the dungeon list (<see cref="BetweenRunsHud"/>).
 /// Every number it shows is a resolved one — a swing's cost
@@ -78,9 +80,21 @@ public sealed class DungeonHud
 
     /// <summary>
     /// A banner across the upper third of the screen: a small line over it, the
-    /// line itself, any lines of warning under it, and how long it stays up.
+    /// line itself, any lines of warning under it, and how long it stays up — and,
+    /// over a floor a save brought back, <see cref="ResumedLine"/> over all of it
+    /// (<see cref="Header"/>).
     /// </summary>
-    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds);
+    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds, string Header = "");
+
+    /// <summary>What a resumed visit's banner says over the floor banner (1f): <c>RESUMED</c>, where the screen between runs says <c>CAMPAIGN RESUMED</c>.</summary>
+    internal const string ResumedLine = "RESUMED";
+
+    /// <summary>How long a resumed floor's banner stays up: long enough to read what it resumed and the trade under it.</summary>
+    private const float ResumedBannerSeconds = WarningBannerSeconds;
+
+    /// <summary>The <see cref="ResumedLine"/> header: its scale, and how far over the banner's over-line it sits.</summary>
+    private const float HeaderScale = 3f;
+    private const float HeaderLift = 34f;
 
     // The banner up now (ShowArrival, ShowBossFall), and how long it has been up —
     // taken down early (HideArrival) the moment the party starts off the floor it
@@ -98,9 +112,12 @@ public sealed class DungeonHud
     private const float NoticeGap = 12f;
 
     // The startup notices up now (ShowNotices), as NoticeText laid them out, and
-    // how long they have been up.
+    // how long they have been up; and how far they sit over the banner's
+    // over-line — clear of RESUMED on a resumed floor, for as long as they are
+    // up, which outlasts the banner.
     private IReadOnlyList<string> _noticeRows = [];
     private float _noticeAge;
+    private float _noticeLift;
 
     public DungeonHud(Game game)
     {
@@ -123,6 +140,35 @@ public sealed class DungeonHud
             trade.Count > 0 ? WarningBannerSeconds : BannerSeconds);
         _bannerAge = 0f;
     }
+
+    /// <summary>
+    /// Put up what a floor a save brought back says (1f, Phase 5.8): the floor's
+    /// own arrival banner — the dungeon's name over the floor reached, the trade
+    /// under it on the boss floor (<see cref="ShowArrival"/>) — with
+    /// <see cref="ResumedLine"/> over it all, up long enough to read; and the
+    /// launch's notices over that (<see cref="ShowNotices"/>): the save's word on
+    /// the campaign — resumed from its backup, the numbers changed, a file set
+    /// aside — then what the data files raised, wrapped and capped as the other
+    /// dungeon screens cap theirs, the log keeping every word. The plain
+    /// <c>CAMPAIGN RESUMED</c> the screen between runs leads with is the banner's
+    /// own word here, so it is not said twice.
+    /// </summary>
+    /// <param name="visit">The visit resumed, standing on the floor it was saved on.</param>
+    /// <param name="notices">What the launch has to say, in order.</param>
+    public void ShowResume(DungeonState visit, IReadOnlyList<string> notices)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        ArgumentNullException.ThrowIfNull(notices);
+        ShowArrival(visit);
+        _banner = _banner! with { Header = ResumedLine, Seconds = MathF.Max(_banner.Seconds, ResumedBannerSeconds) };
+        ShowNotices(notices.Where(notice => notice != BetweenRunsHud.Resumed).ToArray());
+        _noticeLift = HeaderLift;
+    }
+
+    /// <summary>The banner up now, its lines top to bottom — <see cref="ResumedLine"/> first on a resumed floor, then the line over the banner, the banner, and what is under it — or none once it is down: what the HUD draws, for a test to read with no window.</summary>
+    internal IReadOnlyList<string> BannerLines => _banner is not { } banner
+        ? []
+        : [.. new[] { banner.Header, banner.Over }.Where(line => line.Length > 0), banner.Main, .. banner.Under];
 
     /// <summary>
     /// The boss is down (§4.3): the banner says who fell and what that means —
@@ -165,6 +211,7 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(notices);
         _noticeRows = NoticeText.Rows(notices);
         _noticeAge = 0f;
+        _noticeLift = 0f;
     }
 
     /// <summary>The notice rows up now, as <see cref="ShowNotices"/> laid them out: what the HUD draws over the banner.</summary>
@@ -635,8 +682,10 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to
-    /// the between-runs screen, and ESC does nothing there — what the run just
-    /// wrote lives only in memory until it is saved, so it never offers a quit.
+    /// the between-runs screen, and ESC does nothing there — quitting is the
+    /// screen between runs' to offer. What the run wrote is saved once the frame
+    /// it ended in is over, the summary with it, so the screen between runs shows
+    /// it again after a relaunch.
     /// </summary>
     internal const string ContinueHint = "ENTER TO CONTINUE";
 
@@ -693,6 +742,8 @@ public sealed class DungeonHud
         if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
         float alpha = Math.Clamp((banner.Seconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
         float y = h / 3f;
+        if (banner.Header.Length > 0)
+            DrawCentered(w, y - 30f - HeaderLift, banner.Header, HeaderScale, Green with { W = alpha });
         if (banner.Over.Length > 0)
             DrawCentered(w, y - 30f, banner.Over, 2f, Grey with { W = alpha });
         DrawCentered(w, y, banner.Main, 5f, White with { W = alpha });
@@ -706,15 +757,16 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The startup notices (<see cref="ShowNotices"/>), over the arrival banner —
-    /// above the line over it, clear of the top readouts — in the warning's
-    /// orange, fading over their last <see cref="NoticeFadeSeconds"/>. Like the
-    /// banner, not over a menu or the game-over screen.
+    /// above the line over it, and above <see cref="ResumedLine"/> on a resumed
+    /// floor, clear of the top readouts — in the warning's orange, fading over
+    /// their last <see cref="NoticeFadeSeconds"/>. Like the banner, not over a menu
+    /// or the game-over screen.
     /// </summary>
     private void DrawNotices(DungeonScene scene, int w, int h)
     {
         if (_noticeRows.Count == 0 || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
         float alpha = Math.Clamp((NoticeSeconds - _noticeAge) / NoticeFadeSeconds, 0f, 1f);
-        float y = h / 3f - 30f - NoticeGap - _noticeRows.Count * NoticePitch;
+        float y = h / 3f - 30f - _noticeLift - NoticeGap - _noticeRows.Count * NoticePitch;
         foreach (string row in _noticeRows)
         {
             DrawCentered(w, y, row, NoticeScale, Orange with { W = alpha });
@@ -1166,19 +1218,23 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The pause menu's second option, which quits the game. The campaign is saved
-    /// between runs — at a run's end, and on quitting the screen between runs — and
-    /// the run in progress is not saved yet (Phase 5.8 saves it), so the option says
-    /// what quitting now costs: a relaunch resumes the campaign as it stood before
-    /// this run began.
+    /// The pause menu's second option (1f, Phase 5.8): the run in progress is
+    /// saved and the game quits. Opened during the enemies' turn, the menu leaves
+    /// the turn running behind it, and the quit plays it out to the next player
+    /// turn before saving — the turn the player would have met. A relaunch resumes
+    /// the run there: the same floor, turn and positions.
     /// </summary>
-    internal const string PauseQuitLine = "2  QUIT - THIS RUN IS NOT SAVED";
+    internal const string PauseQuitLine = "2  SAVE AND QUIT";
+
+    /// <summary>What the pause menu says under its options (1f): there is no save to make by hand, since the run saves itself at every turn's start and every arrival.</summary>
+    internal const string PauseSavesLine = "PROGRESS SAVES AT EVERY TURN";
 
     /// <summary>The pause menu's options, top to bottom, each with the number key that takes it.</summary>
     internal static IReadOnlyList<string> PauseMenuOptions() => ["1  CLOSE", PauseQuitLine];
 
     /// <summary>
-    /// The pause menu: close it, or quit the game (<see cref="PauseMenuOptions"/>).
+    /// The pause menu: close it, or save and quit (<see cref="PauseMenuOptions"/>),
+    /// and under the options that the run saves itself (<see cref="PauseSavesLine"/>).
     /// Stopping resurrection is the boss's doing (§4.3), and nothing else's — the
     /// dev switch that stood in for it went when the boss arrived — so what the
     /// dungeon has become is the floor line's to say (<see cref="FloorLine"/>).
@@ -1190,6 +1246,7 @@ public sealed class DungeonHud
         var options = PauseMenuOptions();
         for (int i = 0; i < options.Count; i++)
             DrawCentered(w, top + 66f + i * 40f, options[i], 2f, White);
+        DrawCentered(w, top + 132f, PauseSavesLine, 1.5f, Grey);
         DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
     }
 

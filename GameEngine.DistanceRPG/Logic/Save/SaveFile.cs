@@ -32,10 +32,20 @@ public sealed record SaveFile(int Version, string TuningHash, CampaignDto Campai
 
 /// <summary>
 /// Presentation the document carries for the scene, which <c>Logic/</c> never
-/// reads: which member was active. Phase 5.8 appends whether the turn marches.
+/// reads: which member was active, and whether the turn marches. A scene
+/// resuming the visit reads both back rather than deciding them afresh, since
+/// both are decisions the turn already made.
 /// </summary>
 /// <param name="ActiveMemberId">The active member's roster id, or null for the scene's own default.</param>
-public sealed record ViewDto(string? ActiveMemberId = null);
+/// <param name="MarchingThisTurn">
+/// Whether the turn in progress was granted the march at its start or on its
+/// arrival (Phase 5.8). The scene decides it only there, and it changes nothing
+/// after, so a resume reads it back: decided afresh, a turn the party marched
+/// could come back halted, or one a fight had split back marching. A live
+/// enemy seen this turn still halts the march, from the turn's own counters
+/// (<see cref="CarryDto.Seen"/>). Appended by Phase 5.8, with its default.
+/// </param>
+public sealed record ViewDto(string? ActiveMemberId = null, bool MarchingThisTurn = false);
 
 /// <summary>
 /// The campaign (§6.7): what outlasts every visit. Every list is in the order

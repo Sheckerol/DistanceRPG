@@ -86,9 +86,13 @@ public class MovementBudgetTests
     {
         // The Mire legend names the whole a turn start cut: the tuned budget plus
         // what was banked, so under a budget of 200 with 30 banked it is 230 —
-        // exactly what StartTurn cut the MOVE readout's cap from.
-        Assert.Equal(230f, DungeonScene.BudgetBeforeMire(Budget(200), banked: 30f));
-        Assert.Equal(190f, DungeonScene.BudgetBeforeMire(ContentDefaults.Tuning, banked: 30f));
+        // exactly what StartTurn cut the MOVE readout's cap from. From the turn's
+        // end on it is the coming turn's, the bank not yet cashed (Phase 5.8: read
+        // off the member and the phase, never a cache a reload loses).
+        var banked = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
+        banked.SavedMovement = 30f;
+        Assert.Equal(230f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, Budget(200)));
+        Assert.Equal(190f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ContentDefaults.Tuning));
 
         using (TestContent.Use(tuning: Budget(200)))
         {
@@ -97,7 +101,7 @@ public class MovementBudgetTests
             member.ApplyStatus(StatusEffectType.Mire, null, 2);
             member.StartTurn();
 
-            float whole = DungeonScene.BudgetBeforeMire(GameContent.Current.Tuning, banked: 30f);
+            float whole = DungeonScene.BudgetBeforeMire(member, TurnPhase.Player, GameContent.Current.Tuning);
             Assert.Equal(230f, whole);
             Assert.Equal(StatusBehaviours.MiredBudget(member, whole), member.EffectiveMax);
             Assert.Equal($"MIRE 2: MOVEMENT {member.EffectiveMax:0} OF 230", DungeonHud.StatusLegend(member, whole).Single().Text);

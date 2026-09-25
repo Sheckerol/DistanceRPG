@@ -90,6 +90,14 @@ internal static class TestIl
     /// operand is measured and skipped.
     /// </summary>
     internal static IEnumerable<(OpCode Op, int Token)> Instructions(byte[] il)
+        => InstructionsAt(il).Select(instruction => (instruction.Op, instruction.Token));
+
+    /// <summary>
+    /// <see cref="Instructions"/>, with where each instruction's operand starts in
+    /// <paramref name="il"/> — for a guard that reads an operand the walker does
+    /// not decode, such as the float an <c>ldc.r4</c> loads.
+    /// </summary>
+    internal static IEnumerable<(OpCode Op, int Token, int At)> InstructionsAt(byte[] il)
     {
         int i = 0;
         while (i < il.Length)
@@ -112,7 +120,7 @@ internal static class TestIl
             if (i + operand > il.Length) yield break;
 
             int token = op.OperandType == OperandType.InlineMethod ? BitConverter.ToInt32(il, i) : 0;
-            yield return (op, token);
+            yield return (op, token, i);
             i += operand;
         }
     }

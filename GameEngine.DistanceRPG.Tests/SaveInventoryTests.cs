@@ -23,6 +23,9 @@ public class SaveInventoryTests
 
         /// <summary>Not in the document, for the reason given.</summary>
         NotSaved,
+
+        /// <summary>Written to the document's view — presentation the scene reads back, and <c>Logic/</c> never does (Phase 5.8).</summary>
+        View,
     }
 
     private sealed record Row(string Member, Kept Kept, string Why);
@@ -235,6 +238,106 @@ public class SaveInventoryTests
         ],
     };
 
+    // ── The scenes (Phase 5.8) ───────────────────────────────────────────────
+    //
+    // A scene is a view of the campaign, and almost everything in one is rebuilt
+    // by showing it: the floor's objects and caches by the arrival lifecycle, the
+    // list by the campaign. What a save must carry for a scene is in the
+    // document's view — the active member, whether the turn marches — and the
+    // turn's own sight is the floor's (visible[]). The rest is named here, each
+    // with its reason, so a scene field added later fails until someone decides.
+
+    private static readonly Dictionary<Type, Row[]> SceneInventory = new()
+    {
+        [typeof(DungeonScene)] =
+        [
+            // Saved in the view: the two decisions a turn has made that a resume must not make again.
+            new("_activeIdx", Kept.View, "view.activeMemberId: the member by roster id, read back on a resume (the first living member if it has fallen)"),
+            new("_marchingThisTurn", Kept.View, "view.marchingThisTurn: decided at a turn's start or a stairs arrival and read back on a resume, never decided afresh — it gates the march and the turn's automatic end"),
+
+            // Wiring: what the scene was built with.
+            new("_camera", Kept.NotSaved, "wiring: the game's camera"),
+            new("_game", Kept.NotSaved, "wiring: the game window"),
+            new("_hud", Kept.NotSaved, "presentation: the HUD, built with the scene"),
+            new("_campaign", Kept.Derived, "the campaign the save restores — the scene is a view of it"),
+            new("_visit", Kept.Derived, "the campaign's visit, restored by the save"),
+            new("_host", Kept.NotSaved, "wiring: the game"),
+            new("_resume", Kept.NotSaved, "what the host hands a resuming scene: the save's view and the launch's notices, read on the first arrival"),
+
+            // The logic clock.
+            new("_logicClock", Kept.NotSaved, "the clock's remainder, under one fixed step: a save is taken at a player-phase safe point, where the turn system's step does nothing, and a settle runs whole steps"),
+
+            // The floor being played: rebuilt by the arrival lifecycle from what the visit holds.
+            new("_floor", Kept.Derived, "the visit's current floor, taken up by the arrival"),
+            new("_map", Kept.Derived, "the floor's regenerated map"),
+            new("_fogBoxes", Kept.Derived, "the floor's regenerated fog boxes"),
+            new("_fog", Kept.Derived, "the floor's fog, its seen[] and the current floor's visible[] saved"),
+            new("_fogOverlay", Kept.NotSaved, "presentation: rebuilt by the arrival"),
+            new("_turns", Kept.Derived, "the system OpenTurns opens on the arrival, the turn's counters imported from the save's carry"),
+            new("_floorObjects", Kept.NotSaved, "presentation: rebuilt by the arrival"),
+            new("_stairMarkers", Kept.NotSaved, "presentation: rebuilt by the arrival from the regenerated stairs"),
+            new("_mistEmitter", Kept.NotSaved, "presentation: fog animation"),
+            new("_wispEmitter", Kept.NotSaved, "presentation: fog animation"),
+            new("_pendingMistBursts", Kept.NotSaved, "presentation: fog animation"),
+            new("_fxRng", Kept.NotSaved, "presentation: the effects' own die, which decides nothing"),
+            new("_wispTimer", Kept.NotSaved, "presentation: fog animation"),
+            new("_party", Kept.NotSaved, "presentation: the party's stand-ins, rebuilt from the campaign's members"),
+            new("_lastFogTile", Kept.NotSaved, "rebuilt by the arrival: every living member's tile, which a resume lights from"),
+            new("_enemies", Kept.NotSaved, "presentation: the enemies' stand-ins, rebuilt from the floor's rows"),
+            new("_lastEnemyTile", Kept.NotSaved, "the enemy-phase sighting's tiles: taken afresh at every turn's end (TakeEnemyTiles), so a resumed turn measures the enemies' walk as the session that saved it would have"),
+            new("_groundItems", Kept.NotSaved, "presentation: the markers, laid again by the arrival — a lying drop from its row's pin, a loose item from the floor's list"),
+
+            // The march: presentation, rebuilt the way every march (re-)entry builds it.
+            new("_march", Kept.NotSaved, "a resumed march starts a fresh line: the followers tuck in behind the leader, as every march entry and leader switch does"),
+            new("_marchLeader", Kept.NotSaved, "a resumed march starts a fresh line"),
+            new("_wasMarching", Kept.NotSaved, "a resumed march starts a fresh line"),
+
+            // The stairs' fade and the run's end.
+            new("_transit", Kept.NotSaved, "a stairs fade in flight: a quit mid-fade saves whichever floor the Logic stands on"),
+            new("_transitClock", Kept.NotSaved, "a stairs fade in flight"),
+            new("_transitStair", Kept.NotSaved, "a stairs fade in flight"),
+            new("_runOverSent", Kept.NotSaved, "the run's end is the campaign's (lastResult): saved between runs, and shown by the screen between runs"),
+            new("_endedRun", Kept.NotSaved, "the run's end is the campaign's (lastResult): saved between runs, and shown by the screen between runs"),
+
+            // Input, the camera and the menus.
+            new("_up", Kept.NotSaved, "input: a key held"),
+            new("_down", Kept.NotSaved, "input: a key held"),
+            new("_left", Kept.NotSaved, "input: a key held"),
+            new("_right", Kept.NotSaved, "input: a key held"),
+            new("_mousePos", Kept.NotSaved, "input: the mouse"),
+            new("_cameraTarget", Kept.NotSaved, "presentation: the camera, aimed at the active member on the arrival"),
+            new("_cameraDistance", Kept.NotSaved, "presentation: the camera's zoom"),
+            new("_activeMenu", Kept.NotSaved, "a menu: a save is never taken on the run's summary, and a resume opens on none"),
+            new("_leaveArmed", Kept.NotSaved, "a menu: the bag's X, disarmed whenever the bag is not open"),
+            new("LastBankedMovement", Kept.NotSaved, "presentation: the END OF TURN banner's figure"),
+            new("HoveredEnemy", Kept.NotSaved, "presentation: the hover, refreshed every frame"),
+            new("HoveredMember", Kept.NotSaved, "presentation: the hover"),
+            new("HoverCue", Kept.NotSaved, "presentation: the hover"),
+            new("AimCue", Kept.NotSaved, "presentation: the hover"),
+            new("AimCaught", Kept.NotSaved, "presentation: the hover"),
+
+            // The d20 cue bookkeeping: which rolls the cues read — the die itself is the visit's, and saved (diceRolled).
+            new("_lastRoll", Kept.NotSaved, "the d20 cues' bookkeeping: presentation — the die is the visit's own, its position saved as visit.diceRolled"),
+            new("_rollCount", Kept.NotSaved, "the d20 cues' bookkeeping"),
+            new("_castRollCalledAt", Kept.NotSaved, "the d20 cues' bookkeeping"),
+            new("_watchCastRoll", Kept.NotSaved, "the d20 cues' bookkeeping: true only inside a cast"),
+            new("_castRoll", Kept.NotSaved, "the d20 cues' bookkeeping"),
+            new("_castRollAt", Kept.NotSaved, "the d20 cues' bookkeeping"),
+            new("_riderLevels", Kept.NotSaved, "the rider beats' bookkeeping: presentation, taken afresh at every roll"),
+        ],
+        [typeof(BetweenRunsScene)] =
+        [
+            new("_campaign", Kept.Derived, "the campaign the save restores — the scene is a view of it"),
+            new("_host", Kept.NotSaved, "wiring: the game"),
+            new("_hud", Kept.NotSaved, "presentation: the HUD, built with the scene"),
+            new("_listings", Kept.Derived, "the campaign's list (CampaignState.Listings), read when the screen opens"),
+            new("_chosen", Kept.NotSaved, "a relaunch opens on the campaign's default choice, as every return from a run does"),
+            new("_leaving", Kept.NotSaved, "the screen is on its way out: never a save point's concern"),
+            new("_armed", Kept.NotSaved, "the NEW CAMPAIGN prompt: a relaunch opens with it down"),
+            new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a relaunch has its own to say"),
+        ],
+    };
+
     /// <summary>A field's member name: an auto-property's backing field is its property, a field-like event its event.</summary>
     private static string MemberOf(FieldInfo field)
     {
@@ -263,5 +366,33 @@ public class SaveInventoryTests
         Assert.Contains("BudgetBeforeMire", typeof(PartyMemberState).GetFields(Declared).Select(MemberOf));
         Assert.Contains("PinnedDrop", typeof(EnemyState).GetFields(Declared).Select(MemberOf));
         Assert.Contains("_carry", typeof(DungeonState).GetFields(Declared).Select(MemberOf));
+    }
+
+    [Fact]
+    public void EverySceneFieldIsViewDerivedOrNamedAsNot()
+    {
+        // 1b's scene rows, as code (Phase 5.8): every instance field of the two
+        // scenes is in the document's view, derived from what the save restores, or
+        // not saved for the reason given — so a scene field added later fails here
+        // until someone decides whether a resume needs it.
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        foreach (var (type, rows) in SceneInventory)
+        {
+            var fields = type.GetFields(Declared).Select(MemberOf).Order(StringComparer.Ordinal).ToArray();
+            var listed = rows.Select(row => row.Member).Order(StringComparer.Ordinal).ToArray();
+            Assert.True(listed.Distinct().Count() == listed.Length, $"{type.Name} lists a member twice");
+            Assert.True(fields.SequenceEqual(listed),
+                $"{type.Name}: every instance field is in the view, derived or named as not saved. Unlisted: [{string.Join(", ", fields.Except(listed))}]; listed but gone: [{string.Join(", ", listed.Except(fields))}]");
+            Assert.All(rows, row => Assert.False(string.IsNullOrWhiteSpace(row.Why), $"{type.Name}.{row.Member} says neither where nor why"));
+            Assert.DoesNotContain(rows, row => row.Kept == Kept.Saved);   // a scene's is the view, never the document's state
+        }
+
+        // The view is the two decisions 1b names, and ViewDto holds exactly them: the
+        // document's view has a member for each scene field kept in it, and the
+        // gameplay types keep nothing in it.
+        Assert.Equal(["_activeIdx", "_marchingThisTurn"],
+            SceneInventory.Values.SelectMany(rows => rows).Where(row => row.Kept == Kept.View).Select(row => row.Member).Order(StringComparer.Ordinal));
+        Assert.Equal(["ActiveMemberId", "MarchingThisTurn"], typeof(ViewDto).GetConstructors().Single().GetParameters().Select(p => p.Name));
+        Assert.DoesNotContain(Inventory.Values.SelectMany(rows => rows), row => row.Kept == Kept.View);
     }
 }

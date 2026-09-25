@@ -35,8 +35,9 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 
 The game opens on the screen between runs: the dungeon list, with the last
 run's summary above it once a run has ended. Until the tutorial's golem is
-beaten it lists the tutorial alone. A saved campaign resumes there, with
-`CAMPAIGN RESUMED` under the title (see [Saves](#saves)).
+beaten it lists the tutorial alone. A saved campaign resumes where it was left:
+there, with `CAMPAIGN RESUMED` under the title, or back in the dungeon mid-run,
+with `RESUMED` over the floor banner (see [Saves](#saves)).
 
 | Between runs | Action |
 | --- | --- |
@@ -56,7 +57,7 @@ beaten it lists the tutorial alone. A saved campaign resumes there, with
 | I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
 | X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
 | Scroll wheel | Zoom |
-| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the pause menu, whose 2 quits the game: a run in progress is not saved yet, so a relaunch resumes the campaign as it was before the run. Does nothing on a run's summary |
+| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the pause menu, whose 2 saves the run and quits (`2  SAVE AND QUIT`; the run also saves itself at every turn, which the menu says). Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
 
 Outside combat the rest of the party marches behind the active character in a
@@ -79,46 +80,59 @@ its own and resumes where you left off.
   never beside the exe, which a rebuild or `dotnet clean` replaces. Set
   `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
   names the full path of every save written or read.
-- **When**: at a run's end (the summary is saved with it), when NEW CAMPAIGN is
-  confirmed or `--new-campaign` begins one, and on quitting between runs — Esc
-  on the screen between runs, or the window's close button. **A run in progress
-  is not saved yet**: quitting
-  mid-run (the pause menu's `2  QUIT - THIS RUN IS NOT SAVED`, or closing the
-  window) keeps the campaign as it was before the run began.
-- **Resuming**: every launch resumes the campaign on the screen between runs,
-  with `CAMPAIGN RESUMED` under the title and the last run's summary above the
-  list. A campaign saved under other numbers (`tuning.json` edited since) plays
-  on under the new ones and says `THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS
-  SAVED - IT PLAYS ON UNDER THE NEW ONES`, once: the next save records the new
-  numbers.
+- **When**: all the time, on its own. Mid-run the game saves when a run is
+  entered, at the start of every one of your turns, and every time the party
+  arrives on a floor; it saves at a run's end (the summary with it), when NEW
+  CAMPAIGN is confirmed or `--new-campaign` begins one, and on every quit — the
+  pause menu's `2  SAVE AND QUIT`, Esc on the screen between runs, or the
+  window's close button. A save is never taken while the enemies are moving: a
+  quit during their turn (the pause menu can be opened then, and the close
+  button pressed any time) plays their turn out to your next one first — at the
+  game's fixed logic step, so exactly as it would have played — and saves that.
+  If the enemies wipe the party on the way, the run ends and the campaign is
+  saved between runs with its summary.
+- **Resuming**: every launch resumes the campaign where it was. Between runs it
+  is the screen between runs, with `CAMPAIGN RESUMED` under the title and the
+  last run's summary above the list. Mid-run it is the dungeon: the same floor,
+  turn and positions, HP, mana, statuses and movement left, the corpses lying on
+  the very weapons they lay on, the weapons left on the floor, the explored fog
+  and what the party could already see this turn, the same member active and
+  the party marching or not as it was — with `RESUMED` over the floor banner.
+  The dice fall as they would have without the quit: the d20 is the run's own,
+  seeded by the run and saved, so reloading never rerolls a turn. A campaign
+  saved under other numbers (`tuning.json` edited since) plays on under the new
+  ones and says `THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED - IT PLAYS
+  ON UNDER THE NEW ONES`, once: the next save records the new numbers. (A
+  revival due under the new numbers happens as the floor opens.)
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
   no rights — costs nothing: the game says `THE CAMPAIGN COULD NOT BE SAVED`, the
   log says why, and the save on the disk is the last good one.
 - **A save that cannot be played is set aside, never deleted**: one that is not
-  a save, one a newer build wrote, one naming content that is gone, one holding
-  a run in progress (this build resumes only a campaign between runs, so a
-  mid-run save written by a later build or by hand is kept aside), or one that
-  crashed the game as it resumed (a `campaign.resuming` marker sits beside the
-  save while a resume is in flight; a launch that finds it knows the last resume
-  never finished). It is renamed `campaign.unreadable-N.json` (or
-  `campaign.crashed-N.json`), the backup is tried, and failing that a new
-  campaign begins. The screen says so under the title, whole: what became of
-  the campaign, `THE NUMBERS HAVE CHANGED ...` when they have, and each file set
+  a save, one a newer build wrote, one naming content that is gone, or one that
+  crashed the game as it resumed. A `campaign.resuming` marker sits beside the
+  save while a resume is in flight — until the resumed screen is up, the screen
+  between runs or the resumed floor — and a launch that finds it knows the last
+  resume never finished. It is renamed `campaign.unreadable-N.json` (or
+  `campaign.crashed-N.json`), the backup is tried — one save older, so at most a
+  turn or a floor back mid-run — and failing that a new campaign begins. The
+  screen between runs says so under the title, whole: what became of the
+  campaign, `THE NUMBERS HAVE CHANGED ...` when they have, and each file set
   aside by its full path (drawn with forward slashes, since the game's font has
   no backslash; Windows reads it either way). Only what the data files raised
-  after that is cut to three rows (`+N MORE - SEE THE LOG`); the log has every
-  word. **Rename it back to `campaign.json` to try it again.** Nothing ever
-  writes over a file set aside.
+  after that is cut to three rows (`+N MORE - SEE THE LOG`); a floor the backup
+  resumes on cuts all of it to three rows. The log has every word. **Rename it
+  back to `campaign.json` to try it again.** Nothing ever writes over a file set
+  aside.
 - **Starting over**: N, then N, on the screen between runs replaces the saved
   campaign with a new one (the old one stays in `campaign.bak.json` until the
   next save). `DistanceRPG --new-campaign` — `dotnet run --project
   GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --new-campaign` — sets
   the save and its backup aside as `campaign.abandoned-N.json` (the backup first,
   so the higher number is the later save) and starts fresh, saving the new
-  campaign at once: quit before its first run ends and the next launch resumes
-  the new campaign, never the old one. If another program holds either file open
+  campaign at once: even a crash before its next save resumes the new campaign,
+  never the old one. If another program holds either file open
   so it cannot be moved, it stops there, nothing is saved that session, and the
   next launch resumes the old campaign. Deleting `campaign.json` by hand resumes
   the backup instead, if there is one.
@@ -156,7 +170,8 @@ every key.
   `{ "MovementBudget": 240 }` is a whole file. Comments and trailing commas are fine.
 - **A mistake costs a warning, never a crash**: an unknown key, a value out of
   range, or one that is not a whole number is shown under the BETWEEN RUNS title
-  (or over the first floor when `DISTANCERPG_DUNGEON` boots straight in) and
+  (or over the first floor when `DISTANCERPG_DUNGEON` boots straight in, or over
+  the floor a saved run resumes on) and
   written to the log, and the game plays on — `"MovementUnitsPerMana": 0` plays 1
   and says `TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1`. A few keys
   are also fitted to the content: `"PartyCarrySlots": 4` plays 8, because every

@@ -495,9 +495,10 @@ public class ReloadDeterminismTests
     /// A campaign at the point a quit arrives: the Spear Hall's first floor on its
     /// own die, A in the lance's room and out of its reach, the room looked over,
     /// and the turn ended — then the logic clock stepped until the lance is on its
-    /// way to A. Every call builds the same campaign to the same point.
+    /// way to A. Every call builds the same campaign to the same point. Shared with
+    /// <c>CampaignBootTests</c>, whose quit settles it through the save's own door.
     /// </summary>
-    private static VisitScript MidWalk()
+    internal static VisitScript MidWalk()
     {
         var script = VisitScript.Enter(NewCampaign(), "spear_hall", FiveDeep, visitsOwnDie: true);
         var lance = script.Row(10, "pinning_lance");

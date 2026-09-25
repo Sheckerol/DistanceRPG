@@ -74,13 +74,14 @@ public sealed record StairMarker(StairUse Stair, GameObject Slab);
 /// collects on cannot part company.
 /// </para>
 /// <para>
-/// Nothing here is saved. The drop is a pure function of the enemy row and the
-/// floor's seed, so a load re-derives it (<see cref="TurnSystem.GroundItemOf"/>)
-/// rather than restoring it, and picking it up sets
-/// <see cref="EnemyState.DropTaken"/> on that row, which is the one thing that
-/// retires the offer. A loose item is the floor's (<see cref="Floor.LooseItems"/>),
-/// so it is stored there, and this is only its marker. Both are laid again on
-/// every arrival.
+/// Nothing here is saved: this is a marker. A drop is its row's — a pure function
+/// of the row and the floor's seed, pinned on the row by a save once it lies
+/// there untaken (<see cref="EnemyState.PinnedDrop"/>), so a load hands back the
+/// very weapon that was lying there (<see cref="TurnSystem.GroundItemOf"/>) — and
+/// picking it up sets <see cref="EnemyState.DropTaken"/> on that row, which is
+/// the one thing that retires the offer. A loose item is the floor's
+/// (<see cref="Floor.LooseItems"/>), so it is stored there. Both are laid again on
+/// every arrival, a resumed one's included.
 /// </para>
 /// </summary>
 /// <param name="Corpse">A drop's corpse; null for a loose item.</param>
@@ -93,6 +94,22 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
     /// <summary>The weapon lying here, whichever form the item takes.</summary>
     public Weapon Weapon => Drop?.Weapon ?? Loose!.Weapon;
 }
+
+/// <summary>
+/// What the host hands a dungeon scene playing a visit a save brought back
+/// (1f, Phase 5.8): the view the save carried and what the launch has to say
+/// over the floor it resumes on.
+/// </summary>
+/// <param name="View">
+/// The save's view (<see cref="ViewDto"/>): the member who was active, and
+/// whether the turn in progress marches. With it the scene resumes the turn the
+/// save was taken in — that member active, the march as the turn decided it,
+/// what the party could see this turn still lit. Null when the save carried
+/// none: one taken before the floor was opened (right after the entry), which
+/// the scene arrives on afresh, as it would have.
+/// </param>
+/// <param name="Notices">What the launch has to say — the save's word on the campaign, then what the data files raised — shown over the resumed floor (<see cref="DungeonHud.ShowResume"/>).</param>
+public sealed record ResumeView(ViewDto? View, IReadOnlyList<string> Notices);
 
 /// <summary>
 /// The main gameplay scene: one visit to a dungeon (§4.5), played a floor at a
@@ -117,6 +134,26 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
 /// the summary (<see cref="GameMenu.RunSummary"/>). ENTER there hands the run back
 /// to the host, which opens the screen between runs (<see cref="BetweenRunsScene"/>),
 /// where the next dungeon is chosen and the next visit gets a scene of its own.
+/// </para>
+/// <para>
+/// <strong>The turn system runs on a fixed logic clock</strong> (Phase 5.8, 1c):
+/// never on a frame's own time, but in whole steps of
+/// <see cref="SaveGame.LogicStepSeconds"/> (<see cref="LogicClock"/>), each one
+/// <see cref="StepLogic"/> — the system's step plus the enemy-phase sighting
+/// this scene feeds back. So the enemies' turn plays out the same at any frame
+/// rate, and a quit's settle, which takes the same step, saves exactly the turn
+/// the player would have met.
+/// </para>
+/// <para>
+/// <strong>The run saves itself</strong> (1f): the scene asks its host for a
+/// save (<see cref="IRunHost.RequestSave"/>) at every player turn's start and
+/// after every floor arrival, and the host writes it once the frame is over.
+/// What the save carries for the scene is its view (<see cref="View"/>): the
+/// active member and whether the turn marches. A visit a save brought back is
+/// played by a scene built with a <see cref="ResumeView"/>: the saved member
+/// active, the march as the turn decided it, what the party could see this turn
+/// still lit, the dice falling as they would have (the visit's own die,
+/// <see cref="DungeonState.RollD20"/>), and <c>RESUMED</c> over the floor banner.
 /// </para>
 /// </summary>
 public class DungeonScene : Scene
@@ -196,6 +233,15 @@ public class DungeonScene : Scene
     private readonly DungeonState _visit;
     private readonly IRunHost _host;
 
+    // What the host handed a scene playing a visit a save brought back — the
+    // save's view and what the launch has to say — or null for a visit entered
+    // fresh. Read once, by the first floor's arrival.
+    private readonly ResumeView? _resume;
+
+    // The fixed logic clock's remainder (LogicClock): the frame time not yet
+    // stepped, always under one SaveGame.LogicStepSeconds.
+    private float _logicClock;
+
     // The floor being played, and the three parts of it this scene reads most:
     // its map, its fog boxes and its fog, which is the floor's and not the
     // scene's (§4.5) — the floor keeps what the party explored. All four follow
@@ -234,7 +280,7 @@ public class DungeonScene : Scene
     private readonly MarchingLine _march = new();
     private CharacterObject? _marchLeader;
     private bool _wasMarching;
-    private bool _marchingThisTurn; // decided once at each turn start
+    private bool _marchingThisTurn; // decided at each turn's start and on a stairs arrival; a resume reads it back from the save's view
     private const float MarchArriveTolerance = 2f;
     private readonly List<EnemyObject> _enemies = new();
     private readonly Dictionary<EnemyObject, (int R, int C)> _lastEnemyTile = new();
@@ -282,13 +328,50 @@ public class DungeonScene : Scene
     private const float MaxCameraDistance = 30f;
     private const float CameraFollowRate = 6f;
 
+    /// <summary>A scene playing a visit entered fresh — by the screen between runs, or by a dev override booting straight in.</summary>
     /// <param name="camera">The game's camera, which the scene aims.</param>
     /// <param name="game">The game window: its size, its shaders, its close.</param>
     /// <param name="campaign">The campaign, with the visit this scene plays already entered (<see cref="CampaignState.Enter"/>): the party stands at its first floor's arrival.</param>
-    /// <param name="host">Who is told when the run is over (<see cref="IRunHost.RunOver"/>).</param>
+    /// <param name="host">Who is told when the run is over (<see cref="IRunHost.RunOver"/>), and asked for its saves (<see cref="IRunHost.RequestSave"/>).</param>
     /// <param name="notices">What the game's startup has to say over the first floor — the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">The campaign has no visit in progress: there is nothing to play.</exception>
-    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host, IReadOnlyList<string>? notices = null) : base("DungeonScene")
+    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host, IReadOnlyList<string>? notices = null)
+        : this(camera, game, campaign, host)
+    {
+        // What the game's startup had to say: the data files' notices, when this
+        // scene is the first the game opens on. A dev override boots straight in,
+        // past the screen between runs that would say them otherwise. They go up
+        // over the first floor's arrival banner. Every other run is handed none.
+        // They are handed to the HUD here, not in Initialize: nothing before the
+        // first Update ages them, and a test can read the rows with no window.
+        _hud.ShowNotices(notices ?? []);
+    }
+
+    /// <summary>
+    /// A scene playing a visit a save brought back (1f, Phase 5.8): the campaign
+    /// resumed at launch with its run in progress. The floor, the turn, every
+    /// position and every counter are the visit's, restored; what the scene adds
+    /// is what <paramref name="resumed"/> carries — the save's view, restored on
+    /// the first floor's arrival rather than decided afresh — and <c>RESUMED</c>
+    /// over the floor banner with the launch's notices (<see cref="DungeonHud.ShowResume"/>),
+    /// handed to the HUD here for the reason the other constructor gives.
+    /// </summary>
+    /// <param name="camera">The game's camera, which the scene aims.</param>
+    /// <param name="game">The game window: its size, its shaders, its close.</param>
+    /// <param name="campaign">The campaign a save brought back, its visit in progress with no floor's system open (<see cref="SaveGame.Restore"/>).</param>
+    /// <param name="host">Who is told when the run is over, and asked for its saves.</param>
+    /// <param name="resumed">The save's view and the launch's notices.</param>
+    /// <exception cref="ArgumentException">The campaign has no visit in progress: there is nothing to resume.</exception>
+    public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host, ResumeView resumed)
+        : this(camera, game, campaign, host)
+    {
+        ArgumentNullException.ThrowIfNull(resumed);
+        _resume = resumed;
+        _hud.ShowResume(_visit, resumed.Notices);
+    }
+
+    /// <summary>What both constructors share: the campaign and its visit, the host, and the HUD.</summary>
+    private DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host) : base("DungeonScene")
     {
         ArgumentNullException.ThrowIfNull(campaign);
         ArgumentNullException.ThrowIfNull(host);
@@ -299,18 +382,21 @@ public class DungeonScene : Scene
             ?? throw new ArgumentException("A dungeon scene plays a visit in progress: enter a dungeon before building one.", nameof(campaign));
         _host = host;
         _hud = new DungeonHud(game);
-
-        // What the game's startup had to say: the data files' notices, when this
-        // scene is the first the game opens on. A dev override boots straight in,
-        // past the screen between runs that would say them otherwise. They go up
-        // over the first floor's arrival banner. Every other run is handed none.
-        // They are handed to the HUD here, not in Initialize: nothing before the
-        // first Update ages them, and a test can read the rows with no window.
-        _hud.ShowNotices(notices ?? []);
     }
 
-    /// <summary>The startup notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped, capped, or none.</summary>
+    /// <summary>The notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped, capped, or none — the startup's, or a resumed visit's.</summary>
     internal IReadOnlyList<string> NoticeRows => _hud.NoticeRows;
+
+    /// <summary>The banner's lines as the HUD draws them, top to bottom — over a resumed floor, <c>RESUMED</c> first — or none once it is down.</summary>
+    internal IReadOnlyList<string> BannerLines => _hud.BannerLines;
+
+    /// <summary>
+    /// What a save carries for this scene (1b): the active member, and whether
+    /// the turn in progress was granted the march. <c>Logic/</c> never reads it;
+    /// a scene resuming the save does (<see cref="ResumeView"/>). Read by the host
+    /// when it saves, once the frame — or a quit's settle — is over.
+    /// </summary>
+    internal ViewDto View => new(ActiveCharacter.State.Id, _marchingThisTurn);
 
     public CharacterObject ActiveCharacter => _party[_activeIdx];
 
@@ -409,32 +495,32 @@ public class DungeonScene : Scene
         }
     }
 
-    // What each member banked at the last turn's end (TurnEnded): the bonus
-    // its turn start adds to the base allowance before Mire cuts the whole.
-    private readonly Dictionary<PartyMemberState, float> _banked = new();
-
     /// <summary>
-    /// The movement budget <paramref name="member"/>'s Mire cuts: the base
-    /// allowance plus what it banked at the last turn's end — the whole its
-    /// turn start cuts (<see cref="PartyMemberState.StartTurn"/>). In the
-    /// player phase that is what this turn's cap was cut from, so a Mire
-    /// legend agrees with the MOVE readout at the same level; once the turn
-    /// has ended, it is the coming turn's. The allowance is the tuning's
-    /// (<see cref="Tuning.MovementBudget"/>), as <see cref="PartyMemberState.StartTurn"/>'s is.
+    /// The movement budget <paramref name="member"/>'s Mire cuts, as the Mire
+    /// legend states it (<see cref="BudgetBeforeMire(PartyMemberState, TurnPhase, Tuning)"/>):
+    /// in the player phase the whole this turn's cap was cut from, so the legend
+    /// agrees with the MOVE readout at the same level; once the turn has ended,
+    /// the coming turn's.
     /// </summary>
     public float BudgetBeforeMire(PartyMemberState member)
-        => BudgetBeforeMire(GameContent.Current.Tuning, _banked.GetValueOrDefault(member));
+        => BudgetBeforeMire(member, _turns.Phase, GameContent.Current.Tuning);
 
     /// <summary>
-    /// The whole a turn start cuts Mire from, under <paramref name="tuning"/>:
-    /// its <see cref="Tuning.MovementBudget"/> plus <paramref name="banked"/>,
-    /// the movement saved at the last turn's end — so the legend reads the
-    /// tuned budget exactly as the MOVE readout's cap was cut from it.
+    /// The whole a turn start cuts Mire from, for the Mire legend (1b). In the
+    /// player phase it is the whole this turn's cap was cut from —
+    /// <see cref="PartyMemberState.BudgetBeforeMire"/>, which the turn's start
+    /// wrote (<see cref="PartyMemberState.StartTurn"/>) and a save carries. From
+    /// the turn's end on it is the coming turn's: <paramref name="tuning"/>'s
+    /// <see cref="Tuning.MovementBudget"/> plus what the member has just banked
+    /// (<see cref="PartyMemberState.SavedMovement"/>), exactly what the next start
+    /// will cut. Read off the member, never cached beside it, so a legend reads the
+    /// same whole before a reload and after it.
     /// </summary>
-    internal static float BudgetBeforeMire(Tuning tuning, float banked)
+    internal static float BudgetBeforeMire(PartyMemberState member, TurnPhase phase, Tuning tuning)
     {
+        ArgumentNullException.ThrowIfNull(member);
         ArgumentNullException.ThrowIfNull(tuning);
-        return tuning.MovementBudget + banked;
+        return phase == TurnPhase.Player ? member.BudgetBeforeMire : tuning.MovementBudget + member.SavedMovement;
     }
 
     // What the mouse is over and what a click there would do, refreshed each
@@ -476,7 +562,9 @@ public class DungeonScene : Scene
     /// turn. This keeps a split party from charging back into formation the
     /// moment line of sight to the enemy breaks mid-fight; a party that has
     /// just taken the stairs is together by construction, having gathered to
-    /// take them.
+    /// take them. A resumed turn is neither: the grant comes back from the save's
+    /// view and the sighting from the turn's own counters, so a march revoked
+    /// before the quit stays revoked, and one granted stays granted.
     /// </summary>
     public bool Marching => _turns.Phase == TurnPhase.Player
         && _marchingThisTurn
@@ -512,7 +600,10 @@ public class DungeonScene : Scene
     /// was entered by the host, so the floors exist and the party already stands
     /// around the first floor's arrival tile — the dungeon the scene has always
     /// generated, tile for tile, when the seed is the shipped one (floor 0's
-    /// seed is the map seed itself).
+    /// seed is the map seed itself). A visit a save brought back is arrived on
+    /// the same way, where the save left the party, its turn resumed
+    /// (<see cref="ResumeView"/>). Either way the arrival is saved, lit and with
+    /// its march decided, once the frame is over.
     /// </summary>
     public override void Initialize()
     {
@@ -521,8 +612,9 @@ public class DungeonScene : Scene
         BuildFloor();   // the map-independent slab every floor of the visit stands on
         SpawnParty();
         _campaign.RunEnded += OnRunEnded;   // before any system opens: a wipe ends the run in Logic, and this scene shows it
-        ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20));
+        ArriveOnFloor(_visit.OpenTurns(_campaign.Party, RollD20), _resume);
         WireInput();
+        _host.RequestSave();   // the first floor's arrival (1f)
 
         _camera.Yaw = -90f;   // face -Z (up the map)
         _camera.Pitch = -60f; // angled top-down
@@ -537,32 +629,62 @@ public class DungeonScene : Scene
         _hud.Update(deltaTime);
         if (_transit == Transit.Leaving) return;   // the run is over here: nothing moves while the host takes over
 
-        _turns.Update(deltaTime);
+        // The logic clock (1c): the turn system in whole fixed steps, never the
+        // frame's own time, so the enemies' turn plays out the same at any frame
+        // rate — and the same as a quit's settle, which steps StepLogic too.
+        for (int steps = LogicClock.Steps(ref _logicClock, deltaTime, SaveGame.LogicStepSeconds); steps > 0; steps--)
+            StepLogic();
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
         UpdateMarchingFollowers(deltaTime);
         AutoEndTurnWhenDry();
-
-        // While the enemy turn runs, mirror logic positions and refresh
-        // visibility when someone crosses a tile boundary. Syncing through
-        // the attack phase too catches the final sub-step of a walk, which
-        // lands in the same frame the phase flips to EnemyAttacking.
-        if (_turns.Phase is TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
-        {
-            bool crossedTile = false;
-            foreach (var enemy in _enemies)
-            {
-                enemy.SyncTransform();
-                var tile = LogicTile(enemy.State.X, enemy.State.Y);
-                if (_lastEnemyTile.TryGetValue(enemy, out var last) && last == tile) continue;
-                _lastEnemyTile[enemy] = tile;
-                crossedTile = true;
-            }
-            if (crossedTile)
-                UpdateEnemyVisibility();
-        }
-
         UpdateHover();
+    }
+
+    /// <summary>
+    /// One step of the fixed logic clock (1c, 1f): the floor's system advanced by
+    /// <see cref="SaveGame.LogicStepSeconds"/>, then what the scene feeds back
+    /// while the enemies take their turn — their stand-ins mirrored to where the
+    /// logic put them, and, when one has crossed a tile boundary, the sight
+    /// refreshed, which tells the system who is in view
+    /// (<see cref="TurnSystem.NotifyEnemyVisible"/>, whose zones may react). The
+    /// one step live play takes, and the one a quit's settle takes
+    /// (<see cref="CampaignBoot.SaveOnQuit"/>), so the settle saves the turn the
+    /// player would have met. The game assembly's only caller of
+    /// <see cref="TurnSystem.Update"/> outside <c>Logic/</c>.
+    /// <para>
+    /// A crossing is measured from where each enemy stood when the turn ended
+    /// (<see cref="TakeEnemyTiles"/>), never from a tile an earlier turn — or an
+    /// earlier session — left behind: so a resumed turn senses the enemies' walk
+    /// exactly as the session that saved it would have. Syncing through the
+    /// attack phase too catches the final sub-step of a walk, which lands in the
+    /// same step the phase flips to <see cref="TurnPhase.EnemyAttacking"/>.
+    /// </para>
+    /// </summary>
+    internal void StepLogic()
+    {
+        _turns.Update(SaveGame.LogicStepSeconds);
+        if (_turns.Phase is not (TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking))
+            return;
+
+        bool crossedTile = false;
+        foreach (var enemy in _enemies)
+        {
+            enemy.SyncTransform();
+            var tile = LogicTile(enemy.State.X, enemy.State.Y);
+            if (_lastEnemyTile.TryGetValue(enemy, out var last) && last == tile) continue;
+            _lastEnemyTile[enemy] = tile;
+            crossedTile = true;
+        }
+        if (crossedTile)
+            UpdateEnemyVisibility();
+    }
+
+    /// <summary>Take where every enemy stands, at the turn's end: the tiles the enemies' turn measures a crossing from (<see cref="StepLogic"/>).</summary>
+    private void TakeEnemyTiles()
+    {
+        foreach (var enemy in _enemies)
+            _lastEnemyTile[enemy] = LogicTile(enemy.State.X, enemy.State.Y);
     }
 
     public override void LateUpdate(float deltaTime)
@@ -607,7 +729,10 @@ public class DungeonScene : Scene
     //   7. RevealArrival                 — lit only where the party now stands
     //   8. marching, the camera, the banner, and the fade back in
     //
-    // Initialize is steps 3 to 8 for the first floor, with nothing to leave.
+    // Initialize is steps 3 to 8 for the first floor, with nothing to leave —
+    // and for a visit a save brought back, steps 7 and 8 resume the saved turn
+    // instead of starting one: its sight kept, its active member and its march
+    // read back from the save's view (ResumeView).
 
     /// <summary>
     /// Play the floor the visit now stands on — steps 3 to 8 above — with
@@ -621,8 +746,22 @@ public class DungeonScene : Scene
     /// laid again from the floor's own list (<see cref="Floor.LooseItems"/>), after
     /// what the corpses are lying on: a weapon left on the first floor is there,
     /// visible and takeable, when the party climbs back.
+    /// <para>
+    /// <strong>A resumed arrival goes on with the saved turn</strong> (1b, 1f)
+    /// when the save carried the turn's view (<paramref name="resume"/>'s
+    /// <see cref="ResumeView.View"/>): the saved member is active, what the party
+    /// could see this turn stays lit — the pick and the march read it — with the
+    /// boxes it stands in added, and the march is what the turn decided, never
+    /// decided afresh; the system already holds the turn's counters, the enemies
+    /// seen among them, which the lighting leaves as they were. A save that
+    /// carried no view was taken before the floor was opened, and its floor is
+    /// arrived on as it would have been. Either way the banner was put up by the
+    /// scene's constructor, <c>RESUMED</c> over it.
+    /// </para>
     /// </summary>
-    private void ArriveOnFloor(TurnSystem turns)
+    /// <param name="turns">The system the visit opened on the floor.</param>
+    /// <param name="resume">What the host handed a scene resuming a save, on the first floor's arrival; null for every other arrival.</param>
+    private void ArriveOnFloor(TurnSystem turns, ResumeView? resume = null)
     {
         _floor = _visit.Current;
         _map = _floor.Map;
@@ -645,11 +784,44 @@ public class DungeonScene : Scene
         RederiveGroundItems();   // laid without a word: nothing lands as the party arrives (AnnounceDrop)
         foreach (var loose in _floor.LooseItems)
             LayLoose(loose);     // what the party put down here, where it was put
-        RevealArrival();
 
-        EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
+        if (resume?.View is { } kept)
+        {
+            // The saved turn goes on: its leader, its sight and its march.
+            _activeIdx = ActiveIndexFor(_campaign.Party, kept.ActiveMemberId);
+            RevealArrival(keepSight: true);
+            _marchingThisTurn = kept.MarchingThisTurn;
+            Log.Info($"[Save] Resumed on floor {_floor.Index + 1} at turn {turns.TurnCount}: {ActiveCharacter.State.Id} active, "
+                + (_marchingThisTurn ? "the turn marching" : "the turn not marching"));
+        }
+        else
+        {
+            RevealArrival(keepSight: false);
+            EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
+        }
         _cameraTarget = ActiveCharacter.Position;
-        _hud.ShowArrival(_visit);
+        if (resume is null)
+            _hud.ShowArrival(_visit);   // a resume's banner, RESUMED over it, is up already (ShowResume)
+    }
+
+    /// <summary>
+    /// The member a resumed turn hands the lead to: the one the save's view names
+    /// (<see cref="ViewDto.ActiveMemberId"/>), while it stands; failing that — no
+    /// name, a name no member has, a member fallen — the first living member in
+    /// roster order, as a turn's start hands the lead on; and the first member
+    /// when nobody stands, which no save point holds.
+    /// </summary>
+    /// <returns>The index into <paramref name="party"/>, in roster order.</returns>
+    internal static int ActiveIndexFor(IReadOnlyList<PartyMemberState> party, string? activeMemberId)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        for (int i = 0; i < party.Count; i++)
+            if (party[i].Id == activeMemberId && party[i].Alive)
+                return i;
+        for (int i = 0; i < party.Count; i++)
+            if (party[i].Alive)
+                return i;
+        return 0;
     }
 
     /// <summary>
@@ -708,23 +880,57 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Step 7: the floor is lit only where the party now stands. A floor
-    /// returned to still holds the sight it had when the party left it, and
-    /// read as it is that stale sight would arm the zones of the enemies it
-    /// showed and price a swap at 20 for dummies nobody can see — so visibility
-    /// is cleared first (the explored memory stays: it is the floor's), then
-    /// revealed around each living member without the ripple, the reset
-    /// <see cref="ResetFogVisibility"/> makes at a turn's end, less its refog.
+    /// Step 7: the floor is lit only where the party now stands
+    /// (<see cref="LightArrival"/>). A floor returned to still holds the sight it
+    /// had when the party left it, and read as it is that stale sight would arm
+    /// the zones of the enemies it showed and price a swap at 20 for dummies
+    /// nobody can see — so visibility is cleared first (the explored memory
+    /// stays: it is the floor's), then revealed around each living member without
+    /// the ripple, the reset <see cref="ResetFogVisibility"/> makes at a turn's
+    /// end, less its refog. The enemies in sight are then told to the system as
+    /// seen, as any sighting is.
+    /// <para>
+    /// With <paramref name="keepSight"/> — a resumed turn — the floor's sight is
+    /// the turn's own, which the save kept: every tile it had lit stays lit, the
+    /// boxes the party stands in are lit too (they already are), and the system
+    /// is told nothing, since its counters came back with the turn and already
+    /// say who was seen. Telling it afresh would count an enemy the saved turn
+    /// had never noticed, and arm its zone where the turn left it quiet.
+    /// </para>
     /// </summary>
-    private void RevealArrival()
+    private void RevealArrival(bool keepSight)
     {
-        _fog.ResetVisibility();
         _lastFogTile.Clear();   // a member arriving on the (row, column) it left on the other map is revealed, not skipped
-        foreach (var member in _party)
-            if (member.State.Alive)
-                UpdateFogFor(member, animate: false);
+        var living = _party.Where(member => member.State.Alive).ToList();
+        LightArrival(_fog, _fogBoxes.FogBoxes, living.Select(member => LogicTile(member.State.X, member.State.Y)), keepSight);
+        foreach (var member in living)
+            _lastFogTile[member] = LogicTile(member.State.X, member.State.Y);
         _fogOverlay.MarkDirty();
-        UpdateEnemyVisibility();
+        UpdateEnemyVisibility(notify: !keepSight);
+    }
+
+    /// <summary>
+    /// An arrival's lighting, on <paramref name="fog"/>: every box one of
+    /// <paramref name="livingTiles"/> stands in is revealed — lit, and explored —
+    /// and, unless <paramref name="keepSight"/>, nothing else is lit: a stairs
+    /// arrival clears what the floor last showed first. A resumed turn keeps its
+    /// sight (1b: the current floor's <c>visible</c> is saved), so every tile the
+    /// save had lit stays lit and the boxes the party stands in are added. The
+    /// explored memory is only ever added to.
+    /// </summary>
+    /// <param name="fog">The floor's fog.</param>
+    /// <param name="fogBoxes">The floor's fog boxes, which a tile lights by.</param>
+    /// <param name="livingTiles">The tiles the living members stand on, (row, column).</param>
+    /// <param name="keepSight">Keep what is lit (a resume) rather than clearing it first (a stairs arrival).</param>
+    internal static void LightArrival(FogState fog, IReadOnlyList<MapRect> fogBoxes, IEnumerable<(int R, int C)> livingTiles, bool keepSight)
+    {
+        ArgumentNullException.ThrowIfNull(fog);
+        ArgumentNullException.ThrowIfNull(fogBoxes);
+        ArgumentNullException.ThrowIfNull(livingTiles);
+        if (!keepSight)
+            fog.ResetVisibility();
+        foreach (var (r, c) in livingTiles)
+            fog.RevealAt(r, c, fogBoxes);
     }
 
     // ── Setup ────────────────────────────────────────────────────────────────
@@ -904,19 +1110,12 @@ public class DungeonScene : Scene
         {
             Log.Info($"[Turns] End of turn — banked {saved} movement");
             LastBankedMovement = saved;
-            foreach (var member in _party)
-                _banked[member.State] = member.State.SavedMovement;
             if (InventoryOpen) ActiveMenu = GameMenu.None;   // the bag closes at the turn's end, and its "leave" is disarmed with it
             ResetFogVisibility();
+            TakeEnemyTiles();   // what the enemies' turn measures a crossing from (StepLogic)
         };
 
-        _turns.PlayerTurnStarted += () =>
-        {
-            Log.Info($"[Turns] Player turn {_turns.TurnCount} begins");
-            if (!ActiveCharacter.State.Alive)
-                SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
-            EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
-        };
+        _turns.PlayerTurnStarted += OnPlayerTurnStarted;
 
         _turns.EnemyHit += (enemy, res) =>
         {
@@ -1123,6 +1322,21 @@ public class DungeonScene : Scene
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
     }
 
+    /// <summary>
+    /// A player turn has begun: a fallen leader hands the lead on, the turn's
+    /// march is decided, and the turn is saved once the frame is over (1f: an
+    /// autosave at every player turn's start) — asked for here and written by the
+    /// host after the raise that began the turn has returned.
+    /// </summary>
+    private void OnPlayerTurnStarted()
+    {
+        Log.Info($"[Turns] Player turn {_turns.TurnCount} begins");
+        if (!ActiveCharacter.State.Alive)
+            SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
+        EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
+        _host.RequestSave();
+    }
+
     /// <summary>A reaction's floating callout over whoever fired it, on either side.</summary>
     private void AnnounceReaction(ActorState actor, string label)
     {
@@ -1234,11 +1448,13 @@ public class DungeonScene : Scene
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
     /// printed with that number into the hand — 1 is the hand itself — or, with
     /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
-    /// on the pause menu, 1 closes it and 2 exits, and every other number does
-    /// nothing (never a member selected behind the menu); with no menu open, 1-4
-    /// select a party member. Behind any other menu — the way out's "leave the
-    /// dungeon?" among them — a number key does nothing at all: it never selects a
-    /// member behind a prompt. Nor during a stair's fade.
+    /// on the pause menu, 1 closes it and 2 saves and quits — the window closes,
+    /// and the game's close saves the run in progress, playing out the enemies'
+    /// turn first if the menu was opened during it (<see cref="CampaignBoot.SaveOnQuit"/>)
+    /// — and every other number does nothing (never a member selected behind the
+    /// menu); with no menu open, 1-4 select a party member. Behind any other menu —
+    /// the way out's "leave the dungeon?" among them — a number key does nothing at
+    /// all: it never selects a member behind a prompt. Nor during a stair's fade.
     /// </summary>
     private void NumberKey(int digit)
     {
@@ -1302,14 +1518,17 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
-    /// no — or opens the pause menu, whose EXIT quits the game. During a stair's
-    /// fade, and once the party is on its way to the screen between runs, it is swallowed:
+    /// no — or opens the pause menu, whose 2 saves the run in progress and quits
+    /// (<see cref="DungeonHud.PauseQuitLine"/>). During a stair's fade, and once
+    /// the party is on its way to the screen between runs, it is swallowed:
     /// nothing opens over a floor being swapped. <strong>On a run's end it does
-    /// nothing</strong> — the summary, and the defeat screen under it: the run's
-    /// counter, locks and retirement live only in memory until Phase 5 saves
-    /// them, so a quit there would drop what the run just wrote. ENTER is the one
-    /// way on, and quitting is the screen between runs' to offer. Always consumed,
-    /// so the game never quits behind the scene's back.
+    /// nothing</strong> — the summary, and the defeat screen under it. The summary
+    /// is modal: ENTER is the one way on, and quitting is the screen between runs'
+    /// to offer. Nothing would be lost by a quit there — the run's end is saved
+    /// once the frame it ended in is over, the summary with it, and the window's
+    /// close saves again — but a pause menu over a run that has ended would offer
+    /// to save a run there is no longer any of. Always consumed, so the game never
+    /// quits behind the scene's back.
     /// </summary>
     public bool HandleEscape()
     {
@@ -1576,7 +1795,9 @@ public class DungeonScene : Scene
     /// the fallen included) and opens the next floor caught up, and that floor is
     /// built from what the visit holds. Asked of the visit once more first:
     /// nothing can have moved under the fade, but a refusal here swaps nothing
-    /// and the fade simply comes back up on the floor the party never left.
+    /// and the fade simply comes back up on the floor the party never left. The
+    /// arrival is saved once the frame is over (1f: an autosave after every floor
+    /// arrival), so a quit on the new floor never finds the save on the old one.
     /// </summary>
     private void TakeStairs(StairUse stair)
     {
@@ -1594,6 +1815,7 @@ public class DungeonScene : Scene
         else
             _visit.Ascend(party, active);
         ArriveOnFloor(_visit.OpenTurns(party, RollD20));
+        _host.RequestSave();
     }
 
     /// <summary>
@@ -1892,18 +2114,26 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// The turn system's d20 — the same fair die its default rolls — drawn
-    /// here so the scene knows the natural rolls its cues read: the last one,
-    /// which is a staff cast's own when its status lands (the cast rolls just
-    /// before its Cast is raised, and nothing rolls in between), and, while a
-    /// party member's cast is watched (<see cref="WatchCast"/>), the first,
-    /// which is the cast's own before anything its hits set off (a counter, a
-    /// carried shot) rolls again. A hit rolls before its chain runs, so every
-    /// roll also takes the levels <see cref="AttackerRiders"/> stand at before it.
+    /// The turn system's d20 — the visit's own (<see cref="DungeonState.RollD20"/>,
+    /// USER DECISION 1 of Phase 5: seeded by the visit and saved) — drawn here so
+    /// the scene knows the natural rolls its cues read: the last one, which is a
+    /// staff cast's own when its status lands (the cast rolls just before its Cast
+    /// is raised, and nothing rolls in between), and, while a party member's cast
+    /// is watched (<see cref="WatchCast"/>), the first, which is the cast's own
+    /// before anything its hits set off (a counter, a carried shot) rolls again. A
+    /// hit rolls before its chain runs, so every roll also takes the levels
+    /// <see cref="AttackerRiders"/> stand at before it.
+    /// <para>
+    /// Being the visit's, the die rolls on across a save: its position is saved
+    /// (<see cref="DungeonState.DiceRolled"/>), so after a reload the dice fall as
+    /// they would have without one, and a reload is never a reroll. The
+    /// alternative the decision names — a fresh die per session — is this one
+    /// line rolling <c>Random.Shared</c> again.
+    /// </para>
     /// </summary>
     private int RollD20()
     {
-        int roll = Random.Shared.Next(1, 21);
+        int roll = _visit.RollD20();
         _lastRoll = roll;
         _rollCount++;
         if (_watchCastRoll && _castRoll == null)
@@ -2478,14 +2708,22 @@ public class DungeonScene : Scene
         }
     }
 
-    private void UpdateEnemyVisibility()
+    /// <summary>
+    /// Show every enemy stand-in as visible as the tile it stands on, and, with
+    /// <paramref name="notify"/>, tell the floor's system which enemies are in
+    /// sight — a sighting, which it counts as seen this turn (whose zones may
+    /// react). A resumed turn's lighting shows without telling
+    /// (<see cref="RevealArrival"/>): its sightings came back with its counters.
+    /// </summary>
+    private void UpdateEnemyVisibility(bool notify = true)
     {
         foreach (var enemy in _enemies)
         {
             var (r, c) = LogicTile(enemy.State.X, enemy.State.Y);
             bool visible = _fog.Visible[r, c];
             enemy.SetVisible(visible); // hidden, a shove's slide ends where the logic put it
-            _turns.NotifyEnemyVisible(enemy.State, visible);
+            if (notify)
+                _turns.NotifyEnemyVisible(enemy.State, visible);
         }
         UpdateGroundItemVisibility();   // what a corpse left is lit by the same fog the corpse was
     }

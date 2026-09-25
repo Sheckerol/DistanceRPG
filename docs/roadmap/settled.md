@@ -1410,3 +1410,205 @@ four as shipped.
   `bossFloor` runs") in that one corner. The alternatives weighed were a
   second clock (ruled out above), shortening every lock while all are locked,
   and making a sixth dungeon a Phase 4 requirement; the early offer stands.
+
+## Implementation pass — Phase 5 (the numbers, the content files, save and load)
+
+Rulings the Phase 5 branch made where the phase doc was silent, or where two
+passages met and one had to be read in the light of the other. Each is written
+down here so the next reader meets the ruling rather than the code that assumes
+it. Six of them bend a line of the phase doc rather than fill a silence; those
+are marked **bends the phase doc**, each with why it needs no ruling, or that it
+is the user's. Four rulings are the user's to make — the dice on a reload, the
+save model, where content's truth lives, and the class baselines, which is also
+one of the six bends — and each shipped provisionally: open-questions.md sets
+out the alternatives, and this pass records the ruling once the user makes it.
+
+### The numbers: `tuning.json`
+
+- **A key is the `Tuning` property's name, verbatim, and `MovementBudget` is the
+  one new key.** One naming source: `DotDamagePerMana` (the entry above that
+  made it an integer reciprocal), and never an alias — §5.3's spellings are
+  unknown keys whose warning points at the key. `MovementBudget` is the 160 the
+  Phase 2 pass named, in logic units, and the party's refill, its bank's cap and
+  the enemies' cost scale read it.
+- **`MovementUnitsPerMana` is re-derived by hand, never computed from the
+  budget.** It is derived — `(MovementBudget − 40) / (8 + 3)`, the budget less a
+  staff's 40 of movement, over the mana one cast moves at Resonant: 10.9, so 10
+  — and its comment in the file carries that formula and says the divisor does
+  not follow the budget. Computed, a budget edit would silently re-price every
+  cast; a designer who turns the budget re-derives the divisor on purpose.
+- **The file clamps; a tuning built in code is still refused.** A missing key
+  keeps its compiled default, a table merges per entry, an unknown key or a
+  value that is not an integer warns and is ignored, and a value out of range
+  clamps and warns — a typo costs a line on screen and in the log, never a
+  session. `ContentValidator.ValidateTuning` keeps refusing a `Tuning` built in
+  code, so every rule still has its refusal, and every tuning a file can make
+  passes it.
+- **Where tuning meets content, the tuning bends — never the content, and never
+  with an abort.** Three keys are measured against the content as well as
+  against themselves, and an in-range value can still break shipped content: a
+  forge limit below a shipped spread, a carry too small for the roster's
+  loadout, a boss offset that lets a pinned boss floor pay the farm. So
+  `TuningFit` raises `MaxForged`, `PartyCarrySlots` and `BossStackOffset` to what
+  the loaded content needs, within their own ranges, with one warning naming the
+  entry that needed it; content no in-range value can serve is content's own
+  error. Every tuning a file can make loads with the shipped content, and a test
+  holds that.
+- **The save records the hash of the effective values**: the fitted tuning,
+  every table expanded over every member it can be asked for, as sorted
+  `Key=value` lines, so formatting, order and comments never move it and any
+  value — a compiled default a new build changed included — does.
+- **The `…Percent` key names — bends the phase doc** (§5.3 fixes
+  `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
+  `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
+  §5.3 itself makes every ratio an integer with its units in its name, so the
+  doc's `K = 0.26` is written 26 and must say percent, and the entry that made
+  `DotDamagePerMana` an integer ruled the identical case.
+- **The `Tuning` record, not `GameConstants` — bends the phase doc** (§5.3:
+  "read once at startup into `GameConstants`"). Needs no ruling: a `const`
+  cannot be overridden at runtime, §5.3 keeps the parity constants compiled
+  "permanently and without exception", so tunables and parity constants must not
+  share a home, and the record has been §5.3's home since Phase 1.
+  `GameConstants` keeps only what never tunes.
+- **The Enchanter and Consumables keys wait for their readers — bends the phase
+  doc** (§5.3's starting set lists them). Needs no ruling: a key with no reader
+  is a dial wired to nothing, and `EnchantmentWearCost` sits on the open
+  question of what a deposit costs, which nothing here may resolve by accident.
+  `tuning.json` still shows both groups as headings naming their keys, so §5.3's
+  one screen stays whole. **The hand-off**: Phase 6a adds `WearPerHit`,
+  `WearCapacityLadder` (30/40/55), `EnchantmentWearCost` and `GraftBaseChance`
+  with their readers; Phase 6b adds `PotionUseCost`, `HealthPotionPercent`,
+  `ManaPotionPercent` and `FarmYieldPerClear` with theirs.
+
+### The content files
+
+- **Content is strict where tuning is lenient.** Five files — the contract
+  covers `party.json` as well as the four §5.4 names — each a top-level object,
+  every entry with a stable string id, field names the records' camel-cased and
+  the doc's where it fixes them, enum values by their names, comments and
+  trailing commas allowed. An unknown member is refused (`RuleFileShape`): a
+  mistyped field in content is a rule that silently does not apply. Invalid
+  content stops the game on a screen naming the file, the entry, the rule and
+  its detail.
+- **The staged load's order is a stated rule.** Every present file is parsed
+  first, each shape failure recorded, then the stages run in §5.4's order, each
+  first reporting its own file's shape failure: so a syntax error in a later file
+  never pre-empts a semantic error in an earlier one. The one order a reader might
+  not expect is deliberate: `enchantments.json`'s shape is reported before
+  `restricted.json`'s own rules, because those check the relations' ids against
+  the enchantments'.
+- **An absent content file plays the compiled record, and says so.** The doc
+  gives a compiled fallback for missing tuning keys and is silent on a missing
+  content file; the compiled record is valid content — the very content the
+  shipped file is pinned to — so there is nothing to abort for, and a notice
+  keeps a renamed or deleted file from passing unseen.
+- **One owner for a dialled number: the dial.** `ApplyPercent`'s five ids and
+  `arcane`'s potency are `tuning.json`'s (§5.3, and §5.4's "what number? —
+  `tuning.json`"). The row in `enchantments.json` keeps its field — the base the
+  validator checks, and the number for every id no dial names — the file marks
+  each dialled one, and an edit to one there is a notice naming both files.
+- **Three new content checks, none a new invariant**: a file's shape
+  (`RuleFileShape`), an effect name resolving to a kind (`RuleUnknownEffect`),
+  and the two weapons the code names existing (`RuleCodeNamedWeaponsExist`).
+  `kind` and `forgedOnly` name modifiers alone, since only the modifier rules
+  read them: an enchantment named in either would silently not apply, so it is
+  refused under the existing relation-id rule.
+- **"Naming both" is an explanation, not a check.** A weapon a relations edit
+  makes illegal names the relation that refused it, read off the file in hand,
+  asking the rules' own clauses in their order — for modifiers and enchantments
+  alike. It is there exactly when the rule refuses.
+- **Where content's truth lives: the compiled content, the files generated from
+  it — provisional, the user's to rule.** `ContentDefaults` is the source,
+  `--write-data` writes the six files, and a test pins the shipped ones byte for
+  byte; a designer tunes the copies beside the exe and ports a keeper back. The
+  alternative is in open-questions.md.
+- **Class baselines are derived, never a section of `weapons.json` — bends the
+  phase doc** (§5.6: "the class baselines leave `Weapons.cs`"; they did, in
+  Phase 1, for `ContentDefaults`). Every variant carries its whole forged
+  spread, and a class's baseline is what its four variants share, checked at
+  load — one source for a spread, the reason §5.8 gives for computing the drop
+  table. Provisional, the user's to rule; the alternative is in
+  open-questions.md.
+- **No `condition` field in `enchantments.json` — bends the phase doc** (§5.7,
+  and the entry above listing condition among an enchantment's dials). Needs no
+  ruling: §5.7's own example puts the condition inside the effect an entry
+  names, and Phase 3 resolved the condition vocabulary into the kinds' events; a
+  column would be a second answer to "when does it fire".
+- Whether a content file's numbers have bounds stays open: open-questions.md
+  sets out both readings, and Phase 5 adds no new kind of content rule.
+
+### The save
+
+- **A DTO layer, and every piece of live state accounted for.** The save is plain
+  records in `Logic/Save/` — ids for content, names for enums, locators for
+  references — restored through internal doors, never a public setter, and no
+  gameplay type carries an attribute. The campaign is the outer document, the
+  visit inside it or none between runs: Phase 6's line, shipped in Phase 5.4.
+  Beyond §5.1's list the save holds the last run's summary; a member's innate
+  modifiers and attunement (empty today); the whole a turn's movement cap was cut
+  from, which the Mire legend reads; the spoils as locators, a bag slot or a
+  floor, since a spoil put down is still a spoil; the current floor's sight this
+  turn, which the pick and the march read; an untaken drop lying on a corpse,
+  pinned; the visit's die's position; and the scene's view — the active member,
+  and whether the turn marches. Every field of every type the save walks, the
+  two scenes' included, is listed as saved, derived or not saved with its reason,
+  in a test a new field fails. The marching line itself is not saved: a resumed
+  march starts a fresh line, as every march does, so a reload is not claimed
+  indistinguishable on a marching turn — only for what the turn's Logic calls do.
+- **A pending revival follows a changed tuning; a lying drop does not.** A drop
+  already lying there may have been seen, so it is pinned and never changes under
+  an edit. A revival is a future event: under new numbers a dummy due by them
+  gets up as the floor opens — the arrival rule above — and the changed-numbers
+  notice promises exactly that the campaign plays on under the new ones.
+- **The dice are the visit's own, seeded and saved — provisional, the user's to
+  rule.** The d20 is a family of its own (`DiceSalt`, `DiceMix`), each draw a
+  stream keyed by the map seed and how many the visit has rolled, and the count
+  is saved, so after a reload the dice fall as they would have and a reload is
+  never a reroll — at the price, stated, that a turn replayed after killing the
+  process knows its next draws. The family is clean against every drop, revival
+  and boss-drop stream under the shipped `BossFloorMax`, and shares a number with
+  a revival roll only as the Phase 4 pass accepts between the floors' own
+  streams: draw 34,430 meets floor index 8's revival roll for spawn 50, cycle 2 at
+  the shipped depth, and under a tuning as deep as `BossFloorMax`'s clamp allows
+  (99) draw 2801 meets floor index 58's for spawn 7, cycle 16 — the one meeting of
+  draws 0–4096 on any floor a tuning reaches. Both are pinned by a test. The
+  alternatives are in open-questions.md.
+- **A save is taken only at a safe point, and a quit settles on the fixed logic
+  clock.** A safe point is between runs, a visit with no floor open, or the
+  player phase with nothing in flight; the enemies' turn, its banner and a raise
+  in flight never are, which is what lets a save hold none of the enemy phase's
+  working state. The turn system runs on a fixed logic clock — whole steps of
+  1/120 s, never a frame's own time — so the enemies' turn plays out the same at
+  any frame rate, and a quit during it is played out to the next player turn on
+  that same step, the scene's sighting included, before anything is written: the
+  save is the turn the player would have met. A settle in which the party is
+  wiped ends the run, and the campaign is saved between runs.
+- **The save model: one campaign, one slot, saved by itself, resumed where it
+  stood — provisional, the user's to rule.** Saves live in the player's data
+  folder, never beside the exe (the data files do). The game saves at a run's
+  entry, every player turn's start, every floor arrival, a run's end, NEW
+  CAMPAIGN and every quit, with no manual save. A launch resumes the campaign
+  where it stood: between runs, or in the dungeon at the saved floor and turn,
+  the turn's sight, active member and march as they were, `RESUMED` over the
+  floor banner. A `campaign.resuming` marker guards a resume, NEW CAMPAIGN asks
+  twice, `--new-campaign` sets the save and its backup aside and saves the new
+  campaign at once, and the dev overrides play in a scratch slot that never
+  touches the campaign. The alternatives are in open-questions.md.
+- **A save that cannot be played is set aside, never deleted or written over** —
+  unreadable, crashed on its own resume, or retired by `--new-campaign` — named
+  by its full path with how to try it again, and the backup is tried.
+- **The save's word is shown whole on the screen between runs; the data files'
+  notices keep their three-row cap after it.** The cap is for what a broken file
+  can make without bound; what became of the campaign is bounded by construction,
+  and a notice cut off there would hide the one thing the player has to act on.
+  A resumed floor and the error screen cap as before, the log keeping every
+  word. The alternative not taken: a shorter notice naming the file and the save
+  folder, the full path in the log alone.
+- **Wear, `WearCapacity` and carried consumables are not in save version 1 —
+  bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
+  exist until Phases 6a and 6b, and the save's version and migration steps are
+  how the doc asks the format to grow. **The hand-off**: 6a adds `wear` and
+  `wearCapacity` to a weapon's row as a version-2 migration step, with the four
+  Enchanter keys and their readers; 6b adds a non-weapon inventory slot as a
+  migration step, with the four Consumables keys. Every row is a named-field
+  object, so each is an addition and a step, never a reshaping.
