@@ -66,8 +66,8 @@ owner — should settle both entries then, and should settle what a class featur
 
 That filter is `DropOrder`'s own, and it is the only one of its kind in the
 tree: **`EnchantmentCatalogue.Rollable` is not a grantable pool.** Rollable is
-everything outside `neverRolled`, in file order, so both `echoing` and `aegis`
-sit in it — and `neverRolled` cannot absorb them, since
+everything outside `neverRolled`, in the catalogue's order, so both `echoing`
+and `aegis` sit in it — and `neverRolled` cannot absorb them, since
 `ContentValidator.ValidateNeverRolled` cross-checks that set against the
 `unique` flag and neither entry is a unique soul. §6.4's enchanter, specified as
 offering `CampaignState.SeenInOrder` filtered against `NeverRolled`, would
@@ -143,33 +143,39 @@ it would contradict the one §3.1 already settled.
 ## Whether a content file's numbers have bounds (§5.4, §5.6, §5.7)
 
 Phase 5.2 put every enchantment's numbers in `enchantments.json`, a file a
-playtester edits by hand, and the load checks only a few of them: a `lock` of at
-least 1 (`RuleEnchantmentLockIsPositive`), a `trigger` that is never 0 or less
-(`RuleZeroTrigger`), and a `potency` of at least 1 for the three kinds whose
-whole magnitude is their potency — bonus damage, Shattering and Shielding
-(`RuleMagnitudeNamesAPotency`). **Nothing else is bounded.** Phase 5.2's review
-loaded `vampiric` with `"potency": -5`, `"applyPercent": -5`,
-`"potency": 2147483647` or `"lock": 2147483647`, and each played without a word.
+playtester edited by hand. Since the user's ruling of 2026-09-25 they sit in the
+enchantment catalogue, which is code (`EnchantmentDefinitions`, §5.7) and still
+validated at load, first and on its own, by
+`ContentValidator.ValidateEnchantments` — which checks only a few of them: a
+`lock` of at least 1 (`RuleEnchantmentLockIsPositive`), a `trigger` that is
+never 0 or less (`RuleZeroTrigger`), and a `potency` of at least 1 for the three
+kinds whose whole magnitude is their potency — bonus damage, Shattering and
+Shielding (`RuleMagnitudeNamesAPotency`). **Nothing else is bounded.** Phase
+5.2's review loaded `vampiric` with `"potency": -5`, `"applyPercent": -5`,
+`"potency": 2147483647` or `"lock": 2147483647`, and each played without a word;
+the same numbers written into the catalogue's row would too.
 
 Nothing is wrong in play today: every shipped number is sensible. The risk is the
-hand edit. `Enchantment.LevelsFor` multiplies `applyPercent`, the source and the
-tier straight through, so a sign typo lands negative status levels or negative
-healing; and `Enchantment.EffectiveLock` is `Lock x Tier` in unchecked
-arithmetic, so a huge lock wraps negative, and so do the mana sums built on it.
-Where `tuning.json` owns the same numbers — `ApplyPercent` and `ArcanePotency` —
-they are clamped to 0–1000, so the two files disagree about how far such a
-number is trusted.
+edit — by hand in a file, or to a row of the catalogue. `Enchantment.LevelsFor`
+multiplies `applyPercent`, the source and the tier straight through, so a sign
+typo lands negative status levels or negative healing; and
+`Enchantment.EffectiveLock` is `Lock x Tier` in unchecked arithmetic, so a huge
+lock wraps negative, and so do the mana sums built on it. The dialled numbers —
+`ApplyPercent` and `ArcanePotency` — are `tuning.json`'s alone, clamped to
+0–1000, so the catalogue's rows and the clamped dials disagree about how far
+such a number is trusted.
 
 **`weapons.json` has the same gap** (Phase 5.3). A weapon's forged spread is
 bounded — every stack at least 1 (`RuleForgedStackCount`) and at most its
 `MaxForged` (`RuleMaxForged`) — but nothing checks a statline's `range`,
-`damage`, `cost` or `manaCost` or a wand shape's dimensions, and an enchantment
-reference's `tier` answers only to the unique shapes' own rules, none of which
-sets a ceiling. Phase 5.3's review loaded the Halberd with a `range`, `damage`,
-`cost` or `manaCost` of -1, 0 or -2147483648, the Staff of Mire's `manaCost` and
-the Wand of the Blast's `radius` and `targetReach` at the same three, and the
-Nameless Knife's `vampiric` at tier -1, 0 or 2147483647, and each loaded without
-a word.
+`damage`, `cost` or `manaCost` — a class row's, since the ruling gave the classes
+a section of their own, or a variant's own — or a wand shape's dimensions, and
+an enchantment reference's `tier` answers only to the unique shapes' own rules,
+none of which sets a ceiling. Phase 5.3's review loaded the Halberd with a
+`range`, `damage`, `cost` or `manaCost` of -1, 0 or -2147483648, the Staff of
+Mire's `manaCost` and the Wand of the Blast's `radius` and `targetReach` at the
+same three, and the Nameless Knife's `vampiric` at tier -1, 0 or 2147483647, and
+each loaded without a word.
 
 These fail more quietly than the enchantment numbers, because play floors some
 of them. A `tier` below 1 plays as 1 (`WeaponCatalogue.Instantiate` floors it),
@@ -179,33 +185,35 @@ to -20. A `cost` below 1 is charged the one-unit minimum wherever movement is
 paid (`Progression.MovementCost`), while the HUD's `COST` still shows a number
 below 1. A `manaCost` below 0 leaves `ResolvedManaCost` at 0 or below, so the
 cast gate (`Mana >= ResolvedManaCost`) passes on an empty pool. `damage`,
-`range` and a shape's dimensions are read as written. The other content files
-already bound theirs — a boss's statline and innate stacks at least 1
+`range` and a shape's dimensions are read as written. `dungeons.json` already
+bounds its numbers — a boss's statline and innate stacks at least 1
 (`RuleBossStatline`, `RuleBossInnateStackable`), a boss floor range that starts
-at 1 and never inverts (`RuleBossFloorRange`), a member's stats a permutation
-of 1 to 4 (`RulePartyStatPermutation`) — so `enchantments.json` and
-`weapons.json` are the two whose numbers the load mostly takes on trust.
+at 1 and never inverts (`RuleBossFloorRange`) — and the starting party's stats,
+code since the ruling, are still checked at load as a permutation of 1 to 4
+(`RulePartyStatPermutation`); so the enchantment catalogue and `weapons.json`
+are the two whose numbers the load mostly takes on trust.
 
 Two readings, and the choice wants a ruling rather than a guess — one ruling
-for both files, since the question is the same:
+for both, the catalogue and `weapons.json`, since the question is the same:
 
 - **Range rules.** `ContentValidator.ValidateEnchantments` refuses a negative
   `potency`, an `applyPercent` outside 0 to a ceiling, and a `lock` or `trigger`
-  above a ceiling; `ContentValidator.ValidateWeapons` refuses a statline number,
-  a shape dimension or a `tier` outside a range of its own — per field, since a
-  staff's `damage` and a martial weapon's `manaCost` are 0 today. Each is a
-  startup failure naming the entry and the rule — content is "validated rather
-  than clamped" (§5.4), so never a clamp. The ceilings are numbers someone must
-  pick; `tuning.json`'s 1000 is the nearest precedent.
+  above a ceiling; `ContentValidator.ValidateWeapons` refuses a statline number
+  (a class row's or a variant's own), a shape dimension or a `tier` outside a
+  range of its own — per field, since a staff's `damage` and a martial weapon's
+  `manaCost` are 0 today. Each is a startup failure naming the entry and the
+  rule — content is "validated rather than clamped" (§5.4), so never a clamp.
+  The ceilings are numbers someone must pick; `tuning.json`'s 1000 is the
+  nearest precedent.
 - **Trusted fields.** These numbers are the designer's, and the load refuses only
   what makes an entry mean nothing: a free lock, a free trigger, a magnitude of
   zero, a spread the relations refuse. [Settled](settled.md) then says so for
-  both files, and a negative potency or cost is a choice the file permits
-  rather than an oversight.
+  both, and a negative potency or cost is a choice the catalogue or the file
+  permits rather than an oversight.
 
 Phase 5 brings the content files without adding a new kind of content rule, so
-it ships neither: whoever rules on this should add the rules, or the settled
-line, then.
+it ships neither, and the content rework after the ruling ships neither too:
+whoever rules on this should add the rules, or the settled line, then.
 
 ## What the d20 does across a reload (§5.2)
 
@@ -264,39 +272,89 @@ turn; a title screen with CONTINUE and NEW in place of resuming at launch; and
 dev overrides that apply only when no save exists. settled.md's Phase 5
 implementation pass records the ruling.
 
-## Where content's truth lives (§5.4)
+## Whether a variant may name its own statline (§5.6) — REWORK DECISION 1
 
-§5.4 moves the content into five files and §5.3 the numbers into `tuning.json`,
-and neither says whether the files or the compiled content are the source the
-other follows. Something has to be, or the two drift.
+The user's ruling of 2026-09-25 made the weapon types a section of
+`weapons.json`, and each class row carries the statline its variants share:
+§1.2, §1.3 and §1.4 give a class one statline, but for §1.3's staves, which
+differ in mana. Before the ruling every weapon row stated its whole statline,
+so any of its numbers could differ from its siblings'.
 
-**Shipped provisionally: the compiled content (`ContentDefaults.cs`) is the
-source, and the six files are generated from it** (`--write-data`) and pinned
-byte for byte by `ShippedDataTests`. A designer edits the copies beside the exe
-to playtest, and a change worth keeping is ported into `ContentDefaults` and
-regenerated.
+**Shipped provisionally: a variant may name its own statline, field by field.**
+Any of `range`, `damage`, `cost` and `manaCost` given on a variant plays for it
+instead of its class's, and a unique takes its variant's. The shipped file uses
+it only for the Staff of Renewal's 15 mana and the Staff of Mire's 25; the
+Staves of Warding and Blight take the Staff row's 20.
 
-**This decides who owns the data, so it is the user's to decide.** The
-alternative: the JSON as the source, embedded in the assembly as the compiled
-fallback, with `ContentDefaults` reading it — one source a designer edits
-directly, at the cost of the C# builders and the comments that derive every
-unique from its variant (`ContentDefaults.cs`). settled.md's Phase 5
+**This decides what the file lets a designer say, so it is the user's to
+decide.** The alternative: the statline is the class's alone, and only a caster
+variant may name its `manaCost` — stricter to the docs' tables, at the cost of a
+per-variant tweak becoming a new class. settled.md's Phase 5 implementation pass
+records the ruling.
+
+## Where the caster drop order lives (§3.5, §5.6) — REWORK DECISION 2
+
+The ruling makes `weapons.json` the master of every variant, with no copy in
+code. `LootTable.CasterVariants` is one: a C# list of eight of its variant ids —
+which staves and wands a caster drop rolls between, and in what order. So a
+caster variant added to the JSON never drops without a code edit.
+
+**Shipped provisionally: kept in code.** The drop's draw indexes the list, and
+§3.5 wants a saved, not-yet-collected dummy's drop never to move under a content
+edit: with the order held in code, a reorder of `weapons.json` re-rolls nobody.
+It is cross-checked at load — a caster class must hold every variant the list
+names (`RuleCasterVariantPool`) — and settled.md's ruling subsection names it as
+the one weapon-id list the code keeps.
+
+**This keeps a copy the ruling removes everywhere else, so it is the user's to
+decide.** The alternative: an explicit, append-only drop order carried in
+`weapons.json` — a `dropOrder` list on each caster class's row — cross-checked
+at load: every id a variant of that class, none twice, and a copy beside the exe
+keeping the built-in copy's order as its prefix, so an append re-rolls nobody. A
+new caster variant then drops with no code edit, at the cost of a stream order a
+hand edit can break — and an edit that reorders the master itself is caught by
+no load rule, only by review. settled.md's Phase 5 implementation pass records
+the ruling.
+
+## Which of the masters' values the tests pin (§5.3–§5.8) — REWORK DECISION 3
+
+The ruling leaves no copy of a master's value in code, and a test that pins a
+shipped number as a literal is one: a designer's edit to the JSON fails it.
+
+**Shipped provisionally: only the values a design doc fixes stay literal**, each
+pinned where `ShippedDataTests`' summary lists it beside the doc line that fixes
+it, so an edit that moves one fails by name and its doc moves with it:
+`MovementBudget` 160 and `MovementUnitsPerMana` 10 derived from it
+(phase-1-weapons.md's `(160 − 40) / (8 + 3)`); §1.2–§1.4's class rows,
+statlines, spreads and wand shapes; §1.5's unique table; and §5.8's tutorial
+row, its golem and its boss floor. Every other test reads the master, or stands
+on numbers of its own, and the README says which master edits also fail a test.
+Three facts come with the choice, so that it is ruled on knowingly:
+
+- **The `Premise` scope.** The suite did not only learn to read the master: 45
+  scenario suites run on `GameEngine.DistanceRPG.Tests/Premise.cs`, a frozen
+  snapshot — the 113 values of `TestData/saves/pre-rework-tuning.json`, the
+  shipped tuning from before the rework, and, as C# literals, §1.2–§1.4's
+  statlines, the staves' mana, the wands' shapes and the bosses' statlines, the
+  four provisional bosses' 200 and 70 among them (`VisitSaveTests` still asserts
+  the Spear Warden's 200 and 70 under it). Those suites no longer exercise the
+  shipped numbers, and the premise can drift from the master unseen: the two
+  were equal key for key when it was written, and nothing compares them. The
+  alternative for this part: those suites read the master, and a master edit
+  can fail them.
+- **§1.1's modifier table** (phase-1-modifiers.md: `Block` +3 absorbed a stack,
+  `Splitting` +3, `Light` −10% of the weapon's cost, `CritMultiplier`'s base ×2
+  …) is as doc-fixed as §1.2–§1.4, yet sits on neither side of the list: it is
+  pinned nowhere against the master, since `ModifierRulesTests` checks only that
+  the rules read and sum the tuning's tables. A candidate addition.
+- **The friendly-fire switch** — `FriendlyFireEnabled` false, which
+  phase-1-weapons.md L1062–1063 and settled.md L134–136 fix until the wand
+  placement scorer exists — is a doc-fixed value that the numbers-only audit
+  never moved. It is pinned against the master in
+  `WandTests.FriendlyFire_OffByDefault_HalfWhenOn`, and listed with the pins in
+  `ShippedDataTests` and the README.
+
+**This decides what a master edit can break, so it is the user's to decide.**
+The alternative: no literal at all — every test reads the master, the docs alone
+quote their numbers, and no master edit fails the suite. settled.md's Phase 5
 implementation pass records the ruling.
-
-## Whether class baselines are a section of `weapons.json` (§5.6)
-
-§5.6 opens: "The 32 weapons, the uniques, and the class baselines leave
-`Weapons.cs`." They did leave it, in Phase 1, for `ContentDefaults`; the
-question is the file's shape.
-
-**Shipped provisionally: derived, never a section.** Every variant row carries
-its whole forged spread, and a class's baseline is what its four variants share,
-checked at load (`RuleClassBaseline`, `RuleVariantDelta`). A spread has one
-source, so nothing can disagree with it — the reason §5.8 gives for computing a
-dungeon's drop table rather than writing one.
-
-**This bends a line of the phase doc, so it is the user's to decide.** The
-alternative: a `baselines` section, class to spread, with each variant written as
-its one added modifier — re-basing a class becomes one edit, at the cost of a
-second shape for a spread and a reader that composes the two. settled.md's Phase
-5 implementation pass records the ruling.

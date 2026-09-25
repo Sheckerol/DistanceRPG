@@ -442,7 +442,7 @@ public sealed class VisitSaveTests : IDisposable
     [Fact]
     public void TheDepthAndThePromiseAreTheSavesNotTheTunings()
     {
-        // 4D:278, L1360-1367, re-pinning PHASE4-134: the boss floor and the stacks
+        // 4D:278, L1376-1383, re-pinning PHASE4-134: the boss floor and the stacks
         // its drop was promised are fixed at entry — "a tuning change during the
         // visit moves neither" — and a load uses the saved values. Restored under a
         // tuning that would roll this seed's boss onto floor 3 and price floor 5 at
@@ -673,7 +673,7 @@ public sealed class VisitSaveTests : IDisposable
     [Fact]
     public void ASpoilPutDownIsStillASpoilAfterAReload()
     {
-        // 4D:1i, L1389-1391: a spoil put down and taken back is the spoil it was —
+        // 4D:1i, L1405-1407: a spoil put down and taken back is the spoil it was —
         // lost to a wipe — and a weapon the party carried in stays gear however
         // often it is put down: never taken. So across a save too: the golem's drop,
         // taken and put down on the tutorial's floor 2, and D's staff put down beside
@@ -872,7 +872,7 @@ public sealed class VisitSaveTests : IDisposable
             Assert.NotEqual(Describe(shown.Weapon), Describe(LootTable.Roll(row, back.Floor.Seed).Weapon));   // what a fresh roll would lay now
         }
 
-        // A revival is a future event (the arrival rule, L1307-1315): with the boss
+        // A revival is a future event (the arrival rule, L1323-1331): with the boss
         // standing, a dummy put down a turn before the save — not due for nine turns
         // under the premise's numbers — gets up as its floor is opened under a tuning
         // that makes it due, and stays down under the numbers it was saved under.

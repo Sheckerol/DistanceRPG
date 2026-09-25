@@ -539,7 +539,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.8 checks on <c>dungeons.json</c> (S:315-324), run after the weapons
+    /// The §5.8 checks on <c>dungeons.json</c> (S:390-399), run after the weapons
     /// and against the tables <paramref name="tables"/> computed from them —
     /// <see cref="DungeonCatalogue"/> calls this from its constructor, the way
     /// <see cref="EnchantmentCatalogue"/> validates what it builds. In a fixed
@@ -833,7 +833,7 @@ public static class ContentValidator
     /// tables (<see cref="EnchantmentBehaviours.AppliesStatus"/>,
     /// <see cref="EnchantmentBehaviours.LingersAnElement"/>), so a new kind
     /// is a row there and never an edit here. With the first rule, the
-    /// second makes every unique magnitude quote no flat trigger (S:239): it
+    /// second makes every unique magnitude quote no flat trigger (S:296): it
     /// applies a status, so its price is the ladder over what it lands.
     /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
     /// <para>
@@ -907,7 +907,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.5/§5.7 cross-check (S:265-270, S:277): the <c>unique</c> flag says
+    /// The §5.5/§5.7 cross-check (S:334-339, S:352): the <c>unique</c> flag says
     /// the tier is pinned, <c>neverRolled</c> says no roll grants it, and the
     /// two are one question — every unique entry is in <c>neverRolled</c>, and
     /// <c>neverRolled</c> names nothing but unique entries — so declaring one
@@ -934,7 +934,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// §1.4's chart as content (S:278): four types, two pairs, every type opposed
+    /// §1.4's chart as content (S:353): four types, two pairs, every type opposed
     /// by exactly one. Each <see cref="DamageType"/> other than None is carried by
     /// exactly one elemental entry, and the exclusion groups of
     /// <paramref name="restricted"/> oppose every element to exactly one other,
@@ -984,7 +984,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.6 checks on <c>weapons.json</c> (S:231-240). The class rows first,
+    /// The §5.6 checks on <c>weapons.json</c> (S:283-297). The class rows first,
     /// in <see cref="WeaponClass"/> order, each failure's entry the class
     /// (<see cref="ValidateClasses"/>): one row a class, a kind that casts exactly
     /// for the Staff and the Wand, the stats it levels on, a signature no other
@@ -1039,7 +1039,7 @@ public static class ContentValidator
     /// </para>
     /// <para>
     /// <strong>A relations edit that makes a weapon illegal names both</strong>
-    /// (§5.5, S:220-224): the weapon is the entry (or its class, where the
+    /// (§5.5, S:260-264): the weapon is the entry (or its class, where the
     /// relation refuses the class's baseline: the class row alone writes it and
     /// every weapon of the class is forged with it, so the entry named is the one
     /// of the two to change), and the detail ends with the
@@ -1086,7 +1086,7 @@ public static class ContentValidator
             // One hit cannot be two contradictory things: an entry's enchantments
             // never include a pair the relations exclude, in attachment order so
             // the pair reported is the same one every run — naming the
-            // restricted.json group that excludes them (S:220-224: "naming both").
+            // restricted.json group that excludes them (S:260-264: "naming both").
             for (int i = 0; i < def.Enchantments.Count; i++)
                 for (int j = i + 1; j < def.Enchantments.Count; j++)
                 {
@@ -1245,7 +1245,7 @@ public static class ContentValidator
     /// Why <see cref="ModifierRules.Allowed"/> refuses <paramref name="t"/> on a
     /// weapon of <paramref name="kind"/> carrying <paramref name="present"/> — the
     /// relation that refused it, as <c>restricted.json</c> writes it — or null when
-    /// it is allowed (S:220-224, PHASE5-122: a relations edit that makes a weapon
+    /// it is allowed (S:260-264, PHASE5-122: a relations edit that makes a weapon
     /// illegal names "the weapon that is now illegal <em>and</em> the rule that
     /// made it so").
     /// <para>
@@ -1502,7 +1502,7 @@ public static class ContentValidator
             .ToList();
 
     /// <summary>
-    /// The derivation rule (§1.5, S:236-238), checked over the whole unique
+    /// The derivation rule (§1.5, S:293-295), checked over the whole unique
     /// table (K:179-182): a unique names the variant it derives from, and
     /// nothing else does; it keeps that variant's class, statline and shape —
     /// "everything else is unchanged". A martial unique is the variant with

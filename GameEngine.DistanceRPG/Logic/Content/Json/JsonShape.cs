@@ -7,7 +7,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The strict reader every content file shares (1h): one file's text as JSON,
 /// and each value asked for as the documented shape says it is. Content is
 /// strict where <c>tuning.json</c> is lenient — a mistyped field in content is
-/// "a rule that silently does not apply" (S:213) — so nothing here guesses,
+/// "a rule that silently does not apply" (S:253) — so nothing here guesses,
 /// defaults or skips: a member the shape does not know is refused, a member
 /// named twice is refused, a missing member is refused, and a value of the wrong
 /// kind is refused. Comments and trailing commas are allowed, since a human

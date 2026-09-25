@@ -41,7 +41,7 @@ a session, a wand, and a floor of enemies. A constant like that being compiled
 in would be the single worst hardcode in the project.
 
 So: a **`tuning.json` beside the executable**, read once at startup into
-`GameConstants`, overriding compiled defaults.
+`GameConstants`, overriding the shipped file's numbers, which the game carries built in.
 
 ### What it must never contain
 
@@ -63,9 +63,9 @@ is a crash waiting on a typo. `tuning.json` holds **scalars only**.
 
 - **Read once, at startup.** Never hot-reloaded mid-run. A run has to resolve
   under one set of numbers or its own save stops reproducing.
-- **Missing keys fall back to the compiled default.** A partial file is valid,
-  so the player edits the three lines they care about — and adding a constant
-  later never invalidates an existing file.
+- **Missing keys fall back to the shipped file's number, which the game carries
+  built in.** A partial file is valid, so the player edits the three lines they
+  care about — and adding a constant later never invalidates an existing file.
 - **Ratios are integer divisors, not floats.** `MovementUnitsPerMana: 10`, not
   `ManaPerMovementUnit: 0.0625`. It reads correctly, it cannot drift, and it
   makes the units explicit in the name — which is the exact error §1.3 already
@@ -108,23 +108,26 @@ question that matters: *are these the same numbers?*
 
 ## 5.4 The content files, and what they share
 
-Five files hold content: **`restricted.json`**, **`weapons.json`**,
-**`enchantments.json`**, **`dungeons.json`**, **`party.json`**. They are a different kind of thing
-from `tuning.json`, which is scalars — these carry **invariants**, so they are
-validated rather than clamped.
+Three files hold content: **`restricted.json`**, **`weapons.json`** and
+**`dungeons.json`**. They are a different kind of thing from `tuning.json`,
+which is scalars — these carry **invariants**, so they are validated rather
+than clamped. Beside them, the reference data the content names is code: the
+modifiers, the enchantment catalogue and its unique souls (§5.7), and the
+starting party (§5.9).
 
 ### The reason, and it is not that numbers become editable
 
 Numbers becoming editable is a convenience. The real gain is that **adding a
-mechanic stops being a content change.** The work splits four ways, and only one
-part is code:
+mechanic stops being a content change.** The work splits five ways, and only
+two parts are code — the rule, and the reference data the rule is addressed by:
 
 | Question | Answered by | Why there |
 | --- | --- | --- |
 | **What does it do?** | Code | It is a rule. `Brace` fires a retaliation; that has to run |
+| **What is it?** — the modifiers, the enchantments and their souls, the starting party | Code | Reference data: what behaviour is addressed by, by a stable id; it changes when behaviour does |
 | **What number?** | `tuning.json` | It is a scalar |
 | **What may it coexist with, and can it be rolled?** | `restricted.json` | It is a relation, and relations change every time a mechanic is added |
-| **Which weapons and dungeons use it?** | The content files | It is content |
+| **Which weapons and dungeons use it** — the weapon types, the weapons, the dungeons? | `weapons.json`, `dungeons.json` | It is content |
 
 So adding a modifier is: implement the behaviour, price it, declare its
 relations — **and none of that last part is a recompile.** Every existing weapon
@@ -140,9 +143,34 @@ additive property the whole split exists to buy is not real. The validation
 concern is genuine but it is answered by validating the relations too (§5.5),
 not by freezing them.
 
+### The user's ruling (2026-09-25): reference data in code, the JSON the master copy
+
+Phase 5 first shipped `tuning.json` and five content files — these three,
+`enchantments.json` and `party.json` — all generated from a compiled copy
+of every number, relation, weapon and dungeon, with a test holding each
+file to that copy byte for byte. The user ruled that **reference data is
+code and everything else is JSON, with no C# duplicate**: "behaviour,
+modifiers, and enchantments living in the code due to them being reference
+data, while weapon types, weapon modifiers, rolled weapons and numbers
+driving tuning are fully in json". The modifiers, the enchantment catalogue
+and its unique souls, and the starting party are what behaviour is
+addressed by: they change when behaviour does, so they live beside it. The
+numbers, the relations, the weapon types, the weapons and the dungeons are
+the files' alone, because "if it lives in the code then changing the json
+loses all purpose" — a number or a relation with a second home in code is
+one whose file edit may not be the one that plays.
+
+So the shipped files in `GameEngine.DistanceRPG/Data` are the **master copy**,
+edited by hand, and the build carries them: each is the fallback for its copy
+beside the executable, where a playtest edits it. A copy that is missing or
+cannot be read plays the built-in one and says so, and a `tuning.json` key left
+out plays the built-in number — so the game runs with nothing beside it, and
+says so. The weapons the party owns are no content at all: they live in the
+save (§5.1).
+
 ### The shared contract
 
-All four follow the same rules, and it is worth stating once:
+All three follow the same rules, and it is worth stating once:
 
 - **Every entry has a stable string id.** Saves, drops, enemy states and the
   enchanter's seen-catalogue all store ids, never indices or positions.
@@ -160,26 +188,38 @@ All four follow the same rules, and it is worth stating once:
   tables. Worth saying plainly, because "the content is data now" sounds like a
   parity concern and is not.
 
+The code catalogues keep the same contract: every entry has a stable string id,
+and each is validated at load — the enchantment catalogue on its own and against
+`restricted.json`, the starting party against `weapons.json` — so a code edit
+that breaks a rule stops the game as a broken file does, and the tests catch it
+first.
+
 ### Load order is a real constraint
 
-The files reference each other in one direction, so they load in one order:
+The files reference each other, and the code catalogues, in one direction, so
+they load in one order:
 
 ```
-tuning.json → restricted.json → enchantments.json → weapons.json → dungeons.json → party.json
+the code catalogues → tuning.json → restricted.json → weapons.json → dungeons.json → the starting party
 ```
 
-`restricted.json` is the predicates everything after it is checked against;
-`weapons.json` names enchantment ids for caster innates and unique souls;
-`dungeons.json` names a modifier for its theme, and its **drop table is computed
-from the weapon list** rather than read. `party.json` loads last because it is
-the only file that names *specific weapon ids* rather than classes or
-variants — a starting loadout is a concrete item, not a roll. A cycle here
-would be a design error rather than a loader problem — if content ever needs
-to reference forward, the thing it is reaching for probably belongs in code.
+The modifiers and the enchantment catalogue are what every id is checked
+against, so they come first, and the catalogue is checked on its own before
+anything reads it. `restricted.json` is the predicates everything after it is
+checked against, and the catalogue is checked against it in turn — its
+elements' opposition, its unique souls. `weapons.json` names enchantment ids for
+caster innates and unique souls; `dungeons.json` names a modifier for its theme,
+and its **drop table is computed from the weapon list** rather than read. The
+starting party is checked last because it is the only reference data that names
+*specific weapon ids* rather than classes or variants — a starting loadout is a
+concrete item, not a roll. A cycle here would be a design error rather than a
+loader problem — if content ever needs to reference forward, the thing it is
+reaching for probably belongs in code.
 
 ## 5.5 `restricted.json` — what may coexist, and what may be rolled
 
-The relations from §1.1, for modifiers and enchantments alike, in one file:
+The relations from §1.1, for modifiers and enchantments alike, in one file —
+and nowhere else: the game keeps no copy of a relation in its code (§5.4):
 
 | Key | Holds | Shape |
 | --- | --- | --- |
@@ -210,7 +250,7 @@ well-formedness rules, checked before anything reads it:
 
 | Check | Why |
 | --- | --- |
-| Every id resolves to a real modifier or enchantment | A typo in a relation is a rule that silently does not apply |
+| Every id resolves to a real modifier or an enchantment in the game's catalogue | A typo in a relation is a rule that silently does not apply |
 | No id excludes itself | Unsatisfiable, and always a mistake |
 | `excludes` closes symmetrically | Half-declared exclusions produce order-dependent bugs (§1.7) |
 | `requires` is acyclic | `A` needs `B` needs `A` can never be satisfied |
@@ -225,11 +265,28 @@ you which of the two you meant to change.
 
 ## 5.6 `weapons.json`
 
-The 32 weapons, the uniques, and the class baselines leave `Weapons.cs`.
-Statline, forged spread, area shape, innate enchantment id.
+The 32 weapons, the uniques, and the class baselines leave `Weapons.cs` — the
+baselines for a section of their own, since the weapon types are a section of
+`weapons.json` (the user's ruling of 2026-09-25, §5.4). Statline, forged spread,
+area shape, innate enchantment id, in three sections:
+
+| Section | Holds |
+| --- | --- |
+| `classes` | Each of the eight classes once, by name: its `kind` (melee, ranged or caster), the `stats` it levels on, its `signature`, its `baseline` — the modifiers every weapon of the class is forged with — and the statline its weapons share: `range`, `damage`, `cost`, `manaCost` |
+| `variants` | The 32 weapons: each one's class, its role, the modifier it **adds** to its class's baseline, the enchantments it arrives with (a staff's innate, by id) and a wand's area shape. A statline field a variant names plays instead of its class's |
+| `uniques` | Each artifact as the variant it derives from — whose class, statline and shape it takes — the modifier it **raises**, set to the count given, and its enchantments |
+
+So re-basing a class is one edit, to its row: a variant is its class plus the
+modifier it adds, and a unique is its variant with the modifier it raises. The
+loader composes each into the one weapon every other system reads.
 
 | Check | Rule | From |
 | --- | --- | --- |
+| Each of the eight classes has one row | The code names every class: the placer draws five, the Staff and the Wand are cast with, a save keys weapon XP by class | §1.2 |
+| A class casts exactly when it is the Staff or the Wand | The code casts with those two: a staff's innate is its cast, a wand's element and shape arrive when it drops | §1.3, §1.4 |
+| A class levels on one or more of STR, DEX and INT | CON levels no weapon: it is the body's pool, not a craft | §1.2, §2.2 |
+| No two classes share a signature | A dungeon's theme finds its class by its signature | §4.3 |
+| A class baseline is its signature plus a second (a caster's `Resonant ×1`) | No weapon starts with fewer than two forged axes, and a caster's second is its enchantment | §1.2, §1.3 |
 | Every forged spread is legal | `Allowed(t, kind, present)` | §1.1 |
 | Nothing forged too deep | `MaxForged` — `×3`, or `×1` for `Light`/`Resonant` | §1.1 |
 | No weapon has fewer than two forged axes | The farm allowance has somewhere to go | §1.2 |
@@ -253,14 +310,26 @@ fixed in code rather than on the file's length. Adding a fifth variant to a clas
 would still shift it; that is a deliberate, rare change rather than an ordinary
 edit.
 
-## 5.7 `enchantments.json`
+## 5.7 The enchantment catalogue (code)
 
 The catalogue and the unique souls: lock, trigger cost, condition, base potency,
 effect reference, `unique` flag, and a damage type where the entry is elemental.
+They are **code** (`Logic/Enchantments/EnchantmentDefinitions.cs`), not a file:
+the user's ruling of 2026-09-25 (§5.4). An enchantment is reference data, like a
+modifier — the effect it names is code, and the entry is what that behaviour is
+addressed by, through the stable id the relations, the weapons, the drop pool
+and a save name it by. A change to the catalogue is a rebuild, made when
+behaviour changes.
 
 **The effect itself stays code.** "Heal the wielder 1 per tier on damage dealt" is a rule,
 so an entry names an `EffectKind` and supplies parameters — the same shape as a
 modifier naming a behaviour it does not implement.
+
+**The numbers `tuning.json` owns are not written in the catalogue at all.** An
+element's and `Serrated`'s `ApplyPercent` and `Arcane`'s potency are
+`tuning.json`'s (`ApplyPercent`, `ArcanePotency`, §5.3): the catalogue marks each
+as set by tuning and states no number of its own, and the shipped `tuning.json`
+must name every one, or the game does not start.
 
 **The `unique` flag says one thing only: the tier is pinned at 1** (§3.3). Its
 *roll-eligibility* lives in `restricted.json` under `neverRolled`, because that
@@ -268,6 +337,12 @@ is the same question asked of `Charges` and belongs in the same place. The
 loader cross-checks the two and aborts if they disagree, so declaring one and
 forgetting the other is a startup error rather than a unique quietly appearing
 in the enchanter's catalogue.
+
+**It is still validated at load**, first and on its own, as the file was: a code
+edit that breaks a rule stops the game on its screen, and the tests catch it
+before a playtester can. The checks that meet `restricted.json` — the unique
+souls against `neverRolled`, the elements' opposition — are that file's to fix,
+since it is the one a playtest edits, and a failure there names it.
 
 | Check | Rule | From |
 | --- | --- | --- |
@@ -277,7 +352,7 @@ in the enchanter's catalogue.
 | `unique` entries appear in `neverRolled` | One question, one answer, cross-checked | §5.5 |
 | Damage-type opposition is symmetric and total | Four types, two pairs, every type opposed by exactly one | §1.4 |
 | A lingering element names an element that exists | Searing is nothing without its `Flaming` | §1.5 |
-| Every effect reference resolves to an `EffectKind` | A typo is not a silent no-op | — |
+| Every effect reference resolves to an `EffectKind` — by construction: an entry's effect is typed | A typo is not a silent no-op | — |
 
 The first is the one to enforce hardest. §3.3 spends a section on *every trigger
 costs mana* holding up three separate arguments — the resource gate, the
@@ -315,7 +390,7 @@ edit that makes `Brace` legal on axes changes the Brace dungeon's drop table
 | Check | Rule | From |
 | --- | --- | --- |
 | At least one class can carry the theme | Otherwise the boss drops nothing at all | §4.3 |
-| The theme is a **class signature** | So each themed dungeon can drop exactly one named unique, via the Purity coincidence | Settled |
+| The theme is a **class signature**, as `weapons.json`'s class rows name them | So each themed dungeon can drop exactly one named unique, via the Purity coincidence | Settled |
 | `retiresOnClear` implies a fixed boss floor | The tutorial's two floors are the enchanter's mana budget, not a roll | §4.3 |
 | Only one dungeon retires on clear | Two un-repeatable dungeons is a content decision nobody has made | §4.3 |
 
@@ -323,13 +398,17 @@ The second is the one that will get broken by accident, because a theme that is
 *not* a class signature still works — it just quietly means that dungeon can
 never produce its unique, and nothing else in the game announces the difference.
 
-## 5.9 `party.json`
+## 5.9 The starting party (code)
 
 The four-character starting roster: name, innate stat spread (§2.1, a
 permutation of 1–4), and starting weapon **by id**, referencing an entry in
-`weapons.json`. This is what a designer edits while tuning the tutorial, so it
-gets a file for the same reason weapons and dungeons do — a starting loadout
-is content, not a constant.
+`weapons.json`. It is **code** (`Logic/Content/StartingParty.cs`), not a file.
+This section first gave it a file "for the same reason weapons and dungeons do
+— a starting loadout is content, not a constant", with the identities "decided
+in this file, not hardcoded"; the user's ruling of 2026-09-25 reverses both
+(§5.4): the roster and its loadouts are reference data. A change to them is a
+rebuild, and plays from the next campaign started — a saved campaign keeps the
+party it started with (§5.1).
 
 | Field | Notes |
 | --- | --- |
@@ -337,6 +416,14 @@ is content, not a constant.
 | `stats` | `{ STR, DEX, CON, INT }`, one permutation of 1–4 (§2.1, validated per §5.7's checklist) |
 | `startingWeaponId` | A `weapons.json` id. Must exist, and the class must be one the roster wants represented |
 
+**It is still validated at load, last, against `weapons.json`** — the only
+reference data that names specific weapon ids. A `weapons.json` that renames a
+weapon only the party names stops the game naming the member, the rule and
+`weapons.json`, the file a playtest can fix. The roster's own rules — four
+members, each spread a permutation, a caster in hand — no file can break: only
+a code edit can, and the tests catch it first.
+
 Party B/C/D's own identities (which pair splits which stats, which debuff
-staff D carries) are decided in this file, not hardcoded — changing the
-tutorial's fourth character to try a different stat pairing is a data edit.
+staff D carries) are therefore the code's: changing the tutorial's fourth
+character to try a different stat pairing is an edit to `StartingParty` and a
+rebuild.

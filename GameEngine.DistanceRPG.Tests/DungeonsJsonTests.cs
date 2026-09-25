@@ -71,7 +71,7 @@ public class DungeonsJsonTests
 
         // PHASE5-157: boss, "statline plus innate modifiers" — the golem's HP, its
         // movement budget and its Block x3, read as written (the golem's own
-        // numbers are S:302's, pinned in DungeonContentTests.TheTutorialIsTheShippedDungeon).
+        // numbers are S:377's, pinned in DungeonContentTests.TheTutorialIsTheShippedDungeon).
         Assert.Equal("{ \"Block\": 3 }", tutorial.GetProperty("boss").GetProperty("innate").GetRawText());
         var golem = read.Single(d => d.Id == "tutorial").Boss;
         Assert.Equal((golem.MaxHp, golem.MovementBudget), (tutorial.GetProperty("boss").GetProperty("maxHp").GetInt32(), tutorial.GetProperty("boss").GetProperty("movementBudget").GetInt32()));

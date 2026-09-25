@@ -317,7 +317,7 @@ public static class TuningSchema
     /// <summary>
     /// <c>ApplyPercent</c>, keyed by enchantment id: the catalogue lays each
     /// entry the table names over that entry's own percentage, so the dial owns
-    /// the number for every id it names (S:84, S:125) — and for the entries the
+    /// the number for every id it names (S:84, S:128) — and for the entries the
     /// catalogue leaves to it (<see cref="EnchantmentDefinitions.SetByTuning"/>),
     /// it is the only number there is. The table is every id the tuning names,
     /// in ordinal order.

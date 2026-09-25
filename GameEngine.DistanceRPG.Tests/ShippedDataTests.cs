@@ -40,7 +40,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The unique table — phase-1-weapons.md L1075-1083 (§1.5):
 /// <c>UniqueContentTests</c>' <c>Table</c>.</item>
 /// <item>The tutorial's row: its boss pinned to floor 2, and its golem's 80 HP,
-/// movement budget of 40 and Block x3 — phase-5-save.md L300 and L302 (§5.8):
+/// movement budget of 40 and Block x3 — phase-5-save.md L376 and L377 (§5.8):
 /// <see cref="DungeonContentTests.TheTutorialIsTheShippedDungeon"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an

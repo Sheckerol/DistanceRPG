@@ -182,6 +182,14 @@ public static class LootTable
     /// meaning code's, so a content reorder moves nothing and an append re-rolls
     /// nobody.
     /// </para>
+    /// <para>
+    /// <strong>Provisional: REWORK DECISION 2.</strong> The user's ruling of
+    /// 2026-09-25 makes <c>weapons.json</c> the master of every variant, and this
+    /// is a C# list of eight of its ids, kept for the stream's sake: a caster
+    /// variant added to the file drops only once it is named here. The
+    /// alternative, an append-only drop order carried on each caster class's row
+    /// in <c>weapons.json</c>, is set out in docs/roadmap/open-questions.md.
+    /// </para>
     /// <see cref="ContentValidator.ValidateWeapons"/> refuses a caster class
     /// that does not hold every variant named here, which is also what keeps the
     /// draw in range: a file with three staves is refused at load, the way every

@@ -644,19 +644,26 @@
   is −10% of the weapon's cost per stack, not a flat subtraction — attack costs
   span 20–60, and flat would zero out a dagger while barely touching an axe.
 - **Tunable numbers live in `tuning.json`** (§5.3) — read once at startup,
-  never hot-reloaded, compiled fallback for every missing key, scalars only.
-  Nothing the golden tests pin may ever appear in it, enforced by a test that
-  asserts the schema is disjoint from the parity-critical names. Ratios are
+  never hot-reloaded, the built-in file's number for every missing key, scalars
+  only. Nothing the golden tests pin may ever appear in it, enforced by a test
+  that asserts the schema is disjoint from the parity-critical names. Ratios are
   **integer divisors with the units in the name** (`MovementUnitsPerMana: 10`),
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
-  warn on mismatch rather than refusing.
-- **Content lives in four validated files** (§5.4–5.8) — `restricted.json`,
-  `enchantments.json`, `weapons.json`, `dungeons.json` — loading in that order,
-  since relations validate everything, weapons name enchantment ids, and
+  warn on mismatch rather than refusing. (Superseded by the user's ruling,
+  2026-09-25, in one clause: a missing key had a "compiled fallback"; the
+  shipped `tuning.json` is now the master copy, built into the game, and the
+  code keeps no number of its own — the Phase 5 pass below.)
+- **Content lives in three validated files** (§5.4–5.8) — `restricted.json`,
+  `weapons.json`, `dungeons.json` — beside the code catalogues, loading in the
+  order the catalogues, tuning, relations, weapons, dungeons, the starting
+  party, since relations validate everything, weapons name enchantment ids, and
   dungeons name modifiers. Invalid content **aborts startup** naming the entry
   and the rule, rather than clamping as `tuning.json` does, because a broken
-  invariant is not a bad balance number.
+  invariant is not a bad balance number. (Superseded by the user's ruling,
+  2026-09-25: there were four files, `enchantments.json` among them; the
+  enchantment catalogue and the starting party are code — the Phase 5 pass
+  below.)
 - **Relations are data, not code.** `restricted.json` holds `excludes` (as
   *groups*, expanded to directed pairs at load), `requires`, `kind`,
   `forgedOnly` and `neverRolled`, for modifiers and enchantments alike. The
@@ -676,12 +683,17 @@
   otherwise re-rolls every enemy in every existing save; shifting an enchantment
   id silently turns a player's earned catalogue into a set of different
   enchantments.
-- **The point of it is that mechanics become additive.** Behaviour and relations
-  stay in code, values are `tuning.json`, and which weapons and dungeons *use*
-  them is content — so adding a modifier is: implement it, price it, declare its
-  relations, and it is then usable on any weapon in any spread without touching
-  code again. That is §1.1's uniformity finally paying out in the workflow
-  rather than only in the design.
+- **The point of it is that mechanics become additive.** Behaviour and the
+  reference data it is addressed by stay in code, relations are
+  `restricted.json`, values are `tuning.json`, and which weapons and dungeons
+  *use* them is content — so adding a modifier is: implement it, price it,
+  declare its relations, and it is then usable on any weapon in any spread
+  without touching code again. That is §1.1's uniformity finally paying out in
+  the workflow rather than only in the design. (Superseded by the user's
+  ruling, 2026-09-25: this said "behaviour and relations stay in code", against
+  the entry above; the relations are `restricted.json`'s alone, and the
+  modifiers, the enchantment catalogue and the starting party are the reference
+  data code keeps — the Phase 5 pass below.)
 - **A dungeon's drop table is computed, not authored.** §4.3's rule that a
   themed boss cannot drop a class that will not take its theme *is* `Allowed`
   run over the eight classes at load. Authoring it by hand would let the two
@@ -1209,7 +1221,11 @@
   `Arcane` eventually meets dummies that shrug it off — a better lesson than the
   number quietly having been smaller all along.
 - **This is also what keeps the arms race in the data files** (§5.5). A counter
-  is an entry someone adds; a rebalance is a recompile and an argument.
+  is an entry someone adds: a relation or a weapon in the data files, an
+  enchantment in the catalogue — never a rebalance of a constant, which is a
+  recompile and an argument. (Superseded by the user's ruling, 2026-09-25, in
+  its example: the enchantment catalogue is code, so a new enchantment is a
+  rebuild — the Phase 5 pass below.)
 
 ## Implementation pass — Phase 2 (innate stats and the three pools)
 
@@ -1416,12 +1432,104 @@ four as shipped.
 Rulings the Phase 5 branch made where the phase doc was silent, or where two
 passages met and one had to be read in the light of the other. Each is written
 down here so the next reader meets the ruling rather than the code that assumes
-it. Six of them bend a line of the phase doc rather than fill a silence; those
+it. Six of them bent a line of the phase doc rather than fill a silence; those
 are marked **bends the phase doc**, each with why it needs no ruling, or that it
-is the user's. Four rulings are the user's to make — the dice on a reload, the
-save model, where content's truth lives, and the class baselines, which is also
-one of the six bends — and each shipped provisionally: open-questions.md sets
-out the alternatives, and this pass records the ruling once the user makes it.
+is the user's. Four rulings were the user's to make — the dice on a reload, the
+save model, where content's truth lives, and the class baselines, which was also
+one of the six bends — and each shipped provisionally. **Two are ruled**
+(superseded by the user's ruling, 2026-09-25, below): content's truth is the
+JSON, and the class baselines are a section of `weapons.json`, which withdraws
+that bend. **Two are open** — the dice and the save model: open-questions.md sets
+out their alternatives, and this pass records each ruling once the user makes it.
+
+### The user's ruling on content (2026-09-25)
+
+**Reference data is code; everything else is JSON, and the JSON is the master
+copy.** The user ruled: "behaviour, modifiers, and enchantments living in the
+code due to them being reference data, while weapon types, weapon modifiers,
+rolled weapons and numbers driving tuning are fully in json" — and on why no
+value may keep a second home in code, "if it lives in the code then changing the
+json loses all purpose": a number or a relation with a copy in code is one whose
+file edit may not be the one that plays. Phase 5 had shipped six files generated
+from a compiled copy of all of it (`ContentDefaults`), pinned byte for byte; the
+ruling ends that, and supersedes the entries below where they differ.
+
+- **In code**: behaviour (the event table, the modifier and enchantment
+  behaviours), and as reference data the modifiers — the `ModifierType`
+  definitions and what each is; the enchantment catalogue and its unique souls
+  (`Logic/Enchantments/EnchantmentDefinitions.cs`), so `enchantments.json` is
+  gone; and the starting party, its roster and its loadouts
+  (`Logic/Content/StartingParty.cs`), so `party.json` is gone. Each is addressed
+  everywhere by a stable string id, and each is validated at load against the
+  JSON, a failure naming the entry, the rule and the file to fix: a relation
+  naming an enchantment the catalogue lacks stops the game on `restricted.json`,
+  a weapon naming an innate that does not exist on `weapons.json`, and a
+  `weapons.json` that renames a weapon only the party names on `weapons.json`,
+  naming the member. A copy of either retired file left beside the exe is named
+  on screen as no longer read.
+- **In JSON, the master copy**: `restricted.json` — the relations (`excludes`,
+  `requires`, `kind`, `forgedOnly`, `neverRolled`) live there alone; `weapons.json`
+  — the weapon types as a section of their own, every variant, the uniques, and
+  each weapon's forged modifiers and innate enchantment references;
+  `dungeons.json`; and `tuning.json`, whose `Tuning` record keeps its shape, its
+  key names, its clamps and its never-contain rules and holds no value. The
+  shipped files in `GameEngine.DistanceRPG/Data` are hand-kept, the build embeds
+  them, and each is the fallback for its copy beside the exe, **per file and,
+  for the tuning, per key**: a copy missing or unreadable plays the built-in one
+  and says so, as before, and a key left out plays the built-in number. A broken
+  built-in copy stops the game on its screen marked `(BUILT-IN)` — and, when no
+  file beside the exe can have broken it, names the master to fix and rebuild.
+- **The save** keeps the weapons the party owns in `campaign.json`, as before. It
+  stores ids and enum names, every id kept its name, and the tuning's hash
+  covers the same values, so a save written before the ruling loads and resumes
+  unchanged — pinned by two saves the pre-rework code wrote — and the save
+  format needs no new version.
+- **Phase 5 USER DECISIONS 3 and 4 are ruled**: content's truth is the JSON, and
+  the weapon types are a section of `weapons.json` — the class-baselines bend is
+  withdrawn, and §5.6 holds literally. **Decisions 1 and 2** — the dice across a
+  reload, the save model — **stay open**, and so does whether a content file's
+  numbers have bounds; what a deposit costs stays Phase 6a's.
+
+**The exceptions, named so that none reads as a surviving copy.** Code still
+names some weapon ids and keeps one coexistence rule, each for a reason of its
+own:
+
+- The starting party's loadouts — reference data, by the ruling.
+- `arming_sword`, what a dummy holds (`EnemyState.DefaultWeaponId`), and
+  `staff_of_renewal`, a crowded room's healer (`EnemyPlacer.HealerWeaponId`) —
+  named by behaviour, and each checked at load by `RuleCodeNamedWeaponsExist`,
+  which also wants a variant of every class the placer draws.
+- `LootTable.CasterVariants`, the one weapon-id *list* the code keeps: which
+  staves and wands a caster drop rolls between, in an order held in code so that
+  a reorder of `weapons.json` re-rolls no saved caster dummy's drop (§3.5), and
+  checked at load (`RuleCasterVariantPool`). Provisional, as REWORK DECISION 2
+  below; its alternative is in open-questions.md.
+- `ContentValidator.CurrencyGroup` (`Light`, `Resonant`), the one coexistence
+  rule the code keeps. Which modifiers can pay for a second soul (§1.5's combo
+  platform) is what those two modifiers *do*, so it gates
+  `RuleDependencyOnCurrency` from code; every relation *between* ids is
+  `restricted.json`'s alone.
+
+**The rework's own choices, shipped provisionally** — each labelled REWORK
+DECISION, never USER DECISION, which names Phase 5's list; open-questions.md
+sets out each alternative, and this pass records the ruling once the user makes
+it:
+
+- **REWORK DECISION 1 — a variant may name its own statline, field by field.**
+  A class row carries the statline its variants share; any of `range`, `damage`,
+  `cost` and `manaCost` given on a variant plays instead of its class's. The
+  shipped file uses it only for the Staff of Renewal's 15 mana and the Staff of
+  Mire's 25.
+- **REWORK DECISION 2 — the caster drop order stays in code**
+  (`LootTable.CasterVariants`, above), so a caster variant added to
+  `weapons.json` drops only once the list names it.
+- **REWORK DECISION 3 — the suite keeps as literals only the values a design
+  doc fixes** — `MovementBudget` 160 and the `MovementUnitsPerMana` derived from
+  it, §1.2–§1.4's class rows, statlines, spreads and wand shapes, §1.5's unique
+  table, §5.8's tutorial row, and the friendly-fire switch — so an edit to one
+  fails by name and its doc moves with it. Every other test reads the master or
+  stands on numbers of its own (`Premise`), and no other master edit fails the
+  suite.
 
 ### The numbers: `tuning.json`
 
@@ -1447,12 +1555,15 @@ out the alternatives, and this pass records the ruling once the user makes it.
   not follow the budget. Computed, a budget edit would silently re-price every
   cast; a designer who turns the budget re-derives the divisor on purpose.
 - **The file clamps; a tuning built in code is still refused.** A missing key
-  keeps its compiled default, a table merges per entry, an unknown key or a
+  keeps the built-in file's number, a table merges per entry, an unknown key or a
   value that is not an integer warns and is ignored, and a value out of range
   clamps and warns — a typo costs a line on screen and in the log, never a
   session. `ContentValidator.ValidateTuning` keeps refusing a `Tuning` built in
-  code, so every rule still has its refusal, and every tuning a file can make
-  passes it.
+  code — now also a table that does not name every member of its kind
+  (`RuleTableNamesEveryMember`) — so every rule still has its refusal, and every
+  tuning a file can make passes it. (Superseded by the user's ruling,
+  2026-09-25, in its first clause: a missing key kept "its compiled default"
+  until the ruling took every number out of the code.)
 - **Where tuning meets content, the tuning bends — never the content, and never
   with an abort.** Three keys are measured against the content as well as
   against themselves, and an in-range value can still break shipped content: a
@@ -1466,7 +1577,10 @@ out the alternatives, and this pass records the ruling once the user makes it.
 - **The save records the hash of the effective values**: the fitted tuning,
   every table expanded over every member it can be asked for, as sorted
   `Key=value` lines, so formatting, order and comments never move it and any
-  value — a compiled default a new build changed included — does.
+  value — a number the master copy ships, changed by a new build, included —
+  does. (Superseded by the user's ruling, 2026-09-25, in its example: this read
+  "a compiled default a new build changed". The hash covers the same values it
+  did, so a save written before the ruling still hashes as its tuning.)
 - **The `…Percent` key names — bends the phase doc** (§5.3 fixes
   `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
   `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
@@ -1491,58 +1605,87 @@ out the alternatives, and this pass records the ruling once the user makes it.
 
 ### The content files
 
-- **Content is strict where tuning is lenient.** Five files — the contract
-  covers `party.json` as well as the four §5.4 names — each a top-level object,
+- **Content is strict where tuning is lenient.** Three files —
+  `restricted.json`, `weapons.json` and `dungeons.json` — each a top-level object,
   every entry with a stable string id, field names the records' camel-cased and
   the doc's where it fixes them, enum values by their names, comments and
   trailing commas allowed. An unknown member is refused (`RuleFileShape`): a
   mistyped field in content is a rule that silently does not apply. Invalid
   content stops the game on a screen naming the file, the entry, the rule and
-  its detail.
+  its detail. (Superseded by the user's ruling, 2026-09-25: there were five
+  files, the contract covering `enchantments.json` and `party.json` too, until
+  the catalogue and the party became code.)
 - **The staged load's order is a stated rule.** Every present file is parsed
-  first, each shape failure recorded, then the stages run in §5.4's order, each
-  first reporting its own file's shape failure: so a syntax error in a later file
-  never pre-empts a semantic error in an earlier one. The one order a reader might
-  not expect is deliberate: `enchantments.json`'s shape is reported before
-  `restricted.json`'s own rules, because those check the relations' ids against
-  the enchantments'.
-- **An absent content file plays the compiled record, and says so.** The doc
-  gives a compiled fallback for missing tuning keys and is silent on a missing
-  content file; the compiled record is valid content — the very content the
-  shipped file is pinned to — so there is nothing to abort for, and a notice
-  keeps a renamed or deleted file from passing unseen.
+  first, each shape failure recorded, then the stages run in §5.4's order — the
+  enchantment catalogue on its own, the tuning, the relations and the catalogue
+  against them, the weapons, the dungeons, the starting party — each first
+  reporting its own file's shape failure: so a syntax error in a later file never
+  pre-empts a semantic error in an earlier one. (Superseded by the user's ruling,
+  2026-09-25: the one order a reader might not expect — `enchantments.json`'s
+  shape reported before `restricted.json`'s own rules — went with the file.)
+- **An absent content file plays the built-in copy, and says so.** The doc
+  gives a fallback for missing tuning keys and is silent on a missing content
+  file; the built-in copy is the shipped file itself, the master copy the game
+  is built with, so there is nothing to abort for, and a notice keeps a renamed
+  or deleted file from passing unseen. A file there but unreadable does the
+  same, and says why. (Superseded by the user's ruling, 2026-09-25: it played
+  "the compiled record", the copy in code the ruling removed.)
 - **One owner for a dialled number: the dial.** `ApplyPercent`'s five ids and
   `arcane`'s potency are `tuning.json`'s (§5.3, and §5.4's "what number? —
-  `tuning.json`"). The row in `enchantments.json` keeps its field — the base the
-  validator checks, and the number for every id no dial names — the file marks
-  each dialled one, and an edit to one there is a notice naming both files.
-- **Three new content checks, none a new invariant**: a file's shape
-  (`RuleFileShape`), an effect name resolving to a kind (`RuleUnknownEffect`),
-  and the two weapons the code names existing (`RuleCodeNamedWeaponsExist`).
-  `kind` and `forgedOnly` name modifiers alone, since only the modifier rules
-  read them: an enchantment named in either would silently not apply, so it is
-  refused under the existing relation-id rule.
+  `tuning.json`"). The code catalogue carries no number of theirs — each row
+  marks its dialled field as set by tuning — so there is no second number for an
+  edit to disagree with, and a built-in `tuning.json` that leaves one out stops
+  the game (`RuleTuningOwnsTheNumber`). (Superseded by the user's ruling,
+  2026-09-25: the row in `enchantments.json` kept its field as the base, the
+  file marked each dialled one, and an edit there was a notice naming both
+  files; the notice went with the file.)
+- **The content checks the files brought, none a new invariant**: a file's
+  shape (`RuleFileShape`) and the weapons the code names existing
+  (`RuleCodeNamedWeaponsExist`, now also a variant of each class the placer
+  draws). With the ruling came the checks between the code and the JSON: each
+  class of `weapons.json` having one row (`RuleEveryClassHasARow`), casting
+  exactly when the code casts with it (`RuleCasterClass`), levelling on STR, DEX
+  or INT (`RuleClassStats`) and signing alone (`RuleClassSignatureDistinct`) —
+  each a code-names-it-so-the-JSON-must-fit check; a number the catalogue leaves
+  to the tuning named there (`RuleTuningOwnsTheNumber`) and a tuning table built
+  in code naming every member (`RuleTableNamesEveryMember`) — each a
+  no-number-under-it check; and the game carrying every data file it plays built
+  in (`RuleBuiltInCopy`) — a the-build-carries-it check. `kind` and `forgedOnly`
+  name modifiers alone, since only the modifier rules read them: an enchantment
+  named in either would silently not apply, so it is refused under the existing
+  relation-id rule. (Superseded by the user's ruling, 2026-09-25: there were
+  three, the third an effect name resolving to a kind — `RuleUnknownEffect` —
+  which went with `enchantments.json`, since an entry's effect is now typed in
+  code.)
 - **"Naming both" is an explanation, not a check.** A weapon a relations edit
   makes illegal names the relation that refused it, read off the file in hand,
   asking the rules' own clauses in their order — for modifiers and enchantments
   alike. It is there exactly when the rule refuses.
-- **Where content's truth lives: the compiled content, the files generated from
-  it — provisional, the user's to rule.** `ContentDefaults` is the source,
-  `--write-data` writes the six files, and a test pins the shipped ones byte for
-  byte; a designer tunes the copies beside the exe and ports a keeper back. The
-  alternative is in open-questions.md.
-- **Class baselines are derived, never a section of `weapons.json` — bends the
-  phase doc** (§5.6: "the class baselines leave `Weapons.cs`"; they did, in
-  Phase 1, for `ContentDefaults`). Every variant carries its whole forged
-  spread, and a class's baseline is what its four variants share, checked at
-  load — one source for a spread, the reason §5.8 gives for computing the drop
-  table. Provisional, the user's to rule; the alternative is in
-  open-questions.md.
-- **No `condition` field in `enchantments.json` — bends the phase doc** (§5.7,
+- **Where content's truth lives: the JSON — ruled by the user (2026-09-25).**
+  The shipped files are the master copy, hand-kept and built into the game as
+  the fallback, with no copy of any of their values in code (the ruling above).
+  A designer tunes the copies beside the exe and makes a keeper in the master.
+  `--write-data <folder>` writes the four built-in copies out — the way back
+  from an edited copy beside the exe — and refuses the source `Data` folder.
+  (Superseded by the user's ruling, 2026-09-25: shipped provisionally as the
+  compiled content, `ContentDefaults`, being the source, `--write-data` writing
+  the six files from it, and a test pinning the shipped ones byte for byte.)
+- **Class baselines are a section of `weapons.json` — ruled by the user
+  (2026-09-25), withdrawing the bend** (§5.6: "the class baselines leave
+  `Weapons.cs`" — now for a section of the file). Each class has a row — kind,
+  levelling stats, signature, baseline, statline — a variant is written as its
+  class and the modifier it adds, and a unique as its variant and what it raises;
+  re-basing a class is one edit. (Superseded by the user's ruling, 2026-09-25:
+  shipped provisionally as derived, never a section — every variant carrying its
+  whole forged spread, a class's baseline what its four variants share.)
+- **No `condition` field in an enchantment's entry — bends the phase doc** (§5.7,
   and the entry above listing condition among an enchantment's dials). Needs no
   ruling: §5.7's own example puts the condition inside the effect an entry
   names, and Phase 3 resolved the condition vocabulary into the kinds' events; a
-  column would be a second answer to "when does it fire".
+  column would be a second answer to "when does it fire". It holds for the code
+  catalogue's record as it held for the file (superseded by the user's ruling,
+  2026-09-25, in where the entries live: `EnchantmentDefinitions`, not
+  `enchantments.json`).
 - Whether a content file's numbers have bounds stays open: open-questions.md
   sets out both readings, and Phase 5 adds no new kind of content rule.
 

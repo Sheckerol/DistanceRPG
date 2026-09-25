@@ -6,11 +6,13 @@ original [Phaser prototype](https://github.com/Sheckerol/Game) onto the
 custom [GameEngine](https://github.com/Sheckerol/GameEngine), reinterpreted as
 a 3D dungeon with an angled top-down camera.
 
-Each run generates a fresh dungeon (the seed is logged at startup and also
-determines the enemy layout, so a run can be reproduced). Every room but the
-party's starting one holds 0–4 training dummies; defeated dummies resurrect
-after 10 turns. Dummies stay passive until spotted and doze back off two turns
-after losing sight of the party.
+Each run generates a fresh dungeon (the seed is logged as the run is entered and
+also determines the enemy layout, so a run can be reproduced — see the dev
+overrides under [Saves](#saves)). Every room but the party's starting one holds
+0–4 training dummies; a defeated dummy gets back up some turns later, stronger,
+and sooner each time it falls, until the dungeon's boss is killed. Dummies stay
+passive until spotted and doze back off two turns after losing sight of the
+party.
 
 ## Layout requirement
 
@@ -49,8 +51,11 @@ with `RESUMED` over the floor banner (see [Saves](#saves)).
 | In a dungeon | Action |
 | --- | --- |
 | WASD / arrows | Move the active character |
-| 1–4 / Tab / click | Switch party member (click their box or the party list) |
-| Left-click enemy | Attack with the equipped weapon |
+| 1–4 / Tab / click | Switch party member (click their box, the party list, or the member — unless a support staff in hand casts on them instead) |
+| Left-click enemy | Attack with the equipped weapon — or cast with it: a debuff staff lands its effect on the enemy, a wand aims its shape at it |
+| Left-click ally / floor | A support staff (Renewal, Warding) casts on the ally clicked; a Blast, Cone or Beam wand casts at the floor point clicked |
+| N | A Nova wand casts around the active character |
+| O | Hold fire: a ranged weapon with Overwatch spends an attack's movement to hold its shots through the enemies' turn, loosed at whatever walks into reach |
 | Space / Enter | End turn (banks half your unspent movement) |
 | E | Take the stairs the active character stands on: down, up, or out by the first floor's way out. Every living member must be within 3 tiles; the way out asks first, and E or Enter says yes |
 | G | Pick up what the active character stands on: a drop, or a weapon the party left there |
@@ -154,8 +159,8 @@ its own and resumes where you left off.
 Every number the game is tuned by — the movement budget, the mana divisor, each
 status's effect per level, what a stack of each modifier is worth, the farm's
 odds, the boss depths, the carry — sits in one file, `tuning.json`, grouped
-under the headings of `docs/roadmap/phase-5-save.md` §5.3 with a comment on
-every key.
+under the headings of `docs/roadmap/phase-5-save.md` §5.3 (and three of its own:
+Progression, Combat and Drops) with a comment on every key.
 
 - **Where**: beside the executable — `GameEngine.DistanceRPG/bin/Debug/net10.0/tuning.json`
   after a Debug build. The log prints its full path at startup
@@ -303,12 +308,12 @@ everything in them is named by a stable string id.
 - **The files in `GameEngine.DistanceRPG/Data/` are the master copies** — of every
   relation, weapon class, weapon and dungeon — hand-kept, with the reason for each
   group, class and boss written beside it; the game keeps no copy of any in its
-  code. As with
-  `tuning.json`, the game is built with each inside and plays that built-in copy
-  when the copy beside the exe is missing or cannot be read, and a build copies
-  each beside the exe (`bin/Debug/net10.0/`) whenever the master is newer: edit
-  the copy beside the exe to playtest (restart to apply), and the master to change
-  what ships (rebuild). The file headers say what each key and field means.
+  code. As with `tuning.json`, the game is built with each inside and plays that
+  built-in copy when the copy beside the exe is missing or cannot be read, and a
+  build copies each beside the exe (`bin/Debug/net10.0/`) whenever the master is
+  newer: edit the copy beside the exe to playtest (restart to apply), and the
+  master to change what ships (rebuild). The file headers say what each key and
+  field means.
 - **An edit to a master fails a test only where a design doc fixes the
   number**: the eight class rows, every weapon's statline and spread and the
   wands' shapes (`docs/roadmap/phase-1-weapons.md` §1.2–§1.4) fail
@@ -327,11 +332,12 @@ everything in them is named by a stable string id.
   start. It opens on `THE GAME CANNOT START` instead, naming the file, the entry,
   the rule and what broke it, with what `tuning.json` changed and
   `FIX THE FILE AND START AGAIN - ESC QUITS`; the log has the same lines. A typo
-  such as `"Riposte": ["Blok"]` shows `RESTRICTED.JSON`, `BLOK` and `ID DOES NOT
-  RESOLVE TO A MODIFIER OR AN ENCHANTMENT - DID YOU MEAN BLOCK?`. A field the game
-  does not know, a value of the wrong kind, or a file that is not JSON is refused
-  the same way, naming the path in the file (`dungeons[1].boss.maxHp`). Comments
-  and trailing commas are fine.
+  such as `"Riposte": ["Blok"]` shows `RESTRICTED.JSON`, `BLOK`, the rule
+  `ID DOES NOT RESOLVE TO A MODIFIER OR AN ENCHANTMENT` and the detail
+  `NOT A MODIFIER, NOR AN ENCHANTMENT IN THE ENCHANTMENT CATALOGUE - DID YOU MEAN BLOCK?`.
+  A field the game does not know, a value of the wrong kind, or a file that is
+  not JSON is refused the same way, naming the path in the file
+  (`dungeons[1].boss.maxHp`). Comments and trailing commas are fine.
 - **What is reported first**: the load runs in the order the game's catalogues,
   tuning, relations, weapons, dungeons, the starting party, and the first check
   to fail is the one shown. Each file's shape is checked before anything reads

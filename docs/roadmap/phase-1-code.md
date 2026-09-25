@@ -263,10 +263,12 @@ be a `case` in a `switch` that a new entry has to be added to. Instead each
 declares **which events it handles**, and one dispatcher runs the handlers.
 
 **This is the code half of a promise §5.4 already made.** Content lives in JSON
-so that adding a modifier is a data edit — but if its *behaviour* is six
-scattered `switch` arms, that promise is only half true and the half that is
-false is the expensive one. A dispatch table is what makes the data-driven claim
-honest.
+so that adding a modifier is a data edit (per the user's ruling, 2026-09-25: the
+modifier itself is defined in code — its `ModifierType` member, and its handler
+with its priority — and its relations, the weapons carrying it and its numbers
+are the JSON edit) — but if its *behaviour* is six scattered `switch` arms, that
+promise is only half true and the half that is false is the expensive one. A
+dispatch table is what makes the data-driven claim honest.
 
 #### The contract: transform and return, never mutate
 
@@ -348,7 +350,10 @@ to find it. Key by event, sort by priority, and make the sort explicit.
 #### What it buys
 
 - **Adding a modifier is: one JSON entry, one handler, one priority.** Nothing
-  existing is edited, which is the actual test of whether this worked.
+  existing is edited, which is the actual test of whether this worked. (Per the
+  user's ruling, 2026-09-25, the modifier itself is code: what defines it is a
+  `ModifierType` member beside its handler and its priority, and the JSON edit
+  is its relations, the weapons carrying it and its numbers — §5.4.)
 - **`TickStatusEffects` stops being special.** It is the `RoundEnd` and
   `TurnEnd` handlers for eight statuses, sharing the dispatcher with everything
   else rather than being its own path (below).

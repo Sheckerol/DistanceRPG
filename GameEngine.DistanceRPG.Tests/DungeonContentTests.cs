@@ -11,7 +11,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// the one question every graft asks, and the Phase 4 tuning keys. In the
 /// content collection because several tests load or swap content.
 /// <para>
-/// The golem's statline is phase-5-save.md's (S:302), pinned here as literals in
+/// The golem's statline is phase-5-save.md's (S:377), pinned here as literals in
 /// <see cref="TheTutorialIsTheShippedDungeon"/> (REWORK DECISION 3). Every other
 /// number is the master's: a test reads it from the tuning the game reads, or,
 /// where a case is worked around the numbers F:139-165 was written against, it
@@ -88,7 +88,7 @@ public class DungeonContentTests
     {
         // The tutorial is the dungeon shipped today: themed on Block, its boss a
         // stone golem (PHASE4-072), 80 HP on a movement budget of 40 with Block x3
-        // innate whatever it holds (S:302), two floors deep and no deeper, gone
+        // innate whatever it holds (S:377), two floors deep and no deeper, gone
         // for good once beaten.
         var tutorial = Dungeons.Tutorial;
         Assert.Equal("tutorial", tutorial.Id);
@@ -245,7 +245,7 @@ public class DungeonContentTests
     {
         // The relations with Brace taken out of the threat-zone group: an axe's
         // Opportunist no longer excludes it. No dungeon row changes (PHASE4-059,
-        // S:311-313: "with no other edit anywhere").
+        // S:386-388: "with no other edit anywhere").
         var braceFreed = ShippedContent.Restricted with
         {
             Excludes = ShippedContent.Restricted.Excludes
@@ -348,7 +348,7 @@ public class DungeonContentTests
         // catalogue built straight over those relations, because through Load the
         // Ranged row itself is refused first, its baseline forging Longshot on a
         // ranged class; this rule guards what the weapon rules cannot see
-        // (S:322-324).
+        // (S:397-399).
         var meleeLongshot = ShippedContent.Restricted with
         {
             Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.MeleeKind },
