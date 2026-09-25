@@ -673,16 +673,18 @@ public sealed class DungeonState
     public int DiceRolled { get; private set; }
 
     /// <summary>
-    /// The visit's own d20 (USER DECISION 1 of Phase 5, provisional: seeded and
-    /// saved): draw <see cref="DiceRolled"/> of the visit's dice stream,
+    /// The visit's own d20 (USER DECISION 1 of Phase 5, ruled by the user,
+    /// 2026-09-25: seeded and saved, "just to protect players from themselves"):
+    /// draw <see cref="DiceRolled"/> of the visit's dice stream,
     /// <c>DiceStream(MapSeed, DiceRolled).NextInt(1, 20)</c>, and count it. What
     /// every floor's system rolls when <see cref="OpenTurns"/> is handed no die —
     /// the swings, the reactions, the casts, the enemies' beats — so the dice a
     /// visit rolls are a pure function of its map seed and how many it has rolled,
     /// and a reload rolls on from exactly there: no reload-to-reroll. One counter
     /// for the whole visit, on every floor: the stairs move the party and never
-    /// the die. The price, stated with the decision: a turn replayed after the
-    /// process is killed past its autosave knows its next draws.
+    /// the die. The price, stated with the decision and accepted with the ruling:
+    /// a turn replayed after the process is killed past its autosave knows its
+    /// next draws.
     /// </summary>
     /// <returns>A natural roll, 1 to 20, each face equally likely.</returns>
     public int RollD20() => DiceStream(MapSeed, DiceRolled++).NextInt(1, 20);

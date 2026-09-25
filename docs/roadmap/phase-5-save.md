@@ -22,8 +22,8 @@ restore saved states afterwards.
 `Logic/` stops being clean.
 
 Round-trip test: save, reload, and assert that a fixed sequence of turns
-produces an identical world state.
-
+produces an identical world state — in the shipped game too, since its dice are
+the visit's own, seeded and saved (the user's ruling of 2026-09-25, settled.md).
 
 ## 5.3 `tuning.json` — the numbers, editable between loads
 
@@ -80,14 +80,14 @@ Everything currently flagged as a knob, gathered in one place:
 
 | Group | Keys |
 | --- | --- |
-| Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingPool` (25 — HP, mana and wear capacity alike) |
+| Economy | `MovementUnitsPerMana`, `MovementBudget`, `StartingPool` (30 — HP, mana and a weapon's starting wear capacity alike; 25 before settled.md's Phase 2 pass) |
 | Statuses | `EffectPerLevel` per status (`Searing` 1, `Mire` 10%, `Ward` 1), `OverhealPerWard`, `DotManaPerDamage`. **No decay constants** — one level a round, universally (§1.5) |
 | Appliers | `ApplyPercent` per enchantment — the one number that decides how many levels a source grants |
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `ReviveStepPercent`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
-| Enchanter | `WearPerHit`, `WearCapacityLadder` (30/40/55), `EnchantmentWearCost`, `GraftBaseChance` |
+| Enchanter | `WearPerHit`, `GraftBaseChance`, and what a deposit costs by the user's ruling of 2026-09-25 (settled.md): `WearCapacityPerBar`, `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`, `FirstEnchantmentWear`, `EnchantmentWearStep` — superseding `WearCapacityLadder` (30/40/55) and `EnchantmentWearCost` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
 

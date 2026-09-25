@@ -79,24 +79,50 @@ that it is time to rotate it into the shop.
 
 ### Every repair makes the weapon hold more
 
-**`WearCapacity` climbs an authored ladder**, one step per full bar cashed. A
-weapon has no stat to divide its threshold by (§2.1), so it needs the *whole*
-pool for every step:
+**`WearCapacity` grows the way every pool grows** (§2.1): a point for every full
+bar's worth of wear cashed, the bar being the capacity at the time. A weapon
+has no stat to divide its threshold by, so it needs the *whole* bar for every
+point — 30 cashed to reach 31, then 31 to reach 32 — and the progress carries:
+a deposit short of a full bar still counts toward the next point, and what one
+cashes past a full bar is the start of the next. The pool itself still empties
+at every deposit (above): what carries is the capacity's progress, never the
+wear. And the growth is the same whichever service the deposit bought (§6.4).
 
-| Step | Capacity | Wear needed to reach the next |
-| --- | --- | --- |
-| Fresh | **30** | 30 |
-| Second | **40** | 40 |
-| Third | **55** | — |
+Capacity is also what opens the enchanter's slots (§6.2): one every 5 points of
+it, slot n at capacity `30 + 5(n − 1)`, up to the five a weapon may carry.
 
-**Three steps and no fourth**, deliberately. A fourth is a number invented
-against a game nobody has played; these three are enough to see whether the
-curve feels like anything, and the ladder is authored rather than computed
-precisely so a fourth can be appended the moment play asks for one.
+| Slot | Opens at capacity |
+| --- | --- |
+| 1 | **30** — every weapon, fresh |
+| 2 | **35** |
+| 3 | **40** |
+| 4 | **45** |
+| 5 | **50** — the last |
 
-The steps widen because the bar does. Reaching the third step means cashing 30
-and then 40 — 70 hits' worth of fighting on one weapon (§6.1), across at least
-two services and the downtime between them.
+Attaching the enchantment that fills slot n needs a deposit of at least
+`30 + 5(n − 1)` wear as well (§6.2), so the climb from a fresh weapon to a full
+one, cashing full bars, runs:
+
+| Enchantment | Attached by a deposit of | The bars cashed since the last | Wear cashed from new |
+| --- | --- | --- | --- |
+| #1 | 30 | — | **30** |
+| #2 | 35 | 31, 32, 33, 34 | **195** |
+| #3 | 40 | 36, 37, 38, 39 | **385** |
+| #4 | 45 | 41, 42, 43, 44 | **600** |
+| #5 | 50 | 46, 47, 48, 49 | **840** |
+
+The first 30 hits attach #1 and lift capacity to 31; bars of 31 to 34 take it
+to 35, 160 hits in all, and the next 35 attaches #2. That is twenty-one deposits
+from a fresh weapon, five of them attaching — and past the fifth slot capacity
+keeps growing, with no top.
+
+(Superseded by the user's ruling of 2026-09-25, which settled.md records: this
+section first had capacity climb an authored ladder — 30, then 40, then 55, one
+step a full bar cashed, "three steps and no fourth", deliberately, the steps
+widening because the bar did, so that reaching the third meant 70 hits on one
+weapon — and a fourth step appended the moment play asked for one. The ruling
+puts capacity on the curve every pool climbs, with no top and no step to
+append.)
 
 A worked weapon is a tempered one. This is the third thing loyalty compounds —
 proficiency is per class (§2.2), stacks are per weapon (§6.4), and capacity is
@@ -105,10 +131,17 @@ that all took the same route to get there.
 
 Two consequences worth naming, because they change what the two services mean:
 
-- **Refinement is not only a gamble; it is an investment.** Declining a soul
-  buys better odds *now* and a bigger pool *forever*. That is a genuinely
-  different shape from enchanting, which pays out immediately and compounds
-  slowly — and it is what makes the fork in §6.4 a strategy rather than a mood.
+- **Refinement is a gamble, and no faster a road to a bigger pool.** Declining
+  a soul buys better odds *now*; the pool grows the same either way, a point a
+  full bar. What makes the fork in §6.4 a strategy rather than a mood is what
+  each service buys, and when: between one slot and the next there is no soul
+  to attach, so the bars that open the next slot are refinements whatever the
+  player would rather, and at a free slot the choice is a chosen soul now or the
+  graft roll at refinement's odds. (Superseded by the user's ruling of
+  2026-09-25: this read "Refinement is not only a gamble; it is an investment.
+  Declining a soul buys better odds *now* and a bigger pool *forever*" — a
+  different shape from enchanting, which paid out immediately and compounded
+  slowly. The ruling grows the pool alike, whatever the service bought.)
 - **A fresh drop cannot be refined into an heirloom quickly.** Its pool is
   small, so it fills fast, empties fast, and rolls badly whichever service it
   buys. Capacity is the part of a weapon that cannot be shortcut, which is
@@ -129,26 +162,44 @@ the last:
 | 4th | 4 | 10 |
 | 5th | 5 | 15 |
 
-Fifteen runs to a fully enchanted weapon makes it a long-term project, and
-makes a 5-enchantment weapon rare **by construction** rather than by drop rate.
+Fifteen runs of the attaching services alone, and the bars between the slots
+besides (§6.1) — from a fresh weapon, 840 wear and twenty-one deposits, the
+sixteen between the slots refinements at `count + 1` runs each (§6.4), so 71
+runs of downtime at the least — make a fully enchanted weapon a long-term
+project, and a 5-enchantment weapon rare **by construction** rather than by drop
+rate. (Qualified for the user's ruling of 2026-09-25: this counted the fifteen
+runs of the attaching services as the whole climb.)
 
 **An innate enchantment counts.** A weapon that dropped already enchanted
 (§3.1) starts the table on its second row, so a caster's first service costs two
 runs and the full climb costs fourteen more. Casters are handed the first
 enchantment and pay for it in downtime, which keeps a free head start from being
-a free fifteen-run shortcut.
+a free fifteen-run shortcut. The innate fills the first slot, too, so a fresh
+staff attaches its second enchantment only once capacity opens slot 2, at 35
+(§6.1): "a free slot", read literally (the user's ruling of 2026-09-25).
 
-**The wear cost climbs with the clock.** Attaching enchantment #n costs `n`
-runs of downtime *and* `n × EnchantmentWearCost` out of the pool, for one
-reason: the two prices should say the same thing. A fifth enchantment being five
-times the wait but the same material would make the material irrelevant by the
-end.
+**The wear price climbs with the clock.** Attaching enchantment #n costs `n`
+runs of downtime *and* needs a free slot and a deposit of at least
+`30 + 5(n − 1)` wear — 30 for the first, 50 for the fifth — for one reason: the
+two prices should say the same thing. A fifth enchantment being five times the
+wait but the same material would make the material irrelevant by the end. The
+price is the least the deposit must hold: the deposit still spends the whole
+pool (§6.1), and capacity above the price is breathing room — a weapon at
+capacity 35 with no enchantment attaches its first on a deposit of 30.
+(Superseded by the user's ruling of 2026-09-25: the wear cost was
+`n × EnchantmentWearCost` out of the pool, a constant these documents never gave
+a value.)
 
 That is what ties §6.1's growing capacity to breadth rather than leaving it a
-side benefit. A fifth enchantment demands a pool no fresh weapon could hold, so
-**capacity is the gate on breadth** and refinement — which grows it fastest — is
-the road to the next soul rather than a detour from it. Enchanting also grows
-the pool, just slower, so the gate is a gradient and never a wall.
+side benefit. A fifth enchantment demands a deposit of 50, a pool no fresh
+weapon could hold, and slot n opens only where capacity reaches its price, so
+**capacity is the gate on breadth**. Every deposit grows it alike — a point a
+full bar, whatever it bought — and between one slot and the next there is
+nothing to attach, so the bars that open the next slot are refinements:
+refinement is the road to the next soul rather than a detour from it, and the
+gate is a gradient, never a wall. (Superseded by the user's ruling of
+2026-09-25: refinement grew the pool fastest here, and enchanting "just slower";
+the ruling grows it alike.)
 
 **The enchanter does not sell tiers.** Tier is earned by casting (§3.3), so
 service time prices **breadth only** — how many enchantments a weapon carries,
@@ -329,12 +380,16 @@ treadmill — your investment is not stranded when a better base drops.
 
 | | You get | The improvement roll | `WearCapacity` |
 | --- | --- | --- | --- |
-| **Enchanting** | A **chosen** enchantment, guaranteed (§6.2) | **Really low** | `+` a little |
-| **Refinement** | Nothing attached at all | **Much better** | **`+` more** |
+| **Enchanting** | A **chosen** enchantment, guaranteed (§6.2) | **Really low** | `+1` a full bar — either service |
+| **Refinement** | Nothing attached at all | **Much better** | `+1` a full bar — either service |
 
-Refinement is the gamble *and* the investment: you give up the one guaranteed
-thing in itemisation for a better shot at the one thing that cannot be bought,
-and a permanently bigger pool to try again from (§6.1).
+Refinement is the gamble: you give up the one guaranteed thing in itemisation
+for a better shot at the one thing that cannot be bought. The pool grows the
+same either way — a point for every full bar's worth cashed, whichever service
+the deposit bought (§6.1). (Superseded by the user's ruling of 2026-09-25: the
+capacity column read "`+` a little" for enchanting and "`+` more" for
+refinement, which was "the gamble *and* the investment", buying "a permanently
+bigger pool to try again from".)
 
 ### Wear is what makes a weapon workable, and refinement is maintenance
 
@@ -413,7 +468,10 @@ improvementChance = GraftBaseChance × (1 + wear ÷ StartingWearCapacity)
 ```
 
 `StartingWearCapacity` is 30 (§6.1), so a full fresh bar doubles the base to
-**6%**, and a weapon two steps up the ladder cashing 40 reaches **7.8%**.
+**6%**, and a weapon grown to capacity 40 cashing a full bar reaches **7%**.
+(Superseded by the user's ruling of 2026-09-25: the second example was a weapon
+"two steps up the ladder" reaching 7.8% — worked at the old divisor of 25, on a
+ladder the ruling replaced.)
 
 **Proportional rather than thresholded, and that is the point.** A rule that
 paid out on *whether* you refined would make cashing a single point of wear
@@ -441,10 +499,14 @@ Three things fall out that nothing had to state:
   is. Two refinements back to back on an empty weapon achieve precisely
   nothing, so the gamble needs no cooldown, no per-weapon limit and no guard of
   its own.
-- **The odds cannot run away.** A weapon three steps up the ladder cashes 40
-  against a divisor of 25, so the multiplier reaches 2.6 and stops there — the
-  ladder is authored and short (§6.1), so there is no curve for it to climb.
-  A graft stays rare at every depth without needing a cap to say so.
+- **The odds climb, but slowly.** Capacity has no top (§6.1), so neither has the
+  multiplier — but each point of capacity costs a full bar, and the bar grows
+  with it: a fresh full bar refines at 6%, a weapon grown to capacity 40 at 7%,
+  and 9% waits at capacity 60, 1,335 wear cashed from new. A graft stays rare at
+  every depth a campaign reaches without needing a cap to say so. (Superseded
+  by the user's ruling of 2026-09-25: this read "the odds cannot run away" — a
+  weapon three steps up the ladder cashing 40 against a divisor of 25, the
+  multiplier stopping at 2.6 because "the ladder is authored and short".)
 
 ### The clock is the same either way
 
@@ -454,9 +516,12 @@ time; what differs is what he does with it. That keeps the fork about what you
 want rather than about scheduling, and it needs no anti-abuse rule because wear
 already decides how often refining is worth asking for.
 
-**Refinement does not advance the rung.** Nothing was attached, so the next
-enchantment costs what it would have cost anyway — the gamble delays breadth
-without ever making it more expensive.
+**Refinement never raises the next enchantment's price.** Nothing was attached,
+so the next enchantment costs what it would have cost anyway — its price
+depends on its number alone (§6.2) — and the gamble delays breadth without ever
+making it more expensive. The capacity it grows opens slots all the same
+(§6.1). (Reworded for the user's ruling of 2026-09-25: this said refinement
+"does not advance the rung", a rung of the ladder the ruling replaced.)
 
 ### Two outcomes: deepen, or graft
 
@@ -794,8 +859,17 @@ enum Service { Enchant, Refine }
 
 The graft roll is `GraftBaseChance` for `Enchant` and
 `GraftBaseChance * (1 + wear / StartingWearCapacity)` for `Refine` (§6.4) — one
-expression, one branch, and the capacity ladder (§6.1) is a `int[] {25, 30, 40}`
-rather than a formula so a fourth step is an edit and not a redesign.
+expression, one branch. Capacity is the rule of §6.1, not a table: a point for
+every full bar's worth of wear cashed, the bar being the capacity at the time,
+and what a deposit cashes short of the next point carried to the next deposit —
+so a weapon keeps that progress beside `Wear` and `WearCapacity` — with slot n
+opening at capacity `30 + 5(n − 1)`, and attaching enchantment #n needing a free
+slot and a deposit of at least `30 + 5(n − 1)` (§6.2). Every number in it is a
+`tuning.json` key — the start `StartingPool`, the rest keys of the Enchanter
+group (settled.md, the user's ruling of 2026-09-25) — so a change of mind about
+the pacing is an edit to the file, not a rebuild. (Superseded by the user's
+ruling of 2026-09-25: the ladder was to be an `int[] {25, 30, 40}` — stale since
+every pool moved to 30 — so that a fourth step was an edit and not a redesign.)
 
 `Logic/Farm.cs` is small enough to question whether it is a file: a clear set, a
 yield computed from its count, and a split the player chooses. It earns one

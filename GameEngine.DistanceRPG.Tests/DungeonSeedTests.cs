@@ -212,11 +212,12 @@ public sealed class DungeonSeedTests : IDisposable
     [Fact]
     public void TheDiceComeOffTheirOwnStream()
     {
-        // Phase 5.7 (1c, USER DECISION 1): the visit's d20 is a stream family of
-        // its own — draw n is the first roll of SplitMix32(mapSeed ^ DiceSalt ^ n ×
-        // DiceMix), a stream per draw, so the die's position is one integer a save
-        // holds — on two new constants, written out here as literals so this pins
-        // the formula rather than restating the code.
+        // Phase 5.7 (1c, USER DECISION 1, ruled by the user, 2026-09-25): the
+        // visit's d20 is a stream family of its own — draw n is the first roll of
+        // SplitMix32(mapSeed ^ DiceSalt ^ n × DiceMix), a stream per draw, so the
+        // die's position is one integer a save holds — on two new constants,
+        // written out here as literals so this pins the formula rather than
+        // restating the code.
         Assert.Equal((0x7FEB352DL, 0x846CA68BL), (DungeonState.DiceSalt, DungeonState.DiceMix));
         foreach (long seed in new[] { GoldenSeed, 0L, uint.MaxValue })
             foreach (int draw in new[] { 0, 1, 2, 4095, 4096 })

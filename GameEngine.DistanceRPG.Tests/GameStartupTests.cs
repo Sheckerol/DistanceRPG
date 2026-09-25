@@ -513,10 +513,11 @@ public class GameStartupTests
     [Fact]
     public void TheSceneRollsTheVisitsOwnDie()
     {
-        // USER DECISION 1 (provisional: seeded by the visit and saved), S7's review's
-        // check 1: every floor the scene opens rolls the scene's d20, and the scene's
-        // d20 is the visit's own (DungeonState.RollD20), whose position a save keeps —
-        // never Random.Shared, which would make a reload a reroll.
+        // USER DECISION 1 (ruled by the user, 2026-09-25: seeded by the visit and
+        // saved), S7's review's check 1: every floor the scene opens rolls the
+        // scene's d20, and the scene's d20 is the visit's own (DungeonState.RollD20),
+        // whose position a save keeps — never Random.Shared, which would make a
+        // reload a reroll.
         var sceneDie = typeof(DungeonScene).GetMethod("RollD20", Declared)!;
         var visitDie = typeof(DungeonState).GetMethod(nameof(DungeonState.RollD20))!;
         Assert.Equal(1, Mentions(sceneDie, visitDie));

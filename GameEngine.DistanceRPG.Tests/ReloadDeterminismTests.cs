@@ -10,11 +10,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// stable ids, on the same dice — and stay one world: the same document after
 /// every turn, the same hits with the same numbers, the same reactions. On a
 /// test's injected die and on the visit's own (<see cref="DungeonState.RollD20"/>,
-/// USER DECISION 1: seeded and saved, so a reload is never a reroll), through a
-/// farm's revivals and a threat zone crossed after the reload; and a quit that
-/// finds the enemies moving settles them, one fixed logic step at a time
-/// (<see cref="SaveGame.LogicStepSeconds"/>), to the next player turn before
-/// anything is written (<see cref="SaveGame.SettleToSafePoint"/>).
+/// USER DECISION 1, ruled by the user, 2026-09-25: seeded and saved, so a reload
+/// is never a reroll), through a farm's revivals and a threat zone crossed after
+/// the reload; and a quit that finds the enemies moving settles them, one fixed
+/// logic step at a time (<see cref="SaveGame.LogicStepSeconds"/>), to the next
+/// player turn before anything is written (<see cref="SaveGame.SettleToSafePoint"/>).
 /// <para>
 /// Played by <see cref="VisitScript"/> on the game's own campaign, as S6's round
 /// trips are, every seed's depth pinned before a test leans on it. The seeds'
@@ -381,11 +381,12 @@ public sealed class ReloadDeterminismTests : IDisposable
     [Fact]
     public void TheVisitsDieRollsOnAcrossAReload()
     {
-        // USER DECISION 1, provisional (seeded and saved): the flagship as saved —
-        // its tens were injected, so the visit's own die has rolled nothing yet —
-        // opened with OpenTurns(party) and no die at all, as the game is to open
-        // every floor: every roll is the visit's own, the turn's first its
-        // stream's first draw, and the count goes into the document.
+        // USER DECISION 1, ruled by the user, 2026-09-25 (seeded and saved): the
+        // flagship as saved — its tens were injected, so the visit's own die has
+        // rolled nothing yet — opened with OpenTurns(party) and no die at all, as
+        // the game is to open every floor: every roll is the visit's own, the
+        // turn's first its stream's first draw, and the count goes into the
+        // document.
         string flagship = Save(VisitSaveTests.Flagship().Campaign);
         Assert.Equal(0, SaveCodec.Read(flagship).Campaign.Visit!.DiceRolled);
         var live = new VisitScript(Load(flagship).Campaign, visitsOwnDie: true);

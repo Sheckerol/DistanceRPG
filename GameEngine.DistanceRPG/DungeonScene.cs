@@ -2127,20 +2127,21 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// The turn system's d20 — the visit's own (<see cref="DungeonState.RollD20"/>,
-    /// USER DECISION 1 of Phase 5: seeded by the visit and saved) — drawn here so
-    /// the scene knows the natural rolls its cues read: the last one, which is a
-    /// staff cast's own when its status lands (the cast rolls just before its Cast
-    /// is raised, and nothing rolls in between), and, while a party member's cast
-    /// is watched (<see cref="WatchCast"/>), the first, which is the cast's own
-    /// before anything its hits set off (a counter, a carried shot) rolls again. A
-    /// hit rolls before its chain runs, so every roll also takes the levels
-    /// <see cref="AttackerRiders"/> stand at before it.
+    /// USER DECISION 1 of Phase 5, ruled by the user, 2026-09-25: seeded by the
+    /// visit and saved) — drawn here so the scene knows the natural rolls its cues
+    /// read: the last one, which is a staff cast's own when its status lands (the
+    /// cast rolls just before its Cast is raised, and nothing rolls in between),
+    /// and, while a party member's cast is watched (<see cref="WatchCast"/>), the
+    /// first, which is the cast's own before anything its hits set off (a counter,
+    /// a carried shot) rolls again. A hit rolls before its chain runs, so every
+    /// roll also takes the levels <see cref="AttackerRiders"/> stand at before it.
     /// <para>
     /// Being the visit's, the die rolls on across a save: its position is saved
     /// (<see cref="DungeonState.DiceRolled"/>), so after a reload the dice fall as
-    /// they would have without one, and a reload is never a reroll. The
-    /// alternative the decision names — a fresh die per session — is this one
-    /// line rolling <c>Random.Shared</c> again.
+    /// they would have without one, and a reload is never a reroll — "just to
+    /// protect players from themselves", the user's reason. The alternative the
+    /// decision named — a fresh die per session, this one line rolling
+    /// <c>Random.Shared</c> again — is the one the ruling turned down.
     /// </para>
     /// </summary>
     private int RollD20()

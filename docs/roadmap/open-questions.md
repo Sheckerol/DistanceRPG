@@ -6,34 +6,6 @@ accepted-for-now item flagged to watch during playtest rather than pre-solve on
 paper. Append here rather than hedging in place if a new one comes up during
 implementation.
 
-## What a deposit costs (§6.1, §6.2, §6.4)
-
-Three passages price a deposit differently, and none of them is wrong on its own
-terms:
-
-- **§6.1** — a deposit spends the *whole pool*, wear never part-pays and never
-  carries over, and `WearCapacity` climbs one step per **full bar cashed**.
-- **§6.2** — attaching enchantment #n costs `n × EnchantmentWearCost` out of the
-  pool. That constant is listed in §5.3's tuning table and has no value anywhere
-  in these documents.
-- **§6.4** — capacity grows "`+` a little" when enchanting and "`+` more" when
-  refining, which is service-dependent growth rather than §6.1's single authored
-  ladder.
-
-The reading that collapses all three is that **the full bar is the price, and
-the rising capacity is itself the escalating cost of the next enchantment** —
-cash a full 30, get an enchantment, and the next one wants a full 40. That would
-delete `EnchantmentWearCost` and §6.4's per-service growth, leaving one number
-doing the work. It also raises its own question: a weapon may carry five
-enchantments (§6.2) but the ladder has three rungs, so either the ladder grows
-rungs or the top rung repeats for the fourth and fifth.
-
-**Deliberately left open until the enchanter can be played.** Nothing is blocked
-— wear is Phase 6a and no code exists yet — and the difference between the
-readings is a pacing question that a spreadsheet answers worse than an evening
-with the game. Phase 6a must not resolve it by accident: whoever builds the
-enchanter should surface the choice rather than pick a passage.
-
 ## What `Echoing` does, and who raises `AttackDeclared` (§3.3, §1.7)
 
 `Echoing` is in §3.3's starting set — lock 20, trigger 15, fires on Attack — with
@@ -216,37 +188,6 @@ for both, the catalogue and `weapons.json`, since the question is the same:
 Phase 5 brings the content files without adding a new kind of content rule, so
 it ships neither, and the content rework after the ruling ships neither too:
 whoever rules on this should add the rules, or the settled line, then.
-
-## What the d20 does across a reload (§5.2)
-
-§5.2 asks that "a fixed sequence of turns produces an identical world state"
-after a save and a reload, and says nothing of the dice. Every other random
-stream in `Logic/` is drawn fresh per use off the map seed and a counter the
-save already keeps (a dummy's revivals rolled, its defeats), so it replays by
-construction. The d20 is the one stream consumed a draw at a time, and until
-Phase 5.7 it was `Random.Shared` in the scene: a reload rerolled every die still
-to come.
-
-**Shipped provisionally: the visit's own die, seeded and saved.** Each draw is
-a stream of its own, keyed by the visit's map seed and how many the visit has
-rolled (`DungeonState.RollD20`, `DiceSalt`, `DiceMix`), and the count is saved
-(`diceRolled`). So a reload rolls exactly the dice play without one would have
-rolled, a reload is never a reroll, and §5.2's identical world holds in the
-shipped game and not only under a test's die (`ReloadDeterminismTests`).
-
-**The trade-off, stated.** With one counter for the whole visit, a player who
-kills the process after a turn's autosave replays that turn knowing the draws
-to come, and can reorder the turn's actions to route a known natural 20 to the
-swing that matters. The mitigation not taken is keying each draw by the turn,
-the actor and the attack's ordinal rather than one counter, which pins a roll to
-whoever makes it — a new stream family and a key per draw, for foresight it
-narrows but does not remove.
-
-**This fills a silence with a choice the player can feel, so it is the user's
-to decide.** The alternatives: keep it; key each draw by turn, actor and ordinal;
-or go back to `Random.Shared` — one line in `DungeonScene.RollD20`, the visit's
-die then serving the tests alone — so a reload is a reroll. settled.md's Phase 5
-implementation pass records the ruling.
 
 ## How the campaign is saved (§5.1, §5.2)
 

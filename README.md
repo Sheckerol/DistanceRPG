@@ -104,7 +104,8 @@ its own and resumes where you left off.
   and what the party could already see this turn, the same member active and
   the party marching or not as it was — with `RESUMED` over the floor banner.
   The dice fall as they would have without the quit: the d20 is the run's own,
-  seeded by the run and saved, so reloading never rerolls a turn. A campaign
+  seeded by the run and saved, so reloading never rerolls a turn — on purpose,
+  to protect players from themselves: a bad roll is never reloaded away. A campaign
   saved under other numbers (`tuning.json` edited since) plays on under the new
   ones and says `THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED - IT PLAYS
   ON UNDER THE NEW ONES`, once: the next save records the new numbers. (A

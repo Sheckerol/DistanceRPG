@@ -78,7 +78,7 @@
   per attachment and capped, exactly the combination asked for. Ship the
   existing three-step ladder; add a fourth step later if playtesting shows
   weapons plateauing at 40, per §6.1's own note that the ladder is authored
-  precisely so it can grow.
+  precisely so it can grow. (Superseded by the user's ruling, 2026-09-25: R4, below.)
 - **A batch of balance questions are accepted as designed, to be watched
   during playtest rather than pre-solved on paper** — each is a case where the
   doc's own reasoning already leans toward "probably fine" and no amount of
@@ -233,7 +233,12 @@
   but at 3% (doubled at most by a full wear bar, §6.4) it should stay rare in
   practice without an extra rule. Revisit with an explicit per-weapon
   distinct-modifier cap only if playtesting shows heavily-serviced weapons
-  actually accumulating breadth this way.
+  actually accumulating breadth this way. (Superseded by the user's ruling,
+  2026-09-25, in its parenthesis: refining's multiplier grows with the wear a
+  weapon can hold, and capacity has no top now, so a full bar more than doubles
+  the 3% once a weapon has grown — 7% at capacity 40, 9% at 60, which is 1,335
+  wear cashed from new. It climbs slowly enough that the rest stands — R4, the
+  Phase 5 pass below.)
 - **Sword's `Push` stays always-on.** It fires on every hit, same as the rest
   of the sword's kit; occasionally shoving a target out of an axe's cleave or a
   spear's threat zone is accepted as a small tactical cost of mixing a sword
@@ -759,7 +764,14 @@
   literally *the price of the enchantment, unspent*. No second knob, and three
   consequences arrive free: a fresh drop refines for nothing, hoarding wear
   before a deposit is a real decision, and refinement cannot be spammed because
-  the pool — not the clock — is what limits it.
+  the pool — not the clock — is what limits it. (Superseded — already by §6.4,
+  whose two services differ by what the smith works on and not by a remainder,
+  and by the user's ruling, 2026-09-25: a deposit spends the whole pool whatever
+  it buys, and attaching enchantment n needs a deposit of at least
+  `30 + 5(n − 1)` wear, so no remainder is left over to pay for a roll.
+  Refining's odds are `GraftBaseChance × (1 + wear ÷ StartingPool)` on the whole
+  deposit, and the three consequences follow from that instead — R4, the Phase
+  5 pass below.)
 - **A deposit empties the weapon's wear**, whichever service it bought. That is
   what makes *when* to deposit a decision rather than a formality.
 - **Refinement costs the same downtime as the enchantment it replaced** and does
@@ -1126,7 +1138,11 @@
   bar.
 - **`WearCapacity` is an authored ladder: 30 → 40 → 55**, one step per full bar
   cashed, and **no fourth step until play asks for one**. Authored rather than
-  computed precisely so a fourth can be appended.
+  computed precisely so a fourth can be appended. (Superseded by the user's
+  ruling, 2026-09-25: capacity is computed after all, by the entry above's own
+  rule with a weapon's flat 1 — a point for every full bar's worth of wear
+  cashed, the bar being the capacity at the time and the progress carrying, with
+  no top, so there is no step to append — R4, the Phase 5 pass below.)
 - **Grafting is 3% base when enchanting**, multiplied by
   `1 + wear ÷ StartingWearCapacity` when refining — so a full fresh bar doubles
   it to 6%. Proportional rather than thresholded, so cashing one point of wear
@@ -1297,7 +1313,11 @@ it.
   25 → 30 → 40 would have made a weapon's first service raise its capacity from
   30 to 30 and buy nothing. The rungs keep widening, so reaching the third step
   is now 70 hits on one weapon rather than 55 — a longer arc, deliberately, and
-  still three steps with no fourth until play asks for one.
+  still three steps with no fourth until play asks for one. (Superseded by the
+  user's ruling, 2026-09-25: there is no ladder to shift. What this kept stands —
+  a weapon's capacity opens on the shared starting pool, 30, `StartingPool` —
+  and from there it rises a point a full bar cashed, 30 → 31 → 32 and on, with
+  no top — R4, the Phase 5 pass below.)
 
 ## Implementation pass — Phase 4 (floors, the boss, the theme, the way out)
 
@@ -1439,11 +1459,13 @@ it. Six of them bent a line of the phase doc rather than fill a silence; those
 are marked **bends the phase doc**, each with why it needs no ruling, or that it
 is the user's. Four rulings were the user's to make — the dice on a reload, the
 save model, where content's truth lives, and the class baselines, which was also
-one of the six bends — and each shipped provisionally. **Two are ruled**
-(superseded by the user's ruling, 2026-09-25, below): content's truth is the
+one of the six bends — and each shipped provisionally. **Three are ruled**
+(superseded by the user's rulings, 2026-09-25, below): content's truth is the
 JSON, and the class baselines are a section of `weapons.json`, which withdraws
-that bend. **Two are open** — the dice and the save model: open-questions.md sets
-out their alternatives, and this pass records each ruling once the user makes it.
+that bend; and the dice stay the visit's own, seeded and saved. **The save
+model**, the fourth, the user ruled the same day, and this pass records it as it
+is built: until then its entry below says what ships, and open-questions.md the
+alternatives it shipped beside.
 
 ### The user's ruling on content (2026-09-25)
 
@@ -1491,7 +1513,10 @@ ruling ends that, and supersedes the entries below where they differ.
   the weapon types are a section of `weapons.json` — the class-baselines bend is
   withdrawn, and §5.6 holds literally. **Decisions 1 and 2** — the dice across a
   reload, the save model — **stay open**, and so does whether a content file's
-  numbers have bounds; what a deposit costs stays Phase 6a's.
+  numbers have bounds; what a deposit costs stays Phase 6a's. (Superseded by the
+  user's rulings of 2026-09-25, below: the user ruled those four the same day —
+  the dice kept, the save model rebuilt, every number of a content file given a
+  range, and what a deposit costs, which Phase 6a builds.)
 
 **The exceptions, named so that none reads as a surviving copy.** Code still
 names some weapon ids and keeps one coexistence rule, each for a reason of its
@@ -1579,6 +1604,100 @@ it:
   stands on numbers of its own (`Premise`), and no other master edit fails the
   suite.
 
+### The user's rulings of 2026-09-25: the dice, the save model, raw JSON, and the deposit
+
+The same day as the ruling on content, the user ruled on four things more. Each
+supersedes the phase docs, the entries above and the rest of this pass wherever
+they differ: **R1**, what the d20 does across a reload; **R2**, the save model —
+a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT, one autosave
+slot, and manual slots whose count is a `tuning.json` key; **R3**, raw JSON —
+"since we are storing in raw json we should probably not trust the fields", so
+every number of a content file gets a range, and a save's fields are checked
+against each other; and **R4**, what a deposit costs. R1 and R4 build nothing —
+R1 keeps what shipped, and R4 is Phase 6a's to build — so both are written here
+whole. R3 and R2 change the game, and each is written here as it is built;
+until then, the entries below that they supersede — whether a content file's
+numbers have bounds, and the save model — say what ships.
+
+- **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
+  provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
+  save", below): each d20 is a draw from a sequence the visit seeds, and how
+  many the visit has rolled is saved, so a reload rolls on exactly where play
+  left off and never rerolls. The user's reason: "just to protect players from
+  themselves" — a bad roll is never reloaded away. The price stated with the
+  decision is accepted as it stands: a turn replayed after the process is killed
+  past its autosave knows its next draws, and keying each draw by the turn, the
+  actor and the attack's ordinal instead stays not taken. The question leaves
+  open-questions.md.
+- **R4 — what a deposit costs.** Recorded for Phase 6a, which builds the
+  enchanter: nothing of it is code yet. The user's rule:
+  - A weapon's `WearCapacity` starts at **30**: `StartingPool`, the one bar
+    every pool opens on (the Phase 2 pass above), which the graft formula spells
+    `StartingWearCapacity`.
+  - **It rises by 1 for every full bar's worth of wear cashed in**, a bar being
+    the capacity at the time. The progress accumulates across deposits: a
+    partial deposit counts, and what a deposit cashes past a full bar carries
+    toward the next point. Whatever the deposit bought, the growth is the same —
+    "the wear bar increases by one per full bar value cashed in". The pool
+    itself still empties at every deposit (§6.1): what carries is the capacity's
+    progress, never the wear.
+  - **Enchantment slots open every 5 capacity**: slot n at `30 + 5(n − 1)` —
+    30, 35, 40, 45, and the fifth and last at 50, §6.2's five.
+  - **Attaching enchantment #n needs a free slot and a deposit of at least
+    `30 + 5(n − 1)` wear**, and a deposit still spends the whole pool (§6.1).
+    Capacity above the price is breathing room: at capacity 35 with no
+    enchantment, cashing 30 buys the first.
+  - **Worked**, a fresh weapon cashing full bars: #1 at 30 hits, capacity 30 →
+    31; bars of 31, 32, 33 and 34 take capacity to 35, at 160 hits in all; and
+    #2 at 195. On by the same rule: #3 at 385 (bars of 36 to 39 between), #4 at
+    600 (41 to 44) and #5 at 840 (46 to 49) — twenty-one deposits from a fresh
+    weapon, five of them attaching.
+- **R4 agrees with §2.1, and replaces the ladder.** Phase 2's
+  `xpToNextPoint = currentMax / governingStat`, with a weapon's flat 1 — the
+  superseding pass's "all grow by `currentMax / governingStat` … a flat 1 for
+  weapons" — *is* a point per full bar, the bar the current capacity, the
+  progress carrying: capacity climbs the curve HP and mana climb, with a stat
+  of 1. The authored 30 → 40 → 55 ladder was the one passage that disagreed,
+  and it goes, and with it `n × EnchantmentWearCost` (§6.2) and §6.4's
+  service-dependent growth — "`+` a little" when enchanting, "`+` more" when
+  refining. Each passage that stated them is marked where it stands. Above: the
+  entry that answered "does wear cap" with the ladder (its answer stands: the
+  capacity caps wear, and a deposit spends it whole), the graft's "doubled at
+  most", the two rates as one mechanism, the ladder and its shift to 30. Below:
+  the Enchanter's hand-off. In the phase docs: §6.1, §6.2, §6.4 and §6.7, §5.3's
+  rows and §2.1's line on a weapon. The question leaves open-questions.md.
+- **R4's consequences are the rule's own**, each superseding a passage of the
+  phase docs:
+  1. **Refinement grows the pool no faster than enchanting.** §6.1, §6.2 and
+     §6.4 had refinement buy "a bigger pool *forever*" and grow capacity
+     fastest; every deposit now grows it alike, a point a full bar. What sets
+     the two services apart is what they buy — a chosen soul, or the graft roll
+     at refinement's odds (§6.4) — and between one slot and the next there is no
+     soul to buy, so the bars that open a slot are refinements.
+  2. **The graft odds climb without a top, slowly.** §6.4's "the odds cannot run
+     away" stood on a short authored ladder. Capacity has no top now, so
+     refinement's multiplier `1 + wear ÷ StartingPool` climbs a point of
+     capacity per full bar — 6% on a fresh full bar, 7% at capacity 40, and 9%
+     at 60, which is 1,335 wear cashed from new.
+  3. **A fifth enchantment also waits on the bars between slots.** §6.2's
+     "fifteen runs to a fully enchanted weapon" counted the attaching services
+     alone. From new the climb is 840 wear and twenty-one deposits, the sixteen
+     between the slots refinements at `count + 1` runs each — 71 runs of
+     downtime at the least.
+  4. **"A free slot" is read literally.** What a weapon arrives with fills its
+     slots from the first: a staff's innate fills slot 1, so a fresh staff
+     attaches its second enchantment only once capacity opens slot 2, at 35; and
+     a unique that arrives with three souls attaches a fourth only once capacity
+     opens slot 4, at 45. At the ruled numbers the deposit implies the slot — a
+     deposit of `30 + 5(n − 1)` needs a capacity at least that high, which is
+     where slot n opens — so the two conditions part only if their numbers are
+     tuned apart.
+- **Every number of R4 but its start, which is `StartingPool`'s already, becomes
+  a `tuning.json` key of the Enchanter group** (Phase 5.S2), by the user's
+  standing preference that a number the user may revisit lives in the file.
+  They replace the `WearCapacityLadder` and `EnchantmentWearCost` placeholders;
+  `WearPerHit` and `GraftBaseChance` wait with their Phase 6a readers as before.
+
 ### The numbers: `tuning.json`
 
 - **A key is the `Tuning` property's name, verbatim, and `MovementBudget` is the
@@ -1649,7 +1768,12 @@ it:
   one screen stays whole. **The hand-off**: Phase 6a adds `WearPerHit`,
   `WearCapacityLadder` (30/40/55), `EnchantmentWearCost` and `GraftBaseChance`
   with their readers; Phase 6b adds `PotionUseCost`, `HealthPotionPercent`,
-  `ManaPotionPercent` and `FarmYieldPerClear` with theirs.
+  `ManaPotionPercent` and `FarmYieldPerClear` with theirs. (Superseded by the
+  user's ruling, 2026-09-25, in the Enchanter's half: what a deposit costs is
+  ruled — R4, above — so no open question holds `EnchantmentWearCost`, and there
+  is no ladder for `WearCapacityLadder` to hold. The ruling's numbers take the
+  two placeholders' place as keys of the Enchanter group (Phase 5.S2);
+  `WearPerHit` and `GraftBaseChance` still wait with their Phase 6a readers.)
 
 ### The content files
 
@@ -1766,19 +1890,25 @@ it:
   an edit. A revival is a future event: under new numbers a dummy due by them
   gets up as the floor opens — the arrival rule above — and the changed-numbers
   notice promises exactly that the campaign plays on under the new ones.
-- **The dice are the visit's own, seeded and saved — provisional, the user's to
-  rule.** The d20 is a family of its own (`DiceSalt`, `DiceMix`), each draw a
-  stream keyed by the map seed and how many the visit has rolled, and the count
-  is saved, so after a reload the dice fall as they would have and a reload is
-  never a reroll — at the price, stated, that a turn replayed after killing the
-  process knows its next draws. The family is clean against every drop, revival
-  and boss-drop stream under the shipped `BossFloorMax`, and shares a number with
-  a revival roll only as the Phase 4 pass accepts between the floors' own
-  streams: draw 34,430 meets floor index 8's revival roll for spawn 50, cycle 2 at
-  the shipped depth, and under a tuning as deep as `BossFloorMax`'s clamp allows
-  (99) draw 2801 meets floor index 58's for spawn 7, cycle 16 — the one meeting of
-  draws 0–4096 on any floor a tuning reaches. Both are pinned by a test. The
-  alternatives are in open-questions.md.
+- **The dice are the visit's own, seeded and saved — ruled by the user
+  (2026-09-25): kept.** The d20 is a family of its own (`DiceSalt`, `DiceMix`),
+  each draw a stream keyed by the map seed and how many the visit has rolled,
+  and the count is saved, so after a reload the dice fall as they would have and
+  a reload is never a reroll — "just to protect players from themselves", the
+  user's reason: a bad roll is never reloaded away. The price stated with it is
+  accepted as it stands: a turn replayed after killing the process knows its
+  next draws, and keying each draw by the turn, the actor and the attack's
+  ordinal instead is not taken (R1, above). The family is clean against every
+  drop, revival and boss-drop stream under the shipped `BossFloorMax`, and
+  shares a number with a revival roll only as the Phase 4 pass accepts between
+  the floors' own streams: draw 34,430 meets floor index 8's revival roll for
+  spawn 50, cycle 2 at the shipped depth, and under a tuning as deep as
+  `BossFloorMax`'s clamp allows (99) draw 2801 meets floor index 58's for spawn
+  7, cycle 16 — the one meeting of draws 0–4096 on any floor a tuning reaches.
+  Both are pinned by a test. (Superseded by the user's ruling, 2026-09-25:
+  shipped provisionally as the user's to rule, open-questions.md setting out the
+  alternatives — keep it, key each draw by turn, actor and ordinal, or go back to
+  `Random.Shared`, so that a reload is a reroll. The user kept it.)
 - **A save is taken only at a safe point, and a quit settles on the fixed logic
   clock.** A safe point is between runs, a visit with no floor open, or the
   player phase with nothing in flight; the enemies' turn, its banner and a raise
