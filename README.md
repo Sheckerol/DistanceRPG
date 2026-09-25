@@ -185,10 +185,13 @@ menu's QUIT TO TITLE comes back to it, and the game quits from it.
   is newer.
 - **Leaving play**: `3  QUIT TO TITLE`, on the menu in a dungeon or between
   runs, writes the autosave as the window's close does — the enemies' turn
-  played out first when it is theirs — and opens the title, where CONTINUE
-  resumes it. The game quits from the title (QUIT, or Esc) or by the window's
-  close button from anywhere, which saves the campaign in play first. Esc
-  between runs opens the menu and never quits.
+  played out first when it is theirs — and opens the title (no key acts while
+  the screen fades to it), where CONTINUE resumes the campaign. Saved by hand and
+  left with nothing played since, CONTINUE names that slot instead: the autosave had
+  nothing new to write, so it keeps its older time, and the slot holds the same
+  campaign, which it loads with no ask. The game quits from the title (QUIT, or
+  Esc) or by the window's close button from anywhere, which saves the campaign in
+  play first. Esc between runs opens the menu and never quits.
 - **Resuming**: CONTINUE on the title resumes the most recent save where it was,
   and LOAD GAME any slot — `AUTOSAVE`, `SLOT 1` to `SLOT 3`, then any slot above
   the count that holds a save — each row saying where its campaign stands (the
@@ -229,8 +232,9 @@ menu's QUIT TO TITLE comes back to it, and the game quits from it.
   the backup, so a write that fails — a full disk, a locked file, a folder with
   no rights — costs nothing: the save on the disk is the last good one, the log
   says why, and the game says `THE CAMPAIGN COULD NOT BE SAVED` at once, over the
-  floor you are playing, and again on the screen between runs — once, however
-  many saves failed, and not at all if a later save has gone through by then. A
+  floor you are playing, and again on the next screen — the screen between runs,
+  or the title after QUIT TO TITLE — once, however many saves failed, and not at
+  all if a later save has gone through by then, the quit's own included. A
   quit that cannot save leaves `campaign.unsaved` beside the autosave, and the
   title says so the next time it opens — at once, after QUIT TO TITLE — before
   anything is loaded: `THE AUTOSAVE

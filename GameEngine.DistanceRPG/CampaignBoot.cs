@@ -102,7 +102,9 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// <see cref="SaveStore.UnsavedName"/> beside the autosave when it cannot save
 /// (<see cref="SaveOnQuit"/>), and the title takes it (<see cref="TakeUnsaved"/>)
 /// and says, before anything is loaded, that what the autosave holds is from
-/// before then (<see cref="QuitUnsaved"/>) — at once, after QUIT TO TITLE.</item>
+/// before then (<see cref="QuitUnsaved"/>) — at once, after QUIT TO TITLE. A quit
+/// that does save tells its caller so, which takes back what an earlier failed
+/// save said.</item>
 /// <item><strong>A different tuning is said, and plays on</strong> (§5.3,
 /// PHASE5-084): "silently changing a saved game's rules underneath the player is
 /// the failure to avoid", so a campaign saved under other numbers resumes with
@@ -837,7 +839,12 @@ internal static class CampaignBoot
     /// <see cref="SaveStore.UnsavedName"/> beside the save it keeps, and the title
     /// says, when it next opens (at once, after QUIT TO TITLE), that what the
     /// autosave holds is from before this quit (<see cref="QuitUnsaved"/>). What the
-    /// write guard sets aside on the way is logged.
+    /// write guard sets aside on the way is logged. And a quit that saves — the
+    /// save written, or the disk holding it already — tells its caller
+    /// (<paramref name="saved"/>), which takes back the word of an earlier save that
+    /// failed: the disk holds the campaign again, so the title opened by QUIT TO
+    /// TITLE never says the campaign could not be saved when the quit's own save
+    /// went through (S7's review).
     /// </para>
     /// <para>
     /// <strong>The step is the playing scene's own</strong>
@@ -855,9 +862,10 @@ internal static class CampaignBoot
     /// <param name="step">The playing scene's logic step; null when no scene is playing the visit, which leaves nothing to settle.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="savedAt">When the quit saves, the edge's clock; null records no time.</param>
+    /// <param name="saved">Told, once, when the campaign stands on the disk as it was left — the save written, or held there already — and never when the quit could not save; null to tell nobody.</param>
     /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, the save on the disk kept and the marker left; false when it never got to one, nothing was written, and the marker is left.</returns>
     internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null,
-        DateTimeOffset? savedAt = null)
+        DateTimeOffset? savedAt = null, Action? saved = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(campaign);
@@ -891,6 +899,10 @@ internal static class CampaignBoot
         {
             report?.Invoke($"[Save] {failed}");
             MarkUnsaved(store, failed, report);
+        }
+        else
+        {
+            saved?.Invoke();   // the disk holds the campaign as it was left
         }
         return true;
     }

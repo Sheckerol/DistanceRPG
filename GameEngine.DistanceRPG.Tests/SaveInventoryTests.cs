@@ -292,12 +292,13 @@ public class SaveInventoryTests
             new("_marchLeader", Kept.NotSaved, "a resumed march starts a fresh line"),
             new("_wasMarching", Kept.NotSaved, "a resumed march starts a fresh line"),
 
-            // The stairs' fade and the run's end.
+            // The stairs' fade, the run's end, and leaving play.
             new("_transit", Kept.NotSaved, "a stairs fade in flight: a quit mid-fade saves whichever floor the Logic stands on"),
             new("_transitClock", Kept.NotSaved, "a stairs fade in flight"),
             new("_transitStair", Kept.NotSaved, "a stairs fade in flight"),
             new("_runOverSent", Kept.NotSaved, "the run's end is the campaign's (lastResult): saved between runs, and shown by the screen between runs"),
             new("_endedRun", Kept.NotSaved, "the run's end is the campaign's (lastResult): saved between runs, and shown by the screen between runs"),
+            new("_leaving", Kept.NotSaved, "play has been left from the pause menu, for the title or the window's close: the scene is on its way out, never a save point's concern"),
 
             // Input, the camera and the menus.
             new("_up", Kept.NotSaved, "input: a key held"),

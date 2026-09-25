@@ -683,6 +683,179 @@ public sealed class SaveMenuTests : IDisposable
     }
 
     [Fact]
+    public void AQuitWhoseSaveWentThroughTakesBackAFailedAutosavesWord()
+    {
+        InTempFolder(folder =>
+        {
+            // S7's review: an autosave that failed is said on the next screen until a
+            // later save goes through — and the quit's own save is one. So the quit's
+            // door tells its caller once the campaign stands on the disk as it was
+            // left, and the title QUIT TO TITLE opens is never told the campaign could
+            // not be saved when the quit's own save put it there. Walked as the game
+            // wires it: the failure led for the next screen, the quit's door handed
+            // what takes it back.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            Assert.Null(CampaignBoot.Save(store, campaign, savedAt: At));
+            CampaignRuns.ShallowRetreat(campaign, "tutorial");   // played on since: the quit has something to write
+
+            string failed = CampaignBoot.WriteFailed("the disk is full");   // what an autosave since then said
+            var notices = new StartupNotices();
+            notices.Hold(["data"]);
+            notices.Lead([failed]);
+            int told = 0;
+            void TakeBack()
+            {
+                told++;
+                notices.Withdraw(failed);
+            }
+
+            // A quit whose write fails tells nothing: the failure stays for the title,
+            // beside the marker the title says too.
+            Directory.CreateDirectory(store.TempPath);
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(1), saved: TakeBack));
+            Assert.Equal(0, told);
+            Assert.NotNull(store.ReadUnsaved());
+            Directory.Delete(store.TempPath);
+            Assert.True(CampaignBoot.TakeUnsaved(store, report: null));
+
+            // Nor does a quit during the enemies' turn that never comes round to the
+            // party's, or that has no scene to play it out with: nothing is written.
+            var stuck = ReloadDeterminismTests.MidWalk();
+            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }, saved: TakeBack));
+            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), step: null, saved: TakeBack));
+            Assert.Equal(0, told);
+            Assert.True(CampaignBoot.TakeUnsaved(store, report: null));
+
+            // A quit whose save goes through tells, once: the title is handed nothing of
+            // the failure, and what else leads it stays.
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: TakeBack));
+            Assert.Equal(1, told);
+            Assert.Equal(SaveCodec.Write(SaveGame.Capture(campaign, savedAt: At.AddMinutes(2))), store.Read());
+            Assert.Null(store.ReadUnsaved());
+            Assert.Equal(["data"], notices.Take());
+
+            // So does one whose save the disk holds already: nothing needed writing, and
+            // the disk holds the campaign as it was left.
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(3), saved: TakeBack));
+            Assert.Equal(2, told);
+        });
+
+        // Read off the IL: the game's SaveOnQuit hands the quit's door the take-back —
+        // a delegate made before the call, never run in its place — and the take-back
+        // is reached from there and from the autosave's Save alone; it withdraws each
+        // failed save's word and forgets them. And dropping the campaign forgets them
+        // too, so no later campaign's save takes anything back on the dropped one's
+        // behalf.
+        var game = typeof(DistanceRpgGame);
+        var takeBack = game.GetMethod("TakeBackFailedSaves", Declared)!;
+        var quitting = Walk(game.GetMethod("SaveOnQuit", Declared)!);
+        int handed = quitting.FindIndex(i => i.Op == OpCodes.Ldftn && Same(i.Called, takeBack));
+        int door = quitting.FindIndex(i => Same(i.Called, typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.SaveOnQuit), Declared)!));
+        Assert.True(handed >= 0 && handed < door, "The game's SaveOnQuit does not hand the quit's door what takes a failed save's word back");
+        Assert.DoesNotContain(quitting, i => IsCall(i.Op) && Same(i.Called, takeBack));
+        Assert.Equal(["DistanceRpgGame.Save called", "DistanceRpgGame.SaveOnQuit handed"],
+            Edges(game.Assembly).Where(e => Same(e.Target, takeBack))
+                .Select(e => $"{Root(e.From.DeclaringType)!.Name}.{e.From.Name} {(IsDelegate(e.Op) ? "handed" : "called")}")
+                .Distinct().Order(StringComparer.Ordinal));
+
+        var failedSaves = game.GetField("_failedSaves", Declared)!;
+        static bool Forgets(List<(OpCode Op, MethodBase? Called, FieldInfo? Field)> walked, FieldInfo list)
+            => walked.Select((instruction, at) => (instruction, at)).Any(i => i.instruction.Op == OpCodes.Ldfld && Names(i.instruction.Field, list)
+                && i.at + 1 < walked.Count && walked[i.at + 1].Called is { Name: nameof(List<string>.Clear) } clear && clear.DeclaringType == typeof(List<string>));
+        var takingBack = Walk(takeBack);
+        Assert.Contains(takingBack, i => Same(i.Called, typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
+        Assert.True(Forgets(takingBack, failedSaves), "TakeBackFailedSaves does not forget what it took back");
+        Assert.True(Forgets(Walk(game.GetMethod("DropCampaign", Declared)!), failedSaves), "DropCampaign does not forget the dropped campaign's failed saves");
+    }
+
+    [Fact]
+    public void LeavingPlayClosesTheDungeonsKeys()
+    {
+        // S7's review: once the pause menu's 3 has asked the host to leave play, the
+        // dungeon is still the scene up for the first half of the engine's fade to
+        // the title, its menu still up — and, as between runs, it reads no key from
+        // then on. 2 lists no slots; 1 leaves the menu up, so nothing behind it acts
+        // (every other key and click does nothing behind a menu); 3 asks nothing
+        // twice; and ESC is swallowed. No key reaches the campaign the host let go.
+        var host = new RecordingHost(Worded());
+        var scene = new DungeonScene(camera: null!, game: null!, Entered(), host);
+        scene.HandleEscape();
+        scene.AnyKey(Keys.D3);
+        Assert.Equal(1, host.QuitsToTitle);
+        foreach (var key in new[] { Keys.D2, Keys.D1, Keys.D3, Keys.D4, Keys.Enter, Keys.Escape })
+            scene.AnyKey(key);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((true, false, (SlotMenu?)null), (scene.PauseMenuOpen, scene.SavesOpen, scene.SaveList));
+        Assert.Equal((0, 0, 1), (host.SlotsListed, host.SavedTo.Count, host.QuitsToTitle));
+
+        // Play not left, the same keys act: 1 closes the menu, and ESC opens it again.
+        var staying = new DungeonScene(camera: null!, game: null!, Entered(), new RecordingHost(Worded()));
+        staying.HandleEscape();
+        staying.AnyKey(Keys.D1);
+        Assert.False(staying.AnyMenuOpen);
+        Assert.True(staying.HandleEscape());
+        Assert.True(staying.PauseMenuOpen);
+
+        // A dev-override session's 3  QUIT GAME — the window's close, which a scene
+        // built with no window cannot walk — leaves play the same way: NumberKey marks
+        // the scene as leaving before it hands on either way out, and the keys' one
+        // door, the number keys' and ESC's each read the mark first. Read off the IL.
+        var leaving = typeof(DungeonScene).GetField("_leaving", Declared)!;
+        var numberKey = Walk(typeof(DungeonScene).GetMethod("NumberKey", Declared)!);
+        var marked = numberKey.Select((instruction, at) => (instruction, at))
+            .Where(i => i.instruction.Op == OpCodes.Stfld && Names(i.instruction.Field, leaving)).Select(i => i.at).ToList();
+        int toTitle = numberKey.FindIndex(i => Same(i.Called, typeof(ISaveHost).GetMethod(nameof(ISaveHost.QuitToTitle))!));
+        int closed = numberKey.FindIndex(i => Same(i.Called, typeof(GameEngine.Core.Game).GetMethod("Close", Type.EmptyTypes)!.GetBaseDefinition()));
+        Assert.Equal(2, marked.Count);
+        Assert.All(marked, at => Assert.Equal(OpCodes.Ldc_I4_1, numberKey[at - 1].Op));
+        Assert.True(marked[0] < toTitle && toTitle < marked[1] && marked[1] < closed, "NumberKey leaves play before it marks the scene as leaving");
+        foreach (string reads in new[] { "AnyKey", "NumberKey", "HandleEscape" })
+        {
+            var walked = Walk(typeof(DungeonScene).GetMethod(reads, Declared)!);
+            int read = walked.FindIndex(i => i.Op == OpCodes.Ldfld && Names(i.Field, leaving));
+            Assert.True(read >= 0 && walked.Take(read).All(i => i.Called is null || i.Called.Name == "get_" + nameof(DungeonScene.Transiting)),
+                $"DungeonScene.{reads} acts before it reads whether play has been left");
+        }
+    }
+
+    [Fact]
+    public void ASaveByHandThenAQuitWithNothingPlayedContinuesTheSlot()
+    {
+        InTempFolder(folder =>
+        {
+            // S7's review, accepted as it stands (settled.md, R2, saving by hand): a
+            // save by hand into an empty slot, then QUIT TO TITLE with nothing played
+            // since. The autosave holds that campaign already, so the quit writes
+            // nothing and the autosave keeps the time its state was first written (R2,
+            // the folder), while the slot carries the later time of the save by hand:
+            // CONTINUE — the most recent save by its own time — names the slot. It holds
+            // the autosave's own campaign, so loading it asks nothing and sets nothing
+            // aside, and the campaign it brings back is the autosave's.
+            var slots = new SaveSlots(folder, 3);
+            var autosave = slots.Store(SaveSlots.Autosave);
+            var campaign = Retreated();
+            Assert.Null(CampaignBoot.Save(autosave, campaign, savedAt: At));   // the autosave at the turn's start
+            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Store(1), campaign, view: null, 1, savedAt: At.AddMinutes(1)));
+            int told = 0;
+            Assert.True(CampaignBoot.SaveOnQuit(autosave, campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: () => told++));
+            Assert.Equal(1, told);   // the quit went through: the disk holds the campaign as it was left
+            Assert.False(autosave.HasBackup);   // and wrote nothing: no save rotated into the backup
+
+            var listing = SaveListing.Read(slots, At.AddMinutes(3));
+            Assert.Equal((DateTimeOffset?)At, listing.Autosave.Header!.SavedAt);
+            var newest = listing.Newest!;
+            Assert.Equal((1, true, (DateTimeOffset?)At.AddMinutes(1)), (newest.Number, newest.SameAsAutosave, newest.Header!.SavedAt));
+            Assert.False(listing.NeedsRoom(1));
+
+            var load = CampaignBoot.Load(slots.Store(1), GameContent.Current, number: 1);
+            Assert.True(load.Loaded);
+            Assert.Equal(SaveCodec.Untimed(autosave.Read()!), SaveCodec.Untimed(SaveCodec.Write(SaveGame.Capture(load.Campaign!))));
+            slots.Store(1).ClearResuming();
+        });
+    }
+
+    [Fact]
     public void ADevOverrideSessionNeverSavesToASlot()
     {
         // A dev-override session plays a scratch campaign apart from the player's

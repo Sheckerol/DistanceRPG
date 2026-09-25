@@ -182,7 +182,8 @@ public sealed record ResumeView(ViewDto? View, int Leading, IReadOnlyList<string
 /// (<see cref="CanSaveNow"/>) — never while the enemies move — and the slot chosen
 /// is saved by the host at the frame's end (<see cref="ISaveHost.SaveToSlot"/>),
 /// which tells the menu how it went (<see cref="SlotSaved"/>); 3 quits to the
-/// title, the host writing the autosave first (<see cref="ISaveHost.QuitToTitle"/>).
+/// title, the host writing the autosave first (<see cref="ISaveHost.QuitToTitle"/>),
+/// and the scene takes no key after it while it fades out.
 /// </para>
 /// </summary>
 public class DungeonScene : Scene
@@ -349,6 +350,14 @@ public class DungeonScene : Scene
     // saved.
     private SlotMenu? _saves;
     private string? _answer;
+
+    // Play has been left from the pause menu — the host told to quit to the title,
+    // or, in a dev-override session, the window to close — so this scene is on its
+    // way out: every key after it is ignored, as between runs, while the screen
+    // fades to the title or the window closes. The menu stays up meanwhile, so
+    // nothing behind it acts either, and nothing reaches the campaign the host has
+    // let go (S7's review).
+    private bool _leaving;
 
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
@@ -1527,12 +1536,16 @@ public class DungeonScene : Scene
     /// Every key press, once (<see cref="WireInput"/>): while the save list is up,
     /// the list's (<see cref="SaveListKey"/>); otherwise a number key goes on to
     /// <see cref="NumberKey"/>. Any key clears what the pause menu answered — it
-    /// stays until the next key — before the key does anything else. Internal, so a
-    /// scene built with no window can be walked key by key through its menus.
+    /// stays until the next key — before the key does anything else. Nothing during
+    /// a stair's fade, and nothing once play has been left (<see cref="NumberKey"/>'s
+    /// 3): the screen is fading to the title with the menu still up, and a key
+    /// read then — a slot listed, the menu closed and the turn played on — would act
+    /// on a campaign the host has let go. Internal, so a scene built with no window
+    /// can be walked key by key through its menus.
     /// </summary>
     internal void AnyKey(Keys key)
     {
-        if (Transiting) return;
+        if (Transiting || _leaving) return;
         if (ActiveMenu is GameMenu.Pause or GameMenu.Saves)
             _answer = null;
         if (ActiveMenu == GameMenu.Saves && _saves is { } list)
@@ -1608,15 +1621,16 @@ public class DungeonScene : Scene
     /// the title — the host writes the autosave first, playing out the enemies' turn
     /// if the menu was opened during it (<see cref="ISaveHost.QuitToTitle"/>) — or,
     /// in a dev-override session, which has no title, closes the game, whose close
-    /// saves its scratch slot as ever; every other number does nothing there (never
-    /// a member selected behind the menu); with no menu open, 1-4 select a party
-    /// member. Behind any other menu — the way out's "leave the dungeon?" and the
-    /// save list among them — a number key does nothing at all: it never selects a
-    /// member behind a prompt. Nor during a stair's fade.
+    /// saves its scratch slot as ever — either way play is left, and the scene takes
+    /// no key after it (<see cref="AnyKey"/>); every other number does nothing there
+    /// (never a member selected behind the menu); with no menu open, 1-4 select a
+    /// party member. Behind any other menu — the way out's "leave the dungeon?" and
+    /// the save list among them — a number key does nothing at all: it never selects
+    /// a member behind a prompt. Nor during a stair's fade, nor once play is left.
     /// </summary>
     private void NumberKey(int digit)
     {
-        if (Transiting) return;
+        if (Transiting || _leaving) return;
         if (PauseMenuOpen)
         {
             var (action, said) = PauseMenu.Press(digit, CanSaveNow, _host.HasTitle);
@@ -1636,10 +1650,12 @@ public class DungeonScene : Scene
                     Log.Info($"[Save] {said}");
                     break;
                 case PauseAction.QuitToTitle:
+                    _leaving = true;
                     Log.Info("[Run] QUIT TO TITLE");
                     _host.QuitToTitle();
                     break;
                 case PauseAction.QuitGame:
+                    _leaving = true;
                     Log.Info("[Run] QUIT GAME: a dev-override session has no title");
                     _game.Close();
                     break;
@@ -1701,9 +1717,10 @@ public class DungeonScene : Scene
     /// Escape closes whatever menu is open — on "leave the dungeon?" that is the
     /// no — or opens the pause menu (<see cref="PauseMenu"/>), whose 2 saves into a
     /// slot and whose 3 quits to the title. On the save list it answers an ask no,
-    /// and otherwise goes back to the pause menu. During a stair's fade, and once
-    /// the party is on its way to the screen between runs, it is swallowed:
-    /// nothing opens over a floor being swapped. <strong>On a run's end it does
+    /// and otherwise goes back to the pause menu. During a stair's fade, once the
+    /// party is on its way to the screen between runs, and once play has been left
+    /// from the pause menu, it is swallowed: nothing opens or closes over a floor
+    /// being swapped or a scene fading out. <strong>On a run's end it does
     /// nothing</strong> — the summary, and the defeat screen under it. The summary
     /// is modal: ENTER is the one way on, and the screen between runs opens the
     /// menu. Nothing would be lost by a quit there — the run's end is saved once the
@@ -1713,7 +1730,7 @@ public class DungeonScene : Scene
     /// </summary>
     public bool HandleEscape()
     {
-        if (Transiting) return true;
+        if (Transiting || _leaving) return true;
         if (ActiveMenu == GameMenu.RunSummary || _turns is { Phase: TurnPhase.GameOver }) return true;   // no floor open yet is no game over
         if (ActiveMenu == GameMenu.Saves && _saves is { } list)
         {

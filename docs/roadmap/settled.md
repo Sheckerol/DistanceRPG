@@ -2289,9 +2289,13 @@ superseded whole.
     title, the slots listed afresh. The game quits from the title (QUIT, ESC) or
     by the window's close button from anywhere, which saves the campaign in play
     first. There is no QUIT GAME in a session with a title, and no LOAD in the
-    pause menu: the title is the one place a campaign is chosen, two keys away. A
-    second press while the screen fades to the title finds no campaign in play and
-    does nothing.
+    pause menu: the title is the one place a campaign is chosen, two keys away.
+    Once either menu has asked, its screen reads no key while it fades to the
+    title (S7's review: the dungeon's menu, still up under the first half of the
+    fade, went on taking 1 and 2 — a slot listing read, the menu closed and the
+    turn played on, all on a campaign the host had let go — where the hub's never
+    did); the menu stays up, so nothing behind it acts either. A second ask anyway
+    finds no campaign in play and does nothing.
   - **A dev-override session has no title and saves apart**: its menu's 3 reads
     `3  QUIT GAME` — the window's close, saving its scratch slot as ever — and its
     2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`; the host refuses a
@@ -2320,14 +2324,34 @@ superseded whole.
     naming the folder once would reword every set-aside notice, for a case that
     needs five rare things at once. Past the ceiling the rows are cut and counted
     (`+1 MORE - SEE THE LOG`), and the log has every word.
-  - **A failed autosave's notice can outlive the quit that saved**: a save that
-    fails is said on the next screen until a later save through the game's own
-    door goes through, which takes it back; the quit's save goes through the
-    quit's door, which takes nothing back, so after QUIT TO TITLE the title can
-    still say an earlier autosave failed when the quit's own save went through.
-    The log says which went through. Taking it back there would give the quit's
-    door a second way to withdraw a failure's word, a change to the rule above
-    that the step leaves for its review.
+  - **A quit whose save goes through takes back a failed autosave's word** (S7's
+    review, which licensed the change to the take-back's pin): a save that fails
+    is said on the next screen until a later save goes through, which takes it
+    back — and the quit's own save is one. The quit's door tells the game once the
+    campaign stands on the disk as it was left, written or held there already, and
+    the game takes back what the failed saves said, as its own autosave does; so
+    the title QUIT TO TITLE opens never says the campaign could not be saved when
+    the quit's own save put it there. A quit that cannot save leaves them for the
+    title, beside its marker's word, since both are true; the window's close takes
+    them back too, with no screen left to say them on; and dropping the campaign
+    forgets them, so no later campaign's save takes anything back on its behalf.
+    (Until the review the quit's door took nothing back, and the title could say an
+    earlier autosave had failed right after the quit had saved.)
+  - **Saved by hand, then left with nothing played since, CONTINUE names the
+    slot** — S7's review, accepted as it stands, for the user to see. A save of
+    the campaign a slot already holds writes nothing and keeps the time its state
+    was first written (R2, the folder), so the quit's autosave keeps its older
+    time while the save by hand just made, of the same campaign, carries a later
+    one; CONTINUE, the most recent save by its own time, names the slot —
+    `CONTINUE - SLOT 1 - ...` where the player might look for `AUTOSAVE`. It is
+    the autosave's own campaign, so loading it asks nothing and sets nothing aside
+    (`SameAsAutosave`), and its autosaves go into the autosave slot as ever. The
+    alternative, not taken: let CONTINUE prefer the autosave over a newer slot that
+    holds the same campaign — a special case in the one rule CONTINUE's choice
+    follows, for a choice between two copies of one campaign, and one that would
+    have to read the resume markers too, or it would send CONTINUE to an autosave
+    whose last load crashed the game (its marker sets that save aside and resumes
+    the backup, one save older) over a slot holding the same campaign cleanly.
 
 ### The numbers: `tuning.json`
 

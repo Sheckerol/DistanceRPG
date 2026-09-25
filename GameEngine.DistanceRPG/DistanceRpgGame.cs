@@ -177,8 +177,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private readonly StartupNotices _notices = new();
 
     // The notices of the saves that failed since the last one that went through,
-    // led for the next screen: a save that goes through takes them back, since the
-    // disk holds the campaign again and they are no longer true.
+    // led for the next screen: a save that goes through takes them back — an
+    // autosave, or the quit's own — since the disk holds the campaign again and
+    // they are no longer true (TakeBackFailedSaves). Forgotten with the campaign
+    // (DropCampaign).
     private readonly List<string> _failedSaves = new();
 
     // The boot seed when the override named one, spent by the first BeginRun
@@ -589,13 +591,16 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// of 2026-09-25 on the save model, R2(e)): the autosave written through the
     /// window close's own door (<see cref="SaveOnQuit"/>) — a quit during the enemies'
     /// turn played out to the next player turn first, on the playing scene's own
-    /// step, and a quit that cannot save leaving its marker, which the title says at
-    /// once — then the campaign dropped, that once-only door re-armed so the next
-    /// campaign's quit saves, and the title shown, the slots listed afresh. No
-    /// campaign is in play at the title: a close from it saves nothing, and a second
-    /// ask — a key pressed again while the screen fades to the title — finds no
-    /// campaign to leave and does nothing. A dev-override session has no title, and
-    /// is never asked; asked anyway, it closes the game, as its menu's QUIT GAME does.
+    /// step; a quit that cannot save leaving its marker, which the title says at
+    /// once; and a quit that saves taking back what an earlier failed autosave said,
+    /// so the title never says the campaign could not be saved when the quit put it
+    /// on the disk — then the campaign dropped, that once-only door re-armed so the
+    /// next campaign's quit saves, and the title shown, the slots listed afresh. No
+    /// campaign is in play at the title: a close from it saves nothing. Neither
+    /// screen asks twice — each ignores every key once it has asked, while it fades
+    /// to the title — and a second ask anyway finds no campaign to leave and does
+    /// nothing. A dev-override session has no title, and is never asked; asked
+    /// anyway, it closes the game, as its menu's QUIT GAME does.
     /// </summary>
     public void QuitToTitle()
     {
@@ -618,7 +623,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         ShowTitle();
     }
 
-    /// <summary>Play no campaign from now on: the one in play keeps no wire to the game, and nothing it asked of the save is written.</summary>
+    /// <summary>
+    /// Play no campaign from now on: the one in play keeps no wire to the game,
+    /// nothing it asked of the save is written, and what its failed saves said is
+    /// forgotten — taken back already when the quit's save went through, and
+    /// otherwise left among the notices for the title, which takes them — so no
+    /// save of a later campaign takes anything back on its behalf.
+    /// </summary>
     private void DropCampaign()
     {
         if (_campaign is { } dropped)
@@ -627,6 +638,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         _saveRequested = false;
         _slotRequested = null;
         _loadedFrom = _autosave;
+        _failedSaves.Clear();
     }
 
     /// <summary>Play <paramref name="campaign"/> from now on: its run's end is a save request, and the campaign it replaces keeps no wire to the game.</summary>
@@ -886,11 +898,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// said at once over the floor being played, when a run is
     /// (<see cref="DungeonScene.SaveFailed"/>), and on the next screen the game
     /// shows — there once, however many times it failed, and only until a later
-    /// save goes through, which takes it back (<see cref="StartupNotices.Withdraw"/>).
-    /// A file of the slot the write set aside first, since no save could be read
-    /// from it, is said the same way — at once, and on the next screen — and never
-    /// taken back: it is a fact about a file, whatever the saves after it do. The
-    /// save on the disk is kept whatever happens.
+    /// save goes through, which takes it back (<see cref="TakeBackFailedSaves"/>) —
+    /// this door's, or the quit's (<see cref="SaveOnQuit"/>). A file of the slot the
+    /// write set aside first, since no save could be read from it, is said the same
+    /// way — at once, and on the next screen — and never taken back: it is a fact
+    /// about a file, whatever the saves after it do. The save on the disk is kept
+    /// whatever happens.
     /// </summary>
     private void Save(CampaignState campaign, SaveStore store, string when, ViewDto? view = null)
     {
@@ -901,9 +914,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             Log.Warn($"[Save] {setAside}");
         if (failed is null)
         {
-            foreach (string stale in _failedSaves)
-                _notices.Withdraw(stale);
-            _failedSaves.Clear();
+            TakeBackFailedSaves();
         }
         else
         {
@@ -921,6 +932,22 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var scene = PlayingScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
             scene?.SaveFailed(said[i]);
+    }
+
+    /// <summary>
+    /// A save went through — an autosave (<see cref="Save"/>), or the quit's own,
+    /// which its door tells of once the campaign stands on the disk as it was left
+    /// (<see cref="SaveOnQuit"/>) — so the disk holds the campaign again, and the
+    /// word of every save that failed since the last one that went through is no
+    /// longer true: taken back from the next screen (<see cref="StartupNotices.Withdraw"/>)
+    /// — the title's, after QUIT TO TITLE, among them — and forgotten. What else
+    /// leads is left as it was.
+    /// </summary>
+    private void TakeBackFailedSaves()
+    {
+        foreach (string stale in _failedSaves)
+            _notices.Withdraw(stale);
+        _failedSaves.Clear();
     }
 
     /// <summary>
@@ -968,7 +995,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// campaign is saved as the entry left it. No screen of the campaign follows a
     /// quit, so a quit that cannot save leaves a marker beside the autosave instead,
     /// and the title says, when it next opens, that what the autosave holds is from
-    /// before this quit.
+    /// before this quit. A quit that saves — the campaign written, or on the disk
+    /// already — takes back what an earlier failed autosave said
+    /// (<see cref="TakeBackFailedSaves"/>), as every save that goes through does: so
+    /// the title QUIT TO TITLE opens never says the campaign could not be saved when
+    /// the quit's own save put it on the disk (S7's review). The window's close takes
+    /// it back too, with no screen left to say it on.
     /// </summary>
     private void SaveOnQuit()
     {
@@ -981,7 +1013,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var scene = PlayingScene(campaign);
         Log.Info(campaign.Visit is { } visit ? $"[Save] Saving the campaign on quit, mid-run in {visit.Def.Name}" : "[Save] Saving the campaign on quit");
         Action? step = scene is null ? null : scene.StepLogic;
-        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock());
+        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock(),
+            saved: TakeBackFailedSaves);
 
         if (_resuming)
         {

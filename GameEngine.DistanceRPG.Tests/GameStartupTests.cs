@@ -299,12 +299,18 @@ public class GameStartupTests
         // Read off the IL: the game's one Save says a failure to the scene playing
         // the run and leads it for the next screen, and takes back what a later save
         // made untrue; the scene hands it to its HUD, which lays it among the rows.
+        // The taking back is one helper's, TakeBackFailedSaves, which Save calls and
+        // the quit's own door is handed too (S7's review: a quit whose save went
+        // through takes it back from the title; SaveMenuTests pins that door).
         var save = typeof(DistanceRpgGame).GetMethod("Save", Declared)!;
         var saveFailed = typeof(DungeonScene).GetMethod(nameof(DungeonScene.SaveFailed), Declared)!;
         var lead = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Lead))!;
+        var takeBack = typeof(DistanceRpgGame).GetMethod("TakeBackFailedSaves", Declared)!;
         Assert.Equal(["DistanceRpgGame.Save"], Callers(saveFailed));
         Assert.Equal(["DungeonScene.SaveFailed"], Callers(typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowSaveFailed))!));
-        Assert.Equal(["DistanceRpgGame.Save"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
+        Assert.Equal(["DistanceRpgGame.TakeBackFailedSaves"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(takeBack));
+        Assert.Equal(1, Mentions(save, takeBack));
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.Save", "DistanceRpgGame.ShowTitle"],
             Callers(lead));
         Assert.Equal(1, Mentions(save, lead));
