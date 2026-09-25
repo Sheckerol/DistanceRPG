@@ -589,8 +589,8 @@ public static class ContentValidator
     /// id content may name. (The "every forgedOnly id is forged on at least one
     /// weapon" check needs the weapon list and lives with the weapon checks.)
     /// An id that resolves to nothing is checked against the enchantment ids of
-    /// the game's catalogue (<see cref="EnchantmentDefinitions"/>), so its detail
-    /// says so, and names the id it is nearest when it is a typo of one.
+    /// the enchantment catalogue (<see cref="EnchantmentDefinitions"/>), so its
+    /// detail says so, and names the id it is nearest when it is a typo of one.
     /// </summary>
     public static void ValidateRestricted(RestrictedData data, IReadOnlySet<string> knownIds)
     {
@@ -1464,9 +1464,11 @@ public static class ContentValidator
 
     /// <summary>
     /// Every id in <paramref name="ids"/> is a modifier or an enchantment. The
-    /// detail says where the enchantment ids come from — the game's catalogue,
-    /// which is code — and names the known id a typo is nearest, walked in
-    /// ordinal order so the one suggested is the same every run.
+    /// detail says where the enchantment ids come from — the enchantment
+    /// catalogue, which is code — and names the known id a typo is nearest,
+    /// walked in ordinal order so the one suggested is the same every run. It is
+    /// worded without an apostrophe: the screen that shows it draws the HUD's
+    /// font, which has none and would leave a gap.
     /// </summary>
     private static void RequireKnown(IEnumerable<string> ids, IReadOnlySet<string> knownIds)
     {
@@ -1475,7 +1477,7 @@ public static class ContentValidator
             {
                 string? near = TuningSchema.Nearest(id, knownIds.Order(StringComparer.Ordinal));
                 throw new ContentException(id, RuleUnknownId,
-                    "not a modifier, nor an enchantment in the game's catalogue" + (near is null ? "" : $" - did you mean {near}?"));
+                    "not a modifier, nor an enchantment in the enchantment catalogue" + (near is null ? "" : $" - did you mean {near}?"));
             }
     }
 

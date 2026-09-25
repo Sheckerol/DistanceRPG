@@ -46,7 +46,7 @@ public class StartupErrorTests
             "FILE: RESTRICTED.JSON",
             "ENTRY: BLOK",
             "RULE: ID DOES NOT RESOLVE TO A MODIFIER OR AN ENCHANTMENT",
-            "DETAIL: NOT A MODIFIER, NOR AN ENCHANTMENT IN THE GAME'S",
+            "DETAIL: NOT A MODIFIER, NOR AN ENCHANTMENT IN THE ENCHANTMENT",
             "  CATALOGUE - DID YOU MEAN BLOCK?",
             "TUNING.JSON CHANGES 1 NUMBER: MOVEMENTBUDGET 200",
             "FIX THE FILE AND START AGAIN - ESC QUITS",
@@ -56,6 +56,10 @@ public class StartupErrorTests
         // the screens' lines wrap at.
         Assert.All(lines, row => Assert.Equal(row.ToUpperInvariant(), row));
         Assert.All(lines, row => Assert.InRange(row.Length, 1, NoticeText.LineChars));
+
+        // And no row holds an apostrophe, which that font cannot draw (it would
+        // leave a gap): the detail names the enchantment catalogue without one.
+        Assert.All(lines, row => Assert.DoesNotContain("'", row));
 
         // The lines come from the properties, never the message: a failure stamped
         // as compiled says so beside its file; one no stage stamped names no file;

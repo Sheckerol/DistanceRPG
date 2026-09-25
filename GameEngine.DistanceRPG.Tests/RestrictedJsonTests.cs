@@ -187,7 +187,7 @@ public class RestrictedJsonTests
         // id it is nearest (1i: RESTRICTED.JSON - BLOK - ID DOES NOT RESOLVE ...).
         var error = Load(DataTexts.Edit(Shipped, "\"Riposte\": [\"Block\"]", "\"Riposte\": [\"Blok\"]")).Error!;
         Assert.Equal(("Blok", ContentValidator.RuleUnknownId, RestrictedJson.FileName, false), (error.EntryId, error.Rule, error.File, error.Compiled));
-        Assert.Equal("not a modifier, nor an enchantment in the game's catalogue - did you mean Block?", error.Detail);
+        Assert.Equal("not a modifier, nor an enchantment in the enchantment catalogue - did you mean Block?", error.Detail);
 
         // Wherever the typo sits — a group, a row's key, a kind, forgedOnly, an
         // enchantment id in neverRolled — the same rule names it.

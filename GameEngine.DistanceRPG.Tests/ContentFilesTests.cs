@@ -260,8 +260,9 @@ public class ContentFilesTests
         Assert.Equal((RestrictedJson.FileName, false, "burning", ContentValidator.RuleUniqueNeverRolled), Stamp(forgot));
         Assert.Equal("unique, but absent from neverRolled in restricted.json", forgot.Detail);
 
-        // The dungeons' and the party's stages stamp theirs the same way when they
-        // are handed to the staged load directly, as records a file would read to.
+        // The relations', the dungeons' and the party's stages stamp theirs the same
+        // way when they are handed to the staged load directly: records a file would
+        // read to, or the compiled ones.
         ContentSource<T> Read<T>(string file, T data) where T : class => new(file, data, null, Compiled: false);
         var tuning = ShippedContent.Tuning;
         var enchantments = ShippedContent.Enchantments;
@@ -269,6 +270,16 @@ public class ContentFilesTests
         var weapons = ContentSource<WeaponsData>.Built(ContentFiles.WeaponsFileName, ShippedContent.Weapons);
         var dungeons = ContentSource<DungeonsData>.Built(ContentFiles.DungeonsFileName, ShippedContent.Dungeons);
         var party = ShippedContent.Party;
+
+        // The compiled relations, broken by a code edit under them: a catalogue
+        // that loses burning — handed to the staged load the way a test simulates
+        // any code edit, since the game's load hands it the code's own — leaves
+        // restricted.json's requires and neverRolled naming a soul that is gone.
+        // The load stops at restricted.json's stage, stamped with that file and
+        // marked compiled.
+        var noBurning = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Where(e => e.Id != "burning").ToList());
+        var burningGone = Assert.Throws<ContentException>(() => GameContent.Load(tuning, noBurning, restricted, weapons, dungeons, party));
+        Assert.Equal((RestrictedJson.FileName, true, "burning", ContentValidator.RuleUnknownId), Stamp(burningGone));
 
         var noDungeons = Assert.Throws<ContentException>(() => GameContent.Load(tuning, enchantments, restricted, weapons,
             Read(ContentFiles.DungeonsFileName, new DungeonsData([])), party));

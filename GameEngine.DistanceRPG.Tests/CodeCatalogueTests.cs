@@ -117,12 +117,12 @@ public class CodeCatalogueTests
         // near none: the detail says where the ids come from.
         var frost = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, "[\"flaming\", \"cold\"]", "[\"flaming\", \"frost\"]") });
         Assert.Equal((RestrictedJson.FileName, false, "frost", ContentValidator.RuleUnknownId), Stamp(frost));
-        Assert.Equal("not a modifier, nor an enchantment in the game's catalogue", frost.Detail);
+        Assert.Equal("not a modifier, nor an enchantment in the enchantment catalogue", frost.Detail);
 
         // A typo of one is pointed at the id it is nearest.
         var typo = Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, "[\"flaming\", \"cold\"]", "[\"flaming\", \"colld\"]") });
         Assert.Equal((RestrictedJson.FileName, false, "colld", ContentValidator.RuleUnknownId), Stamp(typo));
-        Assert.Equal("not a modifier, nor an enchantment in the game's catalogue - did you mean cold?", typo.Detail);
+        Assert.Equal("not a modifier, nor an enchantment in the enchantment catalogue - did you mean cold?", typo.Detail);
     }
 
     [Fact]
