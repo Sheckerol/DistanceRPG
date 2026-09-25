@@ -340,6 +340,63 @@ public class CampaignBootTests
     }
 
     [Fact]
+    public void ABackupResumedInTheDungeonSaysTheSavesWordWhole()
+    {
+        InTempFolder(folder =>
+        {
+            // S8's review. A save that cannot be read may sit beside a backup that
+            // holds a run, which is common now that the run saves at every turn's
+            // start. The save is set aside and the backup resumes in the dungeon. The
+            // floor it lands on says what became of campaign.json whole, as the screen
+            // between runs would: the full path it was set aside as, and how to try it
+            // again. What the data files raised after it is capped, as on every screen.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            var script = VisitScript.Enter(campaign, "spear_hall", CampaignRuns.FiveDeep);
+            script.Down();
+            Assert.Null(CampaignBoot.Save(store, campaign, new ViewDto("B")));   // a player turn's start
+            script.EndTurn(SaveGame.LogicStepSeconds);
+            Assert.Null(CampaignBoot.Save(store, campaign, new ViewDto("B")));   // the next one: the save before it is the backup
+            File.WriteAllText(store.SavePath, "not a save");
+
+            var boot = Boot(store);
+            Assert.True(boot.Resumed);
+            Assert.Equal(("spear_hall", 1), (boot.Campaign.Visit!.Def.Id, boot.Campaign.Visit.FloorIndex));
+            Assert.Equal(new ViewDto("B"), boot.View);
+            string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
+            Assert.Collection(boot.Notices,
+                notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", store)})", aside));
+            store.ClearResuming();
+
+            // The game hands them to the resumed floor this way (DistanceRpgGame.ResumeRun):
+            // the save's word leads, the data files' notices are held after it, and the
+            // count of what leads is read before the take.
+            string[] data = [.. Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1")];
+            var held = new StartupNotices();
+            held.Hold(data);
+            held.Lead(boot.Notices);
+            int leading = held.Leading;
+            var hud = new DungeonHud(game: null!);
+            hud.ShowResume(boot.Campaign.Visit, held.Take(), leading);
+            Assert.Equal(2, leading);
+            var saysWhole = boot.Notices.SelectMany(NoticeText.Wrap).ToList();   // every word of both, the path and TRY AGAIN among them
+            Assert.InRange(saysWhole.Count, NoticeText.MaxRows + 1, NoticeText.MaxWholeRows);
+            Assert.Equal([.. saysWhole, .. NoticeText.Rows(data).Take(NoticeText.MaxRows), NoticeText.More(2)], hud.NoticeRows);
+            Assert.Contains(aside.Replace('\\', '/').ToUpperInvariant(), string.Concat(hud.NoticeRows.Select(row => row.Trim())), StringComparison.Ordinal);
+            Assert.Contains(CampaignBoot.TryAgain, string.Join(" ", hud.NoticeRows.Select(row => row.Trim())), StringComparison.Ordinal);
+
+            // S8 first capped every notice here. The floor then showed the resumed
+            // line, a row or two of the notice and a count of the rest: never the
+            // whole path, and never how to try it again.
+            var capped = NoticeText.Rows([.. boot.Notices, .. data]);
+            Assert.Equal(NoticeText.MaxRows + 1, capped.Count);
+            Assert.DoesNotContain(CampaignBoot.TryAgain, string.Join(" ", capped.Select(row => row.Trim())), StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public void QuittingMidEnemyTurnSavesTheNextPlayerTurn()
     {
         InTempFolder(folder =>

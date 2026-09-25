@@ -120,11 +120,12 @@ its own and resumes where you left off.
   screen between runs says so under the title, whole: what became of the
   campaign, `THE NUMBERS HAVE CHANGED ...` when they have, and each file set
   aside by its full path (drawn with forward slashes, since the game's font has
-  no backslash; Windows reads it either way). Only what the data files raised
-  after that is cut to three rows (`+N MORE - SEE THE LOG`); a floor the backup
-  resumes on cuts all of it to three rows. The log has every word. **Rename it
-  back to `campaign.json` to try it again.** Nothing ever writes over a file set
-  aside.
+  no backslash; Windows reads it either way). When the backup holds a run in
+  progress, the floor it resumes on says the same, whole, over the floor
+  banner; the banner moves down to make room, and the words stay up longer the
+  more there are. Only what the data files raised after that is cut to three
+  rows (`+N MORE - SEE THE LOG`). The log has every word. **Rename it back to
+  `campaign.json` to try it again.** Nothing ever writes over a file set aside.
 - **Starting over**: N, then N, on the screen between runs replaces the saved
   campaign with a new one (the old one stays in `campaign.bak.json` until the
   next save). `DistanceRPG --new-campaign` — `dotnet run --project

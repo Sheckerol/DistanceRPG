@@ -82,9 +82,13 @@ public sealed class DungeonHud
     /// A banner across the upper third of the screen: a small line over it, the
     /// line itself, any lines of warning under it, and how long it stays up — and,
     /// over a floor a save brought back, <see cref="ResumedLine"/> over all of it
-    /// (<see cref="Header"/>).
+    /// (<see cref="Header"/>). It sits under the notices that were up when it went
+    /// up, <see cref="NoticeRows"/> rows lifted <see cref="NoticeLift"/>
+    /// (<see cref="BannerLine"/>), and keeps that place until it comes down, so it
+    /// never jumps when they fade first.
     /// </summary>
-    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds, string Header = "");
+    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds, string Header = "",
+        int NoticeRows = 0, float NoticeLift = 0f);
 
     /// <summary>What a resumed visit's banner says over the floor banner (1f): <c>RESUMED</c>, where the screen between runs says <c>CAMPAIGN RESUMED</c>.</summary>
     internal const string ResumedLine = "RESUMED";
@@ -94,29 +98,44 @@ public sealed class DungeonHud
 
     /// <summary>The <see cref="ResumedLine"/> header: its scale, and how far over the banner's over-line it sits.</summary>
     private const float HeaderScale = 3f;
-    private const float HeaderLift = 34f;
+    internal const float HeaderLift = 34f;
 
-    // The banner up now (ShowArrival, ShowBossFall), and how long it has been up —
+    /// <summary>How far the banner's over-line (the dungeon's name, on arrival) sits over its main line.</summary>
+    internal const float OverLineRise = 30f;
+
+    // The banner up now (ShowArrival, ShowResume, ShowBossFall), and how long it has been up —
     // taken down early (HideArrival) the moment the party starts off the floor it
     // speaks of.
     private Banner? _banner;
     private float _bannerAge;
 
-    /// <summary>How long the startup notices stay over the first floor, and the last stretch of it over which they fade: long enough to read three rows.</summary>
+    /// <summary>How long the startup notices stay over the first floor, and the last stretch of it over which they fade: long enough to read the four rows a capped list runs to (<see cref="NoticeLife"/>).</summary>
     private const float NoticeSeconds = 12f;
     private const float NoticeFadeSeconds = 2f;
 
+    /// <summary>How much longer the notices stay up for each row past a capped list's four: the save's word, shown whole over a resumed floor, can run to a dozen.</summary>
+    private const float NoticeSecondsPerRow = 2f;
+
     /// <summary>The notices' rows: their scale, their pitch, and the gap they keep above the banner's line over it.</summary>
     private const float NoticeScale = 1.5f;
-    private const float NoticePitch = 18f;
+    internal const float NoticePitch = 18f;
     private const float NoticeGap = 12f;
 
-    // The startup notices up now (ShowNotices), as NoticeText laid them out, and
-    // how long they have been up; and how far they sit over the banner's
-    // over-line — clear of RESUMED on a resumed floor, for as long as they are
-    // up, which outlasts the banner.
+    /// <summary>
+    /// The highest a notice row is drawn: under the two readouts along the top —
+    /// the MOVE line, and the weapon line at 42 under it — so a notice is never
+    /// drawn over them or off the window. When the rows reach it, the banner
+    /// moves down to make room (<see cref="BannerLine"/>).
+    /// </summary>
+    internal const float NoticeTopMargin = 62f;
+
+    // The startup notices up now (ShowNotices, ShowResume), as NoticeText laid
+    // them out, how long they have been up and how long they stay; and how far
+    // they sit over the banner's over-line — clear of RESUMED on a resumed floor,
+    // for as long as they are up, which outlasts the banner.
     private IReadOnlyList<string> _noticeRows = [];
     private float _noticeAge;
+    private float _noticeSeconds;
     private float _noticeLift;
 
     public DungeonHud(Game game)
@@ -136,8 +155,14 @@ public sealed class DungeonHud
     {
         ArgumentNullException.ThrowIfNull(visit);
         var trade = BossFloorBanner(visit);
-        _banner = new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
-            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds);
+        PutUp(new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
+            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds));
+    }
+
+    /// <summary>Put <paramref name="banner"/> up under the notices up now, which it keeps its place under until it comes down (<see cref="Banner"/>).</summary>
+    private void PutUp(Banner banner)
+    {
+        _banner = banner with { NoticeRows = _noticeRows.Count, NoticeLift = _noticeLift };
         _bannerAge = 0f;
     }
 
@@ -146,29 +171,51 @@ public sealed class DungeonHud
     /// own arrival banner — the dungeon's name over the floor reached, the trade
     /// under it on the boss floor (<see cref="ShowArrival"/>) — with
     /// <see cref="ResumedLine"/> over it all, up long enough to read; and the
-    /// launch's notices over that (<see cref="ShowNotices"/>): the save's word on
-    /// the campaign — resumed from its backup, the numbers changed, a file set
-    /// aside — then what the data files raised, wrapped and capped as the other
-    /// dungeon screens cap theirs, the log keeping every word. The plain
-    /// <c>CAMPAIGN RESUMED</c> the screen between runs leads with is the banner's
-    /// own word here, so it is not said twice.
+    /// launch's notices over that. First the save's word on the campaign —
+    /// resumed from its backup, the numbers changed, a file set aside with its
+    /// full path and how to try it again — <strong>shown whole</strong>, as the
+    /// screen between runs shows it (S8's review: a notice cut off here would hide
+    /// the one thing the player has to act on). Then what the data files raised,
+    /// capped as every screen caps it (<see cref="NoticeText.Rows"/>), the log
+    /// keeping every word. The banner moves down to make room when the word runs
+    /// long (<see cref="BannerLine"/>). The plain <c>CAMPAIGN RESUMED</c> the
+    /// screen between runs leads with is the banner's own word here, so it is not
+    /// said twice, and is not counted among the notices shown whole.
     /// </summary>
     /// <param name="visit">The visit resumed, standing on the floor it was saved on.</param>
     /// <param name="notices">What the launch has to say, in order.</param>
-    public void ShowResume(DungeonState visit, IReadOnlyList<string> notices)
+    /// <param name="leading">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign (<see cref="StartupNotices.Leading"/>).</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="leading"/> is negative.</exception>
+    public void ShowResume(DungeonState visit, IReadOnlyList<string> notices, int leading)
     {
         ArgumentNullException.ThrowIfNull(visit);
         ArgumentNullException.ThrowIfNull(notices);
+        ArgumentOutOfRangeException.ThrowIfNegative(leading);
+
+        var said = new List<string>(notices.Count);
+        int whole = 0;
+        for (int i = 0; i < notices.Count; i++)
+        {
+            if (notices[i] == BetweenRunsHud.Resumed)
+                continue;   // RESUMED over the banner says it
+            if (i < leading)
+                whole++;
+            said.Add(notices[i]);
+        }
+        LayNotices(NoticeText.Rows(said, whole), HeaderLift);   // first: the banner goes up under them
+
         ShowArrival(visit);
         _banner = _banner! with { Header = ResumedLine, Seconds = MathF.Max(_banner.Seconds, ResumedBannerSeconds) };
-        ShowNotices(notices.Where(notice => notice != BetweenRunsHud.Resumed).ToArray());
-        _noticeLift = HeaderLift;
     }
 
     /// <summary>The banner up now, its lines top to bottom — <see cref="ResumedLine"/> first on a resumed floor, then the line over the banner, the banner, and what is under it — or none once it is down: what the HUD draws, for a test to read with no window.</summary>
     internal IReadOnlyList<string> BannerLines => _banner is not { } banner
         ? []
         : [.. new[] { banner.Header, banner.Over }.Where(line => line.Length > 0), banner.Main, .. banner.Under];
+
+    /// <summary>Where the banner up now is drawn in a window <paramref name="windowHeight"/> pixels tall — under the notices it went up under (<see cref="BannerLine"/>) — or null once it is down: for a test to read with no window.</summary>
+    internal float? BannerLineIn(float windowHeight)
+        => _banner is { } banner ? BannerLine(windowHeight, banner.NoticeRows, banner.NoticeLift) : null;
 
     /// <summary>
     /// The boss is down (§4.3): the banner says who fell and what that means —
@@ -183,8 +230,7 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(boss);
         var (headline, aftermath) = BossFalls(boss);
         IReadOnlyList<string> under = drop is null ? [aftermath] : [aftermath, BossDropLine(drop, boss.Theme)];
-        _banner = new Banner("", headline, under, WarningBannerSeconds);
-        _bannerAge = 0f;
+        PutUp(new Banner("", headline, under, WarningBannerSeconds));
     }
 
     /// <summary>
@@ -204,18 +250,65 @@ public sealed class DungeonHud
     /// dungeon the game booted straight into, which never passes the screen
     /// between runs that says them otherwise. Wrapped and capped by
     /// <see cref="NoticeText.Rows"/>, the one wrapper every notice goes through,
-    /// and up for <see cref="NoticeSeconds"/>, fading at the end.
+    /// and up for as long as they take to read (<see cref="NoticeLife"/>), fading
+    /// at the end.
     /// </summary>
     public void ShowNotices(IReadOnlyList<string> notices)
     {
         ArgumentNullException.ThrowIfNull(notices);
-        _noticeRows = NoticeText.Rows(notices);
-        _noticeAge = 0f;
-        _noticeLift = 0f;
+        LayNotices(NoticeText.Rows(notices), lift: 0f);
     }
 
-    /// <summary>The notice rows up now, as <see cref="ShowNotices"/> laid them out: what the HUD draws over the banner.</summary>
+    /// <summary>Put <paramref name="rows"/> up over the banner, <paramref name="lift"/> over its over-line, for as long as they take to read (<see cref="NoticeLife"/>).</summary>
+    private void LayNotices(IReadOnlyList<string> rows, float lift)
+    {
+        _noticeRows = rows;
+        _noticeAge = 0f;
+        _noticeSeconds = NoticeLife(rows.Count);
+        _noticeLift = lift;
+    }
+
+    /// <summary>
+    /// How long <paramref name="rows"/> rows of notices stay up:
+    /// <see cref="NoticeSeconds"/> for a list capped as every screen caps one —
+    /// three rows and the one that counts the rest — and
+    /// <see cref="NoticeSecondsPerRow"/> more for each row past that, so the
+    /// save's word, shown whole over a resumed floor, is up long enough to read.
+    /// </summary>
+    internal static float NoticeLife(int rows)
+        => NoticeSeconds + Math.Max(0, rows - (NoticeText.MaxRows + 1)) * NoticeSecondsPerRow;
+
+    /// <summary>The notice rows up now, as <see cref="ShowNotices"/> or <see cref="ShowResume"/> laid them out: what the HUD draws over the banner.</summary>
     internal IReadOnlyList<string> NoticeRows => _noticeRows;
+
+    /// <summary>How far the notice rows up now sit over the banner's over-line: <see cref="HeaderLift"/> on a resumed floor, clear of <see cref="ResumedLine"/>, and none elsewhere.</summary>
+    internal float NoticeLift => _noticeLift;
+
+    /// <summary>
+    /// Where the banner's line — the top of its main line — sits in a window
+    /// <paramref name="windowHeight"/> pixels tall, under <paramref name="noticeRows"/>
+    /// rows of notices lifted <paramref name="noticeLift"/> over its over-line. It
+    /// sits a third of the way down, as it always has, while the rows fit between
+    /// it and the readouts along the top. When they do not, it sits lower by as
+    /// much as they need (<see cref="NoticeTopMargin"/>). The save's word, shown
+    /// whole over a resumed floor, can run to a dozen rows: no row of it is drawn
+    /// over the readouts, off the window, or over the banner.
+    /// </summary>
+    internal static float BannerLine(float windowHeight, int noticeRows, float noticeLift)
+    {
+        float line = windowHeight / 3f;
+        if (noticeRows <= 0)
+            return line;
+        return line + MathF.Max(0f, NoticeTopMargin - NoticesTopOver(line, noticeRows, noticeLift));
+    }
+
+    /// <summary>Where the first of <paramref name="noticeRows"/> notice rows sits in a window <paramref name="windowHeight"/> pixels tall: a gap over the banner's over-line, lifted <paramref name="noticeLift"/> more, over a banner at <see cref="BannerLine"/>, and never higher than <see cref="NoticeTopMargin"/>.</summary>
+    internal static float NoticesTop(float windowHeight, int noticeRows, float noticeLift)
+        => NoticesTopOver(BannerLine(windowHeight, noticeRows, noticeLift), noticeRows, noticeLift);
+
+    /// <summary>Where the first of <paramref name="rows"/> notice rows sits over a banner whose line is <paramref name="line"/>: the last row ends a gap over the over-line, lifted <paramref name="lift"/> more.</summary>
+    private static float NoticesTopOver(float line, int rows, float lift)
+        => line - OverLineRise - lift - NoticeGap - rows * NoticePitch;
 
     /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
     public void ClearFloatingTexts() => _floatingTexts.Clear();
@@ -271,7 +364,7 @@ public sealed class DungeonHud
         if (_noticeRows.Count > 0)
         {
             _noticeAge += deltaTime;
-            if (_noticeAge >= NoticeSeconds)
+            if (_noticeAge >= _noticeSeconds)
                 _noticeRows = [];
         }
     }
@@ -735,17 +828,18 @@ public sealed class DungeonHud
     /// trade, what the fall means). Not over a menu or the game-over screen, whose
     /// words are at the same height and are the ones being asked about; and never
     /// over the fade away from the floor it speaks of, which takes it down as it
-    /// starts (<see cref="HideArrival"/>).
+    /// starts (<see cref="HideArrival"/>). A third of the way down, or lower under
+    /// notices that need the room (<see cref="BannerLine"/>).
     /// </summary>
     private void DrawBanner(DungeonScene scene, int w, int h)
     {
         if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
         float alpha = Math.Clamp((banner.Seconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
-        float y = h / 3f;
+        float y = BannerLine(h, banner.NoticeRows, banner.NoticeLift);
         if (banner.Header.Length > 0)
-            DrawCentered(w, y - 30f - HeaderLift, banner.Header, HeaderScale, Green with { W = alpha });
+            DrawCentered(w, y - OverLineRise - HeaderLift, banner.Header, HeaderScale, Green with { W = alpha });
         if (banner.Over.Length > 0)
-            DrawCentered(w, y - 30f, banner.Over, 2f, Grey with { W = alpha });
+            DrawCentered(w, y - OverLineRise, banner.Over, 2f, Grey with { W = alpha });
         DrawCentered(w, y, banner.Main, 5f, White with { W = alpha });
         float underY = y + 52f;
         foreach (string line in banner.Under)
@@ -756,17 +850,18 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The startup notices (<see cref="ShowNotices"/>), over the arrival banner —
-    /// above the line over it, and above <see cref="ResumedLine"/> on a resumed
-    /// floor, clear of the top readouts — in the warning's orange, fading over
-    /// their last <see cref="NoticeFadeSeconds"/>. Like the banner, not over a menu
-    /// or the game-over screen.
+    /// The startup notices (<see cref="ShowNotices"/>, <see cref="ShowResume"/>),
+    /// over the arrival banner — above the line over it, and above
+    /// <see cref="ResumedLine"/> on a resumed floor, clear of the top readouts
+    /// (<see cref="NoticesTop"/>) — in the warning's orange, fading over their last
+    /// <see cref="NoticeFadeSeconds"/>. Like the banner, not over a menu or the
+    /// game-over screen.
     /// </summary>
     private void DrawNotices(DungeonScene scene, int w, int h)
     {
         if (_noticeRows.Count == 0 || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
-        float alpha = Math.Clamp((NoticeSeconds - _noticeAge) / NoticeFadeSeconds, 0f, 1f);
-        float y = h / 3f - 30f - _noticeLift - NoticeGap - _noticeRows.Count * NoticePitch;
+        float alpha = Math.Clamp((_noticeSeconds - _noticeAge) / NoticeFadeSeconds, 0f, 1f);
+        float y = NoticesTop(h, _noticeRows.Count, _noticeLift);
         foreach (string row in _noticeRows)
         {
             DrawCentered(w, y, row, NoticeScale, Orange with { W = alpha });

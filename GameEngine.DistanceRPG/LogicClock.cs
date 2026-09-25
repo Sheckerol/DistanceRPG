@@ -28,7 +28,8 @@ internal static class LogicClock
     /// left over in <paramref name="accumulator"/>: at most
     /// <see cref="MaxStepsPerFrame"/>, and <paramref name="accumulator"/> left
     /// holding the remainder — always less than one step. A frame of no time (or
-    /// of none that can be read) takes none and leaves the remainder as it was.
+    /// of none that can be read: negative, not a number, or infinite) takes none
+    /// and leaves the remainder as it was.
     /// </summary>
     /// <param name="accumulator">The time carried from the frames before, in seconds, under one step; this frame's remainder on return.</param>
     /// <param name="deltaTime">The frame's time, in seconds.</param>
@@ -39,8 +40,12 @@ internal static class LogicClock
     {
         if (!(step > 0f) || float.IsInfinity(step))
             throw new ArgumentOutOfRangeException(nameof(step), step, "A logic step is a positive number of seconds.");
-        if (!(deltaTime > 0f))
-            return 0;   // no time passed, or none that means anything: nothing to step
+        // No time passed, or none that means anything: nothing to step. An
+        // infinite frame is refused too. Added to the remainder it would leave
+        // Infinity % step, which is NaN, and a NaN remainder never reaches a step
+        // again, so the enemies' turn would stand still for good.
+        if (!(deltaTime > 0f) || float.IsInfinity(deltaTime))
+            return 0;
 
         accumulator += deltaTime;
         int steps = 0;

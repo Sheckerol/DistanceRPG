@@ -1182,10 +1182,11 @@ public class HudTextTests
         // 1f, 1i: a launch that resumes a run in progress opens on the floor the
         // save stood on, with RESUMED over the floor banner — where the screen
         // between runs says CAMPAIGN RESUMED — and the launch's notices over it:
-        // the save's word, then what the data files raised, capped as the other
-        // dungeon screens cap theirs (1h). The plain CAMPAIGN RESUMED is the
-        // banner's own word there, so it is not said twice; resumed from the
-        // backup, the notice says so. Built with no window, as a scene is read.
+        // the save's word whole, as the screen between runs shows it (S8's
+        // review), then what the data files raised, capped as every screen caps
+        // it (1h). The plain CAMPAIGN RESUMED is the banner's own word there, so it
+        // is not said twice; resumed from the backup, the notice says so. Built
+        // with no window, as a scene is read.
         var campaign = CampaignState.Start(GameContent.Current);
         var visit = campaign.Enter("spear_hall", mapSeed: 4);
         Assert.Equal(5, visit.BossFloor);   // seed 4 rolls the Spear Hall five deep
@@ -1195,23 +1196,27 @@ public class HudTextTests
             GameContent.Current);
         Assert.Equal((1, (TurnSystem?)null), (loaded.Campaign.Visit!.FloorIndex, loaded.Campaign.Visit.Turns));
 
+        // The save's word is the first two, as the game counts it (StartupNotices.Leading).
         string[] notices = [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, "tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"];
-        var scene = new DungeonScene(camera: null!, game: null!, loaded.Campaign, new NoRunHost(), new ResumeView(loaded.View, notices));
+        var scene = new DungeonScene(camera: null!, game: null!, loaded.Campaign, new NoRunHost(), new ResumeView(loaded.View, 2, notices));
         Assert.Equal([DungeonHud.ResumedLine, "THE SPEAR HALL", "FLOOR 2"], scene.BannerLines);
         Assert.Equal("RESUMED", DungeonHud.ResumedLine);
-        Assert.Equal(NoticeText.Rows(notices.Skip(1).ToArray()), scene.NoticeRows);
+        Assert.Equal(NoticeText.Rows(notices.Skip(1).ToArray(), whole: 1), scene.NoticeRows);
         Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", scene.NoticeRows.Take(2).Select(row => row.Trim())));
+        Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", scene.NoticeRows[^1]);
         Assert.DoesNotContain(scene.NoticeRows, row => row.Contains(BetweenRunsHud.Resumed, StringComparison.Ordinal));
 
-        // From the backup it says so, the longer line kept; the data files' notices
-        // after it are capped at three rows and the rest counted, as over any floor.
+        // From the backup it says so, the longer line kept and shown whole with the
+        // numbers; the data files' notices after them are capped at three rows and
+        // the rest counted, as over any floor.
         var hud = new DungeonHud(game: null!);
-        string[] many = [CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged, "one", "two", "three"];
-        hud.ShowResume(loaded.Campaign.Visit, many);
-        Assert.Equal(NoticeText.Rows(many), hud.NoticeRows);
+        string[] many = [CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged, "one", "two", "three", "four"];
+        hud.ShowResume(loaded.Campaign.Visit, many, leading: 2);
+        Assert.Equal(NoticeText.Rows(many, whole: 2), hud.NoticeRows);
         Assert.Equal(CampaignBoot.ResumedFromBackup, hud.NoticeRows[0]);
         Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", hud.NoticeRows.Skip(1).Take(2).Select(row => row.Trim())));
-        Assert.Equal([.. NoticeText.Rows([CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged]), NoticeText.More(3)], hud.NoticeRows);
+        Assert.Equal([.. NoticeText.Rows([CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged]), "ONE", "TWO", "THREE", NoticeText.More(1)],
+            hud.NoticeRows);
 
         // On the boss floor the trade stays under it; a floor entered fresh has no
         // RESUMED over its banner. The banner is up long enough to read, then gone.
@@ -1220,16 +1225,111 @@ public class HudTextTests
         deep.OpenTurns(bottom.Party, () => 10);
         while (deep.Current.DownStairs is not null)
             GoDown(deep, bottom.Party);
-        hud.ShowResume(deep, []);
+        hud.ShowResume(deep, [], leading: 0);
         Assert.Equal([DungeonHud.ResumedLine, "THE SPEAR HALL", "FLOOR 5", .. DungeonHud.BossFloorBanner(deep)], hud.BannerLines);
         Assert.Empty(hud.NoticeRows);
         hud.ShowArrival(deep);
         Assert.Equal(["THE SPEAR HALL", "FLOOR 5", .. DungeonHud.BossFloorBanner(deep)], hud.BannerLines);
-        hud.ShowResume(deep, []);
+        hud.ShowResume(deep, [], leading: 0);
         hud.Update(4.9f);
         Assert.NotEmpty(hud.BannerLines);
         hud.Update(0.2f);
         Assert.Empty(hud.BannerLines);
+    }
+
+    [Fact]
+    public void AResumedFloorShowsTheSavesWordWhole_AndItsBannerMakesRoom()
+    {
+        // S8's review (1f over 1h). A launch may set campaign.json aside, because
+        // it could not be read or crashed its own resume, and resume the backup's
+        // run in progress. It then lands in the dungeon, and the file set aside is
+        // the one thing the player has to act on. So the resumed floor shows the
+        // save's word whole, as the screen between runs does, with the full path
+        // and how to try it again. Only what the data files raised after it is
+        // capped. Built with no window, as a scene is read.
+        var campaign = CampaignState.Start(GameContent.Current);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        visit.OpenTurns(campaign.Party, () => 10);
+        GoDown(visit, campaign.Party);
+        var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign, new ViewDto("B")))), GameContent.Current);
+        var resumed = loaded.Campaign.Visit!;
+
+        const string path = @"C:\Users\a-player\AppData\Local\DistanceRPG\saves\campaign.crashed-1.json";
+        string[] saysWhole =
+        [
+            CampaignBoot.ResumedFromBackup,
+            CampaignBoot.TuningChanged,
+            CampaignBoot.SetAsideNotice(SaveStore.FileName, "crashed the game the last time it was resumed", path),
+        ];
+        string[] data = [.. Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1")];
+        var scene = new DungeonScene(camera: null!, game: null!, loaded.Campaign, new NoRunHost(),
+            new ResumeView(loaded.View, saysWhole.Length, [.. saysWhole, .. data]));
+        var whole = saysWhole.SelectMany(NoticeText.Wrap).ToList();   // every word of every notice, the path and TRY AGAIN among them
+        Assert.InRange(whole.Count, NoticeText.MaxRows + 2, NoticeText.MaxWholeRows);   // more than the cap of three alone would show
+        Assert.Equal([.. whole, .. NoticeText.Rows(data).Take(NoticeText.MaxRows), NoticeText.More(2)], scene.NoticeRows);
+        Assert.Contains("C:/USERS/A-PLAYER/APPDATA/LOCAL/DISTANCERPG/SAVES/CAMPAIGN.CRASHED-1.JSON",
+            string.Concat(scene.NoticeRows.Select(row => row.Trim())), StringComparison.Ordinal);   // cut across two rows, but all there
+        Assert.Contains(CampaignBoot.TryAgain, string.Join(" ", scene.NoticeRows.Select(row => row.Trim())), StringComparison.Ordinal);
+
+        // S8 first capped every notice here. That showed the resumed line and the
+        // numbers, and of the file set aside only a count of the notices in the log.
+        Assert.Equal([.. whole.Take(NoticeText.MaxRows), NoticeText.More(6)], NoticeText.Rows([.. saysWhole, .. data]));
+
+        // The plain CAMPAIGN RESUMED is RESUMED over the banner, and is not counted
+        // among what is shown whole. Resumed from campaign.json itself, the numbers
+        // are the save's word, and the data files' notices are capped after them.
+        var hud = new DungeonHud(game: null!);
+        hud.ShowResume(resumed, [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, .. data], leading: 2);
+        Assert.Equal([.. NoticeText.Wrap(CampaignBoot.TuningChanged), .. NoticeText.Rows(data).Take(NoticeText.MaxRows), NoticeText.More(2)],
+            hud.NoticeRows);
+
+        // Where the rows go in the shipped 1280 x 720 window. A short list sits over
+        // the banner, which stays where it has always been, a third of the way down,
+        // and the rows are lifted clear of RESUMED over it.
+        const float h = 720f;
+        hud.ShowResume(resumed, [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, "one"], leading: 2);
+        Assert.Equal(3, hud.NoticeRows.Count);
+        Assert.Equal(DungeonHud.HeaderLift, hud.NoticeLift);
+        Assert.Equal(h / 3f, hud.BannerLineIn(h));
+        Assert.True(DungeonHud.NoticesTop(h, hud.NoticeRows.Count, hud.NoticeLift) > DungeonHud.NoticeTopMargin);
+
+        // The whole word does not fit there. The banner moves down to make room: the
+        // rows start just under the readouts along the top and end clear of RESUMED.
+        hud.ShowResume(resumed, [.. saysWhole, .. data], leading: saysWhole.Length);
+        var rows = hud.NoticeRows;
+        Assert.Equal(scene.NoticeRows, rows);
+        float line = Assert.NotNull(hud.BannerLineIn(h));
+        float top = DungeonHud.NoticesTop(h, rows.Count, hud.NoticeLift);
+        Assert.True(line > h / 3f, $"the banner stayed at {line} under {rows.Count} rows");
+        Assert.Equal(DungeonHud.NoticeTopMargin, top);
+        Assert.True(top + rows.Count * DungeonHud.NoticePitch <= line - DungeonHud.OverLineRise - DungeonHud.HeaderLift, "the rows run into RESUMED");
+
+        // The most rows the save's word can take is every row shown whole, the three
+        // the data files get after it, and the count of the rest. Even then the
+        // banner stays in the upper two thirds of the window, so the boss floor's
+        // trade under it clears the help line along the bottom.
+        Assert.InRange(DungeonHud.BannerLine(h, NoticeText.MaxWholeRows + NoticeText.MaxRows + 1, DungeonHud.HeaderLift), h / 3f, h * 2f / 3f);
+
+        // The rows stay up long enough to read: twelve seconds for a capped list,
+        // and more for every row past its four. A banner put up under them keeps its
+        // place until it comes down, a stair arrival while they are up included. So
+        // it never jumps when the rows go first.
+        Assert.Equal(12f, DungeonHud.NoticeLife(NoticeText.MaxRows + 1));
+        float life = DungeonHud.NoticeLife(rows.Count);
+        Assert.True(life > DungeonHud.NoticeLife(NoticeText.MaxRows + 1));
+        hud.Update(life - 1f);
+        Assert.Equal(rows, hud.NoticeRows);
+        Assert.Empty(hud.BannerLines);                  // the resumed banner is down, and the word still up
+        hud.ShowArrival(resumed);                       // the party takes the stairs while it is
+        Assert.Equal(line, hud.BannerLineIn(h));
+        hud.Update(1.5f);
+        Assert.Empty(hud.NoticeRows);                   // the word has gone
+        Assert.NotEmpty(hud.BannerLines);               // the arrival's banner has not,
+        Assert.Equal(line, hud.BannerLineIn(h));        // and it stays where it went up
+        hud.Update(1f);
+        Assert.Empty(hud.BannerLines);
+        hud.ShowArrival(resumed);                       // the next goes up where banners always have
+        Assert.Equal(h / 3f, hud.BannerLineIn(h));
     }
 
     [Fact]

@@ -5,25 +5,27 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The one wrapper every notice goes through before it is drawn (1h): what the
 /// data files raised at startup — a <c>tuning.json</c> value clamped, a file
-/// missing — under the between-runs title, over the first floor of a dungeon
-/// an override boots straight into, or on the screen a broken content file
-/// stops the game on, whose own lines it wraps too. Each notice is upper-cased (the HUD's font
-/// is capitals) and wrapped at the width the screens' lines wrap at
-/// (<see cref="LineChars"/>, the summary's), its continuation rows indented
-/// under it; and the whole is capped at <see cref="MaxRows"/> rows plus one
-/// saying how many notices did not fit, so a file with fifty mistakes never
-/// pushes the dungeon list off the screen. The log has every one of them.
+/// missing — under the between-runs title, over the first floor of a dungeon an
+/// override boots straight into or a saved run resumes on, or on the screen a
+/// broken content file stops the game on, whose own lines it wraps too. Each
+/// notice is upper-cased (the HUD's font is capitals) and wrapped at the width
+/// the screens' lines wrap at (<see cref="LineChars"/>, the summary's), its
+/// continuation rows indented under it; and the whole is capped at
+/// <see cref="MaxRows"/> rows plus one saying how many notices did not fit, so a
+/// file with fifty mistakes never pushes the dungeon list off the screen. The
+/// log has every one of them.
 /// <para>
 /// <strong>The save's word is shown whole</strong> (S5's review: 1f meets 1h).
 /// The screen between runs leads with what became of the campaign — that it
 /// resumed, the numbers changed since it was saved (PHASE5-084), a save set
 /// aside, by its full path, and how to try it again — and a notice cut off
-/// there would hide the one thing the player has to act on. Those notices are
-/// few by construction (a launch sets at most two files aside), so the screen
-/// hands their count in (<see cref="Rows"/>'s <c>whole</c>) and they are shown
-/// in full, up to <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/>
-/// is for what follows them, the data files' notices, which a broken file can
-/// make as many of as it likes.
+/// there would hide the one thing the player has to act on. A floor a saved run
+/// resumes on leads with the same word, over its banner (S8's review). Those
+/// notices are few by construction (a launch sets at most two files aside), so
+/// the screen hands their count in (<see cref="Rows"/>'s <c>whole</c>) and they
+/// are shown in full, up to <see cref="MaxWholeRows"/>; the cap of
+/// <see cref="MaxRows"/> is for what follows them, the data files' notices,
+/// which a broken file can make as many of as it likes.
 /// </para>
 /// </summary>
 internal static class NoticeText
@@ -41,7 +43,9 @@ internal static class NoticeText
     /// takes about ten rows in the player's own save folder, so this is a ceiling
     /// only a save folder with an unusually long path reaches; past it the rows
     /// are cut like any others, and with <see cref="MaxRows"/> after them and the
-    /// row that counts the rest, the dungeon list still clears a 720-pixel window.
+    /// row that counts the rest, the dungeon list still clears a 720-pixel window,
+    /// and so does a resumed floor's banner, which moves down under them
+    /// (<see cref="DungeonHud.BannerLine"/>).
     /// </summary>
     public const int MaxWholeRows = 14;
 
@@ -56,7 +60,7 @@ internal static class NoticeText
     /// for the notices not shown whole. None for none.
     /// </summary>
     /// <param name="notices">The notices, in the order they are shown.</param>
-    /// <param name="whole">How many of <paramref name="notices"/>, from the first, are shown whole: the save's word on the campaign, which the screen between runs leads with. None by default: every notice is capped.</param>
+    /// <param name="whole">How many of <paramref name="notices"/>, from the first, are shown whole: the save's word on the campaign, which the screen between runs and a resumed floor lead with. None by default: every notice is capped.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="whole"/> is negative.</exception>
     public static IReadOnlyList<string> Rows(IReadOnlyList<string> notices, int whole = 0)
     {

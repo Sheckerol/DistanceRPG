@@ -1543,7 +1543,8 @@ out the alternatives, and this pass records the ruling once the user makes it.
   records in `Logic/Save/` — ids for content, names for enums, locators for
   references — restored through internal doors, never a public setter, and no
   gameplay type carries an attribute. The campaign is the outer document, the
-  visit inside it or none between runs: Phase 6's line, shipped in Phase 5.4.
+  visit inside it or none between runs: PHASE6-223, Phase 6's line, shipped in
+  Phase 5.4.
   Beyond §5.1's list the save holds the last run's summary; a member's innate
   modifiers and attunement (empty today); the whole a turn's movement cap was cut
   from, which the Mire legend reads; the spoils as locators, a bag slot or a
@@ -1597,13 +1598,17 @@ out the alternatives, and this pass records the ruling once the user makes it.
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
-- **The save's word is shown whole on the screen between runs; the data files'
-  notices keep their three-row cap after it.** The cap is for what a broken file
-  can make without bound; what became of the campaign is bounded by construction,
-  and a notice cut off there would hide the one thing the player has to act on.
-  A resumed floor and the error screen cap as before, the log keeping every
-  word. The alternative not taken: a shorter notice naming the file and the save
-  folder, the full path in the log alone.
+- **The save's word is shown whole, on the screen between runs and over a floor
+  a saved run resumes on; the data files' notices keep their three-row cap after
+  it.** The cap is for what a broken file can make without bound; what became of
+  the campaign is bounded by construction, and a notice cut off there would hide
+  the one thing the player has to act on. That holds on a resumed floor too: a
+  backup holding a run resumes in the dungeon, and the file set aside beside it
+  is named there. The floor's banner moves down to make room, so no row is drawn
+  over the readouts along the top, and the rows stay up longer the more there
+  are. A dungeon a dev override boots into and the error screen cap as before,
+  the log keeping every word. The alternative not taken: a shorter notice naming
+  the file and the save folder, the full path in the log alone.
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are
@@ -1611,4 +1616,5 @@ out the alternatives, and this pass records the ruling once the user makes it.
   `wearCapacity` to a weapon's row as a version-2 migration step, with the four
   Enchanter keys and their readers; 6b adds a non-weapon inventory slot as a
   migration step, with the four Consumables keys. Every row is a named-field
-  object, so each is an addition and a step, never a reshaping.
+  object, so each is an addition and a step, never a reshaping. And PHASE6-223,
+  the campaign as the save's outer document, shipped in Phase 5.4 (above).

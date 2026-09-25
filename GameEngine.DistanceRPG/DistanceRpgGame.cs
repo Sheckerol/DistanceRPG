@@ -438,9 +438,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     /// nothing is entered — the visit is the save's, every floor it reached stood
     /// back on its regenerated terrain — so the scene that plays it is handed the
     /// save's view (<paramref name="view"/>: the member who was active, whether
-    /// the turn marched) and what the launch has to say, and it opens the floor the
-    /// party stands on and goes on with the saved turn (<see cref="ResumeView"/>).
-    /// Asked for mid-transition, it waits for the engine to finish.
+    /// the turn marched) and what the launch has to say — the save's word on the
+    /// campaign shown whole, as the screen between runs shows it — and it opens the
+    /// floor the party stands on and goes on with the saved turn
+    /// (<see cref="ResumeView"/>). Asked for mid-transition, it waits for the
+    /// engine to finish.
     /// </summary>
     private void ResumeRun(ViewDto? view)
     {
@@ -455,7 +457,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         Log.Info($"[Run] Resuming {visit.Def.Name} ({visit.Def.Id}) on map seed {visit.MapSeed}: floor {visit.FloorIndex + 1}, turn {visit.Turn}"
             + $" - run counter {campaign.RunCounter}{(view is null ? " - the save carried no view: the floor is arrived on afresh" : "")}");
 
-        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, new ResumeView(view, _notices.Take())));
+        // How many of the notices are the save's word, which the resumed floor
+        // shows whole as the screen between runs does, is read before the take
+        // that hands them over and empties the holder.
+        SwapTo(DungeonSceneName, new DungeonScene(_camera!, this, campaign, this, new ResumeView(view, _notices.Leading, _notices.Take())));
     }
 
     /// <summary>

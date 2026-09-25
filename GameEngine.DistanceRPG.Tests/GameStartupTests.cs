@@ -109,9 +109,10 @@ public class GameStartupTests
         // S5's review: the save's word on the campaign — resumed or begun, the
         // numbers changed, a file set aside and how to try it again — leads the
         // notices, and the screen between runs shows it whole, capping only what
-        // the data files raised after it. The holder counts what was led; the one
-        // screen that shows it whole reads that count, and only there, before the
-        // take that hands the notices over.
+        // the data files raised after it. So does a floor a saved run resumes on
+        // (S8's review). The holder counts what was led. The two methods that open
+        // those screens read that count, and nothing else does. Each reads it
+        // before the take that hands the notices over.
         var notices = new StartupNotices();
         notices.Hold(["data one", "data two"]);
         notices.Lead(["a save that failed"]);
@@ -128,9 +129,22 @@ public class GameStartupTests
         Assert.Equal(["resumed", "data"], notices.Take());
 
         var leading = typeof(StartupNotices).GetProperty(nameof(StartupNotices.Leading))!.GetMethod!;
-        Assert.Equal(["DistanceRpgGame.ShowBetweenRuns"], Callers(leading));
+        Assert.Equal(["DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns"], Callers(leading));
         var built = typeof(BetweenRunsScene).GetConstructors().Single();
         Assert.Equal(["game", "campaign", "host", "shownWhole", "notices"], built.GetParameters().Select(p => p.Name));
+        Assert.Equal(["View", "Leading", "Notices"], typeof(ResumeView).GetConstructors().Single().GetParameters().Select(p => p.Name));
+
+        // Both read the count before the take, which empties the holder: read after
+        // it, the count would be none, and the save's word would be capped.
+        var take = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Take))!;
+        foreach (string opens in new[] { "ShowBetweenRuns", "ResumeRun" })
+        {
+            var method = typeof(DistanceRpgGame).GetMethod(opens, BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var calls = Instructions(Body(method)!).Select(i => i.Token != 0 ? Resolve(method, i.Token) : null).ToList();
+            int counted = calls.FindIndex(called => called is not null && Same(called, leading));
+            int taken = calls.FindIndex(called => called is not null && Same(called, take));
+            Assert.True(counted >= 0 && counted < taken, $"DistanceRpgGame.{opens} does not read the count before the take");
+        }
     }
 
     /// <summary>

@@ -108,8 +108,9 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
 /// none: one taken before the floor was opened (right after the entry), which
 /// the scene arrives on afresh, as it would have.
 /// </param>
+/// <param name="Leading">How many of <paramref name="Notices"/>, from the first, are the save's word on the campaign (<see cref="StartupNotices.Leading"/>): shown whole over the resumed floor, as the screen between runs shows them, where what the data files raised after them is capped (S8's review).</param>
 /// <param name="Notices">What the launch has to say — the save's word on the campaign, then what the data files raised — shown over the resumed floor (<see cref="DungeonHud.ShowResume"/>).</param>
-public sealed record ResumeView(ViewDto? View, IReadOnlyList<string> Notices);
+public sealed record ResumeView(ViewDto? View, int Leading, IReadOnlyList<string> Notices);
 
 /// <summary>
 /// The main gameplay scene: one visit to a dungeon (§4.5), played a floor at a
@@ -353,8 +354,9 @@ public class DungeonScene : Scene
     /// position and every counter are the visit's, restored; what the scene adds
     /// is what <paramref name="resumed"/> carries — the save's view, restored on
     /// the first floor's arrival rather than decided afresh — and <c>RESUMED</c>
-    /// over the floor banner with the launch's notices (<see cref="DungeonHud.ShowResume"/>),
-    /// handed to the HUD here for the reason the other constructor gives.
+    /// over the floor banner with the launch's notices, the save's word among them
+    /// shown whole (<see cref="DungeonHud.ShowResume"/>), handed to the HUD here
+    /// for the reason the other constructor gives.
     /// </summary>
     /// <param name="camera">The game's camera, which the scene aims.</param>
     /// <param name="game">The game window: its size, its shaders, its close.</param>
@@ -367,7 +369,7 @@ public class DungeonScene : Scene
     {
         ArgumentNullException.ThrowIfNull(resumed);
         _resume = resumed;
-        _hud.ShowResume(_visit, resumed.Notices);
+        _hud.ShowResume(_visit, resumed.Notices, resumed.Leading);
     }
 
     /// <summary>What both constructors share: the campaign and its visit, the host, and the HUD.</summary>
@@ -384,7 +386,7 @@ public class DungeonScene : Scene
         _hud = new DungeonHud(game);
     }
 
-    /// <summary>The notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped, capped, or none — the startup's, or a resumed visit's.</summary>
+    /// <summary>The notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped and capped, the save's word whole over a resumed visit, or none — the startup's, or a resumed visit's.</summary>
     internal IReadOnlyList<string> NoticeRows => _hud.NoticeRows;
 
     /// <summary>The banner's lines as the HUD draws them, top to bottom — over a resumed floor, <c>RESUMED</c> first — or none once it is down.</summary>

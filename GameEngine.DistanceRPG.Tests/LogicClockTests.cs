@@ -84,7 +84,20 @@ public class LogicClockTests
         Assert.Equal(0, LogicClock.Steps(ref held, 0f, Step));
         Assert.Equal(0, LogicClock.Steps(ref held, -0.5f, Step));
         Assert.Equal(0, LogicClock.Steps(ref held, float.NaN, Step));
+        Assert.Equal(0, LogicClock.Steps(ref held, float.NegativeInfinity, Step));
+        Assert.Equal(0, LogicClock.Steps(ref held, float.PositiveInfinity, Step));
         Assert.Equal(Step / 2f, held);
+
+        // An infinite frame leaves the clock able to run. Taken into the remainder
+        // it would make it NaN (Infinity % step), no later frame would reach a
+        // step, and the enemies' turn would stand still for good. The next
+        // ordinary frame takes its steps. So does the largest finite frame, which
+        // is only a stall: the cap, and a remainder under a step.
+        Assert.InRange(LogicClock.Steps(ref held, 1f / 60f, Step), 2, 3);
+        Assert.InRange(held, 0f, Step);
+        Assert.Equal(LogicClock.MaxStepsPerFrame, LogicClock.Steps(ref held, float.MaxValue, Step));
+        Assert.True(held >= 0f && held < Step, $"a remainder of {held} after the largest frame is not under a step");
+        Assert.InRange(LogicClock.Steps(ref held, 1f / 60f, Step), 2, 3);
         Assert.Throws<ArgumentOutOfRangeException>(() => LogicClock.Steps(ref held, 1f / 60f, 0f));
         Assert.Throws<ArgumentOutOfRangeException>(() => LogicClock.Steps(ref held, 1f / 60f, -Step));
         Assert.Throws<ArgumentOutOfRangeException>(() => LogicClock.Steps(ref held, 1f / 60f, float.NaN));
