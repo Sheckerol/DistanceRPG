@@ -10,24 +10,23 @@ namespace GameEngine.DistanceRPG.Tests;
 /// keys, read strictly — an unknown member or a value of the wrong kind stops the
 /// game naming the file and the path — and checked before anything reads them,
 /// so a typo in a relation aborts startup rather than "a rule that silently does
-/// not apply". Every case reads text; the shipped file is read from the test
-/// output's own linked copy, by its explicit path.
+/// not apply". Every case reads text; the shipped file is the master copy the
+/// build carries (<see cref="ShippedData.Texts"/>).
 /// </summary>
 public class RestrictedJsonTests
 {
     private static readonly string Shipped = DataTexts.Shipped.Restricted!;
 
-    private static ContentLoad Load(string restricted) => ContentFiles.Load(DataTexts.Shipped with { Restricted = restricted });
+    private static ContentLoad Load(string restricted) => ShippedData.Load(DataTexts.Shipped with { Restricted = restricted });
 
     [Fact]
     public void TheFileIsSectionFivePointFivesKeys()
     {
-        // PHASE5-105–110: the shipped file reads to exactly the compiled relations
-        // — compared by writing both, since the record holds lists and tables — and
-        // holds §5.5's five keys verbatim, in §5.5's order.
-        string text = File.ReadAllText(ShippedDataTests.Shipped(RestrictedJson.FileName));
+        // PHASE5-105–110: the shipped file holds §5.5's five keys verbatim, in
+        // §5.5's order. (It is the master copy: the relations are its alone, so
+        // there is no second record to hold it to.)
+        string text = ShippedData.Texts.Restricted!;
         var read = RestrictedJson.Read(text);
-        Assert.Equal(RestrictedJson.Write(ShippedContent.Restricted), RestrictedJson.Write(read));
 
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
         var root = document.RootElement;
@@ -52,20 +51,14 @@ public class RestrictedJsonTests
         Assert.Equal("ranged", read.Kind["Overwatch"]);
 
         // forgedOnly and neverRolled: arrays of ids, and kept apart — a safety rule
-        // and an economy rule.
+        // and an economy rule. neverRolled is the nine unique souls: the code's
+        // catalogue marks them unique, and the load holds the list to exactly that
+        // (RuleUniqueNeverRolled), so these are the catalogue's, not a choice of
+        // the file's; the order they are listed in is the file's own.
         Assert.Equal(["Charges"], read.ForgedOnly);
-        Assert.Equal(ShippedContent.Restricted.NeverRolled, read.NeverRolled);
+        string[] souls = ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"];
+        Assert.Equal(souls.Order(StringComparer.Ordinal), read.NeverRolled.Order(StringComparer.Ordinal));
         Assert.Empty(read.ForgedOnly.Intersect(read.NeverRolled));
-
-        // The writer is canonical: rows in ordinal key order whatever order the
-        // record's tables hold them in, so one set of relations is one text.
-        var shuffled = ShippedContent.Restricted with
-        {
-            Requires = new Dictionary<string, string[]>(ShippedContent.Restricted.Requires.Reverse(), StringComparer.Ordinal),
-            Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind.Reverse(), StringComparer.Ordinal),
-        };
-        Assert.Equal(Shipped, RestrictedJson.Write(shuffled));
-        Assert.Equal(Shipped, RestrictedJson.Write(RestrictedJson.Read(Shipped)));
     }
 
     [Fact]
@@ -85,7 +78,7 @@ public class RestrictedJsonTests
 
         // Through the loader and the shipped file, the same closure: every member
         // of every group excludes every other, both ways.
-        var content = ContentFiles.Load(DataTexts.Shipped).Content!;
+        var content = ShippedData.Load(DataTexts.Shipped).Content!;
         foreach (var group in RestrictedJson.Read(Shipped).Excludes.Where(group => group.All(ModifierRules.ModifierIds.Contains)))
             foreach (var a in group)
                 foreach (var b in group.Where(b => b != a))
@@ -103,7 +96,7 @@ public class RestrictedJsonTests
             var load = Load(DataTexts.Edit(Shipped, "\"Brace\": \"melee\"", $"\"Brace\": \"{wrong}\""));
             Assert.Null(load.Content);
             Assert.Equal(("Brace", ContentValidator.RuleKindValue, RestrictedJson.FileName, false),
-                (load.Error!.EntryId, load.Error.Rule, load.Error.File, load.Error.Compiled));
+                (load.Error!.EntryId, load.Error.Rule, load.Error.File, load.Error.BuiltIn));
         }
 
         // A kind that is not text at all is the file's shape, named by its path.
@@ -161,7 +154,7 @@ public class RestrictedJsonTests
 
             var error = Load(text).Error!;
             Assert.Equal((entry, ContentValidator.RuleFileShape, detail, RestrictedJson.FileName, false),
-                (error.EntryId, error.Rule, error.Detail, error.File, error.Compiled));
+                (error.EntryId, error.Rule, error.Detail, error.File, error.BuiltIn));
         }
 
         // A file that is not JSON says the line and the column, in words.
@@ -186,7 +179,7 @@ public class RestrictedJsonTests
         // stops the game, naming the id, the rule and the file, and pointing at the
         // id it is nearest (1i: RESTRICTED.JSON - BLOK - ID DOES NOT RESOLVE ...).
         var error = Load(DataTexts.Edit(Shipped, "\"Riposte\": [\"Block\"]", "\"Riposte\": [\"Blok\"]")).Error!;
-        Assert.Equal(("Blok", ContentValidator.RuleUnknownId, RestrictedJson.FileName, false), (error.EntryId, error.Rule, error.File, error.Compiled));
+        Assert.Equal(("Blok", ContentValidator.RuleUnknownId, RestrictedJson.FileName, false), (error.EntryId, error.Rule, error.File, error.BuiltIn));
         Assert.Equal("not a modifier, nor an enchantment in the enchantment catalogue - did you mean Block?", error.Detail);
 
         // Wherever the typo sits — a group, a row's key, a kind, forgedOnly, an
@@ -219,12 +212,12 @@ public class RestrictedJsonTests
         // rather than loading as though it said something.
         var kind = Load(DataTexts.Edit(Shipped, "\"Brace\": \"melee\",", "\"Brace\": \"melee\",\n    \"flaming\": \"melee\",")).Error!;
         Assert.Equal(("flaming", ContentValidator.RuleModifierRelationIds, RestrictedJson.FileName, false),
-            (kind.EntryId, kind.Rule, kind.File, kind.Compiled));
+            (kind.EntryId, kind.Rule, kind.File, kind.BuiltIn));
         Assert.Equal("'flaming' is an enchantment, and kind limits modifiers alone - restricted.json kind flaming: melee", kind.Detail);
 
         var forgedOnly = Load(DataTexts.Edit(Shipped, "\"forgedOnly\": [\"Charges\"]", "\"forgedOnly\": [\"Charges\", \"burning\"]")).Error!;
         Assert.Equal(("burning", ContentValidator.RuleModifierRelationIds, RestrictedJson.FileName, false),
-            (forgedOnly.EntryId, forgedOnly.Rule, forgedOnly.File, forgedOnly.Compiled));
+            (forgedOnly.EntryId, forgedOnly.Rule, forgedOnly.File, forgedOnly.BuiltIn));
         Assert.Equal("'burning' is an enchantment, and forgedOnly lists modifiers alone - restricted.json forgedOnly burning", forgedOnly.Detail);
 
         // A modifier added to kind is the relation it always was, and loads: the

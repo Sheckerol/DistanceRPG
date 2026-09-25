@@ -138,16 +138,15 @@ public static class StatusRules
     /// <see cref="EffectPerLevel(StatusEffectType)"/> under <paramref name="tuning"/>
     /// rather than the current content's: the one reading of the table, so
     /// <see cref="TuningSchema"/>'s <c>EffectPerLevel</c> key can be held to it
-    /// without a content swap. A status neither table names is worth 0.
+    /// without a content swap. The table names every status
+    /// (<see cref="ContentValidator.RuleTableNamesEveryMember"/>): its numbers are
+    /// <c>tuning.json</c>'s, and none is kept in code.
     /// </summary>
     internal static int EffectPerLevel(StatusEffectType type, Tuning tuning)
     {
         ArgumentNullException.ThrowIfNull(tuning);
-        return tuning.Lookup(t => t.EffectPerLevel, type, fallback: EffectFallback);
+        return tuning.EffectPerLevel[type];
     }
-
-    /// <summary>What a status is worth a level when neither the tuning nor the compiled table names it.</summary>
-    internal const int EffectFallback = 0;
 
     /// <summary>Whether the round-end sweep takes this status's level: every status but those that tick at their own turn's end, whose tick is their decay.</summary>
     public static bool DecaysAtRoundEnd(StatusEffectType type) => Of(type).Trigger != StatusTrigger.TurnEnd;

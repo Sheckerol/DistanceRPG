@@ -8,9 +8,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// moves in a turn, read from the tuning wherever the constant was read — a new
 /// member's budget, a turn's refill before Mire's cut, the bank's cap, the
 /// enemies' cost scale — and by the Mire legend, so it agrees with the MOVE
-/// readout under a tuned budget. <see cref="GameConstants.MaxDistance"/> is its
-/// compiled default. In the content collection: the budget is swapped for most of
-/// these through the current content.
+/// readout under a tuned budget. Its number is <c>tuning.json</c>'s alone: no
+/// constant in the code holds it. In the content collection: the budget is
+/// swapped for most of these through the current content.
 /// </summary>
 [Collection(TestContent.Collection)]
 public class MovementBudgetTests
@@ -42,9 +42,12 @@ public class MovementBudgetTests
     [Fact]
     public void TheBudgetIsTheTuningsKey()
     {
-        // PHASE5-047: the budget is a key, its compiled default the constant every
-        // fixture was written against.
-        Assert.Equal((int)GameConstants.MaxDistance, ShippedContent.Tuning.MovementBudget);
+        // PHASE5-047: the budget is a key, and the game plays the master copy's
+        // number. Pinned as a literal on purpose (REWORK DECISION 3, a doc-fixed
+        // pin): phase-1-weapons.md derives the mana divisor from it,
+        // (160 - 40) / (8 + 3), so an edit that moves it fails here by name, and
+        // the doc and MovementUnitsPerMana move with it.
+        Assert.Equal(160, ShippedContent.Tuning.MovementBudget);
         Assert.Equal(160, GameContent.Current.Tuning.MovementBudget);
 
         using (TestContent.Use(tuning: Budget(200)))
@@ -74,7 +77,7 @@ public class MovementBudgetTests
         Assert.Equal(ShippedContent.Budget, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
 
         // And a file turns it: the playtest's edit is the game's budget.
-        var load = ContentFiles.Load(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
+        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
         Assert.Empty(load.Notices);
         Assert.Equal(["MovementBudget 240"], load.TuningOverrides);
         Assert.Equal(240, load.Content!.Tuning.MovementBudget);

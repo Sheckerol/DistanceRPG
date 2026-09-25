@@ -23,13 +23,10 @@ public class ContentEquivalenceTests
     [Fact]
     public void TheShippedContentIsThePreReworkContent()
     {
-        // The content the game loads from the shipped files, as it loads them, and
-        // the relations its restricted.json holds, as read — dumped as the
-        // pre-rework content was.
-        var load = ContentFiles.Load(DataFiles.Read(ShippedDataTests.ShippedFolder));
-        Assert.Null(load.Error);
-        var relations = RestrictedJson.Read(File.ReadAllText(ShippedDataTests.Shipped(RestrictedJson.FileName)));
-        string now = ContentDump.Of(load.Content!, relations);
+        // The content the game loads from the shipped files — the master copies it
+        // carries built in, loaded as the game loads them — and the relations its
+        // restricted.json holds, as read: dumped as the pre-rework content was.
+        string now = ContentDump.Of(ShippedContent.Content, ShippedContent.Restricted);
         string before = File.ReadAllText(PreReworkPath);
 
         // The first line that moved, named, so a drift reads as the field it is...

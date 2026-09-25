@@ -337,7 +337,7 @@ public class DungeonContentTests
             Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.MeleeKind },
         };
         var ex = Assert.Throws<ContentException>(() =>
-            new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, meleeLongshot), Weapons));
+            new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, meleeLongshot), Weapons, ShippedContent.Tuning));
         Assert.Equal(("long_gallery", ContentValidator.RuleThemeReachesItsOwnClass), (ex.EntryId, ex.Rule));
 
         var viaLoad = Assert.Throws<ContentException>(() =>
@@ -396,7 +396,7 @@ public class DungeonContentTests
         {
             Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.RangedKind },
         };
-        var loose = new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, rangedOnly), Weapons);
+        var loose = new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, rangedOnly), Weapons, ShippedContent.Tuning);
         Assert.Equal(new[] { Ranged, Throwing }, loose.ThemeClasses(Longshot));
         Assert.Equal(new[] { Throwing }, loose.WieldClasses(loose["long_gallery"]));
 
@@ -404,12 +404,12 @@ public class DungeonContentTests
         // table no enemy fields, so the Long Gallery's boss would have nothing to hold.
         var bowsOnly = rangedOnly with { Excludes = [.. ShippedContent.Restricted.Excludes, [nameof(Longshot), nameof(Charges)]] };
         var rules = new ModifierRules(ShippedContent.Tuning, bowsOnly);
-        var ex = Assert.Throws<ContentException>(() => new DungeonCatalogue(ShippedContent.Dungeons, rules, Weapons));
+        var ex = Assert.Throws<ContentException>(() => new DungeonCatalogue(ShippedContent.Dungeons, rules, Weapons, ShippedContent.Tuning));
         Assert.Equal(("long_gallery", ContentValidator.RuleBossWieldsAClass), (ex.EntryId, ex.Rule));
 
         // The same relations without the gallery: the table is Ranged alone.
         var withoutGallery = new DungeonsData(ShippedContent.Dungeons.Dungeons.Where(d => d.Id != "long_gallery").ToList());
-        var tables = new DungeonCatalogue(withoutGallery, rules, Weapons);
+        var tables = new DungeonCatalogue(withoutGallery, rules, Weapons, ShippedContent.Tuning);
         Assert.Equal(new[] { Ranged }, tables.ThemeClasses(Longshot));
         Assert.Empty(tables.WieldClasses(ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "long_gallery")));
     }

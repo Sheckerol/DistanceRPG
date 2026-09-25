@@ -13,8 +13,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// naming both — the weapon, and the relation that refused it, asked of the one
 /// predicate every graft asks (<see cref="ModifierRules.Allowed"/>) and explained
 /// by <see cref="ContentValidator.WhyNotAllowed"/>. Every case reads text or
-/// builds rules it never makes current; the shipped file is read from the test
-/// output's own linked copy.
+/// builds rules it never makes current; the shipped file is the master copy the
+/// build carries (<see cref="ShippedData.Texts"/>).
 /// </summary>
 public class WeaponsJsonTests
 {
@@ -26,7 +26,7 @@ public class WeaponsJsonTests
         ["id", "name", "class", "role", "range", "damage", "cost", "manaCost", "forged", "enchantments", "shape", "unique", "derivedFrom"];
 
     private static ContentLoad Load(string? weapons = null, string? restricted = null)
-        => ContentFiles.Load(DataTexts.Shipped with { Weapons = weapons ?? Shipped, Restricted = restricted ?? ShippedRestricted });
+        => ShippedData.Load(DataTexts.Shipped with { Weapons = weapons ?? Shipped, Restricted = restricted ?? ShippedRestricted });
 
     /// <summary>The four relations edits the section's tests make, as restricted.json texts, each passing every restricted and enchantment stage first.</summary>
     private static readonly string PushBlocks = DataTexts.Edit(ShippedRestricted, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],");
@@ -50,14 +50,10 @@ public class WeaponsJsonTests
     {
         // PHASE5-123, -124: "the 32 weapons, the uniques, and the class baselines
         // leave Weapons.cs" — "statline, forged spread, area shape, innate
-        // enchantment id". The shipped file reads to exactly the compiled
-        // catalogue, row for row and in its order.
-        string text = File.ReadAllText(ShippedDataTests.Shipped(WeaponsJson.FileName));
+        // enchantment id". The shipped file is the master copy of every weapon:
+        // no second record of them is kept to hold it to.
+        string text = ShippedData.Texts.Weapons!;
         var read = WeaponsJson.Read(text).Weapons;
-        var compiled = ShippedContent.Weapons.Weapons;
-        Assert.Equal(compiled.Count, read.Count);
-        for (int i = 0; i < compiled.Count; i++)
-            Same(compiled[i], read[i]);
         Assert.Equal(32, read.Count(w => !w.Unique));
         Assert.Equal(11, read.Count(w => w.Unique));
 
@@ -110,9 +106,9 @@ public class WeaponsJsonTests
     [Fact]
     public void ADefaultShapeDimensionOrTierIsOmitted_AndReadsBack()
     {
-        // 1h: a shape's zero dimensions and an enchantment's tier of 1 are left out
-        // when written and read back as left out: a Nova names its radius alone,
-        // a Beam its length and width, a tier-1 soul its id alone.
+        // 1h: a shape's zero dimensions and an enchantment's tier of 1 may be left
+        // out, and read as the number left out: a Nova names its radius alone, a
+        // Beam its length and width, a tier-1 soul its id alone.
         Assert.Contains("\"shape\": { \"kind\": \"Nova\", \"radius\": 96 },", Shipped);
         Assert.Contains("\"shape\": { \"kind\": \"Beam\", \"length\": 224, \"width\": 32 },", Shipped);
         Assert.Contains("\"shape\": { \"kind\": \"Cone\", \"length\": 128, \"angleDegrees\": 90 },", Shipped);
@@ -127,7 +123,10 @@ public class WeaponsJsonTests
         string spelled = DataTexts.Edit(DataTexts.InRow(Shipped, "wand_of_the_nova",
             "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 },", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"width\": 0 },"),
             "[{ \"id\": \"serrated\" }, { \"id\": \"vampiric\", \"tier\": 3 }", "[{ \"id\": \"serrated\", \"tier\": 1 }, { \"id\": \"vampiric\", \"tier\": 3 }");
-        Assert.Equal(Shipped, WeaponsJson.Write(WeaponsJson.Read(spelled)));
+        var spelledOut = WeaponsJson.Read(spelled).Weapons;
+        Assert.Equal(read.Count, spelledOut.Count);
+        foreach (var (left, written) in read.Zip(spelledOut))
+            Same(left, written);
 
         // A dimension its kind does not measure is a number nothing reads, and is
         // refused naming the path and what the kind does measure.
@@ -172,7 +171,7 @@ public class WeaponsJsonTests
 
             // Through the loader, at the weapons' stage, stamped with the file.
             var error = Load(text).Error!;
-            Assert.Equal((entry, rule, detail, WeaponsJson.FileName, false), (error.EntryId, error.Rule, error.Detail, error.File, error.Compiled));
+            Assert.Equal((entry, rule, detail, WeaponsJson.FileName, false), (error.EntryId, error.Rule, error.Detail, error.File, error.BuiltIn));
         }
 
         // Comments and trailing commas are fine: a human edits the file.
@@ -193,7 +192,7 @@ public class WeaponsJsonTests
         ContentException Broken(string restricted)
         {
             var error = Load(restricted: restricted).Error!;
-            Assert.Equal((WeaponsJson.FileName, false), (error.File, error.Compiled));
+            Assert.Equal((WeaponsJson.FileName, false), (error.File, error.BuiltIn));
             return error;
         }
 
@@ -238,7 +237,7 @@ public class WeaponsJsonTests
         Assert.Equal("restricted.json forgedOnly Pin, and no weapon in weapons.json is forged with it", unused.Detail);
 
         // On the screen that stops the game, the relation is on the detail's rows.
-        string screen = string.Join(" ", StartupErrorScene.Lines(excluded, []).Select(row => row.Trim()));
+        string screen = string.Join(" ", StartupErrorScene.Lines(excluded, [], []).Select(row => row.Trim()));
         Assert.Contains("ENTRY: ARMING_SWORD", screen);
         Assert.Contains("RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]", screen);
     }
@@ -314,7 +313,7 @@ public class WeaponsJsonTests
         // refuses it, naming the weapon, the rule and what the code names it as.
         var sword = Load(DataTexts.WithoutRow(Shipped, "arming_sword")).Error!;
         Assert.Equal(("arming_sword", ContentValidator.RuleCodeNamedWeaponsExist, WeaponsJson.FileName, false),
-            (sword.EntryId, sword.Rule, sword.File, sword.Compiled));
+            (sword.EntryId, sword.Rule, sword.File, sword.BuiltIn));
         Assert.Equal("the code names it as what a dummy holds unless told otherwise (EnemyState.DefaultWeaponId), and weapons.json has no such weapon", sword.Detail);
         Assert.Equal(EnemyState.DefaultWeaponId, sword.EntryId);
 

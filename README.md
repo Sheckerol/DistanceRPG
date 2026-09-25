@@ -161,11 +161,15 @@ every key.
   after a Debug build. The log prints its full path at startup
   (`[Data] Read D:\...\net10.0\tuning.json`); the logs are in
   `%LOCALAPPDATA%\Sheckerol\GameEngine\logs`.
-- **Edit that copy**, not `GameEngine.DistanceRPG/Data/tuning.json`. The one in
-  `Data/` is generated from the compiled numbers and pinned byte for byte by
-  `ShippedDataTests`, so editing it fails the tests. A build copies it beside
-  the exe only when it is newer than the copy there, so an edited copy survives
-  a rebuild; `dotnet clean`, or a regenerated `Data/` file, replaces it.
+- **`GameEngine.DistanceRPG/Data/tuning.json` is the master copy**, and the only
+  home of these numbers: the game keeps no copy of one in its code. The game is
+  built with it inside, and plays that built-in copy wherever the copy beside
+  the exe leaves a key out — or all of it, when that copy is missing or cannot
+  be read. A build copies the master beside the exe, where a playtest edits it:
+  **edit the copy beside the exe to playtest, and the master to change what
+  ships.** A build replaces the copy beside the exe whenever the `Data/` master
+  is newer — any change to the master, a checkout or a pull — so keep an edit
+  worth keeping in `Data/`.
 - **Restart to apply**: the file is read once, when the game starts, and never
   during play. If the file is there but the game cannot read it, the built-in
   numbers play and the screen says why. This happens when an editor holds the
@@ -189,11 +193,18 @@ every key.
   where it was — so a longer budget also banks more mana a turn. Its comment
   gives the formula to re-derive it by hand.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
-  says the file is missing), or write a fresh one:
-  `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <folder>`
-  writes the shipped files into `<folder>` and exits without opening a window.
-  A number worth keeping goes into `GameEngine.DistanceRPG/Logic/Content/Tuning.cs`,
-  and `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped files.
+  says the file is missing), or write the built-in copies back:
+  `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`
+  writes the four built-in copies into the folder, byte for byte, and exits
+  without opening a window. A number worth keeping goes into
+  `GameEngine.DistanceRPG/Data/tuning.json`, the master, and the game is rebuilt;
+  `--write-data` refuses that source `Data` folder, so it can never write the
+  last build's copies over an edit there.
+- **The master names every number.** A key or a table member left out of the
+  master stops the game on `THE GAME CANNOT START`, naming
+  `TUNING.JSON (BUILT-IN)` and the key, and ending
+  `THE BUILT-IN TUNING.JSON IS BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/TUNING.JSON AND REBUILD - ESC QUITS`:
+  nothing stands under it. (A copy beside the exe may leave out what it likes.)
 - Nothing the golden tests pin — the map generator, the random streams, the
   pathfinder — is in it, and a test keeps it that way.
 
@@ -221,10 +232,11 @@ everything in them is named by a stable string id.
   it started with). Both are still checked when the game starts, against the
   files beside it. The catalogue's dialled numbers — the `applyPercent` of
   `flaming`, `cold`, `shocking`, `acidic` and `serrated`, and `arcane`'s
-  `potency` — are `tuning.json`'s `ApplyPercent` and `ArcanePotency`: turn them
-  there. `enchantments.json` and `party.json` are no longer read: a build
-  removes the old copies beside the exe (an edit in one is lost with it), and a
-  copy found there anyway is named on screen as no longer read
+  `potency` — are not in the catalogue at all: they are `tuning.json`'s
+  `ApplyPercent` and `ArcanePotency`, so turn them there, and the master
+  `tuning.json` must name each. `enchantments.json` and `party.json` are no
+  longer read: a build removes the old copies beside the exe (an edit in one is
+  lost with it), and a copy found there anyway is named on screen as no longer read
   (`PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE
   (LOGIC/CONTENT/STARTINGPARTY.CS)`), its path in the log.
 - **`weapons.json`** holds every weapon: the thirty-two variants (eight classes
@@ -246,10 +258,14 @@ everything in them is named by a stable string id.
 - **A row marked `/* provisional */`** after its id is one the docs did not fix
   — the four dungeons beside the tutorial and their bosses, and the three
   unnamed uniques — a first guess, expected to move after play.
-- **Edit the copies beside the exe** (`bin/Debug/net10.0/`), as with
-  `tuning.json`: the ones in `GameEngine.DistanceRPG/Data/` are generated from
-  `Logic/Content/ContentDefaults.cs` and pinned by `ShippedDataTests`. The file
-  headers say what each key and field means. Restart to apply.
+- **The files in `GameEngine.DistanceRPG/Data/` are the master copies** — of every
+  relation, weapon and dungeon — hand-kept, with the reason for each group, class
+  and boss written beside it; the game keeps no copy of any in its code. As with
+  `tuning.json`, the game is built with each inside and plays that built-in copy
+  when the copy beside the exe is missing or cannot be read, and a build copies
+  each beside the exe (`bin/Debug/net10.0/`) whenever the master is newer: edit
+  the copy beside the exe to playtest (restart to apply), and the master to change
+  what ships (rebuild). The file headers say what each key and field means.
 - **Content is checked, never clamped.** A number out of range in `tuning.json`
   costs a warning; in a content file it is a broken rule, and the game does not
   start. It opens on `THE GAME CANNOT START` instead, naming the file, the entry,
@@ -264,8 +280,14 @@ everything in them is named by a stable string id.
   tuning, relations, weapons, dungeons, the starting party, and the first check
   to fail is the one shown. Each file's shape is checked before anything reads
   it. A later file's mistake never hides an earlier one's: a typo in
-  `dungeons.json` waits behind a broken relation. When a file beside a built-in
-  record breaks it, the screen marks the built-in one `(COMPILED)`. A
+  `dungeons.json` waits behind a broken relation. A stage that ran a built-in
+  copy is marked `(BUILT-IN)`: either a file beside it broke it — a
+  `restricted.json` there refusing a built-in weapon, and the line at the bottom
+  still says `FIX THE FILE AND START AGAIN` — or the master itself is broken: its
+  own text is not JSON of its shape, or no content file was read from beside the
+  exe to have broken it. Then the screen ends `THE BUILT-IN WEAPONS.JSON IS
+  BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS`,
+  since only fixing the master and rebuilding can mend it. A
   `restricted.json` edit that breaks the enchantment catalogue — `neverRolled`
   without `burning`, say — stops on `RESTRICTED.JSON` itself, the file to fix,
   and one that makes a weapon illegal names both the weapon and the relation that
@@ -279,10 +301,10 @@ everything in them is named by a stable string id.
   `weapons.json` and the game plays the built-in weapons, with
   `WEAPONS.JSON IS MISSING - THE BUILT-IN WEAPONS ARE PLAYING` under the title
   and the path it looked in in the log. The same goes for every content file.
-- `--write-data <folder>` writes all four files: `tuning.json` and the three
-  content files. Run on the folder beside the exe it resets every edited copy;
-  `--write-data GameEngine.DistanceRPG/Data` regenerates the shipped ones after a
-  change to `ContentDefaults.cs`.
+- `--write-data <folder>` writes the four built-in copies: `tuning.json` and the
+  three content files, byte for byte as the build carries them. Run on the folder
+  beside the exe it resets every edited copy there. It refuses the source `Data`
+  folder, which holds the masters.
 
 ## How the port was verified
 

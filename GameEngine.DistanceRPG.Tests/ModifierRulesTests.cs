@@ -271,13 +271,7 @@ public class ModifierRulesTests
             Kind: new Dictionary<string, string> { ["flaming"] = "caster", [nameof(Overwatch)] = "ranged" },
             ForgedOnly: ["burning", nameof(Charges)],
             NeverRolled: ["burning"]);
-        var tuning = ShippedContent.Tuning with
-        {
-            AcquiredHeadroom = 2,
-            PerStack = new Dictionary<ModifierType, int> { [Block] = 4 },
-            Offset = new Dictionary<ModifierType, int>(),
-            MaxForged = new Dictionary<ModifierType, int> { [Block] = 1 },
-        };
+        var tuning = TuningValues.With(ShippedContent.Tuning, (nameof(Tuning.AcquiredHeadroom), 2), ("PerStack.Block", 4), ("MaxForged.Block", 1));
 
         var rules = new ModifierRules(tuning, restricted);
 
@@ -293,23 +287,19 @@ public class ModifierRulesTests
         Assert.Equal(2, rules.AcquiredHeadroom);
         Assert.Equal(3, rules.Cap(Brace, 1));
         Assert.Equal(8, rules.Resolve(Block, 2));
-        Assert.Equal(3, rules.Resolve(CritMultiplier, 1));   // absent offset and per-stack fall back per key to the compiled 2 + 1
-        Assert.Equal(1, rules.MaxForged(Block));              // override
-        Assert.Equal(1, rules.MaxForged(Light));              // absent: the compiled override
-        Assert.Equal(3, rules.MaxForged(Brace));              // in neither table: 3
+        Assert.Equal(3, rules.Resolve(CritMultiplier, 1));   // the offset and per-stack the tuning leaves alone: the shipped 2 + 1
+        Assert.Equal(1, rules.MaxForged(Block));              // moved
+        Assert.Equal(1, rules.MaxForged(Light));              // left alone: the shipped limit
+        Assert.Equal(3, rules.MaxForged(Brace));              // left alone: the shipped 3
     }
 
     [Fact]
-    public void PartialTuningTables_FallBackPerKey_ToTheCompiledDefaults()
+    public void APartialFileMergesPerEntry_ATableBuiltInCodeNamesEveryMember()
     {
-        // A file that re-prices one modifier replaces the whole table on the
-        // record; the rules still read every other key at its compiled value.
-        var partial = ShippedContent.Tuning with
-        {
-            PerStack = new Dictionary<ModifierType, int> { [Block] = 4 },
-            Offset = new Dictionary<ModifierType, int> { [Charges] = 0 },
-            MaxForged = new Dictionary<ModifierType, int> { [Block] = 1 },
-        };
+        // A file that re-prices one modifier names that entry alone, and the read
+        // merges it over the built-in table: the rules still read every other key
+        // at its shipped value.
+        var partial = TuningJson.Read("""{ "PerStack": { "Block": 4 }, "Offset": { "Charges": 0 }, "MaxForged": { "Block": 1 } }""", ShippedContent.Tuning).Tuning;
         var rules = new ModifierRules(partial, ShippedContent.Restricted);
 
         foreach (var t in All)
@@ -324,9 +314,16 @@ public class ModifierRulesTests
             Assert.True(rules.PerStack(t) > 0, $"{t}: a partial table zeroed its stacks");
 
         // An explicit zero is an override, not an absence.
-        var zeroed = new ModifierRules(ShippedContent.Tuning with { PerStack = new Dictionary<ModifierType, int> { [Block] = 0 } }, ShippedContent.Restricted);
+        var zeroed = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 0 } }""", ShippedContent.Tuning).Tuning, ShippedContent.Restricted);
         Assert.Equal(0, zeroed.PerStack(Block));
         Assert.Equal(0, zeroed.Resolve(Block, 3));
+
+        // A table built in code that names one entry alone — no file, so no merge —
+        // has no number under the other twenty-two: refused, naming the first it
+        // leaves out, rather than read as worth nothing.
+        var refused = Assert.Throws<ContentException>(() =>
+            new ModifierRules(ShippedContent.Tuning with { PerStack = new Dictionary<ModifierType, int> { [Block] = 4 } }, ShippedContent.Restricted));
+        Assert.Equal(("PerStack.Brace", ContentValidator.RuleTableNamesEveryMember), (refused.EntryId, refused.Rule));
     }
 
     [Fact]

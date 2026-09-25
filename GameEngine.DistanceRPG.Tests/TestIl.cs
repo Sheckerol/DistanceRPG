@@ -46,6 +46,126 @@ internal static class TestIl
         }
     }
 
+    /// <summary>
+    /// Every method-typed operand in <paramref name="assembly"/> with the method it
+    /// sits in: <see cref="Calls"/>' call, callvirt and newobj, and beside them the
+    /// <c>ldftn</c> and <c>ldvirtftn</c> that make a delegate of a method — a
+    /// method handed on to run later, which is not a call.
+    /// </summary>
+    internal static IEnumerable<(MethodBase From, MethodBase Target, OpCode Op)> Edges(Assembly assembly)
+    {
+        const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+            | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+        foreach (var type in Types(assembly))
+        {
+            var methods = type.GetMethods(Flags).Cast<MethodBase>().Concat(type.GetConstructors(Flags));
+            if (type.TypeInitializer is { } initializer)
+                methods = methods.Append(initializer);
+            foreach (var method in methods.Distinct())
+            {
+                if (Body(method) is not { } il) continue;
+                foreach (var (op, token) in Instructions(il))
+                    if (IsCall(op) || IsDelegate(op))
+                        if (Resolve(method, token) is { } target)
+                            yield return (method, target, op);
+            }
+        }
+    }
+
+    /// <summary>A call, callvirt or newobj: an instruction that runs the method it names, there and then.</summary>
+    internal static bool IsCall(OpCode op) => op == OpCodes.Call || op == OpCodes.Callvirt || op == OpCodes.Newobj;
+
+    /// <summary>An <c>ldftn</c> or <c>ldvirtftn</c>: an instruction that makes a delegate of the method it names, to be run by whoever is handed it.</summary>
+    internal static bool IsDelegate(OpCode op) => op == OpCodes.Ldftn || op == OpCodes.Ldvirtftn;
+
+    /// <summary>Whether <paramref name="method"/> is a type initializer (<c>.cctor</c>) — which <see cref="MethodBase.IsConstructor"/> does not count as a constructor.</summary>
+    internal static bool IsTypeInitializer(MethodBase method) => method is ConstructorInfo { IsStatic: true };
+
+    /// <summary>The methods <paramref name="method"/>'s body calls (<see cref="IsCall"/>), each as named, in order.</summary>
+    internal static IEnumerable<MethodBase> CallsIn(MethodBase method)
+    {
+        if (Body(method) is not { } il) yield break;
+        foreach (var (op, token) in Instructions(il))
+            if (IsCall(op) && Resolve(method, token) is { } target)
+                yield return target;
+    }
+
+    /// <summary>
+    /// Every method of <paramref name="roots"/>' own assembly that running them can
+    /// reach, the roots included, each as its definition: through every call,
+    /// callvirt and newobj; through every delegate a method makes (<c>ldftn</c>) —
+    /// a lambda handed to a query runs there and then — except one a type
+    /// initializer makes, which it stores to run later (a table of behaviours, a
+    /// value made lazily); and to the type initializer of every type a reached
+    /// method calls into or reads or writes a static field of, which the runtime
+    /// runs first. A virtual call is followed to the method named, not to its
+    /// overrides; a method outside the assembly is not followed at all.
+    /// </summary>
+    internal static IReadOnlyCollection<MethodBase> Reachable(params MethodBase[] roots)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var module = roots[0].Module;
+        var reached = new Dictionary<int, MethodBase>();
+        var queue = new Queue<MethodBase>(roots.Select(Definition));
+        while (queue.Count > 0)
+        {
+            var method = queue.Dequeue();
+            if (!reached.TryAdd(method.MetadataToken, method))
+                continue;
+            if (Body(method) is not { } il)
+                continue;
+            bool initializer = IsTypeInitializer(method);
+            foreach (var (op, token) in MemberOperands(il))
+            {
+                if (op.OperandType == OperandType.InlineMethod)
+                {
+                    if ((IsCall(op) || (IsDelegate(op) && !initializer)) && Resolve(method, token) is { } target && target.Module == module)
+                    {
+                        queue.Enqueue(Definition(target));
+                        Initialize(target.DeclaringType);
+                    }
+                }
+                else if ((op == OpCodes.Ldsfld || op == OpCodes.Ldsflda || op == OpCodes.Stsfld)
+                    && ResolveField(method, token) is { } field && field.Module == module)
+                {
+                    Initialize(field.DeclaringType);
+                }
+            }
+        }
+        return reached.Values;
+
+        void Initialize(Type? type)
+        {
+            if (type?.TypeInitializer is { } cctor && cctor.Module == module)
+                queue.Enqueue(cctor);
+        }
+
+        MethodBase Definition(MethodBase target) => target.Module.ResolveMethod(target.MetadataToken)!;
+    }
+
+    /// <summary>Every instruction in <paramref name="il"/> whose operand names a method or a field, with the token.</summary>
+    private static IEnumerable<(OpCode Op, int Token)> MemberOperands(byte[] il)
+    {
+        foreach (var (op, _, at) in InstructionsAt(il))
+            if (op.OperandType is OperandType.InlineMethod or OperandType.InlineField)
+                yield return (op, BitConverter.ToInt32(il, at));
+    }
+
+    private static FieldInfo? ResolveField(MethodBase from, int token)
+    {
+        try
+        {
+            var typeArgs = from.DeclaringType is { IsGenericType: true } t ? t.GetGenericArguments() : null;
+            var methodArgs = from is MethodInfo { IsGenericMethodDefinition: true } m ? m.GetGenericArguments() : null;
+            return from.Module.ResolveField(token, typeArgs, methodArgs);
+        }
+        catch (Exception)
+        {
+            return null;   // a token that is not a field this assembly can name
+        }
+    }
+
     internal static IEnumerable<Type> Types(Assembly assembly)
     {
         try

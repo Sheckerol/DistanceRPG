@@ -6,12 +6,14 @@ using static GameEngine.DistanceRPG.Tests.TestIl;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// The game's startup, as claims about code (PHASE5-040; 1e): the data files are
-/// read once, when the game loads — never on an update path, never hot-reloaded
-/// — by the game alone, from the folder beside the executable, which nothing
-/// else in the game reads; and the command that writes them writes what the
-/// generator makes. Read off the game assembly's IL, so a second caller added
-/// anywhere fails here.
+/// The game's startup, as claims about code (PHASE5-040; 1e; the content
+/// rework, 1g): the data files are read once, when the game loads — never on an
+/// update path, never hot-reloaded — by the game alone, from the folder beside
+/// the executable, which nothing else in the game reads, over the copies the
+/// build carries, which only the edge reads; nothing before the window reads the
+/// content, and the built-in content loads only when something asks for it; and
+/// the command that writes the data files writes the built-in copies. Read off
+/// the game assembly's IL, so a second caller added anywhere fails here.
 /// </summary>
 public class GameStartupTests
 {
@@ -31,19 +33,116 @@ public class GameStartupTests
     public void TheDataIsReadOnceAtStartup()
     {
         // The content is made current, the files are loaded and the executable's
-        // folder is read in one place: the game's LoadData.
+        // folder is read in one place: the game's LoadData, through the edge that
+        // lays the files over the copies the build carries (ShippedData.Load).
+        // ContentFiles.Load's one other caller is the load of the built-in copies
+        // alone — the content GameContent.Current opens on.
         var use = typeof(GameContent).GetMethod(nameof(GameContent.Use))!;
+        var shippedLoad = typeof(ShippedData).GetMethod(nameof(ShippedData.Load))!;
         var load = typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load))!;
         var baseDirectory = typeof(AppContext).GetProperty(nameof(AppContext.BaseDirectory))!.GetMethod!;
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(use));
-        Assert.Equal(["DistanceRpgGame.LoadData"], Callers(load));
+        Assert.Equal(["DistanceRpgGame.LoadData"], Callers(shippedLoad));
+        Assert.Equal(["ShippedData.Load", "ShippedData.LoadBuiltIn"], Callers(load));
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(baseDirectory));
 
         // And LoadData runs from the game's OnLoad alone: once, at startup, never
         // on an update path.
         var loadData = typeof(DistanceRpgGame).GetMethod("LoadData", BindingFlags.NonPublic | BindingFlags.Instance)!;
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(loadData));
+
+        // The loader of the content Current opens on is handed in by the edge's
+        // module initializer alone — as the game's assembly loads — and once: a
+        // second hand-over is refused, and the loader there is left as it was.
+        var openOn = typeof(GameContent).GetMethod(nameof(GameContent.OpenOn), Declared)!;
+        var provide = typeof(ShippedData).GetMethod(nameof(ShippedData.Provide), Declared)!;
+        Assert.Equal(["ShippedData.Provide"], Callers(openOn));
+        Assert.NotNull(provide.GetCustomAttribute<System.Runtime.CompilerServices.ModuleInitializerAttribute>());
+        var opened = typeof(GameContent).GetField("_builtIn", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var before = opened.GetValue(null);
+        Assert.NotNull(before);
+        Assert.Throws<InvalidOperationException>(() => GameContent.OpenOn(() => throw new Xunit.Sdk.XunitException("a second loader of the built-in content was run")));
+        Assert.Same(before, opened.GetValue(null));
+        Assert.Same(ShippedData.Content, ((Lazy<GameContent>)before!).Value);
+
+        // What the build carries is read by the edge alone, and only by ShippedData.
+        var readers = Calls(Game)
+            .Where(c => c.Target.DeclaringType == typeof(Assembly) && c.Target.Name.StartsWith("GetManifestResource", StringComparison.Ordinal))
+            .Select(c => Root(c.From.DeclaringType)!.Name)
+            .Distinct()
+            .ToArray();
+        Assert.Equal([nameof(ShippedData)], readers);
     }
+
+    [Fact]
+    public void NothingBeforeTheWindowReadsTheContent()
+    {
+        // The game makes the loaded content current in LoadData, when the window
+        // loads, before anything reads it; until then GameContent.Current would
+        // open on the built-in content, and forcing that load before the window —
+        // with a broken built-in copy, say — would be a crash, not a screen. So
+        // nothing reachable from Program.Main or the game's constructors, type
+        // initializers and delegates made along the way included, calls
+        // GameContent.Current.
+        var current = typeof(GameContent).GetProperty(nameof(GameContent.Current))!.GetMethod!;
+        var main = typeof(Program).GetMethod("Main", Declared)!;
+        var roots = typeof(DistanceRpgGame).GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Cast<MethodBase>().Prepend(main).ToArray();
+        var reached = Reachable(roots);
+        Assert.Equal([], ReadersOf(current, reached));
+
+        // The walk is not reading nothing: it reaches the command that writes the
+        // data files, the edge that reads what the build carries, and the game's
+        // constructor, and it does find a reader of the content where there is
+        // one — the game's own OnLoad, once the window is up.
+        Assert.Contains(reached, m => Same(m, typeof(Program).GetMethod(nameof(Program.WriteData), Declared)!));
+        Assert.Contains(reached, m => Same(m, typeof(ShippedData).GetProperty(nameof(ShippedData.Texts))!.GetMethod!));
+        Assert.NotEmpty(ReadersOf(current, Reachable(typeof(DistanceRpgGame).GetMethod("OnLoad", Declared)!)));
+    }
+
+    [Fact]
+    public void TheBuiltInContentLoadsOnlyWhenAskedFor()
+    {
+        // The content rework, 1g: ShippedData and GameContent hold no eager static
+        // state. Neither type initializer calls a method of the game's — a Lazy
+        // handed a method to run later is a delegate made, not a call — so a broken
+        // built-in copy can never surface as a type that failed to initialize.
+        var game = typeof(ShippedData).Module;
+        foreach (var type in new[] { typeof(ShippedData), typeof(GameContent) })
+            if (type.TypeInitializer is { } initializer)
+                Assert.Equal([], CallsIn(initializer).Where(target => target.Module == game).Select(target => $"{target.DeclaringType?.Name}.{target.Name}"));
+        var deferred = Edges(Game).Where(e => IsTypeInitializer(e.From) && e.From.DeclaringType == typeof(ShippedData) && IsDelegate(e.Op))
+            .Select(e => e.Target.Name).Order(StringComparer.Ordinal);
+        Assert.Equal(["LoadBuiltIn", "ReadBuiltInTexts"], deferred);   // the deferrals are there: the lazy holders' loaders
+
+        // The module initializer hands GameContent the loader and does nothing else
+        // of the game's: it reads nothing, and forces neither holder.
+        var provide = typeof(ShippedData).GetMethod(nameof(ShippedData.Provide), Declared)!;
+        var openOn = typeof(GameContent).GetMethod(nameof(GameContent.OpenOn), Declared)!;
+        Assert.Equal([openOn.Name], CallsIn(provide).Where(target => target.Module == game).Select(target => target.Name));
+
+        // The built-in content alone is the suite's door: nothing in the game asks
+        // for it.
+        var content = typeof(ShippedData).GetProperty(nameof(ShippedData.Content), Declared)!.GetMethod!;
+        Assert.Empty(Callers(content));
+
+        // And the game's own load never forces it: nothing reachable from LoadData
+        // or from ShippedData.Load calls the built-in-only load or reads Current —
+        // the load builds from its own locals, so it cannot re-enter the content it
+        // is building, and a broken built-in copy reaches the error screen.
+        var loadBuiltIn = typeof(ShippedData).GetMethod("LoadBuiltIn", Declared)!;
+        var current = typeof(GameContent).GetProperty(nameof(GameContent.Current))!.GetMethod!;
+        var fromLoad = Reachable(typeof(DistanceRpgGame).GetMethod("LoadData", Declared)!, typeof(ShippedData).GetMethod(nameof(ShippedData.Load))!);
+        Assert.Contains(fromLoad, m => Same(m, typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load))!));
+        Assert.Equal([], ReadersOf(loadBuiltIn, fromLoad));
+        Assert.Equal([], ReadersOf(current, fromLoad));
+    }
+
+    /// <summary>Every method of <paramref name="reached"/> that calls <paramref name="target"/>, as <c>Type.Method</c>.</summary>
+    private static string[] ReadersOf(MethodBase target, IEnumerable<MethodBase> reached)
+        => reached.Where(method => CallsIn(method).Any(called => Same(called, target)))
+            .Select(method => $"{method.DeclaringType?.FullName}.{method.Name}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     [Fact]
     public void TheStartupNoticesGoToTheFirstSceneAlone()
@@ -213,21 +312,61 @@ public class GameStartupTests
     }
 
     [Fact]
-    public void TheWriteDataCommandWritesWhatTheGeneratorWrites()
+    public void TheWriteDataCommandWritesTheBuiltInCopies()
     {
-        // DistanceRPG --write-data <folder> writes the generator's files into the
-        // folder, no window opened: the command's whole body, run into a temp folder.
+        // DistanceRPG --write-data <folder> writes the four copies the game carries
+        // built in — the tuning and the three content files — into the folder, no
+        // window opened: each byte for byte as the build carries it (UTF-8, no byte
+        // order mark, "\n" line ends), each reported by its full path, and nothing
+        // else in the folder — the enchantment catalogue and the starting party are
+        // code, and have no file. The command's whole body, run into a temp folder of
+        // its own, so no real folder is touched; a game started beside what it wrote
+        // plays exactly the built-in content, saying nothing.
         var folder = Directory.CreateTempSubdirectory("distancerpg-");
         try
         {
-            string target = Path.Combine(folder.FullName, "out");
+            string target = Path.Combine(folder.FullName, "data");
             var report = new List<string>();
-            Program.WriteData(target, report.Add);
+            Assert.True(Program.WriteData(target, report.Add));
 
-            var generated = ContentFiles.WriteDefaults();
-            string path = Path.Combine(target, TuningJson.FileName);
-            Assert.Equal(generated.Tuning, File.ReadAllText(path));
-            Assert.Contains($"[Data] Wrote {path}", report);
+            var builtIn = ShippedData.Texts;
+            string?[] texts = [builtIn.Tuning, builtIn.Restricted, builtIn.Weapons, builtIn.Dungeons];
+            Assert.Equal(4, ContentFiles.FileNames.Count);
+            Assert.Equal(ContentFiles.FileNames.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                Assert.NotNull(texts[i]);
+                Assert.Equal(System.Text.Encoding.UTF8.GetBytes(texts[i]!), File.ReadAllBytes(Path.Combine(target, ContentFiles.FileNames[i])));
+                using var resource = typeof(ShippedData).Assembly.GetManifestResourceStream(ShippedData.ResourcePrefix + ContentFiles.FileNames[i])!;
+                using var bytes = new MemoryStream();
+                resource.CopyTo(bytes);
+                Assert.Equal(bytes.ToArray(), File.ReadAllBytes(Path.Combine(target, ContentFiles.FileNames[i])));
+            }
+            Assert.Equal(ContentFiles.FileNames.Order(StringComparer.Ordinal),
+                Directory.GetFiles(target).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+
+            var load = ShippedData.Load(DataFiles.Read(target));
+            Assert.Null(load.Error);
+            Assert.Empty(load.Notices);
+            Assert.Empty(load.TuningOverrides);
+
+            // It refuses the source Data folder — a folder named Data beside the game
+            // project — which holds the master copies: the last build's copies are
+            // never written over edits not built yet. Nothing is written there, and
+            // the report says why.
+            string project = Path.Combine(folder.FullName, "GameEngine.DistanceRPG");
+            string source = Path.Combine(project, "Data");
+            Directory.CreateDirectory(source);
+            File.WriteAllText(Path.Combine(project, "GameEngine.DistanceRPG.csproj"), "<Project />");
+            report.Clear();
+            Assert.True(Program.IsSourceDataFolder(source));
+            Assert.True(Program.IsSourceDataFolder(source + Path.DirectorySeparatorChar));
+            Assert.False(Program.WriteData(source, report.Add));
+            Assert.Empty(Directory.GetFiles(source));
+            Assert.Contains("is the source Data folder", Assert.Single(report), StringComparison.Ordinal);
+
+            // A Data folder with no game project beside it is any other folder.
+            Assert.False(Program.IsSourceDataFolder(Path.Combine(folder.FullName, "Data")));
         }
         finally
         {
@@ -240,46 +379,6 @@ public class GameStartupTests
         Assert.Null(Program.WriteDataDirectory(["--write-data"]));
         Assert.Null(Program.WriteDataDirectory(["--write-data", "--new-campaign"]));
         Assert.Null(Program.WriteDataDirectory([]));
-    }
-
-    [Fact]
-    public void TheWriteDataCommandWritesTheDataFiles()
-    {
-        // DistanceRPG --write-data <folder> regenerates everything the tests pin
-        // (USER DECISION 3): the tuning and the three content files, each the
-        // generator's text byte for byte — UTF-8, no byte order mark, "\n" line
-        // ends — each reported by its full path, and nothing else in the folder:
-        // the enchantment catalogue and the starting party are code, and have no
-        // file. Run into a temp folder of its own, so no real folder is touched; a
-        // game started beside what it wrote plays the compiled content, saying
-        // nothing.
-        var folder = Directory.CreateTempSubdirectory("distancerpg-");
-        try
-        {
-            string target = Path.Combine(folder.FullName, "data");
-            var report = new List<string>();
-            Program.WriteData(target, report.Add);
-
-            var generated = ContentFiles.WriteDefaults();
-            string?[] texts = [generated.Tuning, generated.Restricted, generated.Weapons, generated.Dungeons];
-            Assert.Equal(4, ContentFiles.FileNames.Count);
-            Assert.Equal(ContentFiles.FileNames.Select(name => $"[Data] Wrote {Path.Combine(target, name)}"), report);
-            for (int i = 0; i < texts.Length; i++)
-            {
-                Assert.NotNull(texts[i]);
-                Assert.Equal(System.Text.Encoding.UTF8.GetBytes(texts[i]!), File.ReadAllBytes(Path.Combine(target, ContentFiles.FileNames[i])));
-            }
-            Assert.Equal(ContentFiles.FileNames.Order(StringComparer.Ordinal),
-                Directory.GetFiles(target).Select(Path.GetFileName).Order(StringComparer.Ordinal));
-
-            var load = ContentFiles.Load(DataFiles.Read(target));
-            Assert.Null(load.Error);
-            Assert.Empty(load.Notices);
-        }
-        finally
-        {
-            folder.Delete(recursive: true);
-        }
     }
 
     [Fact]

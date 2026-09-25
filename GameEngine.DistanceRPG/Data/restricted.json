@@ -2,6 +2,7 @@
  * restricted.json - what may sit together on a weapon, and what may be rolled, for modifiers and
  * enchantments alike. An id is a modifier's name (Block, CritWindow) or an enchantment's id from
  * the game's enchantment catalogue (flaming, burning); kind and forgedOnly name modifiers alone.
+ * The relations live here and nowhere else: the game keeps no copy of one in its code.
  *
  * Read once, when the game starts, and checked before anything else is: an id that names nothing, a
  * group naming an id twice, a requires that loops or that asks for what the same id excludes stops
@@ -10,11 +11,13 @@
  * game does not know, or a value of the wrong kind, stops the game too. Comments and trailing
  * commas are fine. A relation is an edit here, never a rebuild: start the game again to play it.
  *
- * The copy to edit is the one beside the game (bin/Debug/net10.0/restricted.json - the log prints
- * its full path). GameEngine.DistanceRPG/Data/restricted.json is generated from the compiled
- * content (DistanceRPG --write-data <folder>) and pinned by the tests: a relation worth keeping
- * goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy
- * plays the built-in relations, and the screen says so.
+ * GameEngine.DistanceRPG/Data/restricted.json is the master copy: the game is built with it
+ * inside, and plays that built-in copy whenever the copy beside the executable is missing or
+ * cannot be read (the screen says so). A build copies it beside the executable
+ * (bin/Debug/net10.0/restricted.json - the log prints its full path), where a playtest edits it.
+ * A relation worth keeping is made in the master, and the game rebuilt; a build replaces the copy
+ * beside the executable whenever the master is newer. DistanceRPG --write-data <folder> writes the
+ * built-in copies out.
  */
 {
   /* Exclusion groups: every id in a group excludes every other, both ways - a group of three is six
@@ -22,11 +25,18 @@
      block response, crit rider and currency groups, then the opposed damage types: an element is
      opposed by exactly one other. */
   "excludes": [
+    /* Threat zone: one weapon, one zone it watches. */
     ["Brace", "Opportunist", "Overwatch"],
+    /* Displacement: one direction per weapon. */
     ["Push", "Drag", "Rout"],
+    /* Block response: one block, one payoff. */
     ["Riposte", "BlockWeaken"],
+    /* Crit rider: one crit, one rider. */
     ["CritWeaken", "CritSunder"],
+    /* Currency: one discount per weapon. */
     ["Light", "Resonant"],
+    /* The opposed damage types, by the elements' enchantment ids: each pair is an x1.5 on the
+       chart, and one hit cannot be both. */
     ["flaming", "cold"],
     ["shocking", "acidic"]
   ],
@@ -35,26 +45,36 @@
      and BlockWeaken need Block, Rout needs Cleave, and a lingering element needs its element ahead
      of it. */
   "requires": {
+    /* Nothing to succeed at without a block. */
     "BlockWeaken": ["Block"],
+    /* Nothing to counter off without a block. */
     "Riposte": ["Block"],
+    /* Without a cleave it is just a worse Push. */
     "Rout": ["Cleave"],
+    /* A lingering element needs its element on the same weapon, ahead of it: Searing is nothing
+       without Flaming to say how many levels. */
     "burning": ["flaming"]
   },
 
   /* Weapon-type restrictions: a modifier to melee, ranged or caster, in lower case. A modifier not
      named here goes on any kind of weapon. Modifiers only: an enchantment here stops the game. */
   "kind": {
+    /* A threat zone is a weapon's physical reach. */
     "Brace": "melee",
     "Opportunist": "melee",
+    /* Holding a shot is what a nocked arrow does. */
     "Overwatch": "ranged"
+    /* Resonant is deliberately absent: it discounts enchantment triggers too. */
   },
 
   /* Deepened where it is already forged, never added from zero - a safety rule: Charges granted to
      a bow would be a cap where there was none. Each must be a modifier forged on some weapon; an
-     enchantment here stops the game. */
+     enchantment here stops the game. Charges is a cap, not a bonus: granted from zero it would make
+     a bow worse. */
   "forgedOnly": ["Charges"],
 
   /* Never granted by any roll, and never copied - an economy rule: the unique enchantments. Every
-     enchantment the game's catalogue marks unique is here, and nothing else is. */
+     enchantment the game's catalogue marks unique is here, and nothing else is: the load holds the
+     catalogue's unique flag and this list together. */
   "neverRolled": ["siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning"]
 }

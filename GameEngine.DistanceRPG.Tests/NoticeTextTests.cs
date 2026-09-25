@@ -90,18 +90,18 @@ public class NoticeTextTests
         // says, under the between-runs title or over the first floor,
         // TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1. The other data
         // files sit beside it, as they ship, so every notice here is the tuning's.
-        var others = ContentFiles.WriteDefaults() with { Tuning = null };
-        var load = ContentFiles.Load(others with { Tuning = """{ "MovementUnitsPerMana": 0 }""" });
+        var others = ShippedData.Texts with { Tuning = null };
+        var load = ShippedData.Load(others with { Tuning = """{ "MovementUnitsPerMana": 0 }""" });
         Assert.NotNull(load.Content);
         Assert.Equal(["TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"], NoticeText.Rows(load.Notices));
 
         // A deleted file plays the compiled numbers, and says so.
-        Assert.Equal(["TUNING.JSON IS MISSING - THE BUILT-IN NUMBERS ARE PLAYING"], NoticeText.Rows(ContentFiles.Load(others).Notices));
+        Assert.Equal(["TUNING.JSON IS MISSING - THE BUILT-IN NUMBERS ARE PLAYING"], NoticeText.Rows(ShippedData.Load(others).Notices));
 
         // So does one another program is holding open, and it says why rather
         // than calling the file missing. That takes two rows, within the cap.
         var unreadable = others with { Unreadable = new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" } };
         Assert.Equal(["TUNING.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN) -", "  THE BUILT-IN NUMBERS ARE PLAYING"],
-            NoticeText.Rows(ContentFiles.Load(unreadable).Notices));
+            NoticeText.Rows(ShippedData.Load(unreadable).Notices));
     }
 }

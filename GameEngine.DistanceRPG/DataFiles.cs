@@ -9,8 +9,9 @@ namespace GameEngine.DistanceRPG;
 /// file (<see cref="ContentFiles.Load"/>). Engine-free — <c>System.IO</c> only —
 /// and handed its folder every time: there is no default folder here, so nothing
 /// can read or write the real one by accident. The game hands it the
-/// executable's own folder (the files sit beside the exe, S:43) and the
-/// generator whatever <c>--write-data</c> names.
+/// executable's own folder (the files sit beside the exe, S:43), and
+/// <c>--write-data</c> whatever folder it names. What the build itself carries
+/// is read by <see cref="ShippedData"/>, never here.
 /// <para>
 /// Every file read, looked for and not found, or found and not readable, is
 /// reported with its full path. That is how a playtester finds the copy to edit,
@@ -69,8 +70,9 @@ internal static class DataFiles
     /// <summary>
     /// Write every text in <paramref name="texts"/> to its file in
     /// <paramref name="directory"/>, creating the folder: UTF-8 without a byte
-    /// order mark, the text exactly as given (the generator's <c>"\n"</c> line
-    /// ends). Each file written is reported with its full path. What
+    /// order mark, the text exactly as given — the built-in copies, byte for
+    /// byte, when <c>--write-data</c> hands them in. Each file written is
+    /// reported with its full path; a file with no text is not written. What
     /// <c>--write-data</c> runs; the game itself never writes beside the exe.
     /// </summary>
     public static void Write(string directory, ContentTexts texts, Action<string>? report = null)
@@ -89,7 +91,7 @@ internal static class DataFiles
 
     /// <summary>
     /// The log's line for the tuning the game runs under: the file's full path
-    /// and every number it changed from the compiled ones, as clamped and fitted —
+    /// and every number it changed from the built-in copy's, as clamped and fitted —
     /// <c>[Data] D:\...\net10.0\tuning.json changes 2 numbers: MovementBudget 200, PerStack.Block 4</c>.
     /// </summary>
     internal static string TuningSummary(string directory, IReadOnlyList<string> overrides)

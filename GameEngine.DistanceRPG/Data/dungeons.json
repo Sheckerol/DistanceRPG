@@ -22,13 +22,25 @@
  * relation edited there moves it with no edit here. A dungeon or a boss whose id is marked
  * provisional is a first guess the docs did not fix, expected to move after play.
  *
- * The copy to edit is the one beside the game (bin/Debug/net10.0/dungeons.json - the log prints
- * its full path). GameEngine.DistanceRPG/Data/dungeons.json is generated from the compiled
- * content (DistanceRPG --write-data <folder>) and pinned by the tests: a dungeon worth keeping
- * goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy
- * plays the built-in dungeons, and the screen says so.
+ * GameEngine.DistanceRPG/Data/dungeons.json is the master copy: the game is built with it
+ * inside, and plays that built-in copy whenever the copy beside the executable is missing or
+ * cannot be read (the screen says so). A build copies it beside the executable
+ * (bin/Debug/net10.0/dungeons.json - the log prints its full path), where a playtest edits it. A
+ * dungeon worth keeping is made in the master, and the game rebuilt; a build replaces the copy
+ * beside the executable whenever the master is newer. DistanceRPG --write-data <folder> writes
+ * the built-in copies out.
  */
 {
+  /* Each theme is a class signature with a unique to hunt: the Purity variant of the theme's own
+     class, grafted by the boss, is that class's unique by arithmetic (phase-4-floors.md 4.3). Only
+     the tutorial's golem is the docs' - 80 HP, a movement budget of 40, Block x3 innate
+     (phase-5-save.md). Everything else here - the four dungeons, their names, their bosses' names
+     and statlines - is provisional: picked so the hub has somewhere to go, and expected to move
+     after play. settled.md's first playable hub has six; the two missing need content that does
+     not exist yet (a Great Axe unique for Cleave, or a repeated theme), and Phase 6b completes the
+     roster. No dungeon here is attuned: attunement is its own field, and none is set yet. A floor
+     range left null reads tuning.json's; the tutorial pins both ends to 2 and is the one dungeon
+     that retires on its clear. */
   "dungeons": [
     {
       "id": "tutorial",
@@ -37,6 +49,7 @@
       "attunement": null,
       "bossFloorMin": 2,
       "bossFloorMax": 2,
+      /* The docs' golem: slow, and Block x3 whatever it holds. */
       "boss": {
         "id": "stone_golem",
         "name": "Stone Golem",
@@ -53,6 +66,7 @@
       "attunement": null,
       "bossFloorMin": null,
       "bossFloorMax": null,
+      /* Drops daggers, swords and spears; hunts Hoplite's Wall. */
       "boss": {
         "id": "spear_warden", /* provisional */
         "name": "Spear Warden",
@@ -69,6 +83,7 @@
       "attunement": null,
       "bossFloorMin": null,
       "bossFloorMax": null,
+      /* Drops all eight classes; hunts Stormcrow, a bow no enemy wields. */
       "boss": {
         "id": "gallery_marksman", /* provisional */
         "name": "Gallery Marksman",
@@ -85,6 +100,7 @@
       "attunement": null,
       "bossFloorMin": null,
       "bossFloorMax": null,
+      /* Drops all eight classes; hunts Widowmaker. */
       "boss": {
         "id": "knife_mother", /* provisional */
         "name": "Knife Mother",
@@ -101,6 +117,7 @@
       "attunement": null,
       "bossFloorMin": null,
       "bossFloorMax": null,
+      /* Charges is forged-only, so it drops throwing weapons alone; hunts Feathered Death. */
       "boss": {
         "id": "quiver_keeper", /* provisional */
         "name": "Quiver Keeper",

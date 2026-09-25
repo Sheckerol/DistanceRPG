@@ -1,124 +1,151 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// The shipped data files are the generator's output (USER DECISION 3):
-/// <see cref="ContentDefaults"/> is the one source, <c>--write-data</c> writes the
-/// files from it, and the committed <c>GameEngine.DistanceRPG/Data/*.json</c> are
-/// held here to that output byte for byte (line ends aside: a checkout may turn
-/// them). A change worth keeping goes into the compiled content and is
-/// regenerated; an edit made to the committed file alone fails here, naming the
-/// file. Read from the test output's own linked copies in <c>Data\</c>, by that
-/// explicit path — never from any folder a game or a test reads by default.
+/// The shipped data files are the master copy (the user's ruling of 2026-09-25;
+/// the content rework, 1f): hand-kept in <c>GameEngine.DistanceRPG/Data</c>,
+/// built into the game, and the fallback for their copies beside the executable.
+/// So nothing here holds a value of theirs — a literal table of the numbers, or
+/// the content's ids in order, would be a second copy of the master in C#, and a
+/// designer's edit to the file would fail it. What is pinned is structure: the
+/// four are built in and nothing else is; each is LF; each reads with nothing to
+/// say, and the four load together so; the built-in tuning names every key and
+/// member; a provisional row says so; and each header says it is the master copy
+/// and names nothing the rework removed. Read from the build's own texts
+/// (<see cref="ShippedData"/>), never from a folder.
 /// </summary>
 public class ShippedDataTests
 {
-    /// <summary>The test output's own linked copies of the shipped files, read by this explicit path.</summary>
-    internal static string ShippedFolder => Path.Combine(AppContext.BaseDirectory, "Data");
-
-    internal static string Shipped(string name) => Path.Combine(ShippedFolder, name);
-
-    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
-
-    /// <summary>Every file the generator writes, by name, in the load order.</summary>
-    private static IEnumerable<(string Name, string Text)> Generated()
+    /// <summary>The four files, in the load order, with their built-in texts.</summary>
+    private static IEnumerable<(string Name, string? Text)> BuiltIn()
     {
-        var texts = ContentFiles.WriteDefaults();
-        string?[] all = [texts.Tuning, texts.Restricted, texts.Weapons, texts.Dungeons];
-        for (int i = 0; i < all.Length; i++)
-            if (all[i] is { } text)
-                yield return (ContentFiles.FileNames[i], text);
+        var texts = ShippedData.Texts;
+        yield return (TuningJson.FileName, texts.Tuning);
+        yield return (RestrictedJson.FileName, texts.Restricted);
+        yield return (WeaponsJson.FileName, texts.Weapons);
+        yield return (DungeonsJson.FileName, texts.Dungeons);
     }
 
     [Fact]
-    public void TheShippedFilesAreTheGeneratorsOutput()
+    public void EveryShippedFileIsBuiltIn_AndNoOther()
     {
-        // PHASE5-080: the file that puts every number on one screen is the one
-        // the game ships, and it is exactly what the generator writes from the
-        // compiled content — so the two can never tell different stories. All
-        // four: the tuning and the three content files (the enchantment catalogue
-        // and the starting party are code, and ship no file).
-        var generated = Generated().ToList();
-        Assert.Equal([TuningJson.FileName, RestrictedJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName],
-            generated.Select(file => file.Name));
-        foreach (var (name, text) in generated)
+        // The four data files — the tuning and the three content files — are built
+        // into the game under their names, each read out of the build whole; the
+        // enchantment catalogue and the starting party are code, and ship no file.
+        var names = typeof(ShippedData).Assembly.GetManifestResourceNames().Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(ContentFiles.FileNames.Select(name => ShippedData.ResourcePrefix + name).Order(StringComparer.Ordinal), names);
+        Assert.DoesNotContain(names, name => name.EndsWith("enchantments.json", StringComparison.Ordinal) || name.EndsWith("party.json", StringComparison.Ordinal));
+
+        var texts = ShippedData.Texts;
+        Assert.Null(texts.Unreadable);
+        Assert.Null(texts.Retired);
+        Assert.All(BuiltIn(), file => Assert.False(string.IsNullOrWhiteSpace(file.Text), $"{file.Name} is not built in"));
+
+        // Read once: the same texts every time they are asked for.
+        Assert.Same(texts, ShippedData.Texts);
+    }
+
+    [Fact]
+    public void TheBuiltInCopiesAreLf()
+    {
+        // .gitattributes keeps the masters LF in every checkout, so the texts the
+        // suite edits by searching for "\n" are the texts the game carries,
+        // whatever core.autocrlf says. A checkout that turned them fails here, by name.
+        foreach (var (name, text) in BuiltIn())
         {
-            string path = Shipped(name);
-            Assert.True(File.Exists(path), $"{name} is not shipped: run DistanceRPG --write-data GameEngine.DistanceRPG/Data");
-            Assert.True(Normalized(File.ReadAllText(path)) == text,
-                $"{name} is not the generator's output: edit ContentDefaults or Tuning.cs and run DistanceRPG --write-data GameEngine.DistanceRPG/Data");
+            Assert.False(text!.Contains('\r', StringComparison.Ordinal), $"{name} is built in with CRLF line ends: the checkout ignored .gitattributes");
+            Assert.EndsWith("}\n", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheShippedFilesLoadWithNothingToSay()
+    {
+        // Each built-in copy reads with no warning: the tuning strictly, every key
+        // there and in range, and each content file to its record.
+        var texts = ShippedData.Texts;
+        Assert.Empty(TuningJson.ReadBuiltIn(texts.Tuning!).Warnings);
+        RestrictedJson.Read(texts.Restricted!);
+        WeaponsJson.Read(texts.Weapons!);
+        DungeonsJson.Read(texts.Dungeons!);
+
+        // And the four load together, as the game loads them beside the executable
+        // and as it loads its built-in copies alone: no notice, no number moved or
+        // fitted, no failure — a game started beside them plays exactly what a game
+        // with nothing beside it plays.
+        foreach (var load in new[] { ShippedData.Load(texts), ContentFiles.Load(texts, texts) })
+        {
+            Assert.Null(load.Error);
+            Assert.Empty(load.Notices);
+            Assert.Empty(load.TuningOverrides);
+            Assert.Equal([RestrictedJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName], load.ReadBeside);
+            Assert.Equal(TuningJson.Hash(ShippedData.Content.Tuning), TuningJson.Hash(load.Content!.Tuning));
+            Assert.Same(load.Tuning, load.Content.Tuning);
         }
 
-        // And nothing is shipped that the generator does not write.
-        var shipped = Directory.GetFiles(ShippedFolder, "*.json").Select(Path.GetFileName).Order(StringComparer.Ordinal);
-        Assert.Equal(generated.Select(file => file.Name).Order(StringComparer.Ordinal), shipped);
+        // Nothing beside the executable: the built-in copies play, each said.
+        var alone = ShippedData.Load(new ContentTexts());
+        Assert.Null(alone.Error);
+        Assert.Empty(alone.ReadBeside);
+        Assert.Equal(ContentFiles.FileNames.Count, alone.Notices.Count);
+        Assert.Equal(TuningJson.Hash(ShippedData.Content.Tuning), TuningJson.Hash(alone.Content!.Tuning));
     }
 
     [Fact]
-    public void TheShippedTuningIsTheCompiledTuning()
+    public void TheBuiltInTuningNamesEveryKeyAndMember()
     {
-        // The shipped tuning.json reads with nothing to say, changes no number,
-        // and hashes as the compiled tuning does: a game started beside it plays
-        // exactly what a game with no file plays.
-        var read = TuningJson.Read(File.ReadAllText(Shipped(TuningJson.FileName)));
-        Assert.Empty(read.Warnings);
-        Assert.Empty(read.Overrides);
-        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(read.Tuning));
+        // The built-in tuning.json is every number the game has: nothing in code
+        // stands under a key it leaves out. So it names every key once, every
+        // member of every table keyed by an enum, and every ApplyPercent id the
+        // catalogue leaves to it — and no key still to come.
+        using var document = JsonDocument.Parse(ShippedData.Texts.Tuning!, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
+        var root = document.RootElement;
+        var named = root.EnumerateObject().Select(key => key.Name).ToList();
+        Assert.Equal(named.Count, named.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(TuningSchema.Keys.Select(key => key.Name).Order(StringComparer.Ordinal), named.Order(StringComparer.Ordinal));
+        foreach (var table in TuningSchema.Keys.OfType<TableKey>())
+            if (table.Members is { } members)
+                Assert.Equal(members.Order(StringComparer.Ordinal), root.GetProperty(table.Name).EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal));
+        var dials = root.GetProperty(nameof(Tuning.ApplyPercent)).EnumerateObject().Select(member => member.Name).ToHashSet(StringComparer.Ordinal);
+        Assert.All(EnchantmentDefinitions.Data.Enchantments.Where(e => e.ApplyPercent == EnchantmentDefinitions.SetByTuning),
+            e => Assert.Contains(e.Id, dials));
+        Assert.DoesNotContain(named, TuningSchema.Deferred.Values.SelectMany(deferred => deferred.Keys).Contains);
 
-        // Read beside the other shipped data files, as the game reads it, so any
-        // notice would be the tuning's.
-        var load = ContentFiles.Load(DataFiles.Read(ShippedFolder));
-        Assert.Empty(load.Notices);
-        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
+        // So it reads strictly, and the game plays it: its numbers are the ones the
+        // built-in content holds.
+        TuningValues.Same(ShippedData.Content.Tuning, TuningJson.ReadBuiltIn(ShippedData.Texts.Tuning!).Tuning);
     }
 
-    [Fact]
-    public void TheGeneratorWritesWhatTheGameReads()
-    {
-        // The generator's four files, loaded as the game loads them, are the
-        // compiled content with nothing to say: no file missing, no number fitted
-        // or overridden, no failure — and each reads back to the record it was
-        // written from, which writes out again as the very same text (1h: "read
-        // back to records that re-write identically").
-        var texts = ContentFiles.WriteDefaults();
-        var load = ContentFiles.Load(texts);
-        Assert.Null(load.Error);
-        Assert.Empty(load.Notices);
-        Assert.Empty(load.TuningOverrides);
+    /// <summary>
+    /// The rows the docs did not fix: the three uniques they leave unnamed, and the
+    /// four dungeons beside the tutorial with their bosses, names and statlines
+    /// alike — first guesses, expected to move after play. Which rows the docs
+    /// left unfixed is a fact about the docs, not a value of the files, so it is
+    /// held here; the enchantment catalogue's own guesses (the shielding entry's
+    /// id, Burning's lock) are code, and their comments there say so.
+    /// </summary>
+    private static readonly string[] ProvisionalIds =
+    [
+        "flensing_knife_unique", "wand_of_the_nova_unique", "staff_of_renewal_unique",   // weapons.json: the Nameless three
+        "spear_hall", "spear_warden", "long_gallery", "gallery_marksman",               // dungeons.json: the four and their bosses
+        "knife_warrens", "knife_mother", "quiver_pits", "quiver_keeper",
+    ];
 
-        Assert.Equal(texts.Restricted, RestrictedJson.Write(RestrictedJson.Read(texts.Restricted!)));
-        Assert.Equal(texts.Weapons, WeaponsJson.Write(WeaponsJson.Read(texts.Weapons!)));
-        Assert.Equal(texts.Dungeons, DungeonsJson.Write(DungeonsJson.Read(texts.Dungeons!)));
-        Assert.Equal(texts.Tuning, TuningJson.Write(TuningJson.Read(texts.Tuning).Tuning));
-
-        // The content the files load is the compiled content, catalogue for
-        // catalogue: the same rows, in the same order, written the same way — and
-        // beside it the game's own catalogue and starting party, the code's rows.
-        var content = load.Content!;
-        Assert.Equal(WeaponsJson.Write(ShippedContent.Weapons), WeaponsJson.Write(ShippedContent.Weapons with { Weapons = content.Weapons.All }));
-        Assert.Equal(DungeonsJson.Write(ShippedContent.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
-        Assert.Equal(StartingParty.Data.Members, content.Party.All);
-        Assert.Equal(EnchantmentDefinitions.Data.Enchantments, content.Enchantments.All);
-        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(content.Tuning));
-    }
+    /// <summary>What follows the id of a provisional row, and nothing else, in its file.</summary>
+    private const string ProvisionalNote = "/* provisional */";
 
     [Fact]
     public void AProvisionalRowSaysSo()
     {
-        // A designer tuning the copy beside the game can tell a guessed row from
-        // one the docs fixed, as tuning.json's "Provisional:" descriptions mark a
-        // number: every id ContentDefaults marks provisional — the three unnamed
-        // uniques, the four dungeons beside the tutorial and their bosses — is
-        // followed by /* provisional */ in its file, and no other row is. The note
-        // is a comment: every file still reads back to its record
-        // (TheGeneratorWritesWhatTheGameReads). (The catalogue's own guesses — the
-        // shielding entry's id, Burning's lock — are code, and say so in their
-        // comments in EnchantmentDefinitions.)
-        var texts = ContentFiles.WriteDefaults();
+        // A designer tuning a copy can tell a guessed row from one the docs fixed,
+        // as tuning.json's "Provisional:" comments mark a number: every provisional
+        // row is followed by /* provisional */ after its id, and no other row is.
         var marked = new List<string>();
         var rows = new List<string>();
+        var texts = ShippedData.Texts;
         foreach (string? text in new[] { texts.Restricted, texts.Weapons, texts.Dungeons })
         {
             foreach (Match row in Regex.Matches(text!, "\"id\": \"([^\"]+)\",?( /\\* provisional \\*/)?\n"))
@@ -128,21 +155,40 @@ public class ShippedDataTests
                     marked.Add(row.Groups[1].Value);
             }
             // The note appears after an id and nowhere else in the file.
-            Assert.Equal(Regex.Matches(text!, Regex.Escape(JsonText.ProvisionalNote)).Count,
-                Regex.Matches(text!, "\"id\": \"[^\"]+\",? " + Regex.Escape(JsonText.ProvisionalNote)).Count);
+            Assert.Equal(Regex.Matches(text!, Regex.Escape(ProvisionalNote)).Count,
+                Regex.Matches(text!, "\"id\": \"[^\"]+\",? " + Regex.Escape(ProvisionalNote)).Count);
         }
 
-        Assert.Equal(ContentDefaults.ProvisionalIds.Order(StringComparer.Ordinal), marked.Order(StringComparer.Ordinal));
+        Assert.Equal(ProvisionalIds.Order(StringComparer.Ordinal), marked.Order(StringComparer.Ordinal));
 
-        // Every provisional id is a row some file writes, so the set cannot go
-        // stale behind a renamed row; and the docs' own rows are not marked.
-        Assert.Subset(rows.ToHashSet(StringComparer.Ordinal), ContentDefaults.ProvisionalIds.ToHashSet(StringComparer.Ordinal));
-        foreach (string fixedByTheDocs in new[] { "tutorial", "stone_golem", "widowmaker", "arming_sword", "regeneration", "A", "D" })
+        // Every provisional id is a row some file holds, so the list cannot go stale
+        // behind a renamed row; and the docs' own rows are not marked.
+        Assert.Subset(rows.ToHashSet(StringComparer.Ordinal), ProvisionalIds.ToHashSet(StringComparer.Ordinal));
+        foreach (string fixedByTheDocs in new[] { "tutorial", "stone_golem", "widowmaker", "arming_sword", "regeneration" })
             Assert.DoesNotContain(fixedByTheDocs, marked);
+    }
 
-        // A row an edit adds is marked only when ContentDefaults says so: the
-        // writer asks the set, never the row.
-        string renamed = WeaponsJson.Write(ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "widowmaker" ? w with { Id = "widowmaker_2" } : w).ToList() });
-        Assert.Contains("\"id\": \"widowmaker_2\",\n", renamed);
+    [Fact]
+    public void EveryHeaderSaysItIsTheMasterCopy()
+    {
+        // Each file opens on a header naming itself, saying it is the master copy —
+        // GameEngine.DistanceRPG/Data/<name> — that the game carries it built in,
+        // and that --write-data writes the built-in copies out: so a playtester
+        // reading the copy beside the executable knows where a change worth keeping
+        // goes. And no shipped file names what the rework removed: the two files
+        // the game no longer reads, the compiled copy, or a generator.
+        foreach (var (name, builtIn) in BuiltIn())
+        {
+            string text = builtIn!;
+            Assert.StartsWith($"/*\n * {name} - ", text, StringComparison.Ordinal);
+            string header = text[..(text.IndexOf("*/", StringComparison.Ordinal) + 2)];
+            string words = Regex.Replace(header, @"\s*\n \*\s*", " ");
+            Assert.Contains($"GameEngine.DistanceRPG/Data/{name} is the master copy", words, StringComparison.Ordinal);
+            Assert.Contains("built with it inside", words, StringComparison.Ordinal);
+            Assert.Contains("DistanceRPG --write-data <folder> writes the built-in copies out", words, StringComparison.Ordinal);
+
+            foreach (string removed in new[] { "enchantments.json", "party.json", "ContentDefaults", "generated" })
+                Assert.False(text.Contains(removed, StringComparison.OrdinalIgnoreCase), $"{name} names {removed}");
+        }
     }
 }

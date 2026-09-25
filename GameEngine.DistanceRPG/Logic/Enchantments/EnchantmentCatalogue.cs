@@ -24,13 +24,14 @@ public sealed class EnchantmentCatalogue
     private readonly Dictionary<string, string[]> _requires = new(StringComparer.Ordinal);
     private readonly IReadOnlyDictionary<DamageType, DamageType> _opposed;
 
-    /// <exception cref="ContentException">An entry is malformed (<see cref="ContentValidator.ValidateEnchantments"/>), the chart is broken (<see cref="ContentValidator.ValidateOpposition"/>) or the unique flag and <c>neverRolled</c> disagree (<see cref="ContentValidator.ValidateNeverRolled"/>).</exception>
+    /// <exception cref="ContentException">An entry is malformed (<see cref="ContentValidator.ValidateEnchantments"/>), a number it leaves to the tuning is not there (<see cref="ContentValidator.ValidateDials"/>), the chart is broken (<see cref="ContentValidator.ValidateOpposition"/>) or the unique flag and <c>neverRolled</c> disagree (<see cref="ContentValidator.ValidateNeverRolled"/>).</exception>
     public EnchantmentCatalogue(EnchantmentsData data, Tuning tuning, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(tuning);
         ArgumentNullException.ThrowIfNull(restricted);
         ContentValidator.ValidateEnchantments(data);   // never build around a malformed entry
+        ContentValidator.ValidateDials(data, tuning);  // nor around a number no one sets
         _opposed = ContentValidator.ValidateOpposition(data, restricted);   // the chart: every element opposed by exactly one, both ways
         ContentValidator.ValidateNeverRolled(data, restricted);            // one question, one answer: unique entries are exactly the never-rolled ones
 
@@ -38,17 +39,19 @@ public sealed class EnchantmentCatalogue
         foreach (var entry in data.Enchantments)
         {
             // The tuning table wins per id; an id it does not name keeps the
-            // catalogue's percentage. Arcane's magnitude is laid over the same
-            // way and for the same reason (§5.3: a number a playtest turns lives
-            // in tuning.json rather than in a content row) — and keyed the same
+            // catalogue's percentage — and the rows that leave theirs to it
+            // (EnchantmentDefinitions.SetByTuning) are named there, or the load
+            // has stopped. Arcane's magnitude is laid over the same way and for
+            // the same reason (§5.3: a number a playtest turns lives in
+            // tuning.json rather than in a catalogue row) — and keyed the same
             // way too, by the id the dial names rather than by the kind. Keyed by
             // the kind it would overwrite every bonus-damage row there will ever
             // be: a second such entry would silently inherit Arcane's dial with
-            // no way for content to say otherwise, and the magnitude the
+            // no way for its row to say otherwise, and the magnitude the
             // validator checks on those rows would be one nothing ever reads.
             var def = entry with
             {
-                ApplyPercent = tuning.Lookup(x => x.ApplyPercent, entry.Id, entry.ApplyPercent),
+                ApplyPercent = tuning.ApplyPercent.TryGetValue(entry.Id, out int dial) ? dial : entry.ApplyPercent,
                 Potency = entry.Id == Tuning.ArcaneId ? tuning.ArcanePotency : entry.Potency,
             };
             all.Add(def);

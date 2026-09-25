@@ -23,14 +23,9 @@ public static class GameConstants
     /// </summary>
     public const float Tile = LogicUnitsPerTile;
 
-    /// <summary>
-    /// The compiled default of <see cref="Tuning.MovementBudget"/>: a party
-    /// member's movement budget per turn, in logic units. Play reads the tuning
-    /// (<c>GameContent.Current.Tuning.MovementBudget</c>), which
-    /// <c>tuning.json</c> may turn; this constant is the number the tuning falls
-    /// back to, and the one the suite's fixtures were written against.
-    /// </summary>
-    public const float MaxDistance = 160f;
+    // A party member's movement budget per turn lived here as a constant. It is
+    // Tuning.MovementBudget, tuning.json's number alone — play reads
+    // GameContent.Current.Tuning.MovementBudget, and no copy of it is kept in code.
 
     /// <summary>Player movement speed, logic units per second.</summary>
     public const float Speed = 160f;

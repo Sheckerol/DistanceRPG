@@ -44,7 +44,7 @@ public class DataFilesTests
 
             // A tuning.json alone: read whole, reported by its path in that folder,
             // and the three content files looked for and reported missing — the
-            // compiled records play for them.
+            // built-in copies play for them.
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             report.Clear();
             var texts = DataFiles.Read(folder, report.Add);
@@ -53,7 +53,7 @@ public class DataFilesTests
             Assert.StartsWith(folder, path, StringComparison.Ordinal);
 
             // And the game plays what it read.
-            Assert.Equal(200, ContentFiles.Load(texts).Content!.Tuning.MovementBudget);
+            Assert.Equal(200, ShippedData.Load(texts).Content!.Tuning.MovementBudget);
         });
     }
 
@@ -67,7 +67,7 @@ public class DataFilesTests
         InTempFolder(folder =>
         {
             // The other data files sit beside it, as they ship, so any notice is the tuning's.
-            DataFiles.Write(folder, ContentFiles.WriteDefaults() with { Tuning = null });
+            DataFiles.Write(folder, ShippedData.Texts with { Tuning = null });
             string path = Path.Combine(folder, TuningJson.FileName);
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             var report = new List<string>();
@@ -86,7 +86,7 @@ public class DataFilesTests
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, WeaponsJson.FileName)}", line),
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, DungeonsJson.FileName)}", line));
 
-            var load = ContentFiles.Load(texts);
+            var load = ShippedData.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
             Assert.DoesNotContain(load.Notices, notice => notice.Contains("missing", StringComparison.Ordinal));
             Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
@@ -95,7 +95,7 @@ public class DataFilesTests
             // files it sits with: every text read whole, and every file reported.
             report.Clear();
             var free = DataFiles.Read(folder, report.Add);
-            Assert.Equal(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementBudget": 200 }""" }, free);
+            Assert.Equal(ShippedData.Texts with { Tuning = """{ "MovementBudget": 200 }""" }, free);
             Assert.Equal(FilesRead.Select(name => $"[Data] Read {Path.Combine(folder, name)}"), report);
         });
     }
@@ -121,16 +121,16 @@ public class DataFilesTests
     }
 
     [Fact]
-    public void WritesTheGeneratorsFiles_AndReadsThemBack()
+    public void WritesTheBuiltInCopies_AndReadsThemBack()
     {
-        // What --write-data does: the generator's texts into the folder, created if
+        // What --write-data does: the built-in copies into the folder, created if
         // need be, UTF-8 with no byte order mark and the text's own "\n" line ends,
         // each file reported by its path — and they read back as written.
         InTempFolder(folder =>
         {
             string target = Path.Combine(folder, "data");
             var report = new List<string>();
-            var written = ContentFiles.WriteDefaults();
+            var written = ShippedData.Texts;
             DataFiles.Write(target, written, report.Add);
 
             string path = Path.Combine(target, TuningJson.FileName);
@@ -153,7 +153,7 @@ public class DataFilesTests
         // and where the party lives now; and the party that plays is the code's.
         InTempFolder(folder =>
         {
-            DataFiles.Write(folder, ContentFiles.WriteDefaults());
+            DataFiles.Write(folder, ShippedData.Texts);
             string party = Path.Combine(folder, "party.json");
             File.WriteAllText(party, """{ "members": [{ "id": "A", "name": "Edited", "stats": { "STR": 4, "DEX": 3, "CON": 2, "INT": 1 } }] }""");
             var report = new List<string>();
@@ -166,7 +166,7 @@ public class DataFilesTests
                 $"[Data] {party}: party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
             ], report);
 
-            var load = ContentFiles.Load(texts);
+            var load = ShippedData.Load(texts);
             Assert.Null(load.Error);
             Assert.Equal(["party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)"], load.Notices);
             Assert.Equal("PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE (LOGIC/CONTENT/STARTINGPARTY.CS)",
@@ -188,7 +188,7 @@ public class DataFilesTests
             [
                 "enchantments.json is no longer read - the enchantment catalogue is in the code (Logic/Enchantments/EnchantmentDefinitions.cs)",
                 "party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
-            ], ContentFiles.Load(texts).Notices);
+            ], ShippedData.Load(texts).Notices);
 
             // And with neither there, nothing is said of them at all.
             File.Delete(party);
@@ -203,7 +203,7 @@ public class DataFilesTests
     public void TheLogNamesTheFileAndEveryNumberItChanged()
     {
         // The log's line for the tuning played: its full path, and every number it
-        // changed from the compiled ones.
+        // changed from the built-in ones.
         string folder = Path.Combine(Path.GetTempPath(), "beside-the-exe");
         string path = Path.Combine(folder, TuningJson.FileName);
         Assert.Equal($"[Data] {path} changes 2 numbers: MovementBudget 200, PerStack.Block 4",

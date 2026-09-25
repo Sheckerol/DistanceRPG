@@ -27,49 +27,52 @@ public sealed class ContentException : Exception
     public string? File { get; }
 
     /// <summary>
-    /// Whether that stage ran a record built in code rather than one read from
-    /// the file: the compiled fallback, played because no file was found — shown
-    /// as <c>(compiled)</c> beside <see cref="File"/>. The file beside it that did
-    /// load is then what broke it, and the detail says which.
+    /// Whether that stage ran the copy of the file the game carries built in —
+    /// played because no copy beside the executable was there to read, or the
+    /// built-in <c>tuning.json</c> every read stands on — shown as
+    /// <c>(built-in)</c> beside <see cref="File"/>. Either the built-in copy is
+    /// itself broken (a master copy edited and never tested: the fix is in
+    /// <c>GameEngine.DistanceRPG/Data</c>), or a file beside it that did load
+    /// broke it, and the detail says which.
     /// </summary>
-    public bool Compiled { get; }
+    public bool BuiltIn { get; }
 
     /// <param name="detail">What exactly broke it — a modifier, a count — beside the stable <see cref="Rule"/>.</param>
     public ContentException(string entryId, string rule, string? detail = null)
-        : this(entryId, rule, detail, file: null, compiled: false, inner: null)
+        : this(entryId, rule, detail, file: null, builtIn: false, inner: null)
     {
     }
 
-    private ContentException(string entryId, string rule, string? detail, string? file, bool compiled, Exception? inner)
-        : base(Describe(entryId, rule, detail, file, compiled), inner)
+    private ContentException(string entryId, string rule, string? detail, string? file, bool builtIn, Exception? inner)
+        : base(Describe(entryId, rule, detail, file, builtIn), inner)
     {
         EntryId = entryId;
         Rule = rule;
         Detail = detail;
         File = file;
-        Compiled = compiled;
+        BuiltIn = builtIn;
     }
 
     /// <summary>
     /// The same entry, rule and <see cref="Detail"/>, stamped with the file whose
-    /// stage broke and whether that stage ran the compiled record; the failure
+    /// stage broke and whether that stage ran the built-in copy; the failure
     /// stamped is kept as the inner exception. Stamping the same file again
     /// changes nothing.
     /// </summary>
-    internal ContentException In(string file, bool compiled)
+    internal ContentException In(string file, bool builtIn)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(file);
-        return File == file && Compiled == compiled
+        return File == file && BuiltIn == builtIn
             ? this
-            : new ContentException(EntryId, Rule, Detail, file, compiled, this);
+            : new ContentException(EntryId, Rule, Detail, file, builtIn, this);
     }
 
-    /// <summary>The message: the entry, the rule and the detail, after the file and <c>(compiled)</c> when the failure is stamped.</summary>
-    private static string Describe(string entryId, string rule, string? detail, string? file, bool compiled)
+    /// <summary>The message: the entry, the rule and the detail, after the file and <c>(built-in)</c> when the failure is stamped.</summary>
+    private static string Describe(string entryId, string rule, string? detail, string? file, bool builtIn)
     {
         string what = detail == null
             ? $"Invalid content entry '{entryId}': {rule}"
             : $"Invalid content entry '{entryId}': {rule} ({detail})";
-        return file == null ? what : $"{file}{(compiled ? " (compiled)" : "")}: {what}";
+        return file == null ? what : $"{file}{(builtIn ? " (built-in)" : "")}: {what}";
     }
 }

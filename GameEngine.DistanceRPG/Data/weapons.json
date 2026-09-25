@@ -25,15 +25,22 @@
  * the game's code and must be here. A weapon whose id is marked provisional is a first guess the
  * docs did not fix, expected to move after play.
  *
- * The copy to edit is the one beside the game (bin/Debug/net10.0/weapons.json - the log prints
- * its full path). GameEngine.DistanceRPG/Data/weapons.json is generated from the compiled
- * content (DistanceRPG --write-data <folder>) and pinned by the tests: a weapon worth keeping
- * goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy
- * plays the built-in weapons, and the screen says so.
+ * GameEngine.DistanceRPG/Data/weapons.json is the master copy: the game is built with it inside,
+ * and plays that built-in copy whenever the copy beside the executable is missing or cannot be
+ * read (the screen says so). A build copies it beside the executable
+ * (bin/Debug/net10.0/weapons.json - the log prints its full path), where a playtest edits it. A
+ * weapon worth keeping is made in the master, and the game rebuilt; a build replaces the copy
+ * beside the executable whenever the master is newer. DistanceRPG --write-data <folder> writes
+ * the built-in copies out.
  */
 {
   "weapons": [
+    /* The statlines are the class tables' (phase-1-weapons.md 1.2, 1.3, 1.4), and a variant is its
+       class baseline plus one added modifier type. The cost column is a base cost: Light resolves an
+       Efficiency weapon down by 10% at instantiation, never here. */
+
     /* ---- Dagger ---- */
+    /* Dagger (DEX): 19-20 to crit, x3 when it lands. */
     {
       "id": "flensing_knife",
       "name": "Flensing Knife",
@@ -95,6 +102,8 @@
       "derivedFrom": null
     },
     /* ---- Sword ---- */
+    /* Sword and Shield (the better of STR and DEX): a shield bash - you stop them, then you move
+       them. */
     {
       "id": "arming_sword",
       "name": "Arming Sword",
@@ -156,6 +165,7 @@
       "derivedFrom": null
     },
     /* ---- Spear ---- */
+    /* Spear (STR): reach 128, exactly four tiles, so Longshot's tile count is a rule. */
     {
       "id": "skirmishers_pike",
       "name": "Skirmisher's Pike",
@@ -217,6 +227,7 @@
       "derivedFrom": null
     },
     /* ---- Axe ---- */
+    /* Axe (STR): nobody walks away from an axe. The Reaver forges Splitting x2. */
     {
       "id": "hatchet",
       "name": "Hatchet",
@@ -278,6 +289,7 @@
       "derivedFrom": null
     },
     /* ---- Ranged ---- */
+    /* Ranged (DEX): damage 5 is meant to look low; the range curve does the work. */
     {
       "id": "hunting_bow",
       "name": "Hunting Bow",
@@ -339,6 +351,7 @@
       "derivedFrom": null
     },
     /* ---- Throwing ---- */
+    /* Throwing (STR): 15 a throw is honest only because Charges caps it. */
     {
       "id": "darts",
       "name": "Darts",
@@ -400,6 +413,8 @@
       "derivedFrom": null
     },
     /* ---- Staff ---- */
+    /* Staff (INT): Resonant x1 plus the effect it casts, fixed by variant. Range 100, cost 40; the
+       mana a cast takes is each variant's own. */
     {
       "id": "staff_of_renewal",
       "name": "Staff of Renewal",
@@ -461,6 +476,7 @@
       "derivedFrom": null
     },
     /* ---- Wand ---- */
+    /* Wand (INT): Resonant x1 plus an element supplied when it drops; four shapes, in logic units. */
     {
       "id": "wand_of_the_blast",
       "name": "Wand of the Blast",
@@ -522,6 +538,13 @@
       "derivedFrom": null
     },
     /* ---- The uniques ---- */
+    /* The unique table (phase-1-weapons.md 1.5): each a variant with one modifier it already carries
+       raised to x3 - or, for a Light-forged one, the signature at x2 paid for in souls - and a soul
+       no other weapon can have; a caster unique raises nothing and puts the whole artifact in its
+       enchantments. Everything else is its variant's, written out again here: the class, the
+       statline and the shape must be the variant's exactly, or the game does not start. The three
+       the docs leave unnamed carry provisional names. */
+    /* Absorbs 9, shoves what it stops, and refuses to let you die. */
     {
       "id": "the_bulwark",
       "name": "The Bulwark",
@@ -537,6 +560,7 @@
       "unique": true,
       "derivedFrom": "tower_guard"
     },
+    /* Four throws that barely cost anything to make. */
     {
       "id": "feathered_death",
       "name": "Feathered Death",
@@ -552,6 +576,7 @@
       "unique": true,
       "derivedFrom": "bandolier"
     },
+    /* Ignores 9 Block across the swing. */
     {
       "id": "shieldbreaker",
       "name": "Shieldbreaker",
@@ -567,6 +592,7 @@
       "unique": true,
       "derivedFrom": "reaver"
     },
+    /* Finds the gap on 17+, and every kill funds the enchantments doing it. */
     {
       "id": "widowmaker",
       "name": "Widowmaker",
@@ -582,6 +608,7 @@
       "unique": true,
       "derivedFrom": "assassins_fang"
     },
+    /* Three retaliations at full reach, from a line that cannot be moved. */
     {
       "id": "hoplites_wall",
       "name": "Hoplite's Wall",
@@ -597,6 +624,7 @@
       "unique": true,
       "derivedFrom": "phalanx_spear"
     },
+    /* +3 a tile, and the shot does not stop at the first body. */
     {
       "id": "stormcrow",
       "name": "Stormcrow",
@@ -612,6 +640,7 @@
       "unique": true,
       "derivedFrom": "longbow"
     },
+    /* Stabs itself a shield: three souls in a line - the Light shape, x2 buying three. */
     {
       "id": "flensing_knife_unique", /* provisional */
       "name": "Nameless Knife",
@@ -627,6 +656,7 @@
       "unique": true,
       "derivedFrom": "flensing_knife"
     },
+    /* A rot that starts where an ordinary staff's ends. */
     {
       "id": "rotwood",
       "name": "Rotwood",
@@ -642,6 +672,7 @@
       "unique": true,
       "derivedFrom": "staff_of_blight"
     },
+    /* A beam of plasma: two elements, each answering the chart. */
     {
       "id": "the_long_candle",
       "name": "The Long Candle",
@@ -657,6 +688,7 @@
       "unique": true,
       "derivedFrom": "wand_of_the_beam"
     },
+    /* A circle that keeps burning after it lands. */
     {
       "id": "wand_of_the_nova_unique", /* provisional */
       "name": "Nameless Nova",
@@ -672,6 +704,7 @@
       "unique": true,
       "derivedFrom": "wand_of_the_nova"
     },
+    /* Healing that stops being wasted on the healthy. */
     {
       "id": "staff_of_renewal_unique", /* provisional */
       "name": "Nameless Renewal",

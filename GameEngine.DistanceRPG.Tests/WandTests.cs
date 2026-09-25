@@ -464,7 +464,7 @@ public class WandTests
         using var _ = TestContent.Use(
             enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id == "flaming" ? e with { Potency = 3 } : e).ToList()),
-            tuning: ShippedContent.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["flaming"] = 100 } });
+            tuning: TuningValues.With(ShippedContent.Tuning, ("ApplyPercent.flaming", 100)));
         Assert.Equal(3, TestWeapons.Get("wand_of_the_nova", Flaming).Innate!.LevelsFor(3));
         var d = Char("D", 5, 5, "wand_of_the_nova", Flaming);
         var crowd = new[] { Enemy(5, 6), Enemy(5, 4), Enemy(4, 5), Enemy(6, 5), Enemy(4, 6), Enemy(6, 4) };

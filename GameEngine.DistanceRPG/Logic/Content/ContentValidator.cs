@@ -25,6 +25,40 @@ public static class ContentValidator
     /// </summary>
     public const string RuleFileShape = "a content file is well-formed JSON of its documented shape";
 
+    /// <summary>
+    /// The game carries every data file it plays built in (the content rework,
+    /// 1f): the shipped copies in <c>GameEngine.DistanceRPG/Data</c>, the master
+    /// copies, embedded when the game is built. Refused when a copy the load needs
+    /// — the tuning always, a content file with none beside the executable — is not
+    /// in the build or could not be read out of it: a build defect, stamped
+    /// <c>(built-in)</c>, which the suite catches first. The-build-carries-it, not a
+    /// new invariant.
+    /// </summary>
+    public const string RuleBuiltInCopy = "the game carries every data file it plays built in";
+
+    /// <summary>
+    /// A tuning table keyed by an enum names every member of it
+    /// (<see cref="Tuning.PerStack"/>, <see cref="Tuning.Offset"/>,
+    /// <see cref="Tuning.MaxForged"/>, <see cref="Tuning.EffectPerLevel"/>): there
+    /// is no number in code under a member it leaves out. A file cannot break it —
+    /// the built-in copy is refused for a gap as it is read, and a copy beside it
+    /// merges over it — so this is the refusal for a <see cref="Tuning"/> built in
+    /// code. A no-number-under-it check, not a new invariant.
+    /// </summary>
+    public const string RuleTableNamesEveryMember = "a tuning table names every member of its kind";
+
+    /// <summary>
+    /// A number the enchantment catalogue leaves to <c>tuning.json</c>
+    /// (<see cref="EnchantmentDefinitions.SetByTuning"/>: the elements' and
+    /// Serrated's <c>ApplyPercent</c>, Arcane's potency) is named there: the row
+    /// states none of its own, so without the dial there is no number at all.
+    /// Only the built-in copy can leave one out — a copy beside the game merges
+    /// over it and cannot take one away — so a failure is stamped
+    /// <c>tuning.json (built-in)</c>. A code-names-it-so-the-JSON-must-name-it
+    /// check, not a new invariant.
+    /// </summary>
+    public const string RuleTuningOwnsTheNumber = "a number the enchantment catalogue leaves to tuning.json is named there";
+
     public const string RuleUnknownId = "id does not resolve to a modifier or an enchantment";
     public const string RuleModifierRelationIds = "a modifier relation may only name modifier ids";
     public const string RuleKindValue = "kind must be melee, ranged or caster";
@@ -270,7 +304,7 @@ public static class ContentValidator
     /// lands in a slot no key can reach; and the stairs gather from at least a
     /// tile away.
     /// How far short of the farm a boss should stop, and every other judgement
-    /// between these numbers, is a test on the compiled values, never a refusal
+    /// between these numbers, is a test on the shipped values, never a refusal
     /// here.
     /// </para>
     /// <para>
@@ -285,10 +319,22 @@ public static class ContentValidator
     /// one below 1 — the file clamps (<see cref="TuningJson.Read"/>) — so this
     /// is the refusal for a <see cref="Tuning"/> built in code.
     /// </para>
+    /// <para>
+    /// And first, before any number is judged, every table keyed by an enum names
+    /// every member of it (<see cref="RuleTableNamesEveryMember"/>): the game
+    /// reads each member directly, with nothing under a gap. A file cannot leave
+    /// one — the built-in copy is refused for it as it is read, and a copy beside
+    /// it merges over it — so this too is the refusal for a tuning built in code.
+    /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
     {
         ArgumentNullException.ThrowIfNull(tuning);
+
+        RequireEveryMember(tuning.EffectPerLevel, nameof(Tuning.EffectPerLevel), "status");
+        RequireEveryMember(tuning.PerStack, nameof(Tuning.PerStack), "modifier");
+        RequireEveryMember(tuning.Offset, nameof(Tuning.Offset), "modifier");
+        RequireEveryMember(tuning.MaxForged, nameof(Tuning.MaxForged), "modifier");
 
         if (tuning.StartingPool < 1)
             throw new ContentException(nameof(Tuning.StartingPool), RulePoolBarIsPositive, $"{tuning.StartingPool}");
@@ -333,6 +379,49 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
     }
 
+    /// <summary>
+    /// <paramref name="table"/>, the tuning's table <paramref name="name"/>, names
+    /// every member of <typeparamref name="TEnum"/> (<see cref="RuleTableNamesEveryMember"/>):
+    /// the first it leaves out, in the enum's order, is refused, naming it. The
+    /// modifier rules ask it of their three tables as well, so they are never
+    /// built over a gap.
+    /// </summary>
+    internal static void RequireEveryMember<TEnum>(IReadOnlyDictionary<TEnum, int> table, string name, string noun) where TEnum : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        foreach (var member in Enum.GetValues<TEnum>())
+            if (!table.ContainsKey(member))
+                throw new ContentException($"{name}.{member}", RuleTableNamesEveryMember,
+                    $"{name} names {table.Count} of the {Enum.GetValues<TEnum>().Length} of its kind, and no {member}: every {noun} has a number in {TuningJson.FileName}, and none is kept in code");
+    }
+
+    /// <summary>
+    /// The numbers the catalogue leaves to <c>tuning.json</c> are there
+    /// (<see cref="RuleTuningOwnsTheNumber"/>): every row whose
+    /// <c>ApplyPercent</c> is <see cref="EnchantmentDefinitions.SetByTuning"/> is
+    /// named in <see cref="Tuning.ApplyPercent"/>, and a row whose potency is is
+    /// the one <see cref="Tuning.ArcanePotency"/> sets (<see cref="Tuning.ArcaneId"/>),
+    /// the only potency dial there is. In the catalogue's order, so the one
+    /// reported is the same every run. The staged load asks this at its first
+    /// stage and stamps a failure <c>tuning.json (built-in)</c>; the catalogue
+    /// asks it again as it is built, so it is never built around a number no one
+    /// sets.
+    /// </summary>
+    public static void ValidateDials(EnchantmentsData data, Tuning tuning)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(tuning);
+        foreach (var e in data.Enchantments)
+        {
+            if (e.ApplyPercent == EnchantmentDefinitions.SetByTuning && !tuning.ApplyPercent.ContainsKey(e.Id))
+                throw new ContentException(e.Id, RuleTuningOwnsTheNumber,
+                    $"the catalogue leaves the applyPercent of {e.Id} to {TuningJson.FileName} {nameof(Tuning.ApplyPercent)}.{e.Id}, which is not there");
+            if (e.Potency == EnchantmentDefinitions.SetByTuning && e.Id != Tuning.ArcaneId)
+                throw new ContentException(e.Id, RuleTuningOwnsTheNumber,
+                    $"the catalogue leaves the potency of {e.Id} to {TuningJson.FileName}, whose one potency dial, {nameof(Tuning.ArcanePotency)}, sets {Tuning.ArcaneId} alone");
+        }
+    }
+
     /// <summary>A ratio the game divides by is at least 1: zero would divide by nothing, and a negative would turn a cost into a refund.</summary>
     private static void RequireDivisor(int value, string key)
     {
@@ -369,6 +458,15 @@ public static class ContentValidator
     }
 
     /// <summary>
+    /// <see cref="ValidateParty(PartyData, WeaponCatalogue, Tuning)"/> against the
+    /// current content's carry: a direct check of a roster outside a load. The
+    /// load itself names the tuning it is loading, and never reads the current
+    /// content.
+    /// </summary>
+    public static void ValidateParty(PartyData data, WeaponCatalogue weapons)
+        => ValidateParty(data, weapons, GameContent.Current.Tuning);
+
+    /// <summary>
     /// The §5.9 checks on the starting party — code (<see cref="StartingParty"/>),
     /// by the user's ruling of 2026-09-25 — run last because a member names
     /// weapons, at a stage the load stamps <c>weapons.json</c>, the one file an
@@ -394,15 +492,15 @@ public static class ContentValidator
     /// <param name="tuning">
     /// The tuning whose carry the bags are measured against
     /// (<see cref="PartyMemberState.SlotsFor"/>): <see cref="GameContent.Load"/>
-    /// passes the one it is loading, whose content is not current yet. Null
-    /// measures against the current content's slots, which is what a direct
-    /// check of a roster outside a load means.
+    /// passes the one it is loading, whose content is not current yet — the load
+    /// never reads the current content.
     /// </param>
-    public static void ValidateParty(PartyData data, WeaponCatalogue weapons, Tuning? tuning = null)
+    public static void ValidateParty(PartyData data, WeaponCatalogue weapons, Tuning tuning)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(weapons);
-        int slots = tuning is null ? PartyMemberState.InventorySlots : PartyMemberState.SlotsFor(tuning);
+        ArgumentNullException.ThrowIfNull(tuning);
+        int slots = PartyMemberState.SlotsFor(tuning);
 
         if (data.Members.Count != GameConstants.PartySize)
             throw new ContentException(RosterId, RulePartySize, $"{data.Members.Count} members, {GameConstants.PartySize} slots");
@@ -748,12 +846,15 @@ public static class ContentValidator
     /// shape §3.3 refuses everywhere else. Every other kind reads its magnitude
     /// from somewhere the row does not carry — an element's typing, a rule that
     /// fires once, a percentage of the blow — so none of them is asked. It is
-    /// the row that is checked, not what a §5.3 dial may lay over it
-    /// (<see cref="Tuning.ArcanePotency"/> does for the one id it names): a
-    /// row has to state the magnitude it ships with, or content and tuning
-    /// disagree silently about what an entry is worth. The dial being keyed by
-    /// id is what keeps this rule meaning something: every row it checks that no
-    /// dial names is a row the game reads the magnitude from.
+    /// the row that is checked, not what a §5.3 dial lays over it: a row that
+    /// states a magnitude has to state one worth firing for. A row that leaves
+    /// its magnitude to <c>tuning.json</c> (<see cref="EnchantmentDefinitions.SetByTuning"/>:
+    /// Arcane's, whose dial is <see cref="Tuning.ArcanePotency"/>) states none,
+    /// so it is not asked here; its dial must be there
+    /// (<see cref="ValidateDials"/>), and the file clamps it to 0–1000, where 0
+    /// is the legal way to switch it off. The dial being keyed by id is what
+    /// keeps this rule meaning something: every row it checks that no dial
+    /// names is a row the game reads the magnitude from.
     /// </para>
     /// <para>
     /// The game's catalogue is code (<see cref="EnchantmentDefinitions"/>), so the
@@ -784,7 +885,7 @@ public static class ContentValidator
                 throw new ContentException(e.Id, RuleApplierNamesStatus);
             if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
                 throw new ContentException(e.Id, RuleElementNamesType);
-            if (EnchantmentBehaviours.SizedByPotency(e.Effect) && e.Potency < 1)
+            if (EnchantmentBehaviours.SizedByPotency(e.Effect) && e.Potency != EnchantmentDefinitions.SetByTuning && e.Potency < 1)
                 throw new ContentException(e.Id, RuleMagnitudeNamesAPotency, $"potency {e.Potency}");
         }
 
@@ -1451,7 +1552,7 @@ public static class ContentValidator
     /// MaxForged above, never by the acquisition cap. A zero or negative count
     /// is refused here, naming the entry, before <see cref="ModifierSet.Of"/>
     /// would refuse it as an argument: invalid content aborts as content
-    /// (§5.4). The compiled defaults cannot carry one; a file can. Walked in
+    /// (§5.4). The shipped weapons carry none; a file edited can. Walked in
     /// enum order so the count reported is the same one every run.
     /// </summary>
     private static ModifierSet Spread(WeaponDef def)

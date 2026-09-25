@@ -14,7 +14,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class TuningFitTests
 {
-    private static readonly Tuning Compiled = ShippedContent.Tuning;
+    private static readonly Tuning BuiltIn = ShippedContent.Tuning;
 
     private static Tuning Fit(Tuning tuning, List<string> warnings, WeaponsData? weapons = null, DungeonsData? dungeons = null, PartyData? party = null)
         => TuningFit.ToContent(tuning, weapons ?? ShippedContent.Weapons, dungeons ?? ShippedContent.Dungeons, party ?? ShippedContent.Party, warnings);
@@ -30,20 +30,20 @@ public class TuningFitTests
         // to 8 — two a member, shared evenly — naming who needed it and what they
         // carry, and the roster then fits.
         var warnings = new List<string>();
-        var fitted = Fit(Compiled with { PartyCarrySlots = 4 }, warnings);
+        var fitted = Fit(BuiltIn with { PartyCarrySlots = 4 }, warnings);
         Assert.Equal(8, fitted.PartyCarrySlots);
         Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (weakspot_stiletto, staff_of_renewal) - using 8"], warnings);
         ContentValidator.ValidateParty(ShippedContent.Party, Load(fitted).Weapons, fitted);
-        Assert.Throws<ContentException>(() => Load(Compiled with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
+        Assert.Throws<ContentException>(() => Load(BuiltIn with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
 
         // A carry that already fits is left alone, and says nothing.
         warnings.Clear();
-        Assert.Equal(24, Fit(Compiled, warnings).PartyCarrySlots);
-        Assert.Equal(8, Fit(Compiled with { PartyCarrySlots = 8 }, warnings).PartyCarrySlots);
+        Assert.Equal(24, Fit(BuiltIn, warnings).PartyCarrySlots);
+        Assert.Equal(8, Fit(BuiltIn with { PartyCarrySlots = 8 }, warnings).PartyCarrySlots);
         Assert.Empty(warnings);
 
         // Through the loader, as a playtest meets it: a file of 4 plays 8, and says so.
-        var load = ContentFiles.Load(new ContentTexts(Tuning: """{ "PartyCarrySlots": 4 }"""));
+        var load = ShippedData.Load(new ContentTexts(Tuning: """{ "PartyCarrySlots": 4 }"""));
         Assert.Equal(8, load.Content!.Tuning.PartyCarrySlots);
         Assert.Contains(load.Notices, notice => notice.Contains("A carries 2 weapons", StringComparison.Ordinal));
     }
@@ -56,8 +56,8 @@ public class TuningFitTests
         // naming it. Cleave 1 is below the Great Axe's x2 — no Cleave unique exists
         // yet, so x2 is the deepest — and is raised to 2, not to a unique's 3.
         var warnings = new List<string>();
-        var limits = new Dictionary<ModifierType, int> { [CritWindow] = 2, [Cleave] = 1, [Light] = 1, [Brace] = 3 };
-        var fitted = Fit(Compiled with { MaxForged = limits }, warnings);
+        var limits = new Dictionary<ModifierType, int>(BuiltIn.MaxForged) { [CritWindow] = 2, [Cleave] = 1, [Light] = 1, [Brace] = 3 };
+        var fitted = Fit(BuiltIn with { MaxForged = limits }, warnings);
         var rules = Load(fitted).Modifiers;
         Assert.Equal((3, 2, 1, 3), (rules.MaxForged(CritWindow), rules.MaxForged(Cleave), rules.MaxForged(Light), rules.MaxForged(Brace)));
         Assert.Equal(
@@ -68,15 +68,15 @@ public class TuningFitTests
 
         // A limit at or above every forging is left alone, and says nothing.
         warnings.Clear();
-        Fit(Compiled, warnings);
-        Fit(Compiled with { MaxForged = new Dictionary<ModifierType, int> { [Pin] = 2, [Charges] = 3 } }, warnings);
+        Fit(BuiltIn, warnings);
+        Fit(BuiltIn with { MaxForged = new Dictionary<ModifierType, int>(BuiltIn.MaxForged) { [Pin] = 2, [Charges] = 3 } }, warnings);
         Assert.Empty(warnings);
 
         // Every limit at 1: after the fit, every dungeon's theme limit is still its
         // unique's x3 — the Purity coincidence the boss's graft lands on
         // (RuleThemeHasAUnique) — and the content loads.
         var ones = Enum.GetValues<ModifierType>().ToDictionary(t => t, _ => 1);
-        var all = Fit(Compiled with { MaxForged = ones }, warnings);
+        var all = Fit(BuiltIn with { MaxForged = ones }, warnings);
         var content = Load(all);
         foreach (var dungeon in content.Dungeons.All)
             Assert.Equal(3, content.Modifiers.MaxForged(dungeon.Theme));
@@ -91,7 +91,7 @@ public class TuningFitTests
         // floor to 2, whose boss would pay 2 stacks against a farm of 2
         // (RuleBossPaysLessThanTheFarm on the dungeon). The offset is raised to 1,
         // naming the dungeon and the floor.
-        var tuning = Compiled with { BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, AcquiredHeadroom = 1 };
+        var tuning = BuiltIn with { BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, AcquiredHeadroom = 1 };
         ContentValidator.ValidateTuning(tuning);
         Assert.Throws<ContentException>(() => Load(tuning));
 
@@ -105,7 +105,7 @@ public class TuningFitTests
 
         // The shipped numbers need nothing.
         warnings.Clear();
-        Assert.Equal(4, Fit(Compiled, warnings).BossStackOffset);
+        Assert.Equal(4, Fit(BuiltIn, warnings).BossStackOffset);
         Assert.Empty(warnings);
     }
 
@@ -122,13 +122,13 @@ public class TuningFitTests
         var ten = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 0
             ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
             : m).ToList());
-        var carry = Fit(Compiled, warnings, party: ten);
+        var carry = Fit(BuiltIn, warnings, party: ten);
         Assert.Equal(24, carry.PartyCarrySlots);
         Assert.Equal(ContentValidator.RulePartyBagFits, Assert.Throws<ContentException>(() => Load(carry, party: ten)).Rule);
 
         var deep = new DungeonsData(ShippedContent.Dungeons.Dungeons
             .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 500, BossFloorMax = 500 } : d).ToList());
-        var offset = Fit(Compiled, warnings, dungeons: deep);
+        var offset = Fit(BuiltIn, warnings, dungeons: deep);
         Assert.Equal(4, offset.BossStackOffset);
         var refused = Assert.Throws<ContentException>(() => Load(offset, dungeons: deep));
         Assert.Equal(("spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm), (refused.EntryId, refused.Rule));
@@ -138,7 +138,7 @@ public class TuningFitTests
             Weapons = ShippedContent.Weapons.Weapons
                 .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList(),
         };
-        var limit = Fit(Compiled, warnings, weapons: forged);
+        var limit = Fit(BuiltIn, warnings, weapons: forged);
         Assert.Equal(3, new ModifierRules(limit, ShippedContent.Restricted).MaxForged(CritWindow));
         Assert.Equal(("widowmaker", ContentValidator.RuleMaxForged), Refusal(() => Load(limit, weapons: forged)));
 

@@ -4,8 +4,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The §5.5 <c>restricted.json</c> shape: what may coexist and what may be
 /// rolled, for modifiers and enchantments alike, keyed by stable string id.
 /// Modifier ids are the <see cref="ModifierType"/> names; enchantment ids are the
-/// catalogue's. Phase 1 ships a compiled instance (<see cref="ContentDefaults.Restricted"/>);
-/// Phase 5 adds only deserialisation.
+/// catalogue's. The shipped file is the master copy of every relation
+/// (<see cref="RestrictedJson"/>); no relation is kept in code.
 /// </summary>
 /// <param name="Excludes">
 /// Exclusion groups: every member excludes every other. Expanded to directed

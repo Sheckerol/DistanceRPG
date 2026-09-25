@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 
 namespace GameEngine.DistanceRPG.Logic;
@@ -29,6 +28,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// dungeons' stage of the load. A failure inside a boss is reported against the
 /// dungeon that names it, as the validator reports one.
 /// </para>
+/// <para>
+/// The shipped <c>GameEngine.DistanceRPG/Data/dungeons.json</c> is the master
+/// copy of every dungeon (the user's ruling of 2026-09-25): hand-kept, with the
+/// notes on each boss written beside it; the game carries it built in and plays
+/// that copy when none is beside the executable. No dungeon is kept in code.
+/// </para>
 /// </summary>
 public static class DungeonsJson
 {
@@ -37,7 +42,7 @@ public static class DungeonsJson
     /// <summary>The one member of the file: the list of rows, named for the record.</summary>
     private const string ListName = "dungeons";
 
-    /// <summary>A row's fields, in the record's parameter order — §5.8's names: the order they are written in, and the order a missing one is looked for.</summary>
+    /// <summary>A row's fields, in the record's parameter order — §5.8's names: the order the file holds them in, and the order a missing one is looked for.</summary>
     private static readonly string[] Fields =
         ["id", "name", "theme", "attunement", "bossFloorMin", "bossFloorMax", "boss", "retiresOnClear"];
 
@@ -98,86 +103,4 @@ public static class DungeonsJson
             MovementBudget: shape.Int(Get("movementBudget"), At("movementBudget"), entry),
             Innate: shape.Modifiers(Get("innate"), At("innate"), entry, "a table of modifiers to stack counts"));
     }
-
-    /// <summary>
-    /// The file for <paramref name="data"/>: a header saying what the file is and
-    /// how it is read, then every row in the record's order, one field a line in
-    /// the record's parameter order, the boss's fields indented under it, with
-    /// <c>/* provisional */</c> after the id of a row — a dungeon or a boss — the
-    /// docs did not fix (<see cref="JsonText.IdNote"/>). Canonical, with
-    /// <c>"\n"</c> line ends, so one set of dungeons is one text.
-    /// </summary>
-    public static string Write(DungeonsData data)
-    {
-        ArgumentNullException.ThrowIfNull(data);
-        var text = new StringBuilder();
-        JsonText.Header(text, Header);
-        text.Append("{\n");
-        text.Append($"  {JsonText.Quote(ListName)}: [\n");
-        for (int i = 0; i < data.Dungeons.Count; i++)
-        {
-            var d = data.Dungeons[i];
-            const string row = "      ", boss = "        ";
-            text.Append("    {\n");
-            Field(text, row, "id", JsonText.Quote(d.Id), JsonText.IdNote(d.Id));
-            Field(text, row, "name", JsonText.Quote(d.Name));
-            Field(text, row, "theme", JsonText.Quote(d.Theme.ToString()));
-            Field(text, row, "attunement", d.Attunement is { } element ? JsonText.Quote(element.ToString()) : "null");
-            Field(text, row, "bossFloorMin", d.BossFloorMin is { } min ? JsonText.Number(min) : "null");
-            Field(text, row, "bossFloorMax", d.BossFloorMax is { } max ? JsonText.Number(max) : "null");
-            text.Append($"{row}\"boss\": {{\n");
-            Field(text, boss, "id", JsonText.Quote(d.Boss.Id), JsonText.IdNote(d.Boss.Id));
-            Field(text, boss, "name", JsonText.Quote(d.Boss.Name));
-            Field(text, boss, "maxHp", JsonText.Number(d.Boss.MaxHp));
-            Field(text, boss, "movementBudget", JsonText.Number(d.Boss.MovementBudget));
-            Field(text, boss, "innate", JsonText.Modifiers(d.Boss.Innate), last: true);
-            text.Append($"{row}}},\n");
-            Field(text, row, "retiresOnClear", d.RetiresOnClear ? "true" : "false", last: true);
-            text.Append(i < data.Dungeons.Count - 1 ? "    },\n" : "    }\n");
-        }
-        text.Append("  ]\n");
-        text.Append("}\n");
-        return text.ToString();
-    }
-
-    /// <summary>One field's line at <paramref name="indent"/>, with the comma JSON wants after every field but the last, and <paramref name="note"/> after it when there is one.</summary>
-    private static void Field(StringBuilder text, string indent, string name, string value, string? note = null, bool last = false)
-    {
-        text.Append($"{indent}{JsonText.Quote(name)}: {value}{(last ? "" : ",")}");
-        if (note is not null)
-            text.Append(' ').Append(note);
-        text.Append('\n');
-    }
-
-    private static readonly string[] Header =
-    [
-        "dungeons.json - the dungeons the screen between runs lists, in its order, each with its boss.",
-        "",
-        "Read once, when the game starts, after weapons.json. A dungeon is checked, never clamped: a",
-        "theme that is no class's signature, a boss floor range that is inverted or deep enough to pay",
-        "a farm's stacks, a boss without its theme, two dungeons that retire on clear, or a field the",
-        "game does not know stops the game on a screen naming the file, the dungeon and the rule. Every",
-        "dungeon names all eight fields, and its boss all five; comments and trailing commas are fine.",
-        "A dungeon is an edit here, never a rebuild: start the game again to play it.",
-        "",
-        "id: what everything names the dungeon by - a lock, a save. name: what the screen calls it.",
-        "theme: a modifier - the boss carries it whatever it holds and forges it onto its drop, and every",
-        "other drop there may roll it; a class's signature, so the dungeon has one unique to hunt.",
-        "attunement: the damage type everything it spawns is attuned to (Flaming, Cold, Shocking or",
-        "Acidic), or null. bossFloorMin, bossFloorMax: the floors the boss is rolled between, or null",
-        "for tuning.json's BossFloorMin and BossFloorMax. boss: its id, name, maxHp, movementBudget (in",
-        "logic units a turn, 32 a tile) and innate modifiers, each to its stack count, the theme among",
-        "them. retiresOnClear: beating the boss closes the dungeon for good - the tutorial's, and only",
-        "one dungeon may.",
-        "",
-        "There is no drop table: what a boss drops is computed from its theme and restricted.json, so a",
-        "relation edited there moves it with no edit here. A dungeon or a boss whose id is marked",
-        "provisional is a first guess the docs did not fix, expected to move after play.",
-        "",
-        "The copy to edit is the one beside the game (bin/Debug/net10.0/dungeons.json - the log prints",
-        "its full path). GameEngine.DistanceRPG/Data/dungeons.json is generated from the compiled",
-        "content (DistanceRPG --write-data <folder>) and pinned by the tests: a dungeon worth keeping",
-        "goes into Logic/Content/ContentDefaults.cs, and the file is generated again. Deleting the copy",
-        "plays the built-in dungeons, and the screen says so.",
-    ];
 }

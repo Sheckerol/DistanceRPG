@@ -16,14 +16,16 @@ internal class Program
 {
     /// <summary>
     /// The command that writes the data files instead of playing:
-    /// <c>DistanceRPG --write-data &lt;folder&gt;</c> writes the four files the
-    /// generator makes of the compiled content (<see cref="ContentFiles.WriteDefaults"/>:
-    /// <c>tuning.json</c>, <c>restricted.json</c>, <c>weapons.json</c> and
-    /// <c>dungeons.json</c>) into the folder and exits, no window opened. Run on
-    /// <c>GameEngine.DistanceRPG/Data</c> it regenerates the shipped files the
-    /// tests pin; run on the folder beside the executable it resets every edited
-    /// copy to the built-in content. (The enchantment catalogue and the starting
-    /// party are code, and have no file to write.)
+    /// <c>DistanceRPG --write-data &lt;folder&gt;</c> writes the four copies the
+    /// game carries built in (<see cref="ShippedData.Texts"/>: <c>tuning.json</c>,
+    /// <c>restricted.json</c>, <c>weapons.json</c> and <c>dungeons.json</c>), byte
+    /// for byte, into the folder and exits, no window opened. Run on the folder
+    /// beside the executable it puts back every copy there as the build shipped
+    /// it — the way back from an edited copy, which a rebuild keeps when it is
+    /// newer than its master. It refuses the source <c>Data</c> folder, which
+    /// holds the master copies themselves: writing the last build's copies there
+    /// would put them over edits not yet built. (The enchantment catalogue and the
+    /// starting party are code, and have no file to write.)
     /// </summary>
     internal const string WriteDataOption = "--write-data";
 
@@ -60,7 +62,12 @@ internal class Program
                 }
                 if (options.NewCampaign)
                     Log.Warn($"[Launch] {NewCampaignOption} does nothing beside {WriteDataOption}, which writes the data files and exits without playing");
-                WriteData(directory, line => Log.Info(line));
+                if (!WriteData(directory, line => Log.Info(line)))
+                {
+                    Log.Error($"{WriteDataOption} wrote nothing: {Path.GetFullPath(directory)} is the source Data folder, which holds the master copies - "
+                        + "edit them there and rebuild, or name another folder (the one beside the executable, to reset its copies)");
+                    return 1;
+                }
                 return 0;
             }
 
@@ -120,14 +127,44 @@ internal class Program
     }
 
     /// <summary>
-    /// The generator's four files, written into <paramref name="directory"/> (made
-    /// absolute against the working folder, and created if need be), each path
-    /// reported as it is written. The command's whole body, so a test runs it into
-    /// a folder of its own.
+    /// The four built-in copies, written into <paramref name="directory"/> (made
+    /// absolute against the working folder, and created if need be) byte for
+    /// byte, each path reported as it is written — or nothing at all, and false,
+    /// when the folder is the source <c>Data</c> folder
+    /// (<see cref="IsSourceDataFolder"/>). A copy the build does not carry is
+    /// reported, not written. The command's whole body, so a test runs it into a
+    /// folder of its own.
     /// </summary>
-    internal static void WriteData(string directory, Action<string>? report = null)
+    internal static bool WriteData(string directory, Action<string>? report = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
-        DataFiles.Write(Path.GetFullPath(directory), ContentFiles.WriteDefaults(), report);
+        string full = Path.GetFullPath(directory);
+        if (IsSourceDataFolder(full))
+        {
+            report?.Invoke($"[Data] {full} is the source Data folder: it holds the master copies, and the built-in copies are not written over them");
+            return false;
+        }
+
+        var texts = ShippedData.Texts;
+        foreach (var (name, why) in texts.Unreadable ?? new Dictionary<string, string>())
+            report?.Invoke($"[Data] {name} is not written: {why}");
+        DataFiles.Write(full, texts, report);
+        return true;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="directory"/> is the source <c>Data</c> folder: a
+    /// folder named <c>Data</c> whose parent holds <c>GameEngine.DistanceRPG.csproj</c>.
+    /// Its files are the master copies — the ones the game is built with — so the
+    /// command's old use, regenerating them there, would now put the last build's
+    /// copies over edits not yet built.
+    /// </summary>
+    internal static bool IsSourceDataFolder(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        var folder = new DirectoryInfo(Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)));
+        return string.Equals(folder.Name, "Data", StringComparison.OrdinalIgnoreCase)
+            && folder.Parent is { } parent
+            && File.Exists(Path.Combine(parent.FullName, "GameEngine.DistanceRPG.csproj"));
     }
 }

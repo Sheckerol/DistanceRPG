@@ -1216,8 +1216,8 @@ public sealed class TurnSystem
         }
 
         // Attack cost scales the same way the prototype scaled it: the standard
-        // enemy budget is 100 vs the party's MovementBudget (160, the tuning's
-        // compiled default), so weapon costs shrink to match. The scale is that
+        // enemy budget is 100 vs the party's MovementBudget (tuning.json's, 160
+        // as shipped), so weapon costs shrink to match. The scale is that
         // standard budget's, never the enemy's own: it converts the party's cost
         // units into an enemy's, so a slower enemy (a boss's 40,
         // EnemyState.MoveBudget) buys fewer swings as well as fewer steps, and a
@@ -1254,7 +1254,7 @@ public sealed class TurnSystem
     /// <summary>
     /// What converts the party's movement costs into an enemy's: the standard
     /// enemy budget over the party's, <c>EnemyMove / MovementBudget</c> — 100 / 160
-    /// at the compiled tuning, read from the current one at each beat.
+    /// at the shipped tuning, read from the current one at each beat.
     /// </summary>
     private static float EnemyCostScale => GameConstants.EnemyMove / GameContent.Current.Tuning.MovementBudget;
 

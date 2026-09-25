@@ -1117,7 +1117,7 @@ public class HudTextTests
         // the host's notices to its HUD over the first floor's banner, and the rows
         // it draws are the one wrapper's rows of them. The HUD lays them out with
         // no window — the drawing is untested, as ever — so it is built without one.
-        var load = ContentFiles.Load(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }""" });   // beside the shipped content files: the two notices are the tuning's
+        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }""" });   // beside the shipped content files: the two notices are the tuning's
         Assert.Equal(2, load.Notices.Count);
 
         // The scene the host builds with them has them up for its first floor.

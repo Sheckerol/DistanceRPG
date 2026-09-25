@@ -13,20 +13,6 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public sealed class ModifierRules
 {
-    /// <summary>
-    /// Fallback when tuning names no offset: nothing is granted before the first
-    /// stack. Internal so <see cref="TuningSchema"/>'s table says what this
-    /// reader falls back to, and the file and the hash state what the game reads.
-    /// </summary>
-    internal const int DefaultOffset = 0;
-
-    /// <summary>
-    /// Fallback when tuning names no forge limit: a unique is a variant with one
-    /// modifier raised to x3, so nothing is forged past 3 (§1.1, §1.5). Internal
-    /// for the same reason as <see cref="DefaultOffset"/>.
-    /// </summary>
-    internal const int DefaultMaxForged = 3;
-
     private static readonly IReadOnlyDictionary<string, ModifierType> ByName =
         Enum.GetValues<ModifierType>().ToDictionary(t => t.ToString(), t => t, StringComparer.Ordinal);
 
@@ -64,12 +50,18 @@ public sealed class ModifierRules
     /// load before these rules are built (<see cref="ContentValidator.ValidateRestricted"/>)
     /// — while a modifier relation naming an enchantment is refused
     /// (<see cref="ContentValidator.RuleModifierRelationIds"/>) rather than
-    /// quietly losing the member <see cref="Allowed"/> could never see.
+    /// quietly losing the member <see cref="Allowed"/> could never see. The
+    /// numbers are the tuning's tables, read directly: each must name every
+    /// modifier (<see cref="ContentValidator.RuleTableNamesEveryMember"/>), since
+    /// no number in code stands under a gap.
     /// </summary>
     public ModifierRules(Tuning tuning, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(tuning);
         ArgumentNullException.ThrowIfNull(restricted);
+        ContentValidator.RequireEveryMember(tuning.PerStack, nameof(Tuning.PerStack), "modifier");     // never read a stack
+        ContentValidator.RequireEveryMember(tuning.Offset, nameof(Tuning.Offset), "modifier");         // an offset or a limit
+        ContentValidator.RequireEveryMember(tuning.MaxForged, nameof(Tuning.MaxForged), "modifier");   // the tuning does not name
         ContentValidator.ValidateModifierRelations(restricted);   // never build around a dropped relation
 
         _tuning = tuning;
@@ -102,22 +94,22 @@ public sealed class ModifierRules
     /// </summary>
     public int AcquiredHeadroom { get; }
 
-    // The three tables read per key through Tuning.Lookup: a partial table
-    // overrides the modifiers it names and leaves the rest at their compiled
-    // values (§5.3), so a file that re-prices one stack never kills the others.
+    // The three tables, read directly: each names every modifier (checked as
+    // the rules are built). A file that re-prices one stack never kills the
+    // others — the read merges it over the built-in table, entry by entry.
 
     /// <summary>What one stack of <paramref name="t"/> is worth (the §1.1 table).</summary>
-    public int PerStack(ModifierType t) => _tuning.Lookup(x => x.PerStack, t, fallback: 0);
+    public int PerStack(ModifierType t) => _tuning.PerStack[t];
 
     /// <summary>What <paramref name="t"/> grants before its first stack: CritMultiplier's base x2, Charges' first throw.</summary>
-    public int Offset(ModifierType t) => _tuning.Lookup(x => x.Offset, t, DefaultOffset);
+    public int Offset(ModifierType t) => _tuning.Offset[t];
 
     /// <summary>
     /// The most of <paramref name="t"/> any weapon may be forged with. Checked when
     /// a weapon is built — by the content validator — never in <see cref="ModifierSet.With"/>:
     /// it constrains the forge and never acquisition.
     /// </summary>
-    public int MaxForged(ModifierType t) => _tuning.Lookup(x => x.MaxForged, t, DefaultMaxForged);
+    public int MaxForged(ModifierType t) => _tuning.MaxForged[t];
 
     /// <summary>These two cannot coexist. The symmetric closure of the file's groups.</summary>
     public IReadOnlyDictionary<ModifierType, ModifierType[]> Excludes { get; }

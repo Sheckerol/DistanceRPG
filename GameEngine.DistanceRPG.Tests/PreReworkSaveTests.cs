@@ -40,8 +40,13 @@ public class PreReworkSaveTests
 
     private static string TextOf(string name) => File.ReadAllText(PathOf(name));
 
-    /// <summary>The tuning the saves were played under, as the current reader reads <see cref="PlayedTuning"/>.</summary>
-    private static TuningRead ReadPlayedTuning() => TuningJson.Read(TextOf(PlayedTuning));
+    /// <summary>
+    /// The tuning the saves were played under, as the current reader reads
+    /// <see cref="PlayedTuning"/>: strictly, as the game reads its built-in copy —
+    /// the file names every key, as the master copy does, so nothing under it is
+    /// taken from anywhere else.
+    /// </summary>
+    private static TuningRead ReadPlayedTuning() => TuningJson.ReadBuiltIn(TextOf(PlayedTuning));
 
     /// <summary>Whether any number <paramref name="now"/> holds is not the number the saves were played under.</summary>
     private static bool NumbersMoved(Tuning now) => TuningValues.Moved(ReadPlayedTuning().Tuning, now).Length > 0;

@@ -112,7 +112,7 @@ public class XpCreditTests
         => TestContent.Use(
             enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => ids.Contains(e.Id) ? e with { Potency = 3 } : e).ToList()),
-            tuning: ShippedContent.Tuning with { ApplyPercent = ids.ToDictionary(id => id, _ => 100, StringComparer.Ordinal) });
+            tuning: TuningValues.With(ShippedContent.Tuning, ids.Select(id => ($"{nameof(Tuning.ApplyPercent)}.{id}", 100)).ToArray()));
 
     // ── Weapon XP: the weapon's own mitigated damage ─────────────────────────
 

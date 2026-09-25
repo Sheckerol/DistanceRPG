@@ -29,11 +29,25 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public static class EnchantmentDefinitions
 {
+    /// <summary>
+    /// A number this catalogue does not state, because <c>tuning.json</c> owns it:
+    /// the <c>ApplyPercent</c> of the four elements and Serrated, whose dials are
+    /// <c>tuning.json</c>'s <c>ApplyPercent</c> table, and Arcane's potency, whose
+    /// dial is its <c>ArcanePotency</c>. A percentage and a potency no row can mean
+    /// (§5.3: a number a playtest turns lives in <c>tuning.json</c> alone, so it
+    /// has no second home here). The catalogue lays the dial over it as it is
+    /// built (<see cref="EnchantmentCatalogue"/>), and the load refuses a row left
+    /// to a dial the tuning does not name
+    /// (<see cref="ContentValidator.RuleTuningOwnsTheNumber"/>).
+    /// </summary>
+    public const int SetByTuning = -1;
+
     // ---- Enchantments (§5.7): the eight innates, Vampiric, and the nine souls ----
     // Lock per the §3.3 catalogue. A status applier quotes no flat trigger: its
     // price is the DoT ladder over the levels it applies. Potency is the levels
     // one cast grants at ApplyPercent 100 — provisional, re-priced in Phase 3.
-    // An element's ApplyPercent is the burn it feeds; the tuning table overrides it.
+    // An element's ApplyPercent is the burn it feeds, and tuning.json's alone:
+    // the rows below leave it to the ApplyPercent table (SetByTuning).
     // A soul is a rule or a magnitude. A rule quotes a flat trigger: the ones
     // that fire once — a kill refunded, a life spared, a shove refused, a shot
     // carried on — fire whole or not at all, while Overheal's grant scales to
@@ -47,19 +61,19 @@ public static class EnchantmentDefinitions
         Innate("ward", "Ward", TargetSide.Ally, @lock: 20, potency: 5, StatusEffectType.Ward),
         Innate("poison", "Poison", TargetSide.Enemy, @lock: 20, potency: 3, StatusEffectType.Poison),
         Innate("mire", "Mire", TargetSide.Enemy, @lock: 25, potency: 2, StatusEffectType.Mire),
-        Element("flaming", "Flaming", DamageType.Flaming, applyPercent: 20),
-        Element("cold", "Cold", DamageType.Cold, applyPercent: 15),
-        Element("shocking", "Shocking", DamageType.Shocking, applyPercent: 25),
-        Element("acidic", "Acidic", DamageType.Acidic, applyPercent: 15),
+        Element("flaming", "Flaming", DamageType.Flaming, applyPercent: SetByTuning),     // tuning.json ApplyPercent.flaming
+        Element("cold", "Cold", DamageType.Cold, applyPercent: SetByTuning),              // tuning.json ApplyPercent.cold
+        Element("shocking", "Shocking", DamageType.Shocking, applyPercent: SetByTuning),  // tuning.json ApplyPercent.shocking
+        Element("acidic", "Acidic", DamageType.Acidic, applyPercent: SetByTuning),        // tuning.json ApplyPercent.acidic
         // The catalogue entry the Efficiency dagger arrives with at tier 3: fires on damage dealt, heals a flat 1 per tier per instance, 2 a trigger.
         Catalogue("vampiric", "Vampiric", EffectKind.Vampiric, TargetSide.Ally, @lock: 20, trigger: 2, potency: 1),
         // The rest of the §3.3 starting set. Lock and trigger are the table's; the
         // potency column it has no row for is read back out of the same section:
-        // Arcane's is Tuning.ArcanePotency (provisional, and laid over this row by
-        // the catalogue — keyed by this id, so a playtest turns it in tuning.json
-        // without a content edit and a second bonus-damage entry keeps its own),
-        // and Shattering's 1 is "crit riders land one level deeper" at tier 1.
-        Catalogue("arcane", "Arcane", EffectKind.BonusDamage, TargetSide.Enemy, @lock: 30, trigger: 8, potency: 4),
+        // Arcane's is tuning.json's ArcanePotency (provisional, and laid over this
+        // row by the catalogue — keyed by this id, so a playtest turns it in
+        // tuning.json without a rebuild and a second bonus-damage entry keeps its
+        // own), and Shattering's 1 is "crit riders land one level deeper" at tier 1.
+        Catalogue("arcane", "Arcane", EffectKind.BonusDamage, TargetSide.Enemy, @lock: 30, trigger: 8, potency: SetByTuning),   // tuning.json ArcanePotency
         Catalogue("shattering", "Shattering", EffectKind.Shattering, TargetSide.Enemy, @lock: 25, trigger: 10, potency: 1),
         // The shielding entry settled.md asks for and never names: it absorbs one
         // point of enchantment damage per level, which is the EffectPerLevel row it
@@ -79,7 +93,7 @@ public static class EnchantmentDefinitions
         Rule("sturdy", "Sturdy", EffectKind.Sturdy, TargetSide.Ally, @lock: 30, trigger: 40, potency: 1),           // survive lethal damage at 1 HP
         Rule("momentum", "Momentum", EffectKind.Momentum, TargetSide.Ally, @lock: 30, trigger: 10, potency: 0),     // a kill refunds part of the swing — declared, inert until the fraction is fixed
         Rule("overheal", "Overheal", EffectKind.Overheal, TargetSide.Ally, @lock: 25, trigger: 8, potency: 0),      // healing above full banks into Ward at OverhealPerWard to 1
-        Magnitude("serrated", "Serrated", EffectKind.Serrated, TargetSide.Enemy, @lock: 20, applyPercent: 20, StatusEffectType.Bleeding, damageType: null),   // Bleeding at BleedPercent of the weapon's share; the tuning table overrides the percentage
+        Magnitude("serrated", "Serrated", EffectKind.Serrated, TargetSide.Enemy, @lock: 20, applyPercent: SetByTuning, StatusEffectType.Bleeding, damageType: null),   // Bleeding at BleedPercent of the weapon's share: tuning.json ApplyPercent.serrated
         Rule("immovable", "Immovable", EffectKind.Immovable, TargetSide.Ally, @lock: 25, trigger: 10, potency: 0),   // a shove on the wielder is negated entirely
         Rule("piercing", "Piercing", EffectKind.Piercing, TargetSide.Enemy, @lock: 20, trigger: 6, potency: 0),     // the shot continues to the next body in line, re-rolled
         Magnitude("burning", "Burning", EffectKind.LingeringElement, TargetSide.Enemy, @lock: 20, applyPercent: 100, StatusEffectType.Searing, DamageType.Flaming),   // Flaming lingers as Searing/Flaming at the element's percentage of its damage, paid once per cast; lock 20 provisional — the §3.3 unique table does not price Burning, Phase 3 does
@@ -89,7 +103,7 @@ public static class EnchantmentDefinitions
     private static EnchantmentDef Innate(string id, string name, TargetSide targets, int @lock, int potency, StatusEffectType applies)
         => new(id, name, EffectKind.ApplyStatus, targets, @lock, Trigger: null, potency, ApplyPercent: 100, applies, DamageType: null, Unique: false);
 
-    /// <summary>A wand's innate: the element its hit is typed with, feeding the burn at <paramref name="applyPercent"/>.</summary>
+    /// <summary>A wand's innate: the element its hit is typed with, feeding the burn at <paramref name="applyPercent"/> — the tuning's, for every element the game ships.</summary>
     private static EnchantmentDef Element(string id, string name, DamageType type, int applyPercent)
         => new(id, name, EffectKind.ElementalDamage, TargetSide.Enemy, Lock: 20, Trigger: 5, Potency: 0, applyPercent, Applies: null, type, Unique: false);
 

@@ -9,12 +9,15 @@ namespace GameEngine.DistanceRPG;
 /// content aborts startup, naming the entry and the rule it broke"). The game
 /// opens on it instead of the screen between runs when the data files do not
 /// load (<see cref="ContentFiles.Load"/> came back with an error): <c>THE GAME
-/// CANNOT START</c>, then the file whose stage broke (marked <c>(COMPILED)</c>
-/// when that stage ran the built-in record and a file beside it broke it), the
-/// entry, the rule and its detail, what <c>tuning.json</c> changed from the
-/// compiled numbers, and <c>FIX THE FILE AND START AGAIN - ESC QUITS</c>. The
-/// log has the same lines. Under them, the load's notices, wrapped and capped
-/// as everywhere else — a file missing may be what the broken one broke against.
+/// CANNOT START</c>, then the file whose stage broke (marked <c>(BUILT-IN)</c>
+/// when that stage ran the copy the game carries built in), the entry, the rule
+/// and its detail, what <c>tuning.json</c> changed from the built-in numbers,
+/// and what to do: <c>FIX THE FILE AND START AGAIN - ESC QUITS</c>, or — when
+/// the broken copy is a built-in one and nothing beside the executable is
+/// involved — which master copy to fix, and that the game must be rebuilt
+/// (<see cref="ClosingLine"/>). The log has the same lines. Under them, the
+/// load's notices, wrapped and capped as everywhere else — a file missing may be
+/// what the broken one broke against.
 /// <para>
 /// A bad <em>tuning</em> value never gets here: it clamps, the tuning is fitted
 /// to the content, and it shows as a notice where the game opens — the contrast
@@ -66,15 +69,18 @@ public sealed class StartupErrorScene : Scene
 
     /// <param name="game">The game window: its size and its shaders, for the text.</param>
     /// <param name="error">Why the content does not load: the first stage to break, stamped with its file.</param>
-    /// <param name="tuningOverrides">Every number the tuning changed from the compiled ones (<see cref="ContentLoad.TuningOverrides"/>).</param>
+    /// <param name="tuningOverrides">Every number the tuning changed from the built-in copy's (<see cref="ContentLoad.TuningOverrides"/>).</param>
+    /// <param name="readBeside">The content files read from beside the executable (<see cref="ContentLoad.ReadBeside"/>): whether one of them may be what broke a built-in copy.</param>
     /// <param name="notices">What else the load raised, or none.</param>
-    public StartupErrorScene(Game game, ContentException error, IReadOnlyList<string> tuningOverrides, IReadOnlyList<string>? notices = null)
+    public StartupErrorScene(Game game, ContentException error, IReadOnlyList<string> tuningOverrides, IReadOnlyList<string> readBeside,
+        IReadOnlyList<string>? notices = null)
         : base("StartupErrorScene")
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(tuningOverrides);
+        ArgumentNullException.ThrowIfNull(readBeside);
         _game = game;
-        Rows = Lines(error, tuningOverrides);
+        Rows = Lines(error, tuningOverrides, readBeside);
         NoticeRows = NoticeText.Rows(notices ?? []);
         _tuningRows = NoticeText.Wrap(TuningLine(tuningOverrides)).Count;
     }
@@ -88,28 +94,59 @@ public sealed class StartupErrorScene : Scene
     /// <summary>
     /// The screen's lines, top to bottom, upper-cased and wrapped under
     /// <see cref="NoticeText.LineChars"/>: <see cref="Title"/>; the file — with
-    /// <c>(COMPILED)</c> when its stage ran the built-in record — when the failure
+    /// <c>(BUILT-IN)</c> when its stage ran the built-in copy — when the failure
     /// names one; the entry; the rule; the detail, when there is one; what
-    /// <c>tuning.json</c> changed from the compiled numbers; and
-    /// <see cref="KeysLine"/>. The log writes the same lines.
+    /// <c>tuning.json</c> changed from the built-in numbers; and the closing line
+    /// (<see cref="ClosingLine"/>), one line however long. The log writes the
+    /// same lines.
     /// </summary>
-    internal static IReadOnlyList<string> Lines(ContentException error, IReadOnlyList<string> tuningOverrides)
+    internal static IReadOnlyList<string> Lines(ContentException error, IReadOnlyList<string> tuningOverrides, IReadOnlyList<string> readBeside)
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(tuningOverrides);
+        ArgumentNullException.ThrowIfNull(readBeside);
         var lines = new List<string> { Title };
         if (error.File is { } file)
-            lines.AddRange(NoticeText.Wrap($"FILE: {file}{(error.Compiled ? " (compiled)" : "")}"));
+            lines.AddRange(NoticeText.Wrap($"FILE: {file}{(error.BuiltIn ? " (built-in)" : "")}"));
         lines.AddRange(NoticeText.Wrap($"ENTRY: {error.EntryId}"));
         lines.AddRange(NoticeText.Wrap($"RULE: {error.Rule}"));
         if (error.Detail is { } detail)
             lines.AddRange(NoticeText.Wrap($"DETAIL: {detail}"));
         lines.AddRange(NoticeText.Wrap(TuningLine(tuningOverrides)));
-        lines.Add(KeysLine);
+        lines.Add(ClosingLine(error, readBeside));
         return lines;
     }
 
-    /// <summary>What <c>tuning.json</c> changed from the compiled numbers, as clamped and fitted — or that it changed none.</summary>
+    /// <summary>
+    /// What to do, and the one key the screen answers. When the copy that broke
+    /// is a built-in one and nothing beside the executable is involved, the only
+    /// fix is the master copy the game was built with:
+    /// <c>THE BUILT-IN WEAPONS.JSON IS BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS</c>.
+    /// Nothing beside it is involved when the copy is the built-in
+    /// <c>tuning.json</c>, which every read stands on; when the copy's own text is
+    /// what failed — it is not JSON of its shape
+    /// (<see cref="ContentValidator.RuleFileShape"/>, which only reading a file
+    /// raises), or the build does not carry it
+    /// (<see cref="ContentValidator.RuleBuiltInCopy"/>) — since reading a copy
+    /// reads nothing else; and when no content file was read from beside the
+    /// executable at all. Otherwise a file beside the executable broke it, or may
+    /// have — a <c>restricted.json</c> there refusing a built-in weapon — and the
+    /// line is <see cref="KeysLine"/>.
+    /// </summary>
+    internal static string ClosingLine(ContentException error, IReadOnlyList<string> readBeside)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(readBeside);
+        if (!error.BuiltIn || error.File is not { } file)
+            return KeysLine;
+        bool ownText = error.Rule is ContentValidator.RuleFileShape or ContentValidator.RuleBuiltInCopy;
+        if (file != TuningJson.FileName && !ownText && readBeside.Count > 0)
+            return KeysLine;
+        string name = file.ToUpperInvariant();
+        return $"THE BUILT-IN {name} IS BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/{name} AND REBUILD - ESC QUITS";
+    }
+
+    /// <summary>What <c>tuning.json</c> changed from the built-in numbers, as clamped and fitted — or that it changed none.</summary>
     internal static string TuningLine(IReadOnlyList<string> tuningOverrides)
     {
         ArgumentNullException.ThrowIfNull(tuningOverrides);
@@ -135,10 +172,12 @@ public sealed class StartupErrorScene : Scene
         // The failure's rows, then what the tuning changed, as one block:
         // left-aligned so a wrapped line's indented rows read as its own, and the
         // block centred on the widest row. The tuning's rows sit a little apart,
-        // in grey: context, not the failure.
+        // in grey: context, not the failure. The closing line is one line however
+        // long — a master copy's path, say — so the block is fitted with it, and
+        // it is drawn at the block's scale.
         var body = Rows.Skip(1).Take(Rows.Count - 2).ToList();
         int failureRows = body.Count - _tuningRows;
-        float scale = FitScale(w, body.Concat(NoticeRows), BodyScale);
+        float scale = FitScale(w, body.Concat(NoticeRows).Append(Rows[^1]), BodyScale);
         float left = BlockLeft(w, body, scale);
         float y = BodyTop;
         for (int i = 0; i < body.Count; i++)
@@ -161,7 +200,7 @@ public sealed class StartupErrorScene : Scene
             }
         }
 
-        DrawCentered(w, h - KeysFromBottom, Rows[^1], KeysScale, DungeonHud.Yellow);
+        DrawCentered(w, h - KeysFromBottom, Rows[^1], MathF.Min(KeysScale, scale), DungeonHud.Yellow);
         _text.Flush(_game.ShaderManager);
     }
 

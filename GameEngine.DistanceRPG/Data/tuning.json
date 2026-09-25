@@ -8,10 +8,15 @@
  * whole number, true or false, or a table of whole numbers by name: a ratio is an integer divisor
  * with its units in its name, and a percentage says Percent.
  *
- * The copy to edit is the one beside the game (bin/Debug/net10.0/tuning.json - the log prints its
- * full path). GameEngine.DistanceRPG/Data/tuning.json is generated from the compiled numbers
- * (DistanceRPG --write-data <folder>) and pinned by the tests: a number worth keeping goes into
- * Logic/Content/Tuning.cs, and the file is generated again.
+ * GameEngine.DistanceRPG/Data/tuning.json is the master copy, and the only home of these numbers:
+ * the game keeps no copy of one in its code. The game is built with it inside, and plays that
+ * built-in copy key by key wherever the copy beside the executable leaves a key out, or whole when
+ * that copy is missing or cannot be read. So the master names every key and every member of every
+ * table below, or the game does not start. A build copies it beside the executable
+ * (bin/Debug/net10.0/tuning.json - the log prints its full path), where a playtest edits it. A
+ * number worth keeping is changed in the master, and the game rebuilt; a build replaces the copy
+ * beside the executable whenever the master is newer. DistanceRPG --write-data <folder> writes
+ * the built-in copies out.
  *
  * Nothing the golden tests pin - the map generator, the random streams, the pathfinder - is here.
  */
@@ -47,16 +52,16 @@
      its decay - Searing burns for its level, then loses one - so a burn lasts as many rounds as it
      has levels, against however long the fight runs. */
   "EffectPerLevel": {
-    "Regeneration": 1,
-    "Ward": 1,
-    "Poison": 1,
-    "Mire": 10,
-    "Sundered": 1,
-    "Weakened": 1,
-    "Bleeding": 1,
-    "OverhealPool": 1,
-    "Searing": 1,
-    "Softened": 1
+    "Regeneration": 1,  /* 1 HP restored per level at the target's turn end */
+    "Ward": 1,          /* 1 point absorbed per level, spent as it absorbs */
+    "Poison": 1,        /* 1 damage per level at the target's turn end */
+    "Mire": 10,         /* 10 percent of the movement budget cut per level; ten levels is all of it */
+    "Sundered": 1,      /* +1 taken per level from every weapon hit */
+    "Weakened": 1,      /* -1 dealt per level, floored at 1 */
+    "Bleeding": 1,      /* 1 damage per level at the target's turn end */
+    "OverhealPool": 1,  /* 1 surplus healing point per level; OverhealPerWard of them make one Ward level */
+    "Searing": 1,       /* 1 damage per level at the target's turn end, whatever element lit it */
+    "Softened": 1       /* 1 Block stripped per level for the round */
   },
 
   /* Surplus healing points that make one Ward level: Overheal banks healing above full HP at this
@@ -73,9 +78,11 @@
 
   /* Per enchantment id: the percentage of the source number (a hit's damage) that becomes status
      levels - the one number that decides how many levels a source grants. An id named here sets
-     that enchantment's percentage, whatever its own entry says. The elements sit at different
-     points of the 10-25 band so their burns are paced apart; an element's percentage is also the
-     burn its lingering unique feeds. */
+     that enchantment's percentage, whatever its own entry says. The four elements and serrated
+     have no percentage of their own in the game's catalogue: theirs lives here, so the master
+     names each of the five (a copy beside the game may leave one out, and the master's plays). The
+     elements sit at different points of the 10-25 band so their burns are paced apart; an
+     element's percentage is also the burn its lingering unique feeds. */
   "ApplyPercent": {
     "acidic": 15,
     "cold": 15,
@@ -97,29 +104,29 @@
      and Resonant take 10 percent off, Splitting and Softening strip 3 Block, the rest count one a
      stack. Momentum and OnHitPoison never stack on a weapon. */
   "PerStack": {
-    "Brace": 1,
-    "Block": 3,
-    "CritWindow": 1,
-    "CritMultiplier": 1,
-    "Cleave": 1,
-    "Charges": 1,
-    "Longshot": 1,
-    "Light": 10,
-    "Riposte": 1,
-    "Push": 1,
-    "Drag": 1,
-    "Splitting": 3,
-    "Overwatch": 1,
-    "Opportunist": 1,
-    "Rout": 1,
-    "Pin": 1,
-    "Softening": 3,
-    "CritWeaken": 1,
-    "CritSunder": 1,
-    "BlockWeaken": 1,
-    "OnHitPoison": 0,
-    "Resonant": 10,
-    "Momentum": 0
+    "Brace": 1,           /* +1 retaliation */
+    "Block": 3,           /* +3 absorbed; flat by deliberate exception */
+    "CritWindow": 1,      /* +1 to the crit window */
+    "CritMultiplier": 1,  /* +1 to the multiplier (the base x2 is its Offset) */
+    "Cleave": 1,          /* +1 extra target */
+    "Charges": 1,         /* +1 throw per turn, on top of the 1 in its Offset */
+    "Longshot": 1,        /* +1 damage per tile beyond LongshotFreeTiles */
+    "Light": 10,          /* -10% of the weapon's cost, additive not compounding */
+    "Riposte": 1,         /* +1 counter per turn */
+    "Push": 1,            /* +1 tile displaced */
+    "Drag": 1,            /* +1 tile displaced, toward the wielder */
+    "Splitting": 3,       /* +3 of the target's Block ignored */
+    "Overwatch": 1,       /* +1 held shot */
+    "Opportunist": 1,     /* +1 free attack when a target leaves reach */
+    "Rout": 1,            /* +1 tile displaced, on everything a cleave caught */
+    "Pin": 1,             /* +1 Mire level on the target */
+    "Softening": 3,       /* +3 of the target's Block stripped for a round */
+    "CritWeaken": 1,      /* +1 Weakened level on a crit */
+    "CritSunder": 1,      /* +1 Sundered level on a crit */
+    "BlockWeaken": 1,     /* +1 Weakened level on a successful block */
+    "OnHitPoison": 0,     /* reserved: no behaviour in Phase 1 */
+    "Resonant": 10,       /* -10% of all mana the weapon spends */
+    "Momentum": 0         /* enchantment-only: never a modifier stack */
   },
 
   /* What a modifier grants before its first stack: CritMultiplier's base x2 and Charges' first
@@ -128,9 +135,9 @@
     "Brace": 0,
     "Block": 0,
     "CritWindow": 0,
-    "CritMultiplier": 2,
+    "CritMultiplier": 2,  /* the base x2 */
     "Cleave": 0,
-    "Charges": 1,
+    "Charges": 1,         /* the first throw */
     "Longshot": 0,
     "Light": 0,
     "Riposte": 0,
@@ -161,7 +168,7 @@
     "Cleave": 3,
     "Charges": 3,
     "Longshot": 3,
-    "Light": 1,
+    "Light": 1,           /* Light ceilings at x6, a 60% discount */
     "Riposte": 3,
     "Push": 3,
     "Drag": 3,
@@ -175,7 +182,7 @@
     "CritSunder": 3,
     "BlockWeaken": 3,
     "OnHitPoison": 3,
-    "Resonant": 1,
+    "Resonant": 1,        /* same shape, same limit */
     "Momentum": 3
   },
 
@@ -289,7 +296,7 @@
   "DropEnchantChancePercent": 10,
 
   /* Provisional: the untyped damage a tier-1 Arcane adds to a hit, before its tier multiplies it;
-     it replaces the arcane entry's own potency. The docs price Arcane's lock and trigger and give
-     it no potency. */
+     it is the arcane entry's potency, which the game's catalogue leaves to this key. The docs price
+     Arcane's lock and trigger and give it no potency. */
   "ArcanePotency": 4
 }

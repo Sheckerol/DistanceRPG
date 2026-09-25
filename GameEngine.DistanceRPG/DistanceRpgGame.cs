@@ -41,9 +41,11 @@ namespace GameEngine.DistanceRPG;
 /// <para>
 /// <strong>The numbers are read once, here, at startup</strong> (§5.3): the data
 /// files beside the executable (<see cref="DataFiles"/>, <c>tuning.json</c>
-/// first) are loaded into the content the whole session plays under
-/// (<see cref="ContentFiles.Load"/>), made current before the campaign is built
-/// from it, and never read again — a run resolves under one set of numbers.
+/// first) are loaded over the copies the game carries built in — the master
+/// copies, each the fallback for its file (<see cref="ShippedData.Load"/>) —
+/// into the content the whole session plays under, made current before the
+/// campaign is built from it, and never read again — a run resolves under one
+/// set of numbers.
 /// Every path read or missed, every number the file changed and every notice the
 /// load raised goes to the log; the notices also go to whichever scene the game
 /// opens on first, so a playtest never runs under numbers it did not mean
@@ -193,32 +195,48 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     /// <summary>
     /// Read the data files beside the executable, once (§5.3: never
-    /// hot-reloaded), and make what they load the content the session plays
-    /// under. The log gets every path read or missed, every notice, the numbers
-    /// the tuning changed and the tuning's hash; the notices wait for the first
-    /// scene. False when the content does not load — a content file that is
-    /// there and broken (§5.4: "invalid content aborts startup, naming the entry
-    /// and the rule it broke"); no <c>tuning.json</c> can cause it, since every
-    /// tuning a file can make is clamped and fitted to the content it plays
-    /// beside. Then nothing is made current, the failure's lines go to the log,
-    /// and the game opens on the screen that shows them
-    /// (<see cref="StartupErrorScene"/>), handed the load's notices.
+    /// hot-reloaded), over the copies the game carries built in, and make what
+    /// they load the content the session plays under. The log gets every path
+    /// read or missed, every notice, the numbers the tuning changed and the
+    /// tuning's hash; the notices wait for the first scene. False when the
+    /// content does not load — a content file that is there and broken (§5.4:
+    /// "invalid content aborts startup, naming the entry and the rule it
+    /// broke"), or a built-in copy that is broken or missing from the build;
+    /// no <c>tuning.json</c> beside the game can cause it, since every tuning a
+    /// file can make is clamped and fitted to the content it plays beside. Then
+    /// nothing is made current, the failure's lines go to the log, and the game
+    /// opens on the screen that shows them (<see cref="StartupErrorScene"/>),
+    /// handed the load's notices. Should reading what the build carries ever
+    /// throw, the whole error goes to the log and the same screen names it: a
+    /// broken build is a screen, never a crash before the window.
     /// </summary>
     private bool LoadData()
     {
         string directory = AppContext.BaseDirectory;
-        var load = ContentFiles.Load(DataFiles.Read(directory, line => Log.Info(line)));
+        ContentLoad load;
+        try
+        {
+            load = ShippedData.Load(DataFiles.Read(directory, line => Log.Info(line)));
+        }
+        catch (Exception thrown) when (thrown is not OutOfMemoryException)
+        {
+            Log.Error($"[Data] The data files the game carries built in could not be read: {thrown}");
+            var failure = new ContentException("the built-in data files", ContentValidator.RuleBuiltInCopy,
+                $"reading them threw {thrown.GetType().Name}: {thrown.Message.Replace("'", "", StringComparison.Ordinal)}");
+            load = new ContentLoad(null, failure, [], []);
+        }
         foreach (string notice in load.Notices)
             Log.Warn($"[Data] {notice}");
-        Log.Info(DataFiles.TuningSummary(directory, load.TuningOverrides));
+        if (load.Tuning is not null)
+            Log.Info(DataFiles.TuningSummary(directory, load.TuningOverrides));
 
         if (load.Content is not { } content)
         {
             var error = load.Error ?? throw new InvalidOperationException("The data files loaded neither content nor a reason why not.");
             Log.Error($"[Data] The content does not load - {error.Message}");
-            foreach (string line in StartupErrorScene.Lines(error, load.TuningOverrides))
+            foreach (string line in StartupErrorScene.Lines(error, load.TuningOverrides, load.ReadBeside))
                 Log.Error($"[Data] {line}");
-            SwapTo(StartupErrorSceneName, new StartupErrorScene(this, error, load.TuningOverrides, load.Notices));
+            SwapTo(StartupErrorSceneName, new StartupErrorScene(this, error, load.TuningOverrides, load.ReadBeside, load.Notices));
             return false;
         }
 

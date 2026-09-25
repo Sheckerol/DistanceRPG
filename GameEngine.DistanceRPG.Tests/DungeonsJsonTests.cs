@@ -10,8 +10,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// under the doc's own names; no drop table, written or read, because the table
 /// is computed from the theme and the relations, so an edit to
 /// <c>restricted.json</c> moves it with no edit here. Every case reads text and
-/// loads content it never makes current; the shipped file is read from the test
-/// output's own linked copy.
+/// loads content it never makes current; the shipped file is the master copy the
+/// build carries (<see cref="ShippedData.Texts"/>).
 /// </summary>
 public class DungeonsJsonTests
 {
@@ -22,10 +22,10 @@ public class DungeonsJsonTests
     private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "innate"];
 
     private static ContentLoad Load(string dungeons, string? restricted = null)
-        => ContentFiles.Load(DataTexts.Shipped with { Dungeons = dungeons, Restricted = restricted ?? DataTexts.Shipped.Restricted });
+        => ShippedData.Load(DataTexts.Shipped with { Dungeons = dungeons, Restricted = restricted ?? DataTexts.Shipped.Restricted });
 
     /// <summary>Two dungeon rows the same, field for field — the boss's innate modifiers by content, since the record holds them by reference.</summary>
-    private static void Same(DungeonDef expected, DungeonDef actual)
+    internal static void Same(DungeonDef expected, DungeonDef actual)
     {
         Assert.Equal((expected.Id, expected.Name, expected.Theme, expected.Attunement, expected.BossFloorMin, expected.BossFloorMax, expected.RetiresOnClear),
             (actual.Id, actual.Name, actual.Theme, actual.Attunement, actual.BossFloorMin, actual.BossFloorMax, actual.RetiresOnClear));
@@ -38,13 +38,11 @@ public class DungeonsJsonTests
     public void TheFieldsAreSectionFivePointEights()
     {
         // PHASE5-150: "name, theme modifier, attunement, boss definition, floor
-        // range, and the flags the tutorial needs". The shipped file reads to
-        // exactly the compiled dungeons, row for row, in the order the hub lists them.
-        string text = File.ReadAllText(ShippedDataTests.Shipped(DungeonsJson.FileName));
+        // range, and the flags the tutorial needs". The shipped file is the master
+        // copy of every dungeon, in the order the hub lists them: no second record
+        // of them is kept to hold it to.
+        string text = ShippedData.Texts.Dungeons!;
         var read = DungeonsJson.Read(text).Dungeons;
-        Assert.Equal(ShippedContent.Dungeons.Dungeons.Count, read.Count);
-        for (int i = 0; i < read.Count; i++)
-            Same(ShippedContent.Dungeons.Dungeons[i], read[i]);
 
         // §5.8's names verbatim, every row naming all eight and every boss all five.
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
@@ -117,7 +115,7 @@ public class DungeonsJsonTests
         Assert.Equal(("spear_hall", ContentValidator.RuleFileShape), (refused.EntryId, refused.Rule));
         Assert.StartsWith("dungeons.json: dungeons[1].dropTable: is not a member here", refused.Detail);
         var error = Load(authored).Error!;
-        Assert.Equal((DungeonsJson.FileName, false, "spear_hall", ContentValidator.RuleFileShape), (error.File, error.Compiled, error.EntryId, error.Rule));
+        Assert.Equal((DungeonsJson.FileName, false, "spear_hall", ContentValidator.RuleFileShape), (error.File, error.BuiltIn, error.EntryId, error.Rule));
     }
 
     [Fact]
@@ -139,7 +137,9 @@ public class DungeonsJsonTests
         Assert.Null(edited.Error);
         Assert.Empty(edited.Notices);
         Assert.Equal([WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe], edited.Content!.Dungeons.ThemeClasses(ModifierType.Brace));
-        Assert.Equal(DungeonsJson.Write(new DungeonsData(shipped.Dungeons.All)), DungeonsJson.Write(new DungeonsData(edited.Content.Dungeons.All)));
+        Assert.Equal(shipped.Dungeons.All.Select(d => d.Id), edited.Content.Dungeons.All.Select(d => d.Id));
+        foreach (var (before, after) in shipped.Dungeons.All.Zip(edited.Content.Dungeons.All))
+            Same(before, after);
 
         // The boss's hands follow the same table, narrowed to what an enemy fields.
         Assert.Contains(WeaponClass.Axe, edited.Content.Dungeons.WieldClasses(edited.Content.Dungeons["spear_hall"]));
@@ -157,7 +157,7 @@ public class DungeonsJsonTests
         string two = DataTexts.InRow(DataTexts.InRow(Shipped, "spear_hall", "\"bossFloorMin\": null,\n      \"bossFloorMax\": null,", "\"bossFloorMin\": 5,\n      \"bossFloorMax\": 5,"),
             "spear_hall", "\"retiresOnClear\": false", "\"retiresOnClear\": true");
         var error = Load(two).Error!;
-        Assert.Equal(("spear_hall", ContentValidator.RuleOneRetiringDungeon, DungeonsJson.FileName, false), (error.EntryId, error.Rule, error.File, error.Compiled));
+        Assert.Equal(("spear_hall", ContentValidator.RuleOneRetiringDungeon, DungeonsJson.FileName, false), (error.EntryId, error.Rule, error.File, error.BuiltIn));
         Assert.Equal("2 dungeons retire on clear", error.Detail);
 
         var none = Load(DataTexts.InRow(Shipped, "tutorial", "\"retiresOnClear\": true", "\"retiresOnClear\": false")).Error!;

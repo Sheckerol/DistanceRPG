@@ -858,7 +858,7 @@ public class SoulBehaviourTests
         using var _ = TestContent.Use(
             enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id is "shocking" or "flaming" ? e with { Potency = 4 } : e).ToList()),
-            tuning: ShippedContent.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["shocking"] = 100, ["flaming"] = 100 } });
+            tuning: TuningValues.With(ShippedContent.Tuning, ("ApplyPercent.shocking", 100), ("ApplyPercent.flaming", 100)));
 
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "the_long_candle");

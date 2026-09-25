@@ -29,15 +29,20 @@
                  CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
-    <!-- The data files (phase-5-save.md 5.3, 5.4): generated from the compiled content
-         (the write-data command, run on this Data folder) and pinned byte for byte by
-         ShippedDataTests, then copied beside the executable, where the game reads them once
-         at startup and a playtest edits them. PreserveNewest leaves a copy edited there alone. -->
+    <!-- The data files (phase-5-save.md 5.3, 5.4; the content rework, 1f): the files in
+         Data\ are the master copy of every number, relation, weapon and dungeon, edited by
+         hand. The game is built with each inside (EmbeddedResource, read by ShippedData),
+         and plays that built-in copy wherever the copy beside the executable is missing or
+         cannot be read. Each is also copied beside the executable, where the game reads it
+         once at startup and a playtest edits it: PreserveNewest replaces that copy whenever
+         its master is newer, and leaves it alone otherwise. -->
     <ItemGroup>
         <None Remove="Data\**" />
         <Content Include="Data\*.json"
                  Link="%(Filename)%(Extension)"
                  CopyToOutputDirectory="PreserveNewest" />
+        <EmbeddedResource Include="Data\*.json"
+                          LogicalName="DistanceRPG.Data.%(Filename)%(Extension)" />
     </ItemGroup>
 
 </Project>

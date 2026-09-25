@@ -18,12 +18,12 @@ public class CodeCatalogueTests
 {
     private static readonly ContentTexts Shipped = DataTexts.Shipped;
 
-    private static (string? File, bool Compiled, string Entry, string Rule) Stamp(ContentException error)
-        => (error.File, error.Compiled, error.EntryId, error.Rule);
+    private static (string? File, bool BuiltIn, string Entry, string Rule) Stamp(ContentException error)
+        => (error.File, error.BuiltIn, error.EntryId, error.Rule);
 
     private static ContentException Fails(ContentTexts texts)
     {
-        var load = ContentFiles.Load(texts);
+        var load = ShippedData.Load(texts);
         Assert.Null(load.Content);
         return load.Error ?? throw new Xunit.Sdk.XunitException("the load has neither content nor an error");
     }
@@ -66,7 +66,7 @@ public class CodeCatalogueTests
         Assert.All(rows, e => Assert.True(Enum.IsDefined(e.Effect), e.Id));
 
         // And the game plays these rows, in this order, from the shipped files.
-        var content = ContentFiles.Load(Shipped).Content!;
+        var content = ShippedData.Load(Shipped).Content!;
         Assert.Equal(rows.Select(e => e.Id), content.Enchantments.All.Select(e => e.Id));
     }
 
@@ -96,10 +96,11 @@ public class CodeCatalogueTests
         // A bag is checked the same way. No weapons.json edit can reach it — every
         // bag weapon of the shipped roster is one the code names, refused earlier
         // at the weapons' stage — so it is pinned through records built in code:
-        // an A whose bag names staff_of_nothing.
+        // an A whose bag names staff_of_nothing. Records handed in as they stand
+        // are no built-in copy, so the stamp is weapons.json alone.
         var party = new PartyData(StartingParty.Data.Members.Select(m => m.Id == "A" ? m with { BagWeaponIds = ["staff_of_nothing"] } : m).ToList());
         var bag = Assert.Throws<ContentException>(() => TestContent.Load(party: party));
-        Assert.Equal((WeaponsJson.FileName, true, "A", ContentValidator.RulePartyWeaponExists), Stamp(bag));
+        Assert.Equal((WeaponsJson.FileName, false, "A", ContentValidator.RulePartyWeaponExists), Stamp(bag));
         Assert.Equal("staff_of_nothing", bag.Detail);
 
         // And a weapons.json without staff_of_mire, D's bag staff, is refused at the
@@ -172,9 +173,68 @@ public class CodeCatalogueTests
         Assert.Equal(["enchantments.json", "party.json"], ContentFiles.Retired.Keys.Order(StringComparer.Ordinal));
         Assert.All(ContentFiles.Retired.Keys, name => Assert.DoesNotContain(name, ContentFiles.FileNames));
 
-        // The generator writes no file for either.
-        var written = ContentFiles.WriteDefaults();
-        Assert.All(new[] { written.Tuning, written.Restricted, written.Weapons, written.Dungeons }, text => Assert.NotNull(text));
-        Assert.Null(written.Retired);
+        // The build carries no file for either: its four built-in copies are the four.
+        var builtIn = ShippedData.Texts;
+        Assert.All(new[] { builtIn.Tuning, builtIn.Restricted, builtIn.Weapons, builtIn.Dungeons }, text => Assert.NotNull(text));
+        Assert.Null(builtIn.Retired);
+    }
+
+    [Fact]
+    public void ADialledNumberIsTuningsAlone()
+    {
+        // The content rework, 1b: a number a playtest turns in tuning.json has no
+        // second home in the catalogue (the user's ruling: "if it lives in the code
+        // then changing the json loses all purpose"). The four elements' and
+        // Serrated's ApplyPercent and Arcane's potency are SetByTuning in the rows
+        // — no number at all — and no other row leaves one to the tuning.
+        var rows = EnchantmentDefinitions.Data.Enchantments;
+        EnchantmentDef Row(string id) => rows.Single(e => e.Id == id);
+        string[] dialled = ["flaming", "cold", "shocking", "acidic", "serrated"];
+        Assert.All(dialled, id => Assert.Equal(EnchantmentDefinitions.SetByTuning, Row(id).ApplyPercent));
+        Assert.Equal(EnchantmentDefinitions.SetByTuning, Row(Tuning.ArcaneId).Potency);
+        Assert.Equal(dialled.Order(StringComparer.Ordinal),
+            rows.Where(e => e.ApplyPercent == EnchantmentDefinitions.SetByTuning).Select(e => e.Id).Order(StringComparer.Ordinal));
+        Assert.Equal([Tuning.ArcaneId], rows.Where(e => e.Potency == EnchantmentDefinitions.SetByTuning).Select(e => e.Id));
+
+        // The loaded catalogue plays the dials: each the number the built-in
+        // tuning.json holds, and none left unset.
+        var content = ShippedContent.Content;
+        Assert.All(dialled, id => Assert.Equal(ShippedContent.Tuning.ApplyPercent[id], content.Enchantments[id].ApplyPercent));
+        Assert.Equal(ShippedContent.Tuning.ArcanePotency, content.Enchantments[Tuning.ArcaneId].Potency);
+        Assert.All(content.Enchantments.All, e => Assert.True(e.ApplyPercent != EnchantmentDefinitions.SetByTuning && e.Potency != EnchantmentDefinitions.SetByTuning, e.Id));
+
+        // A built-in tuning.json without ApplyPercent.cold — a master edited and
+        // never tested — with no tuning.json beside the game to name it stops the
+        // game: no number stands under cold's percentage. Stamped tuning.json
+        // (built-in), naming cold and the rule.
+        var shipped = ShippedData.Texts;
+        string noCold = DataTexts.WithoutMember(shipped.Tuning!, nameof(Tuning.ApplyPercent), "cold");
+        var gap = ContentFiles.Load(shipped with { Tuning = null }, shipped with { Tuning = noCold });
+        Assert.Null(gap.Content);
+        Assert.Equal((TuningJson.FileName, true, "cold", ContentValidator.RuleTuningOwnsTheNumber), Stamp(gap.Error!));
+
+        // A copy beside the game cannot drop the dial: it merges over the built-in
+        // table, so a copy without cold plays the built-in cold, and says nothing.
+        var beside = ShippedData.Load(shipped with { Tuning = noCold });
+        Assert.Null(beside.Error);
+        Assert.Empty(beside.Notices);
+        Assert.Equal(ShippedContent.Tuning.ApplyPercent["cold"], beside.Content!.Enchantments["cold"].ApplyPercent);
+
+        // Records built in code meet the same rule at the load's first stage: a
+        // tuning whose ApplyPercent table names no cold.
+        var noDial = ShippedContent.Tuning with
+        {
+            ApplyPercent = ShippedContent.Tuning.ApplyPercent.Where(dial => dial.Key != "cold").ToDictionary(dial => dial.Key, dial => dial.Value, StringComparer.Ordinal),
+        };
+        var refused = Assert.Throws<ContentException>(() => TestContent.Load(noDial));
+        Assert.Equal((TuningJson.FileName, true, "cold", ContentValidator.RuleTuningOwnsTheNumber), Stamp(refused));
+        Assert.Equal("the catalogue leaves the applyPercent of cold to tuning.json ApplyPercent.cold, which is not there", refused.Detail);
+
+        // And Arcane's dial is the tuning's scalar, clamped 0 to 1000 where 0 is
+        // the legal way to switch it off: a file that turns it to 0 loads, and
+        // Arcane adds nothing.
+        var off = ShippedData.Load(shipped with { Tuning = """{ "ArcanePotency": 0 }""" });
+        Assert.Null(off.Error);
+        Assert.Equal(0, off.Content!.Enchantments[Tuning.ArcaneId].Potency);
     }
 }

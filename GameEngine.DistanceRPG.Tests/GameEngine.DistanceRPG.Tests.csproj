@@ -26,14 +26,10 @@
     <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- The shipped data files, linked into Data\ of the test output: ShippedDataTests reads
-       them there, by that explicit path, and holds them to the generator's output. (The
-       game project's own copies also reach this output's root through the project
-       reference; no test reads that folder by default.) -->
-  <ItemGroup>
-    <Content Include="..\GameEngine.DistanceRPG\Data\*.json"
-             Link="Data\%(Filename)%(Extension)"
-             CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+  <!-- The shipped data files are read as the game carries them, built in (ShippedData.Texts,
+       through ShippedContent): the suite reads no copy of them from a folder. (The game
+       project's own copies also reach this output's root through the project reference;
+       no test reads that folder.) -->
+
 
 </Project>

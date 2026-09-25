@@ -6,15 +6,17 @@ using static GameEngine.DistanceRPG.Logic.TuningGroup;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// The schema <c>tuning.json</c> is read, written and hashed from (§5.3; 1g):
-/// one key per <see cref="Tuning"/> property, named verbatim; tables read
-/// exactly as the game reads them; nothing the golden tests pin and nothing that
-/// is not a scalar; no decay dial; the §5.3 starting set present or waiting for
-/// the phase that reads it; and every divisor at least one.
+/// The schema <c>tuning.json</c> is read and hashed from (§5.3; 1g): one key per
+/// <see cref="Tuning"/> property, named verbatim; tables read exactly as the game
+/// reads them, and complete — a table built in code names every member of its
+/// kind, since no number in code stands under a gap; nothing the golden tests pin
+/// and nothing that is not a scalar; no decay dial; the §5.3 starting set present
+/// or waiting for the phase that reads it; and every divisor at least one.
 /// </summary>
 public class TuningSchemaTests
 {
-    private static readonly Tuning Compiled = ShippedContent.Tuning;
+    /// <summary>The built-in tuning: the master copy's numbers, as the game plays them.</summary>
+    private static Tuning BuiltIn => ShippedContent.Tuning;
 
     private static TuningKey Key(string name) => TuningSchema.Find(name) ?? throw new KeyNotFoundException(name);
 
@@ -44,35 +46,35 @@ public class TuningSchemaTests
             {
                 case IntKey k:
                 {
-                    int value = k.Get(Compiled);
-                    Assert.Equal(property.GetValue(Compiled), value);
-                    Assert.InRange(value, k.Min, k.Max);   // the compiled number is inside its own range
+                    int value = k.Get(BuiltIn);
+                    Assert.Equal(property.GetValue(BuiltIn), value);
+                    Assert.InRange(value, k.Min, k.Max);   // the shipped number is inside its own range
                     int moved = value + 1 <= k.Max ? value + 1 : value - 1;
-                    written = k.Set(Compiled, moved);
+                    written = k.Set(BuiltIn, moved);
                     Assert.Equal((moved, moved), (k.Get(written), (int)property.GetValue(written)!));
                     break;
                 }
                 case BoolKey k:
-                    Assert.Equal(property.GetValue(Compiled), k.Get(Compiled));
-                    written = k.Set(Compiled, !k.Get(Compiled));
-                    Assert.Equal(!k.Get(Compiled), (bool)property.GetValue(written)!);
+                    Assert.Equal(property.GetValue(BuiltIn), k.Get(BuiltIn));
+                    written = k.Set(BuiltIn, !k.Get(BuiltIn));
+                    Assert.Equal(!k.Get(BuiltIn), (bool)property.GetValue(written)!);
                     break;
                 case TableKey k:
                 {
-                    var table = k.Get(Compiled);
+                    var table = k.Get(BuiltIn);
                     Assert.All(table.Values, value => Assert.InRange(value, k.Min, k.Max));
                     string first = table.Keys.Order(StringComparer.Ordinal).First();
                     var moved = new Dictionary<string, int>(table) { [first] = table[first] + 1 <= k.Max ? table[first] + 1 : table[first] - 1 };
-                    written = k.Set(Compiled, moved);
+                    written = k.Set(BuiltIn, moved);
                     Assert.Equal(moved.OrderBy(e => e.Key, StringComparer.Ordinal), k.Get(written).OrderBy(e => e.Key, StringComparer.Ordinal));
-                    Assert.NotSame(property.GetValue(Compiled), property.GetValue(written));
+                    Assert.NotSame(property.GetValue(BuiltIn), property.GetValue(written));
                     break;
                 }
                 default:
                     throw new InvalidOperationException($"{key.Name} is a {key.GetType().Name}, which the schema never makes");
             }
 
-            var movedNames = TuningValues.Moved(Compiled, written);
+            var movedNames = TuningValues.Moved(BuiltIn, written);
             Assert.NotEmpty(movedNames);
             Assert.All(movedNames, name => Assert.True(name == key.Name || name.StartsWith(key.Name + ".", StringComparison.Ordinal), $"{key.Name} moved {name}"));
         }
@@ -81,20 +83,16 @@ public class TuningSchemaTests
     [Fact]
     public void EveryTableReadsAsTheGameReadsIt()
     {
-        // What the file writes and the hash reads is what the game reads: under a
-        // tuning whose tables name some members and not others, each table's
-        // effective entry is the game's own reader's answer — the modifier rules'
-        // for a stack, an offset and a forge limit, the status table's for a
-        // level, the catalogue's percentage for every id the table names. So a
-        // member neither table names reads the reader's own fallback.
-        var tuning = Compiled with
-        {
-            PerStack = new Dictionary<ModifierType, int> { [ModifierType.Block] = 7 },
-            Offset = new Dictionary<ModifierType, int> { [ModifierType.Push] = 1 },
-            MaxForged = new Dictionary<ModifierType, int> { [ModifierType.Pin] = 2 },
-            EffectPerLevel = new Dictionary<StatusEffectType, int> { [StatusEffectType.Mire] = 5 },
-            ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["cold"] = 40, ["arcane"] = 60 },
-        };
+        // What the hash and the log read is what the game reads: under a tuning
+        // with a member of every table moved, each table's entry is the game's own
+        // reader's answer — the modifier rules' for a stack, an offset and a forge
+        // limit, the status table's for a level, the catalogue's percentage for
+        // every id the table names. Every table stays complete, as every tuning the
+        // game plays is (RuleTableNamesEveryMember): a member moves, and the rest
+        // keep the built-in numbers.
+        var tuning = TuningValues.With(BuiltIn,
+            ("PerStack.Block", 7), ("Offset.Push", 1), ("MaxForged.Pin", 2), ("EffectPerLevel.Mire", 5),
+            ("ApplyPercent.cold", 40), ("ApplyPercent.arcane", 60));
         var content = TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);   // built, never made current
         var rules = content.Modifiers;
 
@@ -113,12 +111,12 @@ public class TuningSchemaTests
         foreach (var (id, percent) in apply)
             Assert.Equal(content.Enchantments[id].ApplyPercent, percent);
 
-        // The pieces this rests on: the tuning's entry wins, the compiled table
-        // stands behind it, and each table's reader falls back to what its key says.
-        Assert.Equal((7, 3, 0), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Splitting), Table(nameof(Tuning.PerStack)).Fallback));
-        Assert.Equal((ModifierRules.DefaultOffset, 0), (Table(nameof(Tuning.Offset)).Fallback, rules.Offset(ModifierType.Block)));
-        Assert.Equal((ModifierRules.DefaultMaxForged, 3), (Table(nameof(Tuning.MaxForged)).Fallback, rules.MaxForged(ModifierType.Brace)));
-        Assert.Equal(StatusRules.EffectFallback, Table(nameof(Tuning.EffectPerLevel)).Fallback);
+        // The pieces this rests on: the moved entry is what the game reads, and
+        // every other keeps the built-in number.
+        Assert.Equal((7, 3), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Splitting)));
+        Assert.Equal((1, 0), (rules.Offset(ModifierType.Push), rules.Offset(ModifierType.Block)));
+        Assert.Equal((2, 3), (rules.MaxForged(ModifierType.Pin), rules.MaxForged(ModifierType.Brace)));
+        Assert.Equal((5, BuiltIn.EffectPerLevel[StatusEffectType.Ward]), (StatusRules.EffectPerLevel(StatusEffectType.Mire, tuning), StatusRules.EffectPerLevel(StatusEffectType.Ward, tuning)));
         Assert.Null(Table(nameof(Tuning.ApplyPercent)).Members);
         Assert.Equal(Enum.GetNames<ModifierType>(), Table(nameof(Tuning.PerStack)).Members!.ToArray());
         Assert.Equal(Enum.GetNames<StatusEffectType>(), Table(nameof(Tuning.EffectPerLevel)).Members!.ToArray());
@@ -161,7 +159,7 @@ public class TuningSchemaTests
         {
             tuningNames.Add(key.Name);
             if (key is TableKey table)
-                tuningNames.AddRange(table.Get(Compiled).Keys.Select(member => $"{key.Name}.{member}"));
+                tuningNames.AddRange(table.Get(BuiltIn).Keys.Select(member => $"{key.Name}.{member}"));
         }
         tuningNames.AddRange(TuningSchema.Deferred.Values.SelectMany(d => d.Keys));
         Assert.Equal([], tuningNames.Where(parity.Contains).ToArray());
@@ -221,13 +219,13 @@ public class TuningSchemaTests
         // status model retired (SearDecayPerTurn, settled's superseding pass) is no
         // key: a file naming it is told so and changes nothing.
         var names = TuningSchema.Keys.Select(k => k.Name)
-            .Concat(TuningSchema.Keys.OfType<TableKey>().SelectMany(t => t.Get(Compiled).Keys))
+            .Concat(TuningSchema.Keys.OfType<TableKey>().SelectMany(t => t.Get(BuiltIn).Keys))
             .Concat(TuningSchema.Deferred.Values.SelectMany(d => d.Keys));
         Assert.DoesNotContain(names, name => name.Contains("Decay", StringComparison.OrdinalIgnoreCase));
 
-        var read = TuningJson.Read("""{ "SearDecayPerTurn": 2 }""");
+        var read = TuningJson.Read("""{ "SearDecayPerTurn": 2 }""", BuiltIn);
         Assert.Contains("SearDecayPerTurn is not a key", Assert.Single(read.Warnings));
-        Assert.Empty(TuningValues.Moved(Compiled, read.Tuning));
+        Assert.Empty(TuningValues.Moved(BuiltIn, read.Tuning));
     }
 
     [Fact]
@@ -276,12 +274,54 @@ public class TuningSchemaTests
         // The numbers the docs and settled.md fix: every pool starts at 30, the
         // divisor is 10 on a budget of 160, DotDamagePerMana is 1/3 as 3, and the
         // statuses and elements are settled's.
-        Assert.Equal((30, 10, 160, 3, 5), (Compiled.StartingPool, Compiled.MovementUnitsPerMana, Compiled.MovementBudget, Compiled.DotDamagePerMana, Compiled.OverhealPerWard));
-        var effect = Table(nameof(Tuning.EffectPerLevel)).Get(Compiled);
+        Assert.Equal((30, 10, 160, 3, 5), (BuiltIn.StartingPool, BuiltIn.MovementUnitsPerMana, BuiltIn.MovementBudget, BuiltIn.DotDamagePerMana, BuiltIn.OverhealPerWard));
+        var effect = Table(nameof(Tuning.EffectPerLevel)).Get(BuiltIn);
         Assert.Equal((1, 10, 1), (effect["Searing"], effect["Mire"], effect["Ward"]));
-        var apply = Table(nameof(Tuning.ApplyPercent)).Get(Compiled);
+        var apply = Table(nameof(Tuning.ApplyPercent)).Get(BuiltIn);
         Assert.Equal((20, 15, 25, 15), (apply["flaming"], apply["cold"], apply["shocking"], apply["acidic"]));
-        Assert.Equal((20, 15, 50, 24), (Compiled.UniqueChanceMidpoint, Compiled.ReviveStepPercent, Compiled.DeathXpLossPercent, Compiled.PartyCarrySlots));
+        Assert.Equal((20, 15, 50, 24), (BuiltIn.UniqueChanceMidpoint, BuiltIn.ReviveStepPercent, BuiltIn.DeathXpLossPercent, BuiltIn.PartyCarrySlots));
+    }
+
+    [Fact]
+    public void ATuningBuiltInCodeNamesEveryMember()
+    {
+        // RuleTableNamesEveryMember (the content rework, 1f): the game reads every
+        // member of the four tables keyed by an enum directly, and no number in
+        // code stands under a member a table leaves out. A file cannot leave one
+        // — the built-in copy is refused for a gap as it is read, and a copy beside
+        // it merges over it — so a tuning built in code with a table short of a
+        // member is refused: by the validator, and by the modifier rules for
+        // their three, naming the first member missing, in the enum's order.
+        (string Table, Tuning Short, string Missing)[] shortOfOne =
+        [
+            (nameof(Tuning.EffectPerLevel), BuiltIn with { EffectPerLevel = new Dictionary<StatusEffectType, int> { [StatusEffectType.Mire] = 5 } }, "Regeneration"),
+            (nameof(Tuning.PerStack), BuiltIn with { PerStack = new Dictionary<ModifierType, int> { [ModifierType.Brace] = 1 } }, "Block"),
+            (nameof(Tuning.Offset), BuiltIn with { Offset = new Dictionary<ModifierType, int>() }, "Brace"),
+            (nameof(Tuning.MaxForged), BuiltIn with { MaxForged = new Dictionary<ModifierType, int> { [ModifierType.Light] = 1 } }, "Brace"),
+        ];
+        foreach (var (table, shortTuning, missing) in shortOfOne)
+        {
+            var refused = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(shortTuning));
+            Assert.Equal(($"{table}.{missing}", ContentValidator.RuleTableNamesEveryMember), (refused.EntryId, refused.Rule));
+
+            // Through the load it is refused before anything else is read, and — a
+            // tuning built in code, no file's — stamped with no file.
+            var loaded = Assert.Throws<ContentException>(() => TestContent.Load(shortTuning));
+            Assert.Equal((null, $"{table}.{missing}", ContentValidator.RuleTableNamesEveryMember), (loaded.File, loaded.EntryId, loaded.Rule));
+
+            if (table != nameof(Tuning.EffectPerLevel))
+            {
+                var rules = Assert.Throws<ContentException>(() => new ModifierRules(shortTuning, ShippedContent.Restricted));
+                Assert.Equal(($"{table}.{missing}", ContentValidator.RuleTableNamesEveryMember), (rules.EntryId, rules.Rule));
+            }
+        }
+
+        // The blank tuning the built-in copy is read over names nothing, and is
+        // never played; the same table with a member moved — complete — loads.
+        Assert.Equal(ContentValidator.RuleTableNamesEveryMember, Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(Tuning.Blank)).Rule);
+        var moved = TuningValues.With(BuiltIn, ("PerStack.Block", 4));
+        ContentValidator.ValidateTuning(moved);
+        Assert.Equal(4, TestContent.Load(moved).Modifiers.PerStack(ModifierType.Block));
     }
 
     [Fact]
@@ -296,10 +336,10 @@ public class TuningSchemaTests
             var key = (IntKey)Key(name);
             Assert.True(key.Min >= 1, name);
 
-            var refused = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(key.Set(Compiled, 0)));
+            var refused = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(key.Set(BuiltIn, 0)));
             Assert.Equal((name, ContentValidator.RuleDivisorIsPositive), (refused.EntryId, refused.Rule));
 
-            var read = TuningJson.Read($$"""{ "{{name}}": 0 }""");
+            var read = TuningJson.Read($$"""{ "{{name}}": 0 }""", BuiltIn);
             Assert.Equal(1, key.Get(read.Tuning));
             ContentValidator.ValidateTuning(read.Tuning);
         }
