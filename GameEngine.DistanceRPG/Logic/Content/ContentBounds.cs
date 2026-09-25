@@ -118,8 +118,11 @@ internal static class ContentBounds
     /// whole number: the largest whole number less the longest lock a clear
     /// writes, the deepest boss floor times <c>CooldownRunsPerFloor</c>'s clamp
     /// ceiling (99 × 99). A run's end adds one to the counter and locks a cleared
-    /// dungeon until the counter plus that, so a save's run counter, its locks
-    /// and its last run's are each below this — no player counts two billion runs.
+    /// dungeon until the counter plus that, so a save's run counter, and its last
+    /// run's, are each below this — no player counts two billion runs. A lock is
+    /// not held to it: nothing reads a lock but against the counter, and a clear
+    /// writes one up to 99 × 99 runs past a counter below this, so a lock keeps its
+    /// floor alone.
     /// </summary>
     internal static int MostRuns { get; } = int.MaxValue - DeepestBossFloor * Int(nameof(Tuning.CooldownRunsPerFloor)).Max;
 

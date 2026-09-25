@@ -4,7 +4,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// A save's fields asked of each other (the user's ruling of 2026-09-25, R3(b):
 /// "since we are storing in raw json we should probably not trust the fields").
 /// <see cref="SaveMapper"/> reads every field on its own first — each id the
-/// content's, each count from its floor to its ceiling — and only then hands the
+/// content's, each count from its floor, and up to its ceiling where a larger one
+/// would wrap the arithmetic that reads it — and only then hands the
 /// document here, so every refusal of a single field keeps its own path. What is
 /// left is a save each of whose fields could be true while together they could
 /// not: a dungeon retired that was never cleared, a last run's summary that

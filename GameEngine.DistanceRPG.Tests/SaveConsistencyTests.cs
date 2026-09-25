@@ -35,6 +35,9 @@ public sealed class SaveConsistencyTests : IDisposable
 
     private static readonly string[] Fixtures = ["pre-rework-mid-run.json", "pre-rework-between-runs.json"];
 
+    /// <summary>Why the run counter stops below <see cref="ContentBounds.MostRuns"/>: what its refusal says after the value and the ceiling.</summary>
+    private const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
+
     private static string FixtureText(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name));
 
     private static CampaignState NewCampaign() => CampaignState.Start(GameContent.Current);
@@ -551,7 +554,6 @@ public sealed class SaveConsistencyTests : IDisposable
             CampaignNode(tree)["locks"]![0]!["lockedUntilRun"] = campaignLock;
         }
         string AcquiredWhy(int stacks) => $"acquisition stops at the {stacks} forged plus the most headroom any tuning gives, {mostAcquired} (AcquiredHeadroom at its most)";
-        const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
 
         (string What, string Text, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] ceilings =
         [
@@ -587,23 +589,17 @@ public sealed class SaveConsistencyTests : IDisposable
                 tree => WeaponNode(tree, 0, 0)["enchantments"] = Entries(mostEnchantments + 1),
                 "campaign.party[0].inventory[0].enchantments",
                 $"{mostEnchantments + 1} entries, more than the {mostEnchantments} a weapon can hold: none arrives with more than {ContentValidator.MostArrivingEnchantments}, and the enchanter fills {mostEnchantments} slots at most"),
-            // 0f. Every count of runs, each at the ceiling with the rest.
+            // 0f. The run counter, and the last run's copy of it, each at the ceiling
+            // with the rest. A lock keeps its floor alone
+            // (ALockKeepsItsFloorAlone_SoEveryLockPlayWritesLoads).
             ("the run counter", hall,
                 tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
                 tree => Runs(tree, mostRuns + 1, mostRuns, mostRuns, mostRuns),
                 "campaign.runCounter", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
-            ("a lock", hall,
-                tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
-                tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns + 1),
-                "campaign.locks[0].lockedUntilRun", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
             ("the last run's counter", hall,
                 tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
                 tree => Runs(tree, mostRuns, mostRuns + 1, mostRuns, mostRuns),
                 "campaign.lastResult.runCounter", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
-            ("the last run's lock", hall,
-                tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
-                tree => Runs(tree, mostRuns, mostRuns, mostRuns + 1, mostRuns),
-                "campaign.lastResult.lockedUntilRun", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
             // 0h. A member's hit points: the largest bar plus a point for each HP XP.
             ("a member's hit points", hall,
                 tree => MemberNode(tree, 2)["body"]!["hp"] = bar + hpXp,
@@ -655,6 +651,60 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal(int.MaxValue / (Top(nameof(Tuning.ApplyPercent)) * Top(nameof(Tuning.ArcanePotency))), ContentBounds.DeepestTier);
         Assert.Equal(int.MaxValue - Top(nameof(Tuning.BossFloorMax)) * Top(nameof(Tuning.CooldownRunsPerFloor)), ContentBounds.MostRuns);
         Assert.Equal(Top(nameof(Tuning.EnchantmentSlots)), ContentBounds.MostEnchantments);
+    }
+
+    [Fact]
+    public void ALockKeepsItsFloorAlone_SoEveryLockPlayWritesLoads()
+    {
+        // Nothing reads a lock but against the counter: entering and the list
+        // compare the two (CampaignState.IsSelectable, EarlyOffer), and the two
+        // countdowns take the counter from a lock above it — the list's, and the
+        // summary's, whose lock check 7 holds at or above its own counter. So no
+        // lock wraps anything, and a lock keeps its floor alone. A clear writes the
+        // counter plus up to 99 x 99 runs, so a lock held to the counter's ceiling
+        // would refuse what a clear writes on a counter near it (the review of
+        // Phase 5.S4, which found the first draft holding the locks to it).
+        var campaign = HallCleared();
+        string hall = Save(campaign);
+        int top = ContentBounds.MostRuns - 1;   // the most a save's run counter can be
+        int cooldown = campaign.LockedUntilRun("spear_hall") - campaign.RunCounter;
+        Assert.True(cooldown > 0, $"the Spear Hall's cooldown, {cooldown}");
+
+        // The counter moved, its summary's with it, and the Spear Hall's lock — as
+        // its clear wrote it, to the campaign and the summary alike — moved too.
+        string Counted(int counter, int until) => Edited(hall, tree =>
+        {
+            CampaignNode(tree)["runCounter"] = counter;
+            Last(tree)["runCounter"] = counter;
+            Last(tree)["lockedUntilRun"] = until;
+            CampaignNode(tree)["locks"]![0]!["lockedUntilRun"] = until;
+        });
+
+        // Any lock at or past the counter loads — the largest whole number over a
+        // counter at its own ceiling included — and one below 0 is refused, at
+        // either path.
+        Restores(Counted(top, int.MaxValue), "a lock at the largest whole number");
+        RefusedAt(Edited(hall, tree => CampaignNode(tree)["locks"]![0]!["lockedUntilRun"] = -1), "campaign.locks[0].lockedUntilRun", "-1 is below 0");
+        RefusedAt(Edited(hall, tree => Last(tree)["lockedUntilRun"] = -1), "campaign.lastResult.lockedUntilRun", "-1 is below 0");
+
+        // What play writes: a counter a run short of its ceiling, its Spear Hall lock
+        // already past that ceiling, and the Long Gallery cleared on it. The tick
+        // takes the counter to its ceiling and the clear locks the Long Gallery
+        // until past it, and that save loads, whole.
+        var nearTop = Restores(Counted(top - 1, top - 1 + cooldown), "a counter a run short of its ceiling").Campaign;
+        var gallery = CampaignRuns.Clear(nearTop, "long_gallery", FiveDeep);
+        Assert.Equal(top, nearTop.RunCounter);
+        Assert.True(gallery.LockedUntilRun > top, $"the lock {gallery.LockedUntilRun}, the counter's ceiling {top}");
+        Loads(nearTop, "a lock a clear wrote past the counter's ceiling");
+
+        // The walk's known edge (settled.md, R3(b)): the run counter is the one count
+        // play itself carries up to its ceiling. One more ticking run on it — the
+        // Knife Warrens cleared — takes it to MostRuns, and the next load refuses
+        // that save at the counter. No ceiling on a count play adds to can admit
+        // everything played on from it; only a hand edit starts a counter this high.
+        CampaignRuns.Clear(nearTop, "knife_warrens", FiveDeep);
+        Assert.Equal(ContentBounds.MostRuns, nearTop.RunCounter);
+        RefusedAt(Save(nearTop), "campaign.runCounter", $"{ContentBounds.MostRuns} is above {top}: {RunsWhy}");
     }
 
     // ── Set aside ────────────────────────────────────────────────────────────

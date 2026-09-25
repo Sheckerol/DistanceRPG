@@ -1891,7 +1891,7 @@ supersedes — the save model — says what ships.
   | a member's innate stack | above 53 | the deepest a stack grows (`DeepestStack`), a boss innate's top in `dungeons.json` too | a member's Block past any weapon's |
   | an enchantment's tier | above 2147 | `DeepestTier`: the largest whole number ÷ (`ApplyPercent`'s clamp ceiling 1000 × `ArcanePotency`'s 1000, the largest potency) | an entry's lock (lock × tier) and its levels (percentage × potency or source × tier) past an int |
   | a weapon's enchantments | more than 10 | `EnchantmentSlots`' clamp ceiling (`MostEnchantments`); none arrives with more than 3 | `Weapon.TotalLock` summing its locks past an int |
-  | the run counter, a lock, the last run's counter and its lock | 2,147,473,846 or more | `MostRuns`: the largest whole number less `BossFloorMax`'s ceiling 99 × `CooldownRunsPerFloor`'s 99 | a run's end adds one, and a clear locks until the counter plus up to 9,801 runs: both would wrap negative |
+  | the run counter, and the last run's copy of it | 2,147,473,846 or more | `MostRuns`: the largest whole number less `BossFloorMax`'s ceiling 99 × `CooldownRunsPerFloor`'s 99 | a run's end adds one, and a clear locks until the counter plus up to 9,801 runs: both would wrap negative |
   | the visit's boss floor | above 99 | `DeepestBossFloor`, R3(a)'s | a dungeon no content made, every floor of which a load generates |
   | a member's hit points; a row's | above 10000 plus its HP XP; above 10000 plus its revival gains — each summed as a long | `StartingPool`'s clamp ceiling (`Bar`): a maximum is its bar plus a point for each HP XP at most, or its base plus what its revivals added | a member standing on 99999 HP |
 
@@ -1904,10 +1904,20 @@ supersedes — the save model — says what ships.
     artifact's 3.
   - **Every ceiling is a clamp's ceiling or a rule, never the tuning in hand**,
     read once in `ContentBounds` beside R3(a)'s, so no tuning in range and no
-    content that loads refuses a save play wrote, and the content and the save
-    never disagree about how deep a number goes. Beside the three the save alone
-    needs (`DeepestTier`, `MostRuns`, `MostEnchantments`), a live stack's reads
-    `MostAcquired`, which `DeepestStack` is now built from.
+    content that loads refuses a save play wrote (the run counter's own edge
+    aside, below), and the content and the save never disagree about how deep a
+    number goes. Beside the three the save alone needs (`DeepestTier`,
+    `MostRuns`, `MostEnchantments`), a live stack's reads `MostAcquired`, which
+    `DeepestStack` is now built from.
+  - **A lock keeps its floor alone** — the campaign's and the last run's. The
+    first draft held both to `MostRuns` as well, and the review of Phase 5.S4
+    found that play could write a lock the next load refused: a clear locks until
+    the counter plus up to 9,801 runs — `MostRuns` or more whenever the counter
+    is within that of it. And a lock needs no ceiling, since nothing reads one but
+    against the counter: entering and the list compare the two (`IsSelectable`,
+    `EarlyOffer`), and the two countdowns take the counter from a lock above it —
+    the list's, only for a dungeon not yet selectable, and the summary's, whose
+    lock check 7 holds at or above its own counter — so no lock wraps anything.
   - **The cross-checks**, in the order asked: (1) a retired dungeon was cleared —
     it retires on its clear; (2) a locked one was cleared — only a clear writes a
     lock; (4) with no run ended, nothing is counted and nothing cleared; (5) a
@@ -1966,9 +1976,15 @@ supersedes — the save model — says what ships.
     gives an honest ceiling short of the largest whole number: a pool grows with
     play, a soul banks its spend for ever, revival gains compound. So a
     hand-edited count within one credit of the largest whole number can still
-    wrap on that credit. A list longer than play writes — a floor's rows — costs
-    load time, never a wrong number: every duplicate and every row that names
-    nothing is refused already.
+    wrap on that credit. And the run counter is the one count play itself carries
+    up to its ceiling: a counter a hand edit leaves just short of `MostRuns`
+    loads, and the ticking runs played on from it take it to `MostRuns`, a save
+    the next load sets aside — and played on past that in the same session, a
+    clear's lock can wrap. No ceiling on a count play adds to can admit
+    everything played on from it; two billion runs are never played, so only a
+    hand edit meets it (`SaveConsistencyTests` pins it). A list longer than play
+    writes — a floor's rows — costs load time, never a wrong number: every
+    duplicate and every row that names nothing is refused already.
 
 ### The numbers: `tuning.json`
 

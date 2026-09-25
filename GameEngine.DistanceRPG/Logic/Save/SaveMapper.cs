@@ -33,13 +33,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// ruling of 2026-09-25, R3(b)). Every field is read on its own first — every
 /// count from its floor, and every count whose larger value would wrap the
 /// arithmetic that reads it up to a ceiling, beside its floor: a forged stack,
-/// a live one, a member's innate, an entry's tier, a weapon's entries, a run
-/// count, a body's hit points, the boss floor. Each ceiling is read off
+/// a live one, a member's innate, an entry's tier, a weapon's entries, the run
+/// counter, a body's hit points, the boss floor. A lock wraps nothing, so it
+/// keeps its floor alone (<see cref="LockedUntil"/>). Each ceiling is read off
 /// <see cref="ContentBounds"/> — a <c>tuning.json</c> clamp's ceiling or a rule,
 /// never the tuning in hand — so no tuning in range and no content that loads
-/// refuses a save play wrote. Only then are the fields asked of each other
-/// (<see cref="SaveConsistency"/>), so every refusal of a field keeps its own
-/// path.
+/// refuses a save play wrote. The one count play itself can carry to its
+/// ceiling is the run counter, and only from a hand edit that left it just
+/// short (settled.md, R3(b): the walk's known edge). Only then are the fields
+/// asked of each other (<see cref="SaveConsistency"/>), so every refusal of a
+/// field keeps its own path.
 /// </para>
 /// </summary>
 internal static class SaveMapper
@@ -506,7 +509,7 @@ internal static class SaveMapper
         return ModifierSet.Of(stacks.ToArray());
     }
 
-    /// <summary>The locks, each on a dungeon the content has, each dungeon once.</summary>
+    /// <summary>The locks, each on a dungeon the content has, each dungeon once, each from its floor alone (<see cref="LockedUntil"/>).</summary>
     private static (string DungeonId, int LockedUntilRun)[] Locks(IReadOnlyList<LockDto> dtos, GameContent content, string at)
     {
         var rows = Rows(dtos, at, "lock");
@@ -520,7 +523,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.dungeonId", $"'{row.DungeonId}' is no dungeon in the content");
             if (!locked.Add(row.DungeonId))
                 throw new SaveFormatException($"{where}.dungeonId", $"'{row.DungeonId}' is already locked: a dungeon has one lock");
-            locks[i] = (row.DungeonId, Runs(row.LockedUntilRun, $"{where}.lockedUntilRun"));
+            locks[i] = (row.DungeonId, LockedUntil(row.LockedUntilRun, $"{where}.lockedUntilRun"));
         }
         return locks;
     }
@@ -552,13 +555,15 @@ internal static class SaveMapper
         var outcome = EnumOf<RunOutcome>(row.Outcome, $"{at}.outcome", "run outcome");
 
         // The depth reached and the boss floor are floor numbers, the first floor
-        // 1 (RunResult); the counter and the lock count runs, as the campaign's own
-        // do, and are held to the campaign's ceiling. How deep the party went is
-        // asked of the rest of the summary with the other cross-checks (SaveConsistency).
+        // 1 (RunResult); the counter counts runs as the campaign's own does, held
+        // to the campaign's ceiling, and the lock is a lock like the campaign's,
+        // from its floor alone. How deep the party went, and the lock against the
+        // counter, are asked of the rest of the summary with the other cross-checks
+        // (SaveConsistency).
         int deepest = FloorNumber(row.DeepestFloor, $"{at}.deepestFloor");
         int? bossFloor = row.BossFloorRevealed is { } revealed ? FloorNumber(revealed, $"{at}.bossFloorRevealed") : null;
         int runCounter = Runs(row.RunCounter, $"{at}.runCounter");
-        int? lockedUntil = row.LockedUntilRun is { } until ? Runs(until, $"{at}.lockedUntilRun") : null;
+        int? lockedUntil = row.LockedUntilRun is { } until ? LockedUntil(until, $"{at}.lockedUntilRun") : null;
 
         Weapon[] Spoils(IReadOnlyList<WeaponDto> spoils, string where)
         {
@@ -948,10 +953,30 @@ internal static class SaveMapper
     private static int AtMost(int value, long most, string at, string why)
         => value <= most ? value : throw new SaveFormatException(at, $"{value} is above {most}: {why}");
 
-    /// <summary>A count of runs — the counter, a lock, the last run's — not negative, and below <see cref="ContentBounds.MostRuns"/>.</summary>
+    /// <summary>
+    /// The run counter — the campaign's, or its last run's copy of it — not
+    /// negative, and below <see cref="ContentBounds.MostRuns"/>: a run's end adds
+    /// one to it and locks a clear until it plus up to 99 × 99 runs, so from there
+    /// on either could wrap.
+    /// </summary>
     private static int Runs(int value, string at)
         => AtMost(NotNegative(value, at), ContentBounds.MostRuns - 1L, at,
             "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs");
+
+    /// <summary>
+    /// A lock — the run a cleared dungeon is locked until, the campaign's or its
+    /// last run's — not negative, and with no ceiling of its own: nothing reads a
+    /// lock but against the counter, so no lock wraps anything. Entering and the
+    /// list compare the two (<see cref="CampaignState.IsSelectable"/>,
+    /// <see cref="CampaignState.EarlyOffer"/>), and the two countdowns take the
+    /// counter from a lock above it — the list's
+    /// (<see cref="DungeonListing.RunsUntilAvailable"/>, for a dungeon not yet
+    /// selectable) and the summary's, whose lock <see cref="SaveConsistency"/>
+    /// holds at or above its own counter. And a clear writes the counter plus up to
+    /// 99 × 99 runs, past the counter's own ceiling whenever the counter is that
+    /// close to it, so a lock held to that ceiling would refuse a save play wrote.
+    /// </summary>
+    private static int LockedUntil(int value, string at) => NotNegative(value, at);
 
     // Why each ceiling is where it is: said after the value and the ceiling, so in
     // the HUD's font — no apostrophe, quote, brace, backslash or semicolon.
