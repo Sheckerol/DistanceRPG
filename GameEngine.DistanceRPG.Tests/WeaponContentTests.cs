@@ -78,7 +78,7 @@ public class WeaponContentTests
         foreach (var def in Catalogue.All)
         {
             int types = def.Forged.Count(f => f.Value > 0);
-            if (Weapon.KindOf(def.Class) == WeaponKind.Caster)
+            if (Catalogue.KindOf(def.Class) == WeaponKind.Caster)
             {
                 // A caster's second axis is its innate enchantment, not a stack: Resonant x1 and nothing else forged.
                 Assert.Equal(1, types);
@@ -216,39 +216,39 @@ public class WeaponContentTests
     }
 
     [Theory]
-    [InlineData("flensing_knife", "Flensing Knife", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
-    [InlineData("assassins_fang", "Assassin's Fang", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
-    [InlineData("disarming_kris", "Disarming Kris", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
-    [InlineData("weakspot_stiletto", "Weakspot Stiletto", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
-    [InlineData("arming_sword", "Arming Sword", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
-    [InlineData("tower_guard", "Tower Guard", WeaponClass.Sword, 80, 10, 50, 0, "Block x2, Push x1")]
-    [InlineData("riposte_blade", "Riposte Blade", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
-    [InlineData("wardens_shield", "Warden's Shield", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
-    [InlineData("skirmishers_pike", "Skirmisher's Pike", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
-    [InlineData("phalanx_spear", "Phalanx Spear", WeaponClass.Spear, 128, 7, 55, 0, "Brace x2, Longshot x1")]
-    [InlineData("halberd", "Halberd", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Push x1")]
-    [InlineData("pinning_lance", "Pinning Lance", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
-    [InlineData("hatchet", "Hatchet", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Light x1, Opportunist x1")]
-    [InlineData("great_axe", "Great Axe", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
-    [InlineData("reaver", "Reaver", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
-    [InlineData("routing_axe", "Routing Axe", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
-    [InlineData("hunting_bow", "Hunting Bow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
-    [InlineData("longbow", "Longbow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x2")]
-    [InlineData("pinning_bow", "Pinning Bow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
-    [InlineData("crossbow", "Crossbow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Overwatch x1")]
-    [InlineData("darts", "Darts", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Light x1")]
-    [InlineData("bandolier", "Bandolier", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
-    [InlineData("harpoon", "Harpoon", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Drag x1")]
-    [InlineData("softening_javelins", "Softening Javelins", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
-    [InlineData("staff_of_renewal", "Staff of Renewal", WeaponClass.Staff, 100, 0, 40, 15, "Resonant x1")]
-    [InlineData("staff_of_warding", "Staff of Warding", WeaponClass.Staff, 100, 0, 40, 20, "Resonant x1")]
-    [InlineData("staff_of_blight", "Staff of Blight", WeaponClass.Staff, 100, 0, 40, 20, "Resonant x1")]
-    [InlineData("staff_of_mire", "Staff of Mire", WeaponClass.Staff, 100, 0, 40, 25, "Resonant x1")]
-    [InlineData("wand_of_the_blast", "Wand of the Blast", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_cone", "Wand of the Cone", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_beam", "Wand of the Beam", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_nova", "Wand of the Nova", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    public void Statlines_MatchTheTables(string id, string name, WeaponClass cls, int range, int damage, int cost, int manaCost, string forged)
+    [InlineData("flensing_knife", "Flensing Knife", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
+    [InlineData("assassins_fang", "Assassin's Fang", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
+    [InlineData("disarming_kris", "Disarming Kris", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
+    [InlineData("weakspot_stiletto", "Weakspot Stiletto", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
+    [InlineData("arming_sword", "Arming Sword", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
+    [InlineData("tower_guard", "Tower Guard", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x2, Push x1")]
+    [InlineData("riposte_blade", "Riposte Blade", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
+    [InlineData("wardens_shield", "Warden's Shield", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
+    [InlineData("skirmishers_pike", "Skirmisher's Pike", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
+    [InlineData("phalanx_spear", "Phalanx Spear", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x2, Longshot x1")]
+    [InlineData("halberd", "Halberd", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Push x1")]
+    [InlineData("pinning_lance", "Pinning Lance", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
+    [InlineData("hatchet", "Hatchet", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Light x1, Opportunist x1")]
+    [InlineData("great_axe", "Great Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
+    [InlineData("reaver", "Reaver", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
+    [InlineData("routing_axe", "Routing Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
+    [InlineData("hunting_bow", "Hunting Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
+    [InlineData("longbow", "Longbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x2")]
+    [InlineData("pinning_bow", "Pinning Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
+    [InlineData("crossbow", "Crossbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Overwatch x1")]
+    [InlineData("darts", "Darts", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Light x1")]
+    [InlineData("bandolier", "Bandolier", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
+    [InlineData("harpoon", "Harpoon", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Drag x1")]
+    [InlineData("softening_javelins", "Softening Javelins", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
+    [InlineData("staff_of_renewal", "Staff of Renewal", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 15, "Resonant x1")]
+    [InlineData("staff_of_warding", "Staff of Warding", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
+    [InlineData("staff_of_blight", "Staff of Blight", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
+    [InlineData("staff_of_mire", "Staff of Mire", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 25, "Resonant x1")]
+    [InlineData("wand_of_the_blast", "Wand of the Blast", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_cone", "Wand of the Cone", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_beam", "Wand of the Beam", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_nova", "Wand of the Nova", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    public void Statlines_MatchTheTables(string id, string name, WeaponClass cls, WeaponKind kind, int range, int damage, int cost, int manaCost, string forged)
     {
         var def = Catalogue[id];
         Assert.Equal(name, def.Name);
@@ -260,7 +260,13 @@ public class WeaponContentTests
         Assert.Equal((id, name, cls), (weapon.Id, weapon.Name, weapon.Class));
         Assert.Equal((range, damage, cost, manaCost), (weapon.Range, weapon.Damage, weapon.Cost, weapon.ManaCost));
         Assert.Equal(forged, weapon.Forged.ToString());   // in ModifierType order
-        Assert.Equal(Weapon.KindOf(cls), weapon.Kind);
+
+        // The kind each class plays as, as §1.1 fixes it — bows and throwing are
+        // ranged, staves and wands cast, the rest melee — held literally: the kind
+        // is its class row's in weapons.json now, and reading the expected value
+        // back from that row would be the very definition of Weapon.Kind
+        // (REWORK DECISION 3, a doc-fixed pin).
+        Assert.Equal(kind, weapon.Kind);
         Assert.Equal(cls is WeaponClass.Staff or WeaponClass.Wand, weapon.IsCaster);
     }
 
@@ -515,7 +521,9 @@ public class WeaponContentTests
         Assert.Equal(("tower_guard", ContentValidator.RulePurityDeepensBaseline), (ex.EntryId, ex.Rule));
         Assert.Contains("signature Block", ex.Message);
 
-        // A class whose baseline lost its signature: every dagger forged Block where CritWindow was.
+        // Every dagger forged Block where CritWindow was: the baseline is the Dagger
+        // row's now (the content rework, 1d), not what the four share, so the first
+        // dagger is off its class row — it carries CritWindow x0 against the row's x1.
         var bludgeons = ShippedContent.Weapons with
         {
             Weapons = ShippedContent.Weapons.Weapons
@@ -525,6 +533,19 @@ public class WeaponContentTests
                 .ToList(),
         };
         ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeons));
+        Assert.Equal(("flensing_knife", ContentValidator.RuleVariantDelta), (ex.EntryId, ex.Rule));
+
+        // And a class whose baseline lost its signature is its row's fault: the
+        // Dagger row forging Block where CritWindow was, whatever its variants carry.
+        var bludgeonRow = ShippedContent.Weapons with
+        {
+            Classes = ShippedContent.Weapons.Classes
+                .Select(c => c.Class == WeaponClass.Dagger
+                    ? c with { Baseline = c.Baseline.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
+                    : c)
+                .ToList(),
+        };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeonRow));
         Assert.Equal(("Dagger", ContentValidator.RuleClassBaseline), (ex.EntryId, ex.Rule));
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));

@@ -4,25 +4,64 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The loaded weapon entries (§5.6), keyed by stable string id and kept in
 /// file order, and the one place a <see cref="Weapon"/> is made from one:
 /// <see cref="Instantiate"/> hands out a fresh instance every call, because
-/// acquired stacks are per item and two actors never share a weapon.
+/// acquired stacks are per item and two actors never share a weapon. Beside
+/// them, the eight class rows (<see cref="Classes"/>): what a class carries as
+/// data — its kind, the stats it levels on, its signature, its baseline — read
+/// here by everything that asks a class a question, from the loaded rows and
+/// never from a table in code.
 /// </summary>
 public sealed class WeaponCatalogue
 {
     private readonly Dictionary<string, WeaponDef> _byId = new(StringComparer.Ordinal);
+    private readonly WeaponClassDef[] _classes;
     private readonly EnchantmentCatalogue _enchantments;
 
-    /// <summary>Build over validated data; the ids are unique by then, and every enchantment ref resolves.</summary>
+    /// <summary>Build over validated data; the ids are unique by then, every class has its one row, and every enchantment ref resolves.</summary>
     public WeaponCatalogue(WeaponsData data, EnchantmentCatalogue enchantments)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(enchantments);
         _enchantments = enchantments;
 
+        var members = Enum.GetValues<WeaponClass>();
+        _classes = new WeaponClassDef[members.Length];
+        foreach (var cls in members)
+            _classes[(int)cls] = data.ClassOf(cls)
+                ?? throw new ContentException(cls.ToString(), ContentValidator.RuleEveryClassHasARow, $"{WeaponsJson.FileName} has no {cls} row");
+        Classes = Array.AsReadOnly(_classes);
+
         All = data.Weapons.ToArray();
         foreach (var def in All)
             if (!_byId.TryAdd(def.Id, def))
                 throw new ContentException(def.Id, ContentValidator.RuleDuplicateId);
         Uniques = All.Where(d => d.Unique).ToArray();
+    }
+
+    /// <summary>The class rows (the content rework, 1d), one per <see cref="WeaponClass"/> member, in the enum's order.</summary>
+    public IReadOnlyList<WeaponClassDef> Classes { get; }
+
+    /// <summary>The row of <paramref name="cls"/>: its kind, stats, signature, baseline and statline.</summary>
+    /// <exception cref="KeyNotFoundException"><paramref name="cls"/> is no member of the enum; every member has a row by validation.</exception>
+    public WeaponClassDef Class(WeaponClass cls)
+        => (uint)cls < (uint)_classes.Length ? _classes[(int)cls] : throw new KeyNotFoundException($"No class row for {cls}.");
+
+    /// <summary>The sort of weapon the relations mean by "kind" (§1.1) that <paramref name="cls"/> is: its row's — melee, ranged, or caster for the Staff and the Wand.</summary>
+    public WeaponKind KindOf(WeaponClass cls) => Class(cls).Kind;
+
+    /// <summary>
+    /// The class whose signature <paramref name="theme"/> is — a theme's "own
+    /// class" (§1.5, §4.3), the one its unique comes from — or null when it is no
+    /// class's signature. Asked of the rows in <see cref="WeaponClass"/> order, so
+    /// the answer never depends on the file's; no two rows share a signature
+    /// (<see cref="ContentValidator.RuleClassSignatureDistinct"/>), so the order
+    /// never has a tie to break.
+    /// </summary>
+    public WeaponClass? ClassSignedBy(ModifierType theme)
+    {
+        foreach (var row in _classes)
+            if (row.Signature == theme)
+                return row.Class;
+        return null;
     }
 
     /// <summary>Every entry, in file order.</summary>

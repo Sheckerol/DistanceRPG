@@ -146,13 +146,16 @@ public static class Progression
         => Math.Max(MinimumMovementCost, resolvedCost - MovementDiscount(level));
 
     /// <summary>
-    /// The stats a weapon class levels on — the §1 class table. One stat each,
-    /// except Sword and Shield, which takes the better of STR and DEX. CON
-    /// governs no weapon: it is the body's pool, not a craft.
+    /// The stats a weapon class levels on — the §1 class table, as the class's
+    /// row in <c>weapons.json</c> names them (<see cref="WeaponClassDef.Stats"/>).
+    /// One stat each in the shipped rows, except Sword and Shield, which takes
+    /// the better of STR and DEX. CON governs no weapon: it is the body's pool,
+    /// not a craft — which the load holds every row to
+    /// (<see cref="ContentValidator.RuleClassStats"/>), along with naming one
+    /// stat at least.
     /// </summary>
-    /// <exception cref="KeyNotFoundException">No row for <paramref name="cls"/>; the table is complete over the enum by construction.</exception>
-    public static IReadOnlyList<Stat> Governing(WeaponClass cls)
-        => GoverningTable.TryGetValue(cls, out var row) ? row : throw new KeyNotFoundException($"No governing stat row for {cls}.");
+    /// <exception cref="KeyNotFoundException"><paramref name="cls"/> is no member of the enum; every member has a row by validation.</exception>
+    public static IReadOnlyList<Stat> Governing(WeaponClass cls) => GameContent.Current.Weapons.Class(cls).Stats;
 
     /// <summary>
     /// The single int <see cref="XpToNext"/> divides by for <paramref name="cls"/>
@@ -170,19 +173,6 @@ public static class Progression
             best = Math.Max(best, stats.Of(row[i]));
         return best;
     }
-
-    /// <summary>The §1 class table, complete over <see cref="WeaponClass"/> or it throws at static init.</summary>
-    private static readonly IReadOnlyDictionary<WeaponClass, IReadOnlyList<Stat>> GoverningTable = BuildGoverning(
-    [
-        (WeaponClass.Dagger, [Stat.DEX]),
-        (WeaponClass.Sword, [Stat.STR, Stat.DEX]),   // a shield bash is whichever of the two you have
-        (WeaponClass.Spear, [Stat.STR]),
-        (WeaponClass.Axe, [Stat.STR]),
-        (WeaponClass.Ranged, [Stat.DEX]),
-        (WeaponClass.Throwing, [Stat.STR]),
-        (WeaponClass.Staff, [Stat.INT]),
-        (WeaponClass.Wand, [Stat.INT]),
-    ]);
 
     /// <summary>
     /// The cost of the next step, floored at 1: a bar small enough that integer
@@ -210,14 +200,5 @@ public static class Progression
         if (bar < 1)
             throw new ArgumentOutOfRangeException(key, bar, $"{key} is the bar a pool divides; below 1 there is no step to take.");
         return bar;
-    }
-
-    private static IReadOnlyDictionary<WeaponClass, IReadOnlyList<Stat>> BuildGoverning((WeaponClass Class, Stat[] Stats)[] rows)
-    {
-        var table = rows.ToDictionary(r => r.Class, r => (IReadOnlyList<Stat>)r.Stats);
-        foreach (var cls in Enum.GetValues<WeaponClass>())
-            if (!table.ContainsKey(cls))
-                throw new InvalidOperationException($"The governing-stat table has no row for {cls}.");
-        return table;
     }
 }

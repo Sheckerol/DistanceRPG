@@ -134,7 +134,7 @@ public class UniqueContentTests
             var changed = Enum.GetValues<ModifierType>()
                 .Where(t => def.Forged.GetValueOrDefault(t) != variant.Forged.GetValueOrDefault(t))
                 .ToList();
-            if (Weapon.KindOf(def.Class) == WeaponKind.Caster)
+            if (Catalogue.KindOf(def.Class) == WeaponKind.Caster)
             {
                 Assert.Empty(changed);
                 Assert.NotEqual(variant.Enchantments, def.Enchantments);
@@ -227,7 +227,7 @@ public class UniqueContentTests
     {
         // A caster unique is not a bigger number on the weapon: Resonant x1 and the statline are the
         // variant's, and every point of its advantage sits in the enchantment list.
-        foreach (var (id, _, derivedFrom, _, _) in Table.Where(t => Weapon.KindOf(Catalogue[t.Id].Class) == WeaponKind.Caster))
+        foreach (var (id, _, derivedFrom, _, _) in Table.Where(t => Catalogue.KindOf(Catalogue[t.Id].Class) == WeaponKind.Caster))
         {
             var unique = TestWeapons.Get(id);
             var variant = TestWeapons.Get(derivedFrom, Catalogue[derivedFrom].Class == WeaponClass.Wand ? DamageType.Flaming : null);

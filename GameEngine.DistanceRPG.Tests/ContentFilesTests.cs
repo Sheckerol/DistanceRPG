@@ -26,29 +26,166 @@ internal static class DataTexts
     /// <summary>
     /// <paramref name="text"/>, a shipped content file, with <paramref name="from"/>
     /// replaced by <paramref name="to"/> inside the row whose id is
-    /// <paramref name="id"/> alone — from its id to the row's own closing brace —
-    /// where <paramref name="from"/> is there exactly once.
+    /// <paramref name="id"/> alone — the table that holds <c>"id": "…"</c> as its
+    /// own member, from its opening brace to the one that matches it, found past
+    /// every string and comment in between, however the row is laid out — where
+    /// <paramref name="from"/> is there exactly once.
     /// </summary>
     public static string InRow(string text, string id, string from, string to)
     {
-        int start = text.IndexOf($"\"id\": \"{id}\"", StringComparison.Ordinal);
-        Assert.True(start >= 0, $"no row '{id}' in the text");
-        int end = text.IndexOf("\n    }", start, StringComparison.Ordinal);   // a row closes four spaces in; a nested table closes deeper
-        Assert.True(end >= 0, $"row '{id}' does not close");
-        return string.Concat(text.AsSpan(0, start), Edit(text[start..end], from, to), text.AsSpan(end));
+        var (open, close) = Row(text, id);
+        return string.Concat(text.AsSpan(0, open), Edit(text[open..(close + 1)], from, to), text.AsSpan(close + 1));
     }
 
     /// <summary><paramref name="text"/>, a shipped content file, with the whole row whose id is <paramref name="id"/> taken out, and the comma that separated it with it.</summary>
     public static string WithoutRow(string text, string id)
     {
-        int at = text.IndexOf($"\"id\": \"{id}\"", StringComparison.Ordinal);
-        Assert.True(at >= 0, $"no row '{id}' in the text");
-        int start = text.LastIndexOf("\n    {\n", at, StringComparison.Ordinal) + 1;   // the row's opening line
-        int close = text.IndexOf("\n    }", at, StringComparison.Ordinal) + "\n    }".Length;
-        if (text[close] == ',')
-            return text.Remove(start, close + 2 - start);   // "},\n": a row with another after it
-        int comma = text.LastIndexOf("},", start, StringComparison.Ordinal);   // the last row: the one before it loses its comma
-        return string.Concat(text.AsSpan(0, comma + 1), text.AsSpan(comma + 2, start - comma - 2), text.AsSpan(close + 1));
+        var (open, close) = Row(text, id);
+        return Without(text, open, close);
+    }
+
+    /// <summary>
+    /// <paramref name="text"/>, a <c>weapons.json</c>, with <paramref name="from"/>
+    /// replaced by <paramref name="to"/> inside the row of <paramref name="cls"/> in
+    /// its <c>classes</c> section alone, where <paramref name="from"/> is there
+    /// exactly once.
+    /// </summary>
+    public static string InClass(string text, WeaponClass cls, string from, string to)
+    {
+        var (_, open, close) = ClassRow(text, cls);
+        return string.Concat(text.AsSpan(0, open), Edit(text[open..(close + 1)], from, to), text.AsSpan(close + 1));
+    }
+
+    /// <summary><paramref name="text"/>, a <c>weapons.json</c>, with the row of <paramref name="cls"/> taken out of its <c>classes</c> section — its name, its table, and the comma that separated it.</summary>
+    public static string WithoutClass(string text, WeaponClass cls)
+    {
+        var (name, _, close) = ClassRow(text, cls);
+        return Without(text, name, close);
+    }
+
+    /// <summary>
+    /// The structure of <paramref name="text"/>, a JSON file with comments, as it
+    /// reads: every bracket and comma where it stands, and every string where it
+    /// starts (<c>'"'</c>) — a bracket or a comma inside a string or a comment is
+    /// no structure, and is not here.
+    /// </summary>
+    private static List<(int At, char Kind)> Structure(string text)
+    {
+        var tokens = new List<(int At, char Kind)>();
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '"')
+            {
+                tokens.Add((i, c));
+                for (i++; i < text.Length && text[i] != '"'; i++)
+                    if (text[i] == '\\')
+                        i++;   // an escape: what it escapes is no quote that closes
+            }
+            else if (c == '/' && i + 1 < text.Length && text[i + 1] == '*')
+            {
+                int end = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                Assert.True(end >= 0, "a comment in the text does not close");
+                i = end + 1;
+            }
+            else if (c == '/' && i + 1 < text.Length && text[i + 1] == '/')
+            {
+                int end = text.IndexOf('\n', i);
+                i = end < 0 ? text.Length : end;
+            }
+            else if (c is '{' or '}' or '[' or ']' or ',')
+            {
+                tokens.Add((i, c));
+            }
+        }
+        return tokens;
+    }
+
+    /// <summary>The one string of <paramref name="tokens"/> that starts with <paramref name="start"/>, by its index: never one in a comment, never text inside another string.</summary>
+    private static int OneString(string text, List<(int At, char Kind)> tokens, string start)
+    {
+        var found = Enumerable.Range(0, tokens.Count)
+            .Where(k => tokens[k].Kind == '"' && string.CompareOrdinal(text, tokens[k].At, start, 0, start.Length) == 0)
+            .ToList();
+        Assert.True(found.Count == 1, $"'{start}' starts {found.Count} strings in the text, not one");
+        return found[0];
+    }
+
+    /// <summary>The bracket that holds the token at <paramref name="k"/>: the innermost one open there.</summary>
+    private static int Holder(List<(int At, char Kind)> tokens, int k)
+    {
+        int depth = 0;
+        for (int j = k - 1; j >= 0; j--)
+        {
+            if (tokens[j].Kind is '}' or ']')
+                depth++;
+            else if (tokens[j].Kind is '{' or '[' && depth-- == 0)
+                return j;
+        }
+        throw new Xunit.Sdk.XunitException("the string is in no table or list");
+    }
+
+    /// <summary>The bracket that closes the one opened at <paramref name="open"/>.</summary>
+    private static int Closer(List<(int At, char Kind)> tokens, int open)
+    {
+        int depth = 0;
+        for (int j = open; j < tokens.Count; j++)
+        {
+            if (tokens[j].Kind is '{' or '[')
+                depth++;
+            else if (tokens[j].Kind is '}' or ']' && --depth == 0)
+                return j;
+        }
+        throw new Xunit.Sdk.XunitException("a table in the text does not close");
+    }
+
+    /// <summary>Where the row whose id is <paramref name="id"/> opens and closes: the table its <c>"id"</c> is a member of, and nothing it merely holds.</summary>
+    private static (int Open, int Close) Row(string text, string id)
+    {
+        var tokens = Structure(text);
+        int at = OneString(text, tokens, $"\"id\": \"{id}\"");
+        int holder = Holder(tokens, at);
+        Assert.True(tokens[holder].Kind == '{', $"'{id}' is no member of a row: it sits in a list");
+        return (tokens[holder].At, tokens[Closer(tokens, holder)].At);
+    }
+
+    /// <summary>Where the class row of <paramref name="cls"/> is: its name, and the table its name opens — a member of the <c>classes</c> table, and nowhere else.</summary>
+    private static (int Name, int Open, int Close) ClassRow(string text, WeaponClass cls)
+    {
+        var tokens = Structure(text);
+        string start = $"\"{cls}\": {{";
+        int at = OneString(text, tokens, start);
+        int holder = Holder(tokens, at);
+        Assert.True(holder > 0 && tokens[holder - 1].Kind == '"' && string.CompareOrdinal(text, tokens[holder - 1].At, "\"classes\"", 0, 9) == 0,
+            $"{cls} is no member of the classes table");
+        int open = at + 1;
+        Assert.True(tokens[open].Kind == '{' && tokens[open].At == tokens[at].At + start.Length - 1, $"{cls} names no table");
+        return (tokens[at].At, tokens[open].At, tokens[Closer(tokens, open)].At);
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> without the member that runs from <paramref name="start"/>
+    /// to <paramref name="close"/>, and without the comma that separates it: the
+    /// one after it, with the member's own lines where it has them to itself, or —
+    /// for the last member — the one before it, with whatever lies between.
+    /// </summary>
+    private static string Without(string text, int start, int close)
+    {
+        var tokens = Structure(text);
+        int first = tokens.FindIndex(t => t.At == start);
+        int last = tokens.FindIndex(t => t.At == close);
+        if (last + 1 < tokens.Count && tokens[last + 1].Kind == ',')
+        {
+            int line = text.LastIndexOf('\n', start) + 1;
+            int from = string.IsNullOrWhiteSpace(text[line..start]) ? line : start;
+            int comma = tokens[last + 1].At;
+            int end = text.IndexOf('\n', comma);
+            int to = end >= 0 && string.IsNullOrWhiteSpace(text[(comma + 1)..end]) ? end + 1 : comma + 1;
+            return text.Remove(from, to - from);
+        }
+        Assert.True(first > 0 && tokens[first - 1].Kind == ',', "the member is the only one: no comma separates it");
+        int before = tokens[first - 1].At;
+        return text.Remove(before, close + 1 - before);
     }
 
     /// <summary>
@@ -210,8 +347,9 @@ public class ContentFilesTests
         Assert.NotNull(locked.Content);
 
         // A present file is read whole, never merged entry by entry with the
-        // built-in copy: a row it edits is the file's...
-        var edited = ShippedData.Load(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "hatchet", "\"damage\": 18,", "\"damage\": 20,") });
+        // built-in copy: a row it edits is the file's — here the Hatchet given a
+        // damage of its own in place of its class's (REWORK DECISION 1)...
+        var edited = ShippedData.Load(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "hatchet", "\"adds\": { \"Light\": 1 },", "\"adds\": { \"Light\": 1 }, \"damage\": 20,") });
         Assert.Empty(edited.Notices);
         Assert.Equal(20, edited.Content!.Weapons["hatchet"].Damage);
         Assert.Equal(18, edited.Content.Weapons["great_axe"].Damage);
@@ -505,10 +643,11 @@ public class ContentFilesTests
 
         // Content is an edit to a file beside the game: a statline and a dungeon's
         // name are each changed in their own file, and the content that loads is
-        // the edited one — 1i's playtest: the Weakspot Stiletto's damage 25.
+        // the edited one — 1i's playtest: the Weakspot Stiletto's damage 25, a
+        // number of its own over its class's (REWORK DECISION 1).
         var edited = ShippedData.Load(Shipped with
         {
-            Weapons = DataTexts.InRow(Shipped.Weapons!, "weakspot_stiletto", "\"damage\": 15,", "\"damage\": 25,"),
+            Weapons = DataTexts.InRow(Shipped.Weapons!, "weakspot_stiletto", "\"adds\": { \"CritSunder\": 1 },", "\"adds\": { \"CritSunder\": 1 }, \"damage\": 25,"),
             Dungeons = DataTexts.Edit(Shipped.Dungeons!, "\"name\": \"The Spear Hall\"", "\"name\": \"The Pike Hall\""),
         });
         Assert.Empty(edited.Notices);

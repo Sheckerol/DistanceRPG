@@ -27,7 +27,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <para>
 /// A class's variants are read as <see cref="WeaponDef"/> spreads — a martial
 /// class's one per role through <see cref="WeaponCatalogue.Variant"/>, a
-/// caster's through <see cref="LootTable.CasterVariants"/> — and never
+/// caster's through <see cref="LootTable.CasterVariants"/> — each asked of the
+/// kind its class row gives it (<see cref="WeaponCatalogue.KindOf"/>), and never
 /// instantiated, so loading content still builds no <see cref="Weapon"/>.
 /// Every class is asked about every variant, because the variant is rolled
 /// after the class and a boss must never drop an ungrafted weapon.
@@ -166,7 +167,7 @@ public sealed class DungeonCatalogue
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
             var variants = DropVariants(cls, weapons);
-            if (variants.Count > 0 && variants.All(v => TakesAsForged(theme, v, modifiers)))
+            if (variants.Count > 0 && variants.All(v => TakesAsForged(theme, v, modifiers, weapons)))
                 table.Add(cls);
         }
         return table.ToArray();
@@ -182,7 +183,7 @@ public sealed class DungeonCatalogue
     {
         if (weapons.ByClass(cls).Count == 0)
             return [];
-        if (Weapon.KindOf(cls) != WeaponKind.Caster)
+        if (weapons.KindOf(cls) != WeaponKind.Caster)
             return Roles.Select(role => weapons.Variant(cls, role)).ToArray();
         return LootTable.CasterVariants.TryGetValue(cls, out var ids)
             ? ids.Select(id => weapons[id]).ToArray()
@@ -192,12 +193,13 @@ public sealed class DungeonCatalogue
     /// <summary>
     /// Whether <paramref name="variant"/> as it drops can take <paramref name="theme"/>
     /// forged: the relations beside its forged spread, and the forge limit
-    /// (<see cref="ModifierRules.CanGraft"/>). A drop is forged and nothing else
-    /// when the graft lands, so its spread is both what is present and what is forged.
+    /// (<see cref="ModifierRules.CanGraft"/>), asked of the kind its class row in
+    /// <paramref name="weapons"/> gives it. A drop is forged and nothing else when
+    /// the graft lands, so its spread is both what is present and what is forged.
     /// </summary>
-    private static bool TakesAsForged(ModifierType theme, WeaponDef variant, ModifierRules modifiers)
+    private static bool TakesAsForged(ModifierType theme, WeaponDef variant, ModifierRules modifiers, WeaponCatalogue weapons)
     {
         var spread = ModifierSet.Of(variant.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
-        return modifiers.CanGraft(theme, Weapon.KindOf(variant.Class), spread, spread, asForged: true);
+        return modifiers.CanGraft(theme, weapons.KindOf(variant.Class), spread, spread, asForged: true);
     }
 }

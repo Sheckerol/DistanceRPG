@@ -1,29 +1,44 @@
 /*
- * weapons.json - every weapon: the thirty-two variants, four to each of the eight classes, then
+ * weapons.json - every weapon: the eight classes, the thirty-two variants, four to each class, and
  * the uniques.
  *
  * Read once, when the game starts, after restricted.json. A weapon is checked, never clamped: a
- * spread restricted.json does not allow, a modifier forged past its limit, a unique that is not
+ * class the game cannot level or cast with, a spread restricted.json does not allow, a modifier
+ * forged past its limit, a variant that is not its class plus one modifier, a unique that is not
  * its variant raised, or a field the game does not know stops the game on a screen naming the
- * file, the weapon and the rule - and, when a relation refused it, that restricted.json relation.
- * Every weapon names all thirteen fields; comments and trailing commas are fine. A weapon is an
- * edit here, never a rebuild: start the game again to play it.
+ * file, the class or the weapon and the rule - and, when a relation refused it, that
+ * restricted.json relation. Comments and trailing commas are fine. A weapon is an edit here, never
+ * a rebuild: start the game again to play it.
  *
- * id: what everything names the weapon by - the starting party (code), a drop, a save. name: what
- * the screen calls it. class: Dagger, Sword, Spear, Axe, Ranged, Throwing, Staff or Wand. role: a
- * martial variant's - Efficiency, Purity, Control or Support - or null for a caster or a unique.
- * range: the reach, in logic units (32 a tile). damage: a hit, before modifiers. cost: the
- * movement an attack or a cast takes. manaCost: the mana a cast takes, 0 for a martial weapon.
- * forged: the modifiers it is forged with, each to its stack count - a class's baseline is what
- * its four variants share, so re-basing a class is an edit to all four. enchantments: what it
- * arrives with, in order, each an id from the game's enchantment catalogue with its tier (1 when
- * left out). shape: a wand's area - Blast (radius, targetReach), Cone (length, angleDegrees), Beam
- * (length, width) or Nova (radius), in logic units - or null. unique: its variant with one
- * modifier raised to x3, carrying a soul. derivedFrom: the variant a unique is made from, or null.
+ * classes: every class once - Dagger, Sword, Spear, Axe, Ranged, Throwing, Staff and Wand - with
+ * what every weapon of it shares. kind: melee, ranged or caster, in lower case - the Staff and the
+ * Wand cast, and no other class does. stats: the stats it levels on, the best of them counting -
+ * STR, DEX or INT; CON levels no weapon. signature: the modifier the class is named for, which its
+ * Purity variant deepens and a dungeon's theme is drawn from; null for a caster. baseline: the
+ * modifiers every weapon of the class is forged with, each to its stack count - its signature and
+ * one more, or a caster's Resonant x1 - so re-basing a class is one edit, here. range: the reach,
+ * in logic units (32 a tile). damage: a hit, before modifiers. cost: the movement an attack or a
+ * cast takes. manaCost: the mana a cast takes, 0 for a martial class.
+ *
+ * variants: what a drop or a dummy carries. id: what everything names the weapon by - the starting
+ * party (code), a drop, a save. name: what the screen calls it. class: one of the classes above.
+ * role: a martial variant's - Efficiency, Purity, Control or Support - or null for a caster. adds:
+ * the modifiers it adds to its class's baseline, each to its stack count and summed onto it - {}
+ * for a caster. enchantments: what it arrives with, in order, each an id from the game's
+ * enchantment catalogue with its tier (1 when left out). shape: a wand's area - Blast (radius,
+ * targetReach), Cone (length, angleDegrees), Beam (length, width) or Nova (radius), in logic
+ * units - or null. range, damage, cost and manaCost may be left out, and are its class's then; one
+ * given plays for that variant alone, in place of its class's.
+ *
+ * uniques: the artifacts, each made from a variant. id, name, enchantments: as a variant's.
+ * derivedFrom: the variant it is made from; it takes that variant's class, statline and shape.
+ * raises: the modifiers it raises, each set to the stack count given - not added to - so a unique
+ * that raises Block to 3 carries Block x3; {} for a caster, which raises nothing.
  *
  * arming_sword (what a dummy holds) and staff_of_renewal (a crowded room's healer) are named by
- * the game's code and must be here. A weapon whose id is marked provisional is a first guess the
- * docs did not fix, expected to move after play.
+ * the game's code and must be here, and so must a variant of each class a dummy can be placed
+ * holding - Dagger, Sword, Spear, Axe and Throwing. A weapon whose id is marked provisional is a
+ * first guess the docs did not fix, expected to move after play.
  *
  * GameEngine.DistanceRPG/Data/weapons.json is the master copy: the game is built with it inside,
  * and plays that built-in copy whenever the copy beside the executable is missing or cannot be
@@ -34,691 +49,308 @@
  * the built-in copies out.
  */
 {
-  "weapons": [
-    /* The statlines are the class tables' (phase-1-weapons.md 1.2, 1.3, 1.4), and a variant is its
-       class baseline plus one added modifier type. The cost column is a base cost: Light resolves an
-       Efficiency weapon down by 10% at instantiation, never here. */
-
-    /* ---- Dagger ---- */
+  /* The statlines are the class tables' (phase-1-weapons.md 1.2, 1.3, 1.4), and every variant is
+     its class baseline plus one added modifier type. The cost column is a base cost: Light resolves
+     an Efficiency weapon down by 10% at instantiation, never here. */
+  "classes": {
     /* Dagger (DEX): 19-20 to crit, x3 when it lands. */
+    "Dagger": {
+      "kind": "melee", "stats": ["DEX"], "signature": "CritWindow",
+      "baseline": { "CritWindow": 1, "CritMultiplier": 1 },
+      "range": 40, "damage": 15, "cost": 30, "manaCost": 0
+    },
+    /* Sword and Shield: the better of STR and DEX, since a shield bash is whichever of the two you
+       have. You stop them, then you move them. */
+    "Sword": {
+      "kind": "melee", "stats": ["STR", "DEX"], "signature": "Block",
+      "baseline": { "Block": 1, "Push": 1 },
+      "range": 80, "damage": 10, "cost": 50, "manaCost": 0
+    },
+    /* Spear (STR): reach 128, exactly four tiles, so Longshot's tile count is a rule. */
+    "Spear": {
+      "kind": "melee", "stats": ["STR"], "signature": "Brace",
+      "baseline": { "Brace": 1, "Longshot": 1 },
+      "range": 128, "damage": 7, "cost": 55, "manaCost": 0
+    },
+    /* Axe (STR): nobody walks away from an axe. */
+    "Axe": {
+      "kind": "melee", "stats": ["STR"], "signature": "Cleave",
+      "baseline": { "Cleave": 1, "Opportunist": 1 },
+      "range": 60, "damage": 18, "cost": 60, "manaCost": 0
+    },
+    /* Ranged (DEX): damage 5 is meant to look low; the range curve does the work. */
+    "Ranged": {
+      "kind": "ranged", "stats": ["DEX"], "signature": "Longshot",
+      "baseline": { "CritWindow": 1, "Longshot": 1 },
+      "range": 320, "damage": 5, "cost": 30, "manaCost": 0
+    },
+    /* Throwing (STR): 15 a throw is honest only because Charges caps it. */
+    "Throwing": {
+      "kind": "ranged", "stats": ["STR"], "signature": "Charges",
+      "baseline": { "CritMultiplier": 1, "Charges": 1 },
+      "range": 190, "damage": 9, "cost": 15, "manaCost": 0
+    },
+    /* Staff (INT): Resonant x1 plus the effect it casts, fixed by variant. Range 100, cost 40 and
+       20 mana a cast - the Staff of Renewal and the Staff of Mire name their own mana. */
+    "Staff": {
+      "kind": "caster", "stats": ["INT"], "signature": null,
+      "baseline": { "Resonant": 1 },
+      "range": 100, "damage": 0, "cost": 40, "manaCost": 20
+    },
+    /* Wand (INT): Resonant x1 plus an element supplied when it drops; four shapes, in logic units. */
+    "Wand": {
+      "kind": "caster", "stats": ["INT"], "signature": null,
+      "baseline": { "Resonant": 1 },
+      "range": 160, "damage": 8, "cost": 45, "manaCost": 20
+    }
+  },
+
+  /* The four roles add Light x1 (Efficiency), another stack of the signature (Purity), something
+     that degrades the enemy (Control) or something that helps the party (Support); a caster varies
+     by the effect it casts or the shape it covers instead, and has no role. */
+  "variants": [
+    /* ---- Dagger ---- */
     {
       "id": "flensing_knife",
-      "name": "Flensing Knife",
-      "class": "Dagger",
-      "role": "Efficiency",
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "CritMultiplier": 1, "Light": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Flensing Knife", "class": "Dagger", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "assassins_fang",
-      "name": "Assassin's Fang",
-      "class": "Dagger",
-      "role": "Purity",
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 2, "CritMultiplier": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Assassin's Fang", "class": "Dagger", "role": "Purity", "adds": { "CritWindow": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "disarming_kris",
-      "name": "Disarming Kris",
-      "class": "Dagger",
-      "role": "Control",
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "CritMultiplier": 1, "CritWeaken": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Disarming Kris", "class": "Dagger", "role": "Control", "adds": { "CritWeaken": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "weakspot_stiletto",
-      "name": "Weakspot Stiletto",
-      "class": "Dagger",
-      "role": "Support",
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "CritMultiplier": 1, "CritSunder": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Weakspot Stiletto", "class": "Dagger", "role": "Support", "adds": { "CritSunder": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Sword ---- */
-    /* Sword and Shield (the better of STR and DEX): a shield bash - you stop them, then you move
-       them. */
     {
       "id": "arming_sword",
-      "name": "Arming Sword",
-      "class": "Sword",
-      "role": "Efficiency",
-      "range": 80,
-      "damage": 10,
-      "cost": 50,
-      "manaCost": 0,
-      "forged": { "Block": 1, "Light": 1, "Push": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Arming Sword", "class": "Sword", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "tower_guard",
-      "name": "Tower Guard",
-      "class": "Sword",
-      "role": "Purity",
-      "range": 80,
-      "damage": 10,
-      "cost": 50,
-      "manaCost": 0,
-      "forged": { "Block": 2, "Push": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Tower Guard", "class": "Sword", "role": "Purity", "adds": { "Block": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "riposte_blade",
-      "name": "Riposte Blade",
-      "class": "Sword",
-      "role": "Control",
-      "range": 80,
-      "damage": 10,
-      "cost": 50,
-      "manaCost": 0,
-      "forged": { "Block": 1, "Riposte": 1, "Push": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Riposte Blade", "class": "Sword", "role": "Control", "adds": { "Riposte": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "wardens_shield",
-      "name": "Warden's Shield",
-      "class": "Sword",
-      "role": "Support",
-      "range": 80,
-      "damage": 10,
-      "cost": 50,
-      "manaCost": 0,
-      "forged": { "Block": 1, "Push": 1, "BlockWeaken": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Warden's Shield", "class": "Sword", "role": "Support", "adds": { "BlockWeaken": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Spear ---- */
-    /* Spear (STR): reach 128, exactly four tiles, so Longshot's tile count is a rule. */
     {
       "id": "skirmishers_pike",
-      "name": "Skirmisher's Pike",
-      "class": "Spear",
-      "role": "Efficiency",
-      "range": 128,
-      "damage": 7,
-      "cost": 55,
-      "manaCost": 0,
-      "forged": { "Brace": 1, "Longshot": 1, "Light": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Skirmisher's Pike", "class": "Spear", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "phalanx_spear",
-      "name": "Phalanx Spear",
-      "class": "Spear",
-      "role": "Purity",
-      "range": 128,
-      "damage": 7,
-      "cost": 55,
-      "manaCost": 0,
-      "forged": { "Brace": 2, "Longshot": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Phalanx Spear", "class": "Spear", "role": "Purity", "adds": { "Brace": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "halberd",
-      "name": "Halberd",
-      "class": "Spear",
-      "role": "Control",
-      "range": 128,
-      "damage": 7,
-      "cost": 55,
-      "manaCost": 0,
-      "forged": { "Brace": 1, "Longshot": 1, "Push": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Halberd", "class": "Spear", "role": "Control", "adds": { "Push": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "pinning_lance",
-      "name": "Pinning Lance",
-      "class": "Spear",
-      "role": "Support",
-      "range": 128,
-      "damage": 7,
-      "cost": 55,
-      "manaCost": 0,
-      "forged": { "Brace": 1, "Longshot": 1, "Pin": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Pinning Lance", "class": "Spear", "role": "Support", "adds": { "Pin": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Axe ---- */
-    /* Axe (STR): nobody walks away from an axe. The Reaver forges Splitting x2. */
     {
       "id": "hatchet",
-      "name": "Hatchet",
-      "class": "Axe",
-      "role": "Efficiency",
-      "range": 60,
-      "damage": 18,
-      "cost": 60,
-      "manaCost": 0,
-      "forged": { "Cleave": 1, "Light": 1, "Opportunist": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Hatchet", "class": "Axe", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "great_axe",
-      "name": "Great Axe",
-      "class": "Axe",
-      "role": "Purity",
-      "range": 60,
-      "damage": 18,
-      "cost": 60,
-      "manaCost": 0,
-      "forged": { "Cleave": 2, "Opportunist": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Great Axe", "class": "Axe", "role": "Purity", "adds": { "Cleave": 1 },
+      "enchantments": [], "shape": null
     },
+    /* The Reaver forges Splitting x2. */
     {
       "id": "reaver",
-      "name": "Reaver",
-      "class": "Axe",
-      "role": "Control",
-      "range": 60,
-      "damage": 18,
-      "cost": 60,
-      "manaCost": 0,
-      "forged": { "Cleave": 1, "Splitting": 2, "Opportunist": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Reaver", "class": "Axe", "role": "Control", "adds": { "Splitting": 2 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "routing_axe",
-      "name": "Routing Axe",
-      "class": "Axe",
-      "role": "Support",
-      "range": 60,
-      "damage": 18,
-      "cost": 60,
-      "manaCost": 0,
-      "forged": { "Cleave": 1, "Opportunist": 1, "Rout": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Routing Axe", "class": "Axe", "role": "Support", "adds": { "Rout": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Ranged ---- */
-    /* Ranged (DEX): damage 5 is meant to look low; the range curve does the work. */
     {
       "id": "hunting_bow",
-      "name": "Hunting Bow",
-      "class": "Ranged",
-      "role": "Efficiency",
-      "range": 320,
-      "damage": 5,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "Longshot": 1, "Light": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Hunting Bow", "class": "Ranged", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "longbow",
-      "name": "Longbow",
-      "class": "Ranged",
-      "role": "Purity",
-      "range": 320,
-      "damage": 5,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "Longshot": 2 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Longbow", "class": "Ranged", "role": "Purity", "adds": { "Longshot": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "pinning_bow",
-      "name": "Pinning Bow",
-      "class": "Ranged",
-      "role": "Control",
-      "range": 320,
-      "damage": 5,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "Longshot": 1, "Pin": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Pinning Bow", "class": "Ranged", "role": "Control", "adds": { "Pin": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "crossbow",
-      "name": "Crossbow",
-      "class": "Ranged",
-      "role": "Support",
-      "range": 320,
-      "damage": 5,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "Longshot": 1, "Overwatch": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Crossbow", "class": "Ranged", "role": "Support", "adds": { "Overwatch": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Throwing ---- */
-    /* Throwing (STR): 15 a throw is honest only because Charges caps it. */
     {
       "id": "darts",
-      "name": "Darts",
-      "class": "Throwing",
-      "role": "Efficiency",
-      "range": 190,
-      "damage": 9,
-      "cost": 15,
-      "manaCost": 0,
-      "forged": { "CritMultiplier": 1, "Charges": 1, "Light": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Darts", "class": "Throwing", "role": "Efficiency", "adds": { "Light": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "bandolier",
-      "name": "Bandolier",
-      "class": "Throwing",
-      "role": "Purity",
-      "range": 190,
-      "damage": 9,
-      "cost": 15,
-      "manaCost": 0,
-      "forged": { "CritMultiplier": 1, "Charges": 2 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Bandolier", "class": "Throwing", "role": "Purity", "adds": { "Charges": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "harpoon",
-      "name": "Harpoon",
-      "class": "Throwing",
-      "role": "Control",
-      "range": 190,
-      "damage": 9,
-      "cost": 15,
-      "manaCost": 0,
-      "forged": { "CritMultiplier": 1, "Charges": 1, "Drag": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Harpoon", "class": "Throwing", "role": "Control", "adds": { "Drag": 1 },
+      "enchantments": [], "shape": null
     },
     {
       "id": "softening_javelins",
-      "name": "Softening Javelins",
-      "class": "Throwing",
-      "role": "Support",
-      "range": 190,
-      "damage": 9,
-      "cost": 15,
-      "manaCost": 0,
-      "forged": { "CritMultiplier": 1, "Charges": 1, "Softening": 1 },
-      "enchantments": [],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Softening Javelins", "class": "Throwing", "role": "Support", "adds": { "Softening": 1 },
+      "enchantments": [], "shape": null
     },
     /* ---- Staff ---- */
-    /* Staff (INT): Resonant x1 plus the effect it casts, fixed by variant. Range 100, cost 40; the
-       mana a cast takes is each variant's own. */
     {
       "id": "staff_of_renewal",
-      "name": "Staff of Renewal",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 15,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "regeneration" }],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Staff of Renewal", "class": "Staff", "role": null, "adds": {}, "manaCost": 15,
+      "enchantments": [{ "id": "regeneration" }], "shape": null
     },
     {
       "id": "staff_of_warding",
-      "name": "Staff of Warding",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "ward" }],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Staff of Warding", "class": "Staff", "role": null, "adds": {},
+      "enchantments": [{ "id": "ward" }], "shape": null
     },
     {
       "id": "staff_of_blight",
-      "name": "Staff of Blight",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "poison" }],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Staff of Blight", "class": "Staff", "role": null, "adds": {},
+      "enchantments": [{ "id": "poison" }], "shape": null
     },
     {
       "id": "staff_of_mire",
-      "name": "Staff of Mire",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 25,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "mire" }],
-      "shape": null,
-      "unique": false,
-      "derivedFrom": null
+      "name": "Staff of Mire", "class": "Staff", "role": null, "adds": {}, "manaCost": 25,
+      "enchantments": [{ "id": "mire" }], "shape": null
     },
     /* ---- Wand ---- */
-    /* Wand (INT): Resonant x1 plus an element supplied when it drops; four shapes, in logic units. */
     {
       "id": "wand_of_the_blast",
-      "name": "Wand of the Blast",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [],
-      "shape": { "kind": "Blast", "radius": 48, "targetReach": 160 },
-      "unique": false,
-      "derivedFrom": null
+      "name": "Wand of the Blast", "class": "Wand", "role": null, "adds": {},
+      "enchantments": [], "shape": { "kind": "Blast", "radius": 48, "targetReach": 160 }
     },
     {
       "id": "wand_of_the_cone",
-      "name": "Wand of the Cone",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [],
-      "shape": { "kind": "Cone", "length": 128, "angleDegrees": 90 },
-      "unique": false,
-      "derivedFrom": null
+      "name": "Wand of the Cone", "class": "Wand", "role": null, "adds": {},
+      "enchantments": [], "shape": { "kind": "Cone", "length": 128, "angleDegrees": 90 }
     },
     {
       "id": "wand_of_the_beam",
-      "name": "Wand of the Beam",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [],
-      "shape": { "kind": "Beam", "length": 224, "width": 32 },
-      "unique": false,
-      "derivedFrom": null
+      "name": "Wand of the Beam", "class": "Wand", "role": null, "adds": {},
+      "enchantments": [], "shape": { "kind": "Beam", "length": 224, "width": 32 }
     },
     {
       "id": "wand_of_the_nova",
-      "name": "Wand of the Nova",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [],
-      "shape": { "kind": "Nova", "radius": 96 },
-      "unique": false,
-      "derivedFrom": null
-    },
-    /* ---- The uniques ---- */
-    /* The unique table (phase-1-weapons.md 1.5): each a variant with one modifier it already carries
-       raised to x3 - or, for a Light-forged one, the signature at x2 paid for in souls - and a soul
-       no other weapon can have; a caster unique raises nothing and puts the whole artifact in its
-       enchantments. Everything else is its variant's, written out again here: the class, the
-       statline and the shape must be the variant's exactly, or the game does not start. The three
-       the docs leave unnamed carry provisional names. */
+      "name": "Wand of the Nova", "class": "Wand", "role": null, "adds": {},
+      "enchantments": [], "shape": { "kind": "Nova", "radius": 96 }
+    }
+  ],
+
+  /* The unique table (phase-1-weapons.md 1.5): each a variant with one modifier it already carries
+     raised to x3 - or, for a Light-forged one, the signature raised to x2 and paid for in souls -
+     and a soul no other weapon can have; a caster unique raises nothing and puts the whole artifact
+     in its enchantments. Everything else is its variant's - the class, the statline and the shape -
+     and is not written here. The three the docs leave unnamed carry provisional names. */
+  "uniques": [
     /* Absorbs 9, shoves what it stops, and refuses to let you die. */
     {
       "id": "the_bulwark",
-      "name": "The Bulwark",
-      "class": "Sword",
-      "role": null,
-      "range": 80,
-      "damage": 10,
-      "cost": 50,
-      "manaCost": 0,
-      "forged": { "Block": 3, "Push": 1 },
-      "enchantments": [{ "id": "sturdy" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "tower_guard"
+      "name": "The Bulwark", "derivedFrom": "tower_guard", "raises": { "Block": 3 },
+      "enchantments": [{ "id": "sturdy" }]
     },
     /* Four throws that barely cost anything to make. */
     {
       "id": "feathered_death",
-      "name": "Feathered Death",
-      "class": "Throwing",
-      "role": null,
-      "range": 190,
-      "damage": 9,
-      "cost": 15,
-      "manaCost": 0,
-      "forged": { "CritMultiplier": 1, "Charges": 3 },
-      "enchantments": [{ "id": "weightless" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "bandolier"
+      "name": "Feathered Death", "derivedFrom": "bandolier", "raises": { "Charges": 3 },
+      "enchantments": [{ "id": "weightless" }]
     },
     /* Ignores 9 Block across the swing. */
     {
       "id": "shieldbreaker",
-      "name": "Shieldbreaker",
-      "class": "Axe",
-      "role": null,
-      "range": 60,
-      "damage": 18,
-      "cost": 60,
-      "manaCost": 0,
-      "forged": { "Cleave": 1, "Splitting": 3, "Opportunist": 1 },
-      "enchantments": [{ "id": "momentum" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "reaver"
+      "name": "Shieldbreaker", "derivedFrom": "reaver", "raises": { "Splitting": 3 },
+      "enchantments": [{ "id": "momentum" }]
     },
     /* Finds the gap on 17+, and every kill funds the enchantments doing it. */
     {
       "id": "widowmaker",
-      "name": "Widowmaker",
-      "class": "Dagger",
-      "role": null,
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 3, "CritMultiplier": 1 },
-      "enchantments": [{ "id": "siphon" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "assassins_fang"
+      "name": "Widowmaker", "derivedFrom": "assassins_fang", "raises": { "CritWindow": 3 },
+      "enchantments": [{ "id": "siphon" }]
     },
     /* Three retaliations at full reach, from a line that cannot be moved. */
     {
       "id": "hoplites_wall",
-      "name": "Hoplite's Wall",
-      "class": "Spear",
-      "role": null,
-      "range": 128,
-      "damage": 7,
-      "cost": 55,
-      "manaCost": 0,
-      "forged": { "Brace": 3, "Longshot": 1 },
-      "enchantments": [{ "id": "immovable" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "phalanx_spear"
+      "name": "Hoplite's Wall", "derivedFrom": "phalanx_spear", "raises": { "Brace": 3 },
+      "enchantments": [{ "id": "immovable" }]
     },
     /* +3 a tile, and the shot does not stop at the first body. */
     {
       "id": "stormcrow",
-      "name": "Stormcrow",
-      "class": "Ranged",
-      "role": null,
-      "range": 320,
-      "damage": 5,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 1, "Longshot": 3 },
-      "enchantments": [{ "id": "piercing" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "longbow"
+      "name": "Stormcrow", "derivedFrom": "longbow", "raises": { "Longshot": 3 },
+      "enchantments": [{ "id": "piercing" }]
     },
     /* Stabs itself a shield: three souls in a line - the Light shape, x2 buying three. */
     {
       "id": "flensing_knife_unique", /* provisional */
-      "name": "Nameless Knife",
-      "class": "Dagger",
-      "role": null,
-      "range": 40,
-      "damage": 15,
-      "cost": 30,
-      "manaCost": 0,
-      "forged": { "CritWindow": 2, "CritMultiplier": 1, "Light": 1 },
-      "enchantments": [{ "id": "serrated" }, { "id": "vampiric", "tier": 3 }, { "id": "overheal" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "flensing_knife"
+      "name": "Nameless Knife", "derivedFrom": "flensing_knife", "raises": { "CritWindow": 2 },
+      "enchantments": [{ "id": "serrated" }, { "id": "vampiric", "tier": 3 }, { "id": "overheal" }]
     },
     /* A rot that starts where an ordinary staff's ends. */
     {
       "id": "rotwood",
-      "name": "Rotwood",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "poison", "tier": 3 }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "staff_of_blight"
+      "name": "Rotwood", "derivedFrom": "staff_of_blight", "raises": {},
+      "enchantments": [{ "id": "poison", "tier": 3 }]
     },
     /* A beam of plasma: two elements, each answering the chart. */
     {
       "id": "the_long_candle",
-      "name": "The Long Candle",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "shocking" }, { "id": "flaming" }],
-      "shape": { "kind": "Beam", "length": 224, "width": 32 },
-      "unique": true,
-      "derivedFrom": "wand_of_the_beam"
+      "name": "The Long Candle", "derivedFrom": "wand_of_the_beam", "raises": {},
+      "enchantments": [{ "id": "shocking" }, { "id": "flaming" }]
     },
     /* A circle that keeps burning after it lands. */
     {
       "id": "wand_of_the_nova_unique", /* provisional */
-      "name": "Nameless Nova",
-      "class": "Wand",
-      "role": null,
-      "range": 160,
-      "damage": 8,
-      "cost": 45,
-      "manaCost": 20,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "flaming" }, { "id": "burning" }],
-      "shape": { "kind": "Nova", "radius": 96 },
-      "unique": true,
-      "derivedFrom": "wand_of_the_nova"
+      "name": "Nameless Nova", "derivedFrom": "wand_of_the_nova", "raises": {},
+      "enchantments": [{ "id": "flaming" }, { "id": "burning" }]
     },
     /* Healing that stops being wasted on the healthy. */
     {
       "id": "staff_of_renewal_unique", /* provisional */
-      "name": "Nameless Renewal",
-      "class": "Staff",
-      "role": null,
-      "range": 100,
-      "damage": 0,
-      "cost": 40,
-      "manaCost": 15,
-      "forged": { "Resonant": 1 },
-      "enchantments": [{ "id": "regeneration" }, { "id": "overheal" }],
-      "shape": null,
-      "unique": true,
-      "derivedFrom": "staff_of_renewal"
+      "name": "Nameless Renewal", "derivedFrom": "staff_of_renewal", "raises": {},
+      "enchantments": [{ "id": "regeneration" }, { "id": "overheal" }]
     }
   ]
 }

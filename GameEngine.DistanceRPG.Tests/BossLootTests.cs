@@ -135,7 +135,7 @@ public class BossLootTests
             {
                 var drop = BossLoot.Roll(Boss(def), seed);
                 Assert.Equal(Grafted(VariantOf(drop), def.Theme), drop.Weapon.Forged);
-                if (ContentValidator.Signature.TryGetValue(drop.Weapon.Class, out var signature))
+                if (Weapons.Class(drop.Weapon.Class).Signature is { } signature)
                     Assert.True(drop.Weapon.Forged.Stacks(signature) >= 1, $"{drop.Weapon.Id} lost its class's {signature}");
             }
     }
@@ -393,7 +393,7 @@ public class BossLootTests
 
             Assert.Equal(new[] { hunted[def.Id] }, uniques.Distinct());
             var own = Weapons[hunted[def.Id]];
-            Assert.Equal((ContentValidator.ClassSignedBy(def.Theme), 3), ((WeaponClass?)own.Class, own.Forged[def.Theme]));
+            Assert.Equal((Weapons.ClassSignedBy(def.Theme), 3), ((WeaponClass?)own.Class, own.Forged[def.Theme]));
             double expected = 1.0 / Dungeons.ThemeClasses(def.Theme).Count / LootTable.Roles;
             Assert.InRange(uniques.Count / (double)Floors, expected - 0.02, expected + 0.02);
         }
@@ -714,14 +714,14 @@ public class BossLootTests
             var table = Dungeons.ThemeClasses(theme);
             foreach (var cls in AllEight)
             {
-                var variants = Weapon.KindOf(cls) == WeaponKind.Caster
+                var variants = Weapons.KindOf(cls) == WeaponKind.Caster
                     ? LootTable.CasterVariants[cls].Select(id => Weapons[id]).ToArray()
                     : Enum.GetValues<VariantRole>().Select(role => Weapons.Variant(cls, role)).ToArray();
                 bool allTake = true;
                 foreach (var variant in variants)
                 {
                     var spread = Spread(variant);
-                    bool can = Rules.CanGraft(theme, Weapon.KindOf(cls), spread, spread, asForged: true);
+                    bool can = Rules.CanGraft(theme, Weapons.KindOf(cls), spread, spread, asForged: true);
                     allTake &= can;
                     if (can)
                         Assert.Equal(Grafted(variant, theme), Weapons.Instantiate(variant.Id, cls == Wand ? DamageType.Cold : null, forgedGraft: theme).Forged);

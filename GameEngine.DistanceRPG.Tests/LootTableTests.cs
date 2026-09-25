@@ -113,7 +113,7 @@ public class LootTableTests
 
         // The same file with each caster class's variants reversed where they sit.
         var casters = ShippedContent.Weapons.Weapons
-            .Where(w => !w.Unique && Weapon.KindOf(w.Class) == WeaponKind.Caster)
+            .Where(w => !w.Unique && GameContent.Current.Weapons.KindOf(w.Class) == WeaponKind.Caster)
             .GroupBy(w => w.Class)
             .ToDictionary(g => g.Key, g => new Queue<WeaponDef>(g.Reverse()));
         var permuted = ShippedContent.Weapons.Weapons
@@ -670,7 +670,7 @@ public class LootTableTests
         // out of range — and every id it names is a variant of its own class.
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
-            bool caster = Weapon.KindOf(cls) == WeaponKind.Caster;
+            bool caster = GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster;
             Assert.Equal(caster, LootTable.CasterVariants.ContainsKey(cls));
             if (!caster) continue;
 
@@ -740,7 +740,7 @@ public class LootTableTests
 
         // The rule is the variant's alone: a unique carries its souls, and a
         // caster's innate is its identity.
-        Assert.All(GameContent.Current.Weapons.All.Where(w => !w.Unique && Weapon.KindOf(w.Class) != WeaponKind.Caster),
+        Assert.All(GameContent.Current.Weapons.All.Where(w => !w.Unique && GameContent.Current.Weapons.KindOf(w.Class) != WeaponKind.Caster),
             w => Assert.Empty(w.Enchantments));
         Assert.NotEmpty(GameContent.Current.Weapons["widowmaker"].Enchantments);
         Assert.NotEmpty(GameContent.Current.Weapons["staff_of_blight"].Enchantments);

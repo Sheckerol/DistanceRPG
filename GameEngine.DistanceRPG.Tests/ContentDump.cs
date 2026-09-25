@@ -13,10 +13,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// what a class carries beyond the statline and spread its variants already
 /// show. Whether a class casts is its kind (<see cref="Weapon.IsCaster"/> is
 /// <c>Kind == Caster</c>), so the kind line holds that too. Read from the code's
-/// tables (<see cref="Weapon.KindOf"/>, <see cref="Progression.Governing"/>,
-/// <see cref="ContentValidator.Signature"/>) until the classes become rows of
-/// <c>weapons.json</c> (Phase 5.R4), and from the content's class rows
-/// after;</item>
+/// tables until the classes became rows of <c>weapons.json</c> (Phase 5.R4), and
+/// from the content's class rows since (<see cref="WeaponCatalogue.Class"/>), so
+/// the rows typed by hand are held to what the code's tables held;</item>
 /// <item>every weapon row in <see cref="WeaponCatalogue.All"/> order, each of its
 /// fields — the forged spread in <see cref="ModifierType"/> order, the
 /// enchantments it arrives with in attachment order with their tiers, the
@@ -52,9 +51,10 @@ internal static class ContentDump
         {
             const string at = "class";
             string name = cls.ToString();
-            Line(at, name, "kind", Weapon.KindOf(cls).ToString());
-            Line(at, name, "stats", List(Progression.Governing(cls).Select(stat => stat.ToString())));
-            Line(at, name, "signature", ContentValidator.Signature.TryGetValue(cls, out var signature) ? signature.ToString() : "null");
+            var row = content.Weapons.Class(cls);
+            Line(at, name, "kind", row.Kind.ToString());
+            Line(at, name, "stats", List(row.Stats.Select(stat => stat.ToString())));
+            Line(at, name, "signature", row.Signature is { } signature ? signature.ToString() : "null");
         }
 
         foreach (var weapon in content.Weapons.All)

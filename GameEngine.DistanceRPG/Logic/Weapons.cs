@@ -184,15 +184,15 @@ public sealed class Weapon
 
     public bool Unique { get; }
 
-    /// <summary>The sort of weapon the relations file means by "kind": staff and wand cast, bow and throwing are ranged, the rest melee.</summary>
-    public static WeaponKind KindOf(WeaponClass cls) => cls switch
-    {
-        WeaponClass.Staff or WeaponClass.Wand => WeaponKind.Caster,
-        WeaponClass.Ranged or WeaponClass.Throwing => WeaponKind.Ranged,
-        _ => WeaponKind.Melee,
-    };
-
-    public WeaponKind Kind => KindOf(Class);
+    /// <summary>
+    /// The sort of weapon the relations file means by "kind" (§1.1): its class
+    /// row's in <c>weapons.json</c> (<see cref="WeaponCatalogue.KindOf"/>) — staff
+    /// and wand cast, bow and throwing are ranged, the rest melee, as the shipped
+    /// rows say. Read off the current content every time rather than kept on the
+    /// item, so a save holds nothing of it; the load itself builds no weapon, so
+    /// it never asks.
+    /// </summary>
+    public WeaponKind Kind => GameContent.Current.Weapons.KindOf(Class);
 
     /// <summary>True for a staff or wand — a weapon that casts rather than strikes.</summary>
     public bool IsCaster => Kind == WeaponKind.Caster;
@@ -309,7 +309,7 @@ public sealed class Weapon
         if (graft is not { } theme)
             return spread;
 
-        if (!GameContent.Current.Modifiers.CanGraft(theme, KindOf(def.Class), spread, spread, asForged: true))
+        if (!GameContent.Current.Modifiers.CanGraft(theme, GameContent.Current.Weapons.KindOf(def.Class), spread, spread, asForged: true))
             throw new ArgumentException(
                 $"'{def.Id}' cannot be forged with {theme} beside {spread}: every graft asks ModifierRules.CanGraft first, and a forged one the forge limit too.",
                 "forgedGraft");

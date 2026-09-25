@@ -87,7 +87,7 @@ public sealed class GameContent
     /// <summary>The §5.7 catalogue: the code's rows (<see cref="EnchantmentDefinitions"/>), with the tuning's dials laid over them.</summary>
     public EnchantmentCatalogue Enchantments { get; }
 
-    /// <summary>The §5.6 catalogue.</summary>
+    /// <summary>The §5.6 catalogue: the weapon classes' rows and the weapons.</summary>
     public WeaponCatalogue Weapons { get; }
 
     /// <summary>The §5.8 dungeons, and the drop tables their themes compute.</summary>
@@ -173,7 +173,8 @@ public sealed class GameContent
     /// chart its elements form, and its unique souls against
     /// <c>neverRolled</c>. The catalogue is code, so <c>restricted.json</c> is
     /// the file to fix, and the failure is stamped with it;</item>
-    /// <item><c>weapons.json</c>'s shape, then its semantics;</item>
+    /// <item><c>weapons.json</c>'s shape, then its semantics — its class rows
+    /// first, which every weapon after them is read against;</item>
     /// <item><c>dungeons.json</c>'s;</item>
     /// <item>the starting party, which is code, against the weapons it names:
     /// stamped <c>weapons.json</c>, with that file's built-in flag, since the one

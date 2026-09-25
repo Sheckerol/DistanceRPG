@@ -5,11 +5,13 @@ using static GameEngine.DistanceRPG.Logic.ModifierType;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// §5.6's <c>weapons.json</c> as a file (PHASE5-122, -123, -124, -133): the
-/// thirty-two variants and the uniques, "statline, forged spread, area shape,
-/// innate enchantment id", a row for a weapon and never a class baseline (bend
-/// (b)); read strictly, with a shape's zero dimensions and a tier of 1 left out;
-/// and a <c>restricted.json</c> edit that makes a weapon illegal stopping the game
+/// §5.6's <c>weapons.json</c> as a file (PHASE5-122, -123, -124, -133): the eight
+/// classes, the thirty-two variants and the uniques, in three sections — "the
+/// class baselines leave Weapons.cs" into the class rows (the content rework, 1d;
+/// Phase 5 USER DECISION 4, ruled), a variant written as its class and the one
+/// modifier it adds, a unique as its variant and what it raises; read strictly,
+/// with a shape's zero dimensions and a tier of 1 left out; and a
+/// <c>restricted.json</c> edit that makes a weapon illegal stopping the game
 /// naming both — the weapon, and the relation that refused it, asked of the one
 /// predicate every graft asks (<see cref="ModifierRules.Allowed"/>) and explained
 /// by <see cref="ContentValidator.WhyNotAllowed"/>. Every case reads text or
@@ -22,8 +24,12 @@ public class WeaponsJsonTests
 
     private static readonly string ShippedRestricted = DataTexts.Shipped.Restricted!;
 
-    private static readonly string[] Fields =
-        ["id", "name", "class", "role", "range", "damage", "cost", "manaCost", "forged", "enchantments", "shape", "unique", "derivedFrom"];
+    private static readonly string[] ClassFields = ["kind", "stats", "signature", "baseline", "range", "damage", "cost", "manaCost"];
+
+    /// <summary>A variant's fields: the seven every variant names, then the statline it may name as its own.</summary>
+    private static readonly string[] VariantFields = ["id", "name", "class", "role", "adds", "enchantments", "shape", "range", "damage", "cost", "manaCost"];
+
+    private static readonly string[] UniqueFields = ["id", "name", "derivedFrom", "raises", "enchantments"];
 
     private static ContentLoad Load(string? weapons = null, string? restricted = null)
         => ShippedData.Load(DataTexts.Shipped with { Weapons = weapons ?? Shipped, Restricted = restricted ?? ShippedRestricted });
@@ -50,55 +56,77 @@ public class WeaponsJsonTests
     {
         // PHASE5-123, -124: "the 32 weapons, the uniques, and the class baselines
         // leave Weapons.cs" — "statline, forged spread, area shape, innate
-        // enchantment id". The shipped file is the master copy of every weapon:
-        // no second record of them is kept to hold it to.
+        // enchantment id". The shipped file is the master copy of every weapon
+        // and every class: no second record of them is kept to hold it to.
         string text = ShippedData.Texts.Weapons!;
-        var read = WeaponsJson.Read(text).Weapons;
+        var data = WeaponsJson.Read(text);
+        var read = data.Weapons;
         Assert.Equal(32, read.Count(w => !w.Unique));
         Assert.Equal(11, read.Count(w => w.Unique));
 
-        // The file's one member is the list — no baselines section (bend (b),
-        // USER DECISION 4) — and every row names all thirteen fields, the record's
-        // parameters camel-cased, in the record's order.
+        // Three sections (the content rework, 1d; Phase 5 USER DECISION 4, ruled):
+        // the classes, by their C# names, every one in the enum's order, each
+        // naming all eight of a class's fields in the record's order; the
+        // variants, each naming the seven every variant names, and a statline
+        // field only where it plays its own; the uniques, each naming its five.
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
-        Assert.Equal(["weapons"], document.RootElement.EnumerateObject().Select(member => member.Name));
-        var rows = document.RootElement.GetProperty("weapons").EnumerateArray().ToList();
-        Assert.All(rows, row => Assert.Equal(Fields, row.EnumerateObject().Select(member => member.Name)));
+        Assert.Equal(["classes", "variants", "uniques"], document.RootElement.EnumerateObject().Select(member => member.Name));
+        var classes = document.RootElement.GetProperty("classes").EnumerateObject().ToList();
+        Assert.Equal(Enum.GetNames<WeaponClass>(), classes.Select(member => member.Name));
+        Assert.All(classes, member => Assert.Equal(ClassFields, member.Value.EnumerateObject().Select(field => field.Name)));
+        var variantRows = document.RootElement.GetProperty("variants").EnumerateArray().ToList();
+        var uniqueRows = document.RootElement.GetProperty("uniques").EnumerateArray().ToList();
+        Assert.All(variantRows, row => Assert.Equal(VariantFields.Take(7), row.EnumerateObject().Select(field => field.Name).Where(name => VariantFields.Take(7).Contains(name))));
+        Assert.All(variantRows, row => Assert.Subset(VariantFields.ToHashSet(), row.EnumerateObject().Select(field => field.Name).ToHashSet()));
+        Assert.All(uniqueRows, row => Assert.Equal(UniqueFields, row.EnumerateObject().Select(field => field.Name)));
 
-        // The statline by field; the forged spread by modifier name; a wand's shape;
-        // the enchantments by id, with a tier where it is not 1.
-        JsonElement Row(string id) => rows.Single(row => row.GetProperty("id").GetString() == id);
+        // The statline is the class's, and a variant's own where it names one; the
+        // forged spread the class baseline plus what the variant adds, by modifier
+        // name; a wand's shape; the enchantments by id, with a tier where it is not 1.
+        JsonElement Row(string id) => variantRows.Concat(uniqueRows).Single(row => row.GetProperty("id").GetString() == id);
+        WeaponDef Played(string id) => read.Single(w => w.Id == id);
         var knife = Row("flensing_knife");
-        Assert.Equal(("Dagger", "Efficiency", 40, 15, 30, 0), (knife.GetProperty("class").GetString(), knife.GetProperty("role").GetString(),
-            knife.GetProperty("range").GetInt32(), knife.GetProperty("damage").GetInt32(), knife.GetProperty("cost").GetInt32(), knife.GetProperty("manaCost").GetInt32()));
-        Assert.Equal(["CritWindow", "CritMultiplier", "Light"], knife.GetProperty("forged").EnumerateObject().Select(member => member.Name));
+        Assert.Equal(("Dagger", "Efficiency"), (knife.GetProperty("class").GetString(), knife.GetProperty("role").GetString()));
+        Assert.Equal((40, 15, 30, 0), (Played("flensing_knife").Range, Played("flensing_knife").Damage, Played("flensing_knife").Cost, Played("flensing_knife").ManaCost));
+        Assert.Equal(["Light"], knife.GetProperty("adds").EnumerateObject().Select(member => member.Name));
+        Assert.Equal([CritWindow, CritMultiplier, Light], Played("flensing_knife").Forged.Keys);
+        var mire = Row("staff_of_mire");
+        Assert.Equal(["manaCost"], mire.EnumerateObject().Select(field => field.Name).Except(VariantFields.Take(7)));
+        Assert.Equal((data.ClassOf(WeaponClass.Staff)!.Range, mire.GetProperty("manaCost").GetInt32()), (Played("staff_of_mire").Range, Played("staff_of_mire").ManaCost));
         Assert.Equal("{ \"kind\": \"Blast\", \"radius\": 48, \"targetReach\": 160 }", Row("wand_of_the_blast").GetProperty("shape").GetRawText());
         Assert.Equal(JsonValueKind.Null, knife.GetProperty("shape").ValueKind);
         Assert.Equal("[{ \"id\": \"serrated\" }, { \"id\": \"vampiric\", \"tier\": 3 }, { \"id\": \"overheal\" }]",
             Row("flensing_knife_unique").GetProperty("enchantments").GetRawText());
         Assert.Equal("[{ \"id\": \"regeneration\" }]", Row("staff_of_renewal").GetProperty("enchantments").GetRawText());
         Assert.Equal("flensing_knife", Row("flensing_knife_unique").GetProperty("derivedFrom").GetString());
-        Assert.Equal(JsonValueKind.Null, Row("flensing_knife_unique").GetProperty("role").ValueKind);
+        Assert.Null(Played("flensing_knife_unique").Role);
 
-        // The baselines are derived, never written: what a class's four variants
-        // share is its signature and one other modifier, as RuleClassBaseline
-        // checks — and the file loads, so it checked.
-        var baselines = new Dictionary<WeaponClass, (ModifierType, ModifierType)>
+        // The baselines are the rows': each class names its signature and a
+        // baseline of it and one other modifier — a caster Resonant x1 and no
+        // signature — as RuleClassBaseline and RuleCasterForged check, and it is
+        // exactly what the class's four variants share. The file loads, so it checked.
+        var baselines = new Dictionary<WeaponClass, (ModifierType? Signature, ModifierType[] Baseline)>
         {
-            [WeaponClass.Dagger] = (CritWindow, CritMultiplier),
-            [WeaponClass.Sword] = (Block, Push),
-            [WeaponClass.Spear] = (Brace, Longshot),
-            [WeaponClass.Axe] = (Cleave, Opportunist),
-            [WeaponClass.Ranged] = (Longshot, CritWindow),
-            [WeaponClass.Throwing] = (Charges, CritMultiplier),
+            [WeaponClass.Dagger] = (CritWindow, [CritWindow, CritMultiplier]),
+            [WeaponClass.Sword] = (Block, [Block, Push]),
+            [WeaponClass.Spear] = (Brace, [Brace, Longshot]),
+            [WeaponClass.Axe] = (Cleave, [Cleave, Opportunist]),
+            [WeaponClass.Ranged] = (Longshot, [Longshot, CritWindow]),
+            [WeaponClass.Throwing] = (Charges, [Charges, CritMultiplier]),
+            [WeaponClass.Staff] = (null, [Resonant]),
+            [WeaponClass.Wand] = (null, [Resonant]),
         };
-        foreach (var (cls, (signature, second)) in baselines)
+        foreach (var (cls, (signature, baseline)) in baselines)
         {
+            var row = data.ClassOf(cls)!;
+            Assert.Equal(signature, row.Signature);
+            Assert.Equal(baseline.ToHashSet(), row.Baseline.Keys.ToHashSet());
+            Assert.All(row.Baseline.Values, stacks => Assert.Equal(1, stacks));
+
             var variants = read.Where(w => w.Class == cls && !w.Unique).ToList();
             Assert.Equal(4, variants.Count);
             var shared = Enum.GetValues<ModifierType>().Where(t => variants.All(v => v.Forged.GetValueOrDefault(t) > 0)).ToHashSet();
-            Assert.Equal(new HashSet<ModifierType> { signature, second }, shared);
-            Assert.Equal(signature, ContentValidator.Signature[cls]);
+            Assert.Equal(baseline.ToHashSet(), shared);
         }
         Assert.Null(Load(text).Error);
     }
@@ -109,9 +137,9 @@ public class WeaponsJsonTests
         // 1h: a shape's zero dimensions and an enchantment's tier of 1 may be left
         // out, and read as the number left out: a Nova names its radius alone, a
         // Beam its length and width, a tier-1 soul its id alone.
-        Assert.Contains("\"shape\": { \"kind\": \"Nova\", \"radius\": 96 },", Shipped);
-        Assert.Contains("\"shape\": { \"kind\": \"Beam\", \"length\": 224, \"width\": 32 },", Shipped);
-        Assert.Contains("\"shape\": { \"kind\": \"Cone\", \"length\": 128, \"angleDegrees\": 90 },", Shipped);
+        Assert.Contains("\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", Shipped);
+        Assert.Contains("\"shape\": { \"kind\": \"Beam\", \"length\": 224, \"width\": 32 }", Shipped);
+        Assert.Contains("\"shape\": { \"kind\": \"Cone\", \"length\": 128, \"angleDegrees\": 90 }", Shipped);
         var read = WeaponsJson.Read(Shipped).Weapons;
         Assert.Equal(AreaShape.Nova(radius: 96), read.Single(w => w.Id == "wand_of_the_nova").Shape);
         Assert.Equal(AreaShape.Cone(angleDegrees: 90, length: 128), read.Single(w => w.Id == "wand_of_the_cone").Shape);
@@ -121,7 +149,7 @@ public class WeaponsJsonTests
         // Written out, a default is the same number as left out: a Nova's width,
         // which it does not measure, as the 0 it is, and a soul's tier as 1.
         string spelled = DataTexts.Edit(DataTexts.InRow(Shipped, "wand_of_the_nova",
-            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 },", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"width\": 0 },"),
+            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"width\": 0 }"),
             "[{ \"id\": \"serrated\" }, { \"id\": \"vampiric\", \"tier\": 3 }", "[{ \"id\": \"serrated\", \"tier\": 1 }, { \"id\": \"vampiric\", \"tier\": 3 }");
         var spelledOut = WeaponsJson.Read(spelled).Weapons;
         Assert.Equal(read.Count, spelledOut.Count);
@@ -131,12 +159,12 @@ public class WeaponsJsonTests
         // A dimension its kind does not measure is a number nothing reads, and is
         // refused naming the path and what the kind does measure.
         var stray = Assert.Throws<ContentException>(() => WeaponsJson.Read(DataTexts.InRow(Shipped, "wand_of_the_nova",
-            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 },", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"length\": 64 },")));
-        Assert.Equal(("wand_of_the_nova", ContentValidator.RuleFileShape, "weapons.json: weapons[31].shape.length: is not a dimension of a Nova - a Nova measures radius"),
+            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"length\": 64 }")));
+        Assert.Equal(("wand_of_the_nova", ContentValidator.RuleFileShape, "weapons.json: variants[31].shape.length: is not a dimension of a Nova - a Nova measures radius"),
             (stray.EntryId, stray.Rule, stray.Detail));
         var kind = Assert.Throws<ContentException>(() => WeaponsJson.Read(DataTexts.InRow(Shipped, "wand_of_the_nova", "\"kind\": \"Nova\"", "\"kind\": \"Ring\"")));
         Assert.Equal(("wand_of_the_nova", ContentValidator.RuleFileShape), (kind.EntryId, kind.Rule));
-        Assert.StartsWith("weapons.json: weapons[31].shape.kind: is the text Ring, which names no AreaShapeKind", kind.Detail);
+        Assert.StartsWith("weapons.json: variants[31].shape.kind: is the text Ring, which names no AreaShapeKind", kind.Detail);
     }
 
     [Fact]
@@ -144,25 +172,30 @@ public class WeaponsJsonTests
     {
         // Content is strict (1h): a member the shape does not have, a value of the
         // wrong kind, a field left out — each refused under the file's shape,
-        // naming the weapon and the path. A forged modifier that is no modifier is
-        // an id that resolves to nothing, pointing at the one it is nearest.
+        // naming the weapon and the path. A modifier that is no modifier is an id
+        // that resolves to nothing, pointing at the one it is nearest. The paths
+        // are the three sections' (the content rework, 1d): the Arming Sword is
+        // variants[4], the Staff of Renewal variants[24].
         (string Text, string Entry, string Rule, string Detail)[] cases =
         [
-            (DataTexts.InRow(Shipped, "arming_sword", "\"forged\": { \"Block\": 1,", "\"forged\": { \"Blok\": 1,"), "arming_sword", ContentValidator.RuleUnknownId,
-                "weapons.json: weapons[4].forged.Blok: is not a modifier - did you mean Block?"),
-            (DataTexts.InRow(Shipped, "arming_sword", "\"unique\": false,", "\"unique\": false,\n      \"baseline\": null,"), "arming_sword", ContentValidator.RuleFileShape,
-                "weapons.json: weapons[4].baseline: is not a member here - the members are " + string.Join(", ", Fields)),
+            (DataTexts.InRow(Shipped, "arming_sword", "\"adds\": { \"Light\": 1 }", "\"adds\": { \"Blok\": 1 }"), "arming_sword", ContentValidator.RuleUnknownId,
+                "weapons.json: variants[4].adds.Blok: is not a modifier - did you mean Block?"),
+            // A class's field on a variant: the baseline is its class row's to name.
+            (DataTexts.InRow(Shipped, "arming_sword", "\"shape\": null", "\"shape\": null,\n      \"baseline\": null"), "arming_sword", ContentValidator.RuleFileShape,
+                "weapons.json: variants[4].baseline: is not a member here - the members are " + string.Join(", ", VariantFields)),
             (DataTexts.InRow(Shipped, "arming_sword", "\"class\": \"Sword\",", "\"class\": \"Swords\","), "arming_sword", ContentValidator.RuleFileShape,
-                "weapons.json: weapons[4].class: is the text Swords, which names no WeaponClass - did you mean Sword?"),
-            (DataTexts.InRow(Shipped, "arming_sword", "\"range\": 80,", "\"range\": \"80\","), "arming_sword", ContentValidator.RuleFileShape,
-                "weapons.json: weapons[4].range: is the text 80, not a whole number"),
-            (DataTexts.InRow(Shipped, "arming_sword", "\"damage\": 10,\n", ""), "arming_sword", ContentValidator.RuleFileShape,
-                "weapons.json: weapons[4].damage: is missing"),
-            (DataTexts.InRow(Shipped, "arming_sword", "\"forged\": { \"Block\": 1, \"Light\": 1, \"Push\": 1 }", "\"forged\": { \"Block\": 1, \"Block\": 2 }"), "arming_sword",
-                ContentValidator.RuleFileShape, "weapons.json: weapons[4].forged.Block: is named twice"),
+                "weapons.json: variants[4].class: is the text Swords, which names no WeaponClass - did you mean Sword?"),
+            // A statline the variant names as its own is a whole number, like the class's.
+            (DataTexts.InRow(Shipped, "arming_sword", "\"adds\": { \"Light\": 1 },", "\"adds\": { \"Light\": 1 }, \"range\": \"80\","), "arming_sword", ContentValidator.RuleFileShape,
+                "weapons.json: variants[4].range: is the text 80, not a whole number"),
+            (DataTexts.InRow(Shipped, "arming_sword", "\"role\": \"Efficiency\", ", ""), "arming_sword", ContentValidator.RuleFileShape,
+                "weapons.json: variants[4].role: is missing"),
+            (DataTexts.InRow(Shipped, "arming_sword", "\"adds\": { \"Light\": 1 }", "\"adds\": { \"Light\": 1, \"Light\": 2 }"), "arming_sword",
+                ContentValidator.RuleFileShape, "weapons.json: variants[4].adds.Light: is named twice"),
             (DataTexts.InRow(Shipped, "staff_of_renewal", "[{ \"id\": \"regeneration\" }]", "[\"regeneration\"]"), "staff_of_renewal", ContentValidator.RuleFileShape,
-                "weapons.json: weapons[24].enchantments[0]: is the text regeneration, not an enchantment: a table of its id and, when it is not 1, its tier"),
-            ("{ \"weapons\": {} }", WeaponsJson.FileName, ContentValidator.RuleFileShape, "weapons.json: weapons: is a table, not a list of weapons"),
+                "weapons.json: variants[24].enchantments[0]: is the text regeneration, not an enchantment: a table of its id and, when it is not 1, its tier"),
+            ("{ \"classes\": [], \"variants\": [], \"uniques\": [] }", WeaponsJson.FileName, ContentValidator.RuleFileShape,
+                "weapons.json: classes: is a list, not a table of each class to its row"),
         ];
         foreach (var (text, entry, rule, detail) in cases)
         {
@@ -175,7 +208,7 @@ public class WeaponsJsonTests
         }
 
         // Comments and trailing commas are fine: a human edits the file.
-        string relaxed = DataTexts.InRow(Shipped, "arming_sword", "\"derivedFrom\": null", "\"derivedFrom\": null, // the dummies' sword\n");
+        string relaxed = DataTexts.InRow(Shipped, "arming_sword", "\"shape\": null", "\"shape\": null, // the dummies' sword\n");
         Assert.Null(Load(relaxed).Error);
     }
 
@@ -294,12 +327,13 @@ public class WeaponsJsonTests
             ContentValidator.WhyNotAllowed(Rout, WeaponKind.Melee, ModifierSet.Of((Block, 1)), shipped));
         Assert.Null(ContentValidator.WhyNotAllowed(Rout, WeaponKind.Melee, ModifierSet.Of((Cleave, 1)), shipped));
 
-        // And every shipped spread is allowed as it is forged: nothing to name.
+        // And every shipped spread is allowed as it is forged, on the kind its
+        // class row gives it: nothing to name.
         foreach (var def in ShippedContent.Weapons.Weapons)
         {
             var spread = ModifierSet.Of(def.Forged.Select(entry => (entry.Key, entry.Value)).ToArray());
             foreach (var (t, _) in spread.Entries)
-                Assert.Null(ContentValidator.WhyNotAllowed(t, Weapon.KindOf(def.Class), spread, shipped));
+                Assert.Null(ContentValidator.WhyNotAllowed(t, ShippedContent.Weapons.ClassOf(def.Class)!.Kind, spread, shipped));
         }
     }
 
@@ -317,7 +351,9 @@ public class WeaponsJsonTests
         Assert.Equal("the code names it as what a dummy holds unless told otherwise (EnemyState.DefaultWeaponId), and weapons.json has no such weapon", sword.Detail);
         Assert.Equal(EnemyState.DefaultWeaponId, sword.EntryId);
 
-        var staff = Load(DataTexts.WithoutRow(Shipped, "staff_of_renewal")).Error!;
+        // The staff goes with the unique made from it, which the reader would
+        // otherwise refuse first for deriving from nothing.
+        var staff = Load(DataTexts.WithoutRow(DataTexts.WithoutRow(Shipped, "staff_of_renewal_unique"), "staff_of_renewal")).Error!;
         Assert.Equal(("staff_of_renewal", ContentValidator.RuleCodeNamedWeaponsExist, WeaponsJson.FileName), (staff.EntryId, staff.Rule, staff.File));
         Assert.Contains("EnemyPlacer.HealerWeaponId", staff.Detail);
         Assert.Equal(EnemyPlacer.HealerWeaponId, staff.EntryId);

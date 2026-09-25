@@ -27,7 +27,7 @@ public class DungeonContentTests
 
     /// <summary>The variants a drop of <paramref name="cls"/> rolls between: one per role for a martial class, the code-fixed list for a caster.</summary>
     private static IEnumerable<WeaponDef> DropVariants(WeaponClass cls)
-        => Weapon.KindOf(cls) == WeaponKind.Caster
+        => Weapons.KindOf(cls) == WeaponKind.Caster
             ? LootTable.CasterVariants[cls].Select(id => Weapons[id])
             : Enum.GetValues<VariantRole>().Select(role => Weapons.Variant(cls, role));
 
@@ -35,7 +35,7 @@ public class DungeonContentTests
     private static bool TakesForged(ModifierType theme, WeaponDef variant)
     {
         var spread = Spread(variant);
-        return Rules.CanGraft(theme, Weapon.KindOf(variant.Class), spread, spread, asForged: true);
+        return Rules.CanGraft(theme, Weapons.KindOf(variant.Class), spread, spread, asForged: true);
     }
 
     /// <summary>The shipped dungeons with <paramref name="edit"/> applied to the one named <paramref name="id"/>.</summary>
@@ -149,13 +149,13 @@ public class DungeonContentTests
         // weapon carrying nothing can.
         Assert.Equal(WeaponKind.Melee, Rules.RequiresKind[Brace]);
         Assert.True(Rules.CanGraft(Brace, WeaponKind.Melee, ModifierSet.Empty, ModifierSet.Empty, asForged: true));
-        Assert.Equal(WeaponKind.Ranged, Weapon.KindOf(Ranged));
-        Assert.Equal(WeaponKind.Ranged, Weapon.KindOf(Throwing));
-        Assert.Equal(WeaponKind.Caster, Weapon.KindOf(Staff));
-        Assert.Equal(WeaponKind.Caster, Weapon.KindOf(Wand));
+        Assert.Equal(WeaponKind.Ranged, Weapons.KindOf(Ranged));
+        Assert.Equal(WeaponKind.Ranged, Weapons.KindOf(Throwing));
+        Assert.Equal(WeaponKind.Caster, Weapons.KindOf(Staff));
+        Assert.Equal(WeaponKind.Caster, Weapons.KindOf(Wand));
         foreach (var cls in new[] { Ranged, Throwing, Staff, Wand })
         {
-            Assert.False(Rules.CanGraft(Brace, Weapon.KindOf(cls), ModifierSet.Empty, ModifierSet.Empty, asForged: true), cls.ToString());
+            Assert.False(Rules.CanGraft(Brace, Weapons.KindOf(cls), ModifierSet.Empty, ModifierSet.Empty, asForged: true), cls.ToString());
             Assert.All(DropVariants(cls), v => Assert.False(TakesForged(Brace, v), v.Id));
         }
 
@@ -258,13 +258,15 @@ public class DungeonContentTests
     public void AThemeIsAClassSignature_PinLightAndCritMultiplierAreRefused()
     {
         // Themes are drawn from class signatures -- the modifiers a Purity variant
-        // doubles (PHASE4-069). The compiled table holds six.
-        var signatures = AllEight.Where(ContentValidator.Signature.ContainsKey).Select(cls => ContentValidator.Signature[cls]).ToArray();
+        // doubles (PHASE4-069). The class rows of weapons.json name six; the two
+        // casters name none.
+        var signed = AllEight.Where(cls => Weapons.Class(cls).Signature is not null).ToArray();
+        var signatures = signed.Select(cls => Weapons.Class(cls).Signature!.Value).ToArray();
         Assert.Equal(new[] { CritWindow, Block, Brace, Cleave, Longshot, Charges }, signatures);
-        foreach (var cls in AllEight.Where(ContentValidator.Signature.ContainsKey))
+        foreach (var cls in signed)
         {
-            Assert.Equal(2, Weapons.Variant(cls, VariantRole.Purity).Forged[ContentValidator.Signature[cls]]);
-            Assert.Equal(cls, ContentValidator.ClassSignedBy(ContentValidator.Signature[cls]));
+            Assert.Equal(2, Weapons.Variant(cls, VariantRole.Purity).Forged[Weapons.Class(cls).Signature!.Value]);
+            Assert.Equal(cls, Weapons.ClassSignedBy(Weapons.Class(cls).Signature!.Value));
         }
 
         // Pin, a Control and Support modifier: no variant is forged x2 in it, so it
@@ -287,7 +289,7 @@ public class DungeonContentTests
 
         // Nothing outside the enum passes either.
         Refused(With("knife_warrens", d => d with { Theme = (ModifierType)99 }), "knife_warrens", ContentValidator.RuleThemeIsClassSignature);
-        Assert.Null(ContentValidator.ClassSignedBy(Pin));
+        Assert.Null(Weapons.ClassSignedBy(Pin));
     }
 
     [Fact]
@@ -299,7 +301,7 @@ public class DungeonContentTests
         var hunted = new List<(string Dungeon, string Unique)>();
         foreach (var def in Dungeons.All)
         {
-            var own = Assert.IsType<WeaponClass>(ContentValidator.ClassSignedBy(def.Theme));
+            var own = Assert.IsType<WeaponClass>(Weapons.ClassSignedBy(def.Theme));
             Assert.Contains(own, Dungeons.ThemeClasses(def.Theme));
 
             var purity = Weapons.Variant(own, VariantRole.Purity);
@@ -355,7 +357,7 @@ public class DungeonContentTests
         // shipped theme it is (PHASE4-058).
         foreach (var def in Dungeons.All)
         {
-            var own = Assert.IsType<WeaponClass>(ContentValidator.ClassSignedBy(def.Theme));
+            var own = Assert.IsType<WeaponClass>(Weapons.ClassSignedBy(def.Theme));
             var purity = Weapons.Variant(own, VariantRole.Purity);
             var unique = Weapons.UniqueDerivedFrom(purity.Id);
             Assert.NotNull(unique);
@@ -631,7 +633,7 @@ public class DungeonContentTests
         foreach (var def in Weapons.All.Where(d => !d.Unique))
         {
             var spread = Spread(def);
-            var kind = Weapon.KindOf(def.Class);
+            var kind = Weapons.KindOf(def.Class);
             foreach (var t in Enum.GetValues<ModifierType>())
             {
                 Assert.Equal(Rules.Allowed(t, kind, spread), Rules.CanGraft(t, kind, spread, spread, asForged: false));

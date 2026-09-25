@@ -239,15 +239,43 @@ everything in them is named by a stable string id.
   lost with it), and a copy found there anyway is named on screen as no longer read
   (`PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE
   (LOGIC/CONTENT/STARTINGPARTY.CS)`), its path in the log.
-- **`weapons.json`** holds every weapon: the thirty-two variants (eight classes
-  of four) and the uniques, each with its statline (`range`, `damage`, `cost`,
-  `manaCost`), its forged spread (`"forged": { "Block": 1, "Push": 1 }`), the
-  enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier left
-  out when it is 1) and a wand's `shape`. A class's baseline is not written
-  anywhere: it is what the class's four variants share, so re-basing a class is
-  an edit to all four. Give the Weakspot Stiletto `"damage": 25` and restart, and
-  A hits harder. `arming_sword` (what a dummy holds) and `staff_of_renewal` (a
-  crowded room's healer) are named by the code, so they must stay.
+- **`weapons.json`** holds every weapon class and every weapon, in three
+  sections:
+  - `classes` gives each of the eight classes (`Dagger`, `Sword`, `Spear`, `Axe`,
+    `Ranged`, `Throwing`, `Staff`, `Wand`) one row: its `kind` (`melee`, `ranged`
+    or `caster` — the Staff and the Wand cast, and no other class may), the
+    `stats` it levels on (`["STR", "DEX"]` for the Sword, the better of the two
+    counting; never `CON`), its `signature` (the modifier it is named for, which
+    its Purity variant deepens and a dungeon's theme is drawn from; `null` for a
+    caster), its `baseline` (`{ "Block": 1, "Push": 1 }`: what every weapon of the
+    class is forged with) and the statline its weapons share (`range`, `damage`,
+    `cost`, `manaCost`). Re-basing a class is one edit to its row: give the Dagger
+    row `"damage": 17` and restart, and every dagger — the uniques made from them
+    too — hits for 17. A class row left out, or one the game cannot level or cast
+    with (a `Staff` that is `melee`, `stats` naming `CON`, a signature another class
+    has), stops the game naming `WEAPONS.JSON` and the class.
+  - `variants` lists the thirty-two weapons a drop or a dummy carries, each as its
+    `class`, its `role` and the modifiers it `adds` to its class's baseline, with
+    the enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier
+    left out when it is 1) and a wand's `shape`. A variant may name its own
+    `range`, `damage`, `cost` or `manaCost`, which then plays for it alone — the
+    Staff of Renewal's and the Staff of Mire's mana do. Give the Weakspot Stiletto
+    `"damage": 25` and restart, and A hits harder while the other daggers do not.
+  - `uniques` lists the artifacts, each as the variant it is `derivedFrom` —
+    whose class, statline and shape it takes — the modifiers it `raises` (set to
+    the count given, not added to) and its enchantments.
+
+  `arming_sword` (what a dummy holds) and `staff_of_renewal` (a crowded room's
+  healer) are named by the code, so they must stay, and so must a variant of each
+  class a dummy can be placed holding (Dagger, Sword, Spear, Axe, Throwing).
+- **An old-format `weapons.json` beside the exe stops the game.** Before the
+  classes section the file was one `weapons` list, every weapon naming all its
+  fields. A copy in that format beside the exe — one edited there after its
+  master, or one an earlier `--write-data <exe folder>` wrote, newer than the
+  master so a build keeps it — opens the game on `THE GAME CANNOT START`, naming
+  `WEAPONS.JSON` and `CLASSES` and saying the file predates the classes section:
+  delete it and the built-in weapons play (the screen says the file is missing),
+  or run `--write-data <exe folder>` to write the current copy there.
 - **`dungeons.json`** holds the dungeons the screen between runs lists: `theme`,
   `attunement` (a damage type, or `null`), `bossFloorMin`/`bossFloorMax` (`null`
   plays `tuning.json`'s range), the `boss` (its statline and `innate` modifiers)
@@ -259,8 +287,9 @@ everything in them is named by a stable string id.
   — the four dungeons beside the tutorial and their bosses, and the three
   unnamed uniques — a first guess, expected to move after play.
 - **The files in `GameEngine.DistanceRPG/Data/` are the master copies** — of every
-  relation, weapon and dungeon — hand-kept, with the reason for each group, class
-  and boss written beside it; the game keeps no copy of any in its code. As with
+  relation, weapon class, weapon and dungeon — hand-kept, with the reason for each
+  group, class and boss written beside it; the game keeps no copy of any in its
+  code. As with
   `tuning.json`, the game is built with each inside and plays that built-in copy
   when the copy beside the exe is missing or cannot be read, and a build copies
   each beside the exe (`bin/Debug/net10.0/`) whenever the master is newer: edit

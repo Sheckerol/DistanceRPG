@@ -6,9 +6,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// the game's code, reference data by the user's ruling of 2026-09-25, and
 /// needs nothing else; then the relations, because they are the predicates
 /// everything after them is checked against, and the catalogue against them;
-/// then the weapons, which name enchantments; then the dungeons, whose themes
-/// name modifiers and whose drop tables are computed over the weapons; the
-/// starting party last, because it names specific weapons. Every failure throws
+/// then the weapons — their class rows first — which name enchantments; then the
+/// dungeons, whose themes name the classes' signatures and whose drop tables are
+/// computed over the weapons; the starting party last, because it names
+/// specific weapons. Every failure throws
 /// a <see cref="ContentException"/> naming the entry and the rule; the first
 /// failure aborts, in a fixed check order, so the report is deterministic.
 /// (§5.7's "every effect reference resolves to an EffectKind" holds by
@@ -183,8 +184,8 @@ public static class ContentValidator
     /// excluding each other. The combo platform of §1.5 — the only weapons an
     /// enchantment may depend on another existing on, because they are the
     /// only ones that can pay for two triggers (Light earns the mana, Resonant
-    /// spends less of it). Compiled, like <see cref="Signature"/>: what a group
-    /// of modifiers is for is code; which weapon carries them is data.
+    /// spends less of it). Compiled: what a group of modifiers is for is code;
+    /// which weapon carries them is data.
     /// </summary>
     private static readonly ModifierType[] CurrencyGroup = [ModifierType.Light, ModifierType.Resonant];
 
@@ -208,16 +209,59 @@ public static class ContentValidator
     public const string RuleMartialVariantNoEnchantment = "a martial variant arrives carrying no enchantment of its own";
 
     /// <summary>
-    /// The weapons the code names by id resolve (1a): what a dummy holds unless
-    /// told otherwise (<see cref="EnemyState.DefaultWeaponId"/>, instantiated by
-    /// every <c>new EnemyState</c>) and the staff a crowded room's healer is
-    /// converted to (<see cref="EnemyPlacer.HealerWeaponId"/>). A compiled
-    /// reference a <c>weapons.json</c> edit could otherwise orphan into a crash
-    /// one construction deep — the same kind of check as the drop pool's
+    /// Each <see cref="WeaponClass"/> member has one row in <c>weapons.json</c>'s
+    /// <c>classes</c> (the content rework, 1d): the code names every class — the
+    /// placer draws five, a staff and a wand are cast with, the save keys weapon XP
+    /// by class — so every class's kind, stats, signature, baseline and statline
+    /// must resolve. The reader refuses a file that leaves one out, as the file's
+    /// parse failure; <see cref="ValidateWeapons"/> refuses records built in code
+    /// that do. A code-names-it-so-it-must-resolve check, the kind
+    /// <see cref="RuleCodeNamedWeaponsExist"/> is, not a new invariant.
+    /// </summary>
+    public const string RuleEveryClassHasARow = "the classes section of weapons.json gives each of the eight classes one row";
+
+    /// <summary>
+    /// A class row's kind is <c>caster</c> exactly for the Staff and the Wand: the
+    /// code keys what a caster does on those two members — a staff's innate is its
+    /// cast, a wand's element and shape are supplied at instantiation, and the
+    /// caster drop order (<see cref="LootTable.CasterVariants"/>) names both — while
+    /// melee or ranged stays free for the six martial classes. A
+    /// code-names-it-so-the-row-must-fit check, not a new invariant.
+    /// </summary>
+    public const string RuleCasterClass = "a class casts exactly when the code casts with it: the Staff and the Wand";
+
+    /// <summary>
+    /// A class row levels on one stat or more, none named twice and never CON
+    /// (§2.2; <see cref="Progression.Governing"/>: CON governs no weapon — it is the
+    /// body's pool, not a craft). The reader refuses a name that is no
+    /// <see cref="Stat"/>; this refuses what a <see cref="Stat"/> list can still get
+    /// wrong, for a file and for records built in code alike.
+    /// </summary>
+    public const string RuleClassStats = "a class levels on one or more of STR, DEX and INT, each named once";
+
+    /// <summary>
+    /// No two class rows share a signature: a dungeon's theme finds its own class
+    /// by signature (<see cref="WeaponCatalogue.ClassSignedBy"/>, asked in enum
+    /// order), so a second class signed the same would never be found — a Ranged
+    /// row signed CritWindow over a CritWindow and Longshot baseline passes
+    /// <see cref="RuleClassBaseline"/> and would take a CritWindow theme from the
+    /// Dagger in silence.
+    /// </summary>
+    public const string RuleClassSignatureDistinct = "no two classes share a signature";
+
+    /// <summary>
+    /// The weapons the code names resolve (1a): what a dummy holds unless told
+    /// otherwise (<see cref="EnemyState.DefaultWeaponId"/>, instantiated by every
+    /// <c>new EnemyState</c>), the staff a crowded room's healer is converted to
+    /// (<see cref="EnemyPlacer.HealerWeaponId"/>), and a variant of every class the
+    /// placer draws rank and file from (<see cref="EnemyPlacer.PlacedClasses"/>),
+    /// which a floor's placement decodes its draw into. A compiled reference a
+    /// <c>weapons.json</c> edit could otherwise orphan into a crash one construction
+    /// deep, or one floor deep — the same kind of check as the drop pool's
     /// (<see cref="RuleDropPoolResolves"/>) and the caster drop order's
     /// (<see cref="RuleCasterVariantPool"/>), not a new invariant.
     /// </summary>
-    public const string RuleCodeNamedWeaponsExist = "every weapon the code names resolves: a dummy's default and the placer's healer staff";
+    public const string RuleCodeNamedWeaponsExist = "every weapon the code names resolves: the default a dummy holds, the healer staff, and a variant of each class the placer draws";
 
     /// <summary>The weapons the code names by id, each with what it is named as: <see cref="RuleCodeNamedWeaponsExist"/>'s list, in the order it is asked.</summary>
     private static readonly (string Id, string NamedAs)[] CodeNamedWeapons =
@@ -225,45 +269,6 @@ public static class ContentValidator
         (EnemyState.DefaultWeaponId, "what a dummy holds unless told otherwise (EnemyState.DefaultWeaponId)"),
         (EnemyPlacer.HealerWeaponId, "the staff a crowded room's healer carries (EnemyPlacer.HealerWeaponId)"),
     ];
-
-    /// <summary>
-    /// The "class feature" column of the §1.2 table (phase-1-modifiers.md:16-25):
-    /// the modifier a class is named for, which every variant of the class
-    /// carries and a Purity variant deepens. Compiled, like <see cref="Weapon.KindOf"/>,
-    /// because a class is code and so is what it is for. Casters are absent:
-    /// they vary by effect and shape rather than by role and are never checked
-    /// as variants.
-    /// <para>
-    /// It is also the set a dungeon's theme is drawn from (§4.3: "themes are
-    /// drawn from class signatures"), because only a signature has a Purity
-    /// variant that forges it at x2, which a boss's graft can take to x3 — the
-    /// dungeon's one unique. Internal so the dungeon checks and their tests read
-    /// the one table rather than restating it.
-    /// </para>
-    /// </summary>
-    internal static readonly IReadOnlyDictionary<WeaponClass, ModifierType> Signature = new Dictionary<WeaponClass, ModifierType>
-    {
-        [WeaponClass.Dagger] = ModifierType.CritWindow,
-        [WeaponClass.Sword] = ModifierType.Block,
-        [WeaponClass.Spear] = ModifierType.Brace,
-        [WeaponClass.Axe] = ModifierType.Cleave,
-        [WeaponClass.Ranged] = ModifierType.Longshot,
-        [WeaponClass.Throwing] = ModifierType.Charges,
-    };
-
-    /// <summary>
-    /// The class whose signature <paramref name="theme"/> is — a theme's "own
-    /// class" (§1.5, §4.3), the one its unique comes from — or null when it is
-    /// no class's signature. Asked in <see cref="WeaponClass"/> order rather than
-    /// by walking the dictionary, so the answer never depends on its layout.
-    /// </summary>
-    internal static WeaponClass? ClassSignedBy(ModifierType theme)
-    {
-        foreach (var cls in Enum.GetValues<WeaponClass>())
-            if (Signature.TryGetValue(cls, out var signature) && signature == theme)
-                return cls;
-        return null;
-    }
 
     /// <summary>
     /// The §5.3 checks on <c>tuning.json</c>, run first because tuning loads
@@ -526,9 +531,10 @@ public static class ContentValidator
         }
 
         // Whoever opens the game holding a staff or a wand is the party's
-        // caster; a bag staff would make the check vacuous, since every member
-        // carries one.
-        if (!data.Members.Any(m => Weapon.KindOf(weapons[m.StartingWeaponId].Class) == WeaponKind.Caster))
+        // caster — a caster by its class row, which casts exactly for those two
+        // (RuleCasterClass) — and a bag staff would make the check vacuous, since
+        // every member carries one.
+        if (!data.Members.Any(m => weapons.KindOf(weapons[m.StartingWeaponId].Class) == WeaponKind.Caster))
             throw new ContentException(RosterId, RulePartyHasACaster, "no member starts with a staff or a wand");
     }
 
@@ -542,7 +548,8 @@ public static class ContentValidator
     /// and the attunement; then the file-wide count of retiring dungeons.
     /// <list type="bullet">
     /// <item><strong>The theme is a class signature</strong> (§4.3's list, as
-    /// the compiled <see cref="Signature"/> table holds it), and its own class's
+    /// the class rows of <c>weapons.json</c> name them —
+    /// <see cref="WeaponCatalogue.ClassSignedBy"/>), and its own class's
     /// Purity variant has a unique raising it to its forge limit — the
     /// dungeon's one unique, the Purity coincidence §5.8 exists to protect. A
     /// theme that is not a signature "still works — it just quietly means that
@@ -590,7 +597,7 @@ public static class ContentValidator
     /// <param name="data">The dungeon rows, in file order.</param>
     /// <param name="tables">The drop and wield tables computed from <paramref name="modifiers"/> and <paramref name="weapons"/>.</param>
     /// <param name="modifiers">The in-flight rules the tables were computed from, whose forge limit a theme's unique must reach; never the current content's.</param>
-    /// <param name="weapons">The weapon catalogue whose uniques the themes hunt.</param>
+    /// <param name="weapons">The weapon catalogue whose class rows name the signatures a theme is drawn from, and whose uniques the themes hunt.</param>
     public static void ValidateDungeons(DungeonsData data, DungeonCatalogue tables, ModifierRules modifiers, WeaponCatalogue weapons)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -606,7 +613,7 @@ public static class ContentValidator
         foreach (var def in data.Dungeons)
         {
             var theme = def.Theme;
-            if (ClassSignedBy(theme) is not { } own)
+            if (weapons.ClassSignedBy(theme) is not { } own)
                 throw new ContentException(def.Id, RuleThemeIsClassSignature, $"{theme} is no class's signature");
 
             // The Purity variant forges its class's signature at x2; the unique
@@ -977,7 +984,13 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.6 checks on <c>weapons.json</c> (S:231-240): ids are unique; every
+    /// The §5.6 checks on <c>weapons.json</c> (S:231-240). The class rows first,
+    /// in <see cref="WeaponClass"/> order, each failure's entry the class
+    /// (<see cref="ValidateClasses"/>): one row a class, a kind that casts exactly
+    /// for the Staff and the Wand, the stats it levels on, a signature no other
+    /// class has, and a baseline of that signature and one more — or a caster's
+    /// <c>Resonant x1</c> and no signature. Then the weapon rows, each read as the
+    /// kind its class row gives it: ids are unique; every
     /// enchantment a weapon names resolves; every forged stack count is at least
     /// one; every forged modifier is allowed
     /// beside the rest of its spread — the state every later roll deepens
@@ -994,9 +1007,10 @@ public static class ContentValidator
     /// wands carry a shape, no wand carries a status-applying enchantment (an
     /// area cast is aimed at a point and names no target to land one on), and
     /// only martial variants carry a role; each martial class
-    /// fields four variants, one per role, on a two-modifier baseline, every
-    /// variant adding exactly one modifier type to it (Efficiency <c>Light x1</c>,
-    /// Purity the class signature again, Control and Support a new one); no
+    /// fields four variants, one per role, on its row's baseline — none carrying
+    /// less of it — every variant adding exactly one modifier type to it
+    /// (Efficiency <c>Light x1</c>, Purity the class signature again, Control and
+    /// Support a new one); no
     /// weapon arrives with two enchantments that exclude each other — opposed
     /// types cannot share a weapon (§1.4), Flaming and Cold excluding each
     /// other exactly as Push and Drag do, off the same groups, while
@@ -1016,9 +1030,11 @@ public static class ContentValidator
     /// <see cref="LootTable.CasterVariants"/> names, since the drop's draw
     /// indexes that rather than the file's order; and a martial variant carries
     /// no enchantment of its own, so the one entry a drop attaches is the one it
-    /// rolled. So do the two weapons the code names by id
+    /// rolled. So do the two weapons the code names by id and the classes the
+    /// placer draws, each of which must field a variant
     /// (<see cref="RuleCodeNamedWeaponsExist"/>), asked once every row has passed
-    /// its own checks and before the checks over whole classes.
+    /// its own checks and before the checks over whole classes — only "at least
+    /// one", so a class short of a role is still <see cref="RuleVariantRoles"/>'s.
     /// </para>
     /// <para>
     /// <strong>A relations edit that makes a weapon illegal names both</strong>
@@ -1039,6 +1055,10 @@ public static class ContentValidator
         ArgumentNullException.ThrowIfNull(restricted);
         ArgumentNullException.ThrowIfNull(enchantments);
 
+        // The class rows first: every weapon after them is read as the kind its
+        // row gives it, and every variant against its row's baseline.
+        ValidateClasses(data);
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var def in data.Weapons)
             if (!seen.Add(def.Id))
@@ -1048,7 +1068,8 @@ public static class ContentValidator
         foreach (var def in data.Weapons)
         {
             var spread = Spread(def);
-            var kind = Weapon.KindOf(def.Class);
+            var kind = (data.ClassOf(def.Class)
+                ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row")).Kind;
 
             foreach (var reference in def.Enchantments)
                 if (!enchantments.TryGet(reference.Id, out _))
@@ -1174,12 +1195,21 @@ public static class ContentValidator
                 throw new ContentException(id, RuleCodeNamedWeaponsExist,
                     $"the code names it as {namedAs}, and {WeaponsJson.FileName} has no such weapon");
 
-        var baselines = new Dictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>>();
+        // And a variant of every class the placer draws rank and file from: a
+        // floor's placement decodes its draw into one of them, so a class left
+        // empty would throw at the first floor rather than stop here. Only "at
+        // least one" — a class short of a role is RuleVariantRoles', below.
+        foreach (var cls in EnemyPlacer.PlacedClasses)
+            if (!data.Weapons.Any(w => w.Class == cls && !w.Unique))
+                throw new ContentException(cls.ToString(), RuleCodeNamedWeaponsExist,
+                    $"the placer draws dummies of the {cls} class (EnemyPlacer.PlacedClasses), and {WeaponsJson.FileName} has no {cls} variant");
+
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
             var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
             if (variants.Count == 0)
-                continue;   // a class the file leaves out is not malformed, only absent
+                continue;   // a class the file gives no weapon is not malformed, only absent, unless the placer draws it (above)
+            var row = data.ClassOf(cls)!;   // every class has its one row: ValidateClasses
 
             // A class with variants is a class a drop can roll (§3.1), and §3.2's
             // unique roll is a ruling: a won draw always yields a unique of the
@@ -1190,7 +1220,7 @@ public static class ContentValidator
             if (!data.Weapons.Any(w => w.Unique && w.Class == cls))
                 throw new ContentException(cls.ToString(), RuleClassCarriesAUnique, $"{variants.Count} variants, no unique");
 
-            if (Weapon.KindOf(cls) == WeaponKind.Caster)
+            if (row.Kind == WeaponKind.Caster)
             {
                 // Casters vary by effect and shape, not by role, so a drop's
                 // code-fixed draw indexes LootTable.CasterVariants rather than
@@ -1206,10 +1236,10 @@ public static class ContentValidator
                 continue;
             }
 
-            baselines[cls] = ValidateVariants(cls, variants);
+            ValidateVariants(row, variants);
         }
 
-        ValidateUniques(data, enchantments, baselines);
+        ValidateUniques(data, enchantments);
 
         // A check that reads restricted.json at the weapons' stage names it (1h).
         foreach (var id in restricted.ForgedOnly)
@@ -1320,14 +1350,92 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The per-class variant checks: four variants, one per role, on a
-    /// two-modifier baseline that holds the class signature, each adding
-    /// exactly one modifier type in the shape its role says. Returns the
-    /// baseline it checked, for the unique checks to read what each
-    /// variant added.
+    /// The class rows (the content rework, 1d), in <see cref="WeaponClass"/> order,
+    /// each failure's entry the class, each check one the code needs of a row
+    /// rather than a new invariant:
+    /// <list type="number">
+    /// <item>one row a class (<see cref="RuleEveryClassHasARow"/>) — the reader's
+    /// refusal for a file, this one for records built in code, which bypass it;</item>
+    /// <item>a kind that is <c>caster</c> exactly for the Staff and the Wand, which
+    /// the code casts with (<see cref="RuleCasterClass"/>);</item>
+    /// <item>one stat or more to level on, none twice, never CON
+    /// (<see cref="RuleClassStats"/>);</item>
+    /// <item>a signature no class before it in the enum has
+    /// (<see cref="RuleClassSignatureDistinct"/>), since a theme finds its class
+    /// by signature;</item>
+    /// <item>a martial row's signature and baseline: a signature, and a baseline
+    /// of exactly it and one other modifier (<see cref="RuleClassBaseline"/>); a
+    /// caster row's: no signature, and a baseline of <c>Resonant x1</c>
+    /// (<see cref="RuleCasterForged"/>).</item>
+    /// </list>
     /// </summary>
-    private static IReadOnlyDictionary<ModifierType, int> ValidateVariants(WeaponClass cls, List<WeaponDef> variants)
+    private static void ValidateClasses(WeaponsData data)
     {
+        var signedBy = new Dictionary<ModifierType, WeaponClass>();
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            string entry = cls.ToString();
+            var rows = data.Classes.Where(row => row.Class == cls).ToList();
+            if (rows.Count != 1)
+                throw new ContentException(entry, RuleEveryClassHasARow,
+                    rows.Count == 0 ? $"{WeaponsJson.FileName} has no {cls} row" : $"{rows.Count} {cls} rows");
+            var row = rows[0];
+
+            bool castsWith = cls is WeaponClass.Staff or WeaponClass.Wand;
+            if ((row.Kind == WeaponKind.Caster) != castsWith)
+                throw new ContentException(entry, RuleCasterClass, castsWith
+                    ? $"kind {KindWord(row.Kind)}, and the code casts with the {cls}"
+                    : $"kind {KindWord(row.Kind)}, and the code casts with the Staff and the Wand alone");
+
+            if (row.Stats.Count == 0)
+                throw new ContentException(entry, RuleClassStats, "levels on no stat");
+            var levelsOn = new HashSet<Stat>();
+            foreach (var stat in row.Stats)
+                if (!levelsOn.Add(stat))
+                    throw new ContentException(entry, RuleClassStats, $"names {stat} twice");
+            if (levelsOn.Contains(Stat.CON))
+                throw new ContentException(entry, RuleClassStats, "names CON, which governs no weapon: it is the pool of the body, not a craft");
+
+            if (row.Signature is { } signature)
+            {
+                if (signedBy.TryGetValue(signature, out var first))
+                    throw new ContentException(entry, RuleClassSignatureDistinct, $"{signature} is the signature of the {first} as well");
+                signedBy[signature] = cls;
+            }
+
+            string spread = row.Baseline.Count == 0
+                ? "nothing"
+                : string.Join(", ", row.Baseline.OrderBy(b => b.Key).Select(b => $"{b.Key} x{b.Value}"));
+            if (castsWith)
+            {
+                if (row.Signature is not null || row.Baseline.Count != 1 || row.Baseline.GetValueOrDefault(ModifierType.Resonant) != 1)
+                    throw new ContentException(entry, RuleCasterForged, $"signature {row.Signature?.ToString() ?? "none"}, baseline {spread}");
+            }
+            else if (row.Signature is not { } named || row.Baseline.Count != 2 || !row.Baseline.ContainsKey(named))
+            {
+                throw new ContentException(entry, RuleClassBaseline, $"baseline is {spread}, signature {row.Signature?.ToString() ?? "none"}");
+            }
+        }
+    }
+
+    /// <summary>A kind as <c>weapons.json</c> and <c>restricted.json</c> write it: melee, ranged or caster.</summary>
+    private static string KindWord(WeaponKind kind) => kind switch
+    {
+        WeaponKind.Melee => RestrictedData.MeleeKind,
+        WeaponKind.Ranged => RestrictedData.RangedKind,
+        WeaponKind.Caster => RestrictedData.CasterKind,
+        _ => kind.ToString(),
+    };
+
+    /// <summary>
+    /// The per-class variant checks, against the class's row: four variants, one
+    /// per role; none carrying less of a baseline modifier than the row forges,
+    /// and each adding exactly one modifier type to the baseline in the shape its
+    /// role says.
+    /// </summary>
+    private static void ValidateVariants(WeaponClassDef row, List<WeaponDef> variants)
+    {
+        var cls = row.Class;
         foreach (var role in Enum.GetValues<VariantRole>())
         {
             int count = variants.Count(v => v.Role == role);
@@ -1335,23 +1443,16 @@ public static class ContentValidator
                 throw new ContentException(cls.ToString(), RuleVariantRoles, $"{count} {role} variants");
         }
 
-        // The baseline is what every variant of the class carries: the per-type
-        // minimum over the four, which leaves each variant's own addition out.
-        // Two modifiers, one of them the class signature.
-        var baseline = new Dictionary<ModifierType, int>();
-        foreach (var t in Enum.GetValues<ModifierType>())
-        {
-            int min = variants.Min(v => v.Forged.GetValueOrDefault(t));
-            if (min > 0)
-                baseline[t] = min;
-        }
-        var signature = Signature[cls];
-        if (baseline.Count != 2 || !baseline.ContainsKey(signature))
-            throw new ContentException(cls.ToString(), RuleClassBaseline,
-                $"baseline is {string.Join(", ", baseline.Select(b => $"{b.Key} x{b.Value}"))}, signature {signature}");
-
+        // The baseline is the row's (ValidateClasses: the signature and one
+        // other). Every variant carries all of it, and one addition on top.
+        var baseline = row.Baseline;
+        var signature = row.Signature!.Value;
         foreach (var v in variants)
         {
+            foreach (var (under, n) in baseline.OrderBy(b => b.Key))
+                if (v.Forged.GetValueOrDefault(under) < n)
+                    throw new ContentException(v.Id, RuleVariantDelta, $"carries {under} x{v.Forged.GetValueOrDefault(under)}, below the x{n} of the {cls} baseline");
+
             var added = AddedTo(v, baseline);
             if (added.Count != 1)
                 throw new ContentException(v.Id, RuleVariantDelta, $"adds {added.Count} modifier types to the {cls} baseline");
@@ -1373,7 +1474,6 @@ public static class ContentValidator
                     break;
             }
         }
-        return baseline;
     }
 
     /// <summary>
@@ -1408,10 +1508,12 @@ public static class ContentValidator
     /// enchantments, one of them unique or at tier 3. A caster unique raises
     /// nothing — Resonant is forge-limited to x1 — and differs from its
     /// variant only in its enchantment list, which is the whole artifact and
-    /// takes one of three shapes (<see cref="ValidateCasterUniqueShape"/>).
+    /// takes one of three shapes (<see cref="ValidateCasterUniqueShape"/>). The
+    /// class's kind, signature and baseline are its row's. (The reader composes
+    /// a unique over the variant it names, so a file cannot break the first
+    /// three; records built in code can.)
     /// </summary>
-    private static void ValidateUniques(WeaponsData data, EnchantmentCatalogue enchantments,
-        IReadOnlyDictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>> baselines)
+    private static void ValidateUniques(WeaponsData data, EnchantmentCatalogue enchantments)
     {
         var byId = data.Weapons.ToDictionary(w => w.Id, StringComparer.Ordinal);
         foreach (var def in data.Weapons)
@@ -1435,7 +1537,8 @@ public static class ContentValidator
                 .Where(t => def.Forged.GetValueOrDefault(t) != variant.Forged.GetValueOrDefault(t))
                 .ToList();
 
-            if (Weapon.KindOf(def.Class) == WeaponKind.Caster)
+            var row = data.ClassOf(def.Class)!;   // the variant's class, which has its one row: ValidateClasses
+            if (row.Kind == WeaponKind.Caster)
             {
                 if (changed.Count != 0)
                     throw new ContentException(def.Id, RuleCasterUniqueEnchantments, $"changes {string.Join(", ", changed)}");
@@ -1445,7 +1548,7 @@ public static class ContentValidator
                 continue;
             }
 
-            var signature = Signature[def.Class];
+            var signature = row.Signature!.Value;   // a martial row names one: ValidateClasses
             if (variant.Forged.GetValueOrDefault(ModifierType.Light) > 0)
             {
                 // The Light shape: depth traded for souls, one per stack given up, floor x2.
@@ -1482,7 +1585,7 @@ public static class ContentValidator
             // modifier, which no role's unique raises. (The variant checks
             // above have passed, so the class has a baseline and the variant
             // one addition.)
-            var added = AddedTo(variant, baselines[def.Class]).Single();
+            var added = AddedTo(variant, row.Baseline).Single();
             if (raised != signature && raised != added)
                 throw new ContentException(def.Id, RuleUniqueRaisedByRole, variant.Role == VariantRole.Purity
                     ? $"raises {raised}: a unique of the Purity '{variant.Id}' deepens the {def.Class} signature {signature} alone"

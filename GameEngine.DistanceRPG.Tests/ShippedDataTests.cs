@@ -176,7 +176,10 @@ public class ShippedDataTests
         // and that --write-data writes the built-in copies out: so a playtester
         // reading the copy beside the executable knows where a change worth keeping
         // goes. And no shipped file names what the rework removed: the two files
-        // the game no longer reads, the compiled copy, or a generator.
+        // the game no longer reads, the compiled copy, or a generator — nor, since
+        // the weapon classes became rows of weapons.json (Phase 5.R4), the flat
+        // format's thirteen fields a weapon named, or the baseline re-based by an
+        // edit to all four of a class's variants.
         foreach (var (name, builtIn) in BuiltIn())
         {
             string text = builtIn!;
@@ -187,8 +190,10 @@ public class ShippedDataTests
             Assert.Contains("built with it inside", words, StringComparison.Ordinal);
             Assert.Contains("DistanceRPG --write-data <folder> writes the built-in copies out", words, StringComparison.Ordinal);
 
-            foreach (string removed in new[] { "enchantments.json", "party.json", "ContentDefaults", "generated" })
-                Assert.False(text.Contains(removed, StringComparison.OrdinalIgnoreCase), $"{name} names {removed}");
+            // Read as words, so a phrase a comment wraps over two lines is found too.
+            string flat = Regex.Replace(text, @"\s*\n \*\s*|\s+", " ");
+            foreach (string removed in new[] { "enchantments.json", "party.json", "ContentDefaults", "generated", "thirteen fields", "an edit to all four" })
+                Assert.False(flat.Contains(removed, StringComparison.OrdinalIgnoreCase), $"{name} names {removed}");
         }
     }
 }

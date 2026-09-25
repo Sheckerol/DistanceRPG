@@ -362,7 +362,7 @@ public static class LootTable
     /// </summary>
     internal static WeaponDef VariantOf(WeaponCatalogue catalogue, WeaponClass cls, int index)
     {
-        if (Weapon.KindOf(cls) != WeaponKind.Caster)
+        if (catalogue.KindOf(cls) != WeaponKind.Caster)
             return catalogue.Variant(cls, (VariantRole)index);
 
         var order = CasterVariants.TryGetValue(cls, out var named)
@@ -529,11 +529,12 @@ public static class LootTable
 
     /// <summary>
     /// The events a weapon of <paramref name="cls"/> actually raises: everything
-    /// strikes, lands a hit, kills and can be healed past full; a caster casts as
-    /// well. What an entry needs is one live behaviour among them — the test
+    /// strikes, lands a hit, kills and can be healed past full; a caster — a class
+    /// whose row in the loaded weapons is <see cref="WeaponKind.Caster"/> — casts
+    /// as well. What an entry needs is one live behaviour among them — the test
     /// <see cref="DropOrder"/> applies.
     /// </summary>
-    private static GameEvent[] RaisedBy(WeaponClass cls) => Weapon.KindOf(cls) == WeaponKind.Caster
+    private static GameEvent[] RaisedBy(WeaponClass cls) => GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster
         ? [GameEvent.Cast, GameEvent.DamageTaken, GameEvent.DamageDealt, GameEvent.Killed, GameEvent.HealingAboveFull]
         : [GameEvent.DamageTaken, GameEvent.DamageDealt, GameEvent.Killed, GameEvent.HealingAboveFull];
 }
