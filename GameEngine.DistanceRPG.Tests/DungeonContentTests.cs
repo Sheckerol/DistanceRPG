@@ -38,11 +38,11 @@ public class DungeonContentTests
         return Rules.CanGraft(theme, Weapon.KindOf(variant.Class), spread, spread, asForged: true);
     }
 
-    /// <summary>The compiled dungeons with <paramref name="edit"/> applied to the one named <paramref name="id"/>.</summary>
+    /// <summary>The shipped dungeons with <paramref name="edit"/> applied to the one named <paramref name="id"/>.</summary>
     private static DungeonsData With(string id, Func<DungeonDef, DungeonDef> edit)
         => new(ShippedContent.Dungeons.Dungeons.Select(d => d.Id == id ? edit(d) : d).ToList());
 
-    /// <summary>The compiled dungeons with <paramref name="extra"/> appended.</summary>
+    /// <summary>The shipped dungeons with <paramref name="extra"/> appended.</summary>
     private static DungeonsData Plus(DungeonDef extra) => new([.. ShippedContent.Dungeons.Dungeons, extra]);
 
     /// <summary>An unpinned, unattuned dungeon themed on <paramref name="theme"/>, its boss carrying the theme.</summary>
@@ -54,16 +54,16 @@ public class DungeonContentTests
     private static DungeonDef WithInnate(DungeonDef def, params (ModifierType Type, int Stacks)[] innate)
         => def with { Boss = def.Boss with { Innate = innate.ToDictionary(e => e.Type, e => e.Stacks) } };
 
-    /// <summary>The compiled content with <paramref name="dungeons"/>, loaded (and never made current).</summary>
+    /// <summary>The shipped content with <paramref name="dungeons"/>, loaded (and never made current).</summary>
     private static GameContent Load(DungeonsData dungeons)
         => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons,
             dungeons: dungeons);
 
-    /// <summary>The compiled content under <paramref name="tuning"/>, loaded (and never made current).</summary>
+    /// <summary>The shipped content under <paramref name="tuning"/>, loaded (and never made current).</summary>
     private static GameContent LoadTuned(Tuning tuning)
         => TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
 
-    /// <summary>The compiled tuning with <paramref name="t"/>'s forge limit set to <paramref name="limit"/>, every other limit as compiled.</summary>
+    /// <summary>The shipped tuning with <paramref name="t"/>'s forge limit set to <paramref name="limit"/>, every other limit as shipped.</summary>
     private static Tuning WithMaxForged(ModifierType t, int limit)
         => ShippedContent.Tuning with { MaxForged = new Dictionary<ModifierType, int>(ShippedContent.Tuning.MaxForged) { [t] = limit } };
 

@@ -95,7 +95,7 @@ public class NoticeTextTests
         Assert.NotNull(load.Content);
         Assert.Equal(["TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"], NoticeText.Rows(load.Notices));
 
-        // A deleted file plays the compiled numbers, and says so.
+        // A deleted file plays the built-in numbers, and says so.
         Assert.Equal(["TUNING.JSON IS MISSING - THE BUILT-IN NUMBERS ARE PLAYING"], NoticeText.Rows(ShippedData.Load(others).Notices));
 
         // So does one another program is holding open, and it says why rather

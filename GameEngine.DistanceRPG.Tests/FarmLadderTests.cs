@@ -87,7 +87,7 @@ public class FarmLadderTests
     {
         // All three are knobs: the ceiling sets how much grinding can ever be
         // worth, the midpoint moves the hot zone, and K controls how sharply it
-        // arrives. Each is turned on its own, against the compiled curve.
+        // arrives. Each is turned on its own, against the shipped curve.
         Assert.Equal(250, FarmLadder.UniqueChancePermille(20));
         Assert.Equal(393, FarmLadder.UniqueChancePermille(25));
 

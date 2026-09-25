@@ -494,7 +494,7 @@ public class BossLootTests
         // PHASE4-045: the most a boss pays is six, deliberately short of the ten
         // a well-farmed two-modifier weapon banks: entering a dungeon is a choice
         // and farming is not, so certainty does not also get to be the largest
-        // reward. Six on the compiled values; a tuning or a dungeon that would
+        // reward. Six on the shipped values; a tuning or a dungeon that would
         // bring it level with the farm is refused at load
         // (DungeonContentTests.ABossThatWouldPayAsMuchAsTheFarmIsRefused).
         var tuning = GameContent.Current.Tuning;

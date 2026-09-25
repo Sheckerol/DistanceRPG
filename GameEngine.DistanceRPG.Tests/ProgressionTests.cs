@@ -11,7 +11,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class ProgressionTests
 {
-    /// <summary>The compiled bar both pools open on; the assertions below are written against it.</summary>
+    /// <summary>The shipped bar both pools open on; the assertions below are written against it.</summary>
     private static int StartingPool => GameContent.Current.Tuning.StartingPool;
 
     [Theory]

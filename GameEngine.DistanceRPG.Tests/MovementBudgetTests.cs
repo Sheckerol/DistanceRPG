@@ -69,7 +69,7 @@ public class MovementBudgetTests
 
             // The enemies' cost scale is 100 against the party's budget: a
             // hatchet's 54 costs a dummy 27 of its 100 under a budget of 200 —
-            // three swings, where 33.75 buys two under the compiled 160.
+            // three swings, where 33.75 buys two under the shipped 160.
             Assert.Equal(3, DummySwings());
         }
 

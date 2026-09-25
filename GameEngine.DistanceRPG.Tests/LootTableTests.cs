@@ -207,7 +207,7 @@ public class LootTableTests
         // only thing deciding.
         var plain = Sweep("assassins_fang", defeatCount: 0, spawns: 400).Where(d => !d.WasUniqueRoll).ToList();
         int enchanted = plain.Count(d => d.Weapon.Enchantments.Count == 1);
-        Assert.InRange(enchanted / (double)plain.Count, 0.05, 0.18);   // 10% compiled
+        Assert.InRange(enchanted / (double)plain.Count, 0.05, 0.18);   // 10% as shipped
 
         using (TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 0 }))
             Assert.All(Sweep("assassins_fang", defeatCount: 0, spawns: 64).Where(d => !d.WasUniqueRoll),
