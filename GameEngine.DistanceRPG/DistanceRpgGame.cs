@@ -56,9 +56,14 @@ namespace GameEngine.DistanceRPG;
 /// </para>
 /// <para>
 /// <strong>The campaign saves itself, and a launch resumes it</strong> (§5.1,
-/// 1f; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>). One campaign, one
-/// slot, in the player's save folder (<c>DISTANCERPG_SAVE_DIR</c> moves it), and
-/// no manual save. It is written only at a safe point
+/// 1f; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>, <see cref="SaveSlots"/>).
+/// One campaign in play, saved into the autosave slot — the player's save folder
+/// itself (<c>DISTANCERPG_SAVE_DIR</c> moves it), whose manual slots,
+/// <c>slot-1</c> to <c>slot-N</c>, sit beside it (the user's ruling of 2026-09-25
+/// on the save model, R2). A launch lists the slots and loads the autosave; no
+/// play writes a manual slot yet. Every save carries its time, from the clock
+/// here (<see cref="_clock"/>), never read in <c>Logic/</c>. It is written only
+/// at a safe point
 /// (<see cref="SaveGame.IsSafePoint"/>) and only once the frame a save was asked
 /// for in is over, so no write runs inside a turn system's raise: when a run is
 /// entered, at every player turn's start and after every floor arrival (the
@@ -75,9 +80,10 @@ namespace GameEngine.DistanceRPG;
 /// A save that cannot be read, or whose resume crashed the game, is set aside
 /// where the notice says. A write that fails is a log line and a notice — at once
 /// over the floor being played, and on the next screen until a later save goes
-/// through — never a crash, and never costs the save before it; a quit that cannot
-/// save leaves a marker, and the next launch says that what it resumes is from
-/// before that quit. A dev-override launch plays a fresh
+/// through — never a crash, and never costs the save before it, nor a file of the
+/// slot that cannot be read, which the write sets aside first and says so; a quit
+/// that cannot save leaves a marker, and the next launch says that what it resumes
+/// is from before that quit. A dev-override launch plays a fresh
 /// campaign in a slot of its own and never touches the campaign.
 /// </para>
 /// </summary>
@@ -121,9 +127,22 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     private CampaignState? _campaign;
 
-    // Where this launch's campaign is saved: the player's save folder, or its
-    // dev-override slot. Null only when the content did not load.
-    private SaveStore? _store;
+    // The clock a save's time is read from: the edge's, never Logic's.
+    private readonly Func<DateTimeOffset> _clock = () => DateTimeOffset.UtcNow;
+
+    // The save folder's slots: the autosave and the manual ones. Never made on a
+    // dev-override launch, whose saves all go to its own slot; null too when the
+    // content did not load.
+    private SaveSlots? _slots;
+
+    // Where this session's campaign autosaves — at a run's entry, every turn's
+    // start, every arrival, a run's end and every quit: the autosave slot's store,
+    // or the dev override's own. Null only when the content did not load.
+    private SaveStore? _autosave;
+
+    // The slot this session's campaign was loaded from, whose resume marker is
+    // cleared once the loaded screen is up: the autosave's, or the dev override's.
+    private SaveStore? _loadedFrom;
 
     // What the game has to say on the next screen it shows: the data files'
     // notices and the save's at startup, a save that could not be written later.
@@ -268,12 +287,23 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     }
 
     /// <summary>
-    /// The campaign this launch plays (<see cref="CampaignBoot.Boot"/>): the save
-    /// folder read from the environment — <c>DISTANCERPG_SAVE_DIR</c>, else the
-    /// player's own data folder — and this launch's slot in it; the campaign
-    /// resumed or begun, and held; a campaign <c>--new-campaign</c> began, saved
-    /// at once; what the boot has to say, ahead of the data files' notices; and
-    /// whether a resume marker waits to be cleared.
+    /// The campaign this launch plays: the save folder read from the environment —
+    /// <c>DISTANCERPG_SAVE_DIR</c>, else the player's own data folder — and, by
+    /// what the launch asked for:
+    /// <list type="bullet">
+    /// <item>a dev override: a scratch campaign in the folder's override slot
+    /// (<see cref="CampaignBoot.BootOverride"/>), which is where every save of the
+    /// session goes — the slots are never made, so nothing of the session reaches
+    /// the autosave or a manual slot;</item>
+    /// <item><c>--new-campaign</c>: the autosave's files set aside and a campaign
+    /// begun (<see cref="CampaignBoot.Abandon"/>), saved at once;</item>
+    /// <item>otherwise the slots listed (<see cref="SaveListing.Read"/>, to the log)
+    /// and the autosave loaded (<see cref="CampaignBoot.Load"/>) — and when it
+    /// brings nothing back, a new campaign, saying <c>A NEW CAMPAIGN BEGINS</c>
+    /// ahead of whatever was set aside, or nothing when nothing was there.</item>
+    /// </list>
+    /// The campaign held; what the launch has to say, ahead of the data files'
+    /// notices; and whether a resume marker waits to be cleared.
     /// </summary>
     private BootResult BootCampaign(GameContent content, BootRequest request)
     {
@@ -281,11 +311,55 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         if (string.IsNullOrEmpty(localAppData))
             Log.Warn("[Save] The system names no local data folder: the saves go under the working folder");
         string saves = SaveStore.SaveDirectory(Environment.GetEnvironmentVariable(SaveStore.DirectoryVariable), localAppData);
-        var store = CampaignBoot.StoreFor(saves, request);
-        _store = store;
-        Log.Info($"[Save] Saves in {store.Folder}{(request.DevOverride ? " - the dev override's own slot" : "")}");
+        Action<string> report = line => Log.Info(line);
 
-        var boot = CampaignBoot.Boot(store, content, request, line => Log.Info(line));
+        BootResult boot;
+        if (request.DevOverride)
+        {
+            // The scratch slot is where this session loads from and saves to: the
+            // slots are never made, so no save of the session reaches them.
+            var scratch = CampaignBoot.StoreFor(saves, request);
+            _autosave = scratch;
+            _loadedFrom = scratch;
+            Log.Info($"[Save] Saves in {scratch.Folder} - the dev override's own slot");
+            boot = CampaignBoot.BootOverride(scratch, content, request, report);
+        }
+        else
+        {
+            var slots = new SaveSlots(saves, content.Tuning.SaveSlots);
+            var autosave = slots.Store(SaveSlots.Autosave);
+            _slots = slots;
+            _autosave = autosave;
+            _loadedFrom = autosave;
+            Log.Info($"[Save] Saves in {slots.Folder}: the autosave and {slots.Count} {(slots.Count == 1 ? "slot" : "slots")}");
+            if (request.NewCampaign)
+            {
+                boot = CampaignBoot.Abandon(autosave, content, report);
+            }
+            else
+            {
+                var listing = SaveListing.Read(slots, _clock(), report);
+                foreach (string notice in listing.Notices)
+                    Log.Warn($"[Save] {notice}");
+                if (listing.Newest is { } newest)
+                    Log.Info($"[Save] The most recent save: {SaveSlots.Label(newest.Number)} - this launch loads the autosave");
+
+                var load = CampaignBoot.Load(autosave, content, report);
+                if (load.Campaign is { } loaded)
+                {
+                    boot = new BootResult(loaded, Resumed: true, load.View, StraightInto: null, FirstSeed: null, load.Notices);
+                }
+                else
+                {
+                    Log.Info(load.Notices.Count == 0
+                        ? "[Save] Nothing saved yet: a new campaign begins"
+                        : "[Save] Nothing could be loaded: a new campaign begins");
+                    IReadOnlyList<string> said = load.Notices.Count == 0 ? [] : [CampaignBoot.NewCampaignBegins, .. load.Notices];
+                    boot = new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, said);
+                }
+            }
+        }
+
         Adopt(boot.Campaign);
         foreach (string notice in boot.Notices)
             Log.Info($"[Save] {notice}");
@@ -296,7 +370,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         // first run ends resumes it, not nothing. A store that refuses writes has
         // said why already (a file that would not move), so it is only logged. A
         // write that fails leads the notices here, and the boot's word leads it.
-        if (request.NewCampaign && !request.DevOverride)
+        if (request.NewCampaign && !request.DevOverride && _autosave is { } store)
         {
             if (store.WritesRefused is { } refused)
                 Log.Info($"[Save] The new campaign is not saved this session: {refused}");
@@ -408,7 +482,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         var campaign = CampaignState.Start(GameContent.Current);
         Adopt(campaign);
         _saveRequested = false;
-        if (_store is { } store)
+        if (_autosave is { } store)
             Save(campaign, store, "as a new campaign begins");
         ShowBetweenRuns();
     }
@@ -536,10 +610,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         ClearResumeMarker("the resumed campaign's first screen is up");
     }
 
-    /// <summary>Clear the resume marker, saying why; a marker that will not go is a log line, never a crash.</summary>
+    /// <summary>Clear the resume marker of the slot the campaign was loaded from, saying why; a marker that will not go is a log line, never a crash.</summary>
     private void ClearResumeMarker(string why)
     {
-        if (_store is not { } store)
+        if (_loadedFrom is not { } store)
             return;
         try
         {
@@ -554,19 +628,23 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     /// <summary>
     /// The save a run's end, a run's entry, a player turn's start or a floor
-    /// arrival asked for, written now that the frame is over — with the playing
-    /// scene's view when a run is in progress. A request that finds the campaign
-    /// off a safe point — the enemies' turn begun in the same frame, the party
-    /// out of movement on a march — waits for the next frame that stands at one.
+    /// arrival asked for, written into the autosave slot now that the frame is
+    /// over — with the playing scene's view when a run is in progress. A request
+    /// that finds the campaign off a safe point — the enemies' turn begun in the
+    /// same frame, the party out of movement on a march — waits for the next frame
+    /// that stands at one. And one that arrives while a loaded campaign's first
+    /// screen is not up yet waits for it: kept, and written the frame the resume
+    /// marker clears, so a load whose first screen crashes never reaches the
+    /// autosave, and the marker left in its slot sets that save aside next time.
     /// </summary>
     private void WriteRequestedSave()
     {
-        if (_campaign is not { } campaign || _store is not { } store)
+        if (_campaign is not { } campaign || _autosave is not { } store)
         {
             _saveRequested = false;
             return;
         }
-        if (!SaveGame.IsSafePoint(campaign))
+        if (_resuming || !SaveGame.IsSafePoint(campaign))
             return;
         _saveRequested = false;
         if (campaign.Visit is { } visit)
@@ -576,30 +654,46 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     }
 
     /// <summary>
-    /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws:
-    /// every line to the log. A write that fails is said at once over the floor
-    /// being played, when a run is (<see cref="DungeonScene.SaveFailed"/>), and on
-    /// the next screen the game shows — there once, however many times it failed,
-    /// and only until a later save goes through, which takes it back
-    /// (<see cref="StartupNotices.Withdraw"/>). The save on the disk is kept
-    /// whatever happens.
+    /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws,
+    /// stamped with the clock's time: every line to the log. A write that fails is
+    /// said at once over the floor being played, when a run is
+    /// (<see cref="DungeonScene.SaveFailed"/>), and on the next screen the game
+    /// shows — there once, however many times it failed, and only until a later
+    /// save goes through, which takes it back (<see cref="StartupNotices.Withdraw"/>).
+    /// A file of the slot the write set aside first, since no save could be read
+    /// from it, is said the same way — at once, and on the next screen — and never
+    /// taken back: it is a fact about a file, whatever the saves after it do. The
+    /// save on the disk is kept whatever happens.
     /// </summary>
     private void Save(CampaignState campaign, SaveStore store, string when, ViewDto? view = null)
     {
         Log.Info($"[Save] Saving the campaign {when}");
-        if (CampaignBoot.Save(store, campaign, view, line => Log.Info(line)) is { } failed)
+        var said = new List<string>();
+        string? failed = CampaignBoot.Save(store, campaign, view, line => Log.Info(line), _clock(), said);
+        foreach (string setAside in said)
+            Log.Warn($"[Save] {setAside}");
+        if (failed is null)
+        {
+            foreach (string stale in _failedSaves)
+                _notices.Withdraw(stale);
+            _failedSaves.Clear();
+        }
+        else
         {
             Log.Warn($"[Save] {failed}");
-            _notices.Lead([failed]);
             if (!_failedSaves.Contains(failed))
                 _failedSaves.Add(failed);
-            PlayingScene(campaign)?.SaveFailed(failed);
-            return;
+            said.Add(failed);
         }
+        if (said.Count == 0)
+            return;
 
-        foreach (string stale in _failedSaves)
-            _notices.Withdraw(stale);
-        _failedSaves.Clear();
+        // Led for the next screen, and shown at once over the floor being played,
+        // each whole ahead of what is up — so the first said is laid last, on top.
+        _notices.Lead(said);
+        var scene = PlayingScene(campaign);
+        for (int i = said.Count - 1; i >= 0; i--)
+            scene?.SaveFailed(said[i]);
     }
 
     /// <summary>
@@ -652,13 +746,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         if (_quitSaved)
             return;
         _quitSaved = true;
-        if (_campaign is not { } campaign || _store is not { } store)
+        if (_campaign is not { } campaign || _autosave is not { } store)
             return;   // the content never loaded: no campaign
 
         var scene = PlayingScene(campaign);
         Log.Info(campaign.Visit is { } visit ? $"[Save] Saving the campaign on quit, mid-run in {visit.Def.Name}" : "[Save] Saving the campaign on quit");
         Action? step = scene is null ? null : scene.StepLogic;
-        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line));
+        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock());
 
         if (_resuming)
         {

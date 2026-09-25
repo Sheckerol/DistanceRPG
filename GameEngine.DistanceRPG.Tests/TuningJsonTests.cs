@@ -510,7 +510,7 @@ public class TuningJsonTests
         // screen is how those get resolved". The shipped file — the master copy,
         // hand-kept — names every key once, under §5.3's ten groups in §5.3's
         // order (S:80-91) — the two with keys still to come in Phase 6 under
-        // headings naming them — then the three beside it, each key under the
+        // headings naming them — then the four beside it, each key under the
         // comment that says what it is; and it reads, strictly, with nothing to
         // warn about.
         string text = ShippedData.Texts.Tuning!;
@@ -521,13 +521,13 @@ public class TuningJsonTests
         foreach (var key in TuningSchema.Keys)
             Assert.Single(Regex.Matches(text, $"\n  \"{key.Name}\":"));
 
-        // The groups in §5.3's order, then Progression, Combat, Drops; the two
-        // deferred ones naming their keys and the phase that brings them.
+        // The groups in §5.3's order, then Progression, Combat, Drops, Saves; the
+        // two deferred ones naming their keys and the phase that brings them.
         var headings = Enum.GetValues<TuningGroup>().Select(group => TuningSchema.Deferred.TryGetValue(group, out var deferred)
             ? $"/* ---- {group} - {deferred.Phase}: {string.Join(", ", deferred.Keys)} ---- */"
             : $"/* ---- {group} ---- */").ToArray();
         Assert.Equal(
-            ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops"],
+            ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
         Assert.Contains("/* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */", headings);
         Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);

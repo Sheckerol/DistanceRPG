@@ -16,9 +16,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// resolves — and, opened as a resume opens it, writes back the same document;
 /// its tuning hash is the hash of the tuning it was played under, read by the
 /// current reader; the game says the numbers changed exactly when the numbers
-/// it ships are not those; and a launch resumes each, the mid-run one in the
-/// dungeon, where its visit plays on. In the content collection, since a restore
-/// runs under the current content and the tuning cases swap it.
+/// it ships are not those; and a launch resumes each — the save folder being the
+/// autosave slot, where the listing finds it the most recent save, with no time —
+/// the mid-run one in the dungeon, where its visit plays on. In the content
+/// collection, since a restore runs under the current content and the tuning
+/// cases swap it.
 /// </summary>
 [Collection(TestContent.Collection)]
 public class PreReworkSaveTests
@@ -35,6 +37,9 @@ public class PreReworkSaveTests
     /// <summary>The document's member holding the hash of the tuning it was saved under: the one member a capture under other numbers writes differently.</summary>
     private const string TuningHashMember = "tuningHash";
 
+    /// <summary>The document's member holding when it was saved: appended since the saves were written, so a capture writes it (null, with no time handed in) and the saves have none.</summary>
+    private const string SavedAtMember = "savedAt";
+
     private static readonly string[] Saves = [MidRun, BetweenRuns];
 
     private static string PathOf(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name);
@@ -45,12 +50,14 @@ public class PreReworkSaveTests
     /// The keys added since <c>febe036</c>, which <see cref="PlayedTuning"/> is
     /// frozen before and so lacks — each one no rule of play reads, and so none a
     /// save's hash covers: what a deposit costs, the user's ruling of 2026-09-25,
-    /// declared ahead of Phase 6a's enchanter.
+    /// declared ahead of Phase 6a's enchanter; and how many manual save slots there
+    /// are, the ruling of the same day on the save model, the launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
+        nameof(Tuning.SaveSlots),
     ];
 
     /// <summary>
@@ -82,7 +89,8 @@ public class PreReworkSaveTests
     /// <c>$.campaign.party[1].inventory[3].enchantments[0].tier</c> — with what
     /// each holds there; null when they are the same document, member order
     /// included. The root's <see cref="TuningHashMember"/> is left out: a capture
-    /// writes the current tuning's hash there.
+    /// writes the current tuning's hash there. So is its <see cref="SavedAtMember"/>,
+    /// which a capture writes and the saves, older than it, do not.
     /// </summary>
     private static string? FirstDifference(JsonNode? expected, JsonNode? actual, string path, bool root = false)
     {
@@ -92,8 +100,9 @@ public class PreReworkSaveTests
                 return null;
             case (JsonObject was, JsonObject now):
             {
-                var wasNames = was.Select(member => member.Key).Where(name => !(root && name == TuningHashMember)).ToList();
-                var nowNames = now.Select(member => member.Key).Where(name => !(root && name == TuningHashMember)).ToList();
+                bool Compared(string name) => !(root && name is TuningHashMember or SavedAtMember);
+                var wasNames = was.Select(member => member.Key).Where(Compared).ToList();
+                var nowNames = now.Select(member => member.Key).Where(Compared).ToList();
                 foreach (string name in wasNames)
                 {
                     if (!now.ContainsKey(name))
@@ -148,9 +157,14 @@ public class PreReworkSaveTests
             if (FirstDifference(JsonNode.Parse(text), JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
                 Assert.Fail($"captured again, the document is not the save: {difference}");
 
-            // And as text, whitespace and number formatting included.
+            // And as text, whitespace and number formatting included — but for the
+            // time a capture writes last, null with none handed in, which the save,
+            // older than the member, never had.
+            string untimed = again.Replace($",\n  \"{SavedAtMember}\": null\n}}", "\n}", StringComparison.Ordinal);
+            Assert.NotEqual(again, untimed);
+            Assert.Null(file.SavedAt);
             string savedHash = $"\"{TuningHashMember}\": \"{file.TuningHash}\"";
-            Assert.True(text.Replace(savedHash, $"\"{TuningHashMember}\": \"{hash}\"", StringComparison.Ordinal) == again,
+            Assert.True(text.Replace(savedHash, $"\"{TuningHashMember}\": \"{hash}\"", StringComparison.Ordinal) == untimed,
                 $"{name}: captured again, the document's text is not the save's, though every value and member order is");
         }
     }
@@ -200,21 +214,34 @@ public class PreReworkSaveTests
             try
             {
                 // The save as the game finds it at launch: the campaign's file in the
-                // save folder. The launch resumes it and says so — and says the numbers
-                // have changed only while they have.
-                var store = new SaveStore(folder.FullName);
+                // save folder, which is the autosave slot — the save folder itself, so
+                // a save written before the slots is the autosave as it stands, and no
+                // file moves. The listing finds it there, with no time recorded and
+                // nothing else saved: the most recent save. Loaded, it resumes and says
+                // so — and says the numbers have changed only while they have.
+                var slots = new SaveSlots(folder.FullName, GameContent.Current.Tuning.SaveSlots);
+                var store = slots.Store(SaveSlots.Autosave);
+                Assert.Equal(Path.GetFullPath(folder.FullName), store.Folder);
                 File.Copy(PathOf(name), store.SavePath);
                 var saved = SaveCodec.Read(TextOf(name)).Campaign;
-                var boot = CampaignBoot.Boot(store, GameContent.Current, new BootRequest());
-                Assert.True(boot.Resumed);
+                var listing = SaveListing.Read(slots, new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero));
+                Assert.Equal(SlotState.Readable, listing.Autosave.State);
+                Assert.Equal(new SlotHeader(null, saved.RunCounter, saved.Visit?.DungeonId, saved.Visit?.FloorIndex + 1, saved.Visit?.Turn), listing.Autosave.Header);
+                Assert.Same(listing.Autosave, listing.Newest);
+                Assert.All(listing.Slots.Skip(1), slot => Assert.Equal(SlotState.Empty, slot.State));
+                Assert.Empty(listing.Notices);
+
+                var boot = CampaignBoot.Load(store, GameContent.Current);
+                Assert.True(boot.Loaded);
                 string[] notices = NumbersMoved(GameContent.Current.Tuning)
                     ? [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged]
                     : [BetweenRunsHud.Resumed];
                 Assert.Equal(notices, boot.Notices);
                 Assert.True(store.WasResuming);
                 store.ClearResuming();
+                Assert.Equal([SaveStore.FileName], Directory.GetFiles(folder.FullName).Select(path => Path.GetFileName(path)!));   // nothing moved
 
-                var campaign = boot.Campaign;
+                var campaign = boot.Campaign!;
                 Assert.Equal(saved.RunCounter, campaign.RunCounter);
                 if (name == MidRun)
                 {
@@ -253,7 +280,7 @@ public class PreReworkSaveTests
                 // Played on, it saves as any campaign does — under the numbers played
                 // now — and the next launch resumes that, with nothing more to say.
                 Assert.Null(CampaignBoot.Save(store, campaign));
-                Assert.Equal([BetweenRunsHud.Resumed], CampaignBoot.Boot(store, GameContent.Current, new BootRequest()).Notices);
+                Assert.Equal([BetweenRunsHud.Resumed], CampaignBoot.Load(store, GameContent.Current).Notices);
                 store.ClearResuming();
             }
             finally

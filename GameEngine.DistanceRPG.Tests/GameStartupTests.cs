@@ -442,12 +442,13 @@ public class GameStartupTests
             Callers(Method(typeof(DistanceRpgGame), "Save")));
 
         // The unsaved-quit marker is written by the quit's own door alone, and read
-        // and cleared by the boot alone.
+        // and cleared by the load alone — and by --new-campaign, which sets the
+        // campaign it spoke of aside and says nothing of it.
         Assert.Equal(["CampaignBoot.MarkUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.MarkUnsaved))));
         Assert.Equal(["CampaignBoot.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), "MarkUnsaved")));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ReadUnsaved))));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ClearUnsaved))));
-        Assert.Equal(["CampaignBoot.Boot"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
+        Assert.Equal(["CampaignBoot.Abandon", "CampaignBoot.Load"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
         Assert.Equal(["DistanceRpgGame.OnClosing"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
 
@@ -460,8 +461,10 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.Save"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Write))));
         Assert.Equal(["CampaignBoot.SetAside"], Callers(Method(typeof(SaveStore), nameof(SaveStore.SetAside))));
         Assert.Equal(["CampaignBoot.BootOverride"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Empty))));
-        Assert.Equal(["CampaignBoot.StoreFor"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
-        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Boot))));
+        Assert.Equal(["CampaignBoot.StoreFor", "SaveSlots.Store"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
+        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Load))));
+        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.BootOverride))));
+        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(Method(typeof(DistanceRpgGame), "BootCampaign")));
     }
 

@@ -28,7 +28,20 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </param>
 /// <param name="Campaign">The campaign: the party and everything a run's end wrote.</param>
 /// <param name="View">What the scene was showing, which it reads back and <c>Logic/</c> never does; null for nothing to say.</param>
-public sealed record SaveFile(int Version, string TuningHash, CampaignDto Campaign, ViewDto? View = null);
+/// <param name="SavedAt">
+/// When the save was written (the user's ruling of 2026-09-25 on the save model,
+/// R2): the UTC instant as round-trip text (<c>"O"</c>,
+/// <c>2026-09-25T14:32:00.0000000Z</c>), handed in by the edge — <c>Logic/</c>
+/// never reads the clock (<see cref="SaveGame.Capture"/>) — or null for a save
+/// that records none, as every save written before it does. The most recent
+/// save is the one with the latest time. A save of the campaign a slot already
+/// holds writes nothing (<see cref="SaveCodec.Untimed"/>), so a save keeps the
+/// time its state was first written. Raw text a hand can edit, so a restore
+/// refuses one that is no such time (<see cref="SaveGame.SavedAtOf"/>). Appended
+/// by Phase 5.S5, with its default, last: a document written before it reads as
+/// a save with no time.
+/// </param>
+public sealed record SaveFile(int Version, string TuningHash, CampaignDto Campaign, ViewDto? View = null, string? SavedAt = null);
 
 /// <summary>
 /// Presentation the document carries for the scene, which <c>Logic/</c> never

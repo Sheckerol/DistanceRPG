@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
@@ -132,15 +134,50 @@ public static class SaveGame
     /// </summary>
     /// <param name="campaign">The campaign, at a safe point (<see cref="IsSafePoint"/>).</param>
     /// <param name="view">What the scene is showing, carried for it; null for nothing to say.</param>
+    /// <param name="savedAt">
+    /// When it is being saved, written as the document's last member
+    /// (<see cref="SaveFile.SavedAt"/>, <see cref="TimeText"/>); null records no time.
+    /// Handed in by the edge, whose clock it is: <c>Logic/</c> never reads one, so
+    /// a capture is the same text for the same campaign and the same time.
+    /// </param>
     /// <exception cref="InvalidOperationException">The campaign is not at a safe point: the enemies are moving, their turn's banner is up, or a raise is running.</exception>
-    public static SaveFile Capture(CampaignState campaign, ViewDto? view = null)
+    public static SaveFile Capture(CampaignState campaign, ViewDto? view = null, DateTimeOffset? savedAt = null)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         if (!IsSafePoint(campaign))
             throw new InvalidOperationException(
                 $"A visit to '{campaign.Visit!.Def.Id}' is not at a safe point ({campaign.Visit.Turns!.Phase}{(campaign.Visit.Turns.Events.Running ? ", a raise running" : "")}): a campaign is saved between runs, or at a player turn with nothing in flight.");
 
-        return new SaveFile(SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning), SaveMapper.Capture(campaign), view);
+        return new SaveFile(SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning), SaveMapper.Capture(campaign), view,
+            savedAt is { } at ? TimeText(at) : null);
+    }
+
+    /// <summary>
+    /// A save's time as the document writes it (<see cref="SaveFile.SavedAt"/>):
+    /// the UTC instant, round-trip (<c>"O"</c>), ending <c>Z</c> —
+    /// <c>2026-09-25T14:32:00.0000000Z</c>. A <c>+00:00</c> offset would be written
+    /// <c>+00:00</c> by the save's encoder; the <c>Z</c> reads the same and
+    /// stays readable in the file.
+    /// </summary>
+    internal static string TimeText(DateTimeOffset at) => at.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// When <paramref name="file"/> was saved, or null when it records no time —
+    /// as every save written before the slots does. The member is raw text a hand
+    /// can edit, and never trusted (the user's ruling of 2026-09-25 on raw JSON), so
+    /// one that is no round-trip time is refused, naming it: <c>savedAt: yesterday
+    /// is no time</c>, a problem whose first clause a notice draws, so it quotes
+    /// nothing.
+    /// </summary>
+    /// <exception cref="SaveFormatException">The time is there and is no round-trip time.</exception>
+    internal static DateTimeOffset? SavedAtOf(SaveFile file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        if (file.SavedAt is not { } text)
+            return null;
+        if (DateTimeOffset.TryParseExact(text, "O", CultureInfo.InvariantCulture, DateTimeStyles.None, out var at))
+            return at;
+        throw new SaveFormatException(SaveCodec.SavedAtMember, $"{(string.IsNullOrWhiteSpace(text) ? "a blank" : text.Trim())} is no time");
     }
 
     /// <summary>
@@ -153,7 +190,8 @@ public static class SaveGame
     /// system is open: whoever plays the visit opens it
     /// (<see cref="DungeonState.OpenTurns"/>), as an arrival does. A different
     /// tuning warns and loads (<see cref="LoadedCampaign.TuningChanged"/>); an id
-    /// the content no longer has refuses the save, naming where.
+    /// the content no longer has refuses the save, naming where, and so does a time
+    /// that is no time (<see cref="SavedAtOf"/>), before anything is built.
     /// </summary>
     /// <param name="file">A document as <see cref="SaveCodec.Read"/> returns it, at <see cref="SaveCodec.CurrentVersion"/>.</param>
     /// <param name="content">
@@ -162,7 +200,7 @@ public static class SaveGame
     /// costs resolve against its modifier table — so a restore under any other
     /// would hand back rows of one content carrying another's numbers.
     /// </param>
-    /// <exception cref="SaveFormatException">The document names something the content does not have, holds a count out of range, contradicts itself, or is at another version; and where.</exception>
+    /// <exception cref="SaveFormatException">The document names something the content does not have, holds a count out of range or a time that is no time, contradicts itself, or is at another version; and where.</exception>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
     public static LoadedCampaign Restore(SaveFile file, GameContent content)
     {
@@ -175,6 +213,7 @@ public static class SaveGame
         if (file.Version != SaveCodec.CurrentVersion)
             throw new SaveFormatException(SaveCodec.VersionMember,
                 $"{file.Version}: a restore reads version {SaveCodec.CurrentVersion}, which SaveCodec.Read lifts an older document to");
+        SavedAtOf(file);   // a time that is no time refuses the save before a floor is built
 
         var campaign = SaveMapper.Restore(file.Campaign, content);
         bool changed = !string.Equals(file.TuningHash, TuningJson.Hash(content.Tuning), StringComparison.Ordinal);

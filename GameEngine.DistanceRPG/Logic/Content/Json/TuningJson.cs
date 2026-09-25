@@ -114,11 +114,12 @@ public static class TuningJson
     /// <c>true</c>/<c>false</c>, lines sorted ordinally. So a file's formatting,
     /// key order and comments never move it, and any value a rule of play reads
     /// does — a number the master copy ships, changed by a new build, included.
-    /// A key declared ahead of its reader (<see cref="TuningKey.Played"/> false —
-    /// the Enchanter's, until Phase 6a) is left out: a save's hash answers "are
-    /// these the numbers it was played under?", and a number nothing plays is none
-    /// it was played under. So turning one never says the numbers changed, and
-    /// declaring one moves no save's hash. A save stores this, never the values.
+    /// A key no rule of play reads (<see cref="TuningKey.Played"/> false — the
+    /// Enchanter's, declared ahead of Phase 6a, and <c>SaveSlots</c>, the
+    /// launcher's) is left out: a save's hash answers "are these the numbers it was
+    /// played under?", and a number nothing plays is none it was played under. So
+    /// turning one never says the numbers changed, and declaring one moves no
+    /// save's hash. A save stores this, never the values.
     /// </summary>
     public static string Hash(Tuning tuning)
     {

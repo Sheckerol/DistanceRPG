@@ -77,14 +77,41 @@ manually.
 
 ## Saves
 
-There is one campaign and one save, and no manual saving: the game saves on
-its own and resumes where you left off.
+There is one campaign in play, and the game saves it on its own and resumes
+where you left off — into the **autosave**, the save folder's `campaign.json`.
+The save folder also has room for manual save slots (the user's ruling of
+2026-09-25 on the save model): a title screen that chooses among them and saving
+by hand are on their way, and until they come nothing writes a manual slot and
+every launch loads the autosave.
 
 - **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\campaign.json` on Windows
   (`~/.local/share/DistanceRPG/saves/` on Linux) — the player's data folder,
   never beside the exe, which a rebuild or `dotnet clean` replaces. Set
   `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
-  names the full path of every save written or read.
+  names the full path of every save written or read, and says at launch where the
+  saves are and how many slots there are (`[Save] Saves in ...: the autosave and
+  3 slots`).
+- **The slots**: the save folder itself is the autosave slot —
+  `campaign.json`, its backup and the markers and set-aside files below, by the
+  names they always had — so a save written by an earlier build is simply the
+  autosave, and nothing moves. Manual slot *n* is the folder `slot-n` inside it
+  (`saves\slot-1\` to `saves\slot-3\`), holding the same files for its own save:
+  its own backup, its own markers, its own files set aside. How many there are is
+  `tuning.json`'s `SaveSlots` (below); lowering it deletes nothing, and a slot
+  above the count keeps its save. A folder named any other way — `slot-01`,
+  `slot-10`, `slot-x` — is no slot, and is never read.
+- **A save's time**: every save records when it was written — `"savedAt"`, the
+  UTC time, the last entry of `campaign.json` (a save from an earlier build has
+  none). A save of the campaign a slot already holds writes nothing, so the time
+  is when that state was first saved. The time is how the most recent save is
+  told — what CONTINUE will load, once the title screen comes: the latest time
+  wins; a save with no time counts as older than any with one; a time more than a
+  day ahead of this computer's clock counts as none, so a hand edit or a clock
+  once set wrong cannot go on winning; and a tie goes to the autosave, then the
+  lowest slot. File dates are never read, so a clock set back can make an older
+  save look like the newest. A `savedAt` that is no such time is refused like any
+  field that cannot be trusted (below): the save is set aside, `CAMPAIGN.JSON
+  COULD NOT BE READ (SAVEDAT: YESTERDAY IS NO TIME)`.
 - **When**: all the time, on its own. Mid-run the game saves when a run is
   entered, at the start of every one of your turns, and every time the party
   arrives on a floor; it saves at a run's end (the summary with it), when NEW
@@ -121,13 +148,21 @@ its own and resumes where you left off.
   launch says `THE CAMPAIGN COULD NOT BE SAVED AS THE GAME LAST QUIT` as it
   resumes, between runs or over the floor: what resumes is the last save from
   before that quit.
+- **No write costs a file**: before any save goes into a slot, a `campaign.json`
+  there that no save can be read from — one that is not a save, or one a newer
+  build wrote — is set aside first as `campaign.unreadable-N.json`, and so is such
+  a `campaign.bak.json` that the write would otherwise push out. The screen says
+  so the way it says a failed save, and the log says why. A file another program
+  holds open is left where it is, and the write fails as above.
 - **A save that cannot be played is set aside, never deleted**: one that is not
   a save, one a newer build wrote, one naming content that is gone, one that
   contradicts itself or holds a number past what play can reach (below), or one
   that crashed the game as it resumed. A `campaign.resuming` marker sits beside the
   save while a resume is in flight — until the resumed screen is up, the screen
-  between runs or the resumed floor — and a launch that finds it knows the last
-  resume never finished. It is renamed `campaign.unreadable-N.json` (or
+  between runs or the resumed floor, and no autosave is written before then — and
+  a launch that finds it knows the last resume never finished. (A save written
+  over the file a marker guarded takes the marker with it.) The save is renamed
+  `campaign.unreadable-N.json` (or
   `campaign.crashed-N.json`), the backup is tried — one save older, so at most a
   turn or a floor back mid-run — and failing that a new campaign begins. The
   screen between runs says so under the title, whole: what became of the
@@ -179,8 +214,8 @@ its own and resumes where you left off.
 Every number the game is tuned by — the movement budget, the mana divisor, each
 status's effect per level, what a stack of each modifier is worth, the farm's
 odds, the boss depths, the carry — sits in one file, `tuning.json`, grouped
-under the headings of `docs/roadmap/phase-5-save.md` §5.3 (and three of its own:
-Progression, Combat and Drops) with a comment on every key. A few gameplay
+under the headings of `docs/roadmap/phase-5-save.md` §5.3 (and four of its own:
+Progression, Combat, Drops and Saves) with a comment on every key. A few gameplay
 numbers were never keys and are still compiled — an enemy's 50 hit points, 100
 mana and 100 movement, the crowded-room healer's odds, the chart's ×1.5, the
 proficiency steps, the room cap; whether they belong in `tuning.json` is open
@@ -237,6 +272,13 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `THE NUMBERS HAVE CHANGED` when a campaign resumes. The docs' older
   `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
   either is told which key took its place.
+- **`SaveSlots`** is how many manual save slots there are beside the autosave
+  (see [Saves](#saves)) — the user ruled it a key, "so that we don't need to fix
+  the code every time I change my mind". At least 1 and at most 9, a digit
+  choosing each: `"SaveSlots": 12` plays 9 and says `TUNING.JSON: SAVESLOTS 12 IS
+  ABOVE 9 - USING 9`. Lowering it deletes nothing. The launcher reads it and no
+  rule of play does, so, like the Enchanter's keys, turning it never says `THE
+  NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`

@@ -18,8 +18,11 @@ internal sealed record BootRequest(string? DungeonId = null, long? Seed = null, 
 }
 
 /// <summary>
-/// The campaign a launch plays, and what to say about it (1f): the campaign —
-/// resumed, or new — and the view its save carried; for a dev-override launch,
+/// The campaign a launch plays, and what to say about it (1f): a dev-override
+/// launch's scratch campaign (<see cref="CampaignBoot.BootOverride"/>), the one
+/// <c>--new-campaign</c> begins (<see cref="CampaignBoot.Abandon"/>), or — put
+/// together by the game — the campaign a load brought back, or the new one begun
+/// when it brought nothing; the view its save carried; for a dev-override launch,
 /// the dungeon to boot straight into and the first run's seed; and the notices
 /// the first screen shows, in this order and whole: that the campaign resumed or
 /// a new one begins, that the numbers changed since it was saved, and that a save
@@ -29,28 +32,55 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
     IReadOnlyList<string> Notices);
 
 /// <summary>
-/// The campaign's life on the disk, between the edge (<see cref="SaveStore"/>)
-/// and <c>Logic/</c>'s save document (<see cref="SaveGame"/>, <see cref="SaveCodec"/>):
-/// which campaign a launch plays (<see cref="Boot"/>), a save that never
-/// throws (<see cref="Save"/>), and the save a quit takes mid-run
+/// What loading one slot brought back (<see cref="CampaignBoot.Load"/>): the
+/// campaign and the view its save carried — or neither, when the slot held
+/// nothing that would load — and what to say, in order and whole: that the
+/// campaign resumed, from which slot or its backup; that the last quit could not
+/// write it; that the numbers changed since it was saved; and every file set
+/// aside on the way, where, and how to try it again. A load never makes a
+/// campaign: what follows one that brings nothing back is the caller's to decide.
+/// </summary>
+internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnlyList<string> Notices)
+{
+    /// <summary>Whether a campaign came back.</summary>
+    [MemberNotNullWhen(true, nameof(Campaign))]
+    public bool Loaded => Campaign is not null;
+}
+
+/// <summary>
+/// The campaign's life on the disk, between the edge (<see cref="SaveStore"/>,
+/// one slot each, and <see cref="SaveSlots"/>) and <c>Logic/</c>'s save document
+/// (<see cref="SaveGame"/>, <see cref="SaveCodec"/>): a slot's load
+/// (<see cref="Load"/>), the two launches that load nothing — a dev override's
+/// scratch campaign (<see cref="BootOverride"/>) and <c>--new-campaign</c>
+/// (<see cref="Abandon"/>) — a save that never throws and never costs a file
+/// (<see cref="Save"/>), and the save a quit takes mid-run
 /// (<see cref="SaveOnQuit"/>). Engine-free, so every case is tested on a
-/// temporary folder with no window; what it has to say goes to the caller as
-/// log lines (<c>report</c>) and as notices, and the game draws and logs them.
+/// temporary folder with no window; what it has to say goes to the caller as log
+/// lines (<c>report</c>) and as notices, and the game draws and logs them.
 /// <list type="bullet">
-/// <item><strong>Loading is resuming</strong> (1f, USER DECISION 2): a launch
-/// resumes <see cref="SaveStore.FileName"/>, and says so — between runs, or in
-/// the run in progress it holds, which the game resumes in the dungeon at the
-/// saved floor and turn (Phase 5.8). A save that cannot be read — malformed,
-/// written by a newer build, naming content that is gone, holding a count past
-/// what play reaches or contradicting itself (R3(b)) — is set aside, never
-/// deleted or written over, and the backup is tried, then a new campaign. A save
-/// whose resume crashed the game last time — the resume marker left behind — is
-/// set aside the same way. Every set-aside notice names the file's full path and
-/// ends <see cref="TryAgain"/>.</item>
+/// <item><strong>Loading is per slot, and resumes</strong> (1f; the user's ruling
+/// of 2026-09-25 on the save model, R2): a slot's <see cref="SaveStore.FileName"/>
+/// is resumed, and the load says so and from which slot — between runs, or in the
+/// run in progress it holds, which the game resumes in the dungeon at the saved
+/// floor and turn (Phase 5.8). A save that cannot be read — malformed, written by
+/// a newer build, naming content that is gone, holding a count past what play
+/// reaches, contradicting itself (R3(b)) or keeping a time that is no time — is
+/// set aside, never deleted or written over, and the backup is tried. A save
+/// whose load crashed the game last time — the resume marker left behind — is set
+/// aside the same way. Every set-aside notice names the file's full path and ends
+/// <see cref="TryAgain"/>. A slot that brings nothing back makes no campaign: the
+/// caller decides what follows.</item>
+/// <item><strong>No write costs a file</strong> (1f): a slot can be written without
+/// being loaded, so before any write a <see cref="SaveStore.FileName"/> there
+/// that no save can be read from is set aside first, and so is such a backup the
+/// replace would otherwise rotate away — the codec's refusal decides, never a
+/// listing's word on the slot. And a write clears its slot's resume marker: the
+/// file it guarded is gone.</item>
 /// <item><strong>A quit that could not save is said at the next launch</strong>
 /// (1f): no screen follows a quit, so the quit's own door leaves
 /// <see cref="SaveStore.UnsavedName"/> beside the save when it cannot save
-/// (<see cref="SaveOnQuit"/>), and the launch that finds it says, under the
+/// (<see cref="SaveOnQuit"/>), and the load that finds it says, under the
 /// resumed line, that what resumes is from before that quit
 /// (<see cref="QuitUnsaved"/>).</item>
 /// <item><strong>A different tuning is said, and plays on</strong> (§5.3,
@@ -60,12 +90,13 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// <item><strong>The dev overrides play in their own slot</strong>: a launch
 /// with <c>DISTANCERPG_DUNGEON</c> or <c>DISTANCERPG_SEED</c> empties
 /// <see cref="SaveStore.OverrideSlot"/> and plays a fresh campaign there, so it
-/// is as repeatable as it ever was and the campaign is untouched.</item>
+/// is as repeatable as it ever was and the campaign — the autosave and every
+/// manual slot — is untouched.</item>
 /// </list>
 /// </summary>
 internal static class CampaignBoot
 {
-    /// <summary>A resume from the backup, one save older than the campaign's own file.</summary>
+    /// <summary>A resume from the autosave's backup, one save older than the campaign's own file.</summary>
     internal const string ResumedFromBackup = BetweenRunsHud.Resumed + " FROM ITS BACKUP, ONE SAVE OLDER";
 
     /// <summary>A save was there and could not be resumed, or was set aside for a new campaign.</summary>
@@ -91,27 +122,38 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// The campaign this launch plays, in this order:
+    /// What loading a slot says first, in green: <c>CAMPAIGN RESUMED</c> for the
+    /// autosave, <c>CAMPAIGN RESUMED FROM SLOT 2</c> for a manual one; and from a
+    /// backup, <see cref="ResumedFromBackup"/>, or <c>CAMPAIGN RESUMED FROM THE
+    /// BACKUP OF SLOT 2, ONE SAVE OLDER</c>. Each starts with
+    /// <see cref="BetweenRunsHud.Resumed"/>, so each is news, not a warning.
+    /// </summary>
+    internal static string Resumed(int number, bool backup)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
+        if (number == SaveSlots.Autosave)
+            return backup ? ResumedFromBackup : BetweenRunsHud.Resumed;
+        return backup
+            ? $"{BetweenRunsHud.Resumed} FROM THE BACKUP OF {SaveSlots.Label(number)}, ONE SAVE OLDER"
+            : $"{BetweenRunsHud.Resumed} FROM {SaveSlots.Label(number)}";
+    }
+
+    /// <summary>
+    /// Load slot <paramref name="number"/> (<paramref name="slot"/>), Boot's resume
+    /// as it always was, in this order:
     /// <list type="number">
-    /// <item>A dev-override launch empties its slot (<paramref name="store"/> must
-    /// be one) and plays a fresh campaign — straight into the dungeon it names,
-    /// its first run on the seed it names. The campaign's own save is never
-    /// opened.</item>
     /// <item>A marker the last quit left because it could not save
     /// (<see cref="SaveStore.UnsavedName"/>) is read and cleared, so it is said
     /// once: a campaign resumed says, under the resumed line, that it is from
-    /// before that quit (<see cref="QuitUnsaved"/>). One set aside or left for a
-    /// new campaign has nothing to say it of.</item>
-    /// <item><c>--new-campaign</c> sets the backup and the save aside as
-    /// <c>abandoned</c> before anything is read, and starts fresh
-    /// (<see cref="Abandon"/>).</item>
-    /// <item>A resume marker left behind means the last resume crashed the game:
-    /// the save it guarded — the save, or the backup when there was no save — is
-    /// set aside as <c>crashed</c>.</item>
+    /// before that quit (<see cref="QuitUnsaved"/>). One set aside has nothing to
+    /// say it of.</item>
+    /// <item>A resume marker left behind means the last load crashed the game: the
+    /// save it guarded — the save, or the backup when there was no save — is set
+    /// aside as <c>crashed</c>.</item>
     /// <item>The save is resumed; failing that it is set aside as
     /// <c>unreadable</c>, and the backup is resumed; failing that it is set aside
-    /// too, and a new campaign starts. With no save there at all but a backup — a
-    /// save set aside by an earlier launch and nothing written since, or one
+    /// too, and nothing is brought back. With no save there at all but a backup —
+    /// a save set aside by an earlier load and nothing written since, or one
     /// deleted by hand — the backup is resumed, so a campaign is never lost to a
     /// missing file while its backup stands. The resume marker is written before
     /// each resume is tried and left for the game to clear once the resumed screen
@@ -119,86 +161,93 @@ internal static class CampaignBoot
     /// </list>
     /// A restore that throws anything — a <see cref="SaveFormatException"/> or a
     /// fault — is logged whole and treated as unreadable, so a player is never
-    /// stuck on a crash at launch. A campaign resumed with a run in progress comes
-    /// back with its visit (<see cref="CampaignState.Visit"/>), and the game plays
-    /// it on in the dungeon; a crash there is the marker's to catch. A file that
-    /// could not be read and cannot be moved either is left where it is, and the
-    /// store refuses every write this session (<see cref="SaveStore.RefuseWrites"/>),
-    /// so nothing takes its place.
+    /// stuck on a crash. A campaign resumed with a run in progress comes back with
+    /// its visit (<see cref="CampaignState.Visit"/>), and the game plays it on in
+    /// the dungeon; a crash there is the marker's to catch. A file that could not
+    /// be read and cannot be moved either is left where it is, and the store
+    /// refuses every write this session (<see cref="SaveStore.RefuseWrites"/>), so
+    /// nothing takes its place. The file a load resumes is one this session knows
+    /// holds a save (<see cref="SaveStore.Vouch"/>).
+    /// <para>
+    /// <strong>It never makes a campaign.</strong> A slot that brings nothing back
+    /// comes back with no campaign and the notices of what was set aside — none for
+    /// a slot that held nothing — and what follows is the caller's.
+    /// </para>
     /// </summary>
-    /// <param name="store">The launch's slot (<see cref="StoreFor"/>).</param>
-    /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a campaign is built and restored under it.</param>
-    /// <param name="request">What the launch was asked for.</param>
+    /// <param name="slot">The slot's store (<see cref="SaveSlots.Store"/>).</param>
+    /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a campaign is restored under it.</param>
     /// <param name="report">Where the log lines go: every file read, set aside or found wanting, with the whole error.</param>
+    /// <param name="number">The slot's number, for what the load says: <see cref="SaveSlots.Autosave"/>, or a manual slot's.</param>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    /// <exception cref="InvalidOperationException">A dev-override launch on a store that is not a dev-override slot.</exception>
-    internal static BootResult Boot(SaveStore store, GameContent content, BootRequest request, Action<string>? report = null)
+    internal static SlotLoad Load(SaveStore slot, GameContent content, Action<string>? report = null, int number = SaveSlots.Autosave)
     {
-        ArgumentNullException.ThrowIfNull(store);
-        ArgumentNullException.ThrowIfNull(content);
-        ArgumentNullException.ThrowIfNull(request);
-        if (!ReferenceEquals(content, GameContent.Current))
-            throw new ArgumentException(
-                "A campaign boots under the current content: it is built and restored under GameContent.Current, so the content handed in must be that one.",
-                nameof(content));
+        ArgumentNullException.ThrowIfNull(slot);
+        RequireCurrent(content);
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
 
-        if (request.DevOverride)
-            return BootOverride(store, content, request, report);
-        bool quitUnsaved = TakeUnsaved(store, report);
-        if (request.NewCampaign)
-            return Abandon(store, content, report);
-
+        bool quitUnsaved = TakeUnsaved(slot, report);
         var setAside = new List<string>();
-        if (store.WasResuming)
+        if (slot.WasResuming)
         {
             // The save it guarded is the one a resume reads first: the save when
             // there is one, and the backup when the resume had only that to read.
-            bool save = store.HasSave;
-            if (save || store.HasBackup)
+            bool save = slot.HasSave;
+            if (save || slot.HasBackup)
             {
-                report?.Invoke($"[Save] {store.ResumingPath} was left behind: resuming {(save ? store.SavePath : store.BackupPath)} crashed the game last time");
-                if (!SetAside(store, backup: !save, "crashed", "crashed the game the last time it was resumed", setAside, report))
-                    return New(content, [NewCampaignBegins, .. setAside]);
+                report?.Invoke($"[Save] {slot.ResumingPath} was left behind: resuming {(save ? slot.SavePath : slot.BackupPath)} crashed the game last time");
+                if (!SetAside(slot, backup: !save, "crashed", "crashed the game the last time it was resumed", setAside, report))
+                    return new SlotLoad(null, null, setAside);
             }
-            Unmark(store, report);
+            Unmark(slot, report);
         }
 
         foreach (bool backup in new[] { false, true })
         {
-            if (!(backup ? store.HasBackup : store.HasSave))
+            if (!(backup ? slot.HasBackup : slot.HasSave))
                 continue;
-            Mark(store, report);   // before the restore, so even a restore that takes the process down is caught next launch
-            if (TryResume(store, backup, content, report, out var loaded, out string why))
+            Mark(slot, report);   // before the restore, so even a restore that takes the process down is caught next time
+            if (TryResume(slot, backup, content, report, out var loaded, out string why))
             {
+                slot.Vouch(backup);
+
                 // What plays first — and that it is from before the last quit, when
                 // that quit could not save — then the numbers it plays under
                 // (PHASE5-084 wants that on the screen, whatever else there is to
                 // say), then what became of any save set aside on the way.
-                var notices = new List<string> { backup ? ResumedFromBackup : BetweenRunsHud.Resumed };
+                var notices = new List<string> { Resumed(number, backup) };
                 if (quitUnsaved)
                     notices.Add(QuitUnsaved);
                 if (loaded.TuningChanged)
                     notices.Add(TuningChanged);
                 notices.AddRange(setAside);
-                return new BootResult(loaded.Campaign, Resumed: true, loaded.View, StraightInto: null, FirstSeed: null, notices);
+                return new SlotLoad(loaded.Campaign, loaded.View, notices);
             }
-            if (!SetAside(store, backup, "unreadable", $"could not be read ({why})", setAside, report))
+            if (!SetAside(slot, backup, "unreadable", $"could not be read ({why})", setAside, report))
                 break;   // stuck where it is: writes are refused, and nothing else is resumed
         }
 
-        Unmark(store, report);
-        if (setAside.Count == 0)
-        {
-            report?.Invoke($"[Save] No campaign to resume in {store.Folder}: a new campaign begins");
-            return New(content, []);
-        }
-        report?.Invoke("[Save] Nothing could be resumed: a new campaign begins");
-        return New(content, [NewCampaignBegins, .. setAside]);
+        Unmark(slot, report);
+        report?.Invoke(setAside.Count == 0
+            ? $"[Save] No campaign to load in {slot.Folder}"
+            : $"[Save] Nothing could be loaded from {slot.Folder}");
+        return new SlotLoad(null, null, setAside);
     }
 
-    /// <summary>A dev-override launch: the slot emptied, a fresh campaign, straight into the dungeon when one is named.</summary>
-    private static BootResult BootOverride(SaveStore store, GameContent content, BootRequest request, Action<string>? report)
+    /// <summary>
+    /// A dev-override launch: its slot (<paramref name="store"/>, from
+    /// <see cref="StoreFor"/>) emptied, a fresh campaign, straight into the dungeon
+    /// when one is named, its first run on the seed when one is. The campaign's own
+    /// saves — the autosave and every manual slot — are never opened.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="request"/> is no dev override, or <paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="store"/> is not a dev-override slot: it is never emptied.</exception>
+    internal static BootResult BootOverride(SaveStore store, GameContent content, BootRequest request, Action<string>? report = null)
     {
+        ArgumentNullException.ThrowIfNull(store);
+        RequireCurrent(content);
+        ArgumentNullException.ThrowIfNull(request);
+        if (!request.DevOverride)
+            throw new ArgumentException("A launch with no dev override plays the campaign's own saves, never the override's slot.", nameof(request));
         try
         {
             store.Empty();
@@ -218,19 +267,26 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// <c>--new-campaign</c>: the campaign's backup and then its save are set
-    /// aside as <c>abandoned</c> — never deleted — and a new campaign begins, which
-    /// the game saves at once (<c>DistanceRpgGame.BootCampaign</c>). Both go. A
-    /// backup left behind would be resumed as though it were the new campaign's
-    /// own the first time no save stood beside it: after a quit mid-run before the
-    /// new campaign was ever saved, or a crash, or a first save that cannot be
-    /// played. The backup goes first, so the later save takes the later number. A
-    /// file that will not move stops it there: the store refuses every write this
-    /// session (<see cref="SetAside"/>), and what is left of the old campaign —
-    /// its save, when that is still in place — is what the next launch resumes.
+    /// <c>--new-campaign</c>: the slot's backup and then its save are set aside as
+    /// <c>abandoned</c> — never deleted — and a new campaign begins, which the game
+    /// saves at once (<c>DistanceRpgGame.BootCampaign</c>). Both go. A backup left
+    /// behind would be resumed as though it were the new campaign's own the first
+    /// time no save stood beside it: after a quit mid-run before the new campaign
+    /// was ever saved, or a crash, or a first save that cannot be played. The
+    /// backup goes first, so the later save takes the later number. A file that
+    /// will not move stops it there: the store refuses every write this session
+    /// (<see cref="SetAside"/>), and what is left of the old campaign — its save,
+    /// when that is still in place — is what the next launch resumes. The old
+    /// campaign's unsaved-quit marker goes with it, logged and never said: there is
+    /// nothing left to say it of.
     /// </summary>
-    private static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report)
+    /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
+    internal static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report = null)
     {
+        ArgumentNullException.ThrowIfNull(store);
+        RequireCurrent(content);
+        TakeUnsaved(store, report);
+
         string what = $"was left for a new campaign ({Program.NewCampaignOption})";
         var setAside = new List<string>();
         foreach (bool backup in new[] { true, false })
@@ -245,12 +301,18 @@ internal static class CampaignBoot
         }
         Unmark(store, report);   // nothing is being resumed
         report?.Invoke($"[Save] {Program.NewCampaignOption}: a new campaign begins in {store.Folder}");
-        return New(content, [NewCampaignBegins, .. setAside]);
+        return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, [NewCampaignBegins, .. setAside]);
     }
 
-    /// <summary>A campaign from the roster, saying <paramref name="notices"/>.</summary>
-    private static BootResult New(GameContent content, IReadOnlyList<string> notices)
-        => new(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, notices);
+    /// <summary>A campaign is built and restored under the current content alone.</summary>
+    private static void RequireCurrent(GameContent content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (!ReferenceEquals(content, GameContent.Current))
+            throw new ArgumentException(
+                "A campaign is loaded or begun under the current content: it is built and restored under GameContent.Current, so the content handed in must be that one.",
+                nameof(content));
+    }
 
     /// <summary>
     /// Read and restore the save, or the backup: true with the campaign, or false
@@ -272,7 +334,8 @@ internal static class CampaignBoot
             report?.Invoke($"[Save] Resumed {path}: run counter {loaded.Campaign.RunCounter}"
                 + (loaded.Campaign.Visit is { } visit
                     ? $", a run in progress in {visit.Def.Id} on map seed {visit.MapSeed}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
-                    : loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet"));
+                    : loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet")
+                + (file.SavedAt is { } savedAt ? $", saved {savedAt}" : ", no time recorded"));
             if (loaded.TuningChanged)
                 report?.Invoke($"[Save] {path} was saved under tuning {file.TuningHash} and the game plays under {TuningJson.Hash(content.Tuning)}: the numbers have changed, and the campaign plays on under the new ones");
             why = "";
@@ -400,34 +463,141 @@ internal static class CampaignBoot
     /// Save <paramref name="campaign"/> to <paramref name="store"/> at a safe point
     /// (<see cref="SaveGame.IsSafePoint"/>) — between runs, or with the run in
     /// progress in it (Phase 5.8): right after the entry, or in the player phase
-    /// with nothing in flight — with the tuning's hash and the scene's
-    /// <paramref name="view"/>, atomically. A text the save already holds is not
-    /// written again, so the backup stays the save before it. Never throws: a write
-    /// that fails — a full disk, a folder with no rights, a locked file, a campaign
-    /// that cannot be captured, the enemies mid-turn — is logged whole and comes
-    /// back as the notice to show, and the save on the disk is what it was.
+    /// with nothing in flight — with the tuning's hash, the scene's
+    /// <paramref name="view"/> and the time, atomically. A save of the campaign the
+    /// slot already holds, whatever its time, is not written again
+    /// (<see cref="Holds"/>), so the backup stays the save before it and the save
+    /// keeps the time its state was first written. Never throws: a write that
+    /// fails — a full disk, a folder with no rights, a locked file, a campaign that
+    /// cannot be captured, the enemies mid-turn — is logged whole and comes back as
+    /// the notice to show, and the save on the disk is what it was.
+    /// <para>
+    /// <strong>No write costs a file</strong> (1f, the write guard): before the
+    /// write, a <see cref="SaveStore.FileName"/> whose text the codec refuses —
+    /// malformed, or a newer build's, which is never written over — is set aside as
+    /// <c>unreadable</c>, so the write moves into place and the backup beside it
+    /// stays untouched; and while a save stands for the replace to rotate, a
+    /// <see cref="SaveStore.BackupName"/> the codec refuses is set aside the same
+    /// way. Only a text the codec refuses counts: a file the file system will not
+    /// let the game read right now is left to the write, which fails and says so. A
+    /// file this session wrote or read whole is not read again
+    /// (<see cref="SaveStore.SaveVouched"/>). What the guard sets aside is said in
+    /// <paramref name="said"/>, a fact about a file that no later save withdraws;
+    /// one that will not move refuses the store's writes, and its notice comes back
+    /// as the failure. And a write clears the slot's resume marker, since the file
+    /// it guarded is gone.
+    /// </para>
     /// </summary>
+    /// <param name="store">The slot.</param>
+    /// <param name="campaign">The campaign, at a safe point.</param>
+    /// <param name="view">What the scene shows, carried for it; null for nothing to say.</param>
+    /// <param name="report">Where the log lines go.</param>
+    /// <param name="savedAt">When it is saved, the edge's clock: written as the save's time. Null records none.</param>
+    /// <param name="said">Where the notices of what the guard set aside go, a list the caller hands in; null to leave them to the log.</param>
     /// <returns>Null when saved, or the notice a failed write shows.</returns>
-    internal static string? Save(SaveStore store, CampaignState campaign, ViewDto? view = null, Action<string>? report = null)
+    internal static string? Save(SaveStore store, CampaignState campaign, ViewDto? view = null, Action<string>? report = null,
+        DateTimeOffset? savedAt = null, List<string>? said = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(campaign);
         try
         {
-            string text = SaveCodec.Write(SaveGame.Capture(campaign, view));
+            string text = SaveCodec.Write(SaveGame.Capture(campaign, view, savedAt));
             if (Holds(store, text))
             {
                 report?.Invoke($"[Save] {store.SavePath} already holds this campaign - nothing written, the backup kept");
                 return null;
             }
+            if (store.WritesRefused is null && MakeWay(store, report, said) is { } stuck)
+                return stuck;
             store.Write(text);
             report?.Invoke($"[Save] Wrote {store.SavePath}");
+            Written(store, report);
             return null;
         }
         catch (Exception error)
         {
             report?.Invoke($"[Save] Could not write {store.SavePath} - the save there is kept: {error}");
             return WriteFailed(store.WritesRefused ?? SaveStore.Why(error, store.Folder, writing: true));
+        }
+    }
+
+    /// <summary>
+    /// The write guard: the save, then — while a save stands for the replace to
+    /// rotate into its place — the backup, each set aside as <c>unreadable</c> when
+    /// the codec refuses its text and it is not one this session knows
+    /// (<see cref="SaveStore.SaveVouched"/>). Silent unless it acts.
+    /// </summary>
+    /// <returns>Null to go on and write; or the stuck notice, when a file the codec refuses would not move — the store refuses its writes from then on.</returns>
+    private static string? MakeWay(SaveStore store, Action<string>? report, List<string>? said)
+    {
+        foreach (bool backup in new[] { false, true })
+        {
+            if (backup && !store.HasSave)
+                break;   // the write moves into place, and the backup beside it is untouched
+            if ((backup ? store.BackupVouched : store.SaveVouched) || Refusal(store, backup, report) is not { } why)
+                continue;
+            var notices = new List<string>();
+            if (!SetAside(store, backup, "unreadable", $"could not be read ({why})", notices, report))
+                return notices[^1];
+            said?.AddRange(notices);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Why the codec refuses the save's — or the backup's — text, in a notice's few
+    /// words (<see cref="WhyUnreadable"/>); or null when it reads — and is then one
+    /// this session knows (<see cref="SaveStore.Vouch"/>) — or is not there, or the
+    /// file system will not let it be read right now, which is left to the write.
+    /// </summary>
+    private static string? Refusal(SaveStore store, bool backup, Action<string>? report)
+    {
+        string? text;
+        try
+        {
+            text = backup ? store.ReadBackup() : store.Read();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        if (text is null)
+            return null;
+
+        try
+        {
+            SaveCodec.Read(text);
+        }
+        catch (Exception error)
+        {
+            report?.Invoke($"[Save] {(backup ? store.BackupPath : store.SavePath)} is no save this build reads, and a write would rotate it away: {error}");
+            return WhyUnreadable(error, store);
+        }
+        store.Vouch(backup);
+        return null;
+    }
+
+    /// <summary>
+    /// A write replaced the slot's save, so a resume marker there guarded a file
+    /// that is gone, and goes too: left standing, it would set the new save aside as
+    /// crashed at the next load and resume the backup — the very save that crashed.
+    /// No write reaches a slot while its own load is in flight
+    /// (<c>DistanceRpgGame.WriteRequestedSave</c> waits for the loaded screen), so a
+    /// marker is only ever cleared here once the file it guarded is gone.
+    /// </summary>
+    private static void Written(SaveStore store, Action<string>? report)
+    {
+        if (!store.WasResuming)
+            return;
+        try
+        {
+            store.ClearResuming();
+            report?.Invoke($"[Save] {store.ResumingPath} cleared: the save it guarded has been written over");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            report?.Invoke($"[Save] {store.ResumingPath} could not be cleared - the next load sets the new save aside as crashed: {error}");
         }
     }
 
@@ -447,7 +617,8 @@ internal static class CampaignBoot
     /// write fails, or the enemies' turn cannot be played out — leaves
     /// <see cref="SaveStore.UnsavedName"/> beside the save it keeps, and the next
     /// launch says that what it resumes is from before this quit
-    /// (<see cref="QuitUnsaved"/>).
+    /// (<see cref="QuitUnsaved"/>). What the write guard sets aside on the way is
+    /// logged: no screen follows to say it.
     /// </para>
     /// <para>
     /// <strong>The step is the playing scene's own</strong>
@@ -459,13 +630,15 @@ internal static class CampaignBoot
     /// safe point is not settled and not saved, and the last save stands.
     /// </para>
     /// </summary>
-    /// <param name="store">The launch's slot.</param>
+    /// <param name="store">The slot the quit saves to: the autosave's.</param>
     /// <param name="campaign">The campaign being quit.</param>
     /// <param name="view">What the playing scene shows once the settle is done — read then, since a turn's start re-decides the march and may hand the lead to a living member — or null for nothing to say.</param>
     /// <param name="step">The playing scene's logic step; null when no scene is playing the visit, which leaves nothing to settle.</param>
     /// <param name="report">Where the log lines go.</param>
+    /// <param name="savedAt">When the quit saves, the edge's clock; null records no time.</param>
     /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, the save on the disk kept and the marker left; false when it never got to one, nothing was written, and the marker is left.</returns>
-    internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null)
+    internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null,
+        DateTimeOffset? savedAt = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(campaign);
@@ -495,7 +668,7 @@ internal static class CampaignBoot
         // A view is the run's: a campaign between runs — a quit on the summary, or
         // a settle that ended the run — has none to carry.
         var viewNow = campaign.Visit is null ? null : view?.Invoke();
-        if (Save(store, campaign, viewNow, report) is { } failed)
+        if (Save(store, campaign, viewNow, report, savedAt) is { } failed)
         {
             report?.Invoke($"[Save] {failed}");
             MarkUnsaved(store, failed, report);
@@ -503,12 +676,18 @@ internal static class CampaignBoot
         return true;
     }
 
-    /// <summary>Whether the save on the disk is already <paramref name="text"/>; a save that cannot be read is written over as ever, through the replace that keeps it as the backup.</summary>
+    /// <summary>
+    /// Whether the save on the disk is already <paramref name="text"/> but for its
+    /// time (<see cref="SaveCodec.Untimed"/>): then nothing is written, the backup
+    /// stays the save before it, and the save keeps the time its state was first
+    /// written. A save that cannot be read never holds it, and the write guard
+    /// deals with it first (<see cref="MakeWay"/>).
+    /// </summary>
     private static bool Holds(SaveStore store, string text)
     {
         try
         {
-            return store.WritesRefused is null && store.Read() == text;
+            return store.WritesRefused is null && store.Read() is { } saved && SaveCodec.Untimed(saved) == SaveCodec.Untimed(text);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {

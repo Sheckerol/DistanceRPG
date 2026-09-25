@@ -2,14 +2,16 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The groups <c>tuning.json</c> is laid out under: §5.3's ten, in §5.3's order
-/// (S:80-91), then the three groups of keys its starting set does not list, which
+/// (S:80-91), then the four groups of keys its starting set does not list, which
 /// sit beside it. <see cref="Consumables"/> holds no key yet: its keys arrive with
 /// the readers Phase 6b builds (<see cref="TuningSchema.Deferred"/>).
 /// <see cref="Enchanter"/> holds what a deposit costs, the user's ruling of
 /// 2026-09-25, as keys no rule of play reads until Phase 6a builds the enchanter
 /// (<see cref="TuningKey.Played"/>); its other two keys arrive with their Phase 6a
-/// readers. The file's heading for each group names the keys still to come, so
-/// §5.3's one screen stays whole.
+/// readers. <see cref="Saves"/> holds how many manual save slots there are, the
+/// user's ruling of the same day on the save model: the launcher's number, never a
+/// rule of play's. The file's heading for each group names the keys still to come,
+/// so §5.3's one screen stays whole.
 /// </summary>
 public enum TuningGroup
 {
@@ -26,6 +28,7 @@ public enum TuningGroup
     Progression,
     Combat,
     Drops,
+    Saves,
 }
 
 /// <summary>
@@ -39,17 +42,19 @@ public enum TuningGroup
 public abstract record TuningKey(string Name, TuningGroup Group)
 {
     /// <summary>
-    /// Whether a rule of play reads this key. True for every key but one declared
-    /// ahead of its reader: a number the user has ruled and wants in the file
-    /// before the code that plays it exists — what a deposit costs, until Phase 6a
-    /// builds the enchanter. Such a key is read exactly as every key — the
-    /// built-in copy must name it with a whole number, a copy beside the game
-    /// merges it, clamps it and warns — and the log names it among the numbers a
-    /// file changed (<see cref="TuningJson.Read"/>). But a save's hash leaves it out
-    /// (<see cref="TuningJson.Hash"/>): the hash asks "are these the numbers the
-    /// campaign was played under?", and a number nothing plays is none it was
-    /// played under, so turning one never says the numbers changed. The change
-    /// that gives it a reader sets it true.
+    /// Whether a rule of play reads this key. True for every key but two kinds: one
+    /// declared ahead of its reader — a number the user has ruled and wants in the
+    /// file before the code that plays it exists: what a deposit costs, until Phase
+    /// 6a builds the enchanter — and one that no rule of play reads at all:
+    /// <c>SaveSlots</c>, how many manual save slots the launcher offers. Such a key
+    /// is read exactly as every key — the built-in copy must name it with a whole
+    /// number, a copy beside the game merges it, clamps it and warns — and the log
+    /// names it among the numbers a file changed (<see cref="TuningJson.Read"/>).
+    /// But a save's hash leaves it out (<see cref="TuningJson.Hash"/>): the hash
+    /// asks "are these the numbers the campaign was played under?", and a number
+    /// nothing plays is none it was played under, so turning one never says the
+    /// numbers changed. The change that gives a rule of play one to read sets it
+    /// true.
     /// </summary>
     public bool Played { get; init; } = true;
 }
@@ -101,7 +106,7 @@ public sealed record TableKey(string Name, TuningGroup Group, int Min, int Max,
 /// </summary>
 public static class TuningSchema
 {
-    /// <summary>Every key, once, in the file's order: §5.3's groups in §5.3's order, then Progression, Combat and Drops.</summary>
+    /// <summary>Every key, once, in the file's order: §5.3's groups in §5.3's order, then Progression, Combat, Drops and Saves.</summary>
     public static IReadOnlyList<TuningKey> Keys { get; } = BuildKeys();
 
     /// <summary>
@@ -314,12 +319,20 @@ public static class TuningSchema
         // Drops (§3.1, §3.3) — not in §5.3's list: Phase 3's two guessed figures
         Int(nameof(Tuning.DropEnchantChancePercent), TuningGroup.Drops, 0, 100, t => t.DropEnchantChancePercent, (t, v) => t with { DropEnchantChancePercent = v }),
         Int(nameof(Tuning.ArcanePotency), TuningGroup.Drops, 0, 1000, t => t.ArcanePotency, (t, v) => t with { ArcanePotency = v }),
+
+        // Saves — not in §5.3's list: the user's ruling of 2026-09-25 on the save
+        // model keeps the manual slots' count here, so a change of mind is an edit.
+        // The launcher reads it (SaveSlots), never a rule of play, so no save's hash
+        // holds it. At least 1, so saving by hand always has somewhere to go; at most
+        // 9, since a digit picks each slot, as the bag's are picked, and the number
+        // row stops at 9.
+        Unplayed(Int(nameof(Tuning.SaveSlots), TuningGroup.Saves, 1, 9, t => t.SaveSlots, (t, v) => t with { SaveSlots = v })),
     ];
 
     private static IntKey Int(string name, TuningGroup group, int min, int max, Func<Tuning, int> get, Func<Tuning, int, Tuning> set)
         => new(name, group, min, max, get, set);
 
-    /// <summary><paramref name="key"/>, declared ahead of its reader: read and clamped as every key, outside a save's hash until a rule plays it (<see cref="TuningKey.Played"/>).</summary>
+    /// <summary><paramref name="key"/>, which no rule of play reads — declared ahead of its reader, or the launcher's: read and clamped as every key, outside a save's hash until a rule plays it (<see cref="TuningKey.Played"/>).</summary>
     private static IntKey Unplayed(IntKey key) => key with { Played = false };
 
     /// <summary>

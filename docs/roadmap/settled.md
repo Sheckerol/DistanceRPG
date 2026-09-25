@@ -1622,8 +1622,11 @@ declared as `tuning.json` keys ahead of it — so both are written here whole. R
 and R2 change the game, and each is written here as it is built. R3 is, both
 halves: every number of a content file has a range (R3(a), below), and every
 count of a save has its ceiling and its fields are checked against each other
-(R3(b), below). R2 is still to come, and until it is, the entry below that R2
-supersedes — the save model — says what ships.
+(R3(b), below). R2 is built in three steps, and its first — the save folder's
+slots, a save's time, the slot count, and what a write never costs — is written
+below (R2, the folder). The title screen and saving by hand are still to come,
+and until they are, the entry below that R2 supersedes — the save model — says
+what the player meets.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -1985,6 +1988,94 @@ supersedes — the save model — says what ships.
     hand edit meets it (`SaveConsistencyTests` pins it). A list longer than play
     writes — a floor's rows — costs load time, never a wrong number: every
     duplicate and every row that names nothing is refused already.
+- **R2, the folder — the save folder's slots, and a save's time.** The user's
+  ruling: a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT; one
+  autosave slot that saves itself where the game autosaves today; and manual
+  slots, "the number of saves should live on the tuning.json so that we don't need
+  to fix the code every time I change my mind". Its first part is the disk and
+  the loader under them, built beneath a launch that plays exactly as before —
+  it loads the autosave, and no play writes a manual slot yet:
+  - **The save folder is the autosave slot**: `campaign.json`, its backup, its
+    markers and its set-aside files, by the names they always had. So a save
+    written before the slots is the autosave as it stands — no file moves, and
+    there is no migration to fail halfway; both saves the pre-rework code wrote
+    load as the autosave, through the listing (`PreReworkSaveTests`). **Manual
+    slot n is the folder `slot-n` inside it**, holding the same files for its own
+    save: its own backup, markers and set-aside files. The names are built from
+    the numbers and the folder is never enumerated, so a folder named any other
+    way — `slot-01`, `slot-10`, `slot-x` — is no slot: never read, listed or
+    written, and no folder's spelling or order reaches a choice.
+  - **The slot count is `tuning.json`'s `SaveSlots`**: 3, clamped 1–9 with the
+    usual warning. At least one, so saving by hand always has somewhere to go; at
+    most nine, since a digit picks each slot, as the bag's are picked, and the
+    number row stops at 9. It sits in a group of its own, `Saves`, the file's
+    last, and is `TuningKey.Played = false`: the launcher reads it, never a rule
+    of play, so the save's hash leaves it out and turning it never says the
+    numbers changed. A count lowered below a slot that holds a save deletes
+    nothing: the slot is kept, listed for loading and never saved into, and a
+    count raised again makes it an ordinary slot.
+  - **Every save carries its time** — `savedAt`, the document's last member: the
+    UTC instant as round-trip text, from the edge's clock. `Logic/` never reads a
+    clock; the game hands the time in, and a test a fixed one. A save written
+    before the member has none, and reads as one with no time. A save of the
+    campaign a slot already holds, whatever its time, writes nothing — the two are
+    compared with the time left out — so the backup stays the save before it and
+    a save keeps the time its state was first written. `savedAt` is raw JSON like
+    every field (R3): one that is no round-trip time refuses the save whole,
+    `savedAt: yesterday is no time`, set aside as any unreadable save is.
+  - **The most recent save** — what CONTINUE is to load — is chosen by that time,
+    deterministically: the latest among the slots whose save, or failing that
+    whose backup, reads; a save with no time is older than any with one; a time
+    more than a day ahead of the clock counts as none, so a hand edit or a clock
+    once set wrong can never pin the choice on one slot through every autosave
+    after it, while the day's slack admits a save carried from a machine whose
+    clock runs a little fast; and a tie goes to the autosave, then the lower
+    slot number, by number and never by a folder's order. File times are never
+    read — a copy or a sync tool rewrites them, and a test cannot fix them — at
+    the price the README states: a clock set back can make an older save look
+    newer. A counter would need every slot read at every write.
+  - **The listing reads and never moves**: each slot's save and backup are read
+    and parsed for a header — when it was saved, the runs counted, and the
+    dungeon, floor and turn of a run in progress — and never restored, since a
+    run in progress would regenerate its floors; nothing is moved, deleted or
+    written. A save that parses and will not restore — content gone, a
+    contradiction — is listed as reading, and its load sets it aside.
+  - **A load is per slot, and never makes a campaign**: a slot's resume marker,
+    its save, then its backup, each set aside in the slot's own folder when it
+    cannot be read or restored, as the one launch's resume always did. The words
+    are the autosave's as ever — `CAMPAIGN RESUMED`, `... FROM ITS BACKUP, ONE SAVE
+    OLDER` — and a manual slot's `CAMPAIGN RESUMED FROM SLOT 2` and `CAMPAIGN
+    RESUMED FROM THE BACKUP OF SLOT 2, ONE SAVE OLDER`, green like them. A slot
+    that brings nothing back hands the choice to its caller: the launch begins a
+    campaign, saying `A NEW CAMPAIGN BEGINS` ahead of whatever was set aside.
+  - **No write costs a file.** Until the slots, every launch set an unreadable,
+    crashed or newer-build `campaign.json` aside before anything wrote there. A
+    slot can now be written without being loaded — the autosave after a manual
+    load, a save by hand into any slot — and the replace would rotate such a file
+    into the backup and delete it at the next write: a newer build's save written
+    over, which the codec promises never happens, and a readable backup deleted
+    under an unreadable save. So the one door every write goes through checks the
+    files first: a `campaign.json` whose text the codec refuses is set aside as
+    `unreadable`, and the write moves into place with the backup untouched; while
+    a save stands for the replace to rotate, a backup the codec refuses is set
+    aside too. Only the codec's refusal counts — a file the file system cannot
+    read right now is left to the write, which fails and says so, so a passing
+    lock never refuses a session's writes — and a file this session wrote there
+    or read whole is not read again. What it sets aside is said like a failed
+    save, at once over the floor and on the next screen, and never taken back: it
+    is a fact about a file. A file that will not move refuses the slot's writes,
+    as a load's does, and its notice is the failure.
+  - **A write clears its slot's resume marker.** The marker guards the file a
+    load was resuming; once a write has replaced that file, a marker left standing
+    would set the new save aside as crashed at the next load and resume the
+    backup — the very save that crashed. No write reaches a slot while its own
+    load is in flight: the autosaves a loaded screen asks for wait until it is up
+    and its marker cleared, and are written the frame it clears, so a load whose
+    first screen crashes never reaches the save it was loading.
+  - **A dev-override session never touches a slot**: its store is its scratch
+    slot, emptied as ever, and the slots are never made, so no save of the session
+    — entry, turn, arrival, a run's end, quit — reaches the autosave or a manual
+    slot.
 
 ### The numbers: `tuning.json`
 
@@ -2042,7 +2133,9 @@ supersedes — the save model — says what ships.
   hashed are those of every key a rule of play reads. A key declared ahead of
   its reader — the Enchanter's six, until Phase 6a — is left out, so turning one
   never says the numbers changed, and declaring them moved no save's hash: R4's
-  keys, above.)
+  keys, above. And by the ruling of the same day on the save model, `SaveSlots`,
+  which the launcher reads and no rule of play does, is left out the same way:
+  R2, the folder, above.)
 - **The `…Percent` key names — bends the phase doc** (§5.3 fixes
   `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
   `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
@@ -2235,7 +2328,11 @@ supersedes — the save model — says what ships.
   floor banner. A `campaign.resuming` marker guards a resume, NEW CAMPAIGN asks
   twice, `--new-campaign` sets the save and its backup aside and saves the new
   campaign at once, and the dev overrides play in a scratch slot that never
-  touches the campaign. The alternatives are in open-questions.md.
+  touches the campaign. The alternatives are in open-questions.md. (Being
+  superseded by the user's ruling, 2026-09-25, as it is built: the save folder
+  is the autosave slot now, beside manual slots whose count is `tuning.json`'s,
+  and every save carries its time — R2, the folder, above. Until the title screen
+  and saving by hand arrive, this entry says what the player meets.)
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.

@@ -746,9 +746,9 @@ public sealed class SaveConsistencyTests : IDisposable
                 File.WriteAllText(store.SavePath, broken);
 
                 var log = new List<string>();
-                var boot = CampaignBoot.Boot(store, GameContent.Current, new BootRequest(), log.Add);
-                Assert.True(boot.Resumed);
-                Assert.Equal(1, boot.Campaign.RunCounter);   // the backup
+                var boot = CampaignBoot.Load(store, GameContent.Current, log.Add);
+                Assert.True(boot.Loaded);
+                Assert.Equal(1, boot.Campaign!.RunCounter);   // the backup
                 string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
                 Assert.Equal(broken, File.ReadAllText(aside));
                 Assert.Collection(boot.Notices,

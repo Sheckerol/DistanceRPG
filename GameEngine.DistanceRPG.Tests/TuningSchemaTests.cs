@@ -254,7 +254,7 @@ public class TuningSchemaTests
             foreach (string name in keys)
                 Assert.Equal(group, Key(name).Group);
 
-        Assert.Equal([Economy, Statuses, Appliers, Modifiers, Farming, Uniques, Dungeon, Enchanter, Inventory, Consumables, TuningGroup.Progression, Combat, Drops],
+        Assert.Equal([Economy, Statuses, Appliers, Modifiers, Farming, Uniques, Dungeon, Enchanter, Inventory, Consumables, TuningGroup.Progression, Combat, Drops, Saves],
             Enum.GetValues<TuningGroup>());
         var groups = TuningSchema.Keys.Select(k => k.Group).ToArray();
         Assert.Equal(groups.Order(), groups);   // the file's order is the groups' order
@@ -341,6 +341,49 @@ public class TuningSchemaTests
         // filling: its clamp starts at the most any weapon arrives carrying, read
         // off the validator's own constant, so the two cannot drift apart.
         Assert.Equal(ContentValidator.MostArrivingEnchantments, ((IntKey)Key(nameof(Tuning.EnchantmentSlots))).Min);
+    }
+
+    [Fact]
+    public void TheSlotCountIsAKeyNoRulePlays()
+    {
+        // R2(c), the user's ruling of 2026-09-25 on the save model: "the number of
+        // saves should live on the tuning.json so that we don't need to fix the code
+        // every time I change my mind". SaveSlots is the one key of a group of its
+        // own, the file's last, clamped 1 to 9 — a slot at least, so saving by hand
+        // always has somewhere to go, and a digit to pick each — and read by the
+        // launcher (the save folder's slots), never by a rule of play: Played is
+        // false, so a save's hash leaves it out. What the master sets it to is its
+        // own to say, so no value is asserted here.
+        var key = Assert.IsType<IntKey>(Key(nameof(Tuning.SaveSlots)));
+        Assert.Equal((Saves, 1, 9), (key.Group, key.Min, key.Max));
+        Assert.False(key.Played);
+        Assert.Equal([key], TuningSchema.Keys.Where(k => k.Group == Saves));
+        Assert.Same(key, TuningSchema.Keys[^1]);
+        Assert.InRange(key.Get(BuiltIn), key.Min, key.Max);
+        Assert.Equal(key.Max, SaveSlots.Most);   // the highest slot number is the clamp's ceiling, read off it
+
+        // A file asking for twelve plays nine and says so, as every clamp does — in
+        // the HUD's font, since it is drawn — and the log names the number it
+        // changed; the tuning's hash does not move.
+        var read = TuningJson.Read("""{ "SaveSlots": 12 }""", BuiltIn);
+        Assert.Equal(["tuning.json: SaveSlots 12 is above 9 - using 9"], read.Warnings);
+        Assert.Equal(9, read.Tuning.SaveSlots);
+        string[] changed = BuiltIn.SaveSlots == 9 ? [] : ["SaveSlots 9"];
+        Assert.Equal(changed, read.Overrides);
+        Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(read.Tuning));
+        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "SaveSlots": 12 }""" });
+        Assert.Null(load.Error);
+        Assert.Equal(9, load.Content!.Tuning.SaveSlots);
+        string warning = Assert.Single(load.Notices);
+        Assert.All(NoticeText.Wrap(warning), row => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", row));
+        Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(load.Content.Tuning));
+
+        // Every count a file can make opens the slots: one to nine of them.
+        foreach (int count in new[] { key.Min, key.Max })
+        {
+            var slots = new SaveSlots(Path.Combine(Path.GetTempPath(), "never-made"), count);
+            Assert.Equal(count, slots.Count);
+        }
     }
 
     [Fact]

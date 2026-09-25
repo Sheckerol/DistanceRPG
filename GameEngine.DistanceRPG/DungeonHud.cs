@@ -276,7 +276,7 @@ public sealed class DungeonHud
     /// rows moves down under these (<see cref="BannerLine"/>), so no row is drawn
     /// over it; it never moves up.
     /// </summary>
-    /// <param name="notice">The failed write's notice (<see cref="CampaignBoot.WriteFailed"/>).</param>
+    /// <param name="notice">The failed write's notice (<see cref="CampaignBoot.WriteFailed"/>), or that of a file the write set aside first (<see cref="CampaignBoot.SetAsideNotice"/>), said alike.</param>
     public void ShowSaveFailed(string notice)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(notice);

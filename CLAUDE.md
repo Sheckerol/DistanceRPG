@@ -76,8 +76,10 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   user has ruled and wants in the file first (the Enchanter group's, until Phase
   6a): declare it in `TuningSchema` with `Played = false`, and it is read,
   clamped and warned like every key but left out of the save's tuning hash, so
-  turning it never says the numbers changed. The change that gives it a reader
-  sets it played.
+  turning it never says the numbers changed. The change that gives a rule of
+  play one to read sets it played. A key no rule of play reads at all — the
+  launcher's `SaveSlots`, how many manual save slots there are — is
+  `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric

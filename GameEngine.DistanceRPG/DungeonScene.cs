@@ -394,9 +394,10 @@ public class DungeonScene : Scene
     /// the floor at once, the save's word shown whole (<see cref="DungeonHud.ShowSaveFailed"/>),
     /// where the player is — not only on the next screen between runs, at the run's
     /// end — so a run whose saves fail is never played on, or quit, as though it
-    /// were saved.
+    /// were saved. A file of the slot the host's write set aside first, since no
+    /// save could be read from it, is said the same way (<see cref="CampaignBoot.Save"/>).
     /// </summary>
-    /// <param name="notice">What the failed write says (<see cref="CampaignBoot.WriteFailed"/>).</param>
+    /// <param name="notice">What the failed write says (<see cref="CampaignBoot.WriteFailed"/>), or what the write set aside (<see cref="CampaignBoot.SetAsideNotice"/>).</param>
     internal void SaveFailed(string notice) => _hud.ShowSaveFailed(notice);
 
     /// <summary>The banner's lines as the HUD draws them, top to bottom — over a resumed floor, <c>RESUMED</c> first — or none once it is down.</summary>

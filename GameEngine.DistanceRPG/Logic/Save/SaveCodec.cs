@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace GameEngine.DistanceRPG.Logic;
 
@@ -46,6 +47,15 @@ public static class SaveCodec
     /// <summary>The member every version of the document carries its version in.</summary>
     internal const string VersionMember = "version";
 
+    /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
+    internal const string SavedAtMember = "savedAt";
+
+    /// <summary>Where <see cref="Write"/> lays the time out: the root's last member, on a line of its own.</summary>
+    private const string TimeLead = ",\n  \"" + SavedAtMember + "\": ";
+
+    /// <summary>The root's time member as <see cref="Write"/> writes it — null, or one string on its line — and the root's close after it, to the end of the text.</summary>
+    private static readonly Regex TimeLine = new("""\A,\n  "savedAt": (?:null|"(?:[^"\\\r\n]|\\[^\r\n])*")\n}\n?\z""", RegexOptions.CultureInvariant);
+
     /// <summary>
     /// The migrations this build ships, one per version it can lift: none at
     /// version 1, which is the first. The table exists so the step that lifts
@@ -72,6 +82,28 @@ public static class SaveCodec
     {
         ArgumentNullException.ThrowIfNull(file);
         return JsonSerializer.Serialize(file, SaveJsonContext.Default.SaveFile) + "\n";
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> with its time left out: the root's
+    /// <see cref="SavedAtMember"/> member taken out as <see cref="Write"/> lays it
+    /// out — the root's last member, on a line of its own — so two saves of one
+    /// campaign taken at different times are one text, and so is a save written
+    /// before the member existed and one written after it. What says whether a save
+    /// would write anything (a slot already holding the campaign keeps its save, its
+    /// backup and the time its state was first written) and whether two slots hold
+    /// the same save. A text laid out any other way — a hand edit, a text that is
+    /// no save — comes back as it is, so it compares as the bytes it holds: never
+    /// the same as a save it is not. Pure text: nothing is parsed.
+    /// </summary>
+    internal static string Untimed(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        int at = text.LastIndexOf(TimeLead, StringComparison.Ordinal);
+        if (at < 0 || !TimeLine.IsMatch(text.AsSpan(at)))
+            return text;
+        int end = text.IndexOf('\n', at + TimeLead.Length);   // the time's own line ends here, before the root's close
+        return string.Concat(text.AsSpan(0, at), text.AsSpan(end));
     }
 
     /// <summary>

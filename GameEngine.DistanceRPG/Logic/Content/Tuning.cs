@@ -463,4 +463,18 @@ public sealed record Tuning
     /// </para>
     /// </summary>
     public int PartyCarrySlots { get; init; }
+
+    // ---- Saves (the user's ruling of 2026-09-25 on the save model) ----
+
+    /// <summary>
+    /// How many manual save slots there are beside the autosave: the save folder's
+    /// <c>slot-1</c> to <c>slot-N</c>. The user ruled the count a key — "the number
+    /// of saves should live on the tuning.json so that we don't need to fix the
+    /// code every time I change my mind". At least one, so saving by hand always
+    /// has somewhere to go, and at most nine, a digit picking each. A count lowered
+    /// below a slot that holds a save deletes nothing: the slot is kept, listed for
+    /// loading and never saved into. The launcher reads it, never a rule of play,
+    /// so a save's hash leaves it out (<see cref="TuningKey.Played"/>).
+    /// </summary>
+    public int SaveSlots { get; init; }
 }

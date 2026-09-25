@@ -335,5 +335,15 @@
   /* Provisional: the untyped damage a tier-1 Arcane adds to a hit, before its tier multiplies it;
      it is the arcane entry's potency, which the game's catalogue leaves to this key. The docs price
      Arcane's lock and trigger and give it no potency. */
-  "ArcanePotency": 4
+  "ArcanePotency": 4,
+
+  /* ---- Saves ---- */
+
+  /* How many manual save slots there are beside the autosave: slot-1 to slot-N in the save
+     folder, as the user ruled on 2026-09-25 - the count lives here so a change of mind is an edit,
+     not a rebuild. At least 1 and at most 9, a digit choosing each: a number outside is brought to
+     the nearer end, with a warning. Lowering it deletes nothing - a slot above the count keeps its
+     save where it is, and is never saved into. The launcher reads it, never a rule of play, so
+     turning it never says the numbers have changed. */
+  "SaveSlots": 3
 }

@@ -8,10 +8,12 @@ namespace GameEngine.DistanceRPG;
 /// (<see cref="Logic.SaveCodec"/>, <see cref="Logic.SaveGame"/>) and never touches
 /// a file. Engine-free — <c>System.IO</c> only — and handed its folder every
 /// time: there is no parameterless constructor and no default folder here, so
-/// nothing can read or write the player's real saves by accident. The game hands
-/// it the player's save folder (<see cref="SaveDirectory"/>), or that folder's
-/// dev-override slot (<see cref="SlotDirectory"/>); a test hands it a temporary
-/// folder.
+/// nothing can read or write the player's real saves by accident. One store is
+/// one slot (the user's ruling of 2026-09-25 on the save model): the game hands
+/// it the player's save folder (<see cref="SaveDirectory"/>), which is the
+/// autosave slot, a manual slot's folder inside it (<see cref="SaveSlots"/>), or
+/// the save folder's dev-override slot (<see cref="SlotDirectory"/>); a test hands
+/// it a temporary folder.
 /// <para>
 /// <strong>What lives in the folder.</strong> <see cref="FileName"/> is the
 /// campaign. <see cref="BackupName"/> is the save before it, kept by every
@@ -29,6 +31,14 @@ namespace GameEngine.DistanceRPG;
 /// any point leaves <see cref="FileName"/> exactly as it was. The one delete is
 /// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The two
 /// markers, which are no saves, are the only other files this class removes.
+/// </para>
+/// <para>
+/// <strong>What this session knows the files hold</strong>
+/// (<see cref="SaveVouched"/>, <see cref="BackupVouched"/>): a flag per file,
+/// true for a text this session wrote there or read and found a save
+/// (<see cref="Vouch"/>), carried to the backup by the replace. The write guard
+/// (<c>CampaignBoot.Save</c>) reads a file before a write only when its flag is
+/// down, so a session that writes its own saves reads nothing back.
 /// </para>
 /// </summary>
 internal sealed class SaveStore
@@ -94,6 +104,26 @@ internal sealed class SaveStore
     /// </summary>
     public string? WritesRefused { get; private set; }
 
+    /// <summary>Whether this session knows <see cref="FileName"/> holds a save: it wrote the text there, or read it and found one (<see cref="Vouch"/>). Down for a file set aside, and for one never read.</summary>
+    internal bool SaveVouched { get; private set; }
+
+    /// <summary>Whether this session knows <see cref="BackupName"/> holds a save: a save it knew, which a write's replace made the backup, or one it read and found a save (<see cref="Vouch"/>).</summary>
+    internal bool BackupVouched { get; private set; }
+
+    /// <summary>
+    /// This session has read the save — or, with <paramref name="backup"/>, the
+    /// backup — whole and found a save there, so a write need not read it again.
+    /// Only a caller that parsed the text says so: a read alone never does, since
+    /// a text read is no save until it is parsed.
+    /// </summary>
+    internal void Vouch(bool backup)
+    {
+        if (backup)
+            BackupVouched = true;
+        else
+            SaveVouched = true;
+    }
+
     /// <summary>The save's text, or null when there is none. A save that is there and cannot be read throws, as the file system says why.</summary>
     public string? Read() => ReadIfThere(SavePath);
 
@@ -108,7 +138,8 @@ internal sealed class SaveStore
     /// in one step. The save it replaces becomes the backup. The first write has
     /// no save to replace, so the temp file is simply moved into place. The
     /// folder is made if need be. UTF-8, no byte order mark, the text exactly as
-    /// given.
+    /// given. The save is then one this session knows (<see cref="SaveVouched"/>),
+    /// and the backup is known exactly when the save it was is.
     /// </summary>
     /// <exception cref="IOException">The write failed — a full disk, a locked file, a folder in the way — or writes are refused; the save on the disk is what it was.</exception>
     /// <exception cref="UnauthorizedAccessException">No permission to write there; the save on the disk is what it was.</exception>
@@ -126,9 +157,15 @@ internal sealed class SaveStore
         }
 
         if (File.Exists(SavePath))
+        {
             File.Replace(TempPath, SavePath, BackupPath, ignoreMetadataErrors: true);
+            BackupVouched = SaveVouched;   // the save it replaced is the backup now
+        }
         else
+        {
             File.Move(TempPath, SavePath);
+        }
+        SaveVouched = true;
     }
 
     /// <summary>
@@ -159,6 +196,10 @@ internal sealed class SaveStore
             if (File.Exists(target) || Directory.Exists(target))
                 continue;
             File.Move(source, target, overwrite: false);
+            if (backup)
+                BackupVouched = false;   // nothing is there now
+            else
+                SaveVouched = false;
             return target;
         }
     }
@@ -229,6 +270,7 @@ internal sealed class SaveStore
         if (!string.Equals(Path.GetFileName(Path.TrimEndingDirectorySeparator(Folder)), OverrideSlot, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 $"{Folder} is not a dev-override slot: only a folder named '{OverrideSlot}' is ever emptied, so a campaign's saves are never deleted.");
+        SaveVouched = BackupVouched = false;
         if (!Directory.Exists(Folder))
             return;
         foreach (string file in Directory.GetFiles(Folder))
