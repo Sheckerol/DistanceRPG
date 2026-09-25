@@ -126,12 +126,14 @@ public sealed class StartupErrorScene : Scene
     /// <c>tuning.json</c>, which every read stands on; when the copy's own text is
     /// what failed — it is not JSON of its shape
     /// (<see cref="ContentValidator.RuleFileShape"/>, which only reading a file
-    /// raises), or the build does not carry it
-    /// (<see cref="ContentValidator.RuleBuiltInCopy"/>) — since reading a copy
-    /// reads nothing else; and when no content file was read from beside the
-    /// executable at all. Otherwise a file beside the executable broke it, or may
-    /// have — a <c>restricted.json</c> there refusing a built-in weapon — and the
-    /// line is <see cref="KeysLine"/>.
+    /// raises), a number in it is outside its range
+    /// (<see cref="ContentValidator.RuleNumberInRange"/>: a range is the game's,
+    /// never another file's, so a number is always its own file's), or the build
+    /// does not carry it (<see cref="ContentValidator.RuleBuiltInCopy"/>) — since
+    /// none of those reads anything else; and when no content file was read from
+    /// beside the executable at all. Otherwise a file beside the executable broke
+    /// it, or may have — a <c>restricted.json</c> there refusing a built-in weapon
+    /// — and the line is <see cref="KeysLine"/>.
     /// </summary>
     internal static string ClosingLine(ContentException error, IReadOnlyList<string> readBeside)
     {
@@ -139,7 +141,7 @@ public sealed class StartupErrorScene : Scene
         ArgumentNullException.ThrowIfNull(readBeside);
         if (!error.BuiltIn || error.File is not { } file)
             return KeysLine;
-        bool ownText = error.Rule is ContentValidator.RuleFileShape or ContentValidator.RuleBuiltInCopy;
+        bool ownText = error.Rule is ContentValidator.RuleFileShape or ContentValidator.RuleNumberInRange or ContentValidator.RuleBuiltInCopy;
         if (file != TuningJson.FileName && !ownText && readBeside.Count > 0)
             return KeysLine;
         string name = file.ToUpperInvariant();

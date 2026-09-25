@@ -7,8 +7,10 @@
  * forged past its limit, a variant that is not its class plus one modifier, a unique that is not
  * its variant raised, or a field the game does not know stops the game on a screen naming the
  * file, the class or the weapon and the rule - and, when a relation refused it, that
- * restricted.json relation. Comments and trailing commas are fine. A weapon is an edit here, never
- * a rebuild: start the game again to play it.
+ * restricted.json relation. Every number here has a range - README.md lists each, with why - and
+ * one outside it stops the game the same way, naming the class or the weapon, the field, the number
+ * and the range. Comments and trailing commas are fine. A weapon is an edit here, never a rebuild:
+ * start the game again to play it.
  *
  * classes: every class once - Dagger, Sword, Spear, Axe, Ranged, Throwing, Staff and Wand - with
  * what every weapon of it shares. kind: melee, ranged or caster, in lower case - the Staff and the

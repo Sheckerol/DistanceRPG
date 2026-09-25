@@ -1619,9 +1619,10 @@ every number of a content file gets a range, and a save's fields are checked
 against each other; and **R4**, what a deposit costs. R1 and R4 change no rule
 of play — R1 keeps what shipped, and R4 is Phase 6a's to build, its numbers
 declared as `tuning.json` keys ahead of it — so both are written here whole. R3
-and R2 change the game, and each is written here as it is built; until then, the
-entries below that they supersede — whether a content file's numbers have
-bounds, and the save model — say what ships.
+and R2 change the game, and each is written here as it is built: R3's content
+half is (R3(a), below: every number of a content file has a range); its save
+half and R2 are still to come, and until they are, the entry below that R2
+supersedes — the save model — says what ships.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -1769,6 +1770,93 @@ bounds, and the save model — say what ships.
     enchanter's ceiling and never the unique table's shape, and the key's floor,
     `MostArrivingEnchantments` — the Light shape at its floor, `LightShapeSlots −
     LightShapeFloor` — keeps the two from contradicting.
+- **R3(a) — every number of a content file has a range.** The user's reason:
+  "since we are storing in raw json we should probably not trust the fields".
+  Every number `weapons.json` and `dungeons.json` hold has a row of
+  `ContentBounds` — the range the game plays it in, and why — and one outside it
+  stops the game under `RuleNumberInRange`, naming the file, the entry, the field,
+  the number and the whole range: `cost 0 is outside 1 to 10000 - movement is
+  charged a unit at least, …`. Never clamped, since content is validated (§5.4):
+  a copy beside the exe out of range never falls back to the built-in copy, and a
+  built-in copy out of range is the master's own — a range is the game's, never
+  another file's to break — so the screen names the master to fix and rebuild.
+  Every top is read once off a `tuning.json` clamp's ceiling or a rule of the
+  game, never a number of a master, and every shipped and doc-fixed number lies
+  inside its row:
+
+  | Number | Range | Why |
+  | --- | --- | --- |
+  | a class row's `range`, and a variant's own | 1 – `MovementBudget`'s ceiling (10000) | a reach of 0 hits nothing, and the farthest the tuning measures is past any map |
+  | a class row's `damage`, and a variant's own | 0 – `PerStack`'s ceiling (1000) | a staff hits for 0, its cast being its innate; the most a magnitude can be |
+  | a class row's `cost`, and a variant's own | `Progression.MinimumMovementCost` (1) – 10000 | movement is charged a unit at least, so a smaller cost names one never charged, which the HUD's COST would show |
+  | a class row's `manaCost`, and a variant's own | 0 – 1000 | a martial class casts for 0; below 0 the cast gate opens on an empty pool |
+  | a class row's `baseline` stack; a weapon's spread as composed, a unique's `raises` among it | 1 – the modifier's tuned `MaxForged` (3 at most) | `RuleForgedStackCount` and `RuleMaxForged`, both ends, as before |
+  | a variant's `adds` stack | 1 – `MaxForged`'s ceiling (3) | an add adds a stack at least, and none is deeper than any forge goes; what it composes to stays the forge's rules' |
+  | an enchantment's `tier` | `DropTier` (1) – `ArtifactTier` (3) | a weapon arrives at tier 1 and an artifact at 3 at most; tier grows in play from there, uncapped (§3.3), and a saved weapon's tier is the save's to bound. Below 1 plays as 1, a tier the game never plays |
+  | a wand's `radius`, `length`, `width`, `targetReach` its kind measures | 1 – 10000 | a measured dimension of 0 covers nothing (a left-out one read as 0); the farthest the tuning measures |
+  | a Cone's `angleDegrees` | 1 – a full turn (360) | a cone of nothing, or wider than all around, is no cone |
+  | a pinned `bossFloorMin` or `bossFloorMax` | 1 – `BossFloorMax`'s ceiling (99) | a floor number starts at 1; no tuning names a deeper floor, and the fit can always serve 99 |
+  | a boss's `maxHp` | 1 – `StartingPool`'s ceiling (10000) | a hit point at least; no pool opens on a bigger bar |
+  | a boss's `movementBudget` | 1 – 10000 | a unit of movement at least; the farthest the tuning measures |
+  | a boss's `innate` stack | 1 – `MaxForged`'s ceiling plus `AcquiredHeadroom`'s (53) | innate is no forge's — "a golem deeper than any forge is a golem" — but no stack grows deeper |
+
+  - **The rules that bounded a number before keep the end they own**, and the
+    range rule is asked after them, so each refuses what it always refused, its
+    detail now in the range rule's form, naming the field and the whole range:
+    `RuleBossStatline` (`boss.maxHp 0 is outside 1 to 10000 - …`, and
+    `boss.movementBudget` alike; a boss that is missing keeps `names no boss`),
+    `RuleBossFloorRange` (`bossFloorMin 0 is outside 1 to 99 - …`; an inverted
+    range `bossFloorMax 3 is below bossFloorMin 5`, an end the dungeon leaves to
+    the tuning named as its key, `tuning.json BossFloorMin 5`),
+    `RuleBossInnateStackable` (`boss.innate.Brace 0 is outside 1 to 53 - …`; a
+    member that never stacks breaks no range, and keeps its detail), and the
+    forge's two, which keep both ends of a forged count: a class row's
+    `baseline.CritMultiplier 0 is outside 1 to 3 - …`, a weapon's
+    `forged.CritWindow 4 is outside 1 to 3 - …`, the top the tuned `MaxForged` of
+    the modifier. A refusal that names a relation keeps its words
+    (`baseline Brace x1 on a Ranged weapon beside …`): it breaks no range.
+  - **Where the range rule is asked.** A class row's statline once the row's own
+    checks pass, so a fault is named on the class, where it is written, and never
+    on the first variant that plays it; a weapon's statline as composed, its
+    shape's measured dimensions and its enchantments' tiers once its row's
+    checks pass; a boss's numbers after its own rules; and a pinned boss floor
+    **straight after `RuleBossFloorRange`, before the retiring rule and the farm's
+    read the floor**, so a floor out of range is named as one whatever the tuning:
+    a dungeon pinned to floor 500 is the range rule's, where it had been
+    `RuleBossPaysLessThanTheFarm`'s, and `TuningFit` raises no offset for a floor
+    past the top and says nothing about it. What a variant `adds` the reader asks
+    as it reads it, before summing it onto the class's baseline: summed, a raw
+    `-1` would read as a composed stack one short, a `0` on a baseline modifier
+    would add nothing in silence, and the largest whole number would wrap — so the
+    refusal names the number written, at its path (`weapons.json:
+    variants[0].adds.Light: 0 is outside 1 to 3 - …`). A unique's `raises` is set,
+    not summed, so the composed spread's rules name its raw number.
+  - **The boss floor's top is the save's too.** `ContentBounds.DeepestBossFloor`,
+    `BossFloorMax`'s clamp ceiling, is one accessor that the content's pinned
+    floors and the save's boss floor both read (`SaveMapper`), so the two never
+    disagree about how deep a boss goes; the save had summed a farm's banks to
+    198 while a pinned floor had no top. And at `AcquiredHeadroom`'s clamp floor a
+    farm banks 2, so a boss on floor 99 needs an offset of 98, inside
+    `BossStackOffset`'s clamp: the fit can always serve the deepest floor a
+    dungeon may pin, which the suite asserts off the schema.
+  - **What holds no number**: `restricted.json`'s relations are ids and groups of
+    ids, and a caster's `dropOrder` is ids, its length and membership bound by
+    `RuleCasterVariantPool`. A dimension a shape's kind does not measure is 0 or
+    refused by the reader, as before.
+  - **A unique soul's tier is held to the same 1 – 3, and plays at its pin.** A
+    narrower row, 1 to 1, was planned — a soul written above 1 names a tier the
+    game never plays (`Enchantment.Tier` pins it) — and is not built: the suite
+    loads a soul written at 3 and holds the pin on it
+    (`UniqueContentTests.UniqueSouls_AreNeverRolled_AndTierPinned`), a test this
+    step had no licence to rewrite. Narrowing it is that row and that test.
+  - **The enchantment catalogue, the other half of the old question, is settled
+    as code.** Under the ruling on content it is code (`EnchantmentDefinitions`),
+    reviewed and tested like every rule, and R3's reason does not reach it: no
+    player edits it. Its load checks stand (`RuleEnchantmentLockIsPositive`,
+    `RuleZeroTrigger`, `RuleMagnitudeNamesAPotency`), and the dialled numbers laid
+    over it (`ApplyPercent`, `ArcanePotency`) are `tuning.json`'s, clamped 0–1000.
+    Nothing of it is a user decision, and the question — whether a content file's
+    numbers have bounds — leaves open-questions.md whole.
 
 ### The numbers: `tuning.json`
 
@@ -1867,7 +1955,9 @@ bounds, and the save model — say what ships.
   trailing commas allowed. An unknown member is refused (`RuleFileShape`): a
   mistyped field in content is a rule that silently does not apply. Invalid
   content stops the game on a screen naming the file, the entry, the rule and
-  its detail. (Superseded by the user's ruling, 2026-09-25: there were five
+  its detail — and so does a number outside its range: every number of the files
+  has one (R3(a), above), and the refusal names the field, the number and the
+  range. (Superseded by the user's ruling, 2026-09-25: there were five
   files, the contract covering `enchantments.json` and `party.json` too, until
   the catalogue and the party became code.)
 - **The staged load's order is a stated rule.** Every present file is parsed
@@ -1915,7 +2005,9 @@ bounds, and the save model — say what ships.
   list in code until the audit). (Superseded by the user's ruling, 2026-09-25:
   there were three, the third an effect name resolving to a kind —
   `RuleUnknownEffect` — which went with `enchantments.json`, since an entry's
-  effect is now typed in code.)
+  effect is now typed in code. And the user's ruling of the same day on raw JSON
+  brought one new invariant: every number of a content file in its range,
+  `RuleNumberInRange` — R3(a), above.)
 - **"Naming both" is an explanation, not a check.** A weapon a relations edit
   makes illegal names the relation that refused it, read off the file in hand,
   asking the rules' own clauses in their order — for modifiers and enchantments
@@ -1948,6 +2040,9 @@ bounds, and the save model — say what ships.
   `enchantments.json`).
 - Whether a content file's numbers have bounds stays open: open-questions.md
   sets out both readings, and Phase 5 adds no new kind of content rule.
+  (Superseded by the user's ruling, 2026-09-25: every number of a content file
+  has a range, and the enchantment catalogue's numbers are settled as code —
+  R3(a), above; the question left open-questions.md.)
 
 ### The save
 

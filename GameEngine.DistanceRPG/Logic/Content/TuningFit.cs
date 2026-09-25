@@ -15,9 +15,11 @@ namespace GameEngine.DistanceRPG.Logic;
 /// with one warning naming the entry that needed it.
 /// <para>
 /// Content that no in-range value can serve — a roster member carrying twelve
-/// weapons, a dungeon pinned to floor 500, a weapon forged x4 — is content's own
-/// error: it is left to fail as content, naming the entry and the rule, and the
-/// tuning says nothing about it. A record that failed to parse arrives null and
+/// weapons, a weapon forged x4, a dungeon pinned to floor 500, past the deepest
+/// floor any tuning names and so past what a dungeon may pin
+/// (<see cref="ContentBounds.DeepestBossFloor"/>) — is content's own error: it
+/// is left to fail as content, naming the entry and the rule, and the tuning
+/// says nothing about it. A record that failed to parse arrives null and
 /// is skipped: nothing is fitted to content that is not loaded. Run by
 /// <see cref="ContentFiles.Load"/> after every file has parsed and before
 /// anything validates, so every tuning a file can make loads with the shipped
@@ -134,7 +136,10 @@ internal static class TuningFit
     /// The boss offset raised until the deepest boss of every dungeon — its own
     /// pinned floor, or the tuning's range where it pins none — pays fewer
     /// guaranteed stacks than a well-farmed weapon banks, naming the dungeon that
-    /// needed the most.
+    /// needed the most. A pinned floor past the deepest a dungeon may pin
+    /// (<see cref="ContentBounds.DeepestBossFloor"/>) is served by nothing: the
+    /// range rule names it (<see cref="ContentValidator.RuleNumberInRange"/>), and
+    /// the fit raises no offset for it and says nothing.
     /// </summary>
     private static Tuning FitOffset(Tuning tuning, DungeonsData dungeons, ICollection<string> warnings)
     {
@@ -148,8 +153,8 @@ internal static class TuningFit
             if (def is null) continue;
             int deepest = def.BossFloorMax ?? tuning.BossFloorMax;
             int offset = deepest - banks + 1;   // the least offset under which that floor pays fewer than a farm banks
-            if (deepest < 1 || offset <= needed || offset > key.Max)
-                continue;   // served already, or floored past any offset there is: the dungeon's own error
+            if (deepest < 1 || deepest > ContentBounds.DeepestBossFloor || offset <= needed || offset > key.Max)
+                continue;   // served already, or floored past any offset or any floor there is: the dungeon's own error
             needed = offset;
             cause = def;
             causeFloor = deepest;

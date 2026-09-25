@@ -361,12 +361,15 @@ public class WeaponClassTests
         Assert.Contains("EnemyPlacer.PlacedClasses", spear.Detail);
 
         // A baseline's fault says it is the baseline's, and a relation's names the
-        // relation, as a weapon's does.
-        Assert.Equal("baseline CritMultiplier x0",
+        // relation, as a weapon's does. A count's names the field and the whole
+        // range it lies outside (the user's ruling of 2026-09-25, R3), the top the
+        // forge limit of its modifier.
+        int limit = ShippedContent.Tuning.MaxForged[CritMultiplier];
+        Assert.Equal($"baseline.CritMultiplier 0 is outside 1 to {limit} - {ContentBounds.Baseline.Why}",
             Fails(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 0")).Detail);
         Assert.Equal("baseline Brace x1 on a Ranged weapon beside Brace x1, Longshot x1 - restricted.json kind Brace: melee",
             Fails(DataTexts.InClass(ShippedWeapons, Ranged, "\"CritWindow\": 1", "\"Brace\": 1")).Detail);
-        Assert.Equal($"baseline CritMultiplier x4, MaxForged {ShippedContent.Tuning.MaxForged[CritMultiplier]}",
+        Assert.Equal($"baseline.CritMultiplier 4 is outside 1 to {limit} - {ContentBounds.Baseline.Why}",
             Fails(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 4")).Detail);
 
         // Records built in code bypass the reader, and meet the same rule in the

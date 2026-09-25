@@ -536,17 +536,14 @@ internal static class SaveMapper
     // ── Restore: the visit in progress ───────────────────────────────────────
 
     /// <summary>
-    /// The deepest floor any content that loads can put a boss on: a boss's
-    /// guaranteed stacks, <c>max(0, floor − BossStackOffset)</c>, stay below what a
-    /// farm banks (<see cref="ContentValidator.FarmBanks"/>) for every floor a
-    /// tuning or a dungeon's own pinned range allows, and a <c>tuning.json</c> can
-    /// raise neither key past its clamp. A save naming a deeper boss names a
-    /// dungeon no content could have made — and would have a load build every
-    /// floor of it.
+    /// The deepest floor any content that loads can put a boss on —
+    /// <c>BossFloorMax</c>'s clamp ceiling, which a pinned floor meets too
+    /// (<see cref="ContentBounds.DeepestBossFloor"/>, the one accessor the
+    /// content's pinned floors are held to, R3(a)): a tuning names no deeper
+    /// floor, and a dungeon pins none. A save naming a deeper boss names a dungeon
+    /// no content could have made — and would have a load build every floor of it.
     /// </summary>
-    private static readonly int DeepestBossFloor =
-        ((IntKey)TuningSchema.Find(nameof(Tuning.BossStackOffset))!).Max
-        + ContentValidator.FarmBanks(((IntKey)TuningSchema.Find(nameof(Tuning.AcquiredHeadroom))!).Max) - 1;
+    private static int DeepestBossFloor => ContentBounds.DeepestBossFloor;
 
     /// <summary>
     /// The visit a document's <c>campaign.visit</c> describes, on the restored

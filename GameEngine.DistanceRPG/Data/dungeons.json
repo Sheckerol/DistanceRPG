@@ -5,8 +5,10 @@
  * theme that is no class's signature, a boss floor range that is inverted or deep enough to pay
  * a farm's stacks, a boss without its theme, two dungeons that retire on clear, or a field the
  * game does not know stops the game on a screen naming the file, the dungeon and the rule. Every
- * dungeon names all eight fields, and its boss all five; comments and trailing commas are fine.
- * A dungeon is an edit here, never a rebuild: start the game again to play it.
+ * number here has a range - README.md lists each, with why - and one outside it stops the game the
+ * same way, naming the dungeon, the field, the number and the range. Every dungeon names all eight
+ * fields, and its boss all five; comments and trailing commas are fine. A dungeon is an edit here,
+ * never a rebuild: start the game again to play it.
  *
  * id: what everything names the dungeon by - a lock, a save. name: what the screen calls it.
  * theme: a modifier - the boss carries it whatever it holds and forges it onto its drop, and every

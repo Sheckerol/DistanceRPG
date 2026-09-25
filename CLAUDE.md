@@ -78,3 +78,8 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   clamped and warned like every key but left out of the save's tuning hash, so
   turning it never says the numbers changed. The change that gives it a reader
   sets it played.
+- Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
+  asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
+  read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric
+  field of `weapons.json` or `dungeons.json` gets its row, with why, in the same
+  change — `ContentBoundsTests` fails until it has one.

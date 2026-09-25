@@ -55,21 +55,23 @@ namespace GameEngine.DistanceRPG.Logic;
 /// dimensions where they are 0.
 /// </para>
 /// <para>
-/// Three refusals are the reader's, as the file's parse failure, because
+/// Four refusals are the reader's, as the file's parse failure, because
 /// composing cannot go on past them and nothing but a
 /// <see cref="ContentException"/> may leave here: a <c>classes</c> section that
 /// does not give every class a row (<see cref="ContentValidator.RuleEveryClassHasARow"/>,
 /// naming the first class missing), a <c>kind</c> that is none of the three words
 /// (<see cref="ContentValidator.RuleKindValue"/>, the relations' rule for the same
-/// words), and a unique whose <c>derivedFrom</c> names no variant
-/// (<see cref="ContentValidator.RuleUniqueDerivedFrom"/>). A file in the flat
+/// words), a stack a variant <c>adds</c> outside its range
+/// (<see cref="ContentValidator.RuleNumberInRange"/>: summed, the number the file
+/// wrote would be lost, and could wrap), and a unique whose <c>derivedFrom</c>
+/// names no variant (<see cref="ContentValidator.RuleUniqueDerivedFrom"/>). A file in the flat
 /// format this one replaced — a <c>weapons</c> list and no <c>classes</c> — is
 /// refused saying so, and how to get the built-in weapons back. What else makes
 /// a row legal is the validator's (<see cref="ContentValidator.ValidateWeapons"/>),
 /// at the weapons' stage of the load: the class rows first, then the relations
 /// of <c>restricted.json</c> asked through <see cref="ModifierRules.Allowed"/>, the
 /// forge limits, the variants against their class's baseline, the unique
-/// derivation, the casters' innates.
+/// derivation, the casters' innates, and every number in its range.
 /// </para>
 /// <para>
 /// The shipped <c>GameEngine.DistanceRPG/Data/weapons.json</c> is the master copy
@@ -136,8 +138,10 @@ public static class WeaponsJson
     /// The dimensions each kind of shape measures (§1.4, <see cref="AreaShape"/>'s
     /// factories): a dimension a kind does not use is 0, so a file giving one any
     /// other number on that kind is naming a number nothing reads, and is refused.
+    /// Each one it measures is held to its range by the validator
+    /// (<see cref="ContentBounds.Dimension"/>), which reads this table too.
     /// </summary>
-    private static readonly IReadOnlyDictionary<AreaShapeKind, string[]> Dimensions = new Dictionary<AreaShapeKind, string[]>
+    internal static readonly IReadOnlyDictionary<AreaShapeKind, string[]> Dimensions = new Dictionary<AreaShapeKind, string[]>
     {
         [AreaShapeKind.Blast] = ["radius", "targetReach"],
         [AreaShapeKind.Cone] = ["length", "angleDegrees"],
@@ -156,8 +160,9 @@ public static class WeaponsJson
     /// The text is not the documented shape (<see cref="ContentValidator.RuleFileShape"/>);
     /// a modifier names no <see cref="ModifierType"/> (<see cref="ContentValidator.RuleUnknownId"/>);
     /// a class has no row (<see cref="ContentValidator.RuleEveryClassHasARow"/>), or a
-    /// row's kind is no kind (<see cref="ContentValidator.RuleKindValue"/>); or a unique
-    /// derives from no variant (<see cref="ContentValidator.RuleUniqueDerivedFrom"/>).
+    /// row's kind is no kind (<see cref="ContentValidator.RuleKindValue"/>); a variant
+    /// adds a stack outside its range (<see cref="ContentValidator.RuleNumberInRange"/>);
+    /// or a unique derives from no variant (<see cref="ContentValidator.RuleUniqueDerivedFrom"/>).
     /// </exception>
     public static WeaponsData Read(string text)
     {
@@ -280,6 +285,7 @@ public static class WeaponsJson
             var cls = shape.Enum<WeaponClass>(Get("class"), At("class"), entry);
             var role = shape.EnumOrNull<VariantRole>(Get("role"), At("role"), entry);
             var adds = shape.Modifiers(Get("adds"), At("adds"), entry, "a table of the modifiers it adds to its class's baseline");
+            RequireAddsInRange(shape, adds, At("adds"), entry);
             var enchantments = References(shape, Get("enchantments"), At("enchantments"), entry);
             var area = Shape(shape, Get("shape"), At("shape"), entry);
 
@@ -350,7 +356,25 @@ public static class WeaponsJson
         return uniques;
     }
 
-    /// <summary>A variant's forged spread: its class's baseline plus what it adds, summed per modifier, in <see cref="ModifierType"/> order. An entry the file names at 0 is kept, for the validator to refuse by name.</summary>
+    /// <summary>
+    /// Every stack a variant adds lies in its range (<see cref="ContentValidator.RuleNumberInRange"/>,
+    /// <see cref="ContentBounds.Adds"/>), asked as it is read and before anything
+    /// sums it: once summed onto the class's baseline, a raw -1 would read as a
+    /// composed stack one short, a 0 on a baseline modifier would add nothing in
+    /// silence, and the largest whole number would wrap. So the refusal names the
+    /// number the file wrote, at its path (<c>variants[6].adds.Riposte: 0 is
+    /// outside 1 to 3 - …</c>), walked in <see cref="ModifierType"/> order so the
+    /// one reported is the same every run.
+    /// </summary>
+    private static void RequireAddsInRange(JsonShape shape, IReadOnlyDictionary<ModifierType, int> adds, string path, string entry)
+    {
+        var bound = ContentBounds.Adds;
+        foreach (var (t, n) in adds.OrderBy(kv => kv.Key))
+            if (n < bound.Min || n > bound.Max)
+                throw shape.Fail(entry, JsonShape.Member(path, t.ToString()), ContentBounds.Outside(bound, n), ContentValidator.RuleNumberInRange);
+    }
+
+    /// <summary>A variant's forged spread: its class's baseline plus what it adds, summed per modifier, in <see cref="ModifierType"/> order. What it adds is in its range by now (<see cref="RequireAddsInRange"/>), so the sum stays well inside a whole number.</summary>
     private static IReadOnlyDictionary<ModifierType, int> Summed(IReadOnlyDictionary<ModifierType, int> baseline, IReadOnlyDictionary<ModifierType, int> adds)
     {
         var spread = new Dictionary<ModifierType, int>();

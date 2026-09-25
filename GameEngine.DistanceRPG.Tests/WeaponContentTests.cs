@@ -516,10 +516,11 @@ public class WeaponContentTests
         ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, Rules.MaxForged(Resonant) + 1)) }, ShippedContent.Tuning);
         Assert.Equal(("staff_of_mire", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
 
-        // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of.
+        // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of,
+        // its detail naming the field and the whole range, the top the forge limit of the tuning in hand.
         ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, -1)) });
         Assert.Equal(("flensing_knife", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
-        Assert.Contains("Light x-1", ex.Message);
+        Assert.Contains($"forged.Light -1 is outside 1 to {ForgeRoom.MaxForged[Light]}", ex.Message);
         ex = LoadWith("darts", w => w with { Forged = Spread((CritMultiplier, 1), (Charges, 1), (Light, 0)) });
         Assert.Equal(("darts", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
 

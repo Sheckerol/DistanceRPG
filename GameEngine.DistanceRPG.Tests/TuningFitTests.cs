@@ -144,7 +144,9 @@ public class TuningFitTests
         // carrying ten weapons (forty slots, past the thirty-six the number keys
         // reach), a dungeon pinned to floor 500, a weapon forged x4. The tuning is
         // left as it was, says nothing, and the content fails as content, naming
-        // the entry and the rule.
+        // the entry and the rule — for the floor, the range every number of a
+        // content file lies in (the user's ruling of 2026-09-25, R3), asked before
+        // anything reads the floor.
         var warnings = new List<string>();
 
         var ten = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 0
@@ -159,7 +161,8 @@ public class TuningFitTests
         var offset = Fit(BuiltIn, warnings, dungeons: deep);
         Assert.Equal(BuiltIn.BossStackOffset, offset.BossStackOffset);
         var refused = Assert.Throws<ContentException>(() => Load(offset, dungeons: deep));
-        Assert.Equal(("spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm), (refused.EntryId, refused.Rule));
+        Assert.Equal(("spear_hall", ContentValidator.RuleNumberInRange), (refused.EntryId, refused.Rule));
+        Assert.StartsWith($"bossFloorMin 500 is outside 1 to {ContentBounds.DeepestBossFloor} - ", refused.Detail, StringComparison.Ordinal);
 
         var forged = ShippedContent.Weapons with
         {

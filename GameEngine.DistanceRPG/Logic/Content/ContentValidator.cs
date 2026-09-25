@@ -13,7 +13,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// a <see cref="ContentException"/> naming the entry and the rule; the first
 /// failure aborts, in a fixed check order, so the report is deterministic.
 /// (§5.7's "every effect reference resolves to an EffectKind" holds by
-/// construction: a catalogue row's effect is typed.)
+/// construction: a catalogue row's effect is typed.) And every number of a
+/// content file lies in its range (<see cref="RuleNumberInRange"/>, the rows of
+/// <see cref="ContentBounds"/>), asked after whatever rule bounded it before.
 /// </summary>
 public static class ContentValidator
 {
@@ -59,6 +61,25 @@ public static class ContentValidator
     /// check, not a new invariant.
     /// </summary>
     public const string RuleTuningOwnsTheNumber = "a number the enchantment catalogue leaves to tuning.json is named there";
+
+    /// <summary>
+    /// Every number of a content file lies in the range the game plays it in
+    /// (the user's ruling of 2026-09-25, R3: "since we are storing in raw json we
+    /// should probably not trust the fields"): each has a row of
+    /// <see cref="ContentBounds"/>, with its reason, and one outside it stops the
+    /// game naming the file, the entry, the field, the number and the range
+    /// (<see cref="RequireInRange"/>) — never clamped, since content is validated
+    /// (§5.4). A rule that bounded a field before the ruling keeps the end it owns,
+    /// its detail now in this rule's form, and this is asked after it: of a class
+    /// row once the row's own checks pass, of a weapon once its row's do, of a
+    /// pinned boss floor straight after <see cref="RuleBossFloorRange"/> and before
+    /// anything reads the floor, and of a boss after its own rules. What a variant
+    /// adds is asked by the reader, as it is read and before it is summed
+    /// (<see cref="WeaponsJson"/>). A number is always its own file's to fix, so a
+    /// built-in copy out of range is the master's (<c>StartupErrorScene.ClosingLine</c>).
+    /// A new invariant, the ruling's.
+    /// </summary>
+    public const string RuleNumberInRange = "a number in a content file lies in the range the game plays it in";
 
     public const string RuleUnknownId = "id does not resolve to a modifier or an enchantment";
     public const string RuleModifierRelationIds = "a modifier relation may only name modifier ids";
@@ -196,11 +217,11 @@ public static class ContentValidator
     /// </summary>
     internal const int MostArrivingEnchantments = LightShapeSlots - LightShapeFloor;
 
-    /// <summary>The tier that makes a catalogue enchantment an artifact's: the only place a drop starts above tier 1.</summary>
-    private const int ArtifactTier = 3;
+    /// <summary>The tier that makes a catalogue enchantment an artifact's: the only place a drop starts above tier 1, and the deepest any weapon arrives at (<see cref="ContentBounds.Tier"/>).</summary>
+    internal const int ArtifactTier = 3;
 
-    /// <summary>The tier an ordinary drop's enchantment arrives at (§3.3): tier is earned by casting, from here.</summary>
-    private const int DropTier = 1;
+    /// <summary>The tier an ordinary drop's enchantment arrives at (§3.3): tier is earned by casting, from here — the shallowest any weapon arrives at (<see cref="ContentBounds.Tier"/>).</summary>
+    internal const int DropTier = 1;
 
     /// <summary>
     /// The currency group (§1.1): the two discounts, forge-limited to x1 and
@@ -517,6 +538,21 @@ public static class ContentValidator
     }
 
     /// <summary>
+    /// <paramref name="value"/>, written in <paramref name="entry"/> at
+    /// <paramref name="field"/>, lies in <paramref name="bound"/>
+    /// (<see cref="RuleNumberInRange"/>); refused otherwise, the detail in the one
+    /// form every range fault takes (<see cref="ContentBounds.Detail"/>):
+    /// <c>cost 0 is outside 1 to 10000 - …</c>. The entry is the class, the
+    /// weapon or the dungeon, and the stage that asks stamps the file.
+    /// </summary>
+    internal static void RequireInRange(string entry, NumberBound bound, int value, string field)
+    {
+        ArgumentNullException.ThrowIfNull(bound);
+        if (value < bound.Min || value > bound.Max)
+            throw new ContentException(entry, RuleNumberInRange, ContentBounds.Detail(bound, field, value));
+    }
+
+    /// <summary>
     /// <see cref="ValidateParty(PartyData, WeaponCatalogue, Tuning)"/> against the
     /// current content's carry: a direct check of a roster outside a load. The
     /// load itself names the tuning it is loading, and never reads the current
@@ -630,7 +666,10 @@ public static class ContentValidator
     /// <item><strong>The boss can wield something</strong>: its drop table has a
     /// class an enemy fields.</item>
     /// <item><strong>The boss floor range</strong>, pinned or the tuning's,
-    /// starts at floor 1 and is not inverted, and a retiring dungeon pins it —
+    /// starts at floor 1 and is not inverted; <strong>a pinned floor is no
+    /// deeper than any tuning can name</strong> (<see cref="RuleNumberInRange"/>,
+    /// <see cref="ContentBounds.BossFloorMin"/>), asked straight after, before
+    /// anything reads the floor; a retiring dungeon pins it —
     /// the tutorial's two floors are the enchanter's mana budget, not a roll —
     /// and <strong>its deepest floor pays less than the farm banks</strong>
     /// (<see cref="RuleBossPaysLessThanTheFarm"/>): the tuning's own range is
@@ -641,7 +680,10 @@ public static class ContentValidator
     /// member <see cref="ModifierRules.NeverStacked"/>, at least one stack
     /// each: innate stacks are content, bounded by nothing a weapon's forge
     /// bounds) <strong>and include the theme</strong>, which it carries
-    /// "regardless of what it wields".</item>
+    /// "regardless of what it wields"; and then each of those numbers lies in
+    /// its range (<see cref="RuleNumberInRange"/>): no bigger than the bar a pool
+    /// opens on, no farther than the tuning measures, no deeper than a stack can
+    /// grow.</item>
     /// <item><strong>An attunement is a damage type or none.</strong></item>
     /// <item><strong>Exactly one dungeon retires on clear</strong>: two
     /// un-repeatable dungeons "is a content decision nobody has made", and none
@@ -696,9 +738,21 @@ public static class ContentValidator
                 throw new ContentException(def.Id, RuleBossWieldsAClass,
                     $"{string.Join(", ", table)} carry {theme}, and no enemy fields any of them");
 
+            // The range starts at floor 1 and never inverts; then a floor the
+            // dungeon pins is no deeper than any tuning names — straight after,
+            // before the retiring rule or the farm's reads the floor, so a floor
+            // out of range is named as one whatever the tuning.
             var (min, max) = tables.BossFloorRange(def);
-            if (min < 1 || max < min)
-                throw new ContentException(def.Id, RuleBossFloorRange, $"floors {min} to {max}");
+            if (min < 1)
+                throw new ContentException(def.Id, RuleBossFloorRange,
+                    ContentBounds.Detail(ContentBounds.BossFloorMin, FloorEnd(def.BossFloorMin, ContentBounds.BossFloorMin, nameof(Tuning.BossFloorMin)), min));
+            if (max < min)
+                throw new ContentException(def.Id, RuleBossFloorRange,
+                    $"{FloorEnd(def.BossFloorMax, ContentBounds.BossFloorMax, nameof(Tuning.BossFloorMax))} {max} is below {FloorEnd(def.BossFloorMin, ContentBounds.BossFloorMin, nameof(Tuning.BossFloorMin))} {min}");
+            if (def.BossFloorMin is { } pinnedMin)
+                RequireInRange(def.Id, ContentBounds.BossFloorMin, pinnedMin, ContentBounds.BossFloorMin.Field);
+            if (def.BossFloorMax is { } pinnedMax)
+                RequireInRange(def.Id, ContentBounds.BossFloorMax, pinnedMax, ContentBounds.BossFloorMax.Field);
             if (def.RetiresOnClear && (def.BossFloorMin is null || def.BossFloorMin != def.BossFloorMax))
                 throw new ContentException(def.Id, RuleRetiringDungeonPinsItsFloor,
                     $"floors {def.BossFloorMin?.ToString() ?? "unpinned"} to {def.BossFloorMax?.ToString() ?? "unpinned"}");
@@ -717,27 +771,55 @@ public static class ContentValidator
     }
 
     /// <summary>
+    /// What one end of a boss floor range is called in a refusal: the dungeon's
+    /// field where it pins that end (<c>bossFloorMin</c>), else the
+    /// <c>tuning.json</c> key it reads (<c>tuning.json BossFloorMax</c>).
+    /// </summary>
+    private static string FloorEnd(int? pinned, NumberBound row, string key)
+        => pinned is null ? $"{TuningJson.FileName} {key}" : row.Field;
+
+    /// <summary>
     /// A dungeon's boss: a statline (a hit point, a unit of movement), innate
     /// modifiers that each stack — walked in <see cref="ModifierType"/> order so
-    /// the one reported is the same every run — and the theme among them.
-    /// Reported against the dungeon, the entry that names the boss.
+    /// the one reported is the same every run — and the theme among them; then
+    /// each of those numbers in its range (<see cref="RuleNumberInRange"/>), the
+    /// rules before it keeping the 1 they own, their details in its form
+    /// (<c>boss.maxHp 0 is outside 1 to 10000 - …</c>). A member that never
+    /// stacks breaks no range, and keeps its detail. Reported against the
+    /// dungeon, the entry that names the boss.
     /// </summary>
     private static void ValidateBoss(DungeonDef def)
     {
         var boss = def.Boss;
         if (boss is null)
             throw new ContentException(def.Id, RuleBossStatline, "names no boss");
-        if (boss.MaxHp < 1 || boss.MovementBudget < 1)
-            throw new ContentException(def.Id, RuleBossStatline, $"'{boss.Id}': {boss.MaxHp} HP, movement {boss.MovementBudget}");
+        if (boss.MaxHp < 1)
+            throw new ContentException(def.Id, RuleBossStatline, ContentBounds.Detail(ContentBounds.BossMaxHp, ContentBounds.BossMaxHp.Field, boss.MaxHp));
+        if (boss.MovementBudget < 1)
+            throw new ContentException(def.Id, RuleBossStatline,
+                ContentBounds.Detail(ContentBounds.BossMovementBudget, ContentBounds.BossMovementBudget.Field, boss.MovementBudget));
 
         var innate = boss.Innate ?? new Dictionary<ModifierType, int>();
         foreach (var (t, n) in innate.OrderBy(kv => kv.Key))
-            if (ModifierRules.NeverStacked.Contains(t) || !Enum.IsDefined(t) || n < 1)
+        {
+            if (ModifierRules.NeverStacked.Contains(t) || !Enum.IsDefined(t))
                 throw new ContentException(def.Id, RuleBossInnateStackable, $"'{boss.Id}': {t} x{n}");
+            if (n < 1)
+                throw new ContentException(def.Id, RuleBossInnateStackable, ContentBounds.Detail(ContentBounds.BossInnate, InnateField(t), n));
+        }
 
         if (innate.GetValueOrDefault(def.Theme) < 1)
             throw new ContentException(def.Id, RuleBossCarriesTheTheme, $"'{boss.Id}' carries no {def.Theme}");
+
+        // And then the range rule, the rules above having kept each floor.
+        RequireInRange(def.Id, ContentBounds.BossMaxHp, boss.MaxHp, ContentBounds.BossMaxHp.Field);
+        RequireInRange(def.Id, ContentBounds.BossMovementBudget, boss.MovementBudget, ContentBounds.BossMovementBudget.Field);
+        foreach (var (t, n) in innate.OrderBy(kv => kv.Key))
+            RequireInRange(def.Id, ContentBounds.BossInnate, n, InnateField(t));
     }
+
+    /// <summary>A boss's innate stack of <paramref name="t"/>, as a refusal names it: <c>boss.innate.Block</c>.</summary>
+    private static string InnateField(ModifierType t) => $"boss.innate.{t}";
 
     /// <summary>
     /// The §5.5 checks on <c>restricted.json</c>: every id resolves, a modifier
@@ -1083,6 +1165,19 @@ public static class ContentValidator
     /// unique, and nothing arrives carrying more than three enchantments.
     /// Unique derivation is checked with the uniques.
     /// <para>
+    /// <strong>Every number in its range</strong> (<see cref="RuleNumberInRange"/>,
+    /// <see cref="ContentBounds"/>), each asked after the checks of the row it is
+    /// written in: a class row's statline once its row passes; a weapon's
+    /// statline, its shape's measured dimensions and the tiers of what it arrives
+    /// with once its own row does — each between the tier a drop arrives at and an
+    /// artifact's, a unique soul's too, which plays at its pin. A
+    /// forged count keeps the forge's own two rules, its detail in the range
+    /// rule's form: a class row's baseline (<c>baseline.CritMultiplier 0 is
+    /// outside 1 to 3 - …</c>) and a weapon's spread as the reader composed it
+    /// (<c>forged.CritWindow 4 is outside 1 to 3 - …</c>), the top the tuned
+    /// <see cref="ModifierRules.MaxForged"/> of the modifier.
+    /// </para>
+    /// <para>
     /// And three the drop leans on (§3.1, §3.2), each refusing at load what
     /// would otherwise surface as a wrong weapon or an exception one collection
     /// deep: a class with variants carries at least one unique, for a won roll
@@ -1131,7 +1226,7 @@ public static class ContentValidator
         var excludes = Closure(restricted.Excludes);
         foreach (var def in data.Weapons)
         {
-            var spread = Spread(def.Id, def.Forged, "");
+            var spread = Spread(def.Id, def.Forged, OfAWeapon, rules);
             var row = data.ClassOf(def.Class)
                 ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row");
             var kind = row.Kind;
@@ -1201,7 +1296,7 @@ public static class ContentValidator
             // Allowed is the question, asked exactly as every graft and roll asks it
             // (PHASE5-133: "no new validation code exists"), and then the forge
             // limit; see the method.
-            RequireForgeable(def.Id, "", spread, kind, rules, restricted);
+            RequireForgeable(def.Id, OfAWeapon, spread, kind, rules, restricted);
 
             if (kind == WeaponKind.Caster)
             {
@@ -1243,6 +1338,22 @@ public static class ContentValidator
                     throw new ContentException(def.Id, RuleMartialVariantNoEnchantment,
                         $"'{def.Enchantments[0].Id}' on a {def.Class} variant");
             }
+
+            // And every number of the row in its range (RuleNumberInRange), once
+            // the row's own checks have passed: the statline as composed — a
+            // variant's own number or its class's, a unique's its variant's, so a
+            // class row's fault is named on the class first — the dimensions its
+            // shape's kind measures, and the tier of each enchantment it arrives
+            // with, in attachment order, between a drop's tier and an artifact's.
+            RequireInRange(def.Id, ContentBounds.VariantRange, def.Range, "range");
+            RequireInRange(def.Id, ContentBounds.VariantDamage, def.Damage, "damage");
+            RequireInRange(def.Id, ContentBounds.VariantCost, def.Cost, "cost");
+            RequireInRange(def.Id, ContentBounds.VariantManaCost, def.ManaCost, "manaCost");
+            if (def.Shape is { } area && WeaponsJson.Dimensions.TryGetValue(area.Kind, out var measured))
+                foreach (string dimension in measured)
+                    RequireInRange(def.Id, ContentBounds.Dimension(dimension), DimensionOf(area, dimension), $"shape.{dimension}");
+            for (int j = 0; j < def.Enchantments.Count; j++)
+                RequireInRange(def.Id, ContentBounds.Tier, def.Enchantments[j].Tier, $"enchantments[{j}].tier");
         }
 
         // The weapons the code names by id are here (RuleCodeNamedWeaponsExist):
@@ -1454,7 +1565,14 @@ public static class ContentValidator
     /// <item>a drop order on a caster's row alone
     /// (<see cref="RuleCasterVariantPool"/>): a martial drop draws one variant per
     /// role, so an order on a martial row is a list nothing reads. What a caster's
-    /// order names is asked with the weapons, whose ids it names.</item>
+    /// order names is asked with the weapons, whose ids it names;</item>
+    /// <item>and then its statline in its range (<see cref="RuleNumberInRange"/>):
+    /// a reach and a cost of a unit at least, a damage and a mana cost of 0 at
+    /// least, none past the farthest the tuning measures or the most a magnitude
+    /// is (<see cref="ContentBounds"/>) — asked here, on the class, so a fault in
+    /// the row is named where it is written and not on the first variant that
+    /// plays it. A baseline's counts keep the forge's rules, their details in the
+    /// range rule's form (<c>baseline.CritMultiplier 4 is outside 1 to 3 - …</c>).</item>
     /// </list>
     /// </summary>
     /// <param name="data">The class rows and the weapons.</param>
@@ -1498,7 +1616,7 @@ public static class ContentValidator
             // forge's to allow before the class's shape is asked of it: a stack of
             // 0, a modifier restricted.json refuses on this kind, or one past its
             // limit is the row's fault, named here rather than on a variant.
-            RequireForgeable(entry, BaselineDetail, Spread(entry, row.Baseline, BaselineDetail), row.Kind, rules, restricted);
+            RequireForgeable(entry, OfABaseline, Spread(entry, row.Baseline, OfABaseline, rules), row.Kind, rules, restricted);
 
             string spread = row.Baseline.Count == 0
                 ? "nothing"
@@ -1516,6 +1634,13 @@ public static class ContentValidator
             if (!castsWith && row.DropOrder is not null)
                 throw new ContentException(entry, RuleCasterVariantPool,
                     $"names a dropOrder, and a {cls} drop draws one variant per role - only the Staff and the Wand order theirs");
+
+            // The statline every weapon of the class shares, in its range, once
+            // the row's own checks pass: named on the class, where it is written.
+            RequireInRange(entry, ContentBounds.ClassRange, row.Range, "range");
+            RequireInRange(entry, ContentBounds.ClassDamage, row.Damage, "damage");
+            RequireInRange(entry, ContentBounds.ClassCost, row.Cost, "cost");
+            RequireInRange(entry, ContentBounds.ClassManaCost, row.ManaCost, "manaCost");
         }
     }
 
@@ -1759,23 +1884,46 @@ public static class ContentValidator
     /// <see cref="ModifierSet.Of"/> would refuse it as an argument: invalid
     /// content aborts as content (§5.4). The shipped weapons carry none; a file
     /// edited can. Walked in enum order so the count reported is the same one
-    /// every run; <paramref name="of"/> is what the detail says the count is of
-    /// (<see cref="RequireForgeable"/>).
+    /// every run; <paramref name="of"/> says what the counts are of, and the
+    /// detail is the range rule's form, its top the tuned forge limit of the
+    /// modifier, read off <paramref name="rules"/>
+    /// (<c>baseline.CritMultiplier 0 is outside 1 to 3 - …</c>).
     /// </summary>
-    private static ModifierSet Spread(string entry, IReadOnlyDictionary<ModifierType, int> forged, string of)
+    private static ModifierSet Spread(string entry, IReadOnlyDictionary<ModifierType, int> forged, SpreadOf of, ModifierRules rules)
     {
         foreach (var (t, n) in forged.OrderBy(kv => kv.Key))
             if (n <= 0)
-                throw new ContentException(entry, RuleForgedStackCount, $"{of}{t} x{n}");
+                throw new ContentException(entry, RuleForgedStackCount, of.Outside(t, n, rules));
         return ModifierSet.Of(forged.Select(kv => (kv.Key, kv.Value)).ToArray());
     }
 
     /// <summary>
-    /// What a detail about a class row's baseline says its counts are of
-    /// (<c>baseline CritMultiplier x0</c>): the entry is the class, and its row
-    /// holds more than a spread.
+    /// What a forged spread's counts are of, for the details about them: the
+    /// words a relation's refusal puts before a count (<c>baseline Block x1 on a
+    /// Melee weapon …</c>), the field a count's range fault names
+    /// (<c>baseline.CritMultiplier</c>, <c>forged.Light</c>) and the row of
+    /// <see cref="ContentBounds"/> it is held to.
     /// </summary>
-    private const string BaselineDetail = "baseline ";
+    private sealed record SpreadOf(string Words, string Field, NumberBound Bound)
+    {
+        /// <summary>
+        /// <paramref name="n"/> stacks of <paramref name="t"/> as a range fault,
+        /// the kept rules' (<see cref="RuleForgedStackCount"/>, <see cref="RuleMaxForged"/>):
+        /// the whole range, its top the tuned <see cref="ModifierRules.MaxForged"/> of the modifier.
+        /// </summary>
+        public string Outside(ModifierType t, int n, ModifierRules rules)
+            => ContentBounds.Detail(Bound with { Max = rules.MaxForged(t) }, $"{Field}{t}", n);
+    }
+
+    /// <summary>
+    /// A class row's baseline (<see cref="ContentBounds.Baseline"/>): the entry is
+    /// the class, and its row holds more than a spread, so a detail says the
+    /// counts are the baseline's.
+    /// </summary>
+    private static readonly SpreadOf OfABaseline = new("baseline ", "baseline.", ContentBounds.Baseline);
+
+    /// <summary>A weapon's forged spread as the reader composed it (<see cref="ContentBounds.Forged"/>): the entry is the weapon.</summary>
+    private static readonly SpreadOf OfAWeapon = new("", "forged.", ContentBounds.Forged);
 
     /// <summary>
     /// The forge's questions of <paramref name="spread"/>, forged on a weapon of
@@ -1789,23 +1937,35 @@ public static class ContentValidator
     /// that refused, read off <paramref name="restricted"/>, the relations in hand
     /// (<see cref="WhyNotAllowed"/>; PHASE5-122: "and the rule that made it so");
     /// a member outside the modifier table is no relation's doing, and says so.
-    /// Asked of every weapon's spread, and of every class row's baseline, which
-    /// each weapon of the class is forged with: <paramref name="of"/> is what the
-    /// detail says the counts are of — nothing for a weapon's own spread,
-    /// <see cref="BaselineDetail"/> for a class's.
+    /// Past the limit, the detail is the range rule's form, naming the field and
+    /// the whole range (<c>forged.CritWindow 4 is outside 1 to 3 - …</c>). Asked of
+    /// every weapon's spread, and of every class row's baseline, which each weapon
+    /// of the class is forged with: <paramref name="of"/> says what the counts are
+    /// of — <see cref="OfAWeapon"/> or <see cref="OfABaseline"/>.
     /// </summary>
-    private static void RequireForgeable(string entry, string of, ModifierSet spread, WeaponKind kind, ModifierRules rules, RestrictedData restricted)
+    private static void RequireForgeable(string entry, SpreadOf of, ModifierSet spread, WeaponKind kind, ModifierRules rules, RestrictedData restricted)
     {
         foreach (var (t, n) in spread.Entries)
         {
             if (!rules.Allowed(t, kind, spread))
                 throw new ContentException(entry, RuleForgedNotAllowed, ModifierRules.NeverStacked.Contains(t)
-                    ? $"{of}{t} x{n}: not in the modifier table, so never a stack on any weapon"
-                    : WithRelation($"{of}{t} x{n} on a {kind} weapon beside {spread}", WhyNotAllowed(t, kind, spread, restricted)));
+                    ? $"{of.Words}{t} x{n}: not in the modifier table, so never a stack on any weapon"
+                    : WithRelation($"{of.Words}{t} x{n} on a {kind} weapon beside {spread}", WhyNotAllowed(t, kind, spread, restricted)));
             if (n > rules.MaxForged(t))
-                throw new ContentException(entry, RuleMaxForged, $"{of}{t} x{n}, MaxForged {rules.MaxForged(t)}");
+                throw new ContentException(entry, RuleMaxForged, of.Outside(t, n, rules));
         }
     }
+
+    /// <summary>A shape's dimension by the name the file writes it under (<see cref="WeaponsJson"/>).</summary>
+    private static int DimensionOf(AreaShape shape, string name) => name switch
+    {
+        "radius" => shape.Radius,
+        "length" => shape.Length,
+        "width" => shape.Width,
+        "angleDegrees" => shape.AngleDegrees,
+        "targetReach" => shape.TargetReach,
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No dimension of a shape is called that."),
+    };
 
     /// <summary>
     /// Every id in <paramref name="ids"/> is a modifier or an enchantment. The

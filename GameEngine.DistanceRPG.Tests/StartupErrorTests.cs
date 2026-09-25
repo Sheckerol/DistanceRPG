@@ -160,11 +160,11 @@ public class StartupErrorTests
             (besideAFile.Error!.File, besideAFile.Error.BuiltIn, besideAFile.Error.Rule));
         Assert.Equal(StartupErrorScene.KeysLine, StartupErrorScene.Lines(besideAFile.Error!, besideAFile.TuningOverrides, besideAFile.ReadBeside)[^1]);
 
-        // The same rule broken with nothing beside the executable — a master weapon
-        // forged Light x0 — is the master's own.
+        // A rule broken with nothing beside the executable — a master variant
+        // adding Light 0, a number out of its range — is the master's own.
         var zeroStack = shipped with { Weapons = DataTexts.InRow(shipped.Weapons!, "flensing_knife", "\"Light\": 1", "\"Light\": 0") };
         var masterRule = ContentFiles.Load(new ContentTexts(), zeroStack);
-        Assert.Equal((WeaponsJson.FileName, true, ContentValidator.RuleForgedStackCount),
+        Assert.Equal((WeaponsJson.FileName, true, ContentValidator.RuleNumberInRange),
             (masterRule.Error!.File, masterRule.Error.BuiltIn, masterRule.Error.Rule));
         Assert.Equal(FixTheMaster, StartupErrorScene.Lines(masterRule.Error!, masterRule.TuningOverrides, masterRule.ReadBeside)[^1]);
 
@@ -181,6 +181,40 @@ public class StartupErrorTests
         Assert.Equal(StartupErrorScene.KeysLine, StartupErrorScene.ClosingLine(new ContentException("x", "a rule").In(WeaponsJson.FileName, builtIn: false), []));
         Assert.Equal(StartupErrorScene.KeysLine, StartupErrorScene.ClosingLine(new ContentException("x", "a rule"), []));
         Assert.All(lines, row => Assert.DoesNotContain("'", row));
+    }
+
+    [Fact]
+    public void ANumberOutOfRangeInAMasterSaysToFixTheMaster()
+    {
+        // The user's ruling of 2026-09-25 (R3): a number outside its range is its
+        // own file's, whatever sits beside the executable — a range is the game's,
+        // never another file's to break. So a built-in weapons.json whose variant
+        // hits harder than any magnitude can be, played beside a restricted.json,
+        // stops the game marked (BUILT-IN) and names the master to fix, where a
+        // rule a file beside it could have broken keeps the line for a file.
+        const string FixTheMaster = "THE BUILT-IN WEAPONS.JSON IS BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS";
+        var shipped = DataTexts.Shipped;
+        int tooHard = ContentBounds.Magnitude + 1;
+        var brokenMaster = shipped with { Weapons = DataTexts.Edit(shipped.Weapons!, "\"id\": \"hatchet\",", $"\"id\": \"hatchet\", \"damage\": {tooHard},") };
+        var load = ContentFiles.Load(new ContentTexts(Restricted: shipped.Restricted), brokenMaster);
+        Assert.Equal([RestrictedJson.FileName], load.ReadBeside);
+        Assert.Equal((WeaponsJson.FileName, true, "hatchet", ContentValidator.RuleNumberInRange),
+            (load.Error!.File, load.Error.BuiltIn, load.Error.EntryId, load.Error.Rule));
+
+        var lines = StartupErrorScene.Lines(load.Error!, load.TuningOverrides, load.ReadBeside);
+        Assert.Equal("FILE: WEAPONS.JSON (BUILT-IN)", lines[1]);
+        Assert.Equal("ENTRY: HATCHET", lines[2]);
+        Assert.StartsWith($"RULE: {ContentValidator.RuleNumberInRange} DETAIL: damage {tooHard} is outside 0 to {ContentBounds.Magnitude} - ".ToUpperInvariant(),
+            string.Join(" ", lines.Skip(3).Select(row => row.Trim())), StringComparison.Ordinal);
+        Assert.Equal(FixTheMaster, lines[^1]);
+        Assert.Equal(FixTheMaster, new StartupErrorScene(game: null!, load.Error!, load.TuningOverrides, load.ReadBeside, load.Notices).Rows[^1]);
+        Assert.All(lines, row => Assert.DoesNotContain("'", row));
+
+        // The same number in the copy beside the executable is that copy's, and the
+        // screen says to fix the file.
+        var beside = ShippedData.Load(shipped with { Weapons = brokenMaster.Weapons });
+        Assert.Equal((WeaponsJson.FileName, false, ContentValidator.RuleNumberInRange), (beside.Error!.File, beside.Error.BuiltIn, beside.Error.Rule));
+        Assert.Equal(StartupErrorScene.KeysLine, StartupErrorScene.Lines(beside.Error!, beside.TuningOverrides, beside.ReadBeside)[^1]);
     }
 
     [Fact]

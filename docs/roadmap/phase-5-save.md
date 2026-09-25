@@ -184,6 +184,13 @@ All three follow the same rules, and it is worth stating once:
   number and the game still runs; a broken invariant is something every
   downstream caller assumes holds, and limping past it turns a typo into a
   crash somewhere unrelated.
+- **Every number has a range, checked as the invariants are** (the user's ruling
+  of 2026-09-25: "since we are storing in raw json we should probably not trust
+  the fields"). A statline, a stack, a tier, a shape's dimension, a boss's floor
+  and statline: each lies in the range the game plays it in, its top read off
+  `tuning.json`'s clamps or a rule and never off the file, and one outside it
+  aborts startup like any broken invariant, naming the entry, the field, the
+  number and the range (settled.md, R3(a), which lists them).
 - **Nothing here touches the golden tests.** `TestData/distancerpg-golden.json`
   pins map generation, fog and pathing — never statlines, relations or drop
   tables. Worth saying plainly, because "the content is data now" sounds like a

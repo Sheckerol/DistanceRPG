@@ -364,8 +364,9 @@ everything in them is named by a stable string id.
   master, or stand on numbers of their own (`Premise`). A relation, an id or a
   row is no number, and a test that names one fails where it names it.
 - **Content is checked, never clamped.** A number out of range in `tuning.json`
-  costs a warning; in a content file it is a broken rule, and the game does not
-  start. It opens on `THE GAME CANNOT START` instead, naming the file, the entry,
+  costs a warning; in a content file it is a broken rule — every number there
+  has a range, below — and the game does not start. It opens on
+  `THE GAME CANNOT START` instead, naming the file, the entry,
   the rule and what broke it, with what `tuning.json` changed and
   `FIX THE FILE AND START AGAIN - ESC QUITS`; the log has the same lines. A typo
   such as `"Riposte": ["Blok"]` shows `RESTRICTED.JSON`, `BLOK`, the rule
@@ -377,6 +378,40 @@ everything in them is named by a stable string id.
   column and the word the reader stopped at, on one line
   (`"shape": nul` reads `NUL... IS AN INVALID JSON LITERAL. EXPECTED THE LITERAL
   NULL`). Comments and trailing commas are fine.
+- **Every number in a content file has a range** (the user's ruling of
+  2026-09-25: "since we are storing in raw json we should probably not trust the
+  fields"), and one outside it is refused the same way, under the rule
+  `A NUMBER IN A CONTENT FILE LIES IN THE RANGE THE GAME PLAYS IT IN`, naming the
+  entry, the field, the number and the whole range with why: give the Halberd
+  `"cost": 0` and the screen shows `WEAPONS.JSON`, `HALBERD` and
+  `COST 0 IS OUTSIDE 1 TO 10000 - MOVEMENT IS CHARGED A UNIT AT LEAST, ...`; pin
+  the tutorial's boss to floor 100 and it shows `DUNGEONS.JSON`, `TUTORIAL` and
+  `BOSSFLOORMIN 100 IS OUTSIDE 1 TO 99 - ...`, with no `tuning.json` notice above
+  it. Where a rule bounded a number before — a stack below 1, a forge past its
+  limit, a boss floor below 1, a boss with no hit point — that rule still refuses
+  it, its detail in the same form (`BOSS.MAXHP 0 IS OUTSIDE 1 TO 10000 - ...`).
+  The tops are the game's own, read off `tuning.json`'s clamps, never numbers of
+  the masters, so every shipped number lies inside them:
+
+  | Number | Range | Why |
+  | --- | --- | --- |
+  | `weapons.json`: a class row's `range`, and a variant's own | 1–10000 | a reach of 0 hits nothing; 10000 is the farthest `tuning.json` measures (`MovementBudget` at its most), past any map |
+  | a class row's `damage`, and a variant's own | 0–1000 | a staff hits for 0, its cast being its innate; 1000 is the most a `tuning.json` magnitude can be (`PerStack` at its most) |
+  | a class row's `cost`, and a variant's own | 1–10000 | movement is charged a unit at least, so a smaller cost would be one the game never charges, and the HUD's COST would show it |
+  | a class row's `manaCost`, and a variant's own | 0–1000 | a martial class casts for 0; below 0 a cast would open on an empty pool |
+  | a class row's `baseline` stack, a unique's `raises`, and every weapon's spread as the game composes it | 1 to the modifier's `MaxForged` (3 at most) | the forge's own rules, as before: a stack is one at least, and nothing is forged past its limit |
+  | a variant's `adds` stack | 1–3 | an add adds a stack at least, and none is deeper than any forge goes (`MaxForged` at its most). Checked as the file is read, before it is added to the class's baseline, so the refusal names the number written and its path — `"adds": { "Light": 0 }` on the Flensing Knife shows `WEAPONS.JSON: VARIANTS[0].ADDS.LIGHT: 0 IS OUTSIDE 1 TO 3` |
+  | an enchantment's `tier` | 1–3 | a weapon arrives at tier 1, and an artifact at 3 at most; tier grows in play, never in the file. A unique enchantment written above 1 plays at 1 |
+  | a wand's `radius`, `length`, `width` and `targetReach`, each its shape measures | 1–10000 | a measured dimension of 0 covers nothing, and none is longer than the farthest the tuning measures. One its shape does not measure is 0, or refused, as before |
+  | a Cone's `angleDegrees` | 1–360 | a cone of 0 degrees covers nothing, and none is wider than a full turn |
+  | `dungeons.json`: `bossFloorMin` and `bossFloorMax`, where a dungeon pins them | 1–99 | a floor number starts at 1 (an inverted range is refused as before); 99 is the deepest floor `tuning.json` can name (`BossFloorMax` at its most), and one the boss offset can always be fitted to |
+  | a boss's `maxHp` | 1–10000 | a boss has a hit point at least, and no more than the largest bar a pool opens on (`StartingPool` at its most) |
+  | a boss's `movementBudget` | 1–10000 | a boss moves a unit at least, and no farther than the tuning measures |
+  | a boss's `innate` stack | 1–53 | an innate stack is one at least — innate is no forge's, so the golem may stand deeper than any weapon — and none is deeper than a stack can ever grow (`MaxForged` 3 plus `AcquiredHeadroom` 50, each at its most) |
+
+  `restricted.json` holds no number, and a `dropOrder` is ids. A copy beside the
+  exe with a number out of range never falls back to the built-in copy; a
+  built-in copy out of range is the master's own, whatever sits beside it.
 - **What is reported first**: the load runs in the order the game's catalogues,
   tuning, relations, weapons, dungeons, the starting party, and the first check
   to fail is the one shown. Each file's shape is checked before anything reads
@@ -385,8 +420,8 @@ everything in them is named by a stable string id.
   copy is marked `(BUILT-IN)`: either a file beside it broke it — a
   `restricted.json` there refusing a built-in weapon, and the line at the bottom
   still says `FIX THE FILE AND START AGAIN` — or the master itself is broken: its
-  own text is not JSON of its shape, or no content file was read from beside the
-  exe to have broken it. Then the screen ends `THE BUILT-IN WEAPONS.JSON IS
+  own text is not JSON of its shape, a number in it is out of its range, or no
+  content file was read from beside the exe to have broken it. Then the screen ends `THE BUILT-IN WEAPONS.JSON IS
   BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS`,
   since only fixing the master and rebuilding can mend it. A
   `restricted.json` edit that breaks the enchantment catalogue — an element

@@ -423,9 +423,13 @@ public class ContentFilesTests
         Assert.Equal(1, tuned.Content!.Tuning.StartingPool);
         Assert.Equal(["tuning.json: StartingPool 0 is below 1 - using 1"], tuned.Notices);
 
+        // An add is a number of the file with its range (the user's ruling of
+        // 2026-09-25, R3), asked as it is read: the refusal names the path in the
+        // file, the number written and the whole range.
         var unstacked = Fails(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "flensing_knife", "\"Light\": 1", "\"Light\": 0") });
-        Assert.Equal((ContentFiles.WeaponsFileName, false, "flensing_knife", ContentValidator.RuleForgedStackCount), Stamp(unstacked));
-        Assert.Equal("Light x0", unstacked.Detail);
+        Assert.Equal((ContentFiles.WeaponsFileName, false, "flensing_knife", ContentValidator.RuleNumberInRange), Stamp(unstacked));
+        int knife = ShippedContent.Weapons.Weapons.Select(w => w.Id).ToList().IndexOf("flensing_knife");
+        Assert.Equal($"weapons.json: variants[{knife}].adds.Light: 0 is outside 1 to {ContentBounds.DeepestForge} - {ContentBounds.Adds.Why}", unstacked.Detail);
     }
 
     [Fact]
