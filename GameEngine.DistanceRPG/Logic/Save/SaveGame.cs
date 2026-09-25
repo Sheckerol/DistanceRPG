@@ -162,7 +162,7 @@ public static class SaveGame
     /// costs resolve against its modifier table — so a restore under any other
     /// would hand back rows of one content carrying another's numbers.
     /// </param>
-    /// <exception cref="SaveFormatException">The document names something the content does not have, holds a count out of range, or is at another version; and where.</exception>
+    /// <exception cref="SaveFormatException">The document names something the content does not have, holds a count out of range, contradicts itself, or is at another version; and where.</exception>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
     public static LoadedCampaign Restore(SaveFile file, GameContent content)
     {

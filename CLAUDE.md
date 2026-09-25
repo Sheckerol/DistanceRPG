@@ -83,3 +83,10 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric
   field of `weapons.json` or `dungeons.json` gets its row, with why, in the same
   change — `ContentBoundsTests` fails until it has one.
+- A save is raw JSON too, and no field of it is trusted: `SaveMapper` reads each
+  count against its floor and, where a larger one would wrap the arithmetic that
+  reads it, a ceiling off `ContentBounds` — never the tuning in hand — and then
+  `Logic/Save/SaveConsistency.cs` checks the fields against each other; a save
+  that fails is set aside, never restored. A new field of the save gets its
+  checks in the same change, and everything play writes must still load
+  (`SaveConsistencyTests`).

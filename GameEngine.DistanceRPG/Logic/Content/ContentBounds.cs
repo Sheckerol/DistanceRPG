@@ -54,9 +54,18 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// the least movement a cost is charged (<see cref="Progression.MinimumMovementCost"/>)
 /// and a full turn's degrees. So a shipped
 /// number moves without touching a bound, and a clamp moved in the schema moves
-/// the bound with it. The save reads its ceiling on a boss floor here too
-/// (<see cref="DeepestBossFloor"/>, <c>SaveMapper</c>), so the content and the
-/// save never disagree about how deep a boss goes.
+/// the bound with it.
+/// </para>
+/// <para>
+/// <strong>The save reads its ceilings here too</strong> (R3(b): a save is raw
+/// JSON as well, <c>SaveMapper</c>): the deepest forge, the most acquisition
+/// adds and the deepest stack for a saved spread, the deepest boss floor, the
+/// largest bar for a body's hit points, and three the content has no field for
+/// — the deepest tier an entry's arithmetic stays whole at
+/// (<see cref="DeepestTier"/>), the run count a run's end could carry past the
+/// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
+/// weapon holds (<see cref="MostEnchantments"/>). One accessor each, read once,
+/// so the content and the save never disagree about how deep a number goes.
 /// </para>
 /// <para>
 /// <strong>What is not here, and why.</strong> <c>restricted.json</c> holds no
@@ -76,11 +85,53 @@ internal static class ContentBounds
     /// <summary>The deepest any forge goes: <c>MaxForged</c>'s clamp ceiling. No weapon is forged past its modifier's limit, and no limit past this.</summary>
     internal static int DeepestForge { get; } = Table(nameof(Tuning.MaxForged)).Max;
 
-    /// <summary>The deepest a stack can grow: the deepest forge plus <c>AcquiredHeadroom</c>'s clamp ceiling, the most acquisition adds above a forging.</summary>
-    internal static int DeepestStack { get; } = DeepestForge + Int(nameof(Tuning.AcquiredHeadroom)).Max;
+    /// <summary>
+    /// The most acquisition adds above a forging: <c>AcquiredHeadroom</c>'s clamp
+    /// ceiling. A live stack stops at its forged count plus the headroom
+    /// (<see cref="ModifierRules.Cap"/>), and a lowered headroom never takes a
+    /// stack away, so no live stack of any tuning is deeper than its forged count
+    /// plus this.
+    /// </summary>
+    internal static int MostAcquired { get; } = Int(nameof(Tuning.AcquiredHeadroom)).Max;
+
+    /// <summary>The deepest a stack can grow: the deepest forge plus the most acquisition adds above a forging (<see cref="MostAcquired"/>).</summary>
+    internal static int DeepestStack { get; } = DeepestForge + MostAcquired;
 
     /// <summary>The deepest floor a tuning names: <c>BossFloorMax</c>'s clamp ceiling — and the deepest a dungeon may pin its boss on.</summary>
     internal static int DeepestBossFloor { get; } = Int(nameof(Tuning.BossFloorMax)).Max;
+
+    /// <summary>
+    /// The deepest tier a saved enchantment holds, <strong>a sanity bound</strong>:
+    /// tier is uncapped by design (§3.3, "the pool is the cap"), and this is only
+    /// where its arithmetic stops being whole — the largest whole number over
+    /// <c>ApplyPercent</c>'s clamp ceiling times <c>ArcanePotency</c>'s, the largest
+    /// potency (2147). At it, an entry's lock (<see cref="Enchantment.EffectiveLock"/>,
+    /// the catalogue's largest lock times the tier) and its levels
+    /// (<see cref="Enchantment.LevelsFor"/>, the percentage times any potency and
+    /// any source up to 1000 times the tier) stay inside an int. Play never nears
+    /// it: an entry climbs only while awake, its lock inside its wielder's mana.
+    /// </summary>
+    internal static int DeepestTier { get; } = int.MaxValue / (Table(nameof(Tuning.ApplyPercent)).Max * Int(nameof(Tuning.ArcanePotency)).Max);
+
+    /// <summary>
+    /// The run count from which a run's end could carry a count past the largest
+    /// whole number: the largest whole number less the longest lock a clear
+    /// writes, the deepest boss floor times <c>CooldownRunsPerFloor</c>'s clamp
+    /// ceiling (99 × 99). A run's end adds one to the counter and locks a cleared
+    /// dungeon until the counter plus that, so a save's run counter, its locks
+    /// and its last run's are each below this — no player counts two billion runs.
+    /// </summary>
+    internal static int MostRuns { get; } = int.MaxValue - DeepestBossFloor * Int(nameof(Tuning.CooldownRunsPerFloor)).Max;
+
+    /// <summary>
+    /// The most enchantments a weapon holds: <c>EnchantmentSlots</c>' clamp
+    /// ceiling. None arrives with more than
+    /// <see cref="ContentValidator.MostArrivingEnchantments"/>, and the enchanter
+    /// fills no more slots than the key allows at its most, so a saved weapon
+    /// holding more is none play made — and its locks, summed, could pass the
+    /// largest whole number (<see cref="Weapon.TotalLock"/>).
+    /// </summary>
+    internal static int MostEnchantments { get; } = Int(nameof(Tuning.EnchantmentSlots)).Max;
 
     /// <summary>The most a magnitude is: the ceiling <c>tuning.json</c>'s magnitudes clamp at, <c>PerStack</c>'s.</summary>
     internal static int Magnitude { get; } = Table(nameof(Tuning.PerStack)).Max;

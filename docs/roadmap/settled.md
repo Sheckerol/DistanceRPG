@@ -1619,9 +1619,10 @@ every number of a content file gets a range, and a save's fields are checked
 against each other; and **R4**, what a deposit costs. R1 and R4 change no rule
 of play — R1 keeps what shipped, and R4 is Phase 6a's to build, its numbers
 declared as `tuning.json` keys ahead of it — so both are written here whole. R3
-and R2 change the game, and each is written here as it is built: R3's content
-half is (R3(a), below: every number of a content file has a range); its save
-half and R2 are still to come, and until they are, the entry below that R2
+and R2 change the game, and each is written here as it is built. R3 is, both
+halves: every number of a content file has a range (R3(a), below), and every
+count of a save has its ceiling and its fields are checked against each other
+(R3(b), below). R2 is still to come, and until it is, the entry below that R2
 supersedes — the save model — says what ships.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
@@ -1864,6 +1865,110 @@ supersedes — the save model — says what ships.
     over it (`ApplyPercent`, `ArcanePotency`) are `tuning.json`'s, clamped 0–1000.
     Nothing of it is a user decision, and the question — whether a content file's
     numbers have bounds — leaves open-questions.md whole.
+- **R3(b) — a save is raw JSON too: every count has its ceiling, and the fields
+  are checked against each other.** The user's reason is R3's: "since we are
+  storing in raw json we should probably not trust the fields". The save's walk
+  (`SaveMapper`) already refused an id the content lacks, a count below its
+  floor, a list that is not one and two answers to one question; it now also
+  refuses every count whose larger value would wrap the arithmetic that reads it
+  — at the field's own path, beside its floor, before anything else is asked of
+  it — and, once every field has been read on its own, `SaveConsistency.Check`
+  asks the fields of each other, so every refusal of a single field keeps its
+  path. A save that fails either is refused whole as one that cannot be read:
+  set aside as `campaign.unreadable-N.json`, never deleted, the backup tried, and
+  never a crash (the resume catches every exception). The notice shows the field
+  and the first clause of what is wrong there — `CAMPAIGN.JSON COULD NOT BE READ
+  (CAMPAIGN.RETIRED[0]: TUTORIAL IS RETIRED AND WAS NEVER CLEARED)` — so every
+  problem is written in the HUD's font, an id named bare. Every ceiling and every
+  check holds by construction in play, on both saves the pre-rework code wrote
+  and on the Flagship, and `SaveConsistencyTests` plays a campaign through every
+  outcome to show it.
+
+  | Count (a weapon's wherever it is: a bag, a floor, a spoil, a row, a pinned drop, a summary) | Refused when | Read off | What it would break |
+  | --- | --- | --- | --- |
+  | a forged stack | above 3 | `MaxForged`'s clamp ceiling (`ContentBounds.DeepestForge`): nothing forges past it | a spread past any forge, which the cap then lifts further |
+  | a live stack | above its forged stack + 50 | `AcquiredHeadroom`'s clamp ceiling (`MostAcquired`): acquisition stops at the forged count plus the headroom, and a lowered headroom never takes a stack away | a Block two billion deep, whose absorb overflows |
+  | a member's innate stack | above 53 | the deepest a stack grows (`DeepestStack`), a boss innate's top in `dungeons.json` too | a member's Block past any weapon's |
+  | an enchantment's tier | above 2147 | `DeepestTier`: the largest whole number ÷ (`ApplyPercent`'s clamp ceiling 1000 × `ArcanePotency`'s 1000, the largest potency) | an entry's lock (lock × tier) and its levels (percentage × potency or source × tier) past an int |
+  | a weapon's enchantments | more than 10 | `EnchantmentSlots`' clamp ceiling (`MostEnchantments`); none arrives with more than 3 | `Weapon.TotalLock` summing its locks past an int |
+  | the run counter, a lock, the last run's counter and its lock | 2,147,473,846 or more | `MostRuns`: the largest whole number less `BossFloorMax`'s ceiling 99 × `CooldownRunsPerFloor`'s 99 | a run's end adds one, and a clear locks until the counter plus up to 9,801 runs: both would wrap negative |
+  | the visit's boss floor | above 99 | `DeepestBossFloor`, R3(a)'s | a dungeon no content made, every floor of which a load generates |
+  | a member's hit points; a row's | above 10000 plus its HP XP; above 10000 plus its revival gains — each summed as a long | `StartingPool`'s clamp ceiling (`Bar`): a maximum is its bar plus a point for each HP XP at most, or its base plus what its revivals added | a member standing on 99999 HP |
+
+  - **The tier's ceiling is a sanity bound, and is recorded as one.** Tier is
+    uncapped by design (§3.3, "the pool is the cap"), and 2147 is only where the
+    arithmetic of an entry stops being whole. Play never nears it: an entry
+    climbs only while awake, its lock inside its wielder's max mana, so tier 2147
+    under the catalogue's smallest lock (15) wants 32,190 mana — some 117 million
+    mana XP — and a drop banks at most `AcquiredHeadroom` tiers onto an
+    artifact's 3.
+  - **Every ceiling is a clamp's ceiling or a rule, never the tuning in hand**,
+    read once in `ContentBounds` beside R3(a)'s, so no tuning in range and no
+    content that loads refuses a save play wrote, and the content and the save
+    never disagree about how deep a number goes. Beside the three the save alone
+    needs (`DeepestTier`, `MostRuns`, `MostEnchantments`), a live stack's reads
+    `MostAcquired`, which `DeepestStack` is now built from.
+  - **The cross-checks**, in the order asked: (1) a retired dungeon was cleared —
+    it retires on its clear; (2) a locked one was cleared — only a clear writes a
+    lock; (4) with no run ended, nothing is counted and nothing cleared; (5) a
+    boss kill has the boss down and a retreat has it standing; (6) a run counted
+    exactly when its boss fell or its mercy was earned, and never a mercy with the
+    boss down; (7) a clear locks or retires its dungeon and never both, a failure
+    does neither, and a last run's own lock is never below its own counter; (8)
+    the boss floor is told exactly when it was reached — it is the deepest floor,
+    never missing with the boss down — and the deepest floor is no deeper than
+    99, the ceiling a visit's boss floor has; (9) spoils are lost and XP clawed
+    back only by a wipe, and a wipe keeps no spoil; (10) a claw-back takes back,
+    once a pool; (11) the last run's counter is the campaign's; (12) a last run's
+    lock is the campaign's on that dungeon, unless a visit to it is in progress
+    and the lock is the counter — the early offer's rewrite — while a run that
+    locks nothing writes none beside an earlier clear's lock, so an unset lock is
+    never compared; (13) a clear's dungeon is cleared, and a retiring clear's
+    retired; (14) no two members share a colour; (15) a visit's dungeon is neither
+    retired nor locked past the counter, which only the early offer's lifted lock
+    lets it be entered at; (16) what each pool held at the door is no more than it
+    holds now — a visit only adds XP; (17) the boss's drop is promised no more
+    stacks than the boss floor; (18) where the bottom floor is saved, its boss
+    row stands exactly while the visit has the boss standing — its fall records
+    it, and a boss never rises; (19) a drop is taken only from a corpse, once the
+    boss is down.
+  - **The ruling's own example is legal state — please confirm.** "A lock ending
+    before the current run count" is how a lifted lock stays: nothing removes a
+    lock (`CampaignState.LockedInOrder`: "a lock that has lifted stays, reading a
+    run already reached"), since a lifted lock already reads as open — the
+    counter at or past it — and the early offer compares locks lifted or not; and
+    the early offer itself writes the counter as a lock. Refusing it would refuse
+    every campaign that played a cooldown out. The form of it no play writes is
+    check 7's — a last run's own lock below its own counter — and that is refused.
+  - **Check 3, a lock on a retired dungeon, is withdrawn.** `dungeons.json`
+    beside the exe may move `retiresOnClear` onto a dungeon already cleared and
+    locked (`RuleOneRetiringDungeon` asks only that one dungeon carry it, and a
+    retiring dungeon pins its floor), and its next clear retires it and leaves
+    the old lock where it was: play writes the pair. It is inert — the list, the
+    early offer and entering all ask whether a dungeon is retired first.
+  - **Considered and not refused**, each for its reason: HP and mana against
+    their maximum — stored mana reads as its spendable ceiling at most, and the
+    maximum is derived at load from today's tuning and content, so a save made
+    before either was lowered holds more HP honestly, and play meets it (a heal
+    adds nothing past full, a rest sets the maximum); a soul's tier above 1,
+    which its pin plays at 1 (a later build may make an entry a soul); a lock
+    further ahead of the counter than a clear writes, which only counts down, the
+    early offer reaching it before any dead end; the active member naming nobody,
+    where the scene falls back; an enchantment carried and never seen; spoils
+    lost on a wipe whose boss stood, which the summary alone reads; a row's farm
+    counters against each other, and the boss row's defeat turn against the
+    visit's — tests fell rows by hand, and only a revival's timing reads them,
+    which tolerates it; a member's `alive` against its HP, written apart; and
+    bags of unequal length, each member keeping the bag it was built with.
+  - **The walk's known edge.** Every other count — the XP pools and an entry's
+    XP, the turn and the dice rolled, a row's farm counters and revival gains,
+    held shots, a status's levels — keeps its floor alone, since no clamp or rule
+    gives an honest ceiling short of the largest whole number: a pool grows with
+    play, a soul banks its spend for ever, revival gains compound. So a
+    hand-edited count within one credit of the largest whole number can still
+    wrap on that credit. A list longer than play writes — a floor's rows — costs
+    load time, never a wrong number: every duplicate and every row that names
+    nothing is refused already.
 
 ### The numbers: `tuning.json`
 
@@ -2118,6 +2223,9 @@ supersedes — the save model — says what ships.
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
+  (Superseded by the user's ruling, 2026-09-25, in what cannot be read: a save
+  that contradicts itself, or holds a count past what play can reach, is one too,
+  set aside the same way — R3(b), above.)
 - **A save that fails is said at once, and a quit that cannot save is said at
   the next launch.** A write that fails — a full disk, a folder with no rights,
   another program holding the file — costs nothing, since the save before it is

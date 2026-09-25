@@ -28,6 +28,19 @@ namespace GameEngine.DistanceRPG.Logic;
 /// document, and nothing is half-built: the restore throws before it hands
 /// anything back.
 /// </para>
+/// <para>
+/// <strong>And a save is raw JSON, so no field is trusted</strong> (the user's
+/// ruling of 2026-09-25, R3(b)). Every field is read on its own first — every
+/// count from its floor, and every count whose larger value would wrap the
+/// arithmetic that reads it up to a ceiling, beside its floor: a forged stack,
+/// a live one, a member's innate, an entry's tier, a weapon's entries, a run
+/// count, a body's hit points, the boss floor. Each ceiling is read off
+/// <see cref="ContentBounds"/> — a <c>tuning.json</c> clamp's ceiling or a rule,
+/// never the tuning in hand — so no tuning in range and no content that loads
+/// refuses a save play wrote. Only then are the fields asked of each other
+/// (<see cref="SaveConsistency"/>), so every refusal of a field keeps its own
+/// path.
+/// </para>
 /// </summary>
 internal static class SaveMapper
 {
@@ -295,9 +308,12 @@ internal static class SaveMapper
     /// <summary>
     /// The campaign a document's <c>campaign</c> describes, under
     /// <paramref name="content"/> — which must be the current content, since a
-    /// member and a weapon are built under it.
+    /// member and a weapon are built under it. Every field is read on its own
+    /// first, and then the fields are asked of each other
+    /// (<see cref="SaveConsistency.Check"/>): a save no play could have written is
+    /// refused whole, before any campaign is built of it.
     /// </summary>
-    /// <exception cref="SaveFormatException">Something in it does not resolve or is out of range, and where.</exception>
+    /// <exception cref="SaveFormatException">Something in it does not resolve, is out of range, or contradicts another field, and where.</exception>
     internal static CampaignState Restore(CampaignDto campaign, GameContent content)
     {
         ArgumentNullException.ThrowIfNull(campaign);
@@ -306,12 +322,16 @@ internal static class SaveMapper
 
         var party = Party(campaign.Party, content, $"{at}.party");
         var seen = Ids(campaign.Seen, $"{at}.seen", "enchantment", id => content.Enchantments.TryGet(id, out _));
-        NotNegative(campaign.RunCounter, $"{at}.runCounter");
+        Runs(campaign.RunCounter, $"{at}.runCounter");
         var locks = Locks(campaign.Locks, content, $"{at}.locks");
         var cleared = Ids(campaign.Cleared, $"{at}.cleared", "dungeon", id => content.Dungeons.TryGet(id, out _));
         var retired = Ids(campaign.Retired, $"{at}.retired", "dungeon", id => content.Dungeons.TryGet(id, out _));
         var lastResult = campaign.LastResult is { } result ? Result(result, content, party, $"{at}.lastResult") : null;
         var visit = campaign.Visit is { } saved ? Visit(saved, content, party, $"{at}.visit") : null;
+
+        // Every field has been read on its own, so a refusal of one keeps its own
+        // path; now the fields against each other (R3(b)).
+        SaveConsistency.Check(campaign);
 
         return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit);
     }
@@ -354,9 +374,12 @@ internal static class SaveMapper
             member.WeaponXp[EnumOf<WeaponClass>(name, $"{at}.weaponXp.{name}", "weapon class")] = NotNegative(xp, $"{at}.weaponXp.{name}");
         member.HpXp = NotNegative(row.HpXp, $"{at}.hpXp");
         member.ManaXp = NotNegative(row.ManaXp, $"{at}.manaXp");
-        member.Innate = Modifiers(row.Innate, $"{at}.innate");
+        member.Innate = Modifiers(row.Innate, $"{at}.innate", _ => (ContentBounds.DeepestStack, DeepestStackWhy));
         member.Attunement = row.Attunement is { } attunement ? EnumOf<DamageType>(attunement, $"{at}.attunement", "damage type") : null;
-        Body(member, Required(row.Body, $"{at}.body"), $"{at}.body");
+        // A member's maximum is its bar plus a point for each HP XP at most (each
+        // point costs one or more), and no bar opens larger than Bar: summed as a
+        // long, so an XP near the largest whole number cannot wrap the ceiling.
+        Body(member, Required(row.Body, $"{at}.body"), $"{at}.body", ContentBounds.Bar + (long)member.HpXp, MemberHpWhy);
 
         for (int slot = 0; slot < bag.Count; slot++)
             member.Inventory[slot] = bag[slot] is { } carried ? Weapon(carried, content, $"{at}.inventory[{slot}]") : null;
@@ -379,12 +402,18 @@ internal static class SaveMapper
         return new InnateStats(Divisor(row.Str, "str"), Divisor(row.Dex, "dex"), Divisor(row.Con, "con"), Divisor(row.Int, "int"));
     }
 
-    /// <summary>An actor's body onto <paramref name="actor"/>: where it stands, its pools as stored, and its statuses landed again in their order.</summary>
-    private static void Body(ActorState actor, ActorDto body, string at)
+    /// <summary>
+    /// An actor's body onto <paramref name="actor"/>: where it stands, its pools as
+    /// stored — its hit points no more than <paramref name="mostHp"/>, the most its
+    /// maximum can be, which its kind hands in; mana has no ceiling, since it reads
+    /// as its spendable ceiling at most whatever is stored — and its statuses
+    /// landed again in their order.
+    /// </summary>
+    private static void Body(ActorState actor, ActorDto body, string at, long mostHp, string mostHpWhy)
     {
         actor.X = body.X;
         actor.Y = body.Y;
-        actor.RawHp = body.Hp is { } hp ? NotNegative(hp, $"{at}.hp") : null;
+        actor.RawHp = body.Hp is { } hp ? AtMost(NotNegative(hp, $"{at}.hp"), mostHp, $"{at}.hp", mostHpWhy) : null;
         actor.RawMana = body.Mana is { } mana ? NotNegative(mana, $"{at}.mana") : null;
         actor.Alive = body.Alive;
         actor.HeldShots = NotNegative(body.HeldShots, $"{at}.heldShots");
@@ -415,20 +444,30 @@ internal static class SaveMapper
         }
     }
 
-    /// <summary>A weapon as saved: the row by id, both spreads by name, the entries by id at their tiers, in attachment order.</summary>
+    /// <summary>
+    /// A weapon as saved: the row by id, both spreads by name, the entries by id
+    /// at their tiers, in attachment order. A forged stack is no deeper than any
+    /// forge goes, a live one no deeper than its forged count plus the most
+    /// headroom any tuning gives, an entry's tier no deeper than its arithmetic
+    /// stays whole at, and the entries no more than a weapon holds
+    /// (<see cref="ContentBounds"/>).
+    /// </summary>
     private static Weapon Weapon(WeaponDto row, GameContent content, string at)
     {
         if (!content.Weapons.TryGet(row.Id, out var def))
             throw new SaveFormatException($"{at}.id", $"'{row.Id}' is no weapon in the content");
 
-        var forged = Modifiers(row.Forged, $"{at}.forged");
-        var live = Modifiers(row.Modifiers, $"{at}.modifiers");
+        var forged = Modifiers(row.Forged, $"{at}.forged", _ => (ContentBounds.DeepestForge, DeepestForgeWhy));
+        var live = Modifiers(row.Modifiers, $"{at}.modifiers", type => (forged.Stacks(type) + ContentBounds.MostAcquired, AcquiredWhy(forged.Stacks(type))));
         foreach (var (type, stacks) in forged.Entries)
             if (live.Stacks(type) < stacks)
                 throw new SaveFormatException($"{at}.modifiers.{Name(type)}",
                     $"{live.Stacks(type)} is below the {stacks} forged: the live spread is the forged one plus what was acquired, never less");
 
         var rows = Rows(row.Enchantments, $"{at}.enchantments", "enchantment");
+        if (rows.Count > ContentBounds.MostEnchantments)
+            throw new SaveFormatException($"{at}.enchantments",
+                $"{rows.Count} entries, more than the {ContentBounds.MostEnchantments} a weapon can hold: none arrives with more than {ContentValidator.MostArrivingEnchantments}, and the enchanter fills {ContentBounds.MostEnchantments} slots at most");
         var entries = new Enchantment[rows.Count];
         for (int i = 0; i < rows.Count; i++)
         {
@@ -438,6 +477,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.id", $"'{entry.Id}' is no enchantment in the content");
             if (entry.Tier < 1)
                 throw new SaveFormatException($"{where}.tier", $"{entry.Tier} is no tier: an entry is attached at tier 1 or deeper");
+            AtMost(entry.Tier, ContentBounds.DeepestTier, $"{where}.tier", DeepestTierWhy);
             // The content's own def — the tuned one — so a unique's pin holds whatever the text says.
             entries[i] = new Enchantment(entryDef, entry.Tier) { Xp = NotNegative(entry.Xp, $"{where}.xp") };
         }
@@ -449,12 +489,20 @@ internal static class SaveMapper
         return new Weapon(def, forged, live, entries, row.ForgedEnchantments);
     }
 
-    /// <summary>A modifier table by name: every key a <see cref="ModifierType"/>, every count whole and not negative.</summary>
-    private static ModifierSet Modifiers(IReadOnlyDictionary<string, int>? table, string at)
+    /// <summary>
+    /// A modifier table by name: every key a <see cref="ModifierType"/>, every
+    /// count whole, not negative, and no deeper than <paramref name="ceiling"/>
+    /// gives for its modifier — the most it can be, and why.
+    /// </summary>
+    private static ModifierSet Modifiers(IReadOnlyDictionary<string, int>? table, string at, Func<ModifierType, (int Most, string Why)> ceiling)
     {
         var stacks = new List<(ModifierType, int)>();
         foreach (var (name, count) in Required(table, at))
-            stacks.Add((EnumOf<ModifierType>(name, $"{at}.{name}", "modifier"), NotNegative(count, $"{at}.{name}")));
+        {
+            var type = EnumOf<ModifierType>(name, $"{at}.{name}", "modifier");
+            var (most, why) = ceiling(type);
+            stacks.Add((type, AtMost(NotNegative(count, $"{at}.{name}"), most, $"{at}.{name}", why)));
+        }
         return ModifierSet.Of(stacks.ToArray());
     }
 
@@ -472,7 +520,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.dungeonId", $"'{row.DungeonId}' is no dungeon in the content");
             if (!locked.Add(row.DungeonId))
                 throw new SaveFormatException($"{where}.dungeonId", $"'{row.DungeonId}' is already locked: a dungeon has one lock");
-            locks[i] = (row.DungeonId, NotNegative(row.LockedUntilRun, $"{where}.lockedUntilRun"));
+            locks[i] = (row.DungeonId, Runs(row.LockedUntilRun, $"{where}.lockedUntilRun"));
         }
         return locks;
     }
@@ -504,11 +552,13 @@ internal static class SaveMapper
         var outcome = EnumOf<RunOutcome>(row.Outcome, $"{at}.outcome", "run outcome");
 
         // The depth reached and the boss floor are floor numbers, the first floor
-        // 1 (RunResult); the counter and the lock count runs, as the campaign's own do.
+        // 1 (RunResult); the counter and the lock count runs, as the campaign's own
+        // do, and are held to the campaign's ceiling. How deep the party went is
+        // asked of the rest of the summary with the other cross-checks (SaveConsistency).
         int deepest = FloorNumber(row.DeepestFloor, $"{at}.deepestFloor");
         int? bossFloor = row.BossFloorRevealed is { } revealed ? FloorNumber(revealed, $"{at}.bossFloorRevealed") : null;
-        int runCounter = NotNegative(row.RunCounter, $"{at}.runCounter");
-        int? lockedUntil = row.LockedUntilRun is { } until ? NotNegative(until, $"{at}.lockedUntilRun") : null;
+        int runCounter = Runs(row.RunCounter, $"{at}.runCounter");
+        int? lockedUntil = row.LockedUntilRun is { } until ? Runs(until, $"{at}.lockedUntilRun") : null;
 
         Weapon[] Spoils(IReadOnlyList<WeaponDto> spoils, string where)
         {
@@ -701,7 +751,10 @@ internal static class SaveMapper
             : new EnemyState { Weapon = weapon, Attunement = def.Attunement, Theme = def.Theme };
         enemy.SpawnIndex = row.SpawnIndex;
         var body = Required(row.Body, $"{at}.body");
-        Body(enemy, body, $"{at}.body");
+        // A row's maximum is its base — a dummy's, or its boss's, none above Bar —
+        // plus what its revivals added (a negative gain is refused below, at its
+        // own path, and adds nothing here), summed as a long.
+        Body(enemy, body, $"{at}.body", ContentBounds.Bar + Math.Max(0L, row.RevivalMaxHp), RowHpWhy);
 
         if (row.DefeatedAtTurn < -1 || row.DefeatedAtTurn > visit.Turn)
             throw new SaveFormatException($"{at}.defeatedAtTurn", $"{row.DefeatedAtTurn}: a row falls on a turn the visit has had, 0 to {visit.Turn}, or never (-1)");
@@ -884,6 +937,40 @@ internal static class SaveMapper
 
     private static int NotNegative(int value, string at)
         => value >= 0 ? value : throw new SaveFormatException(at, $"{value} is below 0");
+
+    /// <summary>
+    /// A count no larger than <paramref name="most"/>, a ceiling off
+    /// <see cref="ContentBounds"/> (R3(b)): past it the arithmetic that reads the
+    /// count would wrap, and no play writes it. Refused at the count's own path,
+    /// the value and the ceiling in the first clause — what the notice of a save
+    /// set aside shows — and <paramref name="why"/> after it, in the HUD's font.
+    /// </summary>
+    private static int AtMost(int value, long most, string at, string why)
+        => value <= most ? value : throw new SaveFormatException(at, $"{value} is above {most}: {why}");
+
+    /// <summary>A count of runs — the counter, a lock, the last run's — not negative, and below <see cref="ContentBounds.MostRuns"/>.</summary>
+    private static int Runs(int value, string at)
+        => AtMost(NotNegative(value, at), ContentBounds.MostRuns - 1L, at,
+            "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs");
+
+    // Why each ceiling is where it is: said after the value and the ceiling, so in
+    // the HUD's font — no apostrophe, quote, brace, backslash or semicolon.
+
+    private const string DeepestForgeWhy = "no forge goes deeper (MaxForged at its most)";
+
+    private const string DeepestStackWhy = "no stack grows deeper than the deepest forge plus the most headroom (MaxForged and AcquiredHeadroom at their most)";
+
+    private const string DeepestTierWhy = "tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number";
+
+    private static readonly string MemberHpWhy =
+        $"a member holds no more hit points than the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), plus a point for each HP XP";
+
+    private static readonly string RowHpWhy =
+        $"a row holds no more hit points than the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), plus what its revivals added";
+
+    /// <summary>Why a live stack stops at its forged count plus the most headroom any tuning gives.</summary>
+    private static string AcquiredWhy(int forged)
+        => $"acquisition stops at the {forged} forged plus the most headroom any tuning gives, {ContentBounds.MostAcquired} (AcquiredHeadroom at its most)";
 
     /// <summary>A floor by the number a run's summary gives it: the party starts on floor 1, and a boss floor range starts there too.</summary>
     private static int FloorNumber(int value, string at)

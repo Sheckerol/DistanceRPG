@@ -2,11 +2,13 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// A save that cannot be restored, and where: malformed text, a version newer
-/// than this build reads, a member missing, or a name or an id the loaded
-/// content does not have — <c>campaign.party[1].inventory[2].id: 'blade_x' is no
-/// weapon in the content</c>. A save never limps: it restores whole or is
-/// refused whole, and the refusal names the path in the document that broke
-/// it, so a playtester can open the file and find the line.
+/// than this build reads, a member missing, a name or an id the loaded content
+/// does not have — <c>campaign.party[1].inventory[2].id: 'blade_x' is no weapon
+/// in the content</c> — a count past what play can reach, or two fields that
+/// contradict each other (<see cref="SaveConsistency"/>): <c>campaign.retired[0]:
+/// tutorial is retired and was never cleared</c>. A save never limps: it restores
+/// whole or is refused whole, and the refusal names the path in the document that
+/// broke it, so a playtester can open the file and find the line.
 /// </summary>
 public sealed class SaveFormatException : Exception
 {

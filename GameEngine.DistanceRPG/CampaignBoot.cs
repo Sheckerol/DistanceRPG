@@ -41,7 +41,8 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// resumes <see cref="SaveStore.FileName"/>, and says so — between runs, or in
 /// the run in progress it holds, which the game resumes in the dungeon at the
 /// saved floor and turn (Phase 5.8). A save that cannot be read — malformed,
-/// written by a newer build, naming content that is gone — is set aside, never
+/// written by a newer build, naming content that is gone, holding a count past
+/// what play reaches or contradicting itself (R3(b)) — is set aside, never
 /// deleted or written over, and the backup is tried, then a new campaign. A save
 /// whose resume crashed the game last time — the resume marker left behind — is
 /// set aside the same way. Every set-aside notice names the file's full path and

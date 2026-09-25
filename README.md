@@ -122,8 +122,9 @@ its own and resumes where you left off.
   resumes, between runs or over the floor: what resumes is the last save from
   before that quit.
 - **A save that cannot be played is set aside, never deleted**: one that is not
-  a save, one a newer build wrote, one naming content that is gone, or one that
-  crashed the game as it resumed. A `campaign.resuming` marker sits beside the
+  a save, one a newer build wrote, one naming content that is gone, one that
+  contradicts itself or holds a number past what play can reach (below), or one
+  that crashed the game as it resumed. A `campaign.resuming` marker sits beside the
   save while a resume is in flight — until the resumed screen is up, the screen
   between runs or the resumed floor — and a launch that finds it knows the last
   resume never finished. It is renamed `campaign.unreadable-N.json` (or
@@ -138,6 +139,24 @@ its own and resumes where you left off.
   more there are. Only what the data files raised after that is cut to three
   rows (`+N MORE - SEE THE LOG`). The log has every word. **Rename it back to
   `campaign.json` to try it again.** Nothing ever writes over a file set aside.
+- **No field of a save is trusted** (the user's ruling of 2026-09-25: "since we
+  are storing in raw json we should probably not trust the fields"). Each is
+  checked on its own — an id the content has, a count no smaller than play
+  writes it and, where a larger one would break the game's arithmetic, no larger
+  than play can reach: a forged stack past 3, a live one past its forged count
+  plus 50, an enchantment's tier past 2147, more than 10 on a weapon, a run
+  counter in the billions, hit points past the largest bar plus what was earned
+  — and then against the rest: a retired dungeon never cleared, a last run's
+  summary that disagrees with the campaign (its run count, its lock, the dungeon
+  it cleared), a run in progress in a dungeon the list could not have offered,
+  a boss standing that the run has down. A save that fails any of it is set
+  aside as one that cannot be read, the notice naming the field and what is
+  wrong there: edit `"retired": ["tutorial"]` while `"cleared": []` and the
+  launch says `CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.RETIRED[0]: TUTORIAL IS
+  RETIRED AND WAS NEVER CLEARED)`, sets it aside and resumes the backup; give a
+  carried weapon's entry `"tier": 99999` and it names the tier and `IS ABOVE
+  2147`. A lock that has already lifted is no contradiction: it stays in the
+  save, and the list reads its dungeon as open.
 - **Starting over**: N, then N, on the screen between runs replaces the saved
   campaign with a new one (the old one stays in `campaign.bak.json` until the
   next save). `DistanceRPG --new-campaign` — `dotnet run --project

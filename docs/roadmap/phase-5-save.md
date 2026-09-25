@@ -25,6 +25,16 @@ Round-trip test: save, reload, and assert that a fixed sequence of turns
 produces an identical world state — in the shipped game too, since its dice are
 the visit's own, seeded and saved (the user's ruling of 2026-09-25, settled.md).
 
+A save is raw JSON, so none of its fields is trusted (the user's ruling of
+2026-09-25: "since we are storing in raw json we should probably not trust the
+fields"). Each is read against the content and its range — a count past what
+play can reach, where a larger one would wrap the arithmetic that reads it, is
+refused at its path as a count below 0 is — and then the fields against each
+other: **a save that contradicts itself is refused whole** (a retired dungeon
+never cleared, a last run's summary that disagrees with the campaign it ended),
+and set aside like any save that cannot be read (settled.md, R3(b), which lists
+the ceilings and the checks).
+
 ## 5.3 `tuning.json` — the numbers, editable between loads
 
 Almost every open question in these documents is a **number nobody can pick on
