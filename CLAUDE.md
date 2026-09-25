@@ -29,7 +29,12 @@ up-to-date main, push, and open a PR with `gh pr create`.
 ```
 GameEngine.DistanceRPG/         # Game executable
   Program.cs                    # Entry point (crash handler + logging)
-  DistanceRpgGame.cs            # Game subclass; registers DungeonScene
+  DistanceRpgGame.cs            # Game subclass: the title, then the screen between runs and the runs
+  TitleScene.cs                 # The first scene: CONTINUE / NEW CAMPAIGN / LOAD GAME / QUIT (TitleHud,
+                                # TitleText; SlotMenu and SlotText, the slot list)
+  SaveSlots.cs                  # The save folder's slots: its campaign.json is the autosave, slot-n/ the
+                                # manual slots (SaveStore one slot, SaveListing what each holds, CampaignBoot
+                                # a slot's load and every write)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions

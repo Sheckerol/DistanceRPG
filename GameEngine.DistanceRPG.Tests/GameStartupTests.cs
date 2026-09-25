@@ -148,17 +148,20 @@ public class GameStartupTests
     public void TheStartupNoticesGoToTheFirstSceneAlone()
     {
         // What the data files raised reaches the screen through the first scene
-        // the game opens on (1h, 1i). That is the screen between runs, a run that
-        // a dev override boots straight into, or — from Phase 5.8 — a run a save
-        // held, resumed in the dungeon (ResumeRun). The load holds the notices.
-        // Each of the methods that show a scene takes them and passes them
-        // straight into what that scene is built with, where the last argument is
-        // the notices. Nothing else takes them.
+        // the game opens on (1h, 1i). That is the title (the user's ruling of
+        // 2026-09-25 on the save model, R2(a); ShowTitle), and else the screen
+        // between runs — a --new-campaign launch's, or a dev override's that names
+        // only a seed — or a run that a dev override boots straight into; and once
+        // the title has taken them, a campaign loaded from it opens on the screen
+        // between runs or on a run a save held, resumed in the dungeon (ResumeRun),
+        // with the load's word. The load holds the notices. Each of the methods that
+        // show a scene takes them and passes them straight into what that scene is
+        // built with, where the last argument is the notices. Nothing else takes them.
         var hold = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Hold))!;
         var take = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Take))!;
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(hold));
-        Assert.Equal(["DistanceRpgGame.BeginRun", "DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns"], Callers(take));
-        foreach (var (shows, scene) in new[] { ("ShowBetweenRuns", typeof(BetweenRunsScene)), ("BeginRun", typeof(DungeonScene)) })
+        Assert.Equal(["DistanceRpgGame.BeginRun", "DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns", "DistanceRpgGame.ShowTitle"], Callers(take));
+        foreach (var (shows, scene) in new[] { ("ShowBetweenRuns", typeof(BetweenRunsScene)), ("BeginRun", typeof(DungeonScene)), ("ShowTitle", typeof(TitleScene)) })
         {
             var built = BuiltWithTheTake(shows, take);
             Assert.True(built is not null, $"DistanceRpgGame.{shows} does not hand what it takes straight to a constructor");
@@ -189,17 +192,31 @@ public class GameStartupTests
         Assert.Empty(notices.Take());
 
         // Each scene lays out what it is handed, and its HUD draws that. The
-        // screen between runs puts the rows under its title. A dungeon scene's
-        // HUD puts them over the first floor; HudTextTests builds that scene and
-        // reads its rows.
+        // screen between runs and the title put the rows under their titles. A
+        // dungeon scene's HUD puts them over the first floor; HudTextTests builds
+        // that scene and reads its rows.
         var rows = typeof(NoticeText).GetMethod(nameof(NoticeText.Rows))!;
         var showNotices = typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowNotices))!;
         var noticeRows = typeof(BetweenRunsScene).GetProperty("NoticeRows", BindingFlags.NonPublic | BindingFlags.Instance)!.GetMethod!;
+        var titleRows = typeof(TitleScene).GetProperty("NoticeRows", BindingFlags.NonPublic | BindingFlags.Instance)!.GetMethod!;
         var drawNotices = typeof(DungeonHud).GetMethod("DrawNotices", BindingFlags.NonPublic | BindingFlags.Instance)!;
         Assert.Contains("BetweenRunsScene..ctor", Callers(rows));
+        Assert.Contains("TitleScene..ctor", Callers(rows));
         Assert.Contains("DungeonScene..ctor", Callers(showNotices));
         Assert.Contains("BetweenRunsHud.Render", Callers(noticeRows));
+        Assert.Contains("TitleHud.Render", Callers(titleRows));
         Assert.Equal(["DungeonHud.Render"], Callers(drawNotices));
+
+        // The title is the first scene's door (S6): the launch shows it unless a dev
+        // override or --new-campaign skips it, and a load that brings nothing back
+        // shows it again; nothing else does. (A title asked for mid-fade is shown
+        // by a lambda of ShowTitle's own, once the fade is done.)
+        var showTitle = typeof(DistanceRpgGame).GetMethod("ShowTitle", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot"], Callers(showTitle).Where(caller => !caller.Contains('<')));
+        var bootCampaign = typeof(DistanceRpgGame).GetMethod("BootCampaign", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Assert.Equal(1, Mentions(bootCampaign, showTitle));
+        Assert.Equal(["TitleScene..ctor"], Callers(typeof(TitleMenu).GetConstructor([typeof(SaveListing)])!));
+        Assert.Equal(["DistanceRpgGame.ShowTitle"], Callers(typeof(TitleScene).GetConstructors().Single()));
     }
 
     [Fact]
@@ -209,9 +226,11 @@ public class GameStartupTests
         // numbers changed, a file set aside and how to try it again — leads the
         // notices, and the screen between runs shows it whole, capping only what
         // the data files raised after it. So does a floor a saved run resumes on
-        // (S8's review). The holder counts what was led. The two methods that open
-        // those screens read that count, and nothing else does. Each reads it
-        // before the take that hands the notices over.
+        // (S8's review), and so does the title (S6), whose word is what a load that
+        // brought nothing back set aside, the autosave left unwritten, a file the
+        // listing could not read. The holder counts what was led. The three methods
+        // that open those screens read that count, and nothing else does. Each
+        // reads it before the take that hands the notices over.
         var notices = new StartupNotices();
         notices.Hold(["data one", "data two"]);
         notices.Lead(["a save that failed"]);
@@ -228,15 +247,16 @@ public class GameStartupTests
         Assert.Equal(["resumed", "data"], notices.Take());
 
         var leading = typeof(StartupNotices).GetProperty(nameof(StartupNotices.Leading))!.GetMethod!;
-        Assert.Equal(["DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns"], Callers(leading));
+        Assert.Equal(["DistanceRpgGame.ResumeRun", "DistanceRpgGame.ShowBetweenRuns", "DistanceRpgGame.ShowTitle"], Callers(leading));
         var built = typeof(BetweenRunsScene).GetConstructors().Single();
         Assert.Equal(["game", "campaign", "host", "shownWhole", "notices"], built.GetParameters().Select(p => p.Name));
+        Assert.Equal(["game", "host", "listing", "shownWhole", "notices"], typeof(TitleScene).GetConstructors().Single().GetParameters().Select(p => p.Name));
         Assert.Equal(["View", "Leading", "Notices"], typeof(ResumeView).GetConstructors().Single().GetParameters().Select(p => p.Name));
 
-        // Both read the count before the take, which empties the holder: read after
+        // Each reads the count before the take, which empties the holder: read after
         // it, the count would be none, and the save's word would be capped.
         var take = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Take))!;
-        foreach (string opens in new[] { "ShowBetweenRuns", "ResumeRun" })
+        foreach (string opens in new[] { "ShowBetweenRuns", "ResumeRun", "ShowTitle" })
         {
             var method = typeof(DistanceRpgGame).GetMethod(opens, BindingFlags.NonPublic | BindingFlags.Instance)!;
             var calls = Instructions(Body(method)!).Select(i => i.Token != 0 ? Resolve(method, i.Token) : null).ToList();
@@ -284,7 +304,8 @@ public class GameStartupTests
         Assert.Equal(["DistanceRpgGame.Save"], Callers(saveFailed));
         Assert.Equal(["DungeonScene.SaveFailed"], Callers(typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowSaveFailed))!));
         Assert.Equal(["DistanceRpgGame.Save"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
-        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.Save"], Callers(lead));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.Save", "DistanceRpgGame.ShowTitle"],
+            Callers(lead));
         Assert.Equal(1, Mentions(save, lead));
         Assert.Equal(1, Mentions(save, typeof(DistanceRpgGame).GetMethod("PlayingScene", Declared)!));
         Assert.Equal(1, Mentions(save, saveFailed));
@@ -425,30 +446,31 @@ public class GameStartupTests
     {
         // 1f: a save is written at the end of the frame a run's end asked for it
         // in — never inside the turn system's raise that ended the run — when NEW
-        // CAMPAIGN is confirmed, or --new-campaign begins a campaign at launch
-        // (BootCampaign, S5's review), and on quitting, which every close arrives
+        // CAMPAIGN begins one, on the title or by --new-campaign at launch
+        // (BeginNewCampaign, S6), and on quitting, which every close arrives
         // at (OnClosing): through the quit's own door, which settles the enemies'
         // turn first when a run is in progress and then saves (CampaignBoot.SaveOnQuit,
         // Phase 5.8) — between runs as well since the audit's pass, so a quit that
-        // cannot save leaves its marker for the next launch however it came. The
-        // campaign a launch plays is decided at load, once. Read off the IL, so a
-        // save added anywhere else fails here.
+        // cannot save leaves its marker for the title however it came. The
+        // campaign in play is decided by the title — a slot loaded, or a new one
+        // begun — or by a dev override at launch. Read off the IL, so a save added
+        // anywhere else fails here.
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
         Assert.Equal(["CampaignBoot.SaveOnQuit", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
         Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
-        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.NewCampaign", "DistanceRpgGame.WriteRequestedSave"],
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.WriteRequestedSave"],
             Callers(Method(typeof(DistanceRpgGame), "Save")));
 
         // The unsaved-quit marker is written by the quit's own door alone, and read
-        // and cleared by the load alone — and by --new-campaign, which sets the
-        // campaign it spoke of aside and says nothing of it.
+        // and cleared by the title alone, before anything is loaded — and by NEW
+        // CAMPAIGN, which sets the campaign it spoke of aside and says nothing of it.
         Assert.Equal(["CampaignBoot.MarkUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.MarkUnsaved))));
         Assert.Equal(["CampaignBoot.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), "MarkUnsaved")));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ReadUnsaved))));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ClearUnsaved))));
-        Assert.Equal(["CampaignBoot.Abandon", "CampaignBoot.Load"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
+        Assert.Equal(["CampaignBoot.Abandon", "DistanceRpgGame.ShowTitle"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
         Assert.Equal(["DistanceRpgGame.OnClosing"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
 
@@ -462,10 +484,23 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.SetAside"], Callers(Method(typeof(SaveStore), nameof(SaveStore.SetAside))));
         Assert.Equal(["CampaignBoot.BootOverride"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Empty))));
         Assert.Equal(["CampaignBoot.StoreFor", "SaveSlots.Store"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
-        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Load))));
+        Assert.Equal(["DistanceRpgGame.LoadSlot"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Load))));
         Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.BootOverride))));
-        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(Method(typeof(DistanceRpgGame), "BootCampaign")));
+
+        // A manual slot's campaign makes room in the autosave slot (S6, USER DECISION
+        // 2) in the title's load alone, and only once its Load has brought a campaign
+        // back: a load that restores nothing leaves the autosave as it was.
+        var load = Method(typeof(CampaignBoot), nameof(CampaignBoot.Load));
+        var makeRoom = Method(typeof(CampaignBoot), nameof(CampaignBoot.MakeRoom));
+        var loadSlot = Method(typeof(DistanceRpgGame), nameof(DistanceRpgGame.LoadSlot));
+        Assert.Equal(["DistanceRpgGame.LoadSlot"], Callers(makeRoom));
+        var inLoadSlot = CallsIn(loadSlot).ToList();
+        int loaded = inLoadSlot.FindIndex(called => Same(called, load));
+        int madeRoom = inLoadSlot.FindIndex(called => Same(called, makeRoom));
+        Assert.True(loaded >= 0 && loaded < madeRoom, "LoadSlot makes room in the autosave slot before its Load has brought a campaign back");
+        Assert.Equal(1, Mentions(loadSlot, makeRoom));
     }
 
     private const BindingFlags Declared = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;

@@ -3,21 +3,24 @@ using GameEngine.DistanceRPG.Logic;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// Where the game boots. A campaign begins on the screen between runs, whose
-/// list offers the tutorial alone until it is beaten, so its first run is the
-/// tutorial. The <c>DISTANCERPG_DUNGEON</c> override is the dev route straight
-/// into any dungeon, past that screen. It is how a five- to ten-floor dungeon is
+/// Where the game boots. The game opens on the title (the user's ruling of
+/// 2026-09-25 on the save model, R2(a)), where a campaign is continued or begun;
+/// a campaign begins on the screen between runs, whose list offers the tutorial
+/// alone until it is beaten, so its first run is the tutorial. The
+/// <c>DISTANCERPG_DUNGEON</c> override is the dev route straight into any dungeon,
+/// past the title and that screen. It is how a five- to ten-floor dungeon is
 /// played without first beating the tutorial that opens the hub. A typo in it
-/// must open the screen as usual rather than stop the game at the door.
+/// must open the title as usual rather than stop the game at the door.
 /// </summary>
 public class RunBootTests
 {
     [Fact]
-    public void WithoutTheOverrideTheGameOpensOnTheScreenBetweenRuns()
+    public void WithoutTheOverrideTheGameOpensOnTheTitle()
     {
-        // Unset, blank, or naming nothing: the screen between runs, where the
-        // campaign's first choice is the tutorial. The override is a dev route,
-        // and a typo in it is no reason to skip the screen or to stop the game.
+        // Unset, blank, or naming nothing: the title, and past it a campaign's
+        // screen between runs, where its first choice is the tutorial. The override
+        // is a dev route, and a typo in it is no reason to skip them or to stop the
+        // game.
         var dungeons = GameContent.Current.Dungeons;
         foreach (string? notADungeon in new[] { null, "", "   ", "spear_hal", "The Spear Hall", "SPEAR_HALL" })
             Assert.False(DistanceRpgGame.BootsIntoADungeon(notADungeon, dungeons), $"'{notADungeon}' boots past the screen");

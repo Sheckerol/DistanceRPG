@@ -6,11 +6,12 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// What the between-runs screen reaches the game through: a dungeon chosen, or
-/// a new campaign confirmed. The screen never holds the concrete game that
-/// hosts it (§6.7: the campaign outlives every scene, and the scenes are views
-/// of it). It is the dungeon list's half of what <see cref="IRunHost"/> is to a
-/// dungeon scene.
+/// What the between-runs screen reaches the game through: a dungeon chosen. The
+/// screen never holds the concrete game that hosts it (§6.7: the campaign
+/// outlives every scene, and the scenes are views of it). It is the dungeon
+/// list's half of what <see cref="IRunHost"/> is to a dungeon scene. A new
+/// campaign is the title's to begin (<see cref="ITitleHost.BeginNewCampaign"/>),
+/// never this screen's (the user's ruling of 2026-09-25 on the save model, R2(e)).
 /// </summary>
 public interface IBetweenRunsHost
 {
@@ -21,37 +22,28 @@ public interface IBetweenRunsHost
     /// between scenes.
     /// </summary>
     void Descend(string dungeonId);
-
-    /// <summary>
-    /// The player confirmed NEW CAMPAIGN (N, then N again): replace the campaign
-    /// with a fresh one from the roster, save it over the saved one, and show the
-    /// screen between runs again over it. The screen calls this once, never while
-    /// the engine is still fading between scenes.
-    /// </summary>
-    void NewCampaign();
 }
 
 /// <summary>
 /// The screen between runs (§4.5, §6.7): the hub's dungeon list, and the last
-/// run's summary above it. The game opens on it — a resumed campaign's with
-/// <c>CAMPAIGN RESUMED</c> under the title — and every run's end comes back to
-/// it. The campaign's list decides what is offered
-/// (<see cref="CampaignState.Listings"/>). Before the tutorial is beaten that is
-/// the tutorial alone, with the warning §4.3 asks for. After, it is every dungeon
-/// left, a locked one counting down, and with every one locked, the one offered
-/// early. This screen only presents the list and passes the choice on.
+/// run's summary above it. A campaign continued or loaded from the title opens on
+/// it when it was saved between runs — with <c>CAMPAIGN RESUMED</c> under the
+/// title — and so does a new one; and every run's end comes back to it. The
+/// campaign's list decides what is offered (<see cref="CampaignState.Listings"/>).
+/// Before the tutorial is beaten that is the tutorial alone, with the warning §4.3
+/// asks for. After, it is every dungeon left, a locked one counting down, and with
+/// every one locked, the one offered early. This screen only presents the list and
+/// passes the choice on.
 /// <para>
 /// W/S or the arrows move the choice over the lines that can be entered — a
 /// locked line is read, not chosen. ENTER descends into the choice, once, and
-/// the host begins the run (<see cref="IBetweenRunsHost.Descend"/>). N arms the
-/// NEW CAMPAIGN prompt, and N again confirms it (<see cref="IBetweenRunsHost.NewCampaign"/>);
-/// while it is armed the next key is the prompt's alone, and any key but N only
-/// disarms it (<see cref="NextPrompt"/>). ESC is the game's: it asks
-/// <see cref="HandleEscape"/> first, which takes it only to disarm the prompt,
-/// and otherwise the game saves the campaign and quits (<c>DistanceRpgGame</c>).
-/// The choice starts on the campaign's own default
-/// (<see cref="CampaignState.DefaultNext"/>): the tutorial until it is beaten,
-/// then the first dungeon whose lock has lifted, then the early offer.
+/// the host begins the run (<see cref="IBetweenRunsHost.Descend"/>). ESC is the
+/// game's: it asks <see cref="HandleEscape"/> first, which never takes it here,
+/// so the game saves the campaign and quits (<c>DistanceRpgGame</c>). NEW
+/// CAMPAIGN is the title's (R2(e)), and no key here begins one. The choice starts
+/// on the campaign's own default (<see cref="CampaignState.DefaultNext"/>): the
+/// tutorial until it is beaten, then the first dungeon whose lock has lifted, then
+/// the early offer.
 /// </para>
 /// <para>
 /// Like every gameplay scene it is single-use: the host registers a fresh one
@@ -59,32 +51,18 @@ public interface IBetweenRunsHost
 /// written when the last run ended, and nothing here writes to it.
 /// </para>
 /// <para>
-/// A screen is handed what the game has to say under its title — the startup's
-/// notices on the first one: the save's word on the campaign, then what the data
-/// files raised — and, after a save that could not be written, that. The save's
-/// word is shown whole — a set-aside notice's full path and how to try the file
-/// again, the numbers changed since the save — and what the data files raised is
-/// capped after it (<see cref="NoticeText.Rows"/>). The log keeps them all.
+/// A screen is handed what the game has to say under its title — on the first one
+/// a campaign opens on, the save's word on it: that it resumed, or a new one
+/// begins, and what was set aside on the way (and, when a dev override or
+/// <c>--new-campaign</c> skipped the title, what the data files raised) — and,
+/// after a save that could not be written, that. The save's word is shown whole —
+/// a set-aside notice's full path and how to try the file again, the numbers
+/// changed since the save — and anything else is capped after it
+/// (<see cref="NoticeText.Rows"/>). The log keeps them all.
 /// </para>
 /// </summary>
 public sealed class BetweenRunsScene : Scene
 {
-    /// <summary>What one key press does to the NEW CAMPAIGN prompt (<see cref="NextPrompt"/>).</summary>
-    internal enum PromptStep
-    {
-        /// <summary>The prompt is not armed and this key is not N: the screen handles the key as ever.</summary>
-        PassOn,
-
-        /// <summary>N, unarmed: the prompt is armed, and the next key is its alone.</summary>
-        Arm,
-
-        /// <summary>N, armed: a new campaign.</summary>
-        Confirm,
-
-        /// <summary>Any other key, armed: the prompt is disarmed, and the key does nothing else.</summary>
-        Disarm,
-    }
-
     private readonly CampaignState _campaign;
     private readonly IBetweenRunsHost _host;
     private readonly BetweenRunsHud _hud;
@@ -92,16 +70,13 @@ public sealed class BetweenRunsScene : Scene
     private IReadOnlyList<DungeonListing> _listings = [];
     private int _chosen = -1;
 
-    // The host has been told something that ends this screen: a descent or a
-    // new campaign. After it every key is ignored while the screen fades out.
+    // The host has been told something that ends this screen: a descent. After it
+    // every key is ignored while the screen fades out.
     private bool _leaving;
-
-    // The NEW CAMPAIGN prompt is up: the next key is its alone.
-    private bool _armed;
 
     /// <param name="game">The game window: its size and its shaders, for the text.</param>
     /// <param name="campaign">The campaign between its runs: no visit is in progress.</param>
-    /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>), or that a new campaign was confirmed.</param>
+    /// <param name="host">Who is told which dungeon was chosen (<see cref="IBetweenRunsHost.Descend"/>).</param>
     /// <param name="shownWhole">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign, shown whole (<see cref="StartupNotices.Leading"/>).</param>
     /// <param name="notices">What the game has to say under the title — the save's word and the data files' notices — or none.</param>
     /// <exception cref="ArgumentException">A visit is in progress: its run has to end before the screen between runs can show.</exception>
@@ -130,9 +105,6 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>How the last run ended, which the screen shows above the list, or null before the first.</summary>
     public RunResult? LastResult => _campaign.LastResult;
 
-    /// <summary>Whether the NEW CAMPAIGN prompt is up, which the screen asks along its bottom in place of its keys.</summary>
-    internal bool NewCampaignArmed => _armed;
-
     public override void Initialize()
     {
         base.Initialize();
@@ -159,10 +131,8 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// Every key press, once, through one handler: the prompt reads it first, so
-    /// the N that arms it is never also the key that disarms it, and a key the
-    /// prompt takes never also moves the choice or descends. KeyPressed fires once
-    /// per physical press, so a held key acts once.
+    /// Every key press, once, through one handler. KeyPressed fires once per
+    /// physical press, so a held key acts once.
     /// </summary>
     private void WireInput() => Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
 
@@ -170,24 +140,6 @@ public sealed class BetweenRunsScene : Scene
     {
         if (key == Keys.Escape) return;   // the game's to route: it asks HandleEscape
         if (_leaving || SceneManager.Instance.IsTransitioning) return;
-
-        switch (NextPrompt(_armed, key))
-        {
-            case PromptStep.Arm:
-                _armed = true;
-                Log.Info("[Hub] NEW CAMPAIGN? - N again to confirm, any other key to keep the campaign");
-                return;
-            case PromptStep.Confirm:
-                _armed = false;
-                _leaving = true;
-                Log.Info("[Hub] NEW CAMPAIGN confirmed");
-                _host.NewCampaign();
-                return;
-            case PromptStep.Disarm:
-                _armed = false;
-                Log.Info($"[Hub] NEW CAMPAIGN not taken ({key}): the campaign stays");
-                return;
-        }
 
         switch (key)
         {
@@ -204,30 +156,10 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// What one key press does to the NEW CAMPAIGN prompt (1f): unarmed, N arms
-    /// it and every other key passes on to the screen — ENTER descends, ESC saves
-    /// and quits. Armed, N confirms, and every other key — ENTER, the arrows and
-    /// ESC included — disarms it and is spent doing so. Asking twice is the whole
-    /// guard: the saved campaign is replaced.
+    /// ESC, asked by the game before it does anything else with it: never this
+    /// screen's, so false, and the game saves the campaign and quits.
     /// </summary>
-    internal static PromptStep NextPrompt(bool armed, Keys key)
-        => armed
-            ? key == Keys.N ? PromptStep.Confirm : PromptStep.Disarm
-            : key == Keys.N ? PromptStep.Arm : PromptStep.PassOn;
-
-    /// <summary>
-    /// ESC, asked by the game before it does anything else with it: true when
-    /// ESC disarmed the NEW CAMPAIGN prompt and is spent; false otherwise, and
-    /// the game saves the campaign and quits.
-    /// </summary>
-    public bool HandleEscape()
-    {
-        if (NextPrompt(_armed, Keys.Escape) != PromptStep.Disarm)
-            return false;
-        _armed = false;
-        Log.Info("[Hub] NEW CAMPAIGN not taken (Escape): the campaign stays");
-        return true;
-    }
+    public bool HandleEscape() => false;
 
     /// <summary>Move the choice to the next line that can be entered, up or down, round the end of the list.</summary>
     private void Move(int step) => _chosen = NextChoice(_listings, _chosen, step);

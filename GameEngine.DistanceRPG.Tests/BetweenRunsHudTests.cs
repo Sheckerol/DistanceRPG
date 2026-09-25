@@ -1,5 +1,4 @@
 using GameEngine.DistanceRPG.Logic;
-using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -330,22 +329,20 @@ public sealed class BetweenRunsHudTests : IDisposable
     }
 
     [Fact]
-    public void TheKeysNameTheNewCampaign_AndItAsksTwice()
+    public void TheKeysChooseAndDescend()
     {
-        // 1f: the campaign is saved, so the screen between runs names the two
-        // ways out of it — N for a new campaign, ESC to save and quit — beside the
-        // keys that choose and descend. NEW CAMPAIGN replaces the saved campaign,
-        // so it asks again before it does, and says what the answer costs.
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - N NEW CAMPAIGN - ESC SAVES AND QUITS", BetweenRunsHud.KeysLine);
-        Assert.Equal("NEW CAMPAIGN? N AGAIN: YES - ANY OTHER KEY: NO - THE SAVED CAMPAIGN IS REPLACED", BetweenRunsHud.NewCampaignPrompt);
+        // 1f, and the user's ruling of 2026-09-25 on the save model, R2(e): the
+        // screen between runs names the keys that choose and descend, and ESC, which
+        // saves the campaign and quits. NEW CAMPAIGN is the title's now, so no key
+        // here begins one, and the line names none.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS", BetweenRunsHud.KeysLine);
+        Assert.DoesNotContain("NEW CAMPAIGN", BetweenRunsHud.KeysLine, StringComparison.Ordinal);
 
-        // The prompt stands where the keys do while it is armed, in the yellow a
-        // question is asked in; unarmed, the keys are back in their grey.
-        Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine(newCampaignArmed: false));
-        Assert.Equal((BetweenRunsHud.NewCampaignPrompt, DungeonHud.Yellow), BetweenRunsHud.BottomLine(newCampaignArmed: true));
+        // The keys stand along the bottom in their grey.
+        Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine());
 
-        // Both fit the shipped 1280-wide window at the keys line's scale, with room either side.
-        foreach (string line in new[] { BetweenRunsHud.KeysLine, BetweenRunsHud.NewCampaignPrompt })
+        // It fits the shipped 1280-wide window at the keys line's scale, with room either side.
+        foreach (string line in new[] { BetweenRunsHud.KeysLine })
             Assert.True(line.Length * 6f * 1.3f <= 1280f - 40f, line);
 
         // A resumed campaign says so first under the title, in green — news, not a
@@ -355,45 +352,5 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.ResumedFromBackup])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.TuningChanged])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"));
-    }
-
-    [Fact]
-    public void ThePromptTakesExactlyTheNextKey()
-    {
-        // The screen reads every key press once, through the prompt first, so the
-        // N that arms it is never also the key that disarms it (1f).
-        const BetweenRunsScene.PromptStep PassOn = BetweenRunsScene.PromptStep.PassOn, Arm = BetweenRunsScene.PromptStep.Arm,
-            Confirm = BetweenRunsScene.PromptStep.Confirm, Disarm = BetweenRunsScene.PromptStep.Disarm;
-
-        // Unarmed: N arms, and every other key passes on to the screen — ENTER
-        // descends, ESC saves and quits, the arrows and W/S choose.
-        Assert.Equal(Arm, BetweenRunsScene.NextPrompt(armed: false, Keys.N));
-        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.Escape, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.Space, Keys.M })
-            Assert.Equal(PassOn, BetweenRunsScene.NextPrompt(armed: false, key));
-
-        // Armed: N confirms, and every other key — ENTER, the arrows and ESC
-        // among them — disarms it and does nothing else.
-        Assert.Equal(Confirm, BetweenRunsScene.NextPrompt(armed: true, Keys.N));
-        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.Up, Keys.Down, Keys.W, Keys.S, Keys.Escape, Keys.Space, Keys.M, Keys.LeftShift })
-            Assert.Equal(Disarm, BetweenRunsScene.NextPrompt(armed: true, key));
-
-        // Key by key, as the screen reads them: armed after an Arm, and after
-        // anything else not.
-        static BetweenRunsScene.PromptStep[] Walk(params Keys[] keys)
-        {
-            bool armed = false;
-            var steps = new List<BetweenRunsScene.PromptStep>();
-            foreach (var key in keys)
-            {
-                var step = BetweenRunsScene.NextPrompt(armed, key);
-                armed = step == BetweenRunsScene.PromptStep.Arm;
-                steps.Add(step);
-            }
-            return steps.ToArray();
-        }
-        Assert.Equal([Arm, Confirm], Walk(Keys.N, Keys.N));                          // asked twice: a new campaign
-        Assert.Equal([Arm, Disarm, PassOn], Walk(Keys.N, Keys.Enter, Keys.Enter));  // the first ENTER only answers no; the second descends
-        Assert.Equal([Arm, Disarm, Arm], Walk(Keys.N, Keys.Escape, Keys.N));        // ESC answers no, and an N after it asks afresh
-        Assert.Equal([PassOn, Arm, Disarm, PassOn], Walk(Keys.S, Keys.N, Keys.S, Keys.S));
     }
 }

@@ -1622,11 +1622,12 @@ declared as `tuning.json` keys ahead of it — so both are written here whole. R
 and R2 change the game, and each is written here as it is built. R3 is, both
 halves: every number of a content file has a range (R3(a), below), and every
 count of a save has its ceiling and its fields are checked against each other
-(R3(b), below). R2 is built in three steps, and its first — the save folder's
-slots, a save's time, the slot count, and what a write never costs — is written
-below (R2, the folder). The title screen and saving by hand are still to come,
-and until they are, the entry below that R2 supersedes — the save model — says
-what the player meets.
+(R3(b), below). R2 is built in three steps, and its first two are written
+below: the save folder's slots, a save's time, the slot count, and what a write
+never costs (R2, the folder); and the title screen, with CONTINUE, NEW CAMPAIGN,
+LOAD GAME and QUIT (R2, the title). Saving by hand is still to come, and until it
+is, the entry below that R2 supersedes — the save model — says what else the
+player meets.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -2048,6 +2049,8 @@ what the player meets.
     RESUMED FROM THE BACKUP OF SLOT 2, ONE SAVE OLDER`, green like them. A slot
     that brings nothing back hands the choice to its caller: the launch begins a
     campaign, saying `A NEW CAMPAIGN BEGINS` ahead of whatever was set aside.
+    (Superseded by the title, below: the launch no longer loads, and a load that
+    brings nothing back goes back to the title, saying so.)
   - **No write costs a file.** Until the slots, every launch set an unreadable,
     crashed or newer-build `campaign.json` aside before anything wrote there. A
     slot can now be written without being loaded — the autosave after a manual
@@ -2076,6 +2079,108 @@ what the player meets.
     slot, emptied as ever, and the slots are never made, so no save of the session
     — entry, turn, arrival, a run's end, quit — reaches the autosave or a manual
     slot.
+- **R2, the title — CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT.** The ruling's
+  second part: "the game opens on a TITLE SCREEN offering, in this order, CONTINUE
+  / NEW CAMPAIGN / LOAD GAME / QUIT". Built on the folder above, in place of the
+  launch that resumed the autosave:
+  - **The game opens on the title**: `DISTANCE RPG`, the notices under it, the
+    four options in the ruling's order, and the keys along the bottom
+    (`TitleScene`, `TitleHud`, every string of `TitleText` and `SlotText` tested).
+    A dev-override launch has none — it boots straight into its scratch campaign,
+    as ever — and `--new-campaign` begins a campaign at launch, straight to the
+    screen between runs: both developer tooling. No campaign is in play at the
+    title, so a close from it saves nothing. The data files' notices are the
+    title's, as the first scene's.
+  - **CONTINUE loads the most recent save** — the listing's choice (R2, the
+    folder), the autosave or a manual slot — and names it by its own row:
+    `CONTINUE - AUTOSAVE - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32`, the
+    time in the player's own zone. With nothing to load it is `CONTINUE - NO SAVE
+    YET`, dimmed and passed over, and the choice starts on NEW CAMPAIGN; otherwise
+    it starts on CONTINUE, so ENTER at launch is one key to where the game stood.
+  - **LOAD GAME lists every slot** in the options' place and the notices', so the
+    list never contends with the save's word for height: `AUTOSAVE`, `SLOT 1` to
+    the count, then any slot beyond it that holds a save. A slot is its own row —
+    where its campaign stands (the dungeon's name and floor, or `BETWEEN RUNS`),
+    the runs counted and the time, or `EMPTY`, or `CANNOT BE READ` — and, only
+    when one applies, a markers' row under it: `FROM ITS BACKUP`, `ITS LAST LOAD
+    DID NOT FINISH`, `AHEAD OF THIS CLOCK` or `NO TIME RECORDED`, `BEYOND THE 3
+    SLOTS - LOAD ONLY`. One row of both would run past a 1280-pixel window at any
+    scale the list can be read at; split, at the list's one scale (1.4), ten
+    slots each with its markers' row fit a 720-pixel window. W/S or the arrows
+    move over the slots that hold something, a digit takes its slot (0 the
+    autosave), and an empty slot says `SLOT 2 IS EMPTY` and loads nothing. A slot
+    whose files none of which reads can be chosen: its load sets them aside and
+    says so. Nothing drawn is the file's raw text: a dungeon id the content lacks
+    is `AN UNKNOWN DUNGEON`, and a time the player's zone cannot hold is shown in
+    UTC.
+  - **Every ask is two rows, where the keys stand, and only ENTER says yes**:
+    what it does, then `... - ENTER: YES - ESC: NO`. N, Y and every other key say
+    no and are spent, so a player pressing N to mean no keeps what the ask named —
+    the guarantee the between-runs prompt gave (a key that answers never also
+    acts), kept, and its N-then-N yes gone with it.
+  - **NEW CAMPAIGN asks only when it sets something aside** — USER DECISION 3,
+    shipped provisionally: with the autosave slot empty it begins at once; when it
+    holds a save or a backup it asks, `NEW CAMPAIGN SETS THE AUTOSAVE ASIDE - THE
+    SPEAR HALL FLOOR 4 - 3 RUNS` / `AS FILES, NEVER DELETED - SLOTS 1 TO 3 ARE
+    KEPT - ENTER: YES - ESC: NO`, and on ENTER sets the autosave's backup and save
+    aside as `campaign.abandoned-N.json` — `--new-campaign`'s path, its notices
+    naming no command line — the manual slots untouched, the new campaign saved
+    at once, and the screen between runs saying `A NEW CAMPAIGN BEGINS` and where
+    the old files went. The alternative: it asks, then saves over the autosave
+    (the old save one save deep as the backup, then gone).
+  - **A manual slot loaded over a different autosave asks first, then sets that
+    autosave aside — never a silent loss** (USER DECISION 2, shipped
+    provisionally). Whatever slot a campaign is loaded from, it autosaves into the
+    autosave slot, and the manual slot changes only when saved into by hand. Left
+    at that, a different campaign in the autosave slot — for a player who never
+    saved by hand, their only copy — would be the backup after the first autosave
+    and gone after the second. So a load of a manual slot while the autosave holds
+    anything else (another text, time aside, or files that cannot be read) asks —
+    `LOADING SLOT 2 SETS THE AUTOSAVE ASIDE - ...` / `AS FILES, NEVER DELETED -
+    ENTER: YES - ESC: NO` — from the list or from CONTINUE alike, and once the
+    slot's load has brought its campaign back (never before, so a load that
+    restores nothing leaves the autosave as it was) and before anything is
+    written, the autosave's backup and then its save are set aside
+    (`CampaignBoot.MakeRoom`): the one its resume marker guards as `crashed`, one
+    the codec refuses as `unreadable`, anything else as `replaced` —
+    `CAMPAIGN.JSON MADE WAY FOR SLOT 2 - SET ASIDE AS ...` — said on the loaded
+    screen after the load's own word; then the marker is cleared. A file that will
+    not move refuses the autosave's writes, as every stuck file does, and nothing
+    is autosaved that session. A slot whose text is the autosave's own (a hand save,
+    then a quit that changed nothing) asks nothing: continuing it is continuing
+    the autosave. The title's ask and the host's load read one question, off the
+    one listing the title showed. The alternative: a loaded manual slot autosaves
+    into itself, the autosave slot kept for the last campaign begun or continued
+    there — no ask and no file set aside, but a manual slot is then written by the
+    game and not by hand alone.
+  - **A load that restores nothing goes back to the title** — every file of the
+    slot set aside — which says so first, whole: `NOTHING COULD BE LOADED FROM
+    SLOT 2` (or `FROM THE AUTOSAVE`), then each file set aside, in the load's
+    order; the listing is read again (the slot now empty, or its backup's), and
+    nothing else is touched. Nothing begins on its own any more: the launch's `A
+    NEW CAMPAIGN BEGINS` over what was set aside is gone with the launch's resume.
+  - **The unsaved-quit marker is the title's to say**: it is the autosave's (a
+    quit saves there), and the title takes it when it opens, before anything is
+    loaded, in words true of the window's close and of leaving play for the title
+    alike, and of a manual slot's campaign that a quit was writing into the
+    autosave: `THE AUTOSAVE COULD NOT BE WRITTEN WHEN YOU LAST LEFT PLAY - WHAT IT
+    HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT`. A load says what resumed,
+    and nothing of the marker.
+  - **What went with the title** (R2(e)): the launch's resume — CONTINUE is its
+    replacement — and the screen between runs' NEW CAMPAIGN, N then N, whose keys
+    line now reads `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS`.
+    ESC between runs still saves and quits, and the pause menu's `2  SAVE AND
+    QUIT` still closes the game, until saving by hand gives both screens their
+    menu. The developer tooling stays as it was: `DISTANCERPG_DUNGEON`,
+    `DISTANCERPG_SEED` and their scratch slot, `--new-campaign`, `--write-data`.
+  - **The save's word can now name three files** (the entry on the save's word,
+    below): a manual slot's save set aside as its backup resumes, and the
+    autosave's two making room. The common case — a slot's campaign making room
+    for itself — takes about seven rows in the player's own save folder; the
+    rarest — the slot resumed from its backup under other numbers, its save set
+    aside with a long reason, the autosave's crashed save and its backup set aside
+    — about fourteen, the ceiling itself, past which the rows are cut and counted
+    and the log has every word.
 
 ### The numbers: `tuning.json`
 
@@ -2331,8 +2436,11 @@ what the player meets.
   touches the campaign. The alternatives are in open-questions.md. (Being
   superseded by the user's ruling, 2026-09-25, as it is built: the save folder
   is the autosave slot now, beside manual slots whose count is `tuning.json`'s,
-  and every save carries its time — R2, the folder, above. Until the title screen
-  and saving by hand arrive, this entry says what the player meets.)
+  and every save carries its time — R2, the folder, above; and the game opens on
+  a title screen — CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT — in place of resuming
+  at launch and of NEW CAMPAIGN's N-then-N between runs — R2, the title, above.
+  Until saving by hand arrives, the rest of this entry says what the player
+  meets.)
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
@@ -2350,7 +2458,9 @@ what the player meets.
   enemies' turn cannot be played out — leaves `campaign.unsaved` beside the save,
   and the next launch says, under the resumed line, that what resumes is from
   before that quit. A marker that cannot be written either leaves the log to say
-  so.
+  so. (Superseded by the user's ruling, 2026-09-25, in who says it and how: the
+  title, when it opens and before anything is loaded, that what the autosave
+  holds is from before the last time play was left — R2, the title, above.)
 - **The save's word is shown whole, on the screen between runs and over a floor
   a saved run resumes on; the data files' notices keep their three-row cap after
   it.** The cap is for what a broken file can make without bound; what became of
@@ -2371,7 +2481,10 @@ what the player meets.
   long path (`DISTANCERPG_SAVE_DIR` can name any) reaches the ceiling; past it
   the rows are cut and counted like any others. The alternative not taken: a
   shorter notice naming the file and the save folder, the full path in the log
-  alone.
+  alone. (Superseded by the user's ruling, 2026-09-25, in how many files: a load
+  of a manual slot can set three aside, the title shows the save's word whole
+  too, and the rarest such word reaches the ceiling in an ordinary save folder —
+  R2, the title, above.)
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are

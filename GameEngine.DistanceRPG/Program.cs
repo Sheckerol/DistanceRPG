@@ -32,9 +32,9 @@ internal class Program
     /// <summary>
     /// <c>DistanceRPG --new-campaign</c> sets the campaign's backup and its save
     /// aside as <c>campaign.abandoned-N.json</c> — never deleted — and starts a
-    /// fresh campaign, saved at once (1f): the way out of a campaign a playtester
-    /// wants gone without finishing its run, beside NEW CAMPAIGN on the screen
-    /// between runs. Neither file is left to come back as the new campaign's own.
+    /// fresh campaign, saved at once (1f), straight to the screen between runs past
+    /// the title: developer tooling, beside the title's NEW CAMPAIGN, which asks
+    /// first. Neither file is left to come back as the new campaign's own.
     /// </summary>
     internal const string NewCampaignOption = "--new-campaign";
 

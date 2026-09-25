@@ -333,7 +333,6 @@ public class SaveInventoryTests
             new("_listings", Kept.Derived, "the campaign's list (CampaignState.Listings), read when the screen opens"),
             new("_chosen", Kept.NotSaved, "a relaunch opens on the campaign's default choice, as every return from a run does"),
             new("_leaving", Kept.NotSaved, "the screen is on its way out: never a save point's concern"),
-            new("_armed", Kept.NotSaved, "the NEW CAMPAIGN prompt: a relaunch opens with it down"),
             new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a relaunch has its own to say"),
         ],
     };

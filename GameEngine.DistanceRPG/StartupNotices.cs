@@ -10,9 +10,10 @@ namespace GameEngine.DistanceRPG;
 /// many times it failed (<see cref="Lead"/>), and only until a later save goes
 /// through (<see cref="Withdraw"/>). They are held for the next scene the game
 /// opens, and handed to that scene alone
-/// (<see cref="Take"/>). The screen between runs says them under its title,
-/// the save's word whole (<see cref="Leading"/>, <see cref="NoticeText.Rows"/>),
-/// and so does a floor a saved run resumes on, over its banner; a dungeon that a
+/// (<see cref="Take"/>). The title — the first scene, as a rule — and the
+/// screen between runs say them under their titles, the save's word whole
+/// (<see cref="Leading"/>, <see cref="NoticeText.Rows"/>), and so does a floor a
+/// saved run resumes on, over its banner; a dungeon that a
 /// dev override boots straight into says them over its first floor, capped. A
 /// scene is handed only what arrived since the last one was, and the log has
 /// them all. A holder of its own rather than a field of the game, so the

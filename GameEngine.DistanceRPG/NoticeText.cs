@@ -5,8 +5,9 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The one wrapper every notice goes through before it is drawn (1h): what the
 /// data files raised at startup — a <c>tuning.json</c> value clamped, a file
-/// missing — under the between-runs title, over the first floor of a dungeon an
-/// override boots straight into or a saved run resumes on, or on the screen a
+/// missing — under the title screen's name or the between-runs title, over the
+/// first floor of a dungeon an override boots straight into or a saved run
+/// resumes on, or on the screen a
 /// broken content file stops the game on, whose own lines it wraps too. Each
 /// notice is upper-cased (the HUD's font is capitals) and wrapped at the width
 /// the screens' lines wrap at (<see cref="LineChars"/>, the summary's), its
@@ -20,12 +21,15 @@ namespace GameEngine.DistanceRPG;
 /// resumed, the numbers changed since it was saved (PHASE5-084), a save set
 /// aside, by its full path, and how to try it again — and a notice cut off
 /// there would hide the one thing the player has to act on. A floor a saved run
-/// resumes on leads with the same word, over its banner (S8's review). Those
-/// notices are few by construction (a launch sets at most two files aside), so
-/// the screen hands their count in (<see cref="Rows"/>'s <c>whole</c>) and they
-/// are shown in full, up to <see cref="MaxWholeRows"/>; the cap of
-/// <see cref="MaxRows"/> is for what follows them, the data files' notices,
-/// which a broken file can make as many of as it likes.
+/// resumes on leads with the same word, over its banner (S8's review), and so
+/// does the title, with what a load that brought nothing back set aside. Those
+/// notices are few by construction (a load sets at most three files aside: its
+/// slot's save, and the autosave's two when a manual slot's campaign makes room
+/// there; NEW CAMPAIGN two), so the screen hands their count in
+/// (<see cref="Rows"/>'s <c>whole</c>) and they are shown in full, up to
+/// <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/> is for what
+/// follows them, the data files' notices, which a broken file can make as many
+/// of as it likes.
 /// </para>
 /// </summary>
 internal static class NoticeText
@@ -38,15 +42,18 @@ internal static class NoticeText
 
     /// <summary>
     /// The most rows the notices shown whole take (<see cref="Rows"/>): the save's
-    /// word on the campaign. Its longest case — a new campaign after the save and
-    /// its backup were both set aside, each notice naming its file's full path —
-    /// takes about ten rows in the player's own save folder, so this is a ceiling
-    /// only a save folder with an unusually long path reaches; past it the rows
-    /// are cut like any others, and with <see cref="MaxRows"/> after them and the
-    /// row that counts the rest, the dungeon list still clears a 720-pixel window,
-    /// and so does a resumed floor's banner, which moves down under them
-    /// (<see cref="DungeonHud.BannerLine"/>). settled.md's entry on the save's
-    /// word records the ceiling and why.
+    /// word on the campaign. Its common long cases — a new campaign after the save
+    /// and its backup were both set aside, or a manual slot's campaign that made
+    /// room in the autosave slot, each notice naming its file's full path — take
+    /// about seven to ten rows in the player's own save folder. Its rarest — a
+    /// manual slot resumed from its backup under other numbers, its save set aside
+    /// with a long reason, and the autosave's crashed save and its backup set aside
+    /// to make room — takes about fourteen, the ceiling itself (Phase 5.S6). Past it
+    /// the rows are cut like any others, and the log has every word; with
+    /// <see cref="MaxRows"/> after them and the row that counts the rest, the
+    /// dungeon list still clears a 720-pixel window, and so does a resumed floor's
+    /// banner, which moves down under them (<see cref="DungeonHud.BannerLine"/>).
+    /// settled.md's entry on the save's word records the ceiling and why.
     /// </summary>
     public const int MaxWholeRows = 14;
 

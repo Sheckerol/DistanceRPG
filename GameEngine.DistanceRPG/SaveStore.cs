@@ -18,11 +18,12 @@ namespace GameEngine.DistanceRPG;
 /// <strong>What lives in the folder.</strong> <see cref="FileName"/> is the
 /// campaign. <see cref="BackupName"/> is the save before it, kept by every
 /// write's atomic replace. <see cref="ResumingName"/> is there while a resume is
-/// in flight, so a launch that finds it knows the last resume never finished.
-/// <see cref="UnsavedName"/> is there when the last quit could not save the
-/// campaign, so the next launch can say that what it resumes is from before that
-/// quit. And <c>campaign.&lt;reason&gt;-N.json</c> is a save set aside — unreadable,
-/// crashed or abandoned — which nothing here ever deletes or writes over.
+/// in flight, so a load that finds it knows the last resume never finished.
+/// <see cref="UnsavedName"/> is there when the last time play was left the
+/// autosave could not be written, so the title can say that what the autosave
+/// holds is from before then. And <c>campaign.&lt;reason&gt;-N.json</c> is a save
+/// set aside — unreadable, crashed, abandoned, or replaced to make room for a
+/// manual slot's campaign — which nothing here ever deletes or writes over.
 /// </para>
 /// <para>
 /// <strong>A write never costs the save before it.</strong> The text goes to
@@ -49,10 +50,10 @@ internal sealed class SaveStore
     /// <summary>The save before the last one, kept by the atomic replace.</summary>
     public const string BackupName = "campaign.bak.json";
 
-    /// <summary>There while a resume is in flight: a launch that finds it knows the resume before it never finished.</summary>
+    /// <summary>There while a resume is in flight: a load that finds it knows the resume before it never finished.</summary>
     public const string ResumingName = "campaign.resuming";
 
-    /// <summary>There when the last quit could not save the campaign: the save beside it is from before that quit, and the next launch says so and removes it.</summary>
+    /// <summary>There when the last time play was left the autosave could not be written: the save beside it is from before then, and the title says so and removes it.</summary>
     public const string UnsavedName = "campaign.unsaved";
 
     /// <summary>Set to a folder, the saves live there instead of the player's data folder, the dev-override slot inside it.</summary>
@@ -175,7 +176,7 @@ internal sealed class SaveStore
     /// written over: the move refuses a name that is taken. Renaming the file back
     /// to <see cref="FileName"/> is how it is tried again.
     /// </summary>
-    /// <param name="reason">Why, in one lower-case word: <c>unreadable</c>, <c>crashed</c>, <c>abandoned</c>.</param>
+    /// <param name="reason">Why, in one lower-case word: <c>unreadable</c>, <c>crashed</c>, <c>abandoned</c>, <c>replaced</c>.</param>
     /// <param name="backup">Set the backup aside rather than the save.</param>
     /// <returns>The full path it now has.</returns>
     /// <exception cref="ArgumentException"><paramref name="reason"/> is not one lower-case word.</exception>
@@ -226,20 +227,21 @@ internal sealed class SaveStore
     public string? ReadUnsaved() => ReadIfThere(UnsavedPath);
 
     /// <summary>
-    /// Write the unsaved-quit marker: this quit could not save the campaign, for
-    /// <paramref name="why"/>, so the next launch resumes a save from before it and
-    /// says so. A marker, never a save: it is written even while writes are
-    /// refused (<see cref="RefuseWrites"/>), since it can take no save's place.
+    /// Write the unsaved-quit marker: leaving play could not write the autosave,
+    /// for <paramref name="why"/>, so what it holds is from before then, and the
+    /// title says so the next time it opens — before anything is loaded — and
+    /// removes this file. A marker, never a save: it is written even while writes
+    /// are refused (<see cref="RefuseWrites"/>), since it can take no save's place.
     /// </summary>
     public void MarkUnsaved(string why)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(why);
         Directory.CreateDirectory(Folder);
         File.WriteAllText(UnsavedPath,
-            $"The last quit could not save the campaign: {why}\nThe save beside this file is from before that quit. The next launch says so and removes this file.\n", Utf8);
+            $"Leaving play could not write the autosave: {why}\nWhat the autosave holds is from before that. The title says so and removes this file.\n", Utf8);
     }
 
-    /// <summary>Remove the unsaved-quit marker, if it is there: a launch has read it.</summary>
+    /// <summary>Remove the unsaved-quit marker, if it is there: the title has read it, or NEW CAMPAIGN has set aside the campaign it spoke of.</summary>
     public void ClearUnsaved()
     {
         if (File.Exists(UnsavedPath))

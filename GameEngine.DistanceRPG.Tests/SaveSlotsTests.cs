@@ -789,7 +789,7 @@ public sealed class SaveSlotsTests : IDisposable
             // And the game's launch keeps it so: its override branch makes the
             // session's store the override's (CampaignBoot.StoreFor), and asks the
             // slots for nothing before the scratch campaign is begun — the slots are
-            // made only on the other branch, after it.
+            // made only on the other branch, after it, which opens on the title.
             var bootCampaign = typeof(DistanceRpgGame).GetMethod("BootCampaign", Declared)!;
             byte[] il = Body(bootCampaign)!;
             var instructions = InstructionsAt(il).ToList();
@@ -813,18 +813,16 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.Equal(["DistanceRpgGame.BootCampaign"], Calls(typeof(DistanceRpgGame).Assembly)
                 .Where(call => Same(call.Target, slotsMade)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct());
 
-            // A load makes no campaign: the launch's new campaign, when the autosave
-            // brings nothing back, is the launch's own — begun by what it plays from
-            // the load (CampaignBoot.ResumeOrBegin, S5's review, tested in
-            // CampaignBootTests), which BootCampaign alone calls.
+            // A load makes no campaign: one that brings nothing back goes back to the
+            // title (S6; CampaignBoot.NothingLoadedWord, tested in CampaignBootTests).
+            // A campaign is begun by NEW CAMPAIGN — the title's, or --new-campaign
+            // (CampaignBoot.Abandon) — and by a dev override (BootOverride), and by
+            // nothing else in the game.
             var start = typeof(CampaignState).GetMethod(nameof(CampaignState.Start), Declared)!;
             var load = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.Load), Declared)!;
-            var resumeOrBegin = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.ResumeOrBegin), Declared)!;
             Assert.DoesNotContain(Reachable(load), method => CallsIn(method).Any(called => Same(called, start)));
-            Assert.Contains(CallsIn(resumeOrBegin), called => Same(called, start));
-            Assert.Contains(CallsIn(bootCampaign), called => Same(called, resumeOrBegin));
-            Assert.Equal(["DistanceRpgGame.BootCampaign"], Calls(typeof(DistanceRpgGame).Assembly)
-                .Where(call => Same(call.Target, resumeOrBegin)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct());
+            Assert.Equal(["CampaignBoot.Abandon", "CampaignBoot.BootOverride"], Calls(typeof(DistanceRpgGame).Assembly)
+                .Where(call => Same(call.Target, start)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct().Order(StringComparer.Ordinal));
         });
     }
 }

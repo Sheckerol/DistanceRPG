@@ -18,16 +18,15 @@ internal sealed record BootRequest(string? DungeonId = null, long? Seed = null, 
 }
 
 /// <summary>
-/// The campaign a launch plays, and what to say about it (1f): a dev-override
-/// launch's scratch campaign (<see cref="CampaignBoot.BootOverride"/>), the one
-/// <c>--new-campaign</c> begins (<see cref="CampaignBoot.Abandon"/>), or — put
-/// together from the autosave's load (<see cref="CampaignBoot.ResumeOrBegin"/>) —
-/// the campaign the load brought back, or the new one begun when it brought
-/// nothing; the view its save carried; for a dev-override launch,
-/// the dungeon to boot straight into and the first run's seed; and the notices
-/// the first screen shows, in this order and whole: that the campaign resumed or
-/// a new one begins, that the numbers changed since it was saved, and that a save
-/// was set aside, where, and how to try it again.
+/// A campaign begun rather than loaded, and what to say about it (1f): a
+/// dev-override launch's scratch campaign (<see cref="CampaignBoot.BootOverride"/>),
+/// with the dungeon to boot straight into and the first run's seed; or the one
+/// NEW CAMPAIGN — on the title, or <c>--new-campaign</c> at launch — begins
+/// (<see cref="CampaignBoot.Abandon"/>); and the notices the first screen shows,
+/// in this order and whole: that a new campaign begins, and every file set aside
+/// for it, where, and how to try it again. A campaign loaded from a slot is a
+/// <see cref="SlotLoad"/>, so <see cref="Resumed"/> is false and
+/// <see cref="View"/> null for every campaign here.
 /// </summary>
 internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto? View, string? StraightInto, long? FirstSeed,
     IReadOnlyList<string> Notices);
@@ -36,11 +35,10 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// What loading one slot brought back (<see cref="CampaignBoot.Load"/>): the
 /// campaign and the view its save carried — or neither, when the slot held
 /// nothing that would load — and what to say, in order and whole: that the
-/// campaign resumed, from which slot or its backup; that the last quit could not
-/// write it; that the numbers changed since it was saved; and every file set
-/// aside on the way, where, and how to try it again. A load never makes a
-/// campaign: what follows one that brings nothing back is the caller's to decide
-/// (the launch's: <see cref="CampaignBoot.ResumeOrBegin"/>).
+/// campaign resumed, from which slot or its backup; that the numbers changed
+/// since it was saved; and every file set aside on the way, where, and how to try
+/// it again. A load never makes a campaign: one that brings nothing back goes
+/// back to the title, which says so first (<see cref="CampaignBoot.NothingLoadedWord"/>).
 /// </summary>
 internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnlyList<string> Notices)
 {
@@ -53,15 +51,16 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// The campaign's life on the disk, between the edge (<see cref="SaveStore"/>,
 /// one slot each, and <see cref="SaveSlots"/>) and <c>Logic/</c>'s save document
 /// (<see cref="SaveGame"/>, <see cref="SaveCodec"/>): a slot's load
-/// (<see cref="Load"/>), what the launch plays from the autosave's load
-/// (<see cref="ResumeOrBegin"/>), the two launches that load nothing — a dev
-/// override's scratch campaign (<see cref="BootOverride"/>) and
-/// <c>--new-campaign</c> (<see cref="Abandon"/>) — a save that never throws and
-/// never costs a file
-/// (<see cref="Save"/>), and the save a quit takes mid-run
-/// (<see cref="SaveOnQuit"/>). Engine-free, so every case is tested on a
-/// temporary folder with no window; what it has to say goes to the caller as log
-/// lines (<c>report</c>) and as notices, and the game draws and logs them.
+/// (<see cref="Load"/>), and the title's word when it brings nothing back
+/// (<see cref="NothingLoadedWord"/>); the room a manual slot's campaign makes in
+/// the autosave slot (<see cref="MakeRoom"/>); the two ways a campaign is begun
+/// rather than loaded — a dev override's scratch campaign
+/// (<see cref="BootOverride"/>) and NEW CAMPAIGN (<see cref="Abandon"/>); a save
+/// that never throws and never costs a file (<see cref="Save"/>); and the save a
+/// quit takes mid-run (<see cref="SaveOnQuit"/>). Engine-free, so every case is
+/// tested on a temporary folder with no window; what it has to say goes to the
+/// caller as log lines (<c>report</c>) and as notices, and the game draws and logs
+/// them.
 /// <list type="bullet">
 /// <item><strong>Loading is per slot, and resumes</strong> (1f; the user's ruling
 /// of 2026-09-25 on the save model, R2): a slot's <see cref="SaveStore.FileName"/>
@@ -74,20 +73,25 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// whose load crashed the game last time — the resume marker left behind — is set
 /// aside the same way. Every set-aside notice names the file's full path and ends
 /// <see cref="TryAgain"/>. A slot that brings nothing back makes no campaign: the
-/// caller decides what follows — the launch begins one, saying so ahead of what
-/// was set aside (<see cref="ResumeOrBegin"/>).</item>
+/// game goes back to the title, which says so first, then what was set aside
+/// (<see cref="NothingLoadedWord"/>).</item>
+/// <item><strong>A manual slot's campaign makes room in the autosave slot</strong>
+/// (<see cref="MakeRoom"/>; USER DECISION 2): once loaded it autosaves there, so a
+/// different campaign in the autosave slot is set aside — after the title asked,
+/// once the load has brought a campaign back, before anything is written — never
+/// deleted, and never lost to two autosaves.</item>
 /// <item><strong>No write costs a file</strong> (1f): a slot can be written without
 /// being loaded, so before any write a <see cref="SaveStore.FileName"/> there
 /// that no save can be read from is set aside first, and so is such a backup the
 /// replace would otherwise rotate away — the codec's refusal decides, never a
 /// listing's word on the slot. And a write clears its slot's resume marker: the
 /// file it guarded is gone.</item>
-/// <item><strong>A quit that could not save is said at the next launch</strong>
-/// (1f): no screen follows a quit, so the quit's own door leaves
-/// <see cref="SaveStore.UnsavedName"/> beside the save when it cannot save
-/// (<see cref="SaveOnQuit"/>), and the load that finds it says, under the
-/// resumed line, that what resumes is from before that quit
-/// (<see cref="QuitUnsaved"/>).</item>
+/// <item><strong>Leaving play without writing the autosave is said on the
+/// title</strong> (1f): no screen follows a quit, so the quit's own door leaves
+/// <see cref="SaveStore.UnsavedName"/> beside the autosave when it cannot save
+/// (<see cref="SaveOnQuit"/>), and the title takes it (<see cref="TakeUnsaved"/>)
+/// and says, before anything is loaded, that what the autosave holds is from
+/// before then (<see cref="QuitUnsaved"/>).</item>
 /// <item><strong>A different tuning is said, and plays on</strong> (§5.3,
 /// PHASE5-084): "silently changing a saved game's rules underneath the player is
 /// the failure to avoid", so a campaign saved under other numbers resumes with
@@ -104,7 +108,7 @@ internal static class CampaignBoot
     /// <summary>A resume from the autosave's backup, one save older than the campaign's own file.</summary>
     internal const string ResumedFromBackup = BetweenRunsHud.Resumed + " FROM ITS BACKUP, ONE SAVE OLDER";
 
-    /// <summary>A save was there and could not be resumed, or was set aside for a new campaign.</summary>
+    /// <summary>NEW CAMPAIGN began one — on the title, or <c>--new-campaign</c> at launch — whatever was set aside for it.</summary>
     internal const string NewCampaignBegins = "A NEW CAMPAIGN BEGINS";
 
     /// <summary>PHASE5-084: the save's tuning hash is not the loaded tuning's.</summary>
@@ -113,8 +117,15 @@ internal static class CampaignBoot
     /// <summary>How every set-aside notice ends: how to try the file again.</summary>
     internal const string TryAgain = "RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN";
 
-    /// <summary>The last quit could not save the campaign (<see cref="SaveStore.UnsavedName"/>): what resumes is a save from before it.</summary>
-    internal const string QuitUnsaved = "THE CAMPAIGN COULD NOT BE SAVED AS THE GAME LAST QUIT - IT RESUMES FROM AN EARLIER SAVE, BEHIND WHERE YOU LEFT IT";
+    /// <summary>
+    /// The last time play was left, the autosave could not be written
+    /// (<see cref="SaveStore.UnsavedName"/>): what it holds is from before then. The
+    /// title says it, before anything is loaded — true of the window's close, and
+    /// of leaving play for the title, alike; and after a manual slot was loaded the
+    /// quit was writing that slot's campaign into the autosave, so the words name
+    /// the autosave and never a campaign.
+    /// </summary>
+    internal const string QuitUnsaved = "THE AUTOSAVE COULD NOT BE WRITTEN WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT";
 
     /// <summary>A dev-override launch's word on the campaign it plays.</summary>
     internal const string OverrideNotice = "A DEV OVERRIDE LAUNCH - A SCRATCH CAMPAIGN, SAVED APART - YOUR CAMPAIGN IS UNTOUCHED";
@@ -143,15 +154,40 @@ internal static class CampaignBoot
             : $"{BetweenRunsHud.Resumed} FROM {SaveSlots.Label(number)}";
     }
 
+    /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE AUTOSAVE</c>.</summary>
+    internal static string NothingLoaded(int number)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
+        return number == SaveSlots.Autosave
+            ? "NOTHING COULD BE LOADED FROM THE AUTOSAVE"
+            : $"NOTHING COULD BE LOADED FROM {SaveSlots.Label(number)}";
+    }
+
+    /// <summary>
+    /// The title's word on a load of slot <paramref name="number"/> that brought
+    /// nothing back (R2): <see cref="NothingLoaded"/> first, then every file the
+    /// load set aside, whole and in the load's order — the save, then its backup —
+    /// or the file it could neither read nor move. The game goes back to the title
+    /// with it, the listing read again, and nothing else is touched: a load makes no
+    /// campaign, and the autosave is set aside for a manual slot's campaign only
+    /// once one has come back (<see cref="MakeRoom"/>). Reads, writes and moves no
+    /// file: the load has done all of that.
+    /// </summary>
+    /// <param name="load">What <see cref="Load"/> brought back from the slot: nothing.</param>
+    /// <param name="number">The slot's number.</param>
+    /// <exception cref="ArgumentException"><paramref name="load"/> brought a campaign back: its word is its own.</exception>
+    internal static IReadOnlyList<string> NothingLoadedWord(SlotLoad load, int number)
+    {
+        ArgumentNullException.ThrowIfNull(load);
+        if (load.Loaded)
+            throw new ArgumentException("The load brought a campaign back: what it says is its own word, and the campaign is played.", nameof(load));
+        return [NothingLoaded(number), .. load.Notices];
+    }
+
     /// <summary>
     /// Load slot <paramref name="number"/> (<paramref name="slot"/>), Boot's resume
     /// as it always was, in this order:
     /// <list type="number">
-    /// <item>A marker the last quit left because it could not save
-    /// (<see cref="SaveStore.UnsavedName"/>) is read and cleared, so it is said
-    /// once: a campaign resumed says, under the resumed line, that it is from
-    /// before that quit (<see cref="QuitUnsaved"/>). One set aside has nothing to
-    /// say it of.</item>
     /// <item>A resume marker left behind means the last load crashed the game: the
     /// save it guarded — the save, or the backup when there was no save — is set
     /// aside as <c>crashed</c>.</item>
@@ -176,7 +212,10 @@ internal static class CampaignBoot
     /// <para>
     /// <strong>It never makes a campaign.</strong> A slot that brings nothing back
     /// comes back with no campaign and the notices of what was set aside — none for
-    /// a slot that held nothing — and what follows is the caller's.
+    /// a slot that held nothing — and what follows is the caller's: the game goes
+    /// back to the title, saying so (<see cref="NothingLoadedWord"/>). The
+    /// autosave's unsaved-quit marker is not the load's: the title has taken it
+    /// before anything is loaded (<see cref="TakeUnsaved"/>).
     /// </para>
     /// </summary>
     /// <param name="slot">The slot's store (<see cref="SaveSlots.Store"/>).</param>
@@ -190,7 +229,6 @@ internal static class CampaignBoot
         RequireCurrent(content);
         ArgumentOutOfRangeException.ThrowIfNegative(number);
 
-        bool quitUnsaved = TakeUnsaved(slot, report);
         var setAside = new List<string>();
         if (slot.WasResuming)
         {
@@ -215,13 +253,10 @@ internal static class CampaignBoot
             {
                 slot.Vouch(backup);
 
-                // What plays first — and that it is from before the last quit, when
-                // that quit could not save — then the numbers it plays under
-                // (PHASE5-084 wants that on the screen, whatever else there is to
-                // say), then what became of any save set aside on the way.
+                // What plays first, then the numbers it plays under (PHASE5-084
+                // wants that on the screen, whatever else there is to say), then
+                // what became of any save set aside on the way.
                 var notices = new List<string> { Resumed(number, backup) };
-                if (quitUnsaved)
-                    notices.Add(QuitUnsaved);
                 if (loaded.TuningChanged)
                     notices.Add(TuningChanged);
                 notices.AddRange(setAside);
@@ -236,35 +271,6 @@ internal static class CampaignBoot
             ? $"[Save] No campaign to load in {slot.Folder}"
             : $"[Save] Nothing could be loaded from {slot.Folder}");
         return new SlotLoad(null, null, setAside);
-    }
-
-    /// <summary>
-    /// What the launch plays from the autosave's load (1f's last bullet: the launch
-    /// as it always was, until the title replaces it): the campaign
-    /// <paramref name="load"/> brought back, resumed, with the view its save
-    /// carried and the load's word as the load said it; or, when it brought
-    /// nothing back, a new campaign (<see cref="CampaignState.Start"/>) — a load
-    /// makes none of its own — whose word is <see cref="NewCampaignBegins"/>
-    /// followed by every file the load set aside, in the load's order, or nothing
-    /// at all when the slot held nothing, the first launch ever. Reads, writes and
-    /// moves no file: the load has done all of that.
-    /// </summary>
-    /// <param name="load">What <see cref="Load"/> brought back from the autosave slot.</param>
-    /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a new campaign is built under it.</param>
-    /// <param name="report">Where the log line goes when a new campaign begins.</param>
-    /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    internal static BootResult ResumeOrBegin(SlotLoad load, GameContent content, Action<string>? report = null)
-    {
-        ArgumentNullException.ThrowIfNull(load);
-        RequireCurrent(content);
-        if (load.Campaign is { } loaded)
-            return new BootResult(loaded, Resumed: true, load.View, StraightInto: null, FirstSeed: null, load.Notices);
-
-        report?.Invoke(load.Notices.Count == 0
-            ? "[Save] Nothing saved yet: a new campaign begins"
-            : "[Save] Nothing could be loaded: a new campaign begins");
-        IReadOnlyList<string> said = load.Notices.Count == 0 ? [] : [NewCampaignBegins, .. load.Notices];
-        return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, said);
     }
 
     /// <summary>
@@ -301,27 +307,33 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// <c>--new-campaign</c>: the slot's backup and then its save are set aside as
-    /// <c>abandoned</c> — never deleted — and a new campaign begins, which the game
-    /// saves at once (<c>DistanceRpgGame.BootCampaign</c>). Both go. A backup left
-    /// behind would be resumed as though it were the new campaign's own the first
-    /// time no save stood beside it: after a quit mid-run before the new campaign
-    /// was ever saved, or a crash, or a first save that cannot be played. The
-    /// backup goes first, so the later save takes the later number. A file that
+    /// NEW CAMPAIGN — on the title, or <c>--new-campaign</c> at launch: the
+    /// autosave slot's backup and then its save are set aside as <c>abandoned</c> —
+    /// never deleted — and a new campaign begins, which the game saves at once
+    /// (<c>DistanceRpgGame.BeginNewCampaign</c>; USER DECISION 3). Both go. A backup
+    /// left behind would be resumed as though it were the new campaign's own the
+    /// first time no save stood beside it: after a quit mid-run before the new
+    /// campaign was ever saved, or a crash, or a first save that cannot be played.
+    /// The backup goes first, so the later save takes the later number. A file that
     /// will not move stops it there: the store refuses every write this session
     /// (<see cref="SetAside"/>), and what is left of the old campaign — its save,
-    /// when that is still in place — is what the next launch resumes. The old
-    /// campaign's unsaved-quit marker goes with it, logged and never said: there is
-    /// nothing left to say it of.
+    /// when that is still in place — is what CONTINUE finds next time. The manual
+    /// slots are never touched. The old campaign's unsaved-quit marker goes with it,
+    /// logged and never said: there is nothing left to say it of.
     /// </summary>
+    /// <param name="store">The autosave slot.</param>
+    /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: the new campaign is built under it.</param>
+    /// <param name="report">Where the log lines go.</param>
+    /// <param name="how">What asked for it, which each set-aside notice names: <c>--new-campaign</c> by default; null for NEW CAMPAIGN on the title, which the player has just chosen and the notice need not name.</param>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    internal static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report = null)
+    internal static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report = null, string? how = Program.NewCampaignOption)
     {
         ArgumentNullException.ThrowIfNull(store);
         RequireCurrent(content);
         TakeUnsaved(store, report);
 
-        string what = $"was left for a new campaign ({Program.NewCampaignOption})";
+        string asked = how ?? "NEW CAMPAIGN";
+        string what = how is null ? "was left for a new campaign" : $"was left for a new campaign ({how})";
         var setAside = new List<string>();
         foreach (bool backup in new[] { true, false })
         {
@@ -329,13 +341,71 @@ internal static class CampaignBoot
                 continue;
             if (!SetAside(store, backup, "abandoned", what, setAside, report))
             {
-                report?.Invoke($"[Save] {Program.NewCampaignOption} stops there: nothing more is set aside and nothing is saved this session, so the next launch resumes the campaign still in {store.Folder}");
+                report?.Invoke($"[Save] {asked} stops there: nothing more is set aside and nothing is saved this session, so the campaign still in {store.Folder} is what CONTINUE finds next time");
                 break;
             }
         }
         Unmark(store, report);   // nothing is being resumed
-        report?.Invoke($"[Save] {Program.NewCampaignOption}: a new campaign begins in {store.Folder}");
+        report?.Invoke($"[Save] {asked}: a new campaign begins in {store.Folder}");
         return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, [NewCampaignBegins, .. setAside]);
+    }
+
+    /// <summary>
+    /// Make room in the autosave slot for the campaign manual slot
+    /// <paramref name="number"/> brought back (USER DECISION 2): the loaded campaign
+    /// autosaves into the autosave slot, so a different campaign there would be the
+    /// backup after one autosave and gone after the second — for a player who never
+    /// saved by hand, their whole campaign. So its files are set aside first,
+    /// through <see cref="SetAside"/> as every set-aside goes: the backup, then the
+    /// save, so the later save takes the later number, each named for why — the
+    /// one the resume marker guards (the save, or the backup when there is no save)
+    /// <c>crashed</c>, one the codec refuses <c>unreadable</c>, anything else
+    /// <c>replaced</c> — and never deleted; then the resume marker, which guarded a
+    /// file that is gone, is cleared. The caller calls it only once a load has
+    /// brought a campaign back, and before anything is written — so a load that
+    /// restores nothing leaves the autosave exactly as it was — and only when the
+    /// title asked (<see cref="SaveListing.NeedsRoom"/>). A file that will not move
+    /// stops it there: the autosave refuses every write this session, and nothing
+    /// is autosaved over what is left.
+    /// </summary>
+    /// <param name="autosave">The autosave slot.</param>
+    /// <param name="number">The manual slot whose campaign was loaded, which the notices name.</param>
+    /// <param name="report">Where the log lines go.</param>
+    /// <returns>What to say on the loaded screen, after the load's own word: each file set aside, where, and how to try it again — or the file that would not move.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is not a manual slot's.</exception>
+    internal static IReadOnlyList<string> MakeRoom(SaveStore autosave, int number, Action<string>? report = null)
+    {
+        ArgumentNullException.ThrowIfNull(autosave);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+        string slot = SaveSlots.Label(number).ToLowerInvariant();
+        var setAside = new List<string>();
+
+        // The file the resume marker guards is the one a load of the autosave reads
+        // first: the save when there is one, and the backup when there is only that.
+        bool marked = autosave.WasResuming;
+        bool saveThere = autosave.HasSave;
+        foreach (bool backup in new[] { true, false })
+        {
+            if (!(backup ? autosave.HasBackup : autosave.HasSave))
+                continue;
+            string reason, what;
+            if (marked && backup == !saveThere)
+                (reason, what) = ("crashed", "crashed the game the last time it was resumed");
+            else if (Refusal(autosave, backup, report) is { } why)
+                (reason, what) = ("unreadable", $"could not be read ({why})");
+            else
+                (reason, what) = ("replaced", $"made way for {slot}");
+            if (!SetAside(autosave, backup, reason, what, setAside, report, stuckWhat: $"was to make way for {slot}"))
+            {
+                report?.Invoke($"[Save] Making room for {slot} stops there: nothing is autosaved this session, so what is left in {autosave.Folder} is never written over");
+                return setAside;
+            }
+        }
+        Unmark(autosave, report);
+        report?.Invoke(setAside.Count == 0
+            ? $"[Save] The autosave slot holds nothing: nothing to set aside for {slot}"
+            : $"[Save] The autosave slot is clear for {slot}'s campaign: its autosaves go into {autosave.Folder}");
+        return setAside;
     }
 
     /// <summary>A campaign is built and restored under the current content alone.</summary>
@@ -388,9 +458,13 @@ internal static class CampaignBoot
     /// Set the save, or the backup, aside as <paramref name="reason"/>, saying so
     /// in <paramref name="notices"/> by its new full path. False when it could not
     /// be moved: then it stays where it is, the store refuses every write this
-    /// session so nothing takes its place, and the notice says that instead.
+    /// session so nothing takes its place, and the notice says that instead — in
+    /// <paramref name="stuckWhat"/>'s words when what happened to the file and what
+    /// was to happen to it read differently (a file that "made way" did not, when
+    /// it would not move).
     /// </summary>
-    private static bool SetAside(SaveStore store, bool backup, string reason, string what, List<string> notices, Action<string>? report)
+    private static bool SetAside(SaveStore store, bool backup, string reason, string what, List<string> notices, Action<string>? report,
+        string? stuckWhat = null)
     {
         string file = backup ? SaveStore.BackupName : SaveStore.FileName;
         string from = backup ? store.BackupPath : store.SavePath;
@@ -409,9 +483,10 @@ internal static class CampaignBoot
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             string why = SaveStore.Why(error, store.Folder, writing: true);
-            report?.Invoke($"[Save] {from} {what} and could not be set aside - nothing is saved this session, so it is never written over: {error}");
-            store.RefuseWrites($"{file} {what} and could not be set aside ({why})");
-            notices.Add(StuckNotice(file, what, why));
+            string stuck = stuckWhat ?? what;
+            report?.Invoke($"[Save] {from} {stuck} and could not be set aside - nothing is saved this session, so it is never written over: {error}");
+            store.RefuseWrites($"{file} {stuck} and could not be set aside ({why})");
+            notices.Add(StuckNotice(file, stuck, why));
             return false;
         }
     }
@@ -443,14 +518,18 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// Whether the last quit here could not save the campaign: its marker
-    /// (<see cref="SaveStore.MarkUnsaved"/>) read, logged with what that quit wrote
-    /// in it, and cleared, so it is said once. A marker that is there and cannot be
-    /// read is one all the same. One that will not go is said again next launch,
-    /// and the log says why.
+    /// Whether the last time play was left here the autosave could not be written:
+    /// its marker (<see cref="SaveStore.MarkUnsaved"/>) read, logged with what that
+    /// quit wrote in it, and cleared, so it is said once. The title takes the
+    /// autosave's when it opens, before anything is loaded, and says it
+    /// (<see cref="QuitUnsaved"/>); NEW CAMPAIGN takes it as it sets the campaign it
+    /// spoke of aside, and says nothing. A marker that is there and cannot be read
+    /// is one all the same. One that will not go is said again the next time, and
+    /// the log says why.
     /// </summary>
-    private static bool TakeUnsaved(SaveStore store, Action<string>? report)
+    internal static bool TakeUnsaved(SaveStore store, Action<string>? report)
     {
+        ArgumentNullException.ThrowIfNull(store);
         string? wrote;
         try
         {
@@ -463,20 +542,20 @@ internal static class CampaignBoot
         if (wrote is null)
             return false;
 
-        report?.Invoke($"[Save] {store.UnsavedPath} was left by the last quit, which could not save the campaign - what resumes is from before it: {wrote.ReplaceLineEndings(" ").Trim()}");
+        report?.Invoke($"[Save] {store.UnsavedPath} was left by the last quit, which could not write the autosave - what it holds is from before then: {wrote.ReplaceLineEndings(" ").Trim()}");
         try
         {
             store.ClearUnsaved();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            report?.Invoke($"[Save] {store.UnsavedPath} could not be cleared - the next launch says this again: {error}");
+            report?.Invoke($"[Save] {store.UnsavedPath} could not be cleared - the title says this again next time: {error}");
         }
         return true;
     }
 
     /// <summary>
-    /// Leave the unsaved-quit marker for the next launch (<see cref="SaveStore.MarkUnsaved"/>):
+    /// Leave the unsaved-quit marker for the title to say (<see cref="SaveStore.MarkUnsaved"/>):
     /// this quit could not save the campaign, for <paramref name="why"/>. One that
     /// cannot be written either leaves the log alone to say so.
     /// </summary>
@@ -485,11 +564,11 @@ internal static class CampaignBoot
         try
         {
             store.MarkUnsaved(why);
-            report?.Invoke($"[Save] {store.UnsavedPath} written: the next launch says that what it resumes is from before this quit");
+            report?.Invoke($"[Save] {store.UnsavedPath} written: the title says that what the autosave holds is from before this quit");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            report?.Invoke($"[Save] {store.UnsavedPath} could not be written either - the next launch cannot say this quit went unsaved: {error}");
+            report?.Invoke($"[Save] {store.UnsavedPath} could not be written either - the title cannot say this quit went unsaved: {error}");
         }
     }
 
@@ -649,10 +728,10 @@ internal static class CampaignBoot
     /// <para>
     /// <strong>No screen follows a quit</strong>, so a quit that cannot save — the
     /// write fails, or the enemies' turn cannot be played out — leaves
-    /// <see cref="SaveStore.UnsavedName"/> beside the save it keeps, and the next
-    /// launch says that what it resumes is from before this quit
-    /// (<see cref="QuitUnsaved"/>). What the write guard sets aside on the way is
-    /// logged: no screen follows to say it.
+    /// <see cref="SaveStore.UnsavedName"/> beside the save it keeps, and the title
+    /// says, the next time it opens, that what the autosave holds is from before
+    /// this quit (<see cref="QuitUnsaved"/>). What the write guard sets aside on
+    /// the way is logged: no screen follows to say it.
     /// </para>
     /// <para>
     /// <strong>The step is the playing scene's own</strong>

@@ -8,13 +8,12 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
 /// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it, or the NEW
-/// CAMPAIGN prompt asking again — and, under the title, the notices the game
-/// hands it (<see cref="NoticeText"/>): on the first one the game opens on, the
-/// save's word on the campaign, shown whole (<see cref="Resumed"/>, the numbers
-/// changed since it was saved, a save set aside and where), and then what the
-/// data files raised at startup, capped; on a later one, a save that could not
-/// be written.
+/// the hub's dungeon list under it, and the keys that choose from it — and, under
+/// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
+/// first one a campaign opens on, the save's word on it, shown whole
+/// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
+/// aside and where), and then anything else, capped; on a later one, a save that
+/// could not be written.
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before
@@ -50,21 +49,15 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, N asks for a new campaign, ESC saves the
-    /// campaign and quits. This is the one screen where ESC quits outright. A
-    /// run's end never offers it (<see cref="DungeonHud.ContinueHint"/>), and in a
-    /// dungeon it opens the pause menu.
+    /// choice, ENTER descends into it, ESC saves the campaign and quits. This is
+    /// the one screen with a campaign in play where ESC quits outright. A run's end
+    /// never offers it (<see cref="DungeonHud.ContinueHint"/>), and in a dungeon it
+    /// opens the pause menu. NEW CAMPAIGN is the title's (the user's ruling of
+    /// 2026-09-25 on the save model, R2(e)), so no key here begins one.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - N NEW CAMPAIGN - ESC SAVES AND QUITS";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS";
 
-    /// <summary>
-    /// The NEW CAMPAIGN prompt, along the bottom in place of the keys while it is
-    /// armed (<see cref="BetweenRunsScene.NextPrompt"/>): it asks twice, because
-    /// the answer replaces the saved campaign, and any other key keeps it.
-    /// </summary>
-    internal const string NewCampaignPrompt = "NEW CAMPAIGN? N AGAIN: YES - ANY OTHER KEY: NO - THE SAVED CAMPAIGN IS REPLACED";
-
-    /// <summary>Under the title of the screen a launch resumed a saved campaign on, first among the notices (1f).</summary>
+    /// <summary>Under the title of the screen a loaded campaign opens on between runs, first among the notices (1f): the word of every load, <c>CAMPAIGN RESUMED FROM SLOT 2</c> and the rest, starts with it, and so is green.</summary>
     internal const string Resumed = "CAMPAIGN RESUMED";
 
     /// <summary>What the list says when nothing is left to enter: content whose only dungeon is the tutorial, beaten.</summary>
@@ -367,13 +360,8 @@ public sealed class BetweenRunsHud : IDisposable
         return row.StartsWith(Resumed, StringComparison.Ordinal) ? DungeonHud.Green : DungeonHud.Orange;
     }
 
-    /// <summary>
-    /// The line along the bottom, and its colour: the keys the screen answers
-    /// (<see cref="KeysLine"/>), or, with NEW CAMPAIGN armed, the prompt asking
-    /// again (<see cref="NewCampaignPrompt"/>), in the yellow a question is asked in.
-    /// </summary>
-    internal static (string Text, Vector4 Color) BottomLine(bool newCampaignArmed)
-        => newCampaignArmed ? (NewCampaignPrompt, DungeonHud.Yellow) : (KeysLine, DungeonHud.Grey);
+    /// <summary>The line along the bottom, and its colour: the keys the screen answers (<see cref="KeysLine"/>), in grey.</summary>
+    internal static (string Text, Vector4 Color) BottomLine() => (KeysLine, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -460,7 +448,7 @@ public sealed class BetweenRunsHud : IDisposable
             rowY += row.Pitch;
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.NewCampaignArmed);
+        var (bottom, bottomColor) = BottomLine();
         DrawCentered(w, h - KeysLineFromBottom, bottom, 1.3f, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
