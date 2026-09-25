@@ -163,12 +163,15 @@ the last:
 | 5th | 5 | 15 |
 
 Fifteen runs of the attaching services alone, and the bars between the slots
-besides (§6.1) — from a fresh weapon, 840 wear and twenty-one deposits, the
-sixteen between the slots refinements at `count + 1` runs each (§6.4), so 71
-runs of downtime at the least — make a fully enchanted weapon a long-term
-project, and a 5-enchantment weapon rare **by construction** rather than by drop
-rate. (Qualified for the user's ruling of 2026-09-25: this counted the fifteen
-runs of the attaching services as the whole climb.)
+besides (§6.1), make a fully enchanted weapon a long-term project, and a
+5-enchantment weapon rare **by construction** rather than by drop rate. From a
+fresh weapon the climb is 840 wear and twenty-one deposits, each `count + 1`
+runs, refinements included (§6.4): 71 runs of downtime attaching each
+enchantment as its slot opens, the sixteen deposits between the slots
+refinements, and 31 at the least, refining first and attaching all five on the
+last five deposits, at capacities 46 to 50. (Qualified for the user's ruling of
+2026-09-25: this counted the fifteen runs of the attaching services as the whole
+climb.)
 
 **An innate enchantment counts.** A weapon that dropped already enchanted
 (§3.1) starts the table on its second row, so a caster's first service costs two
@@ -177,6 +180,14 @@ enchantment and pay for it in downtime, which keeps a free head start from being
 a free fifteen-run shortcut. The innate fills the first slot, too, so a fresh
 staff attaches its second enchantment only once capacity opens slot 2, at 35
 (§6.1): "a free slot", read literally (the user's ruling of 2026-09-25).
+(Qualified for the user's ruling of 2026-09-25: with the bars between the slots
+counted, the head start is the soul a caster holds from its first fight, and no
+shortcut at all. It saves no wear, since slot 5 opens at capacity 50 whatever a
+weapon arrived with, and the innate is in the count every later deposit pays,
+refinements included — so an innate staff's whole climb takes 72 runs against a
+fresh weapon's 71, attaching each enchantment as its slot opens, and 48 against
+31 in the order that takes the least (above). "Fourteen more" counted the
+attaching services alone.)
 
 **The wear price climbs with the clock.** Attaching enchantment #n costs `n`
 runs of downtime *and* needs a free slot and a deposit of at least
@@ -521,7 +532,9 @@ so the next enchantment costs what it would have cost anyway — its price
 depends on its number alone (§6.2) — and the gamble delays breadth without ever
 making it more expensive. The capacity it grows opens slots all the same
 (§6.1). (Reworded for the user's ruling of 2026-09-25: this said refinement
-"does not advance the rung", a rung of the ladder the ruling replaced.)
+"does not advance the rung" — the rung of §6.2's service table, which the
+ruling keeps, so that still holds; the ruling adds only that the capacity a
+refinement grows opens slots.)
 
 ### Two outcomes: deepen, or graft
 

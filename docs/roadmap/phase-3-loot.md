@@ -21,7 +21,7 @@ A dropped weapon rolls for an enchantment (§3.3) alongside its variant:
 Always **exactly one**, always **tier 1**. Breadth stays the enchanter's
 product (§6.4) and depth past the first tier stays a project; what the dungeon
 hands you is a *seed*, and the fifteen-run climb to a fully enchanted weapon
-(§6.2) is untouched.
+(§6.2) is untouched. (Qualified for the user's ruling of 2026-09-25: the climb is longer than fifteen runs — from a fresh weapon, 840 wear and 71 runs of downtime attaching each enchantment as its slot opens, 31 at the least (§6.2) — and a seed does not shorten it: it saves no wear, and being in the count every later deposit pays, it adds downtime, 72 runs against 71, or 48 against 31.)
 
 **The two casters are asymmetric on purpose.** A staff's identity is the effect
 it casts, so fixing it keeps a Staff of Mire recognisably a Staff of Mire. A

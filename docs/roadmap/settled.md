@@ -78,7 +78,7 @@
   per attachment and capped, exactly the combination asked for. Ship the
   existing three-step ladder; add a fourth step later if playtesting shows
   weapons plateauing at 40, per §6.1's own note that the ladder is authored
-  precisely so it can grow. (Superseded by the user's ruling, 2026-09-25: R4, below.)
+  precisely so it can grow. (Superseded in its ladder by the user's ruling, 2026-09-25 — that capacity caps wear, and a deposit spends it whole, stands: R4, below.)
 - **A batch of balance questions are accepted as designed, to be watched
   during playtest rather than pre-solved on paper** — each is a case where the
   doc's own reasoning already leans toward "probably fine" and no amount of
@@ -844,7 +844,10 @@
   derives from and stops being an artifact. So `×3` buys two enchantments and
   `×2` buys three, and three is the most any weapon in the game *arrives*
   carrying. **Five remains the ceiling** (§6.2) — the trade buys a head start on
-  the service climb, not a higher cap.
+  the service climb, not a higher cap. (Qualified by the user's ruling,
+  2026-09-25: a head start in the souls the weapon holds, never on the climb to
+  five, which costs every weapon the same 840 wear and costs one that arrives
+  with souls more downtime — R4's fifth consequence, the Phase 5 pass below.)
 - **The Efficiency dagger is `CritWindow ×2, Light ×1` + `Serrated`,
   `Vampiric` tier 3, `Overheal`** — three souls forming a *chain* rather than a
   pair, each link consuming what the last produced: a hit becomes continuous
@@ -1681,9 +1684,13 @@ numbers have bounds, and the save model — say what ships.
      at 60, which is 1,335 wear cashed from new.
   3. **A fifth enchantment also waits on the bars between slots.** §6.2's
      "fifteen runs to a fully enchanted weapon" counted the attaching services
-     alone. From new the climb is 840 wear and twenty-one deposits, the sixteen
-     between the slots refinements at `count + 1` runs each — 71 runs of
-     downtime at the least.
+     alone. From new the climb is 840 wear and twenty-one deposits at the least,
+     since slot 5 opens only at capacity 50, and every deposit, refinements
+     included, costs `count + 1` runs (§6.4). Attaching each enchantment as its
+     slot opens, the sixteen deposits between the slots are refinements and the
+     climb takes 71 runs of downtime. Refining first and attaching all five on
+     the last five deposits, at capacities 46 to 50, takes the least there is:
+     31 runs, for a weapon that carries no soul until then.
   4. **"A free slot" is read literally.** What a weapon arrives with fills its
      slots from the first: a staff's innate fills slot 1, so a fresh staff
      attaches its second enchantment only once capacity opens slot 2, at 35; and
@@ -1692,6 +1699,18 @@ numbers have bounds, and the save model — say what ships.
      deposit of `30 + 5(n − 1)` needs a capacity at least that high, which is
      where slot n opens — so the two conditions part only if their numbers are
      tuned apart.
+  5. **What a weapon arrives with is a head start in the souls it holds, never
+     on the climb to five.** It saves no wear: slot 5 opens at capacity 50
+     whatever the weapon arrived with, so every weapon cashes the same 840 to
+     fill it. And it costs downtime, because every soul a weapon arrives with
+     is in the count each later deposit pays `count + 1` runs on, refinements
+     included. Attaching each enchantment as its slot opens, an innate staff's
+     climb takes 72 runs, a unique that arrives with two souls 78 and one that
+     arrives with three 89, against a fresh weapon's 71; in the order that
+     takes the least (3), they take 48, 66 and 85 against 31. The phase docs
+     had a head start shorten the climb by what the weapon was handed (§1.5,
+     §3.1, §6.2), and each of those passages is qualified where it stands, as
+     is the entry above on a `Light` artifact's souls.
 - **Every number of R4 but its start, which is `StartingPool`'s already, becomes
   a `tuning.json` key of the Enchanter group** (Phase 5.S2), by the user's
   standing preference that a number the user may revisit lives in the file.
