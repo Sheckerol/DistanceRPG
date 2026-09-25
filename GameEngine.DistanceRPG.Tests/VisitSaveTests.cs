@@ -413,7 +413,7 @@ public class VisitSaveTests
         Assert.Equal(("tower_guard", WeaponClass.Sword), (boss.Weapon.Id, boss.Weapon.Class));
         string text = Save(script.Campaign);
 
-        var blockOrBrace = ContentDefaults.Restricted with { Excludes = [.. ContentDefaults.Restricted.Excludes, ["Brace", "Block"]] };
+        var blockOrBrace = ShippedContent.Restricted with { Excludes = [.. ShippedContent.Restricted.Excludes, ["Brace", "Block"]] };
         using (TestContent.Use(restricted: blockOrBrace))
         {
             var hall = GameContent.Current.Dungeons["spear_hall"];
@@ -451,7 +451,7 @@ public class VisitSaveTests
             deep.Down();
         string bottom = Save(deep.Campaign);
 
-        var shallow = ContentDefaults.Tuning with { BossFloorMin = 3, BossFloorMax = 4, BossStackOffset = 0 };
+        var shallow = ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4, BossStackOffset = 0 };
         using (TestContent.Use(tuning: shallow))
         {
             var hall = GameContent.Current.Dungeons["spear_hall"];
@@ -465,7 +465,7 @@ public class VisitSaveTests
             Assert.False(back.Floors[4].Visited);
             Assert.Equal(1, back.Floors[4].Boss!.PromisedStacks);
             Assert.Equal(5 * GameContent.Current.Tuning.CooldownRunsPerFloor, back.LockRuns);
-            Assert.Equal(text.Replace(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
+            Assert.Equal(text.Replace(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
 
             var reached = Load(bottom).Campaign.Visit!;
             Assert.True(reached.Floors[4].Visited);
@@ -851,12 +851,12 @@ public class VisitSaveTests
         script.Up();
         string text = Save(script.Campaign);
 
-        var generous = ContentDefaults.Tuning with { DropEnchantChancePercent = 100, DefeatStackChance = 0 };
+        var generous = ShippedContent.Tuning with { DropEnchantChancePercent = 100, DefeatStackChance = 0 };
         using (TestContent.Use(tuning: generous))
         {
             var loaded = Load(text);
             Assert.True(loaded.TuningChanged);
-            Assert.Equal(text.Replace(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
+            Assert.Equal(text.Replace(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
             var back = new VisitScript(loaded.Campaign);
             var row = back.Row(1, 21);
             Assert.Equal(Describe(shown.Weapon), Describe(DungeonState.GroundItemOf(back.Visit.Floors[1], row, bossDefeated: true)!.Weapon));
@@ -882,7 +882,7 @@ public class VisitSaveTests
         same.Resume();
         Assert.False(same.Row(0, 20).Alive);
 
-        var quick = ContentDefaults.Tuning with { ResurrectTurnsBase = 1, ResurrectTurnsFloor = 1 };
+        var quick = ShippedContent.Tuning with { ResurrectTurnsBase = 1, ResurrectTurnsFloor = 1 };
         using (TestContent.Use(tuning: quick))
         {
             var loaded = Load(pending);
@@ -906,10 +906,10 @@ public class VisitSaveTests
         var script = Flagship();
         string text = Save(script.Campaign);
 
-        var reversed = new WeaponsData(ContentDefaults.Weapons.Weapons.Reverse().ToArray());
+        var reversed = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Reverse().ToArray() };
         using (TestContent.Use(weapons: reversed))
         {
-            Assert.NotEqual(ContentDefaults.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
+            Assert.NotEqual(ShippedContent.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
             var loaded = Load(text);
             Assert.False(loaded.TuningChanged);
             var back = loaded.Campaign.Visit!;

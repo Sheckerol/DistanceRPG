@@ -494,8 +494,8 @@ public class SoulBehaviourTests
         Assert.Equal((200 - 16 - 3, 2), (seared.Hp, seared.StatusLevel(Searing, Flaming)));
 
         // Without Flaming on the weapon, content refuses the burn: a lingering element needs its element.
-        var ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments,
-            new WeaponsData(ContentDefaults.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList())));
+        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
         Assert.Equal(("wand_of_the_nova_unique", ContentValidator.RuleEnchantmentDependency), (ex.EntryId, ex.Rule));
 
         // And transfer the Flaming off, as a later transfer (section 6.5) will leave a weapon built past the
@@ -573,15 +573,15 @@ public class SoulBehaviourTests
         // levels each, and the burn's price paid once for the cast beside the element's.
         var shock = new EnchantmentDef("test_static", "Static", EffectKind.LingeringElement, TargetSide.Enemy, Lock: 20, Trigger: null,
             Potency: 0, ApplyPercent: 100, Applies: Mire, DamageType: Shocking, Unique: true);
-        var requires = new Dictionary<string, string[]>(ContentDefaults.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
-        var stormNova = ContentDefaults.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova_unique") with
+        var requires = new Dictionary<string, string[]>(ShippedContent.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
+        var stormNova = ShippedContent.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova_unique") with
         {
             Id = "test_storm_nova", Name = "Storm Nova", Enchantments = [new EnchantmentRef("shocking"), new EnchantmentRef("test_static")],
         };
         using (TestContent.Use(
-            restricted: ContentDefaults.Restricted with { NeverRolled = [.. ContentDefaults.Restricted.NeverRolled, "test_static"], Requires = requires },
-            enchantments: new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, shock]),
-            weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, stormNova])))
+            restricted: ShippedContent.Restricted with { NeverRolled = [.. ShippedContent.Restricted.NeverRolled, "test_static"], Requires = requires },
+            enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, shock]),
+            weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, stormNova] }))
         {
             var a = Char("A", 5, 5, "test_storm_nova");
             var ring = new[] { Enemy(5, 6), Enemy(5, 4), Enemy(4, 5) };
@@ -699,7 +699,7 @@ public class SoulBehaviourTests
         Assert.Equal(new[] { "Killed (0,0) momentum@0" }, turns.Events.HandlersFor(GameEvent.Killed, b).Select(h => h.ToString()));
 
         Assert.True(turns.TryAttack(a, target));
-        Assert.Equal(GameConstants.MaxDistance - 15, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 15, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana, a.Mana);
         Assert.False(target.Alive);
 
@@ -707,7 +707,7 @@ public class SoulBehaviourTests
         var axe = new TurnSystem(grid, new[] { b }, new[] { victim }, () => 10);
         Assert.True(axe.TryAttack(b, victim));
         Assert.False(victim.Alive);
-        Assert.Equal(GameConstants.MaxDistance - 60, b.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 60, b.DistLeft);
         Assert.Equal(TestPools.FixtureMana, b.Mana);
         Assert.Empty(spent);
     }
@@ -856,9 +856,9 @@ public class SoulBehaviourTests
         // 4 — halved in a Flaming dungeon on the one element while the other still lands in full — and each
         // pays its trigger once at the cast. Priced here so the shares are visible: 4 each at 100%.
         using var _ = TestContent.Use(
-            enchantments: new EnchantmentsData(ContentDefaults.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id is "shocking" or "flaming" ? e with { Potency = 4 } : e).ToList()),
-            tuning: ContentDefaults.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["shocking"] = 100, ["flaming"] = 100 } });
+            tuning: ShippedContent.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["shocking"] = 100, ["flaming"] = 100 } });
 
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "the_long_candle");

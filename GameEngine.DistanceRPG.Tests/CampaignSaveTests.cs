@@ -428,7 +428,7 @@ public class CampaignSaveTests
         Assert.Equal((float)budget, member.BudgetBeforeMire);
 
         // And under a tuned budget, the whole is the tuned one plus the bank.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200 }))
         {
             member.SavedMovement = 12;
             member.StartTurn();
@@ -446,7 +446,7 @@ public class CampaignSaveTests
         // nine-slot one stays nine under the shipped 24.
         string six = Save(NewCampaign());
         string nine;
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { PartyCarrySlots = 36 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { PartyCarrySlots = 36 }))
         {
             Assert.Equal(9, PartyMemberState.InventorySlots);
             var loaded = Load(six);
@@ -460,7 +460,7 @@ public class CampaignSaveTests
 
         Assert.Equal(6, PartyMemberState.InventorySlots);
         Assert.All(Load(nine).Campaign.Party, member => Assert.Equal(9, member.Inventory.Length));
-        Assert.Equal(nine.Replace(TuningJson.Hash(ContentDefaults.Tuning with { PartyCarrySlots = 36 }), TuningJson.Hash(GameContent.Current.Tuning), StringComparison.Ordinal),
+        Assert.Equal(nine.Replace(TuningJson.Hash(ShippedContent.Tuning with { PartyCarrySlots = 36 }), TuningJson.Hash(GameContent.Current.Tuning), StringComparison.Ordinal),
             Save(Load(nine).Campaign));
 
         // A bag no member can carry — no hand, or more slots than there are keys — is refused.
@@ -500,10 +500,10 @@ public class CampaignSaveTests
 
         // ...and so it does under an enchantments.json whose entries run in the
         // opposite order: an id means its entry wherever the file puts it.
-        var reversed = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Reverse().ToArray());
+        var reversed = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Reverse().ToArray());
         using (TestContent.Use(enchantments: reversed))
         {
-            Assert.NotEqual(ContentDefaults.Enchantments.Enchantments[0].Id, GameContent.Current.Enchantments.All[0].Id);
+            Assert.NotEqual(ShippedContent.Enchantments.Enchantments[0].Id, GameContent.Current.Enchantments.All[0].Id);
             var underReversed = Load(text);
             Assert.False(underReversed.TuningChanged);
             Assert.Equal(campaign.SeenInOrder, underReversed.Campaign.SeenInOrder);
@@ -637,7 +637,7 @@ public class CampaignSaveTests
 
         // The same campaign under other numbers writes the same document but for
         // the hash: the numbers themselves are in no line of it.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200, StartingPool = 40, ArcanePotency = 9 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200, StartingPool = 40, ArcanePotency = 9 }))
         {
             string other = Save(campaign);
             Assert.NotEqual(text, other);
@@ -658,12 +658,12 @@ public class CampaignSaveTests
         string text = Save(campaign);
         Assert.False(Load(text).TuningChanged);
 
-        var tuned = ContentDefaults.Tuning with { MovementBudget = 200, StartingPool = 40 };
+        var tuned = ShippedContent.Tuning with { MovementBudget = 200, StartingPool = 40 };
         using (TestContent.Use(tuning: tuned))
         {
             var loaded = Load(text);
             Assert.True(loaded.TuningChanged);
-            Assert.Equal(text.Replace(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(tuned), StringComparison.Ordinal),
+            Assert.Equal(text.Replace(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(tuned), StringComparison.Ordinal),
                 Save(loaded.Campaign));
             Assert.Equal(campaign.SeenInOrder, loaded.Campaign.SeenInOrder);
             Assert.Equal(campaign.LockedInOrder, loaded.Campaign.LockedInOrder);
@@ -721,7 +721,7 @@ public class CampaignSaveTests
         // locks and cleared set do.
         Clear(campaign, "quiver_pits");
         string cleared = Save(campaign);
-        var without = new DungeonsData(ContentDefaults.Dungeons.Dungeons.Where(def => def.Id != "quiver_pits").ToArray());
+        var without = new DungeonsData(ShippedContent.Dungeons.Dungeons.Where(def => def.Id != "quiver_pits").ToArray());
         using (TestContent.Use(dungeons: without))
         {
             var refused = Assert.Throws<SaveFormatException>(() => Load(cleared));
@@ -744,11 +744,11 @@ public class CampaignSaveTests
         campaign.Party[2].Inventory[2] = TestWeapons.Get("wand_of_the_beam", DamageType.Shocking);
         string text = Save(campaign);
 
-        var weapons = new WeaponsData(ContentDefaults.Weapons.Weapons.Reverse().ToArray());
-        var enchantments = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Reverse().ToArray());
+        var weapons = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Reverse().ToArray() };
+        var enchantments = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Reverse().ToArray());
         using (TestContent.Use(weapons: weapons, enchantments: enchantments))
         {
-            Assert.NotEqual(ContentDefaults.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
+            Assert.NotEqual(ShippedContent.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
             var loaded = Load(text);
             Assert.False(loaded.TuningChanged);
             Assert.Equal(text, Save(loaded.Campaign));
@@ -822,7 +822,7 @@ public class CampaignSaveTests
         var campaign = NewCampaign();
         In(campaign, "tutorial", FiveDeep).Turns!.EndTurn();   // the banner is up: the enemies' turn has begun
         Assert.Throws<InvalidOperationException>(() => SaveGame.Capture(campaign));
-        var other = GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);
+        var other = TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
         Assert.Throws<ArgumentException>(() => SaveGame.Restore(SaveCodec.Read(text), other));
         Assert.Throws<SaveFormatException>(() => SaveGame.Restore(SaveCodec.Read(text) with { Version = 0 }, GameContent.Current));
     }

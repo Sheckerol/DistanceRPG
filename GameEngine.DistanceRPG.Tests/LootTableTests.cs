@@ -90,7 +90,7 @@ public class LootTableTests
             Forged: new Dictionary<ModifierType, int> { [ModifierType.Resonant] = 1 },
             Enchantments: [new EnchantmentRef("poison")], Shape: null, Unique: false, DerivedFrom: null);
 
-        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, fifth]));
+        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, fifth] });
 
         Assert.Equal(5, GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Count);
         Assert.Equal(before, Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList());
@@ -112,15 +112,15 @@ public class LootTableTests
         var order = GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id).ToList();
 
         // The same file with each caster class's variants reversed where they sit.
-        var casters = ContentDefaults.Weapons.Weapons
+        var casters = ShippedContent.Weapons.Weapons
             .Where(w => !w.Unique && Weapon.KindOf(w.Class) == WeaponKind.Caster)
             .GroupBy(w => w.Class)
             .ToDictionary(g => g.Key, g => new Queue<WeaponDef>(g.Reverse()));
-        var permuted = ContentDefaults.Weapons.Weapons
+        var permuted = ShippedContent.Weapons.Weapons
             .Select(w => !w.Unique && casters.TryGetValue(w.Class, out var queue) ? queue.Dequeue() : w)
             .ToList();
 
-        using var _ = TestContent.Use(weapons: new WeaponsData(permuted));
+        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = permuted });
 
         Assert.Equal(order.AsEnumerable().Reverse(), GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id));
         Assert.Equal(staves, Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList());
@@ -144,7 +144,7 @@ public class LootTableTests
             Id: "test_glimmer", Name: "Glimmer", Effect: EffectKind.Vampiric, Targets: TargetSide.Ally,
             Lock: 20, Trigger: 3, Potency: 1, ApplyPercent: 100, Applies: null, DamageType: null, Unique: false);
 
-        using var _ = TestContent.Use(enchantments: new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, appended]));
+        using var _ = TestContent.Use(enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, appended]));
 
         Assert.Equal(14, GameContent.Current.Enchantments.Rollable.Count);   // the content-ordered list did grow
         Assert.Equal(dagger, LootTable.DropOrder(WeaponClass.Dagger));       // the code-ordered one did not
@@ -209,11 +209,11 @@ public class LootTableTests
         int enchanted = plain.Count(d => d.Weapon.Enchantments.Count == 1);
         Assert.InRange(enchanted / (double)plain.Count, 0.05, 0.18);   // 10% compiled
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 0 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 0 }))
             Assert.All(Sweep("assassins_fang", defeatCount: 0, spawns: 64).Where(d => !d.WasUniqueRoll),
                 d => Assert.Empty(d.Weapon.Enchantments));
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 100 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 }))
             Assert.All(Sweep("assassins_fang", defeatCount: 0, spawns: 64).Where(d => !d.WasUniqueRoll),
                 d => Assert.Single(d.Weapon.Enchantments));
     }
@@ -226,7 +226,7 @@ public class LootTableTests
         // fire on something it does. The four staff effects are the case that
         // matters: ApplyStatus is in the cast table and no other, so a dagger
         // winning one would reserve its lock for a behaviour that can never run.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
 
         var entries = Sweep("assassins_fang", defeatCount: 0, spawns: 400)
             .Where(d => !d.WasUniqueRoll)
@@ -260,7 +260,7 @@ public class LootTableTests
             Assert.DoesNotContain("aegis", LootTable.DropOrder(cls));
         }
 
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
         foreach (var (weaponId, element) in EveryClass())
             Assert.All(Sweep(weaponId, defeatCount: 0, spawns: 64, element: element).Where(d => !d.WasUniqueRoll),
                 d => Assert.All(d.Weapon.Enchantments, e => Assert.NotEqual("echoing", e.Id)));
@@ -287,7 +287,7 @@ public class LootTableTests
     {
         // Forged in the §1.1 sense — part of what the weapon is — which is what
         // makes it farmable (§3.2) and what counts toward service time (§6.2).
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
 
         foreach (var (weaponId, element) in EveryClass())
             foreach (var drop in Sweep(weaponId, defeatCount: 0, spawns: 16, element: element).Where(d => !d.WasUniqueRoll))
@@ -654,7 +654,7 @@ public class LootTableTests
         Assert.All(LootTable.DropPool, id => Assert.True(GameContent.Current.Enchantments.TryGet(id, out _)));
 
         var before = GameContent.Current;
-        var missing = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Where(e => e.Id != "vampiric").ToList());
+        var missing = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Where(e => e.Id != "vampiric").ToList());
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(enchantments: missing));
 
         Assert.Equal(("vampiric", ContentValidator.RuleDropPoolResolves), (ex.EntryId, ex.Rule));
@@ -689,7 +689,7 @@ public class LootTableTests
         // collection rather than at load. Refused here instead, the way the drop
         // pool's own dangling ids are.
         var before = GameContent.Current;
-        var threeStaves = new WeaponsData(ContentDefaults.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList());
+        var threeStaves = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList() };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: threeStaves));
 
         Assert.Equal(("staff_of_mire", ContentValidator.RuleCasterVariantPool), (ex.EntryId, ex.Rule));
@@ -706,8 +706,10 @@ public class LootTableTests
         // win and hand over nothing — reported as a lost roll, so nobody would
         // ever see it — which is a content failure and is refused as one.
         var before = GameContent.Current;
-        var noDaggerUnique = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Where(w => !(w.Unique && w.Class == WeaponClass.Dagger)).ToList());
+        var noDaggerUnique = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons.Where(w => !(w.Unique && w.Class == WeaponClass.Dagger)).ToList(),
+        };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: noDaggerUnique));
 
         Assert.Equal((nameof(WeaponClass.Dagger), ContentValidator.RuleClassCarriesAUnique), (ex.EntryId, ex.Rule));
@@ -725,8 +727,11 @@ public class LootTableTests
         // listed one, both silently, so the assumption is enforced where it is
         // made rather than assumed.
         var before = GameContent.Current;
-        var venomous = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Id == "assassins_fang" ? w with { Enchantments = [new EnchantmentRef("vampiric")] } : w).ToList());
+        var venomous = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Id == "assassins_fang" ? w with { Enchantments = [new EnchantmentRef("vampiric")] } : w).ToList(),
+        };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: venomous));
 
         Assert.Equal(("assassins_fang", ContentValidator.RuleMartialVariantNoEnchantment), (ex.EntryId, ex.Rule));

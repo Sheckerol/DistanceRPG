@@ -15,7 +15,7 @@ internal static class DataTexts
     public static ContentTexts Shipped => ContentFiles.WriteDefaults();
 
     /// <summary>The compiled catalogue's entries, in file order.</summary>
-    public static IReadOnlyList<EnchantmentDef> Catalogue => ContentDefaults.Enchantments.Enchantments;
+    public static IReadOnlyList<EnchantmentDef> Catalogue => ShippedContent.Enchantments.Enchantments;
 
     /// <summary><paramref name="text"/> with <paramref name="from"/>, which it holds exactly once, replaced by <paramref name="to"/>.</summary>
     public static string Edit(string text, string from, string to)
@@ -56,7 +56,7 @@ internal static class DataTexts
 
     /// <summary>An <c>enchantments.json</c> of <paramref name="entries"/>, as the generator writes one.</summary>
     public static string Enchantments(IEnumerable<EnchantmentDef> entries)
-        => EnchantmentsJson.Write(new EnchantmentsData(entries.ToList()), ContentDefaults.Tuning);
+        => EnchantmentsJson.Write(new EnchantmentsData(entries.ToList()), ShippedContent.Tuning);
 
     /// <summary>The shipped <c>enchantments.json</c> with the entry <paramref name="id"/> changed.</summary>
     public static string Enchantments(string id, Func<EnchantmentDef, EnchantmentDef> change)
@@ -309,19 +309,19 @@ public class ContentFilesTests
         // The dungeons' and the roster's stages stamp theirs the same way when they
         // are handed to the staged load directly, as records a file would read to.
         ContentSource<T> Read<T>(string file, T data) where T : class => new(file, data, null, Compiled: false);
-        var tuning = ContentDefaults.Tuning;
-        var restricted = ContentSource<RestrictedData>.Built(RestrictedJson.FileName, ContentDefaults.Restricted);
-        var enchantments = ContentSource<EnchantmentsData>.Built(EnchantmentsJson.FileName, ContentDefaults.Enchantments);
-        var weapons = ContentSource<WeaponsData>.Built(ContentFiles.WeaponsFileName, ContentDefaults.Weapons);
-        var dungeons = ContentSource<DungeonsData>.Built(ContentFiles.DungeonsFileName, ContentDefaults.Dungeons);
-        var party = ContentSource<PartyData>.Built(ContentFiles.PartyFileName, ContentDefaults.Party);
+        var tuning = ShippedContent.Tuning;
+        var restricted = ContentSource<RestrictedData>.Built(RestrictedJson.FileName, ShippedContent.Restricted);
+        var enchantments = ContentSource<EnchantmentsData>.Built(EnchantmentsJson.FileName, ShippedContent.Enchantments);
+        var weapons = ContentSource<WeaponsData>.Built(ContentFiles.WeaponsFileName, ShippedContent.Weapons);
+        var dungeons = ContentSource<DungeonsData>.Built(ContentFiles.DungeonsFileName, ShippedContent.Dungeons);
+        var party = ContentSource<PartyData>.Built(ContentFiles.PartyFileName, ShippedContent.Party);
 
         var noDungeons = Assert.Throws<ContentException>(() => GameContent.Load(tuning, restricted, enchantments, weapons,
             Read(ContentFiles.DungeonsFileName, new DungeonsData([])), party));
         Assert.Equal((ContentFiles.DungeonsFileName, false, "dungeons", ContentValidator.RuleOneRetiringDungeon), Stamp(noDungeons));
 
         var threeMembers = Assert.Throws<ContentException>(() => GameContent.Load(tuning, restricted, enchantments, weapons, dungeons,
-            Read(ContentFiles.PartyFileName, new PartyData(ContentDefaults.Party.Members.Take(3).ToList()))));
+            Read(ContentFiles.PartyFileName, new PartyData(ShippedContent.Party.Members.Take(3).ToList()))));
         Assert.Equal((ContentFiles.PartyFileName, false, "party", ContentValidator.RulePartySize), Stamp(threeMembers));
 
         // A parse failure held back is reported at its own stage, stamped, and
@@ -336,8 +336,8 @@ public class ContentFilesTests
         // The public load, which every test and the compiled content call, wraps its
         // records as built in code: the same failure, in the same order, stamped
         // with the stage's file and marked compiled.
-        var publicLoad = Assert.Throws<ContentException>(() => GameContent.Load(tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments,
-            ContentDefaults.Weapons, new PartyData([])));
+        var publicLoad = Assert.Throws<ContentException>(() => GameContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            ShippedContent.Weapons, new PartyData([])));
         Assert.Equal((ContentFiles.PartyFileName, true, "party", ContentValidator.RulePartySize), Stamp(publicLoad));
         Assert.StartsWith("party.json (compiled): Invalid content entry 'party': ", publicLoad.Message, StringComparison.Ordinal);
 
@@ -466,7 +466,7 @@ public class ContentFilesTests
         var content = load.Content!;
         Assert.Equal(Lf(texts.Restricted), RestrictedJson.Write(RestrictedJson.Read(texts.Restricted!)));
         Assert.Equal(Lf(texts.Enchantments), EnchantmentsJson.Write(new EnchantmentsData(content.Enchantments.All), content.Tuning));
-        Assert.Equal(Lf(texts.Weapons), WeaponsJson.Write(new WeaponsData(content.Weapons.All)));
+        Assert.Equal(Lf(texts.Weapons), WeaponsJson.Write(ShippedContent.Weapons with { Weapons = content.Weapons.All }));
         Assert.Equal(Lf(texts.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
         Assert.Equal(Lf(texts.Party), PartyJson.Write(new PartyData(content.Party.All)));
 
@@ -545,6 +545,6 @@ public class ContentFilesTests
             "dungeons.json is missing - the built-in dungeons are playing",
             "party.json is missing - the built-in party members are playing",
         ], missing.Notices);
-        Assert.Equal(WeaponsJson.Write(ContentDefaults.Weapons), WeaponsJson.Write(new WeaponsData(missing.Content!.Weapons.All)));
+        Assert.Equal(WeaponsJson.Write(ShippedContent.Weapons), WeaponsJson.Write(ShippedContent.Weapons with { Weapons = missing.Content!.Weapons.All }));
     }
 }

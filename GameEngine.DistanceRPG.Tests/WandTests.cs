@@ -111,7 +111,7 @@ public class WandTests
         Assert.Equal((8, 8, 8, 0, false), (hit.WeaponShare, hit.Dealt, hit.Taken, hit.EnchantmentShare, hit.OnAlly));
         Assert.Equal(200 - 8, enemy.Hp);
         Assert.Equal(8, Assert.Single(resolutions).Dealt);
-        Assert.Equal(GameConstants.MaxDistance - 45, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 45, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - 18 - 4, a.Mana);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
         Assert.Equal(0, turns.AttacksThisTurn(a));   // a cast is no chosen attack
@@ -361,7 +361,7 @@ public class WandTests
 
         // On: allies inside the shape are hit — the caster never — at half the base, marked on the
         // payload and priced at (1,2); the enemy takes the full 8, and the trigger is still paid once.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { FriendlyFireEnabled = true }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { FriendlyFireEnabled = true }))
         {
             Assert.True(GameContent.Current.Tuning.FriendlyFireEnabled);
             var a = Char("A", 5, 5, "wand_of_the_nova", Flaming);
@@ -431,7 +431,7 @@ public class WandTests
         Assert.Equal(4, casts[0].ManaToSpend);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
         Assert.Equal(TestPools.FixtureMana - 22, a.Mana);
-        Assert.Equal(GameConstants.MaxDistance - 45, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 45, a.DistLeft);
 
         // A one-target Blast pays exactly the same.
         var b = Char("B", 5, 5, "wand_of_the_blast", Flaming);
@@ -462,9 +462,9 @@ public class WandTests
         // whole of it while the cast pays the trigger once: re-priced to three levels at 100%, six
         // bodies take 8 + 3 each for the one 4.
         using var _ = TestContent.Use(
-            enchantments: new EnchantmentsData(ContentDefaults.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id == "flaming" ? e with { Potency = 3 } : e).ToList()),
-            tuning: ContentDefaults.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["flaming"] = 100 } });
+            tuning: ShippedContent.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["flaming"] = 100 } });
         Assert.Equal(3, TestWeapons.Get("wand_of_the_nova", Flaming).Innate!.LevelsFor(3));
         var d = Char("D", 5, 5, "wand_of_the_nova", Flaming);
         var crowd = new[] { Enemy(5, 6), Enemy(5, 4), Enemy(4, 5), Enemy(6, 5), Enemy(4, 6), Enemy(6, 4) };
@@ -488,7 +488,7 @@ public class WandTests
         // Flaming and Cold exclude each other exactly as Push and Drag do — the same relations file, the
         // same groups — so content listing both on one weapon is refused, naming the entry and the rule:
         // a unique wand fixing both, or a fighter's dagger carrying both (the counter is transferable).
-        var excludes = ContentDefaults.Restricted.Excludes;
+        var excludes = ShippedContent.Restricted.Excludes;
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "flaming", "cold" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "shocking", "acidic" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { nameof(Push), nameof(Drag), nameof(Rout) }));
@@ -502,7 +502,7 @@ public class WandTests
         Assert.Equal(("test_frostfire_knife", ContentValidator.RuleEnchantmentsExcluded), (ex.EntryId, ex.Rule));
 
         // A wand fixed to one element cannot be instantiated as another, opposed or not.
-        using (TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, UniqueWand("test_ember", ("flaming", 3))])))
+        using (TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, UniqueWand("test_ember", ("flaming", 3))] }))
         {
             Assert.Equal(Flaming, TestWeapons.Get("test_ember").Innate!.Def.DamageType);
             Assert.Equal(Flaming, TestWeapons.Get("test_ember", Flaming).Innate!.Def.DamageType);
@@ -517,8 +517,10 @@ public class WandTests
     {
         // Non-opposing types stack freely: a Flaming-and-Shocking wand is legal content, and so is a
         // Cold-and-Acidic dagger; both instantiate with the elements in attachment order.
-        using var _ = TestContent.Use(weapons: new WeaponsData(
-            [.. ContentDefaults.Weapons.Weapons, UniqueWand("test_candle", "flaming", "shocking"), Dagger("test_rime_knife", "cold", "acidic")]));
+        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with
+        {
+            Weapons = [.. ShippedContent.Weapons.Weapons, UniqueWand("test_candle", "flaming", "shocking"), Dagger("test_rime_knife", "cold", "acidic")],
+        });
 
         var candle = TestWeapons.Get("test_candle");
         Assert.Equal(new[] { "flaming", "shocking" }, candle.Enchantments.Select(e => e.Id));
@@ -548,7 +550,7 @@ public class WandTests
 
         // The rule is the wand's alone: a staff casts one as a matter of course, and a martial weapon may
         // carry one (the counter is transferable) — its Cast never runs.
-        using var _ = TestContent.Use(weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, Dagger("test_venom_knife", "poison", "acidic")]));
+        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, Dagger("test_venom_knife", "poison", "acidic")] });
         Assert.Equal(new[] { "poison", "acidic" }, TestWeapons.Get("test_venom_knife").Enchantments.Select(e => e.Id));
         Assert.Equal("regeneration", TestWeapons.Get("staff_of_renewal").Innate!.Id);
         Assert.Equal(32 + 11 + 1, GameContent.Current.Weapons.All.Count);
@@ -699,7 +701,7 @@ public class WandTests
             Shape: null, Unique: true, DerivedFrom: "flensing_knife");
 
     private static ContentException LoadWith(WeaponDef extra)
-        => Assert.Throws<ContentException>(() => GameContent.Load(
-            ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments,
-            new WeaponsData([.. ContentDefaults.Weapons.Weapons, extra])));
+        => Assert.Throws<ContentException>(() => TestContent.Load(
+            ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, extra] }));
 }

@@ -17,7 +17,7 @@ namespace GameEngine.DistanceRPG.Tests;
 [Collection(TestContent.Collection)]
 public class TuningJsonTests
 {
-    private static readonly Tuning Compiled = ContentDefaults.Tuning;
+    private static readonly Tuning Compiled = ShippedContent.Tuning;
 
     private static TuningKey Key(string name) => TuningSchema.Find(name) ?? throw new KeyNotFoundException(name);
 
@@ -78,7 +78,7 @@ public class TuningJsonTests
 
         // And the game reads the merged table so: Block is worth 4 a stack, Brace
         // still its compiled 1.
-        var rules = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 4 } }""").Tuning, ContentDefaults.Restricted);
+        var rules = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 4 } }""").Tuning, ShippedContent.Restricted);
         Assert.Equal((4, 1), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Brace)));
     }
 

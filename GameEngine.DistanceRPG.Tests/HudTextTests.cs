@@ -564,7 +564,7 @@ public class HudTextTests
         member.StartTurn();
         Assert.Equal(120f, member.EffectiveMax);   // the MOVE readout's cap
         Assert.Equal("MIRE 4: MOVEMENT 120 OF 200",
-            DungeonHud.StatusLegend(member, GameConstants.MaxDistance + 40).Single().Text);
+            DungeonHud.StatusLegend(member, ShippedContent.Budget + 40).Single().Text);
     }
 
     [Fact]

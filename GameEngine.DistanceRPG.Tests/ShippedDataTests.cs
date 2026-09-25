@@ -64,13 +64,13 @@ public class ShippedDataTests
         var read = TuningJson.Read(File.ReadAllText(Shipped(TuningJson.FileName)));
         Assert.Empty(read.Warnings);
         Assert.Empty(read.Overrides);
-        Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(read.Tuning));
+        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(read.Tuning));
 
         // Read beside the other shipped data files, as the game reads it, so any
         // notice would be the tuning's.
         var load = ContentFiles.Load(DataFiles.Read(ShippedFolder));
         Assert.Empty(load.Notices);
-        Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(load.Content!.Tuning));
+        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class ShippedDataTests
         Assert.Empty(load.TuningOverrides);
 
         Assert.Equal(texts.Restricted, RestrictedJson.Write(RestrictedJson.Read(texts.Restricted!)));
-        Assert.Equal(texts.Enchantments, EnchantmentsJson.Write(EnchantmentsJson.Read(texts.Enchantments!), ContentDefaults.Tuning));
+        Assert.Equal(texts.Enchantments, EnchantmentsJson.Write(EnchantmentsJson.Read(texts.Enchantments!), ShippedContent.Tuning));
         Assert.Equal(texts.Weapons, WeaponsJson.Write(WeaponsJson.Read(texts.Weapons!)));
         Assert.Equal(texts.Dungeons, DungeonsJson.Write(DungeonsJson.Read(texts.Dungeons!)));
         Assert.Equal(texts.Party, PartyJson.Write(PartyJson.Read(texts.Party!)));
@@ -97,11 +97,11 @@ public class ShippedDataTests
         // The content the files load is the compiled content, catalogue for
         // catalogue: the same rows, in the same order, written the same way.
         var content = load.Content!;
-        Assert.Equal(WeaponsJson.Write(ContentDefaults.Weapons), WeaponsJson.Write(new WeaponsData(content.Weapons.All)));
-        Assert.Equal(DungeonsJson.Write(ContentDefaults.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
-        Assert.Equal(PartyJson.Write(ContentDefaults.Party), PartyJson.Write(new PartyData(content.Party.All)));
-        Assert.Equal(ContentDefaults.Enchantments.Enchantments, content.Enchantments.All);
-        Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(content.Tuning));
+        Assert.Equal(WeaponsJson.Write(ShippedContent.Weapons), WeaponsJson.Write(ShippedContent.Weapons with { Weapons = content.Weapons.All }));
+        Assert.Equal(DungeonsJson.Write(ShippedContent.Dungeons), DungeonsJson.Write(new DungeonsData(content.Dungeons.All)));
+        Assert.Equal(PartyJson.Write(ShippedContent.Party), PartyJson.Write(new PartyData(content.Party.All)));
+        Assert.Equal(ShippedContent.Enchantments.Enchantments, content.Enchantments.All);
+        Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(content.Tuning));
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class ShippedDataTests
 
         // A row an edit adds is marked only when ContentDefaults says so: the
         // writer asks the set, never the row.
-        string renamed = WeaponsJson.Write(new WeaponsData(ContentDefaults.Weapons.Weapons.Select(w => w.Id == "widowmaker" ? w with { Id = "widowmaker_2" } : w).ToList()));
+        string renamed = WeaponsJson.Write(ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "widowmaker" ? w with { Id = "widowmaker_2" } : w).ToList() });
         Assert.Contains("\"id\": \"widowmaker_2\",\n", renamed);
     }
 }

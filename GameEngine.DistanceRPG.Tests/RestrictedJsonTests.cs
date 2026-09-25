@@ -27,7 +27,7 @@ public class RestrictedJsonTests
         // holds §5.5's five keys verbatim, in §5.5's order.
         string text = File.ReadAllText(ShippedDataTests.Shipped(RestrictedJson.FileName));
         var read = RestrictedJson.Read(text);
-        Assert.Equal(RestrictedJson.Write(ContentDefaults.Restricted), RestrictedJson.Write(read));
+        Assert.Equal(RestrictedJson.Write(ShippedContent.Restricted), RestrictedJson.Write(read));
 
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
         var root = document.RootElement;
@@ -54,15 +54,15 @@ public class RestrictedJsonTests
         // forgedOnly and neverRolled: arrays of ids, and kept apart — a safety rule
         // and an economy rule.
         Assert.Equal(["Charges"], read.ForgedOnly);
-        Assert.Equal(ContentDefaults.Restricted.NeverRolled, read.NeverRolled);
+        Assert.Equal(ShippedContent.Restricted.NeverRolled, read.NeverRolled);
         Assert.Empty(read.ForgedOnly.Intersect(read.NeverRolled));
 
         // The writer is canonical: rows in ordinal key order whatever order the
         // record's tables hold them in, so one set of relations is one text.
-        var shuffled = ContentDefaults.Restricted with
+        var shuffled = ShippedContent.Restricted with
         {
-            Requires = new Dictionary<string, string[]>(ContentDefaults.Restricted.Requires.Reverse(), StringComparer.Ordinal),
-            Kind = new Dictionary<string, string>(ContentDefaults.Restricted.Kind.Reverse(), StringComparer.Ordinal),
+            Requires = new Dictionary<string, string[]>(ShippedContent.Restricted.Requires.Reverse(), StringComparer.Ordinal),
+            Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind.Reverse(), StringComparer.Ordinal),
         };
         Assert.Equal(Shipped, RestrictedJson.Write(shuffled));
         Assert.Equal(Shipped, RestrictedJson.Write(RestrictedJson.Read(Shipped)));
@@ -77,7 +77,7 @@ public class RestrictedJsonTests
         var read = RestrictedJson.Read("""
             { "excludes": [["Brace", "Opportunist", "Overwatch"]], "requires": {}, "kind": {}, "forgedOnly": [], "neverRolled": [] }
             """);
-        var rules = new ModifierRules(ContentDefaults.Tuning, read);
+        var rules = new ModifierRules(ShippedContent.Tuning, read);
         var pairs = rules.Excludes.SelectMany(entry => entry.Value.Select(other => (entry.Key, other))).ToList();
         (ModifierType, ModifierType)[] six =
             [(Brace, Opportunist), (Brace, Overwatch), (Opportunist, Brace), (Opportunist, Overwatch), (Overwatch, Brace), (Overwatch, Opportunist)];
@@ -115,7 +115,7 @@ public class RestrictedJsonTests
         var read = RestrictedJson.Read("""
             { "excludes": [], "requires": {}, "kind": { "Brace": "melee", "Overwatch": "ranged", "Resonant": "caster" }, "forgedOnly": [], "neverRolled": [] }
             """);
-        var rules = new ModifierRules(ContentDefaults.Tuning, read);
+        var rules = new ModifierRules(ShippedContent.Tuning, read);
         Assert.Equal(WeaponKind.Melee, rules.RequiresKind[Brace]);
         Assert.Equal(WeaponKind.Ranged, rules.RequiresKind[Overwatch]);
         Assert.Equal(WeaponKind.Caster, rules.RequiresKind[Resonant]);

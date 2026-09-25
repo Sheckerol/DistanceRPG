@@ -140,7 +140,7 @@ public class CampaignVisitTests
         // read from any other content would be one content's rows carrying
         // another's weapons. The campaign refuses to start that party rather than
         // build it half and half.
-        var other = GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);
+        var other = TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
         Assert.NotSame(GameContent.Current, other);
         Assert.Throws<ArgumentException>(() => CampaignState.Start(other));
         Assert.Throws<ArgumentNullException>(() => CampaignState.Start(null!));
@@ -308,7 +308,7 @@ public class CampaignVisitTests
             Assert.Equal(m.MaxHp, m.Hp);
             Assert.Equal(m.UsableMaxMana, m.Mana);
             Assert.Empty(m.StatusEffects);
-            Assert.Equal((GameConstants.MaxDistance, GameConstants.MaxDistance, 0f, 0), (m.DistLeft, m.EffectiveMax, m.SavedMovement, m.HeldShots));
+            Assert.Equal((ShippedContent.Budget, ShippedContent.Budget, 0f, 0), (m.DistLeft, m.EffectiveMax, m.SavedMovement, m.HeldShots));
         });
         Assert.Equal(TestPools.FixtureHp, a.Hp);
         Assert.Equal(kept, campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => w?.Id)))));

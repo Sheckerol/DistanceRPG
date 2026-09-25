@@ -54,7 +54,7 @@ public class WeaponsJsonTests
         // catalogue, row for row and in its order.
         string text = File.ReadAllText(ShippedDataTests.Shipped(WeaponsJson.FileName));
         var read = WeaponsJson.Read(text).Weapons;
-        var compiled = ContentDefaults.Weapons.Weapons;
+        var compiled = ShippedContent.Weapons.Weapons;
         Assert.Equal(compiled.Count, read.Count);
         for (int i = 0; i < compiled.Count; i++)
             Same(compiled[i], read[i]);
@@ -254,7 +254,7 @@ public class WeaponsJsonTests
         // forged-only modifier can refuse — under the shipped relations and each
         // edit above, it is named exactly when Allowed refuses.
         var spreads = new List<ModifierSet> { ModifierSet.Empty };
-        foreach (var def in ContentDefaults.Weapons.Weapons)
+        foreach (var def in ShippedContent.Weapons.Weapons)
         {
             spreads.Add(ModifierSet.Of(def.Forged.Select(entry => (entry.Key, entry.Value)).ToArray()));
             foreach (var left in def.Forged.Keys)
@@ -267,7 +267,7 @@ public class WeaponsJsonTests
         int refusals = 0, asked = 0;
         foreach (var restricted in relations)
         {
-            var rules = new ModifierRules(ContentDefaults.Tuning, restricted);
+            var rules = new ModifierRules(ShippedContent.Tuning, restricted);
             foreach (var t in Enum.GetValues<ModifierType>())
                 foreach (var kind in new[] { WeaponKind.Melee, WeaponKind.Ranged, WeaponKind.Caster, WeaponKind.Any })
                     foreach (var present in spreads)
@@ -285,7 +285,7 @@ public class WeaponsJsonTests
 
         // When several clauses refuse, the one named is the first Allowed asks:
         // outside the table, then the kind, forgedOnly, excludes, requires.
-        var shipped = ContentDefaults.Restricted;
+        var shipped = ShippedContent.Restricted;
         Assert.Equal("Momentum is not in the modifier table", ContentValidator.WhyNotAllowed(Momentum, WeaponKind.Melee, ModifierSet.Empty, shipped));
         Assert.Equal("restricted.json kind Brace: melee", ContentValidator.WhyNotAllowed(Brace, WeaponKind.Ranged, ModifierSet.Of((Opportunist, 1)), shipped));
         Assert.Equal("restricted.json forgedOnly Charges", ContentValidator.WhyNotAllowed(Charges, WeaponKind.Melee, ModifierSet.Empty, shipped));
@@ -296,7 +296,7 @@ public class WeaponsJsonTests
         Assert.Null(ContentValidator.WhyNotAllowed(Rout, WeaponKind.Melee, ModifierSet.Of((Cleave, 1)), shipped));
 
         // And every shipped spread is allowed as it is forged: nothing to name.
-        foreach (var def in ContentDefaults.Weapons.Weapons)
+        foreach (var def in ShippedContent.Weapons.Weapons)
         {
             var spread = ModifierSet.Of(def.Forged.Select(entry => (entry.Key, entry.Value)).ToArray());
             foreach (var (t, _) in spread.Entries)

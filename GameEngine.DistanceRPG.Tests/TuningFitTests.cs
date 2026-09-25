@@ -14,13 +14,13 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class TuningFitTests
 {
-    private static readonly Tuning Compiled = ContentDefaults.Tuning;
+    private static readonly Tuning Compiled = ShippedContent.Tuning;
 
     private static Tuning Fit(Tuning tuning, List<string> warnings, WeaponsData? weapons = null, DungeonsData? dungeons = null, PartyData? party = null)
-        => TuningFit.ToContent(tuning, weapons ?? ContentDefaults.Weapons, dungeons ?? ContentDefaults.Dungeons, party ?? ContentDefaults.Party, warnings);
+        => TuningFit.ToContent(tuning, weapons ?? ShippedContent.Weapons, dungeons ?? ShippedContent.Dungeons, party ?? ShippedContent.Party, warnings);
 
     private static GameContent Load(Tuning tuning, PartyData? party = null, DungeonsData? dungeons = null, WeaponsData? weapons = null)
-        => GameContent.Load(tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, weapons ?? ContentDefaults.Weapons, party, dungeons);
+        => TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, weapons ?? ShippedContent.Weapons, party, dungeons);
 
     [Fact]
     public void ACarryTheRosterCannotFitIsRaisedToIt_NamingTheMember()
@@ -33,7 +33,7 @@ public class TuningFitTests
         var fitted = Fit(Compiled with { PartyCarrySlots = 4 }, warnings);
         Assert.Equal(8, fitted.PartyCarrySlots);
         Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (weakspot_stiletto, staff_of_renewal) - using 8"], warnings);
-        ContentValidator.ValidateParty(ContentDefaults.Party, Load(fitted).Weapons, fitted);
+        ContentValidator.ValidateParty(ShippedContent.Party, Load(fitted).Weapons, fitted);
         Assert.Throws<ContentException>(() => Load(Compiled with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
 
         // A carry that already fits is left alone, and says nothing.
@@ -119,24 +119,27 @@ public class TuningFitTests
         // the entry and the rule.
         var warnings = new List<string>();
 
-        var ten = new PartyData(ContentDefaults.Party.Members.Select((m, i) => i == 0
+        var ten = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 0
             ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
             : m).ToList());
         var carry = Fit(Compiled, warnings, party: ten);
         Assert.Equal(24, carry.PartyCarrySlots);
         Assert.Equal(ContentValidator.RulePartyBagFits, Assert.Throws<ContentException>(() => Load(carry, party: ten)).Rule);
 
-        var deep = new DungeonsData(ContentDefaults.Dungeons.Dungeons
+        var deep = new DungeonsData(ShippedContent.Dungeons.Dungeons
             .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 500, BossFloorMax = 500 } : d).ToList());
         var offset = Fit(Compiled, warnings, dungeons: deep);
         Assert.Equal(4, offset.BossStackOffset);
         var refused = Assert.Throws<ContentException>(() => Load(offset, dungeons: deep));
         Assert.Equal(("spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm), (refused.EntryId, refused.Rule));
 
-        var forged = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList());
+        var forged = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList(),
+        };
         var limit = Fit(Compiled, warnings, weapons: forged);
-        Assert.Equal(3, new ModifierRules(limit, ContentDefaults.Restricted).MaxForged(CritWindow));
+        Assert.Equal(3, new ModifierRules(limit, ShippedContent.Restricted).MaxForged(CritWindow));
         Assert.Equal(("widowmaker", ContentValidator.RuleMaxForged), Refusal(() => Load(limit, weapons: forged)));
 
         Assert.Empty(warnings);

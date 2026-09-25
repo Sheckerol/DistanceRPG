@@ -95,7 +95,7 @@ public class CastTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxDistance - 40, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 40, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - 13 - 1, a.Mana);
         Assert.Equal(((ActorState)a, 14, 14, "staff_of_renewal"), Assert.Single(spent));
         Assert.Equal(new StatusEffect(Regeneration, null, 1), buffed);
@@ -161,7 +161,7 @@ public class CastTests
         Assert.False(turns.TryCast(a, enemy));
         Assert.Empty(enemy.StatusEffects);
         Assert.Equal(TestPools.FixtureMana, a.Mana);
-        Assert.Equal(GameConstants.MaxDistance, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget, a.DistLeft);
     }
 
     [Fact]
@@ -508,8 +508,8 @@ public class CastTests
             Forged: new Dictionary<ModifierType, int> { [Resonant] = 1 },
             Enchantments: [new EnchantmentRef("searing_flame")], Shape: null, Unique: false, DerivedFrom: null);
         using var _ = TestContent.Use(
-            enchantments: new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, searing]),
-            weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, embers]));
+            enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, searing]),
+            weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, embers] });
 
         var (turns, a, b, enemy) = Scene("staff_of_embers");
         var casts = CastProbe(turns);

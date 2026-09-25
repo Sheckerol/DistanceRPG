@@ -82,7 +82,7 @@ public class AttackShapeTests
         Assert.Equal(200 - 5, enemy.Hp);   // 8 into Block 3
 
         enemy.X = a.X + 28f + 90f;   // surface 90: the third tile, nothing to pay
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(200 - 5 - 4, enemy.Hp);   // 7 into Block 3
     }
@@ -186,7 +186,7 @@ public class AttackShapeTests
         Assert.Equal(200 - 15, e3.Hp);   // 18 into Block 3
         Assert.Equal(200 - 15, e1.Hp);
         Assert.Equal(200, e2.Hp);
-        Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // 54, once
+        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // 54, once
         Assert.Equal(1, turns.AttacksThisTurn(a));
 
         // Without Cleave the swing is one hit: a dagger beside the same crowd lands on its target alone.
@@ -221,7 +221,7 @@ public class AttackShapeTests
         Assert.Equal(200 - 15, e2.Hp);
         Assert.Equal(200 - 15, e3.Hp);
         Assert.Equal(200, e4.Hp);
-        Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 60, a.DistLeft);
 
         // Worked to x5, the same swing takes five more: every dummy in reach
         // here, the movement still paid once. It also crosses the axe's first
@@ -235,7 +235,7 @@ public class AttackShapeTests
         var e5 = Enemy(4, 5);
         var e6 = Enemy(5, 4);
         var crowd = new TurnSystem(grid, new[] { a }, new[] { e1, e2, e3, e4, e5, e6 }, () => 10);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(crowd.TryAttack(a, e1));
         Assert.Equal(200 - 30, e1.Hp);
         Assert.Equal(200 - 30, e2.Hp);
@@ -244,7 +244,7 @@ public class AttackShapeTests
         Assert.Equal(200 - 15, e5.Hp);
         Assert.Equal(200 - 15, e6.Hp);
         Assert.Equal(2, a.WeaponLevel(a.EquippedWeapon!));   // the swing that crossed the bar
-        Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);   // charged before it crossed, and floor(2 / 3) is nothing anyway
+        Assert.Equal(ShippedContent.Budget - 60, a.DistLeft);   // charged before it crossed, and floor(2 / 3) is nothing anyway
     }
 
     [Fact]
@@ -275,8 +275,8 @@ public class AttackShapeTests
         Assert.Equal(new[] { s, s }, braced);   // both were driven into the spear line
         Assert.Equal(200 - 15 - 5, e1.Hp);   // the axe's 18 and the spear's 7 + 1 at the fourth tile, each into Block 3
         Assert.Equal(200 - 15 - 5, e2.Hp);
-        Assert.Equal(GameConstants.MaxDistance, s.DistLeft);
-        Assert.Equal(GameConstants.MaxDistance - 60, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget, s.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 60, a.DistLeft);
     }
 
     [Fact]
@@ -326,7 +326,7 @@ public class AttackShapeTests
 
         Assert.True(turns.TryAttack(a, enemy));
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(GameConstants.MaxDistance - 2 * 13, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 2 * 13, a.DistLeft);
         Assert.False(turns.CanAttack(a, enemy));   // movement to spare, throws spent
         Assert.False(turns.TryAttack(a, enemy));
         Assert.Equal(2, turns.AttacksThisTurn(a));
@@ -351,7 +351,7 @@ public class AttackShapeTests
         for (int i = 0; i < 3; i++)
             Assert.True(purity.TryAttack(b, dummy));
         Assert.False(purity.TryAttack(b, dummy));
-        Assert.Equal(GameConstants.MaxDistance - 3 * 15, b.DistLeft);
+        Assert.Equal(ShippedContent.Budget - 3 * 15, b.DistLeft);
 
         // Without Charges only the budget binds: a dagger swings until its movement is gone.
         var c = Char("C", 5, 5, "weakspot_stiletto");
@@ -423,7 +423,7 @@ public class AttackShapeTests
         while (turns.TryAttack(a, enemy)) thrown++;
 
         Assert.Equal(throws, thrown);
-        Assert.Equal((float)spent, GameConstants.MaxDistance - a.DistLeft);
+        Assert.Equal((float)spent, ShippedContent.Budget - a.DistLeft);
         Assert.Equal((float)left, a.DistLeft);
         Assert.Equal(1000 - damage, enemy.Hp);
     }
@@ -550,7 +550,7 @@ public class AttackShapeTests
         Assert.Equal(200 - 3, enemy.Hp);   // 5 + 1 at the fourth tile, into Block 3: the pin rides the hit and changes nothing about it
 
         a.EquippedWeapon!.Acquire(Pin, 2);   // x3
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(4, enemy.StatusLevel(Mire));
         Assert.Equal(200 - 6, enemy.Hp);
@@ -578,6 +578,6 @@ public class AttackShapeTests
         enemyLine.NotifyCharacterMoved(c);
         Assert.Equal(1, c.StatusLevel(Mire));
         Assert.Equal(TestPools.FixtureHp - 8, c.Hp);   // 7 + 1 at the fourth tile, no shield on a dagger
-        Assert.Equal(GameConstants.MaxDistance * 90 / 100, StatusBehaviours.MiredBudget(c, GameConstants.MaxDistance));
+        Assert.Equal(ShippedContent.Budget * 90 / 100, StatusBehaviours.MiredBudget(c, ShippedContent.Budget));
     }
 }

@@ -209,7 +209,7 @@ public class FloorGenerationTests
         // every floor, and an unattuned dungeon's carry none. The shipped five
         // are unattuned (attunement is its own field; none is set yet), so the
         // attuned one here is a fixture loaded through the content path.
-        var hall = ContentDefaults.Dungeons.Dungeons.Single(d => d.Id == "spear_hall");
+        var hall = ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "spear_hall");
         var frost = hall with
         {
             Id = "frost_hall",
@@ -217,7 +217,7 @@ public class FloorGenerationTests
             Attunement = DamageType.Cold,
             Boss = hall.Boss with { Id = "frost_warden", Name = "Frost Warden" },
         };
-        using var _ = TestContent.Use(dungeons: new DungeonsData([.. ContentDefaults.Dungeons.Dungeons, frost]));
+        using var _ = TestContent.Use(dungeons: new DungeonsData([.. ShippedContent.Dungeons.Dungeons, frost]));
         var attuned = GameContent.Current.Dungeons["frost_hall"];
 
         for (int n = 0; n < 3; n++)

@@ -271,7 +271,7 @@ public class ModifierRulesTests
             Kind: new Dictionary<string, string> { ["flaming"] = "caster", [nameof(Overwatch)] = "ranged" },
             ForgedOnly: ["burning", nameof(Charges)],
             NeverRolled: ["burning"]);
-        var tuning = new Tuning
+        var tuning = ShippedContent.Tuning with
         {
             AcquiredHeadroom = 2,
             PerStack = new Dictionary<ModifierType, int> { [Block] = 4 },
@@ -304,13 +304,13 @@ public class ModifierRulesTests
     {
         // A file that re-prices one modifier replaces the whole table on the
         // record; the rules still read every other key at its compiled value.
-        var partial = new Tuning
+        var partial = ShippedContent.Tuning with
         {
             PerStack = new Dictionary<ModifierType, int> { [Block] = 4 },
             Offset = new Dictionary<ModifierType, int> { [Charges] = 0 },
             MaxForged = new Dictionary<ModifierType, int> { [Block] = 1 },
         };
-        var rules = new ModifierRules(partial, ContentDefaults.Restricted);
+        var rules = new ModifierRules(partial, ShippedContent.Restricted);
 
         foreach (var t in All)
         {
@@ -324,7 +324,7 @@ public class ModifierRulesTests
             Assert.True(rules.PerStack(t) > 0, $"{t}: a partial table zeroed its stacks");
 
         // An explicit zero is an override, not an absence.
-        var zeroed = new ModifierRules(new Tuning { PerStack = new Dictionary<ModifierType, int> { [Block] = 0 } }, ContentDefaults.Restricted);
+        var zeroed = new ModifierRules(ShippedContent.Tuning with { PerStack = new Dictionary<ModifierType, int> { [Block] = 0 } }, ShippedContent.Restricted);
         Assert.Equal(0, zeroed.PerStack(Block));
         Assert.Equal(0, zeroed.Resolve(Block, 3));
     }
@@ -335,7 +335,7 @@ public class ModifierRulesTests
         // Allowed sees a weapon's modifiers and nothing else, so the member could only be dropped.
         var restricted = new RestrictedData([["flaming", nameof(Light)]], new Dictionary<string, string[]>(),
             new Dictionary<string, string>(), [], []);
-        var ex = Assert.Throws<ContentException>(() => new ModifierRules(new Tuning(), restricted));
+        var ex = Assert.Throws<ContentException>(() => new ModifierRules(ShippedContent.Tuning, restricted));
         Assert.Equal(nameof(Light), ex.EntryId);
         Assert.Equal(ContentValidator.RuleModifierRelationIds, ex.Rule);
     }
@@ -345,7 +345,7 @@ public class ModifierRulesTests
     {
         var restricted = new RestrictedData([], new Dictionary<string, string[]>(),
             new Dictionary<string, string> { [nameof(Brace)] = "flying" }, [], []);
-        var ex = Assert.Throws<ContentException>(() => new ModifierRules(new Tuning(), restricted));
+        var ex = Assert.Throws<ContentException>(() => new ModifierRules(ShippedContent.Tuning, restricted));
         Assert.Equal(nameof(Brace), ex.EntryId);
         Assert.Equal(ContentValidator.RuleKindValue, ex.Rule);
     }
@@ -354,7 +354,7 @@ public class ModifierRulesTests
     public void Tuning_CompiledDefaults_MatchTheDocs()
     {
         var tuning = GameContent.Current.Tuning;
-        Assert.Same(ContentDefaults.Tuning, tuning);
+        Assert.Same(ShippedContent.Tuning, tuning);
         Assert.Equal(5, tuning.AcquiredHeadroom);
         Assert.Equal(23, tuning.PerStack.Count);
         Assert.Equal(1, tuning.EffectPerLevel[StatusEffectType.Regeneration]);
@@ -365,7 +365,7 @@ public class ModifierRulesTests
         Assert.Equal(25, tuning.ApplyPercent["shocking"]);
         Assert.Equal(15, tuning.ApplyPercent["acidic"]);
         Assert.Equal(10, tuning.MovementUnitsPerMana);
-        Assert.Equal(16, (int)GameConstants.MaxDistance / tuning.MovementUnitsPerMana);   // a fully banked turn
+        Assert.Equal(16, (int)ShippedContent.Budget / tuning.MovementUnitsPerMana);   // a fully banked turn
         Assert.Equal(20, tuning.WeaponSwapCost);
         Assert.Equal(3, tuning.LongshotFreeTiles);
         Assert.False(tuning.FriendlyFireEnabled);

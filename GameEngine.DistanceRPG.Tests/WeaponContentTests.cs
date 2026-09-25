@@ -505,12 +505,15 @@ public class WeaponContentTests
         Assert.Contains("signature Block", ex.Message);
 
         // A class whose baseline lost its signature: every dagger forged Block where CritWindow was.
-        var bludgeons = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Class == WeaponClass.Dagger
-                ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
-                : w)
-            .ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, bludgeons));
+        var bludgeons = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Class == WeaponClass.Dagger
+                    ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
+                    : w)
+                .ToList(),
+        };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeons));
         Assert.Equal(("Dagger", ContentValidator.RuleClassBaseline), (ex.EntryId, ex.Rule));
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));
@@ -530,13 +533,13 @@ public class WeaponContentTests
         Assert.Equal(("staff_of_renewal", ContentValidator.RuleUnknownId), (ex.EntryId, ex.Rule));
 
         // Ids are unique.
-        var doubled = new WeaponsData(ContentDefaults.Weapons.Weapons.Append(ContentDefaults.Weapons.Weapons[0]).ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, doubled));
+        var doubled = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Append(ShippedContent.Weapons.Weapons[0]).ToList() };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, doubled));
         Assert.Equal(("flensing_knife", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // Every forgedOnly id is forged somewhere, or it could never exist.
-        var restricted = ContentDefaults.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        var restricted = ShippedContent.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal((nameof(OnHitPoison), ContentValidator.RuleForgedOnlyUnused), (ex.EntryId, ex.Rule));
 
         // Every abort names both the entry and the rule, and the defaults are untouched by any of it.
@@ -571,27 +574,27 @@ public class WeaponContentTests
         Assert.Equal(("shattering", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
         ex = LoadWithEnchantment("aegis", e => e with { Potency = 0 });
         Assert.Equal(("aegis", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
-        GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted,
-            new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Select(e =>
-                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ContentDefaults.Weapons);   // a declared-inert kind is not asked
+        TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted,
+            new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e =>
+                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ShippedContent.Weapons);   // a declared-inert kind is not asked
 
         // The chart: two elements carrying one type, or an element nobody opposes.
         ex = LoadWithEnchantment("cold", e => e with { DamageType = DamageType.Flaming });
         Assert.Equal(("cold", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
-        var unopposed = ContentDefaults.Restricted with
+        var unopposed = ShippedContent.Restricted with
         {
-            Excludes = ContentDefaults.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
+            Excludes = ShippedContent.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
         };
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, unopposed, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, unopposed, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal(("flaming", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
 
         // Duplicate ids.
-        var doubled = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Append(ContentDefaults.Enchantments.Enchantments[0]).ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, doubled, ContentDefaults.Weapons));
+        var doubled = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Append(ShippedContent.Enchantments.Enchantments[0]).ToList());
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, doubled, ShippedContent.Weapons));
         Assert.Equal(("regeneration", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // The opposed pairs may be read off the relations: flaming-cold, shocking-acidic, and nothing across.
-        var excludes = ContentDefaults.Restricted.Excludes;
+        var excludes = ShippedContent.Restricted.Excludes;
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "flaming", "cold" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "shocking", "acidic" }));
         Assert.DoesNotContain(excludes, g => g.Contains("flaming") && g.Contains("shocking"));
@@ -601,9 +604,12 @@ public class WeaponContentTests
     public void TestContent_SwapsCurrentForOneTest_AndRestoresIt()
     {
         var before = GameContent.Current;
-        var cheaper = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Id == "great_axe" ? w with { Cost = 10 } : w)
-            .ToList());
+        var cheaper = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Id == "great_axe" ? w with { Cost = 10 } : w)
+                .ToList(),
+        };
 
         using (TestContent.Use(weapons: cheaper))
         {
@@ -618,16 +624,16 @@ public class WeaponContentTests
 
     private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit)
     {
-        var weapons = new WeaponsData(ContentDefaults.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList());
+        var weapons = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
         return Assert.Throws<ContentException>(() =>
-            GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, weapons));
+            TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, weapons));
     }
 
     private static ContentException LoadWithEnchantment(string id, Func<EnchantmentDef, EnchantmentDef> edit)
     {
-        var enchantments = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
+        var enchantments = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
         return Assert.Throws<ContentException>(() =>
-            GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, enchantments, ContentDefaults.Weapons));
+            TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, enchantments, ShippedContent.Weapons));
     }
 
     private static IReadOnlyDictionary<ModifierType, int> Spread(params (ModifierType Type, int Stacks)[] forged)

@@ -195,7 +195,7 @@ public class EnchantmentXpTests
         for (int cast = 0; cast < 14; cast++)
         {
             caster.Mana = caster.UsableMaxMana;
-            caster.DistLeft = GameConstants.MaxDistance;
+            caster.DistLeft = ShippedContent.Budget;
             Assert.True(turns.TryCast(caster, ally));
         }
         Assert.Equal((1, 14), Entry(staff, 0));           // a point short of the bar
@@ -204,7 +204,7 @@ public class EnchantmentXpTests
         // clamp below is read against, because the same record's mana credit
         // grows the earned pool a point on its way past.
         caster.Mana = caster.UsableMaxMana;
-        caster.DistLeft = GameConstants.MaxDistance;
+        caster.DistLeft = ShippedContent.Budget;
         int ceiling = caster.UsableMaxMana;
         Assert.True(turns.TryCast(caster, ally));
 
@@ -235,7 +235,7 @@ public class EnchantmentXpTests
         // at what the pool could pay rather than overdrawing it.
         roll = 1;
         caster.Mana = staff.ResolvedManaCost;
-        caster.DistLeft = GameConstants.MaxDistance;
+        caster.DistLeft = ShippedContent.Budget;
 
         Assert.True(turns.TryCast(caster, ally));
 
@@ -373,7 +373,7 @@ public class EnchantmentXpTests
         for (int fired = 0; fired < 200 && weapon.Enchantments[0].Tier == 1; fired++)
         {
             member.Mana = member.UsableMaxMana;
-            member.DistLeft = GameConstants.MaxDistance;
+            member.DistLeft = ShippedContent.Budget;
             Fire(turns, member, dummy, def, weapon);
         }
 
@@ -458,7 +458,7 @@ public class EnchantmentXpTests
 
         for (int swing = 0; swing < 4; swing++)
         {
-            a.DistLeft = GameConstants.MaxDistance;
+            a.DistLeft = ShippedContent.Budget;
             Assert.True(turns.TryAttack(a, dummy));
         }
 
@@ -496,8 +496,8 @@ public class EnchantmentXpTests
 
         for (int swing = 0; swing < 10; swing++)
         {
-            wizard.DistLeft = GameConstants.MaxDistance;
-            fighter.DistLeft = GameConstants.MaxDistance;
+            wizard.DistLeft = ShippedContent.Budget;
+            fighter.DistLeft = ShippedContent.Budget;
             Assert.True(turns.TryAttack(wizard, wizardDummy));
             Assert.True(turns.TryAttack(fighter, fighterDummy));
         }
@@ -557,7 +557,7 @@ public class EnchantmentXpTests
         var onHit = new List<int>();
         turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 8), "hit",
             (p, _, _) => { onHit.Add(p.Payments.IsDefaultOrEmpty ? 0 : p.Payments.Length); return p; });
-        member.DistLeft = GameConstants.MaxDistance;
+        member.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal(new[] { 0 }, onHit.ToArray());
         Assert.Equal(new[] { 0, 4 }, Xps(knife));

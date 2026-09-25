@@ -215,9 +215,9 @@ public class BossLootTests
         // Brace table - a floor whose class draws never touched the axe drops the
         // identical weapon, and only a floor with an axe draw ahead of the kept
         // one moves: to the axe, the first draw that now stands.
-        var braceFreed = ContentDefaults.Restricted with
+        var braceFreed = ShippedContent.Restricted with
         {
-            Excludes = ContentDefaults.Restricted.Excludes
+            Excludes = ShippedContent.Restricted.Excludes
                 .Select(g => g.Contains(nameof(Brace)) ? g.Where(id => id != nameof(Brace)).ToArray() : g)
                 .ToList(),
         };
@@ -598,7 +598,7 @@ public class BossLootTests
         };
         Assert.Equal(dropped, Describe(BossLoot.Roll(reloaded, bottom.Seed)));
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossStackOffset = 2 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossStackOffset = 2 }))
         {
             Assert.Equal(5, DungeonState.PromisedStacksFor(7));             // the tuning now prices floor 7 at five...
             Assert.Equal(3, visit.PromisedStacks);                          // ...and the visit still owes three

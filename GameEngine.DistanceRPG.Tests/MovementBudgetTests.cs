@@ -17,7 +17,7 @@ public class MovementBudgetTests
 {
     private const float Tile = GameConstants.Tile;
 
-    private static Tuning Budget(int units) => ContentDefaults.Tuning with { MovementBudget = units };
+    private static Tuning Budget(int units) => ShippedContent.Tuning with { MovementBudget = units };
 
     private static void Put(ActorState actor, (int R, int C) tile) => (actor.X, actor.Y) = (tile.C * Tile + Tile / 2f, tile.R * Tile + Tile / 2f);
 
@@ -44,7 +44,7 @@ public class MovementBudgetTests
     {
         // PHASE5-047: the budget is a key, its compiled default the constant every
         // fixture was written against.
-        Assert.Equal((int)GameConstants.MaxDistance, ContentDefaults.Tuning.MovementBudget);
+        Assert.Equal((int)GameConstants.MaxDistance, ShippedContent.Tuning.MovementBudget);
         Assert.Equal(160, GameContent.Current.Tuning.MovementBudget);
 
         using (TestContent.Use(tuning: Budget(200)))
@@ -71,7 +71,7 @@ public class MovementBudgetTests
         }
 
         Assert.Equal(2, DummySwings());
-        Assert.Equal(GameConstants.MaxDistance, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
+        Assert.Equal(ShippedContent.Budget, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
 
         // And a file turns it: the playtest's edit is the game's budget.
         var load = ContentFiles.Load(ContentFiles.WriteDefaults() with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
@@ -92,7 +92,7 @@ public class MovementBudgetTests
         var banked = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
         banked.SavedMovement = 30f;
         Assert.Equal(230f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, Budget(200)));
-        Assert.Equal(190f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ContentDefaults.Tuning));
+        Assert.Equal(190f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ShippedContent.Tuning));
 
         using (TestContent.Use(tuning: Budget(200)))
         {

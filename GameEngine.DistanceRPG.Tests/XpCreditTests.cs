@@ -110,9 +110,9 @@ public class XpCreditTests
     /// </summary>
     private static IDisposable PricedElements(params string[] ids)
         => TestContent.Use(
-            enchantments: new EnchantmentsData(ContentDefaults.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => ids.Contains(e.Id) ? e with { Potency = 3 } : e).ToList()),
-            tuning: ContentDefaults.Tuning with { ApplyPercent = ids.ToDictionary(id => id, _ => 100, StringComparer.Ordinal) });
+            tuning: ShippedContent.Tuning with { ApplyPercent = ids.ToDictionary(id => id, _ => 100, StringComparer.Ordinal) });
 
     // ── Weapon XP: the weapon's own mitigated damage ─────────────────────────
 

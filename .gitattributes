@@ -1,0 +1,8 @@
+# Line endings pinned (the Phase 5 content rework, 1f). The shipped data files
+# are the copies the tests read and the game ships, and the save and content
+# fixtures are compared as text, so each is LF in every checkout and worktree,
+# whatever core.autocrlf says: the suite's result must not depend on how the tree
+# was checked out.
+GameEngine.DistanceRPG/Data/*.json text eol=lf
+GameEngine.DistanceRPG.Tests/TestData/saves/* text eol=lf
+GameEngine.DistanceRPG.Tests/TestData/content/* text eol=lf

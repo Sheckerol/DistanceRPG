@@ -31,15 +31,15 @@ public class RestrictedDataTests
     public void DefaultRestricted_Validates()
     {
         var known = KnownPlus(ContentDefaults.EnchantmentIds.ToArray());
-        ContentValidator.ValidateRestricted(ContentDefaults.Restricted, known);   // does not throw
-        Assert.NotNull(GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        ContentValidator.ValidateRestricted(ShippedContent.Restricted, known);   // does not throw
+        Assert.NotNull(TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.NotNull(GameContent.Current);   // the static init loaded the same defaults
     }
 
     [Fact]
     public void Default_DeclaresTheDocumentedRelations()
     {
-        var r = ContentDefaults.Restricted;
+        var r = ShippedContent.Restricted;
 
         Assert.Equal(7, r.Excludes.Count);
         Assert.Equal(new[] { "Brace", "Opportunist", "Overwatch" }, r.Excludes[0]);
@@ -221,7 +221,7 @@ public class RestrictedDataTests
     {
         var before = GameContent.Current;
         var ex = Assert.Throws<ContentException>(() =>
-            GameContent.Load(new Tuning(), Data(excludes: [["Brace", "Brace"]]), ContentDefaults.Enchantments, ContentDefaults.Weapons));
+            TestContent.Load(ShippedContent.Tuning, Data(excludes: [["Brace", "Brace"]]), ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal(ContentValidator.RuleSelfExclusion, ex.Rule);
         Assert.Same(before, GameContent.Current);
     }
@@ -233,11 +233,11 @@ public class RestrictedDataTests
         // against and the never-rolled list the default souls' unique flag is cross-checked with. A
         // headroom of one banks two stacks on a two-modifier weapon, so this tuning's bosses pay one at
         // most: a boss never pays as much as the farm (PHASE4-045), and a load refuses one that would.
-        var content = GameContent.Load(
-            new Tuning { AcquiredHeadroom = 1, BossStackOffset = 9 },
+        var content = TestContent.Load(
+            ShippedContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = 9 },
             Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
-                 neverRolled: ContentDefaults.Restricted.NeverRolled),
-            ContentDefaults.Enchantments, ContentDefaults.Weapons);
+                 neverRolled: ShippedContent.Restricted.NeverRolled),
+            ShippedContent.Enchantments, ShippedContent.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);
         Assert.NotSame(content, GameContent.Current);
@@ -245,7 +245,7 @@ public class RestrictedDataTests
 
         // Use makes content current; re-using the current content is the only safe swap in a parallel suite.
         GameContent.Use(GameContent.Current);
-        Assert.Same(ContentDefaults.Tuning, GameContent.Current.Tuning);
+        Assert.Same(ShippedContent.Tuning, GameContent.Current.Tuning);
     }
 
     [Theory]

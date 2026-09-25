@@ -42,9 +42,9 @@ public class DungeonsJsonTests
         // exactly the compiled dungeons, row for row, in the order the hub lists them.
         string text = File.ReadAllText(ShippedDataTests.Shipped(DungeonsJson.FileName));
         var read = DungeonsJson.Read(text).Dungeons;
-        Assert.Equal(ContentDefaults.Dungeons.Dungeons.Count, read.Count);
+        Assert.Equal(ShippedContent.Dungeons.Dungeons.Count, read.Count);
         for (int i = 0; i < read.Count; i++)
-            Same(ContentDefaults.Dungeons.Dungeons[i], read[i]);
+            Same(ShippedContent.Dungeons.Dungeons[i], read[i]);
 
         // §5.8's names verbatim, every row naming all eight and every boss all five.
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });

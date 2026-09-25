@@ -144,7 +144,7 @@ public class ProficiencyEffectTests
         // hits size it off the share they actually landed. Both must read the
         // same base or the cast pays for one burn and the shape lands another —
         // from wand level 2 on, where the bonus first bites.
-        using var priced = TestContent.Use(tuning: ContentDefaults.Tuning with
+        using var priced = TestContent.Use(tuning: ShippedContent.Tuning with
         {
             ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["flaming"] = 100 },
         });

@@ -408,7 +408,7 @@ public class RunOutcomeTests
         // and between them the share is taken in whole points, truncated.
         foreach (int percent in new[] { 0, 50, 100 })
         {
-            using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { DeathXpLossPercent = percent });
+            using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DeathXpLossPercent = percent });
             var party = Party();
             var a = party[0];
             a.WeaponXp[Dagger] = 300;   // before the run: never clawed

@@ -345,7 +345,7 @@ public class EnchantmentLockTests
         member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
         Assert.Equal((117, 115, 2, 0), (member.MaxMana, member.PaidLocks, member.UsableMaxMana, member.Mana));
 
-        Assert.Equal(2, member.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        Assert.Equal(2, member.RegenManaFromUnusedMovement(ShippedContent.Budget));
         Assert.Equal(2, member.Mana);
 
         Assert.True(turns.TryAttack(member, dummy));
@@ -448,7 +448,7 @@ public class EnchantmentLockTests
         Assert.Equal((100, 60, 40), (member.MaxMana, member.PaidLocks, member.UsableMaxMana));
 
         member.Mana = 0;
-        Assert.Equal(16, member.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
+        Assert.Equal(16, member.RegenManaFromUnusedMovement(ShippedContent.Budget));
         Assert.Equal(16, member.Mana);
 
         Assert.Equal(24, member.RegenManaFromUnusedMovement(10_000f));

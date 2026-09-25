@@ -56,7 +56,7 @@ public class OverwatchTests
 
         Assert.True(turns.CanOverwatch(a));
         Assert.True(turns.TryOverwatch(a));
-        Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
         Assert.Equal(1, a.HeldShots);
         Assert.False(turns.TryOverwatch(a));   // already holding
 

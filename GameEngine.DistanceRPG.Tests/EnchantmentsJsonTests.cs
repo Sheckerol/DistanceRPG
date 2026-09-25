@@ -50,7 +50,7 @@ public class EnchantmentsJsonTests
         Assert.All(entries, entry => Assert.Equal(Fields, entry.EnumerateObject().Select(member => member.Name)));
 
         // The unique flag is on the souls, and only on them — the ids neverRolled lists.
-        Assert.Equal(ContentDefaults.Restricted.NeverRolled.Order(StringComparer.Ordinal),
+        Assert.Equal(ShippedContent.Restricted.NeverRolled.Order(StringComparer.Ordinal),
             read.Enchantments.Where(e => e.Unique).Select(e => e.Id).Order(StringComparer.Ordinal));
 
         // An applier quotes no flat trigger (null), a rule does; an element carries
@@ -180,7 +180,7 @@ public class EnchantmentsJsonTests
         // 1h: one owner for a dialled number — the dial. The written file says, after
         // each field a tuning.json dial owns, which key sets it: ApplyPercent's five
         // ids and Arcane's potency, and no other field.
-        string text = EnchantmentsJson.Write(ContentDefaults.Enchantments, ContentDefaults.Tuning);
+        string text = EnchantmentsJson.Write(ShippedContent.Enchantments, ShippedContent.Tuning);
         var noted = new List<(string Id, string Line)>();
         string? id = null;
         foreach (string line in text.Split('\n').Select(line => line.Trim()))
@@ -206,10 +206,10 @@ public class EnchantmentsJsonTests
         Assert.Equal(Shipped, text);
 
         // A dial a tuning adds is noted too, on the row it owns.
-        var dialled = ContentDefaults.Tuning with
+        var dialled = ShippedContent.Tuning with
         {
-            ApplyPercent = new Dictionary<string, int>(ContentDefaults.Tuning.ApplyPercent, StringComparer.Ordinal) { ["vampiric"] = 50 },
+            ApplyPercent = new Dictionary<string, int>(ShippedContent.Tuning.ApplyPercent, StringComparer.Ordinal) { ["vampiric"] = 50 },
         };
-        Assert.Contains("\"applyPercent\": 100, /* tuning.json ApplyPercent.vampiric sets this */", EnchantmentsJson.Write(ContentDefaults.Enchantments, dialled));
+        Assert.Contains("\"applyPercent\": 100, /* tuning.json ApplyPercent.vampiric sets this */", EnchantmentsJson.Write(ShippedContent.Enchantments, dialled));
     }
 }

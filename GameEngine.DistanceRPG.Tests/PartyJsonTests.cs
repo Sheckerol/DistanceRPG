@@ -29,7 +29,7 @@ public class PartyJsonTests
         // file to exactly the compiled one, member for member and in spawn order.
         string text = File.ReadAllText(ShippedDataTests.Shipped(PartyJson.FileName));
         var read = PartyJson.Read(text).Members;
-        var compiled = ContentDefaults.Party.Members;
+        var compiled = ShippedContent.Party.Members;
         Assert.Equal(compiled.Count, read.Count);
         for (int i = 0; i < read.Count; i++)
         {
@@ -47,7 +47,7 @@ public class PartyJsonTests
         Assert.All(rows, row => Assert.Equal(["STR", "DEX", "CON", "INT"], row.GetProperty("stats").EnumerateObject().Select(member => member.Name)));
         Assert.Equal(["A", "B", "C", "D"], rows.Select(row => row.GetProperty("id").GetString()));
         Assert.Equal("{ \"STR\": 1, \"DEX\": 4, \"CON\": 2, \"INT\": 3 }", rows[0].GetProperty("stats").GetRawText());
-        var weapons = ContentDefaults.Weapons.Weapons.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        var weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
         Assert.All(rows, row => Assert.Contains(row.GetProperty("startingWeaponId").GetString()!, weapons));
 
         // A stat is its capital name, exactly: a lower-case one is not a member,
@@ -95,7 +95,7 @@ public class PartyJsonTests
         using (TestContent.Use(party: PartyJson.Read(Shipped)))
         {
             var campaign = CampaignState.Start(GameContent.Current);
-            Assert.Equal(ContentDefaults.Party.Members.Select(m => m.Stats), campaign.Party.Select(member => member.Stats));
+            Assert.Equal(ShippedContent.Party.Members.Select(m => m.Stats), campaign.Party.Select(member => member.Stats));
             Assert.Equal("staff_of_mire", campaign.Party.Single(member => member.Id == "D").Inventory[1]!.Id);
         }
     }

@@ -14,7 +14,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class TuningSchemaTests
 {
-    private static readonly Tuning Compiled = ContentDefaults.Tuning;
+    private static readonly Tuning Compiled = ShippedContent.Tuning;
 
     private static TuningKey Key(string name) => TuningSchema.Find(name) ?? throw new KeyNotFoundException(name);
 
@@ -95,7 +95,7 @@ public class TuningSchemaTests
             EffectPerLevel = new Dictionary<StatusEffectType, int> { [StatusEffectType.Mire] = 5 },
             ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["cold"] = 40, ["arcane"] = 60 },
         };
-        var content = GameContent.Load(tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons);   // built, never made current
+        var content = TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);   // built, never made current
         var rules = content.Modifiers;
 
         foreach (var type in Enum.GetValues<ModifierType>())

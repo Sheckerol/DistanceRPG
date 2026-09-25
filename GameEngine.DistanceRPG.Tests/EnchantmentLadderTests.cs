@@ -182,7 +182,7 @@ public class EnchantmentLadderTests
         Assert.Equal(0, new Enchantment(broken, Tier: 9).XpToNextTier(1));
 
         var before = GameContent.Current;
-        var data = new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, broken]);
+        var data = new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, broken]);
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(enchantments: data));
 
         Assert.Equal(("voidlock", ContentValidator.RuleEnchantmentLockIsPositive), (ex.EntryId, ex.Rule));

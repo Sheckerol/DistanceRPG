@@ -51,26 +51,39 @@ public static class TestWeapons
 /// Swap <see cref="GameContent.Current"/> for one test, restored on dispose.
 /// The current content is process-wide and xUnit runs test classes in
 /// parallel, so a class that calls <see cref="Use"/> must sit in the
-/// <see cref="Collection"/> collection, which runs with nothing else.
+/// <see cref="Collection"/> collection, which runs with nothing else. Content
+/// built from parts without being made current comes from <see cref="Load"/>.
 /// </summary>
 public static class TestContent
 {
     public const string Collection = "GameContent";
 
-    /// <summary>Load content with the given parts (the compiled defaults for the rest) and make it current until disposed.</summary>
+    /// <summary>Load content with the given parts (the shipped content's for the rest) and make it current until disposed.</summary>
     public static IDisposable Use(RestrictedData? restricted = null, WeaponsData? weapons = null,
         EnchantmentsData? enchantments = null, Tuning? tuning = null, PartyData? party = null, DungeonsData? dungeons = null)
     {
         var previous = GameContent.Current;
-        GameContent.Use(GameContent.Load(
-            tuning ?? ContentDefaults.Tuning,
-            restricted ?? ContentDefaults.Restricted,
-            enchantments ?? ContentDefaults.Enchantments,
-            weapons ?? ContentDefaults.Weapons,
-            party ?? ContentDefaults.Party,
-            dungeons ?? ContentDefaults.Dungeons));
+        GameContent.Use(Load(tuning, restricted, enchantments, weapons, party, dungeons));
         return new Restore(previous);
     }
+
+    /// <summary>
+    /// Load content with the given parts — the shipped content's
+    /// (<see cref="ShippedContent"/>) for every part left null — validated as
+    /// the game's load validates it, and never made current: the suite's one
+    /// door to content built from parts. The parameters run in the order of
+    /// <c>GameContent.Load</c>'s records overload, so a call reads as it did there.
+    /// </summary>
+    /// <exception cref="ContentException">The parts are not well formed together; the entry, the rule and the file whose stage broke are named.</exception>
+    public static GameContent Load(Tuning? tuning = null, RestrictedData? restricted = null, EnchantmentsData? enchantments = null,
+        WeaponsData? weapons = null, PartyData? party = null, DungeonsData? dungeons = null)
+        => GameContent.Load(
+            tuning ?? ShippedContent.Tuning,
+            restricted ?? ShippedContent.Restricted,
+            enchantments ?? ShippedContent.Enchantments,
+            weapons ?? ShippedContent.Weapons,
+            party ?? ShippedContent.Party,
+            dungeons ?? ShippedContent.Dungeons);
 
     private sealed class Restore(GameContent previous) : IDisposable
     {

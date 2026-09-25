@@ -91,7 +91,7 @@ public class DataFilesTests
             var load = ContentFiles.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
             Assert.DoesNotContain(load.Notices, notice => notice.Contains("missing", StringComparison.Ordinal));
-            Assert.Equal(TuningJson.Hash(ContentDefaults.Tuning), TuningJson.Hash(load.Content!.Tuning));
+            Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
 
             // Once it is free again, it is read like any other, beside the shipped
             // files it sits with: every text read whole, and every file reported.

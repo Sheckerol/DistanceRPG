@@ -645,7 +645,7 @@ public class CampaignBootTests
             Assert.Equal([BetweenRunsHud.Resumed], Boot(store).Notices);   // the same numbers: nothing to say
             store.ClearResuming();
 
-            var tuned = ContentDefaults.Tuning with { MovementBudget = 200 };
+            var tuned = ShippedContent.Tuning with { MovementBudget = 200 };
             using (TestContent.Use(tuning: tuned))
             {
                 var log = new List<string>();
@@ -669,7 +669,7 @@ public class CampaignBootTests
                 Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(rows[1]));
 
                 // The log names both hashes; the campaign is the one saved, playing on.
-                Assert.Contains(log, line => line.Contains(TuningJson.Hash(ContentDefaults.Tuning), StringComparison.Ordinal)
+                Assert.Contains(log, line => line.Contains(TuningJson.Hash(ShippedContent.Tuning), StringComparison.Ordinal)
                     && line.Contains(TuningJson.Hash(tuned), StringComparison.Ordinal));
                 Assert.Equal(campaign.LockedInOrder, boot.Campaign.LockedInOrder);
                 Assert.Equal(1, boot.Campaign.RunCounter);
@@ -702,7 +702,7 @@ public class CampaignBootTests
             Saved(store, campaign);
             File.WriteAllText(store.SavePath, "not a save");
 
-            using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200 }))
+            using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200 }))
             {
                 var boot = Boot(store);
                 Assert.True(boot.Resumed);
@@ -1136,7 +1136,7 @@ public class CampaignBootTests
             Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }));
             Assert.Contains("did not come round to the party's", store.ReadUnsaved()!, StringComparison.Ordinal);
             File.WriteAllText(store.SavePath, "not a save");
-            using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200 }))
+            using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200 }))
             {
                 var busiest = Boot(store);
                 Assert.True(busiest.Resumed);

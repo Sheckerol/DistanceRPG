@@ -36,7 +36,7 @@ public class TurnSystemTests
 
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(1, turns.TurnCount);
-        Assert.Equal(GameConstants.MaxDistance + 50f, a.EffectiveMax);
+        Assert.Equal(ShippedContent.Budget + 50f, a.EffectiveMax);
         Assert.Equal(a.EffectiveMax, a.DistLeft);
     }
 
@@ -53,7 +53,7 @@ public class TurnSystemTests
         turns.TurnEnded += saved => banked = saved;
         turns.EndTurn();
 
-        Assert.Equal(GameConstants.MaxDistance / 2f, banked);
+        Assert.Equal(ShippedContent.Budget / 2f, banked);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class TurnSystemTests
         turns.EnemyHit += (_, r) => res = r;
 
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // the stiletto's 30: no Light
+        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // the stiletto's 30: no Light
         Assert.NotNull(res);
         // Dagger 15 into sword block 3 â†’ 12
         Assert.Equal(12, res.Value.Damage);

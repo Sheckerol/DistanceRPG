@@ -328,7 +328,7 @@ public class ReloadDeterminismTests
         // arithmetic across the save, and the counters that key them, which S6's
         // round trips compare only field for field. On an injected die, and on the
         // visit's own.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { ResurrectTurnsBase = 2, ResurrectTurnsFloor = 1 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { ResurrectTurnsBase = 2, ResurrectTurnsFloor = 1 });
         Assert.Equal((1, 1), (FarmLadder.ResurrectTurns(1), FarmLadder.ResurrectTurns(2)));
 
         var liveDie = visitsOwnDie ? null : new Dice(Sequence());

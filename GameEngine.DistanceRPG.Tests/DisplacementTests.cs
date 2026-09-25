@@ -60,13 +60,13 @@ public class DisplacementTests
         // Mostly sideways, a little up: the dominant axis wins and the step is 4-directional.
         enemy.X = At(5, 6).X;
         enemy.Y = At(5, 6).Y - 10f;
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
 
         // Below rather than beside: the shove goes down the column.
         (enemy.X, enemy.Y) = At(6, 5);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(7, 5), (enemy.X, enemy.Y));
 
@@ -74,7 +74,7 @@ public class DisplacementTests
         a.EquippedWeapon!.Acquire(Push, 2);
         Assert.Equal(3, a.Value(Push));
         (enemy.X, enemy.Y) = At(5, 6);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 9), (enemy.X, enemy.Y));
         Assert.Equal(3, displaced[^1].Tiles);
@@ -123,7 +123,7 @@ public class DisplacementTests
         a.EquippedWeapon!.Acquire(Drag, 4);
         var tiles = new List<int>();
         turns.ActorDisplaced += (_, n) => tiles.Add(n);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
         Assert.Equal(new[] { 2 }, tiles);
@@ -142,7 +142,7 @@ public class DisplacementTests
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);
         Assert.Equal(new[] { 2 }, tiles);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
         Assert.Equal(new[] { 2 }, tiles);
@@ -201,7 +201,7 @@ public class DisplacementTests
         // An occupied tile stops it the same way, and nobody overlaps: shoved down the column into the bystander, it stays put.
         (enemy.X, enemy.Y) = At(6, 6);
         (a.X, a.Y) = At(5, 6);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(6, 6), (enemy.X, enemy.Y));
         Assert.Equal(At(7, 6), (bystander.X, bystander.Y));
@@ -210,7 +210,7 @@ public class DisplacementTests
         // The edge of the map is a wall too.
         (a.X, a.Y) = At(5, 18);
         (enemy.X, enemy.Y) = At(5, 19);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 19), (enemy.X, enemy.Y));
 
@@ -247,8 +247,8 @@ public class DisplacementTests
         Assert.Equal(new[] { s }, braced);
         Assert.Equal(2, hits);
         Assert.Equal(200 - 7 - 5, enemy.Hp);   // the sword's 10 and the spear's 7 + 1 (Longshot x1 at the fourth tile), each into Block 3
-        Assert.Equal(GameConstants.MaxDistance, s.DistLeft);
-        Assert.Equal(GameConstants.MaxDistance - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
+        Assert.Equal(ShippedContent.Budget, s.DistLeft);
+        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public class DisplacementTests
         (a.X, a.Y) = At(5, 5);
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);   // set down at the edge of S's reach, still inside it
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
         Assert.False(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));  // shoved out
@@ -363,7 +363,7 @@ public class DisplacementTests
         // Back out of reach (a forced move: the pair is released), then shoved in again: the use is spent.
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);
-        a.DistLeft = GameConstants.MaxDistance;
+        a.DistLeft = ShippedContent.Budget;
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
         Assert.Equal(1, braces);

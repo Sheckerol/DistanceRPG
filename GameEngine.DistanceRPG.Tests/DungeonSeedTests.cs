@@ -391,7 +391,7 @@ public class DungeonSeedTests
         // The 5-10 is two tuning keys, read through the content that is current:
         // swap them and every unpinned dungeon rolls over the new range, by the
         // same one draw.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 3, BossFloorMax = 4 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4 });
         var hall = Dungeon("spear_hall");
         var tutorial = GameContent.Current.Dungeons.Tutorial;
 

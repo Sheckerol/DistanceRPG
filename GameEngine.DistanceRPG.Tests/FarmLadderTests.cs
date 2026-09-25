@@ -91,19 +91,19 @@ public class FarmLadderTests
         Assert.Equal(250, FarmLadder.UniqueChancePermille(20));
         Assert.Equal(393, FarmLadder.UniqueChancePermille(25));
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { UniqueChanceCeilingPercent = 80 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceCeilingPercent = 80 }))
         {
             Assert.Equal(400, FarmLadder.UniqueChancePermille(20));   // still half the ceiling at the midpoint
             Assert.Equal(800, FarmLadder.UniqueChancePermille(1000));
         }
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { UniqueChanceMidpoint = 30 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceMidpoint = 30 }))
         {
             Assert.Equal(250, FarmLadder.UniqueChancePermille(30));   // the hot zone moved, whole
             Assert.True(FarmLadder.UniqueChancePermille(20) < 250);
         }
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { UniqueChanceKPercent = 52 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceKPercent = 52 }))
         {
             Assert.Equal(250, FarmLadder.UniqueChancePermille(20));   // the midpoint is where K does nothing
             Assert.True(FarmLadder.UniqueChancePermille(25) > 393);   // and everywhere else it steepens
@@ -138,7 +138,7 @@ public class FarmLadderTests
         Assert.Equal(2, FarmLadder.DefeatAdvance(dealt: GameConstants.DummyHp, maxHp: GameConstants.DummyHp));
 
         // The bonus is the knob, not the 2.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { CleanKillBonus = 3 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { CleanKillBonus = 3 });
         Assert.Equal(3, FarmLadder.DefeatAdvance(dealt: 40, maxHp: 24));
         Assert.Equal(1, FarmLadder.DefeatAdvance(dealt: 2, maxHp: 24));
     }
@@ -172,14 +172,14 @@ public class FarmLadderTests
                 hits++;
         Assert.InRange(hits, 450, 550);
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { DefeatStackChance = 0 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { DefeatStackChance = 0 }))
         {
             var never = new Mulberry32(Seed);
             for (int i = 0; i < 100; i++)
                 Assert.False(FarmLadder.RollsAStack(never));
         }
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { DefeatStackChance = 100 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { DefeatStackChance = 100 }))
         {
             var always = new Mulberry32(Seed);
             for (int i = 0; i < 100; i++)
@@ -281,7 +281,7 @@ public class FarmLadderTests
 
     private static void Rejected(Func<Tuning, Tuning> edit, string key, string rule)
     {
-        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(ContentDefaults.Tuning)));
+        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(ShippedContent.Tuning)));
         Assert.Equal((key, rule), (ex.EntryId, ex.Rule));
         Assert.Contains(ex.Rule, ex.Message);
     }

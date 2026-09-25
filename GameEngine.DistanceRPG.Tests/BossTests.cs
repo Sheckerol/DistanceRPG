@@ -388,9 +388,9 @@ public class BossTests
         // a seed whose class draws never touched the axe keeps its class and its
         // role, and only a seed with a class draw on the axe moves: to the axe, the
         // first draw that now stands.
-        var braceFreed = ContentDefaults.Restricted with
+        var braceFreed = ShippedContent.Restricted with
         {
-            Excludes = ContentDefaults.Restricted.Excludes
+            Excludes = ShippedContent.Restricted.Excludes
                 .Select(g => g.Contains(nameof(Brace)) ? g.Where(id => id != nameof(Brace)).ToArray() : g)
                 .ToList(),
         };
@@ -913,7 +913,7 @@ public class BossTests
 
         // Tuned to three runs a floor, the seven-floor Spear Hall locks for
         // twenty-one, and its bottom floor's banner says twenty-one.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { CooldownRunsPerFloor = 3 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { CooldownRunsPerFloor = 3 }))
         {
             var party = Party();
             var visit = DungeonState.Enter(Dungeons["spear_hall"], 7, party);
@@ -944,7 +944,7 @@ public class BossTests
         // re-roll: on the boss floor's banner, in the way out's question, and in
         // the run's summary. Five floors still reach the mercy floor, so a shallow
         // failure there still names the rule it missed.
-        var pinned = new DungeonsData(ContentDefaults.Dungeons.Dungeons
+        var pinned = new DungeonsData(ShippedContent.Dungeons.Dungeons
             .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 5, BossFloorMax = 5 } : d).ToList());
         using (TestContent.Use(dungeons: pinned))
         {
@@ -968,7 +968,7 @@ public class BossTests
 
         // The two questions are apart: a range of 1 to 2 re-rolls the depth, and
         // never reaches the mercy floor, so its failures never count.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 1, BossFloorMax = 2 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 1, BossFloorMax = 2 }))
         {
             Assert.False(Dungeons.HasFixedDepth(Dungeons["spear_hall"]));
             var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 1, null, false, false, 0, null, false, [], [], []);
@@ -978,7 +978,7 @@ public class BossTests
         }
 
         // And a range the tuning fixes leaves every dungeon as deep on every visit.
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 7, BossFloorMax = 7 }))
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 7, BossFloorMax = 7 }))
             Assert.All(Dungeons.All, d => Assert.True(Dungeons.HasFixedDepth(d), d.Id));
     }
 }
