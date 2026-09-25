@@ -30,7 +30,7 @@ public class RestrictedDataTests
     [Fact]
     public void DefaultRestricted_Validates()
     {
-        var known = KnownPlus(ContentDefaults.EnchantmentIds.ToArray());
+        var known = KnownPlus(ShippedContent.Enchantments.Enchantments.Select(e => e.Id).ToArray());   // the ids the shipped relations may name: the catalogue's
         ContentValidator.ValidateRestricted(ShippedContent.Restricted, known);   // does not throw
         Assert.NotNull(TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.NotNull(GameContent.Current);   // the static init loaded the same defaults

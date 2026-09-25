@@ -8,6 +8,15 @@ namespace GameEngine.DistanceRPG.Tests;
 /// exactly when their dumps are the same string (the content rework's 1i). One
 /// <c>&lt;section&gt; &lt;id&gt;.&lt;field&gt;=&lt;value&gt;</c> line per field:
 /// <list type="bullet">
+/// <item>every weapon class, in <see cref="WeaponClass"/> order: the kind it
+/// plays as, the stats it levels on and its signature (null for a caster) —
+/// what a class carries beyond the statline and spread its variants already
+/// show. Whether a class casts is its kind (<see cref="Weapon.IsCaster"/> is
+/// <c>Kind == Caster</c>), so the kind line holds that too. Read from the code's
+/// tables (<see cref="Weapon.KindOf"/>, <see cref="Progression.Governing"/>,
+/// <see cref="ContentValidator.Signature"/>) until the classes become rows of
+/// <c>weapons.json</c> (Phase 5.R4), and from the content's class rows
+/// after;</item>
 /// <item>every weapon row in <see cref="WeaponCatalogue.All"/> order, each of its
 /// fields — the forged spread in <see cref="ModifierType"/> order, the
 /// enchantments it arrives with in attachment order with their tiers, the
@@ -38,6 +47,15 @@ internal static class ContentDump
         ArgumentNullException.ThrowIfNull(relations);
         var lines = new List<string>();
         void Line(string section, string id, string field, string value) => lines.Add($"{section} {id}.{field}={Escape(value)}");
+
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            const string at = "class";
+            string name = cls.ToString();
+            Line(at, name, "kind", Weapon.KindOf(cls).ToString());
+            Line(at, name, "stats", List(Progression.Governing(cls).Select(stat => stat.ToString())));
+            Line(at, name, "signature", ContentValidator.Signature.TryGetValue(cls, out var signature) ? signature.ToString() : "null");
+        }
 
         foreach (var weapon in content.Weapons.All)
         {

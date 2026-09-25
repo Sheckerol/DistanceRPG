@@ -4,6 +4,8 @@
 (Phases 0–5, before the Phase 5 content rework), written as one canonical text
 by `ContentDump.Of`: one `<section> <id>.<field>=<value>` line per field.
 
+- every weapon class, in `WeaponClass` order — the kind it plays as, the stats
+  it levels on and its signature (see "The class section" below);
 - every weapon row, in the catalogue's order — each field, the forged spread in
   `ModifierType` order, the enchantments it arrives with and their tiers, the
   shape;
@@ -30,6 +32,21 @@ loads them. At `febe036` that content is the compiled content exactly: the
 shipped files were pinned byte for byte to the generator's output, and the run
 checked that the content they load dumps to the same text as the compiled
 content does.
+
+## The class section
+
+The 24 `class` lines at the head of the file were added once, at the review
+of Phase 5.R1, after the rest of it was first written: the rework moves what a
+class carries into `weapons.json` by hand (Phase 5.R4), and until then the dump
+held a class's kind, stats and signature only through its variants and the
+validator. They were written the same way, by a throwaway run (never committed)
+of `ContentDump.Of` on the tree at `2b978c6`, whose game code is byte for byte
+the code at `febe036` (`git diff febe036 2b978c6 -- GameEngine.DistanceRPG` is
+empty), so they are what `febe036`'s code held. The run checked that the shipped
+files' content and the compiled content dump to the same text, and that the new
+text is the old one, unchanged line for line, with the class lines added at its
+head. The same rule applies to them as to every other line: never regenerate
+them, never edit them by hand.
 
 ## When it goes
 

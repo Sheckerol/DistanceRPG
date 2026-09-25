@@ -35,7 +35,18 @@ public class WeaponContentTests
         Assert.Equal(
             new[] { "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic" },
             innates.Select(e => e.Id));
-        Assert.Equal(GameContent.Current.Enchantments.Ids, ContentDefaults.EnchantmentIds);
+        // The ids content may name an enchantment by are the catalogue's
+        // twenty-two (UniqueContentTests pins their order), held literally: the
+        // catalogue is code and Current is built from it, so reading the
+        // expected ids back from a catalogue would compare it with itself.
+        Assert.Equal(
+            new[]
+            {
+                "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic",
+                "vampiric", "arcane", "shattering", "aegis", "echoing",
+                "siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning",
+            }.Order(StringComparer.Ordinal),
+            GameContent.Current.Enchantments.Ids.Order(StringComparer.Ordinal));
         Assert.Equal(Catalogue.All.Count, Catalogue.All.Select(w => w.Id).Distinct().Count());
     }
 
