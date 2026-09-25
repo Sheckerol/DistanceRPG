@@ -88,13 +88,17 @@ public class WeaponsJsonTests
         WeaponDef Played(string id) => read.Single(w => w.Id == id);
         var knife = Row("flensing_knife");
         Assert.Equal(("Dagger", "Efficiency"), (knife.GetProperty("class").GetString(), knife.GetProperty("role").GetString()));
-        Assert.Equal((40, 15, 30, 0), (Played("flensing_knife").Range, Played("flensing_knife").Damage, Played("flensing_knife").Cost, Played("flensing_knife").ManaCost));
+        var dagger = data.ClassOf(WeaponClass.Dagger)!;
+        int Own(string field, int classValue) => knife.TryGetProperty(field, out var value) ? value.GetInt32() : classValue;
+        Assert.Equal((Own("range", dagger.Range), Own("damage", dagger.Damage), Own("cost", dagger.Cost), Own("manaCost", dagger.ManaCost)),
+            (Played("flensing_knife").Range, Played("flensing_knife").Damage, Played("flensing_knife").Cost, Played("flensing_knife").ManaCost));
         Assert.Equal(["Light"], knife.GetProperty("adds").EnumerateObject().Select(member => member.Name));
         Assert.Equal([CritWindow, CritMultiplier, Light], Played("flensing_knife").Forged.Keys);
         var mire = Row("staff_of_mire");
         Assert.Equal(["manaCost"], mire.EnumerateObject().Select(field => field.Name).Except(VariantFields.Take(7)));
         Assert.Equal((data.ClassOf(WeaponClass.Staff)!.Range, mire.GetProperty("manaCost").GetInt32()), (Played("staff_of_mire").Range, Played("staff_of_mire").ManaCost));
-        Assert.Equal("{ \"kind\": \"Blast\", \"radius\": 48, \"targetReach\": 160 }", Row("wand_of_the_blast").GetProperty("shape").GetRawText());
+        var blast = Played("wand_of_the_blast").Shape!;
+        Assert.Equal($"{{ \"kind\": \"Blast\", \"radius\": {blast.Radius}, \"targetReach\": {blast.TargetReach} }}", Row("wand_of_the_blast").GetProperty("shape").GetRawText());
         Assert.Equal(JsonValueKind.Null, knife.GetProperty("shape").ValueKind);
         Assert.Equal("[{ \"id\": \"serrated\" }, { \"id\": \"vampiric\", \"tier\": 3 }, { \"id\": \"overheal\" }]",
             Row("flensing_knife_unique").GetProperty("enchantments").GetRawText());
@@ -137,20 +141,24 @@ public class WeaponsJsonTests
     {
         // 1h: a shape's zero dimensions and an enchantment's tier of 1 may be left
         // out, and read as the number left out: a Nova names its radius alone, a
-        // Beam its length and width, a tier-1 soul its id alone.
-        Assert.Contains("\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", Shipped);
-        Assert.Contains("\"shape\": { \"kind\": \"Beam\", \"length\": 224, \"width\": 32 }", Shipped);
-        Assert.Contains("\"shape\": { \"kind\": \"Cone\", \"length\": 128, \"angleDegrees\": 90 }", Shipped);
+        // Beam its length and width, a tier-1 soul its id alone. The dimensions
+        // are the master's (WandShapes_MatchTheTable pins them to §1.4's table).
         var read = WeaponsJson.Read(Shipped).Weapons;
-        Assert.Equal(AreaShape.Nova(radius: 96), read.Single(w => w.Id == "wand_of_the_nova").Shape);
-        Assert.Equal(AreaShape.Cone(angleDegrees: 90, length: 128), read.Single(w => w.Id == "wand_of_the_cone").Shape);
+        AreaShape ShapeOf(string id) => read.Single(w => w.Id == id).Shape!;
+        var (nova, beam, cone) = (ShapeOf("wand_of_the_nova"), ShapeOf("wand_of_the_beam"), ShapeOf("wand_of_the_cone"));
+        string novaText = $"\"shape\": {{ \"kind\": \"Nova\", \"radius\": {nova.Radius} }}";
+        Assert.Contains(novaText, Shipped);
+        Assert.Contains($"\"shape\": {{ \"kind\": \"Beam\", \"length\": {beam.Length}, \"width\": {beam.Width} }}", Shipped);
+        Assert.Contains($"\"shape\": {{ \"kind\": \"Cone\", \"length\": {cone.Length}, \"angleDegrees\": {cone.AngleDegrees} }}", Shipped);
+        Assert.Equal(AreaShape.Nova(radius: nova.Radius), nova);
+        Assert.Equal(AreaShape.Cone(angleDegrees: cone.AngleDegrees, length: cone.Length), cone);
         Assert.Equal([new EnchantmentRef("serrated", 1), new EnchantmentRef("vampiric", 3), new EnchantmentRef("overheal", 1)],
             read.Single(w => w.Id == "flensing_knife_unique").Enchantments);
 
         // Written out, a default is the same number as left out: a Nova's width,
         // which it does not measure, as the 0 it is, and a soul's tier as 1.
         string spelled = DataTexts.Edit(DataTexts.InRow(Shipped, "wand_of_the_nova",
-            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"width\": 0 }"),
+            novaText, novaText[..^2] + ", \"width\": 0 }"),
             "[{ \"id\": \"serrated\" }, { \"id\": \"vampiric\", \"tier\": 3 }", "[{ \"id\": \"serrated\", \"tier\": 1 }, { \"id\": \"vampiric\", \"tier\": 3 }");
         var spelledOut = WeaponsJson.Read(spelled).Weapons;
         Assert.Equal(read.Count, spelledOut.Count);
@@ -160,7 +168,7 @@ public class WeaponsJsonTests
         // A dimension its kind does not measure is a number nothing reads, and is
         // refused naming the path and what the kind does measure.
         var stray = Assert.Throws<ContentException>(() => WeaponsJson.Read(DataTexts.InRow(Shipped, "wand_of_the_nova",
-            "\"shape\": { \"kind\": \"Nova\", \"radius\": 96 }", "\"shape\": { \"kind\": \"Nova\", \"radius\": 96, \"length\": 64 }")));
+            novaText, novaText[..^2] + ", \"length\": 64 }")));
         Assert.Equal(("wand_of_the_nova", ContentValidator.RuleFileShape, "weapons.json: variants[31].shape.length: is not a dimension of a Nova - a Nova measures radius"),
             (stray.EntryId, stray.Rule, stray.Detail));
         var kind = Assert.Throws<ContentException>(() => WeaponsJson.Read(DataTexts.InRow(Shipped, "wand_of_the_nova", "\"kind\": \"Nova\"", "\"kind\": \"Ring\"")));

@@ -2,9 +2,20 @@ using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class EnemyHealerTests
+/// <summary>
+/// A staff in enemy hands: who it heals, when it casts, and that a lone healer
+/// runs. The heals stand on the numbers they were written against — the staff's
+/// reach and mana, a Regeneration level's healing (<see cref="Premise"/>) — made
+/// current for each test, so the content collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class EnemyHealerTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
         => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);

@@ -60,19 +60,21 @@ public class DungeonsJsonTests
         Assert.All(rows, row => Assert.Equal(JsonValueKind.Null, row.GetProperty("attunement").ValueKind));
 
         // PHASE5-155: bossFloorMin/bossFloorMax — the tutorial pins both to 2, and
-        // the rest leave them null, which reads the tuning's 5 to 10.
+        // the rest leave them null, which reads the tuning's range.
         var tutorial = Row("tutorial");
         Assert.Equal((2, 2), (tutorial.GetProperty("bossFloorMin").GetInt32(), tutorial.GetProperty("bossFloorMax").GetInt32()));
         Assert.All(rows.Where(row => row.GetProperty("id").GetString() != "tutorial"), row =>
             Assert.Equal((JsonValueKind.Null, JsonValueKind.Null), (row.GetProperty("bossFloorMin").ValueKind, row.GetProperty("bossFloorMax").ValueKind)));
         var content = Load(text).Content!;
-        Assert.Equal((5, 10), content.Dungeons.BossFloorRange(content.Dungeons["spear_hall"]));
+        Assert.Equal((content.Tuning.BossFloorMin, content.Tuning.BossFloorMax), content.Dungeons.BossFloorRange(content.Dungeons["spear_hall"]));
         Assert.Equal((2, 2), content.Dungeons.BossFloorRange(content.Dungeons.Tutorial));
 
-        // PHASE5-157: boss, "statline plus innate modifiers" — the golem's 80 HP,
-        // its movement budget of 40 and its Block x3.
+        // PHASE5-157: boss, "statline plus innate modifiers" — the golem's HP, its
+        // movement budget and its Block x3, read as written (the golem's own
+        // numbers are S:302's, pinned in DungeonContentTests.TheTutorialIsTheShippedDungeon).
         Assert.Equal("{ \"Block\": 3 }", tutorial.GetProperty("boss").GetProperty("innate").GetRawText());
-        Assert.Equal((80, 40), (tutorial.GetProperty("boss").GetProperty("maxHp").GetInt32(), tutorial.GetProperty("boss").GetProperty("movementBudget").GetInt32()));
+        var golem = read.Single(d => d.Id == "tutorial").Boss;
+        Assert.Equal((golem.MaxHp, golem.MovementBudget), (tutorial.GetProperty("boss").GetProperty("maxHp").GetInt32(), tutorial.GetProperty("boss").GetProperty("movementBudget").GetInt32()));
 
         // PHASE5-161: retiresOnClear, the tutorial's alone.
         Assert.Equal([true, false, false, false, false], rows.Select(row => row.GetProperty("retiresOnClear").GetBoolean()));
@@ -94,7 +96,7 @@ public class DungeonsJsonTests
         var innate = Assert.Throws<ContentException>(() => DungeonsJson.Read(DataTexts.InRow(Shipped, "tutorial", "\"innate\": { \"Block\": 3 }", "\"innate\": { \"Block\": \"3\" }")));
         Assert.Equal(("tutorial", ContentValidator.RuleFileShape, "dungeons.json: dungeons[0].boss.innate.Block: is the text 3, not a whole number"),
             (innate.EntryId, innate.Rule, innate.Detail));
-        var bossField = Assert.Throws<ContentException>(() => DungeonsJson.Read(DataTexts.InRow(Shipped, "tutorial", "\"maxHp\": 80,", "\"hp\": 80,")));
+        var bossField = Assert.Throws<ContentException>(() => DungeonsJson.Read(DataTexts.InRow(Shipped, "tutorial", $"\"maxHp\": {golem.MaxHp},", $"\"hp\": {golem.MaxHp},")));
         Assert.Equal(("tutorial", "dungeons.json: dungeons[0].boss.hp: is not a member here - the members are id, name, maxHp, movementBudget, innate"),
             (bossField.EntryId, bossField.Detail));
     }

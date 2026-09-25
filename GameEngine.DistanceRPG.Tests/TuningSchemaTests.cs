@@ -113,9 +113,9 @@ public class TuningSchemaTests
 
         // The pieces this rests on: the moved entry is what the game reads, and
         // every other keeps the built-in number.
-        Assert.Equal((7, 3), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Splitting)));
-        Assert.Equal((1, 0), (rules.Offset(ModifierType.Push), rules.Offset(ModifierType.Block)));
-        Assert.Equal((2, 3), (rules.MaxForged(ModifierType.Pin), rules.MaxForged(ModifierType.Brace)));
+        Assert.Equal((7, BuiltIn.PerStack[ModifierType.Splitting]), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Splitting)));
+        Assert.Equal((1, BuiltIn.Offset[ModifierType.Block]), (rules.Offset(ModifierType.Push), rules.Offset(ModifierType.Block)));
+        Assert.Equal((2, BuiltIn.MaxForged[ModifierType.Brace]), (rules.MaxForged(ModifierType.Pin), rules.MaxForged(ModifierType.Brace)));
         Assert.Equal((5, BuiltIn.EffectPerLevel[StatusEffectType.Ward]), (StatusRules.EffectPerLevel(StatusEffectType.Mire, tuning), StatusRules.EffectPerLevel(StatusEffectType.Ward, tuning)));
         Assert.Null(Table(nameof(Tuning.ApplyPercent)).Members);
         Assert.Equal(Enum.GetNames<ModifierType>(), Table(nameof(Tuning.PerStack)).Members!.ToArray());
@@ -271,15 +271,10 @@ public class TuningSchemaTests
         }
         Assert.DoesNotContain(TuningSchema.Keys, k => k.Group is Enchanter or Consumables);
 
-        // The numbers the docs and settled.md fix: every pool starts at 30, the
-        // divisor is 10 on a budget of 160, DotDamagePerMana is 1/3 as 3, and the
-        // statuses and elements are settled's.
-        Assert.Equal((30, 10, 160, 3, 5), (BuiltIn.StartingPool, BuiltIn.MovementUnitsPerMana, BuiltIn.MovementBudget, BuiltIn.DotDamagePerMana, BuiltIn.OverhealPerWard));
-        var effect = Table(nameof(Tuning.EffectPerLevel)).Get(BuiltIn);
-        Assert.Equal((1, 10, 1), (effect["Searing"], effect["Mire"], effect["Ward"]));
-        var apply = Table(nameof(Tuning.ApplyPercent)).Get(BuiltIn);
-        Assert.Equal((20, 15, 25, 15), (apply["flaming"], apply["cold"], apply["shocking"], apply["acidic"]));
-        Assert.Equal((20, 15, 50, 24), (BuiltIn.UniqueChanceMidpoint, BuiltIn.ReviveStepPercent, BuiltIn.DeathXpLossPercent, BuiltIn.PartyCarrySlots));
+        // What each key is set to is tuning.json's to say: the one derivation a
+        // doc fixes — the divisor off the budget, W:774 — is pinned where its
+        // test is (MovementBudgetTests; ShippedDataTests lists every such pin),
+        // and no other number of the master is pinned here.
     }
 
     [Fact]

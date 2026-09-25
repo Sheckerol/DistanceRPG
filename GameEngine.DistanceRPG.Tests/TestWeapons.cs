@@ -50,9 +50,10 @@ public static class TestWeapons
 /// <summary>
 /// Swap <see cref="GameContent.Current"/> for one test, restored on dispose.
 /// The current content is process-wide and xUnit runs test classes in
-/// parallel, so a class that calls <see cref="Use"/> must sit in the
-/// <see cref="Collection"/> collection, which runs with nothing else. Content
-/// built from parts without being made current comes from <see cref="Load"/>.
+/// parallel, so a class that calls <see cref="Use"/> or <see cref="UsePremise"/>
+/// must sit in the <see cref="Collection"/> collection, which runs with nothing
+/// else. Content built from parts without being made current comes from
+/// <see cref="Load"/>.
 /// </summary>
 public static class TestContent
 {
@@ -64,6 +65,29 @@ public static class TestContent
     {
         var previous = GameContent.Current;
         GameContent.Use(Load(tuning, restricted, enchantments, weapons, party, dungeons));
+        return new Restore(previous);
+    }
+
+    /// <summary>
+    /// Make the shipped content under the premise current until disposed: the
+    /// numbers the suite's worked examples were written against
+    /// (<see cref="Premise"/>) — what a test stands on without testing — so the
+    /// master copy may move them without failing it. With nothing given it is the
+    /// premise's content as it is, loaded once; a test that needs one more thing
+    /// edits a part from the premise's own — the tuning, the weapons, the dungeons —
+    /// or gives the relations, the enchantment catalogue or the party whole, as
+    /// <see cref="Use"/> takes them. A class that calls it sits in <see cref="Collection"/>.
+    /// </summary>
+    public static IDisposable UsePremise(Func<Tuning, Tuning>? tuning = null, Func<WeaponsData, WeaponsData>? weapons = null,
+        Func<DungeonsData, DungeonsData>? dungeons = null, RestrictedData? restricted = null, EnchantmentsData? enchantments = null,
+        PartyData? party = null)
+    {
+        var previous = GameContent.Current;
+        GameContent.Use(tuning is null && weapons is null && dungeons is null && restricted is null && enchantments is null && party is null
+            ? Premise.Content
+            : Load(tuning is null ? Premise.Tuning : tuning(Premise.Tuning), restricted, enchantments,
+                weapons is null ? Premise.Weapons : weapons(Premise.Weapons), party,
+                dungeons is null ? Premise.Dungeons : dungeons(Premise.Dungeons)));
         return new Restore(previous);
     }
 

@@ -16,10 +16,21 @@ namespace GameEngine.DistanceRPG.Tests;
 /// what a save restores, and the test says so. The party waits out turns in a
 /// floor's arrival room, where the placer puts nobody and nothing reaches.
 /// </para>
+/// <para>
+/// Every visit stands on the numbers it was written against — the seeds' depths,
+/// the revival clock, the gather radius, the golem's statline, the modifier table
+/// (<see cref="Premise"/>) — made current for each test, so the content collection
+/// holds it.
+/// </para>
 /// </summary>
-public class DungeonStateTests
+[Collection(TestContent.Collection)]
+public sealed class DungeonStateTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The shipped seed: its first floor is the golden dungeon, and the Spear Hall rolls five floors on it.</summary>
     private const long GoldenSeed = 2762136374;

@@ -10,6 +10,17 @@ namespace GameEngine.DistanceRPG.Tests;
 /// derivation rule forbids, the nine souls are never rolled and pinned at tier
 /// 1, and each named unique reads as the doc says it does. In the content
 /// collection because tests here swap the current content.
+/// <para>
+/// The table itself — which uniques there are, what each derives from, raises
+/// and carries — is §1.5's, and <see cref="Table"/> pins it (REWORK DECISION 3).
+/// The numbers a unique is read in are not: what a stack of Block absorbs, how
+/// deep a window opens, how many throws Charges buys are the master's
+/// (<see cref="ShippedContent.Tuning"/>), and each named unique's test reads them
+/// there, so a key edited in <c>tuning.json</c> moves what it expects with it.
+/// Where a scenario's own geometry stands on numbers that are not its subject —
+/// the shove that carries a dummy into a line, the Block it meets — they are its
+/// premise, stated as its input (<see cref="Premise"/>).
+/// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
 public class UniqueContentTests
@@ -19,6 +30,22 @@ public class UniqueContentTests
     private static WeaponCatalogue Catalogue => GameContent.Current.Weapons;
     private static ModifierRules Rules => GameContent.Current.Modifiers;
     private static EnchantmentCatalogue Enchantments => GameContent.Current.Enchantments;
+
+    /// <summary>The tuning the game reads: the numbers the named uniques are read in.</summary>
+    private static Tuning Shipped => ShippedContent.Tuning;
+
+    /// <summary>
+    /// The shipped tuning with every forge limit at x3, the unique raise: the
+    /// fixtures below raise modifiers no shipped unique raises (CritSunder,
+    /// Riposte, Push, CritMultiplier, Cleave), and how deep those may be forged
+    /// is <c>tuning.json</c>'s to say — the fit keeps the shipped uniques' own
+    /// raises loadable whatever the file says, never a fixture's. The fixtures'
+    /// premise, not their subject: every fixture load in this file runs over it.
+    /// </summary>
+    private static Tuning RaisesAllowed => Shipped with
+    {
+        MaxForged = Shipped.MaxForged.ToDictionary(kv => kv.Key, kv => Math.Max(3, kv.Value)),
+    };
 
     /// <summary>The unique table (W:1075-1083, W:1345-1350): id, name, the variant it derives from, the one modifier raised — none for the Light shape and the casters — and what it carries.</summary>
     private static readonly (string Id, string Name, string DerivedFrom, ModifierType? Raised, string[] Enchantments)[] Table =
@@ -99,21 +126,22 @@ public class UniqueContentTests
         }
         Assert.Equal(2, TestWeapons.Get("flensing_knife_unique").Forged.Stacks(CritWindow));
 
-        // The ceiling of the raise is x3 + 5 acquired: x8, with a full five-stack acquired budget still unspent above it.
+        // The ceiling of the raise is x3 plus the acquired headroom, the whole of the headroom still unspent above it.
+        int headroom = Shipped.AcquiredHeadroom;
         foreach (var t in Enum.GetValues<ModifierType>())
-            Assert.Equal(8, Rules.Cap(t, 3));
+            Assert.Equal(3 + headroom, Rules.Cap(t, 3));
 
-        // The ceilings the combat doc quotes: a Weakspot Stiletto at CritSunder x6, a Stiletto-derived unique
-        // raising it at x8, and the Bulwark at Block x8.
-        Assert.Equal(6, Rules.Cap(CritSunder, TestWeapons.Get("weakspot_stiletto").Forged.Stacks(CritSunder)));
-        using (TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        // The ceilings the combat doc quotes, each the forged depth plus the headroom: a Weakspot Stiletto's
+        // CritSunder x1, a Stiletto-derived unique raising it to x3, and the Bulwark's Block x3.
+        Assert.Equal(1 + headroom, Rules.Cap(CritSunder, TestWeapons.Get("weakspot_stiletto").Forged.Stacks(CritSunder)));
+        using (TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
             Martial("test_sundering_stiletto", "weakspot_stiletto", [(CritWindow, 1), (CritMultiplier, 1), (CritSunder, 3)], "siphon")] }))
         {
             var unique = TestWeapons.Get("test_sundering_stiletto");
-            unique.Acquire(CritSunder, 10);
-            Assert.Equal((8, 8), (Rules.Cap(CritSunder, unique.Forged.Stacks(CritSunder)), unique.Stacks(CritSunder)));
+            unique.Acquire(CritSunder, headroom + 5);   // more than the headroom: it stops at the ceiling
+            Assert.Equal((3 + headroom, 3 + headroom), (Rules.Cap(CritSunder, unique.Forged.Stacks(CritSunder)), unique.Stacks(CritSunder)));
         }
-        Assert.Equal(8, Rules.Cap(Block, TestWeapons.Get("the_bulwark").Forged.Stacks(Block)));
+        Assert.Equal(3 + headroom, Rules.Cap(Block, TestWeapons.Get("the_bulwark").Forged.Stacks(Block)));
     }
 
     [Fact]
@@ -216,7 +244,7 @@ public class UniqueContentTests
         Assert.Equal(("widowmaker", ContentValidator.RuleRoleOnMartialOnly), (ex.EntryId, ex.Rule));
 
         // A legitimate derivation loads: the Halberd braced three times, the doc's own example.
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
             Martial("test_halberd_wall", "halberd", [(Brace, 3), (Longshot, 1), (Push, 1)], "immovable")] });
         Assert.Equal(3, TestWeapons.Get("test_halberd_wall").Stacks(Brace));
         Assert.Equal(32 + 11 + 1, Catalogue.All.Count);
@@ -294,7 +322,7 @@ public class UniqueContentTests
         Assert.Equal(new[] { ("serrated", 1), ("vampiric", 3), ("overheal", 1) }, knife.Enchantments.Select(e => (e.Id, e.Tier)));
         Assert.Equal(3, knife.Enchantments[1].LevelsFor(1));   // tier scales a catalogue entry: 3 HP a drink
         Assert.Equal(3, TestWeapons.Get("rotwood").Innate!.Tier);
-        using (TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using (TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
             Martial("test_deep_soul", "tower_guard", [(Block, 3), (Push, 1)], ("sturdy", 3))] }))
             Assert.Equal(1, Assert.Single(TestWeapons.Get("test_deep_soul").Enchantments).Tier);
 
@@ -342,8 +370,8 @@ public class UniqueContentTests
         Assert.Equal(1, Enchantments["vampiric"].Potency);  // 1 HP per tier, per instance
 
         var serrated = Enchantments["serrated"];
-        Assert.Equal((EffectKind.Serrated, 20, (int?)null, (StatusEffectType?)StatusEffectType.Bleeding, 20),
-            (serrated.Effect, serrated.Lock, serrated.Trigger, serrated.Applies, serrated.ApplyPercent));   // BleedPercent: Tuning.ApplyPercent["serrated"]
+        Assert.Equal((EffectKind.Serrated, 20, (int?)null, (StatusEffectType?)StatusEffectType.Bleeding, Shipped.ApplyPercent["serrated"]),
+            (serrated.Effect, serrated.Lock, serrated.Trigger, serrated.Applies, serrated.ApplyPercent));   // BleedPercent: Tuning.ApplyPercent["serrated"], laid over the row
         var burning = Enchantments["burning"];
         Assert.Equal((EffectKind.LingeringElement, 20, (int?)null, (StatusEffectType?)StatusEffectType.Searing, (DamageType?)DamageType.Flaming),
             (burning.Effect, burning.Lock, burning.Trigger, burning.Applies, burning.DamageType));
@@ -400,7 +428,7 @@ public class UniqueContentTests
         Assert.Contains("'poison'", ex.Message);
 
         // Legitimate: a wand fixing its element at tier 3, and a staff dropping with a second catalogue entry.
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
             Wand("test_deep_ember", "wand_of_the_blast", "flaming") with { Enchantments = [new EnchantmentRef("flaming", 3)] },
             Staff("test_mending_ward", "staff_of_renewal", "regeneration", "ward")] });
         Assert.Equal(("flaming", 3), (TestWeapons.Get("test_deep_ember").Innate!.Id, TestWeapons.Get("test_deep_ember").Innate!.Tier));
@@ -441,7 +469,7 @@ public class UniqueContentTests
             w => Assert.True(w.Forged.ContainsKey(Light) || w.Forged.ContainsKey(Resonant), $"{w.Id} carries a dependency off the currency group"));
 
         // Both legitimate homes load beside the defaults, with the element ahead of the burn.
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
             Martial("test_leech", "flensing_knife", [(CritWindow, 3), (CritMultiplier, 1), (Light, 1)], ("vampiric", 3), ("overheal", 1)),
             Wand("test_cinder", "wand_of_the_blast", "flaming", "burning")] });
         Assert.Equal(new[] { "vampiric", "overheal" }, TestWeapons.Get("test_leech").Enchantments.Select(e => e.Id));
@@ -471,121 +499,163 @@ public class UniqueContentTests
     [Fact]
     public void Widowmaker_CritsOn17_CapsAt8()
     {
-        // CritWindow x3: finds the gap on 17+, and a ceiling of 8 with five stacks of headroom above it — 12+ fully worked.
+        // CritWindow x3: finds the gap three stacks' worth of window below the natural 20 (17+ as the doc
+        // prices a stack), and a ceiling of x3 plus the headroom above it — the window fully worked.
         var widowmaker = TestWeapons.Get("widowmaker");
         Assert.Equal("CritWindow x3, CritMultiplier x1", widowmaker.Forged.ToString());
-        Assert.Equal(17, CombatRules.CritThreshold(widowmaker));
-        Assert.Equal(8, Rules.Cap(CritWindow, widowmaker.Forged.Stacks(CritWindow)));
+        int ThresholdAt(int stacks) => CombatRules.NaturalTwenty - (Shipped.Offset[CritWindow] + Shipped.PerStack[CritWindow] * stacks);
+        int threshold = ThresholdAt(3);
+        int ceiling = 3 + Shipped.AcquiredHeadroom;
+        Assert.Equal(threshold, CombatRules.CritThreshold(widowmaker));
+        Assert.Equal(ceiling, Rules.Cap(CritWindow, widowmaker.Forged.Stacks(CritWindow)));
 
         var a = Member(widowmaker);
         var dummy = Member(null, "B");
-        Assert.Equal((RollOutcome.Crit, 45), (Settle(a, dummy, 17).Outcome, Settle(a, dummy, 17).Dealt));   // 15 x3
-        Assert.Equal((RollOutcome.Normal, 15), (Settle(a, dummy, 16).Outcome, Settle(a, dummy, 16).Dealt));
+        int multiplier = Shipped.Offset[CritMultiplier] + Shipped.PerStack[CritMultiplier];   // CritMultiplier x1
+        Assert.Equal((RollOutcome.Crit, widowmaker.Damage * multiplier), (Settle(a, dummy, threshold).Outcome, Settle(a, dummy, threshold).Dealt));
+        Assert.Equal((RollOutcome.Normal, widowmaker.Damage), (Settle(a, dummy, threshold - 1).Outcome, Settle(a, dummy, threshold - 1).Dealt));
 
-        widowmaker.Acquire(CritWindow, 10);
-        Assert.Equal(8, widowmaker.Stacks(CritWindow));
+        widowmaker.Acquire(CritWindow, ceiling);   // more than the headroom: it stops at the ceiling
+        Assert.Equal(ceiling, widowmaker.Stacks(CritWindow));
         Assert.Equal(3, widowmaker.Forged.Stacks(CritWindow));
-        Assert.Equal(12, CombatRules.CritThreshold(widowmaker));
-        Assert.True(Settle(a, dummy, 12).IsCrit);
+        Assert.Equal(ThresholdAt(ceiling), CombatRules.CritThreshold(widowmaker));
+        Assert.True(Settle(a, dummy, ThresholdAt(ceiling)).IsCrit);
     }
 
     [Fact]
     public void Stormcrow_CritsOn19_LongshotX3()
     {
-        // Longshot x3 and CritWindow x1 — the Longbow's window, not the stale ladder row: +3 a tile beyond
-        // the free three, so 26 at ten tiles, 52 on a 19, and the 5 it looks like at knife range.
+        // Longshot x3 and CritWindow x1 — the Longbow's window, not the stale ladder row: three stacks of
+        // Longshot a tile beyond the free tiles, so a bow's shot grows with the room, a crit multiplies all of
+        // it, and at knife range it is the bow it looks like.
         var stormcrow = TestWeapons.Get("stormcrow");
         Assert.Equal("CritWindow x1, Longshot x3", stormcrow.Forged.ToString());
-        Assert.Equal(19, CombatRules.CritThreshold(stormcrow));
+        int threshold = CombatRules.NaturalTwenty - (Shipped.Offset[CritWindow] + Shipped.PerStack[CritWindow]);
+        Assert.Equal(threshold, CombatRules.CritThreshold(stormcrow));
         var a = Member(stormcrow);
-        Assert.Equal(3, a.Value(Longshot));
+        int perTile = Shipped.Offset[Longshot] + Shipped.PerStack[Longshot] * 3;
+        Assert.Equal(perTile, a.Value(Longshot));
         var target = Member(null, "B");
 
-        Assert.Equal(26, Settle(a, target, 10, distanceUnits: 320).Dealt);   // 5 + 7 x 3
-        Assert.Equal(52, Settle(a, target, 19, distanceUnits: 320).Dealt);
-        Assert.Equal(RollOutcome.Normal, Settle(a, target, 18, distanceUnits: 320).Outcome);
-        Assert.Equal(5, Settle(a, target, 10, distanceUnits: 96).Dealt);
+        int AtTiles(int tiles) => stormcrow.Damage + perTile * Math.Max(0, tiles - Shipped.LongshotFreeTiles);
+        Assert.Equal(AtTiles(10), Settle(a, target, 10, distanceUnits: 320).Dealt);   // ten tiles out: the bow and every tile past the free ones
+        Assert.Equal(AtTiles(10) * Shipped.Offset[CritMultiplier], Settle(a, target, threshold, distanceUnits: 320).Dealt);   // no CritMultiplier stacks: the offset alone multiplies it
+        Assert.Equal(RollOutcome.Normal, Settle(a, target, threshold - 1, distanceUnits: 320).Outcome);
+        Assert.Equal(AtTiles(3), Settle(a, target, 10, distanceUnits: 96).Dealt);    // three tiles: knife range
     }
 
     [Fact]
     public void Bulwark_Absorbs9()
     {
-        // Block x3 absorbs 9; worked to its ceiling of x8 it absorbs 24, the Bulwark's ceiling the combat doc quotes.
+        // Block x3 absorbs its three stacks times PerStack[Block] (9 as the doc prices a stack); worked to its
+        // ceiling, x3 plus the headroom, it absorbs the ceiling's worth — the Bulwark's ceiling the combat doc quotes.
+        // Every blade here is forged with no Splitting, so what it meets is the Block less Splitting's offset alone
+        // (nothing, as shipped).
         var bulwark = TestWeapons.Get("the_bulwark");
         Assert.Equal("Block x3, Push x1", bulwark.Forged.ToString());
         var shield = Member(bulwark, "B");
-        Assert.Equal(9, shield.Value(Block));
+        int BlockAt(int stacks) => Shipped.Offset[Block] + Shipped.PerStack[Block] * stacks;
+        int Met(int stacks) => Math.Max(0, BlockAt(stacks) - Shipped.Offset[Splitting]);
+        Assert.Equal(BlockAt(bulwark.Forged.Stacks(Block)), shield.Value(Block));
         var stiletto = Member(TestWeapons.Get("weakspot_stiletto"));
+        int dagger = stiletto.EquippedWeapon!.Damage;
+        int absorbed = Math.Min(Met(3), dagger - 1);   // never below 1 of the weapon's share
         var hit = Settle(stiletto, shield, 10);
-        Assert.Equal((15, 9, 6, true), (hit.WeaponShare, hit.Absorbed, hit.Dealt, hit.Blocked));
+        Assert.Equal((dagger, absorbed, dagger - absorbed, absorbed > 0), (hit.WeaponShare, hit.Absorbed, hit.Dealt, hit.Blocked));
 
-        bulwark.Acquire(Block, 5);
-        Assert.Equal((8, 24), (bulwark.Stacks(Block), shield.Value(Block)));
-        var maul = Member(TestWeapons.Make("Maul", 40, 30, 30));
-        Assert.Equal((24, 6), (Settle(maul, shield, 10).Absorbed, Settle(maul, shield, 10).Dealt));
-        Assert.Equal(1, Settle(stiletto, shield, 10).Dealt);   // never below 1 of the weapon's share
+        int ceiling = 3 + Shipped.AcquiredHeadroom;
+        bulwark.Acquire(Block, ceiling);   // more than the headroom: it stops at the ceiling
+        Assert.Equal((ceiling, BlockAt(ceiling)), (bulwark.Stacks(Block), shield.Value(Block)));
+        var maul = Member(TestWeapons.Make("Maul", 40, Met(ceiling) + 6, 30));   // a blow with six past the worked Block
+        Assert.Equal((Met(ceiling), 6), (Settle(maul, shield, 10).Absorbed, Settle(maul, shield, 10).Dealt));
+        var needle = Member(TestWeapons.Make("Needle", 40, Met(ceiling), 30));   // a blow the worked Block would swallow whole
+        Assert.Equal(1, Settle(needle, shield, 10).Dealt);   // never below 1 of the weapon's share
     }
 
     [Fact]
     public void Shieldbreaker_Ignores9()
     {
-        // Splitting x3 ignores 9 of the target's Block across the swing: the Bulwark's 9 is nothing to it.
+        // Splitting x3 ignores three stacks' worth of the target's Block across the swing (9 as the doc prices
+        // a stack): against the Bulwark's Block x3, stack for stack, what is left is what Block's price exceeds
+        // Splitting's by — nothing, as shipped — and a fourth stack of Block is a stack past what it ignores.
         var shieldbreaker = TestWeapons.Get("shieldbreaker");
         Assert.Equal("Cleave x1, Splitting x3, Opportunist x1", shieldbreaker.Forged.ToString());
         var axe = Member(shieldbreaker);
-        Assert.Equal(9, axe.Value(Splitting));
+        int ignored = Shipped.Offset[Splitting] + Shipped.PerStack[Splitting] * 3;
+        Assert.Equal(ignored, axe.Value(Splitting));
         var shield = Member(TestWeapons.Get("the_bulwark"), "B");
-        Assert.Equal(0, CombatBehaviours.BlockAgainst(axe, shield));
-        Assert.Equal((18, 0, false), (Settle(axe, shield, 10).Dealt, Settle(axe, shield, 10).Absorbed, Settle(axe, shield, 10).Blocked));
+        int share = shieldbreaker.Damage;
+        int LeftAt(int stacks) => Math.Max(0, Shipped.Offset[Block] + Shipped.PerStack[Block] * stacks - ignored);
+        int AbsorbedAt(int stacks) => Math.Min(LeftAt(stacks), share - 1);
 
-        shield.EquippedWeapon!.Acquire(Block, 1);   // x4: 12, of which 9 are ignored
-        Assert.Equal(3, CombatBehaviours.BlockAgainst(axe, shield));
-        Assert.Equal(15, Settle(axe, shield, 10).Dealt);
+        Assert.Equal(LeftAt(3), CombatBehaviours.BlockAgainst(axe, shield));
+        Assert.Equal((share - AbsorbedAt(3), AbsorbedAt(3), AbsorbedAt(3) > 0),
+            (Settle(axe, shield, 10).Dealt, Settle(axe, shield, 10).Absorbed, Settle(axe, shield, 10).Blocked));
+
+        shield.EquippedWeapon!.Acquire(Block, 1);   // x4: one stack past the three it meets stack for stack
+        Assert.Equal(LeftAt(4), CombatBehaviours.BlockAgainst(axe, shield));
+        Assert.Equal(share - AbsorbedAt(4), Settle(axe, shield, 10).Dealt);
     }
 
     [Fact]
     public void HoplitesWall_ThreeRetaliations()
     {
-        // Brace x3: three retaliations a turn at full reach — a fourth entry into the line's reach goes
-        // unanswered until the next turn — each paying Longshot's point at the fourth tile.
+        // Brace x3: its value in retaliations a turn at full reach — three, as the doc prices a stack — and
+        // the entry past them goes unanswered until the next turn, each paying Longshot's point at the fourth
+        // tile. How a stack of Brace is priced is the master's, and the count reads it there; the shove that
+        // carries the dummy into the line, the swords' and the spear's numbers and the Block they meet are the
+        // scenario's premise (Premise), laid under the master's Brace so the geometry holds whatever it says.
+        int retaliations = Shipped.Offset[Brace] + Shipped.PerStack[Brace] * 3;
+        using var premise = TestContent.UsePremise(tuning: t => TuningValues.With(t,
+            ("PerStack.Brace", Shipped.PerStack[Brace]), ("Offset.Brace", Shipped.Offset[Brace])));
+
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "tower_guard");
         var s = Char("S", 5, 11, "hoplites_wall");   // reach covers tiles 7..10 of the row
-        var enemy = Enemy(5, 6);
+        const int Hp = 1000;
+        var enemy = Enemy(5, 6, hp: Hp);
         var turns = new TurnSystem(grid, new[] { a, s }, new[] { enemy }, () => 10);
-        Assert.Equal(3, s.Value(Brace));
+        Assert.Equal(retaliations, s.Value(Brace));
         int braces = 0;
         turns.BraceTriggered += _ => braces++;
 
-        for (int entry = 1; entry <= 4; entry++)
+        for (int entry = 1; entry <= retaliations + 1; entry++)
         {
             (enemy.X, enemy.Y) = At(5, 6);
             turns.NotifyActorMoved(enemy, MoveKind.Forced);   // back out of reach: the pair is released
-            a.DistLeft = ShippedContent.Budget;
+            a.DistLeft = Premise.Budget;
             Assert.True(turns.TryAttack(a, enemy));           // shoved to tile 7, into the line
             Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
-            Assert.Equal(Math.Min(entry, 3), braces);
+            Assert.Equal(Math.Min(entry, retaliations), braces);
         }
-        Assert.Equal(200 - 4 * 7 - 3 * 5, enemy.Hp);   // four sword hits into Block 3, three braces of 7 + 1 into Block 3
+        Assert.Equal(Hp - (retaliations + 1) * 7 - retaliations * 5, enemy.Hp);   // every sword hit into Block 3, and each brace's 7 + 1 into Block 3
     }
 
     [Fact]
     public void FeatheredDeath_FourThrows()
     {
-        // Charges x3: four throws a turn — the Offset's one plus three — and no fifth with movement to spare.
+        // Charges x3: its value in throws a turn — the Offset's one plus a throw a stack, four as the doc prices
+        // them — and not one more with movement to spare. How Charges is priced is the master's, and the count
+        // reads it there, as the ceiling a worked one throws from does; what a throw costs and lands is the
+        // scenario's premise (Premise), laid under the master's Charges.
+        int throws = Shipped.Offset[Charges] + Shipped.PerStack[Charges] * 3;
+        Assert.Equal(3 + Shipped.AcquiredHeadroom, Rules.Cap(Charges, 3));   // the ceiling a worked Feathered Death throws from
+        using var premise = TestContent.UsePremise(tuning: t => TuningValues.With(t,
+            ("PerStack.Charges", Shipped.PerStack[Charges]), ("Offset.Charges", Shipped.Offset[Charges])));
+
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "feathered_death");
         Assert.Equal("CritMultiplier x1, Charges x3", a.EquippedWeapon!.Forged.ToString());
         var enemy = Enemy(5, 8, hp: 1000);
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
-        Assert.Equal(4, turns.AttacksPerTurn(a));
+        Assert.Equal(throws, turns.AttacksPerTurn(a));
 
-        for (int i = 0; i < 4; i++)
+        a.DistLeft = (throws + 1) * 15f;   // movement for a throw more than the cap allows: 15 a throw
+        for (int i = 0; i < throws; i++)
             Assert.True(turns.TryAttack(a, enemy));
         Assert.False(turns.CanAttack(a, enemy));
-        Assert.Equal(ShippedContent.Budget - 4 * 15, a.DistLeft);
-        Assert.Equal(1000 - 4 * 6, enemy.Hp);   // 9 into Block 3, four times
-        Assert.Equal(8, Rules.Cap(Charges, 3));   // nine throws for 135 at the ceiling
+        Assert.Equal(15f, a.DistLeft);
+        Assert.Equal(1000 - throws * 6, enemy.Hp);   // 9 into Block 3, each throw
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -617,17 +687,17 @@ public class UniqueContentTests
 
     private static ContentException LoadWith(WeaponDef extra)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            RaisesAllowed, ShippedContent.Restricted, ShippedContent.Enchantments,
             ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, extra] }));
 
     private static ContentException LoadEnchantmentEditing(string id, Func<EnchantmentDef, EnchantmentDef> edit)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            ShippedContent.Tuning, ShippedContent.Restricted,
+            RaisesAllowed, ShippedContent.Restricted,
             new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList()),
             ShippedContent.Weapons));
 
     private static ContentException LoadEditing(string id, Func<WeaponDef, WeaponDef> edit)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            RaisesAllowed, ShippedContent.Restricted, ShippedContent.Enchantments,
             ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() }));
 }

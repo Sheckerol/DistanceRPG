@@ -209,13 +209,13 @@ public class CampaignVisitTests
         var first = campaign.Enter("tutorial", GoldenSeed);
         Assert.Same(first, campaign.Visit);
 
-        // Farm a dummy — a clean kill, two cycles on its count — and explore, on the first floor.
+        // Farm a dummy — a clean kill, the tuning's clean-kill cycles on its count — and explore, on the first floor.
         var turns = first.OpenTurns(party, () => 10);
         var farmed = first.Current.Enemies[23];
         Assert.Equal((23, "hatchet"), (farmed.SpawnIndex, farmed.Weapon.Id));
         StandBeside(first.Current, party[0], farmed);
         Assert.True(turns.TryAttack(party[0], farmed));
-        Assert.Equal((false, 2), (farmed.Alive, farmed.DefeatCount));
+        Assert.Equal((false, GameContent.Current.Tuning.CleanKillBonus), (farmed.Alive, farmed.DefeatCount));
         var start = first.Current.UpStairs;
         first.Current.Fog.RevealAt(start.R, start.C, first.Current.FogBoxes.FogBoxes);
         Assert.True(first.Current.Fog.Seen[start.R, start.C]);

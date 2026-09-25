@@ -7,12 +7,17 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>DefeatCount</c> drives, the logistic the deep farm gambles on, and the
 /// revival stream. Everything here is a pure function of saved state and the
 /// §5.3 knobs, so every assertion is a claim about the curve rather than about
-/// anything a dummy did. In the content collection because three of them swap
-/// tuning through <see cref="TestContent.Use"/>.
+/// anything a dummy did. The knobs are the ones the curve's worked figures were
+/// written against — the docs' (<see cref="Premise"/>) — made current for each
+/// test, and three tests turn them over it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class FarmLadderTests
+public sealed class FarmLadderTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The prototype's own map seed; it overflows int32, which is the interesting case for a stream mix.</summary>
     private const long Seed = 2762136374;
 
@@ -91,19 +96,19 @@ public class FarmLadderTests
         Assert.Equal(250, FarmLadder.UniqueChancePermille(20));
         Assert.Equal(393, FarmLadder.UniqueChancePermille(25));
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceCeilingPercent = 80 }))
+        using (TestContent.UsePremise(tuning: t => t with { UniqueChanceCeilingPercent = 80 }))
         {
             Assert.Equal(400, FarmLadder.UniqueChancePermille(20));   // still half the ceiling at the midpoint
             Assert.Equal(800, FarmLadder.UniqueChancePermille(1000));
         }
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceMidpoint = 30 }))
+        using (TestContent.UsePremise(tuning: t => t with { UniqueChanceMidpoint = 30 }))
         {
             Assert.Equal(250, FarmLadder.UniqueChancePermille(30));   // the hot zone moved, whole
             Assert.True(FarmLadder.UniqueChancePermille(20) < 250);
         }
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { UniqueChanceKPercent = 52 }))
+        using (TestContent.UsePremise(tuning: t => t with { UniqueChanceKPercent = 52 }))
         {
             Assert.Equal(250, FarmLadder.UniqueChancePermille(20));   // the midpoint is where K does nothing
             Assert.True(FarmLadder.UniqueChancePermille(25) > 393);   // and everywhere else it steepens
@@ -138,7 +143,7 @@ public class FarmLadderTests
         Assert.Equal(2, FarmLadder.DefeatAdvance(dealt: GameConstants.DummyHp, maxHp: GameConstants.DummyHp));
 
         // The bonus is the knob, not the 2.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { CleanKillBonus = 3 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { CleanKillBonus = 3 });
         Assert.Equal(3, FarmLadder.DefeatAdvance(dealt: 40, maxHp: 24));
         Assert.Equal(1, FarmLadder.DefeatAdvance(dealt: 2, maxHp: 24));
     }
@@ -172,14 +177,14 @@ public class FarmLadderTests
                 hits++;
         Assert.InRange(hits, 450, 550);
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { DefeatStackChance = 0 }))
+        using (TestContent.UsePremise(tuning: t => t with { DefeatStackChance = 0 }))
         {
             var never = new Mulberry32(Seed);
             for (int i = 0; i < 100; i++)
                 Assert.False(FarmLadder.RollsAStack(never));
         }
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { DefeatStackChance = 100 }))
+        using (TestContent.UsePremise(tuning: t => t with { DefeatStackChance = 100 }))
         {
             var always = new Mulberry32(Seed);
             for (int i = 0; i < 100; i++)
@@ -240,19 +245,13 @@ public class FarmLadderTests
     }
 
     [Fact]
-    public void TheKnobsAreTheDocsNumbers_AndAreRefusedWhenTheyCannotMeanAnything()
+    public void TheKnobsAreRefusedWhenTheyCannotMeanAnything()
     {
-        Assert.Equal(10, Tuning.ResurrectTurnsBase);
-        Assert.Equal(3, Tuning.ResurrectTurnsFloor);
-        Assert.Equal(50, Tuning.DefeatStackChance);
-        Assert.Equal(2, Tuning.CleanKillBonus);
-        Assert.Equal(15, Tuning.ReviveStepPercent);
-        Assert.Equal(50, Tuning.UniqueChanceCeilingPercent);
-        Assert.Equal(20, Tuning.UniqueChanceMidpoint);
-        Assert.Equal(26, Tuning.UniqueChanceKPercent);
-        Assert.Equal(10, Tuning.DropEnchantChancePercent);
-        Assert.Equal(4, Tuning.ArcanePotency);
-
+        // What each knob is set to is tuning.json's to say, and the master copy's
+        // numbers are pinned nowhere here: the curve's worked figures above stand
+        // on the docs' knobs as their own premise. What is the code's is which
+        // values can mean nothing at all.
+        //
         // A floor of 0 lets ResurrectTurns return 0 and a dummy revive the turn
         // it died, so it is a named startup failure rather than a hang to find.
         Rejected(t => t with { ResurrectTurnsFloor = 0 },

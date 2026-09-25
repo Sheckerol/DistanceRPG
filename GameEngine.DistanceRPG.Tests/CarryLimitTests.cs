@@ -8,13 +8,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// that were a testing remnant. Slot 0 is still the weapon in hand, every bag
 /// slot swaps in, and loot lands in the same slots the weapons are carried in
 /// -- there is no haul bag, so every drop carried out of the dungeon is a
-/// weapon that could have been swung. In the content collection because the
-/// carry is a tuning key and two of these swap it.
+/// weapon that could have been swung. The carry is a tuning key: these stand on
+/// the 24 they were written against (<see cref="Premise"/>), made current for each
+/// test, and two of them swap it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class CarryLimitTests
+public sealed class CarryLimitTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>A fixture member at the centre of tile (5, 5), holding <paramref name="weaponId"/>.</summary>
     private static PartyMemberState Holding(string id, string weaponId)
@@ -40,7 +45,7 @@ public class CarryLimitTests
         // The count is content: a member is built with the carry current when it
         // is made, and keeps it.
         PartyMemberState deep;
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { PartyCarrySlots = 32 }))
+        using (TestContent.UsePremise(tuning: t => t with { PartyCarrySlots = 32 }))
         {
             Assert.Equal(8, PartyMemberState.InventorySlots);
             deep = TestPools.Char("A");
@@ -54,13 +59,13 @@ public class CarryLimitTests
         var five = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 3
             ? m with { BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "arming_sword"] }
             : m).ToList());
-        using (TestContent.Use(party: five))
+        using (TestContent.UsePremise(party: five))
             Assert.Equal(5, GameContent.Current.Party["D"].BagWeaponIds.Count);
 
         var six = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 3
             ? m with { BagWeaponIds = [.. five.Members[3].BagWeaponIds, "hatchet"] }
             : m).ToList());
-        var refused = Assert.Throws<ContentException>(() => TestContent.Use(party: six));
+        var refused = Assert.Throws<ContentException>(() => TestContent.UsePremise(party: six));
         Assert.Equal(("D", ContentValidator.RulePartyBagFits), (refused.EntryId, refused.Rule));
     }
 
@@ -106,7 +111,7 @@ public class CarryLimitTests
         }
 
         // Out of combat every one of them was free; past the last slot there is nothing to swap.
-        Assert.Equal(ShippedContent.Budget, member.DistLeft);
+        Assert.Equal(Premise.Budget, member.DistLeft);
         Assert.False(turns.CanSwap(member, member.Inventory.Length));
     }
 

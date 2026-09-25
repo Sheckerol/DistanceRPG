@@ -232,16 +232,17 @@ public class RestrictedDataTests
         // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked
         // against and the never-rolled list the default souls' unique flag is cross-checked with. A
         // headroom of one banks two stacks on a two-modifier weapon, so this tuning's bosses pay one at
-        // most: a boss never pays as much as the farm (PHASE4-045), and a load refuses one that would.
+        // most — an offset a floor short of the deepest boss floor: a boss never pays as much as the
+        // farm (PHASE4-045), and a load refuses one that would.
         var content = TestContent.Load(
-            ShippedContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = 9 },
+            ShippedContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = ShippedContent.Tuning.BossFloorMax - 1 },
             Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
                  neverRolled: ShippedContent.Restricted.NeverRolled),
             ShippedContent.Enchantments, ShippedContent.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);
         Assert.NotSame(content, GameContent.Current);
-        Assert.Equal(5, GameContent.Current.Modifiers.AcquiredHeadroom);
+        Assert.Equal(ShippedContent.Tuning.AcquiredHeadroom, GameContent.Current.Modifiers.AcquiredHeadroom);   // the running content's is the shipped one still
 
         // Use makes content current; re-using the current content is the only safe swap in a parallel suite.
         GameContent.Use(GameContent.Current);

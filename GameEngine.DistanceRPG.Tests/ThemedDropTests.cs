@@ -12,13 +12,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// not let hold it simply grows something else. Which table a corpse rolls on is
 /// the roster's to say, never the row's.
 /// <para>
-/// In the content collection because the tutorial's floors are generated under
-/// the current content.
+/// The drops are worked in the numbers they were written against — the forge
+/// headroom, the farm's odds (<see cref="Premise"/>) — made current for each test,
+/// and the tutorial's floors are generated under it, so the content collection
+/// holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class ThemedDropTests
+public sealed class ThemedDropTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The prototype's own map seed, and the shipped tutorial's.</summary>
     private const long Seed = 2762136374;
 

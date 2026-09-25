@@ -8,13 +8,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §1.3's staves and the cast economy: a cast is a hit that resolves through
 /// the table, rolls its d20, pays the resolved cast mana plus the innate's
 /// resolved trigger out of what the cast left, lands on the side its innate is
-/// for, and both sides pay and regain mana by the one divisor. In the content
-/// collection because one test swaps the current content.
+/// for, and both sides pay and regain mana by the one divisor. Every scenario
+/// stands on the numbers it was written against — the staves' statlines,
+/// Resonant's tenth, the trigger ladder, each status's effect, the divisor
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class CastTests
+public sealed class CastTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
         => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
@@ -95,7 +102,7 @@ public class CastTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
-        Assert.Equal(ShippedContent.Budget - 40, a.DistLeft);
+        Assert.Equal(Premise.Budget - 40, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - 13 - 1, a.Mana);
         Assert.Equal(((ActorState)a, 14, 14, "staff_of_renewal"), Assert.Single(spent));
         Assert.Equal(new StatusEffect(Regeneration, null, 1), buffed);
@@ -161,7 +168,7 @@ public class CastTests
         Assert.False(turns.TryCast(a, enemy));
         Assert.Empty(enemy.StatusEffects);
         Assert.Equal(TestPools.FixtureMana, a.Mana);
-        Assert.Equal(ShippedContent.Budget, a.DistLeft);
+        Assert.Equal(Premise.Budget, a.DistLeft);
     }
 
     [Fact]
@@ -507,9 +514,9 @@ public class CastTests
             Range: 100, Damage: 0, Cost: 40, ManaCost: 20,
             Forged: new Dictionary<ModifierType, int> { [Resonant] = 1 },
             Enchantments: [new EnchantmentRef("searing_flame")], Shape: null, Unique: false, DerivedFrom: null);
-        using var _ = TestContent.Use(
+        using var _ = TestContent.UsePremise(
             enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, searing]),
-            weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, embers] });
+            weapons: w => w with { Weapons = [.. w.Weapons, embers] });
 
         var (turns, a, b, enemy) = Scene("staff_of_embers");
         var casts = CastProbe(turns);

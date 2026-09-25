@@ -15,12 +15,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// in a slot of its own and never touches the campaign; a tuning changed since
 /// the save is said on screen; and a write that fails is a notice, never an
 /// exception, and never costs the save before it. Every case runs on a temporary
-/// folder of its own, deleted after. In the content collection, since a campaign
-/// is built and restored under the current content and one case swaps it.
+/// folder of its own, deleted after. The runs behind the saves stand on the
+/// numbers they were written against — the seeds' depths, the mercy floor
+/// (<see cref="Premise"/>) — made current for each test, and a campaign is built
+/// and restored under it and some cases change the numbers over it, so the
+/// content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class CampaignBootTests
+public sealed class CampaignBootTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>A fresh empty folder under the system's temp folder, deleted with everything in it once <paramref name="use"/> is done.</summary>
     private static void InTempFolder(Action<string> use)
     {
@@ -636,8 +643,8 @@ public class CampaignBootTests
         {
             // PHASE5-084, §5.3: "loading under different numbers warns rather than
             // refuses ... silently changing a saved game's rules underneath the
-            // player is the failure to avoid". A campaign saved under the shipped
-            // numbers, resumed under others, says so on the screen it opens on.
+            // player is the failure to avoid". A campaign saved under the numbers it
+            // was played under, resumed under others, says so on the screen it opens on.
             var store = new SaveStore(folder);
             var campaign = NewCampaign();
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
@@ -645,8 +652,9 @@ public class CampaignBootTests
             Assert.Equal([BetweenRunsHud.Resumed], Boot(store).Notices);   // the same numbers: nothing to say
             store.ClearResuming();
 
-            var tuned = ShippedContent.Tuning with { MovementBudget = 200 };
-            using (TestContent.Use(tuning: tuned))
+            var played = GameContent.Current.Tuning;
+            var tuned = played with { MovementBudget = 200 };
+            using (TestContent.UsePremise(tuning: _ => tuned))
             {
                 var log = new List<string>();
                 var boot = Boot(store, log: log);
@@ -669,7 +677,7 @@ public class CampaignBootTests
                 Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(rows[1]));
 
                 // The log names both hashes; the campaign is the one saved, playing on.
-                Assert.Contains(log, line => line.Contains(TuningJson.Hash(ShippedContent.Tuning), StringComparison.Ordinal)
+                Assert.Contains(log, line => line.Contains(TuningJson.Hash(played), StringComparison.Ordinal)
                     && line.Contains(TuningJson.Hash(tuned), StringComparison.Ordinal));
                 Assert.Equal(campaign.LockedInOrder, boot.Campaign.LockedInOrder);
                 Assert.Equal(1, boot.Campaign.RunCounter);
@@ -681,7 +689,7 @@ public class CampaignBootTests
                 store.ClearResuming();
             }
 
-            // Back under the shipped numbers, they have changed again, and it says so again.
+            // Back under the numbers it was first played under, they have changed again, and it says so again.
             Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.TuningChanged], Boot(store).Notices);
             store.ClearResuming();
         });
@@ -702,7 +710,7 @@ public class CampaignBootTests
             Saved(store, campaign);
             File.WriteAllText(store.SavePath, "not a save");
 
-            using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200 }))
+            using (TestContent.UsePremise(tuning: t => t with { MovementBudget = 200 }))
             {
                 var boot = Boot(store);
                 Assert.True(boot.Resumed);
@@ -1136,7 +1144,7 @@ public class CampaignBootTests
             Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }));
             Assert.Contains("did not come round to the party's", store.ReadUnsaved()!, StringComparison.Ordinal);
             File.WriteAllText(store.SavePath, "not a save");
-            using (TestContent.Use(tuning: ShippedContent.Tuning with { MovementBudget = 200 }))
+            using (TestContent.UsePremise(tuning: t => t with { MovementBudget = 200 }))
             {
                 var busiest = Boot(store);
                 Assert.True(busiest.Resumed);

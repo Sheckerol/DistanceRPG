@@ -16,6 +16,32 @@ namespace GameEngine.DistanceRPG.Tests;
 /// member; a provisional row says so; and each header says it is the master copy
 /// and names nothing the rework removed. Read from the build's own texts
 /// (<see cref="ShippedData"/>), never from a folder.
+/// <para>
+/// The rest of the suite holds none either (the content rework's R5): a test that
+/// leans on a number of the masters reads it where the game does
+/// (<see cref="ShippedContent"/>), or stands on it as its own input
+/// (<see cref="Premise"/>), so an edit to any number of theirs fails nothing —
+/// bar the few a design doc fixes (REWORK DECISION 3), pinned as literals in the
+/// tests below, so an edit that moves one fails by name and its doc moves with it:
+/// <list type="bullet">
+/// <item><c>MovementBudget</c> 160, and <c>MovementUnitsPerMana</c> 10 derived from
+/// it — phase-1-weapons.md L773-775, <c>(160 − 40) / (8 + 3)</c>:
+/// <see cref="MovementBudgetTests.TheBudgetIsTheTuningsKey"/>.</item>
+/// <item>The eight class rows, the thirty-two weapons' statlines and spreads, the
+/// staves' own mana and the wands' shapes — phase-1-weapons.md §1.2–§1.4 (the
+/// costs at L131-138, the staves at L642-647, the wands at L897-902):
+/// <see cref="WeaponContentTests.Statlines_MatchTheTables"/>,
+/// <see cref="WeaponContentTests.WandShapes_MatchTheTable"/> and
+/// <see cref="WeaponClassTests.AClassRowIsWhatTheClassCarries"/>.</item>
+/// <item>The unique table — phase-1-weapons.md L1075-1083 (§1.5):
+/// <c>UniqueContentTests</c>' <c>Table</c>.</item>
+/// <item>The tutorial's row: its boss pinned to floor 2, and its golem's 80 HP,
+/// movement budget of 40 and Block x3 — phase-5-save.md L300 and L302 (§5.8):
+/// <see cref="DungeonContentTests.TheTutorialIsTheShippedDungeon"/>.</item>
+/// </list>
+/// A relation, an id or a row is no number: a test that names one fails, when an
+/// edit moves it, at the assertion that states it.
+/// </para>
 /// </summary>
 public class ShippedDataTests
 {

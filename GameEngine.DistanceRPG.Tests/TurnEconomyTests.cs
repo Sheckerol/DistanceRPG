@@ -5,11 +5,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// §1.2's turn economy: a weapon swap costs movement once combat has begun
 /// and nothing out of it, gated on the same signal that grants marching, so
-/// no weapon's downside is optional once the fight is on.
+/// no weapon's downside is optional once the fight is on. The swap is priced in
+/// the numbers it was written against — the swap's cost, the budget, the weapons'
+/// statlines (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class TurnEconomyTests
+[Collection(TestContent.Collection)]
+public sealed class TurnEconomyTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId)
         => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
@@ -39,7 +47,7 @@ public class TurnEconomyTests
         Assert.Equal("longbow", a.Inventory[1]!.Id);
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("longbow", a.EquippedWeapon!.Id);
-        Assert.Equal(ShippedContent.Budget, a.DistLeft);
+        Assert.Equal(Premise.Budget, a.DistLeft);
         // A free swap is still a swap: the event records it, settled at zero, so whatever counts swaps sees every one.
         Assert.Equal(new[] { (0, 0, "swap"), (0, 0, "swap") }, spent);
 
@@ -50,13 +58,13 @@ public class TurnEconomyTests
         Assert.Equal(GameContent.Current.Tuning.WeaponSwapCost, turns.SwapCost);
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("weakspot_stiletto", a.EquippedWeapon!.Id);
-        Assert.Equal(ShippedContent.Budget - 20, a.DistLeft);
+        Assert.Equal(Premise.Budget - 20, a.DistLeft);
         Assert.Equal((20, 20, "swap"), spent[^1]);
         Assert.Equal(3, spent.Count);
 
         // A bow user caught at knife range pays 20 to swap and 30 to swing: 50 for the first hit.
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(ShippedContent.Budget - 50, a.DistLeft);
+        Assert.Equal(Premise.Budget - 50, a.DistLeft);
         Assert.Equal(GameConstants.DummyHp - 12, enemy.Hp);   // 15 into Block 3
 
         // Under 20 the swap is refused and nothing changes; at exactly 20 it goes through.
@@ -75,7 +83,7 @@ public class TurnEconomyTests
 
         // An empty slot is nothing to swap to (slots 2 and 3 are empty), slot 0 is the equipped slot itself,
         // and there is no slot past the member's last.
-        a.DistLeft = ShippedContent.Budget;
+        a.DistLeft = Premise.Budget;
         Assert.Null(a.Inventory[2]);
         Assert.False(turns.CanSwap(a, 2));
         Assert.False(turns.CanSwap(a, 0));
@@ -83,7 +91,7 @@ public class TurnEconomyTests
         Assert.False(turns.CanSwap(a, 3));
         Assert.False(turns.CanSwap(a, PartyMemberState.InventorySlots));
         Assert.False(turns.TrySwap(a, 2));
-        Assert.Equal(ShippedContent.Budget, a.DistLeft);
+        Assert.Equal(Premise.Budget, a.DistLeft);
 
         // The signal is a *live* enemy seen: once the only one seen has fallen, swapping is free again this turn.
         enemy.Hp = 1;

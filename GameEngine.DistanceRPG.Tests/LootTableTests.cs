@@ -17,14 +17,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// scorer (PHASE3-003, Phase 4), and the roll has to be right before the placer
 /// can reach it.
 /// </para>
-/// In the content collection because several of these swap content through
-/// <see cref="TestContent.Use"/>.
+/// The drops are worked in the numbers they were written against — the forge
+/// headroom, the enchant chance, the unique curve, the clean-kill bonus
+/// (<see cref="Premise"/>) — made current for each test, and several swap
+/// content over it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class LootTableTests
+public sealed class LootTableTests : IDisposable
 {
     /// <summary>The prototype's own map seed; it overflows int32, which is the interesting case for a stream mix.</summary>
     private const long Seed = 2762136374;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>
     /// A dummy carrying <paramref name="weaponId"/>. Only three things are ever
@@ -90,7 +96,7 @@ public class LootTableTests
             Forged: new Dictionary<ModifierType, int> { [ModifierType.Resonant] = 1 },
             Enchantments: [new EnchantmentRef("poison")], Shape: null, Unique: false, DerivedFrom: null);
 
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, fifth] });
+        using var _ = TestContent.UsePremise(weapons: w => w with { Weapons = [.. w.Weapons, fifth] });
 
         Assert.Equal(5, GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Count);
         Assert.Equal(before, Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList());
@@ -112,15 +118,15 @@ public class LootTableTests
         var order = GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id).ToList();
 
         // The same file with each caster class's variants reversed where they sit.
-        var casters = ShippedContent.Weapons.Weapons
+        var casters = Premise.Weapons.Weapons
             .Where(w => !w.Unique && GameContent.Current.Weapons.KindOf(w.Class) == WeaponKind.Caster)
             .GroupBy(w => w.Class)
             .ToDictionary(g => g.Key, g => new Queue<WeaponDef>(g.Reverse()));
-        var permuted = ShippedContent.Weapons.Weapons
+        var permuted = Premise.Weapons.Weapons
             .Select(w => !w.Unique && casters.TryGetValue(w.Class, out var queue) ? queue.Dequeue() : w)
             .ToList();
 
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = permuted });
+        using var _ = TestContent.UsePremise(weapons: w => w with { Weapons = permuted });
 
         Assert.Equal(order.AsEnumerable().Reverse(), GameContent.Current.Weapons.ByClass(WeaponClass.Staff).Select(d => d.Id));
         Assert.Equal(staves, Sweep("staff_of_blight", defeatCount: 6, spawns: 16).Select(Describe).ToList());
@@ -144,7 +150,7 @@ public class LootTableTests
             Id: "test_glimmer", Name: "Glimmer", Effect: EffectKind.Vampiric, Targets: TargetSide.Ally,
             Lock: 20, Trigger: 3, Potency: 1, ApplyPercent: 100, Applies: null, DamageType: null, Unique: false);
 
-        using var _ = TestContent.Use(enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, appended]));
+        using var _ = TestContent.UsePremise(enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, appended]));
 
         Assert.Equal(14, GameContent.Current.Enchantments.Rollable.Count);   // the content-ordered list did grow
         Assert.Equal(dagger, LootTable.DropOrder(WeaponClass.Dagger));       // the code-ordered one did not
@@ -207,13 +213,13 @@ public class LootTableTests
         // only thing deciding.
         var plain = Sweep("assassins_fang", defeatCount: 0, spawns: 400).Where(d => !d.WasUniqueRoll).ToList();
         int enchanted = plain.Count(d => d.Weapon.Enchantments.Count == 1);
-        Assert.InRange(enchanted / (double)plain.Count, 0.05, 0.18);   // 10% as shipped
+        Assert.InRange(enchanted / (double)plain.Count, 0.05, 0.18);   // the premise's 10%
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 0 }))
+        using (TestContent.UsePremise(tuning: t => t with { DropEnchantChancePercent = 0 }))
             Assert.All(Sweep("assassins_fang", defeatCount: 0, spawns: 64).Where(d => !d.WasUniqueRoll),
                 d => Assert.Empty(d.Weapon.Enchantments));
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 }))
+        using (TestContent.UsePremise(tuning: t => t with { DropEnchantChancePercent = 100 }))
             Assert.All(Sweep("assassins_fang", defeatCount: 0, spawns: 64).Where(d => !d.WasUniqueRoll),
                 d => Assert.Single(d.Weapon.Enchantments));
     }
@@ -226,7 +232,7 @@ public class LootTableTests
         // fire on something it does. The four staff effects are the case that
         // matters: ApplyStatus is in the cast table and no other, so a dagger
         // winning one would reserve its lock for a behaviour that can never run.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { DropEnchantChancePercent = 100 });
 
         var entries = Sweep("assassins_fang", defeatCount: 0, spawns: 400)
             .Where(d => !d.WasUniqueRoll)
@@ -260,7 +266,7 @@ public class LootTableTests
             Assert.DoesNotContain("aegis", LootTable.DropOrder(cls));
         }
 
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { DropEnchantChancePercent = 100 });
         foreach (var (weaponId, element) in EveryClass())
             Assert.All(Sweep(weaponId, defeatCount: 0, spawns: 64, element: element).Where(d => !d.WasUniqueRoll),
                 d => Assert.All(d.Weapon.Enchantments, e => Assert.NotEqual("echoing", e.Id)));
@@ -287,7 +293,7 @@ public class LootTableTests
     {
         // Forged in the §1.1 sense — part of what the weapon is — which is what
         // makes it farmable (§3.2) and what counts toward service time (§6.2).
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DropEnchantChancePercent = 100 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { DropEnchantChancePercent = 100 });
 
         foreach (var (weaponId, element) in EveryClass())
             foreach (var drop in Sweep(weaponId, defeatCount: 0, spawns: 16, element: element).Where(d => !d.WasUniqueRoll))

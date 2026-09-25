@@ -2,9 +2,21 @@
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class TurnSystemTests
+/// <summary>
+/// The turn loop: banking, attacks, the enemies' phase, the threat zones and the
+/// farm's timer. The scenarios stand on the numbers they were written against —
+/// the budget, the weapons' statlines, the shields' Block, the timer
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class TurnSystemTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
         => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
@@ -36,7 +48,7 @@ public class TurnSystemTests
 
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(1, turns.TurnCount);
-        Assert.Equal(ShippedContent.Budget + 50f, a.EffectiveMax);
+        Assert.Equal(Premise.Budget + 50f, a.EffectiveMax);
         Assert.Equal(a.EffectiveMax, a.DistLeft);
     }
 
@@ -53,7 +65,7 @@ public class TurnSystemTests
         turns.TurnEnded += saved => banked = saved;
         turns.EndTurn();
 
-        Assert.Equal(ShippedContent.Budget / 2f, banked);
+        Assert.Equal(Premise.Budget / 2f, banked);
     }
 
     [Fact]
@@ -68,7 +80,7 @@ public class TurnSystemTests
         turns.EnemyHit += (_, r) => res = r;
 
         Assert.True(turns.TryAttack(a, enemy));
-        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // the stiletto's 30: no Light
+        Assert.Equal(Premise.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);   // the stiletto's 30: no Light
         Assert.NotNull(res);
         // Dagger 15 into sword block 3 â†’ 12
         Assert.Equal(12, res.Value.Damage);

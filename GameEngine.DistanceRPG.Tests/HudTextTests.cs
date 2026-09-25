@@ -12,10 +12,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// the whole budget is paralysis; and the two crit riders carry their flavour
 /// (§1.6). The drawing itself is untested — bar the one arithmetic the
 /// inventory panel does, which decides whether what it draws fits the window
-/// it is drawn in (§2.2); these are its strings.
+/// it is drawn in (§2.2); these are its strings. Every string stands on the
+/// numbers it was written against — the weapons' statlines, the modifier
+/// table, each status's effect, the carry, the boss floor range
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class HudTextTests
+[Collection(TestContent.Collection)]
+public sealed class HudTextTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     private static PartyMemberState Holding(string weaponId, DamageType? element = null)
         => TestPools.Holding("A", TestWeapons.Get(weaponId, element));
 
@@ -564,7 +573,7 @@ public class HudTextTests
         member.StartTurn();
         Assert.Equal(120f, member.EffectiveMax);   // the MOVE readout's cap
         Assert.Equal("MIRE 4: MOVEMENT 120 OF 200",
-            DungeonHud.StatusLegend(member, ShippedContent.Budget + 40).Single().Text);
+            DungeonHud.StatusLegend(member, Premise.Budget + 40).Single().Text);
     }
 
     [Fact]

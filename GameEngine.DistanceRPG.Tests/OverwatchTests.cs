@@ -8,11 +8,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §1.2 Overwatch: bank the shot instead of firing, and whatever enters the
 /// bow's reach on the enemy turn is shot for free — walked or shoved in, but
 /// on the enemy's turn, never the party's own — a ranged mirror of Brace on
-/// the same threat-zone machinery.
+/// the same threat-zone machinery. The shots stand on the numbers they were
+/// written against — the bows' reach and damage, the budget, the shields' Block
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class OverwatchTests
+[Collection(TestContent.Collection)]
+public sealed class OverwatchTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
@@ -56,7 +64,7 @@ public class OverwatchTests
 
         Assert.True(turns.CanOverwatch(a));
         Assert.True(turns.TryOverwatch(a));
-        Assert.Equal(ShippedContent.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
+        Assert.Equal(Premise.Budget - a.EquippedWeapon!.ResolvedCost, a.DistLeft);
         Assert.Equal(1, a.HeldShots);
         Assert.False(turns.TryOverwatch(a));   // already holding
 

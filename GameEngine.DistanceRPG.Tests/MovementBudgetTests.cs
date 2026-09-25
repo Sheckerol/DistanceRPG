@@ -66,14 +66,17 @@ public class MovementBudgetTests
 
             member.Rest();
             Assert.Equal((200f, 200f, 0f), (member.DistLeft, member.EffectiveMax, member.SavedMovement));
-
-            // The enemies' cost scale is 100 against the party's budget: a
-            // hatchet's 54 costs a dummy 27 of its 100 under a budget of 200 —
-            // three swings, where 33.75 buys two under the shipped 160.
-            Assert.Equal(3, DummySwings());
         }
 
-        Assert.Equal(2, DummySwings());
+        // The enemies' cost scale is 100 against the party's budget: a hatchet's 54
+        // costs a dummy 27 of its 100 under a budget of 200 — three swings, where
+        // 33.75 buys two under 160. Worked in the numbers the example was written
+        // against — the hatchet's cost and Light's discount (Premise) — the budget
+        // alone moved, so only the budget can move the count.
+        using (TestContent.UsePremise(tuning: t => t with { MovementBudget = 200 }))
+            Assert.Equal(3, DummySwings());
+        using (TestContent.UsePremise())
+            Assert.Equal(2, DummySwings());
         Assert.Equal(ShippedContent.Budget, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
 
         // And a file turns it: the playtest's edit is the game's budget.
@@ -95,7 +98,7 @@ public class MovementBudgetTests
         var banked = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
         banked.SavedMovement = 30f;
         Assert.Equal(230f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, Budget(200)));
-        Assert.Equal(190f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ShippedContent.Tuning));
+        Assert.Equal(ShippedContent.Budget + 30f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ShippedContent.Tuning));
 
         using (TestContent.Use(tuning: Budget(200)))
         {

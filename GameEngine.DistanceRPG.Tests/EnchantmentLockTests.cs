@@ -16,10 +16,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// rest of the suite's trigger arithmetic stands, and the pool being too small
 /// is the whole subject of this file.
 /// </para>
+/// <para>
+/// The fires stand on the numbers they were written against — Arcane's potency,
+/// the mana divisor, the Bulwark's Block (<see cref="Premise"/>) — made current
+/// for each test, so the content collection holds it.
+/// </para>
 /// </summary>
-public class EnchantmentLockTests
+[Collection(TestContent.Collection)]
+public sealed class EnchantmentLockTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
@@ -345,7 +355,7 @@ public class EnchantmentLockTests
         member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
         Assert.Equal((117, 115, 2, 0), (member.MaxMana, member.PaidLocks, member.UsableMaxMana, member.Mana));
 
-        Assert.Equal(2, member.RegenManaFromUnusedMovement(ShippedContent.Budget));
+        Assert.Equal(2, member.RegenManaFromUnusedMovement(Premise.Budget));
         Assert.Equal(2, member.Mana);
 
         Assert.True(turns.TryAttack(member, dummy));
@@ -448,7 +458,7 @@ public class EnchantmentLockTests
         Assert.Equal((100, 60, 40), (member.MaxMana, member.PaidLocks, member.UsableMaxMana));
 
         member.Mana = 0;
-        Assert.Equal(16, member.RegenManaFromUnusedMovement(ShippedContent.Budget));
+        Assert.Equal(16, member.RegenManaFromUnusedMovement(Premise.Budget));
         Assert.Equal(16, member.Mana);
 
         Assert.Equal(24, member.RegenManaFromUnusedMovement(10_000f));

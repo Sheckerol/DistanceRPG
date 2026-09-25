@@ -17,14 +17,22 @@ namespace GameEngine.DistanceRPG.Tests;
 /// These run whole runs on real floors, through the campaign that holds them:
 /// entered, walked down and back up by the stairs, and left by the first floor's
 /// way out or ended by a wipe inside a turn system. Each seed's depth is pinned
-/// by an assertion before a test leans on it. In the content collection, because
-/// one test turns <see cref="Tuning.DeathXpLossPercent"/>.
+/// by an assertion before a test leans on it. Every run stands on the numbers it
+/// was written against — the boss floor range, the mercy floor, the lock a floor,
+/// the clawback's share, the poison that wipes the party (<see cref="Premise"/>) —
+/// made current for each test, and one test turns
+/// <see cref="Tuning.DeathXpLossPercent"/> over it, so the content collection
+/// holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class RunOutcomeTests
+public sealed class RunOutcomeTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The shipped seed: the tutorial's golem holds a Pinning Lance on floor 2, and floor 1's spawn 23 is a hatchet dummy.</summary>
     private const long GoldenSeed = 2762136374;
@@ -408,7 +416,7 @@ public class RunOutcomeTests
         // and between them the share is taken in whole points, truncated.
         foreach (int percent in new[] { 0, 50, 100 })
         {
-            using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { DeathXpLossPercent = percent });
+            using var _ = TestContent.UsePremise(tuning: t => t with { DeathXpLossPercent = percent });
             var party = Party();
             var a = party[0];
             a.WeaponXp[Dagger] = 300;   // before the run: never clawed

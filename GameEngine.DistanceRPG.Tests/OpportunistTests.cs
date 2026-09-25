@@ -6,11 +6,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// §1.2 Opportunist: the axe's free attack on a target that chooses to leave
 /// its reach — the exit-edge mirror of Brace, on the same zone lookup and the
-/// same per-turn pool, and never on forced movement.
+/// same per-turn pool, and never on forced movement. The swings stand on the
+/// numbers they were written against — the axe's damage, the shields' Block
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class OpportunistTests
+[Collection(TestContent.Collection)]
+public sealed class OpportunistTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 

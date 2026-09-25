@@ -3,10 +3,20 @@ using static GameEngine.DistanceRPG.Logic.ModifierType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
+/// <summary>
+/// The modifier rules as the game loads them: the relations, and the numbers the
+/// rules read out of the tuning. Every number expected here is the master's — the
+/// tuning the game reads (<see cref="ShippedContent.Tuning"/>) — so a table edited
+/// in <c>tuning.json</c> moves what these expect with it: what is pinned is how
+/// the rules read and combine the numbers, never what the numbers are.
+/// </summary>
 public class ModifierRulesTests
 {
     private static ModifierRules Rules => GameContent.Current.Modifiers;
     private static readonly ModifierType[] All = Enum.GetValues<ModifierType>();
+
+    /// <summary>The tuning the game reads: the numbers the rules are expected to resolve.</summary>
+    private static Tuning Shipped => ShippedContent.Tuning;
 
     [Fact]
     public void ModifierType_HasTheTwentyThreeMembers_InDocOrder()
@@ -33,74 +43,75 @@ public class ModifierRulesTests
     }
 
     [Theory]
-    [InlineData(CritMultiplier, 0, 2)]   // base x2 with no stacks
-    [InlineData(CritMultiplier, 1, 3)]
-    [InlineData(CritMultiplier, 8, 10)]  // only a unique that raised CritMultiplier reaches x10
-    [InlineData(Charges, 1, 2)]          // the shipped baseline: 2 throws at x1
-    [InlineData(Charges, 8, 9)]          // 9 throws for 135, just inside the budget
-    [InlineData(CritMultiplier, 6, 8)]   // forged x1 and fully worked: the x8 multiplier ceiling
-    [InlineData(Block, 3, 9)]            // The Bulwark
-    [InlineData(Light, 5, 50)]           // a maxed graft halves any weapon
-    [InlineData(Light, 6, 60)]           // the Light ceiling: a 60% discount
-    [InlineData(Resonant, 6, 60)]        // the same ceiling for the same shape
-    [InlineData(CritWindow, 8, 8)]       // crit on 12+
-    [InlineData(Brace, 0, 0)]
-    public void Resolve_IsOffsetPlusPerStackTimesStacks(ModifierType t, int stacks, int expected)
-        => Assert.Equal(expected, Rules.Resolve(t, stacks));
+    [InlineData(CritMultiplier, 0)]   // no stacks: the offset alone
+    [InlineData(CritMultiplier, 1)]
+    [InlineData(CritMultiplier, 8)]   // only a unique that raised CritMultiplier gets this deep
+    [InlineData(Charges, 1)]          // the shipped baseline: a thrower forged x1
+    [InlineData(Charges, 8)]          // a thrower worked to the top
+    [InlineData(CritMultiplier, 6)]   // forged x1 and fully worked: the multiplier's ceiling
+    [InlineData(Block, 3)]            // The Bulwark
+    [InlineData(Light, 5)]            // a maxed graft
+    [InlineData(Light, 6)]            // the Light ceiling
+    [InlineData(Resonant, 6)]         // the same ceiling for the same shape
+    [InlineData(CritWindow, 8)]
+    [InlineData(Brace, 0)]
+    public void Resolve_IsOffsetPlusPerStackTimesStacks(ModifierType t, int stacks)
+        => Assert.Equal(Shipped.Offset[t] + Shipped.PerStack[t] * stacks, Rules.Resolve(t, stacks));
 
     [Theory]
-    [InlineData(Brace, 1)]
-    [InlineData(Block, 3)]
-    [InlineData(CritWindow, 1)]
-    [InlineData(CritMultiplier, 1)]
-    [InlineData(Cleave, 1)]
-    [InlineData(Charges, 1)]
-    [InlineData(Longshot, 1)]
-    [InlineData(Light, 10)]
-    [InlineData(Riposte, 1)]
-    [InlineData(Push, 1)]
-    [InlineData(Drag, 1)]
-    [InlineData(Splitting, 3)]
-    [InlineData(Overwatch, 1)]
-    [InlineData(Opportunist, 1)]
-    [InlineData(Rout, 1)]
-    [InlineData(Pin, 1)]
-    [InlineData(Softening, 3)]
-    [InlineData(CritWeaken, 1)]
-    [InlineData(CritSunder, 1)]
-    [InlineData(BlockWeaken, 1)]
-    [InlineData(OnHitPoison, 0)]
-    [InlineData(Resonant, 10)]
-    [InlineData(Momentum, 0)]
-    public void PerStack_MatchesTheModifierTable(ModifierType t, int perStack)
-        => Assert.Equal(perStack, Rules.PerStack(t));
+    [InlineData(Brace)]
+    [InlineData(Block)]
+    [InlineData(CritWindow)]
+    [InlineData(CritMultiplier)]
+    [InlineData(Cleave)]
+    [InlineData(Charges)]
+    [InlineData(Longshot)]
+    [InlineData(Light)]
+    [InlineData(Riposte)]
+    [InlineData(Push)]
+    [InlineData(Drag)]
+    [InlineData(Splitting)]
+    [InlineData(Overwatch)]
+    [InlineData(Opportunist)]
+    [InlineData(Rout)]
+    [InlineData(Pin)]
+    [InlineData(Softening)]
+    [InlineData(CritWeaken)]
+    [InlineData(CritSunder)]
+    [InlineData(BlockWeaken)]
+    [InlineData(OnHitPoison)]
+    [InlineData(Resonant)]
+    [InlineData(Momentum)]
+    public void PerStack_MatchesTheModifierTable(ModifierType t)
+        => Assert.Equal(Shipped.PerStack[t], Rules.PerStack(t));
 
     [Fact]
-    public void Offset_IsCritMultiplierTwo_ChargesOne_ElseZero()
+    public void Offset_IsTheTuningsTable()
     {
         foreach (var t in All)
-            Assert.Equal(t switch { CritMultiplier => 2, Charges => 1, _ => 0 }, Rules.Offset(t));
+            Assert.Equal(Shipped.Offset[t], Rules.Offset(t));
     }
 
     [Fact]
     public void Cap_IsForgedPlusHeadroom_NoFlatTerm()
     {
-        Assert.Equal(5, Rules.AcquiredHeadroom);
+        int headroom = Shipped.AcquiredHeadroom;
+        Assert.Equal(headroom, Rules.AcquiredHeadroom);
         foreach (var t in All)
         {
-            Assert.Equal(8, Rules.Cap(t, 3));     // Widowmaker's CritWindow x3: a ceiling of 8
-            Assert.Equal(7, Rules.Cap(t, 2));     // Assassin's Fang, the Purity dagger: one higher than its siblings
-            Assert.Equal(6, Rules.Cap(t, 1));     // Flensing Knife: CritWindow and Light both ceiling at 6
-            Assert.Equal(5, Rules.Cap(t, 0));     // never forged: caps at 5
-            Assert.Equal(105, Rules.Cap(t, 100)); // nothing is capped
+            Assert.Equal(3 + headroom, Rules.Cap(t, 3));     // Widowmaker's CritWindow x3
+            Assert.Equal(2 + headroom, Rules.Cap(t, 2));     // Assassin's Fang, the Purity dagger: one higher than its siblings
+            Assert.Equal(1 + headroom, Rules.Cap(t, 1));     // Flensing Knife: CritWindow and Light alike
+            Assert.Equal(headroom, Rules.Cap(t, 0));         // never forged: the headroom alone
+            Assert.Equal(100 + headroom, Rules.Cap(t, 100)); // nothing is capped
         }
     }
 
     [Fact]
-    public void MaxForged_IsOneForCurrencyPair_ElseThree()
+    public void MaxForged_IsTheTuningsTable()
     {
         foreach (var t in All)
-            Assert.Equal(t is Light or Resonant ? 1 : 3, Rules.MaxForged(t));
+            Assert.Equal(Shipped.MaxForged[t], Rules.MaxForged(t));
     }
 
     [Fact]
@@ -286,11 +297,11 @@ public class ModifierRulesTests
 
         Assert.Equal(2, rules.AcquiredHeadroom);
         Assert.Equal(3, rules.Cap(Brace, 1));
-        Assert.Equal(8, rules.Resolve(Block, 2));
-        Assert.Equal(3, rules.Resolve(CritMultiplier, 1));   // the offset and per-stack the tuning leaves alone: the shipped 2 + 1
-        Assert.Equal(1, rules.MaxForged(Block));              // moved
-        Assert.Equal(1, rules.MaxForged(Light));              // left alone: the shipped limit
-        Assert.Equal(3, rules.MaxForged(Brace));              // left alone: the shipped 3
+        Assert.Equal(Shipped.Offset[Block] + 4 * 2, rules.Resolve(Block, 2));   // the moved per-stack, over the offset left alone
+        Assert.Equal(Shipped.Offset[CritMultiplier] + Shipped.PerStack[CritMultiplier], rules.Resolve(CritMultiplier, 1));   // the offset and per-stack the tuning leaves alone: the shipped ones
+        Assert.Equal(1, rules.MaxForged(Block));                          // moved
+        Assert.Equal(Shipped.MaxForged[Light], rules.MaxForged(Light));   // left alone: the shipped limit
+        Assert.Equal(Shipped.MaxForged[Brace], rules.MaxForged(Brace));   // left alone: the shipped limit
     }
 
     [Fact]
@@ -309,14 +320,14 @@ public class ModifierRulesTests
             Assert.Equal(t == Block ? 1 : Rules.MaxForged(t), rules.MaxForged(t));
         }
 
-        // No dead stacks from a partial file: every priced modifier is still worth something.
-        foreach (var t in All.Where(t => t is not (OnHitPoison or Momentum)))
+        // No dead stacks from a partial file: every modifier the shipped table prices is still worth something.
+        foreach (var t in All.Where(t => Shipped.PerStack[t] > 0))
             Assert.True(rules.PerStack(t) > 0, $"{t}: a partial table zeroed its stacks");
 
-        // An explicit zero is an override, not an absence.
+        // An explicit zero is an override, not an absence: three stacks are worth the offset alone.
         var zeroed = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 0 } }""", ShippedContent.Tuning).Tuning, ShippedContent.Restricted);
         Assert.Equal(0, zeroed.PerStack(Block));
-        Assert.Equal(0, zeroed.Resolve(Block, 3));
+        Assert.Equal(Shipped.Offset[Block], zeroed.Resolve(Block, 3));
 
         // A table built in code that names one entry alone — no file, so no merge —
         // has no number under the other twenty-two: refused, naming the first it
@@ -348,24 +359,14 @@ public class ModifierRulesTests
     }
 
     [Fact]
-    public void Tuning_CompiledDefaults_MatchTheDocs()
+    public void Tuning_IsTheShippedTuning_PricingEveryModifier()
     {
+        // What each key is set to is tuning.json's to say: its doc-fixed numbers
+        // are pinned where their docs are (ShippedDataTests lists them), and no
+        // other is pinned anywhere. What is the code's is that the game plays the
+        // shipped tuning, and that its per-stack table prices every modifier.
         var tuning = GameContent.Current.Tuning;
         Assert.Same(ShippedContent.Tuning, tuning);
-        Assert.Equal(5, tuning.AcquiredHeadroom);
         Assert.Equal(23, tuning.PerStack.Count);
-        Assert.Equal(1, tuning.EffectPerLevel[StatusEffectType.Regeneration]);
-        Assert.Equal(5, tuning.OverhealPerWard);
-        Assert.Equal(3, tuning.DotDamagePerMana);
-        Assert.Equal(20, tuning.ApplyPercent["flaming"]);
-        Assert.Equal(15, tuning.ApplyPercent["cold"]);
-        Assert.Equal(25, tuning.ApplyPercent["shocking"]);
-        Assert.Equal(15, tuning.ApplyPercent["acidic"]);
-        Assert.Equal(10, tuning.MovementUnitsPerMana);
-        Assert.Equal(16, (int)ShippedContent.Budget / tuning.MovementUnitsPerMana);   // a fully banked turn
-        Assert.Equal(20, tuning.WeaponSwapCost);
-        Assert.Equal(3, tuning.LongshotFreeTiles);
-        Assert.False(tuning.FriendlyFireEnabled);
-        Assert.Equal(50, tuning.FriendlyFireAllyPercent);
     }
 }

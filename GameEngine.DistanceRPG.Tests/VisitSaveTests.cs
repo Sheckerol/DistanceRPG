@@ -18,13 +18,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// Played by <see cref="VisitScript"/>, on the game's own campaign
 /// (<see cref="CampaignState.Start"/>) and catalogue weapons only — a save names
 /// content by id — with every seed's depth pinned by an assertion before a test
-/// leans on it. In the content collection, since several restores run under
-/// another tuning, other relations or a reordered weapons file.
+/// leans on it. The seeds' depths, the farm's timer and the bosses' statlines are
+/// the numbers they were written against (<see cref="Premise"/>), made current for
+/// each test, and several restores run over it under another tuning, other
+/// relations or a reordered weapons file, so the content collection holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class VisitSaveTests
+public sealed class VisitSaveTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>A seed the Spear Hall rolls five floors on, its boss holding a Tower Guard (pinned where a test leans on it).</summary>
     private const long FiveDeep = 4;
 
@@ -414,7 +420,7 @@ public class VisitSaveTests
         string text = Save(script.Campaign);
 
         var blockOrBrace = ShippedContent.Restricted with { Excludes = [.. ShippedContent.Restricted.Excludes, ["Brace", "Block"]] };
-        using (TestContent.Use(restricted: blockOrBrace))
+        using (TestContent.UsePremise(restricted: blockOrBrace))
         {
             var hall = GameContent.Current.Dungeons["spear_hall"];
             Assert.DoesNotContain(WeaponClass.Sword, GameContent.Current.Dungeons.WieldClasses(hall));
@@ -451,8 +457,8 @@ public class VisitSaveTests
             deep.Down();
         string bottom = Save(deep.Campaign);
 
-        var shallow = ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4, BossStackOffset = 0 };
-        using (TestContent.Use(tuning: shallow))
+        var shallow = Premise.Tuning with { BossFloorMin = 3, BossFloorMax = 4, BossStackOffset = 0 };
+        using (TestContent.UsePremise(tuning: _ => shallow))
         {
             var hall = GameContent.Current.Dungeons["spear_hall"];
             Assert.Equal(3, DungeonState.RollBossFloor(FiveDeep, hall));
@@ -465,7 +471,7 @@ public class VisitSaveTests
             Assert.False(back.Floors[4].Visited);
             Assert.Equal(1, back.Floors[4].Boss!.PromisedStacks);
             Assert.Equal(5 * GameContent.Current.Tuning.CooldownRunsPerFloor, back.LockRuns);
-            Assert.Equal(text.Replace(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
+            Assert.Equal(text.Replace(TuningJson.Hash(Premise.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
 
             var reached = Load(bottom).Campaign.Visit!;
             Assert.True(reached.Floors[4].Visited);
@@ -851,12 +857,12 @@ public class VisitSaveTests
         script.Up();
         string text = Save(script.Campaign);
 
-        var generous = ShippedContent.Tuning with { DropEnchantChancePercent = 100, DefeatStackChance = 0 };
-        using (TestContent.Use(tuning: generous))
+        var generous = Premise.Tuning with { DropEnchantChancePercent = 100, DefeatStackChance = 0 };
+        using (TestContent.UsePremise(tuning: _ => generous))
         {
             var loaded = Load(text);
             Assert.True(loaded.TuningChanged);
-            Assert.Equal(text.Replace(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
+            Assert.Equal(text.Replace(TuningJson.Hash(Premise.Tuning), TuningJson.Hash(GameContent.Current.Tuning), Ordinal), Save(loaded.Campaign));
             var back = new VisitScript(loaded.Campaign);
             var row = back.Row(1, 21);
             Assert.Equal(Describe(shown.Weapon), Describe(DungeonState.GroundItemOf(back.Visit.Floors[1], row, bossDefeated: true)!.Weapon));
@@ -868,7 +874,7 @@ public class VisitSaveTests
 
         // A revival is a future event (the arrival rule, L1307-1315): with the boss
         // standing, a dummy put down a turn before the save — not due for nine turns
-        // under the shipped numbers — gets up as its floor is opened under a tuning
+        // under the premise's numbers — gets up as its floor is opened under a tuning
         // that makes it due, and stays down under the numbers it was saved under.
         var farm = VisitScript.Enter(NewCampaign(), "tutorial", GoldenSeed);
         var knife = farm.Row(20, "flensing_knife");
@@ -882,8 +888,8 @@ public class VisitSaveTests
         same.Resume();
         Assert.False(same.Row(0, 20).Alive);
 
-        var quick = ShippedContent.Tuning with { ResurrectTurnsBase = 1, ResurrectTurnsFloor = 1 };
-        using (TestContent.Use(tuning: quick))
+        var quick = Premise.Tuning with { ResurrectTurnsBase = 1, ResurrectTurnsFloor = 1 };
+        using (TestContent.UsePremise(tuning: _ => quick))
         {
             var loaded = Load(pending);
             Assert.True(loaded.TuningChanged);
@@ -906,10 +912,9 @@ public class VisitSaveTests
         var script = Flagship();
         string text = Save(script.Campaign);
 
-        var reversed = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Reverse().ToArray() };
-        using (TestContent.Use(weapons: reversed))
+        using (TestContent.UsePremise(weapons: w => w with { Weapons = w.Weapons.Reverse().ToArray() }))
         {
-            Assert.NotEqual(ShippedContent.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
+            Assert.NotEqual(Premise.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
             var loaded = Load(text);
             Assert.False(loaded.TuningChanged);
             var back = loaded.Campaign.Visit!;

@@ -352,7 +352,7 @@ public class ContentFilesTests
         var edited = ShippedData.Load(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "hatchet", "\"adds\": { \"Light\": 1 },", "\"adds\": { \"Light\": 1 }, \"damage\": 20,") });
         Assert.Empty(edited.Notices);
         Assert.Equal(20, edited.Content!.Weapons["hatchet"].Damage);
-        Assert.Equal(18, edited.Content.Weapons["great_axe"].Damage);
+        Assert.Equal(ShippedContent.Weapons.Weapons.Single(w => w.Id == "great_axe").Damage, edited.Content.Weapons["great_axe"].Damage);   // its class's, as the master has it
 
         // ...and one it leaves out is gone, not filled in from the built-in
         // weapons: the code names arming_sword as what a dummy holds, so the load
@@ -653,7 +653,7 @@ public class ContentFilesTests
         });
         Assert.Empty(edited.Notices);
         Assert.Equal(25, edited.Content!.Weapons["weakspot_stiletto"].Damage);
-        Assert.Equal(15, edited.Content.Weapons["assassins_fang"].Damage);
+        Assert.Equal(ShippedContent.Weapons.Weapons.Single(w => w.Id == "assassins_fang").Damage, edited.Content.Weapons["assassins_fang"].Damage);   // its class's, as the master has it
         Assert.Equal("The Pike Hall", edited.Content.Dungeons["spear_hall"].Name);
 
         // PHASE5-090: "which weapons and dungeons use it?" — "it" a modifier or an

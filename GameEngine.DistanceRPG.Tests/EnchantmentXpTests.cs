@@ -15,10 +15,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// are credited their shares of the same spend, so nothing is counted twice and
 /// nothing is counted at two different figures.
 /// </para>
+/// <para>
+/// The spends stand on the numbers they were written against — the staves' mana,
+/// Resonant's tenth, Arcane's potency, the trigger ladder (<see cref="Premise"/>) —
+/// made current for each test, so the content collection holds it.
+/// </para>
 /// </summary>
-public class EnchantmentXpTests
+[Collection(TestContent.Collection)]
+public sealed class EnchantmentXpTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
@@ -195,7 +205,7 @@ public class EnchantmentXpTests
         for (int cast = 0; cast < 14; cast++)
         {
             caster.Mana = caster.UsableMaxMana;
-            caster.DistLeft = ShippedContent.Budget;
+            caster.DistLeft = Premise.Budget;
             Assert.True(turns.TryCast(caster, ally));
         }
         Assert.Equal((1, 14), Entry(staff, 0));           // a point short of the bar
@@ -204,7 +214,7 @@ public class EnchantmentXpTests
         // clamp below is read against, because the same record's mana credit
         // grows the earned pool a point on its way past.
         caster.Mana = caster.UsableMaxMana;
-        caster.DistLeft = ShippedContent.Budget;
+        caster.DistLeft = Premise.Budget;
         int ceiling = caster.UsableMaxMana;
         Assert.True(turns.TryCast(caster, ally));
 
@@ -235,7 +245,7 @@ public class EnchantmentXpTests
         // at what the pool could pay rather than overdrawing it.
         roll = 1;
         caster.Mana = staff.ResolvedManaCost;
-        caster.DistLeft = ShippedContent.Budget;
+        caster.DistLeft = Premise.Budget;
 
         Assert.True(turns.TryCast(caster, ally));
 
@@ -373,7 +383,7 @@ public class EnchantmentXpTests
         for (int fired = 0; fired < 200 && weapon.Enchantments[0].Tier == 1; fired++)
         {
             member.Mana = member.UsableMaxMana;
-            member.DistLeft = ShippedContent.Budget;
+            member.DistLeft = Premise.Budget;
             Fire(turns, member, dummy, def, weapon);
         }
 
@@ -458,7 +468,7 @@ public class EnchantmentXpTests
 
         for (int swing = 0; swing < 4; swing++)
         {
-            a.DistLeft = ShippedContent.Budget;
+            a.DistLeft = Premise.Budget;
             Assert.True(turns.TryAttack(a, dummy));
         }
 
@@ -496,8 +506,8 @@ public class EnchantmentXpTests
 
         for (int swing = 0; swing < 10; swing++)
         {
-            wizard.DistLeft = ShippedContent.Budget;
-            fighter.DistLeft = ShippedContent.Budget;
+            wizard.DistLeft = Premise.Budget;
+            fighter.DistLeft = Premise.Budget;
             Assert.True(turns.TryAttack(wizard, wizardDummy));
             Assert.True(turns.TryAttack(fighter, fighterDummy));
         }
@@ -557,7 +567,7 @@ public class EnchantmentXpTests
         var onHit = new List<int>();
         turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 8), "hit",
             (p, _, _) => { onHit.Add(p.Payments.IsDefaultOrEmpty ? 0 : p.Payments.Length); return p; });
-        member.DistLeft = ShippedContent.Budget;
+        member.DistLeft = Premise.Budget;
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal(new[] { 0 }, onHit.ToArray());
         Assert.Equal(new[] { 0, 4 }, Xps(knife));

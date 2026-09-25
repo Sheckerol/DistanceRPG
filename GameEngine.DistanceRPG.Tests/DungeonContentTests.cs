@@ -10,6 +10,13 @@ namespace GameEngine.DistanceRPG.Tests;
 /// theme computes from the relations (never authored), what a boss can hold,
 /// the one question every graft asks, and the Phase 4 tuning keys. In the
 /// content collection because several tests load or swap content.
+/// <para>
+/// The golem's statline is phase-5-save.md's (S:302), pinned here as literals in
+/// <see cref="TheTutorialIsTheShippedDungeon"/> (REWORK DECISION 3). Every other
+/// number is the master's: a test reads it from the tuning the game reads, or,
+/// where a case is worked around the numbers F:139-165 was written against, it
+/// edits those (<see cref="Premise"/>).
+/// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
 public class DungeonContentTests
@@ -54,9 +61,9 @@ public class DungeonContentTests
     private static DungeonDef WithInnate(DungeonDef def, params (ModifierType Type, int Stacks)[] innate)
         => def with { Boss = def.Boss with { Innate = innate.ToDictionary(e => e.Type, e => e.Stacks) } };
 
-    /// <summary>The shipped content with <paramref name="dungeons"/>, loaded (and never made current).</summary>
-    private static GameContent Load(DungeonsData dungeons)
-        => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons,
+    /// <summary>The shipped content with <paramref name="dungeons"/>, loaded (and never made current) — under <paramref name="tuning"/> when one is named.</summary>
+    private static GameContent Load(DungeonsData dungeons, Tuning? tuning = null)
+        => TestContent.Load(tuning ?? ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons,
             dungeons: dungeons);
 
     /// <summary>The shipped content under <paramref name="tuning"/>, loaded (and never made current).</summary>
@@ -67,11 +74,11 @@ public class DungeonContentTests
     private static Tuning WithMaxForged(ModifierType t, int limit)
         => ShippedContent.Tuning with { MaxForged = new Dictionary<ModifierType, int>(ShippedContent.Tuning.MaxForged) { [t] = limit } };
 
-    private static ContentException Rejected(DungeonsData dungeons) => Assert.Throws<ContentException>(() => Load(dungeons));
+    private static ContentException Rejected(DungeonsData dungeons, Tuning? tuning = null) => Assert.Throws<ContentException>(() => Load(dungeons, tuning));
 
-    private static void Refused(DungeonsData dungeons, string entry, string rule)
+    private static void Refused(DungeonsData dungeons, string entry, string rule, Tuning? tuning = null)
     {
-        var ex = Rejected(dungeons);
+        var ex = Rejected(dungeons, tuning);
         Assert.Equal((entry, rule), (ex.EntryId, ex.Rule));
         Assert.Contains(ex.Rule, ex.Message);
     }
@@ -102,14 +109,15 @@ public class DungeonContentTests
         Assert.Equal(new[] { (Block, 3) }, golem.Innate.OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)));
 
         // Beside it the four provisional dungeons, each a theme with a unique to
-        // hunt, each rolling its depth from the tuning's 5-10.
+        // hunt, each rolling its depth from the tuning's range.
         Assert.Equal(new[] { "tutorial", "spear_hall", "long_gallery", "knife_warrens", "quiver_pits" }, Dungeons.All.Select(d => d.Id));
         Assert.Equal(new[] { Block, Brace, Longshot, CritWindow, Charges }, Dungeons.All.Select(d => d.Theme));
+        var tuning = GameContent.Current.Tuning;
         foreach (var def in Dungeons.All.Where(d => d != tutorial))
         {
             Assert.Null(def.BossFloorMin);
             Assert.Null(def.BossFloorMax);
-            Assert.Equal((5, 10), Dungeons.BossFloorRange(def));
+            Assert.Equal((tuning.BossFloorMin, tuning.BossFloorMax), Dungeons.BossFloorRange(def));
             Assert.False(def.RetiresOnClear);
         }
 
@@ -173,7 +181,15 @@ public class DungeonContentTests
         // classes" (F:263-264, PHASE4-057), and nothing normalises breadth.
         Assert.Equal(AllEight, Dungeons.ThemeClasses(Block));
         Assert.Equal(AllEight, Dungeons.ThemeClasses(Dungeons.Tutorial.Theme));
-        Assert.Equal(AllEight, Dungeons.ThemeClasses(Cleave));
+
+        // Cleave is related to nothing, so its table is every class whose drops have
+        // forge room for one more stack of it — all eight under the shipped limit;
+        // how deep Cleave may be forged is tuning.json's to say.
+        Assert.DoesNotContain(Cleave, Rules.Excludes);
+        Assert.DoesNotContain(Cleave, Rules.Requires);
+        Assert.DoesNotContain(Cleave, Rules.RequiresKind);
+        Assert.Equal(AllEight.Where(cls => DropVariants(cls).All(v => v.Forged.GetValueOrDefault(Cleave) < Rules.MaxForged(Cleave))),
+            Dungeons.ThemeClasses(Cleave));
 
         // The one variant that could have refused it is Tower Guard, forged Block x2:
         // the golem's graft lands it on exactly MaxForged, and not past it.
@@ -274,8 +290,7 @@ public class DungeonContentTests
         Assert.All(Weapons.All.Where(d => !d.Unique), d => Assert.True(d.Forged.GetValueOrDefault(Pin) < 2, d.Id));
         Refused(With("knife_warrens", d => d with { Theme = Pin }), "knife_warrens", ContentValidator.RuleThemeIsClassSignature);
 
-        // Light, forge-limited to x1 (PHASE4-071): a Light graft can never be the x3 of a unique.
-        Assert.Equal(1, Rules.MaxForged(Light));
+        // Light, forge-limited to x1 as shipped (PHASE4-071): a Light graft can never be the x3 of a unique.
         Refused(With("knife_warrens", d => d with { Theme = Light }), "knife_warrens", ContentValidator.RuleThemeIsClassSignature);
 
         // CritMultiplier is in F:313-315's list but is a second baseline modifier
@@ -284,7 +299,6 @@ public class DungeonContentTests
         // under the shipped content, so both are refused -- a recorded departure.
         Assert.All(Weapons.All.Where(d => !d.Unique), d => Assert.True(d.Forged.GetValueOrDefault(CritMultiplier) < 2, d.Id));
         Refused(With("knife_warrens", d => d with { Theme = CritMultiplier }), "knife_warrens", ContentValidator.RuleThemeIsClassSignature);
-        Assert.Equal(1, Rules.MaxForged(Resonant));
         Refused(With("knife_warrens", d => d with { Theme = Resonant }), "knife_warrens", ContentValidator.RuleThemeIsClassSignature);
 
         // Nothing outside the enum passes either.
@@ -440,7 +454,8 @@ public class DungeonContentTests
     public void ABossFloorRangeStartsAtFloorOne_AndIsNeverInverted()
     {
         // A pinned range is its own; an unpinned one is the tuning's.
-        Assert.Equal((5, 10), Dungeons.BossFloorRange(Dungeons["spear_hall"]));
+        var tuning = GameContent.Current.Tuning;
+        Assert.Equal((tuning.BossFloorMin, tuning.BossFloorMax), Dungeons.BossFloorRange(Dungeons["spear_hall"]));
         using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4 }))
         {
             var swapped = GameContent.Current.Dungeons;
@@ -451,10 +466,11 @@ public class DungeonContentTests
         Refused(With("tutorial", d => d with { BossFloorMin = 0, BossFloorMax = 0 }), "tutorial", ContentValidator.RuleBossFloorRange);
         Refused(With("spear_hall", d => d with { BossFloorMin = 7, BossFloorMax = 6 }), "spear_hall", ContentValidator.RuleBossFloorRange);
 
-        // One end pinned reads the other off the tuning: a floor-12 minimum against its 10 is inverted.
-        Refused(With("spear_hall", d => d with { BossFloorMin = 12 }), "spear_hall", ContentValidator.RuleBossFloorRange);
-        var shallow = Load(With("spear_hall", d => d with { BossFloorMax = 6 }));
-        Assert.Equal((5, 6), shallow.Dungeons.BossFloorRange(shallow.Dungeons["spear_hall"]));
+        // One end pinned reads the other off the tuning: a minimum two floors past its maximum is inverted,
+        // and a maximum a floor past its minimum is a shallow range.
+        Refused(With("spear_hall", d => d with { BossFloorMin = tuning.BossFloorMax + 2 }), "spear_hall", ContentValidator.RuleBossFloorRange);
+        var shallow = Load(With("spear_hall", d => d with { BossFloorMax = tuning.BossFloorMin + 1 }));
+        Assert.Equal((tuning.BossFloorMin, tuning.BossFloorMin + 1), shallow.Dungeons.BossFloorRange(shallow.Dungeons["spear_hall"]));
 
         // And an id is declared once.
         Refused(Plus(ShippedContent.Dungeons.Dungeons[1]), "spear_hall", ContentValidator.RuleDuplicateId);
@@ -517,24 +533,13 @@ public class DungeonContentTests
     }
 
     [Fact]
-    public void TheNewKnobsAreTheDocsNumbers_AndAreRefusedWhenTheyCannotMeanAnything()
+    public void TheNewKnobsAreRefusedWhenTheyCannotMeanAnything()
     {
+        // What each knob is set to is tuning.json's to say, and pinned nowhere.
+        // What they add up to is the load's to hold: the deepest boss pays short
+        // of the farm (F:139-165: a floor-10 boss six stacks against its ten).
         var tuning = GameContent.Current.Tuning;
-        Assert.Equal(5, tuning.BossFloorMin);
-        Assert.Equal(10, tuning.BossFloorMax);
-        Assert.Equal(4, tuning.BossStackOffset);
-        Assert.Equal(1, tuning.CooldownRunsPerFloor);
-        Assert.Equal(3, tuning.MercyFloor);
-        Assert.Equal(50, tuning.DeathXpLossPercent);
-        Assert.Equal(24, tuning.PartyCarrySlots);
-        Assert.Equal(3, tuning.StairGatherTiles);
-
-        // What they add up to: a floor-5 boss pays one stack and a floor-10 six,
-        // deliberately short of the farm's ten (F:139-165).
-        Assert.Equal(1, tuning.BossFloorMin - tuning.BossStackOffset);
-        Assert.Equal(6, tuning.BossFloorMax - tuning.BossStackOffset);
         Assert.True(tuning.BossFloorMax - tuning.BossStackOffset < 2 * tuning.AcquiredHeadroom);
-        Assert.Equal(6, tuning.PartyCarrySlots / GameConstants.PartySize);
 
         // A range that starts below floor 1 or runs backwards has no roll to make.
         Rejected(t => t with { BossFloorMin = 0 }, nameof(Tuning.BossFloorMin), ContentValidator.RuleBossFloorRange);
@@ -576,46 +581,54 @@ public class DungeonContentTests
     [Fact]
     public void ABossThatWouldPayAsMuchAsTheFarmIsRefused()
     {
-        // PHASE4-045: the most a boss pays is six, deliberately short of the ten a
-        // well-farmed two-modifier weapon banks - "never raise the boss cap to 10".
-        // A boss that paid as much would leave the farm no longer the only route to
-        // a finished weapon, so a load holds every tuning and every dungeon to it.
-        int farm = ContentValidator.FarmBanks(GameContent.Current.Tuning.AcquiredHeadroom);
-        Assert.Equal(10, farm);
-        Assert.Equal(6, Dungeons.MostStacksPaid(Dungeons["spear_hall"]));
-        Assert.Equal(0, Dungeons.MostStacksPaid(Dungeons.Tutorial));
+        // PHASE4-045: the most a boss pays is short of what a well-farmed
+        // two-modifier weapon banks - "never raise the boss cap to 10". A boss that
+        // paid as much would leave the farm no longer the only route to a finished
+        // weapon, so a load holds every tuning and every dungeon to it. What the
+        // shipped dungeons pay is the master's: the deepest floor of a range less
+        // the offset, against two modifiers worked through the headroom.
+        var tuning = GameContent.Current.Tuning;
+        int farm = ContentValidator.FarmBanks(tuning.AcquiredHeadroom);
+        Assert.Equal(2 * tuning.AcquiredHeadroom, farm);
+        Assert.Equal(tuning.BossFloorMax - tuning.BossStackOffset, Dungeons.MostStacksPaid(Dungeons["spear_hall"]));
+        Assert.Equal(Math.Max(0, 2 - tuning.BossStackOffset), Dungeons.MostStacksPaid(Dungeons.Tutorial));   // floor 2: nothing, as shipped
         Assert.All(Dungeons.All, d => Assert.True(Dungeons.MostStacksPaid(d) < farm, d.Id));
 
-        // Deeper floors, a smaller offset or a shallower farm: each brings the
-        // deepest boss level with the farm, and each is refused at the key that
-        // prices a floor.
-        Rejected(t => t with { BossFloorMax = 14 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
-        Rejected(t => t with { BossFloorMax = 16 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
-        Rejected(t => t with { BossStackOffset = 0 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
-        Rejected(t => t with { AcquiredHeadroom = 3 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm);
+        // The cases are worked around the numbers F:139-165 was written against -
+        // a floor-10 boss paying six against the farm's ten - and edit those
+        // (Premise). Deeper floors, a smaller offset or a shallower farm: each
+        // brings the deepest boss level with the farm, and each is refused at the
+        // key that prices a floor.
+        var premise = Premise.Tuning;
+        Rejected(t => t with { BossFloorMax = 14 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm, premise);
+        Rejected(t => t with { BossFloorMax = 16 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm, premise);
+        Rejected(t => t with { BossStackOffset = 0 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm, premise);
+        Rejected(t => t with { AcquiredHeadroom = 3 }, nameof(Tuning.BossStackOffset), ContentValidator.RuleBossPaysLessThanTheFarm, premise);
 
         // One short of the farm is a choice, not an error: nine stacks against ten,
         // and a deeper dungeon that moves its offset with it.
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with { BossFloorMax = 13 });
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with { BossStackOffset = 1 });
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with { BossFloorMax = 16, BossStackOffset = 7 });
+        ContentValidator.ValidateTuning(premise with { BossFloorMax = 13 });
+        ContentValidator.ValidateTuning(premise with { BossStackOffset = 1 });
+        ContentValidator.ValidateTuning(premise with { BossFloorMax = 16, BossStackOffset = 7 });
 
         // A dungeon that pins a deeper range of its own is held to it the same way.
-        Refused(With("spear_hall", d => d with { BossFloorMax = 14 }), "spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm);
-        var deep = Load(With("spear_hall", d => d with { BossFloorMax = 13 }));
+        Refused(With("spear_hall", d => d with { BossFloorMax = 14 }), "spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm, premise);
+        var deep = Load(With("spear_hall", d => d with { BossFloorMax = 13 }), premise);
         Assert.Equal(9, deep.Dungeons.MostStacksPaid(deep.Dungeons["spear_hall"]));
     }
 
     [Fact]
     public void CanGraftIsTheRelationsPlusTheForgeLimit()
     {
-        // A forged Light graft past x1 is refused; the same graft acquired is not
-        // (PHASE4-036: one question, the source's choice the only difference).
+        // A forged Light graft past Light's forge limit is refused; the same graft
+        // acquired is not (PHASE4-036: one question, the source's choice the only
+        // difference). The Flensing Knife's Light x1, forged to the limit
+        // tuning.json sets — the knife as it is forged, as shipped.
         var knife = Spread(Weapons["flensing_knife"]);
         Assert.Equal(1, knife.Stacks(Light));
-        Assert.Equal(1, Rules.MaxForged(Light));
-        Assert.False(Rules.CanGraft(Light, WeaponKind.Melee, knife, knife, asForged: true));
-        Assert.True(Rules.CanGraft(Light, WeaponKind.Melee, knife, knife, asForged: false));
+        var atLimit = ModifierSet.Of([.. knife.Entries.Where(e => e.Type != Light), (Light, Rules.MaxForged(Light))]);
+        Assert.False(Rules.CanGraft(Light, WeaponKind.Melee, atLimit, atLimit, asForged: true));
+        Assert.True(Rules.CanGraft(Light, WeaponKind.Melee, atLimit, atLimit, asForged: false));
 
         // The forge limit counts the forged spread, never what was acquired on top:
         // a Tower Guard farmed to Block x5 still takes one forged stack.
@@ -644,15 +657,17 @@ public class DungeonContentTests
         }
     }
 
-    private static void Rejected(Func<Tuning, Tuning> edit, string key, string rule)
+    /// <summary><paramref name="edit"/> to the shipped tuning — or to <paramref name="over"/> — refused at <paramref name="key"/> for <paramref name="rule"/>, by the validator and by the load.</summary>
+    private static void Rejected(Func<Tuning, Tuning> edit, string key, string rule, Tuning? over = null)
     {
-        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(ShippedContent.Tuning)));
+        var tuning = over ?? ShippedContent.Tuning;
+        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(tuning)));
         Assert.Equal((key, rule), (ex.EntryId, ex.Rule));
         Assert.Contains(ex.Rule, ex.Message);
 
         // And the load refuses it the same way, leaving the running content alone.
         var before = GameContent.Current;
-        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: edit(ShippedContent.Tuning)));
+        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: edit(tuning)));
         Assert.Equal((key, rule), (loaded.EntryId, loaded.Rule));
         Assert.Same(before, GameContent.Current);
     }

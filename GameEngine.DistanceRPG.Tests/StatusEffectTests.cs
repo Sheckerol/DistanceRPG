@@ -4,9 +4,21 @@ using static GameEngine.DistanceRPG.Logic.StatusEffectType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class StatusEffectTests
+/// <summary>
+/// The status table and its behaviours: casts that land a status, ticks and
+/// decay, Mire's cut of the budget. Every scenario stands on the numbers it was
+/// written against - each status's effect a level, the staves' statlines, the
+/// mana divisor, the budget (<see cref="Premise"/>) - made current for each test,
+/// so the content collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class StatusEffectTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The Staff of Renewal's statline: Resonant x1 resolves its 15 mana to 13.</summary>
     private static Weapon Staff => TestWeapons.Get("staff_of_renewal");
@@ -69,7 +81,7 @@ public class StatusEffectTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
-        Assert.Equal(ShippedContent.Budget - Staff.Cost, a.DistLeft);
+        Assert.Equal(Premise.Budget - Staff.Cost, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - RenewalCastMana, a.Mana);   // 13 (Resonant x1) plus the innate's 1 trigger
         Assert.NotNull(buffed);
         Assert.Equal(1, buffed!.Levels);
@@ -126,7 +138,7 @@ public class StatusEffectTests
         Assert.False(turns.CanAttack(a, enemy));
         Assert.False(turns.TryAttack(a, enemy));
         Assert.Equal(GameConstants.DummyHp, enemy.Hp);       // untouched
-        Assert.Equal(ShippedContent.Budget, a.DistLeft);  // no movement spent
+        Assert.Equal(Premise.Budget, a.DistLeft);  // no movement spent
     }
 
     [Fact]
@@ -239,11 +251,11 @@ public class StatusEffectTests
         a.Mana = 0;
         turns.EndTurn();   // a.DistLeft is a full budget: nothing moved
         Assert.Equal(16, a.Mana);
-        Assert.Equal((int)(ShippedContent.Budget / GameContent.Current.Tuning.MovementUnitsPerMana), a.Mana);
+        Assert.Equal((int)(Premise.Budget / GameContent.Current.Tuning.MovementUnitsPerMana), a.Mana);
 
         var (turns2, a2, _) = Scene();
         a2.Mana = 0;
-        a2.DistLeft = ShippedContent.Budget / 2f;   // half the budget left unspent
+        a2.DistLeft = Premise.Budget / 2f;   // half the budget left unspent
         turns2.EndTurn();
         Assert.Equal(8, a2.Mana);
     }
@@ -258,26 +270,26 @@ public class StatusEffectTests
         staff.Acquire(Resonant, 5);   // x6, the ceiling: five acquired over the forged one
         Assert.Equal((6, 8), (staff.Stacks(Resonant), staff.ResolvedManaCost));
         const int TriggerManaAtSix = 3;
-        int derived = ((int)ShippedContent.Budget - staff.Cost) / (staff.ResolvedManaCost + TriggerManaAtSix);
+        int derived = ((int)Premise.Budget - staff.Cost) / (staff.ResolvedManaCost + TriggerManaAtSix);
         Assert.Equal(10, derived);
         Assert.Equal(derived, GameContent.Current.Tuning.MovementUnitsPerMana);
 
         // A fully banked turn is 16 mana; a turn spent on one cast banks 120 and pays 12, against the 11 spent.
         var caster = Char("A", 0, 0, "staff_of_warding");
         caster.Mana = 0;
-        Assert.Equal(16, caster.RegenManaFromUnusedMovement(ShippedContent.Budget));
+        Assert.Equal(16, caster.RegenManaFromUnusedMovement(Premise.Budget));
         caster.Mana = 0;
-        Assert.Equal(12, caster.RegenManaFromUnusedMovement(ShippedContent.Budget - staff.Cost));
+        Assert.Equal(12, caster.RegenManaFromUnusedMovement(Premise.Budget - staff.Cost));
         Assert.True(12 >= staff.ResolvedManaCost + TriggerManaAtSix);
 
         // Never past the pool, nothing from nothing, and nothing for the dead.
         caster.Mana = TestPools.FixtureMana - 3;
-        Assert.Equal(3, caster.RegenManaFromUnusedMovement(ShippedContent.Budget));
+        Assert.Equal(3, caster.RegenManaFromUnusedMovement(Premise.Budget));
         Assert.Equal(TestPools.FixtureMana, caster.Mana);
         caster.Mana = 0;
         Assert.Equal(0, caster.RegenManaFromUnusedMovement(9f));
         caster.Alive = false;
-        Assert.Equal(0, caster.RegenManaFromUnusedMovement(ShippedContent.Budget));
+        Assert.Equal(0, caster.RegenManaFromUnusedMovement(Premise.Budget));
         Assert.Equal(0, caster.Mana);
     }
 

@@ -17,13 +17,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// Nothing here reads a level: the effects of proficiency are the next step, so
 /// every number in this file is the XP itself.
 /// </para>
-/// In the content collection because the wand tests price an element to make an
-/// enchantment's share visible at all.
+/// The credits are worked in the numbers they were written against — the
+/// weapons' statlines, the shields' Block, the casts' mana, a Regeneration
+/// level's healing (<see cref="Premise"/>) — made current for each test, and the
+/// wand tests price an element over it to make an enchantment's share visible at
+/// all, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class XpCreditTests
+public sealed class XpCreditTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The centre of tile (row, column), in logic units.</summary>
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
@@ -109,10 +116,10 @@ public class XpCreditTests
     /// attribute. The tuning table's percentage is the one the catalogue reads.
     /// </summary>
     private static IDisposable PricedElements(params string[] ids)
-        => TestContent.Use(
+        => TestContent.UsePremise(
             enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => ids.Contains(e.Id) ? e with { Potency = 3 } : e).ToList()),
-            tuning: TuningValues.With(ShippedContent.Tuning, ids.Select(id => ($"{nameof(Tuning.ApplyPercent)}.{id}", 100)).ToArray()));
+            tuning: t => TuningValues.With(t, ids.Select(id => ($"{nameof(Tuning.ApplyPercent)}.{id}", 100)).ToArray()));
 
     // ── Weapon XP: the weapon's own mitigated damage ─────────────────────────
 

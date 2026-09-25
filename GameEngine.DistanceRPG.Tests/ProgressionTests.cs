@@ -7,11 +7,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// it, the class table, and the two level effects. Everything here is derived
 /// from a cumulative integer — nothing is stored, so every number in a
 /// <see cref="PoolProgress"/> or a <see cref="LevelProgress"/> is a claim about
-/// the replay rather than about state.
+/// the replay rather than about state. The replays are worked in the numbers
+/// they were written against — the starting bar, the weapon ladder's step
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class ProgressionTests
+[Collection(TestContent.Collection)]
+public sealed class ProgressionTests : IDisposable
 {
-    /// <summary>The shipped bar both pools open on; the assertions below are written against it.</summary>
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
+    /// <summary>The bar both pools open on under the premise; the assertions below are written against it.</summary>
     private static int StartingPool => GameContent.Current.Tuning.StartingPool;
 
     [Theory]

@@ -19,13 +19,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// site through <see cref="ActorState.MovementCost"/>, after Light, so the gate
 /// and the charge read one number.
 /// </para>
-/// In the content collection: the wand case prices an element's burn up far
-/// enough that what the cast paid for and what the hit landed can be told apart.
+/// The ladders are worked in the numbers they were written against — the
+/// weapons' statlines, the ladder's bar, the shields' Block, the free tiles
+/// (<see cref="Premise"/>) — made current for each test, and the wand case prices
+/// an element's burn up over it far enough that what the cast paid for and what
+/// the hit landed can be told apart, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class ProficiencyEffectTests
+public sealed class ProficiencyEffectTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The centre of tile (row, column), in logic units.</summary>
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
@@ -144,7 +151,7 @@ public class ProficiencyEffectTests
         // hits size it off the share they actually landed. Both must read the
         // same base or the cast pays for one burn and the shape lands another —
         // from wand level 2 on, where the bonus first bites.
-        using var priced = TestContent.Use(tuning: TuningValues.With(ShippedContent.Tuning, ("ApplyPercent.flaming", 100)));
+        using var priced = TestContent.UsePremise(tuning: t => TuningValues.With(t, ("ApplyPercent.flaming", 100)));
 
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "wand_of_the_nova_unique");   // 8, Flaming + Burning

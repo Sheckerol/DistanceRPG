@@ -17,13 +17,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// anything is written (<see cref="SaveGame.SettleToSafePoint"/>).
 /// <para>
 /// Played by <see cref="VisitScript"/> on the game's own campaign, as S6's round
-/// trips are, every seed's depth pinned before a test leans on it. In the content
-/// collection: the farm runs under a tuning of its own.
+/// trips are, every seed's depth pinned before a test leans on it. The seeds'
+/// depths, the flagship's blows and the farm's revivals stand on the numbers they
+/// were written against (<see cref="Premise"/>), made current for each test, and
+/// the farm runs under a tuning of its own over it, so the content collection
+/// holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class ReloadDeterminismTests
+public sealed class ReloadDeterminismTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>A seed the Spear Hall rolls five floors on (pinned where a test leans on it).</summary>
     private const long FiveDeep = 4;
 
@@ -328,7 +335,7 @@ public class ReloadDeterminismTests
         // arithmetic across the save, and the counters that key them, which S6's
         // round trips compare only field for field. On an injected die, and on the
         // visit's own.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { ResurrectTurnsBase = 2, ResurrectTurnsFloor = 1 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { ResurrectTurnsBase = 2, ResurrectTurnsFloor = 1 });
         Assert.Equal((1, 1), (FarmLadder.ResurrectTurns(1), FarmLadder.ResurrectTurns(2)));
 
         var liveDie = visitsOwnDie ? null : new Dice(Sequence());

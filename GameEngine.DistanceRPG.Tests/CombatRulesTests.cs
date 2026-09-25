@@ -3,8 +3,19 @@ using static GameEngine.DistanceRPG.Logic.ModifierType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class CombatRulesTests
+/// <summary>
+/// The swing's roll and the Block it meets. Every case stands on the numbers it
+/// was written against — the weapons' damage and the modifier table
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class CombatRulesTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     private static Weapon Dagger => TestWeapons.Get("weakspot_stiletto"); // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
     private static Weapon Sword => TestWeapons.Get("tower_guard");        // dmg 10, Block x2 (absorbs 6), Push x1
     private static Weapon Spear => TestWeapons.Get("skirmishers_pike");   // dmg 7, Brace x1, Longshot x1, Light x1

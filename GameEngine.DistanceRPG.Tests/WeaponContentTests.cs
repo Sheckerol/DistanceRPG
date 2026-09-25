@@ -6,14 +6,26 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// The thirty-two weapons and the innate enchantments as content: the
 /// validator's checks, the statlines, the resolved costs, and the catalogue's
-/// lookups by stable id. In the content collection because one test swaps the
+/// lookups by stable id. In the content collection because tests here swap the
 /// current content.
+/// <para>
+/// The statlines and the wands' shapes are §1.2–§1.4's tables, pinned here as
+/// literals (<see cref="Statlines_MatchTheTables"/>,
+/// <see cref="WandShapes_MatchTheTable"/>: REWORK DECISION 3). Every other number
+/// is the master's: the ladders read it from the tuning the game reads, and the
+/// resolved costs' truncation is worked in the numbers the doc's examples were
+/// written against, made current for the test that works it (<see cref="Premise"/>).
+/// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
 public class WeaponContentTests
 {
     private static WeaponCatalogue Catalogue => GameContent.Current.Weapons;
     private static ModifierRules Rules => GameContent.Current.Modifiers;
+
+    /// <summary>The roll a wielder with <paramref name="stacks"/> of CritWindow crits on, as the tuning the game reads prices a stack.</summary>
+    private static int ThresholdAt(int stacks)
+        => CombatRules.NaturalTwenty - (ShippedContent.Tuning.Offset[CritWindow] + ShippedContent.Tuning.PerStack[CritWindow] * stacks);
 
     private static readonly WeaponClass[] MartialClasses =
         [WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe, WeaponClass.Ranged, WeaponClass.Throwing];
@@ -286,6 +298,10 @@ public class WeaponContentTests
     [Fact]
     public void ResolvedCost_TruncatesLightDiscount()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // statlines' costs, Light's ten percent a stack and the headroom of five.
+        using var premise = TestContent.UsePremise();
+
         Assert.Equal(27, TestWeapons.Get("flensing_knife").ResolvedCost);    // 30 x 90 / 100
         Assert.Equal(49, TestWeapons.Get("skirmishers_pike").ResolvedCost);  // 55 x 90 / 100 = 49.5, truncated
         Assert.Equal(13, TestWeapons.Get("darts").ResolvedCost);             // 15 x 90 / 100 = 13.5
@@ -319,6 +335,10 @@ public class WeaponContentTests
     [Fact]
     public void ResolvedManaCost_TruncatesResonant()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // staves' mana, Resonant's ten percent a stack and the headroom of five.
+        using var premise = TestContent.UsePremise();
+
         var mire = TestWeapons.Get("staff_of_mire");
         Assert.Equal(25, mire.ManaCost);
         Assert.Equal(22, mire.ResolvedManaCost);   // x1: 25 x 90 / 100 = 22.5
@@ -343,6 +363,10 @@ public class WeaponContentTests
     [Fact]
     public void Acquire_ClampsAtForgedPlusFive_AndRefreshesResolvedCost()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // headroom of five, a stack of window a point, Light's ten percent.
+        using var premise = TestContent.UsePremise();
+
         var fang = TestWeapons.Get("assassins_fang");   // CritWindow x2 forged
         fang.Acquire(CritWindow, 10);
         Assert.Equal(7, fang.Stacks(CritWindow));        // 2 + 5
@@ -374,12 +398,13 @@ public class WeaponContentTests
         // takes, so it asks the predicate a roll gates its offers on: a refused stack throws and the weapon is
         // untouched. Nothing ever gives a bow its first Charges, a Brace, or a member outside the table.
         var bow = TestWeapons.Get("longbow");
+        int cost = bow.ResolvedCost;
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Charges, 1));       // forged only: deepened, never granted
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Brace, 1));         // melee only
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Momentum, 1));      // an enchantment, never a stack
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(OnHitPoison, 1));   // reserved: no behaviour
         Assert.Equal(bow.Forged, bow.Modifiers);
-        Assert.Equal(30, bow.ResolvedCost);
+        Assert.Equal(cost, bow.ResolvedCost);
 
         // One displacement direction: a sword that pushes is never given a pull, nor a Rout (which wants a Cleave besides).
         var guard = TestWeapons.Get("tower_guard");
@@ -400,33 +425,35 @@ public class WeaponContentTests
     }
 
     [Theory]
-    [InlineData(0, 20)]
-    [InlineData(1, 19)]
-    [InlineData(2, 18)]
-    [InlineData(3, 17)]
-    [InlineData(6, 14)]
-    [InlineData(8, 12)]
-    public void CritWindowLadder(int stacks, int threshold)
+    [InlineData(0)]   // the natural 20 alone, as shipped
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(6)]
+    [InlineData(8)]
+    public void CritWindowLadder(int stacks)
     {
         var actor = TestPools.Char("A");
         actor.Innate = ModifierSet.Of((CritWindow, stacks));
-        Assert.Equal(threshold, CombatRules.CritThreshold(actor));
+        Assert.Equal(ThresholdAt(stacks), CombatRules.CritThreshold(actor));
     }
 
     [Fact]
     public void CritWindow_IsForgedOnDaggersAndBowsOnly_CritMultiplierOnDaggersAndThrowing()
     {
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("weakspot_stiletto")));
-        Assert.Equal(18, CombatRules.CritThreshold(TestWeapons.Get("assassins_fang")));
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("hunting_bow")));
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("longbow")));   // Purity deepens Longshot, not the window: the variant table wins over the stale ladder row
+        // The stacks are §1.2's spreads; what a stack is worth is the tuning's.
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("weakspot_stiletto")));
+        Assert.Equal(ThresholdAt(2), CombatRules.CritThreshold(TestWeapons.Get("assassins_fang")));
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("hunting_bow")));
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("longbow")));   // Purity deepens Longshot, not the window: the variant table wins over the stale ladder row
         foreach (var def in Catalogue.All.Where(d => d.Class is not (WeaponClass.Dagger or WeaponClass.Ranged)))
-            Assert.Equal(20, CombatRules.CritThreshold(Any(def)));
+            Assert.Equal(ThresholdAt(0), CombatRules.CritThreshold(Any(def)));
 
+        var tuning = ShippedContent.Tuning;
         foreach (var def in Catalogue.All)
         {
-            int expected = def.Class is WeaponClass.Dagger or WeaponClass.Throwing ? 3 : 2;
-            Assert.Equal(expected, Any(def).Modifiers.Value(CritMultiplier));
+            int stacks = def.Class is WeaponClass.Dagger or WeaponClass.Throwing ? 1 : 0;
+            Assert.Equal(tuning.Offset[CritMultiplier] + tuning.PerStack[CritMultiplier] * stacks, Any(def).Modifiers.Value(CritMultiplier));
         }
     }
 
@@ -453,6 +480,11 @@ public class WeaponContentTests
     [Fact]
     public void Enchantment_LevelsAndTriggerCosts_FollowTheLadder()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // tuning's percentages, three damage a point of mana, Resonant's ten
+        // percent a stack.
+        using var premise = TestContent.UsePremise();
+
         var staff = TestWeapons.Get("staff_of_renewal");
         var regeneration = staff.Innate!;
         Assert.Equal(1, regeneration.LevelsFor(1));
@@ -477,10 +509,11 @@ public class WeaponContentTests
     [Fact]
     public void Validator_RefusesIllegalWeapons_NamingEntryAndRule()
     {
-        // Past MaxForged: Light x2, and Resonant x2 on a staff, caught before the caster check reads the spread.
-        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, 2)) });
+        // Past MaxForged — a stack past whatever limit tuning.json sets — on Light, and on Resonant on a staff,
+        // caught before the caster check reads the spread.
+        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, Rules.MaxForged(Light) + 1)) }, ShippedContent.Tuning);
         Assert.Equal(("flensing_knife", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
-        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, 2)) });
+        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, Rules.MaxForged(Resonant) + 1)) }, ShippedContent.Tuning);
         Assert.Equal(("staff_of_mire", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
 
         // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of.
@@ -636,6 +669,7 @@ public class WeaponContentTests
     public void TestContent_SwapsCurrentForOneTest_AndRestoresIt()
     {
         var before = GameContent.Current;
+        int axe = TestWeapons.Get("great_axe").ResolvedCost, reaver = TestWeapons.Get("reaver").ResolvedCost;
         var cheaper = ShippedContent.Weapons with
         {
             Weapons = ShippedContent.Weapons.Weapons
@@ -646,19 +680,31 @@ public class WeaponContentTests
         using (TestContent.Use(weapons: cheaper))
         {
             Assert.NotSame(before, GameContent.Current);
-            Assert.Equal(10, TestWeapons.Get("great_axe").ResolvedCost);
-            Assert.Equal(60, TestWeapons.Get("reaver").ResolvedCost);   // the rest of the defaults came along
+            var cheap = TestWeapons.Get("great_axe");
+            Assert.Equal(10, cheap.Cost);
+            Assert.Equal(10 * Math.Max(0, 100 - cheap.Modifiers.Value(Light)) / 100, cheap.ResolvedCost);   // the swapped cost, less whatever Light it carries
+            Assert.Equal(reaver, TestWeapons.Get("reaver").ResolvedCost);   // the rest of the defaults came along
         }
 
         Assert.Same(before, GameContent.Current);
-        Assert.Equal(60, TestWeapons.Get("great_axe").ResolvedCost);
+        Assert.Equal(axe, TestWeapons.Get("great_axe").ResolvedCost);
     }
 
-    private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit)
+    /// <summary>
+    /// The shipped tuning with every forge limit at x3 at least: the refusals below forge a modifier deeper
+    /// than any shipped weapon does (Cleave x3, Push x2), and how deep that may be is tuning.json's to say — the
+    /// fixtures' premise, not their subject. The two cases about the limit itself load under the master's.
+    /// </summary>
+    private static Tuning ForgeRoom => ShippedContent.Tuning with
+    {
+        MaxForged = ShippedContent.Tuning.MaxForged.ToDictionary(kv => kv.Key, kv => Math.Max(3, kv.Value)),
+    };
+
+    private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit, Tuning? tuning = null)
     {
         var weapons = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
         return Assert.Throws<ContentException>(() =>
-            TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, weapons));
+            TestContent.Load(tuning ?? ForgeRoom, ShippedContent.Restricted, ShippedContent.Enchantments, weapons));
     }
 
     private static ContentException LoadWithEnchantment(string id, Func<EnchantmentDef, EnchantmentDef> edit)

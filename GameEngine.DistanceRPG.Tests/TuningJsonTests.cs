@@ -26,6 +26,16 @@ public class TuningJsonTests
 
     private static IReadOnlyDictionary<string, int> Table(Tuning tuning, string name) => ((TableKey)Key(name)).Get(tuning);
 
+    /// <summary>
+    /// A number one step from <paramref name="builtIn"/> inside its range — up,
+    /// or down at the ceiling — so a file naming it moves it, whatever the
+    /// master copy says: the cases below are about what a file does to the
+    /// built-in numbers, never about what those numbers are.
+    /// </summary>
+    private static int Step(int builtIn, int max) => builtIn < max ? builtIn + 1 : builtIn - 1;
+
+    private static string Text(int value) => value.ToString(CultureInfo.InvariantCulture);
+
     [Fact]
     public void NoFileAndAnEmptyFileAreTheBuiltInNumbers()
     {
@@ -72,17 +82,24 @@ public class TuningJsonTests
             Assert.Equal(value, TuningValues.Of(read.Tuning)[name]);
         }
 
-        OnlyMoves("""{ "PerStack": { "Block": 4 } }""", "PerStack.Block", "4");
-        OnlyMoves("""{ "EffectPerLevel": { "Mire": 20 } }""", "EffectPerLevel.Mire", "20");
-        OnlyMoves("""{ "ApplyPercent": { "cold": 30 } }""", "ApplyPercent.cold", "30");
-        OnlyMoves("""{ "MaxForged": { "Light": 2 } }""", "MaxForged.Light", "2");
-        OnlyMoves("""{ "MovementBudget": 200 }""", "MovementBudget", "200");
-        OnlyMoves("""{ "FriendlyFireEnabled": true }""", "FriendlyFireEnabled", "true");
+        // Each file names one number a step from the built-in one (Step).
+        int block = Step(BuiltIn.PerStack[ModifierType.Block], 1000);
+        int mire = Step(BuiltIn.EffectPerLevel[StatusEffectType.Mire], 1000);
+        int cold = Step(BuiltIn.ApplyPercent["cold"], 1000);
+        int light = Step(BuiltIn.MaxForged[ModifierType.Light], 3);
+        int budget = Step(BuiltIn.MovementBudget, 10000);
+        string friendlyFire = BuiltIn.FriendlyFireEnabled ? "false" : "true";
+        OnlyMoves($$"""{ "PerStack": { "Block": {{block}} } }""", "PerStack.Block", Text(block));
+        OnlyMoves($$"""{ "EffectPerLevel": { "Mire": {{mire}} } }""", "EffectPerLevel.Mire", Text(mire));
+        OnlyMoves($$"""{ "ApplyPercent": { "cold": {{cold}} } }""", "ApplyPercent.cold", Text(cold));
+        OnlyMoves($$"""{ "MaxForged": { "Light": {{light}} } }""", "MaxForged.Light", Text(light));
+        OnlyMoves($$"""{ "MovementBudget": {{budget}} }""", "MovementBudget", Text(budget));
+        OnlyMoves($$"""{ "FriendlyFireEnabled": {{friendlyFire}} }""", "FriendlyFireEnabled", friendlyFire);
 
-        // And the game reads the merged table so: Block is worth 4 a stack, Brace
-        // still its built-in 1.
-        var rules = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 4 } }""", BuiltIn).Tuning, ShippedContent.Restricted);
-        Assert.Equal((4, 1), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Brace)));
+        // And the game reads the merged table so: Block is worth what the file
+        // says a stack, Brace still its built-in number.
+        var rules = new ModifierRules(TuningJson.Read($$"""{ "PerStack": { "Block": {{block}} } }""", BuiltIn).Tuning, ShippedContent.Restricted);
+        Assert.Equal((block, BuiltIn.PerStack[ModifierType.Brace]), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Brace)));
     }
 
     [Fact]
@@ -311,14 +328,15 @@ public class TuningJsonTests
     {
         // PHASE5-043, -044: "Ratios are integer divisors, not floats" — a fraction,
         // a number written as text, a boolean or a null where the divisor belongs
-        // warns and keeps the built-in 10; a whole number is the divisor.
+        // warns and keeps the built-in divisor; a whole number is the divisor.
+        int divisor = BuiltIn.MovementUnitsPerMana;
         foreach (string value in new[] { "10.5", "\"10\"", "true", "null", "1e1", "10.0" })
         {
             var read = TuningJson.Read($$"""{ "MovementUnitsPerMana": {{value}} }""", BuiltIn);
             string warning = Assert.Single(read.Warnings);
             Assert.StartsWith("tuning.json: MovementUnitsPerMana ", warning);
-            Assert.EndsWith("keeping 10", warning);
-            Assert.Equal(10, read.Tuning.MovementUnitsPerMana);
+            Assert.EndsWith($"keeping {divisor}", warning);
+            Assert.Equal(divisor, read.Tuning.MovementUnitsPerMana);
         }
 
         var whole = TuningJson.Read("""{ "MovementUnitsPerMana": 12 }""", BuiltIn);
@@ -362,11 +380,11 @@ public class TuningJsonTests
     {
         // A human edits it (S:73-74): line and block comments anywhere, and the
         // trailing comma an edit leaves behind, are no mistake.
-        const string file = """
+        string file = $$"""
             // the numbers for tonight's playtest
             {
-              /* further */ "MovementBudget": 200, // a longer walk
-              "PerStack": { "Block": 4, },
+              /* further */ "MovementBudget": {{Step(BuiltIn.MovementBudget, 10000)}}, // a longer walk
+              "PerStack": { "Block": {{Step(BuiltIn.PerStack[ModifierType.Block], 1000)}}, },
             }
             """;
         var read = TuningJson.Read(file, BuiltIn);
@@ -540,15 +558,17 @@ public class TuningJsonTests
         foreach (var (name, value) in System.Text.Json.Nodes.JsonNode.Parse(text, documentOptions: new System.Text.Json.JsonDocumentOptions
             { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })!.AsObject().Reverse())
             reversed[name] = value?.DeepClone();
+        // A key named at its default is named at the built-in number, whatever that is.
+        int budget = BuiltIn.MovementBudget, block = BuiltIn.PerStack[ModifierType.Block], headroom = BuiltIn.AcquiredHeadroom;
         foreach (string file in new[]
         {
             text,
             bare,
             reversed.ToJsonString(),
             "{}",
-            """{ "MovementBudget": 160 }""",
-            "/* hi */ {\n\n  \"PerStack\": { \"Block\": 3 },\n    \"AcquiredHeadroom\" :5,\n}",
-            """{ "AcquiredHeadroom": 5, "PerStack": { "Block": 3 } }""",
+            $$"""{ "MovementBudget": {{budget}} }""",
+            "/* hi */ {\n\n  \"PerStack\": { \"Block\": " + Text(block) + " },\n    \"AcquiredHeadroom\" :" + Text(headroom) + ",\n}",
+            $$"""{ "AcquiredHeadroom": {{headroom}}, "PerStack": { "Block": {{block}} } }""",
         })
             Assert.Equal(shipped, TuningJson.Hash(TuningJson.Read(file, BuiltIn).Tuning));
         Assert.Equal(shipped, TuningJson.Hash(TuningJson.ReadBuiltIn(bare).Tuning));
@@ -583,9 +603,12 @@ public class TuningJsonTests
     {
         // What the log names: every number the file changed from the built-in
         // ones, in the file's order — never a key set to its built-in number.
-        var read = TuningJson.Read("""{ "StartingPool": 30, "PerStack": { "Block": 4, "Brace": 1 }, "MovementBudget": 200 }""", BuiltIn);
+        int block = Step(BuiltIn.PerStack[ModifierType.Block], 1000), budget = Step(BuiltIn.MovementBudget, 10000);
+        var read = TuningJson.Read(
+            $$"""{ "StartingPool": {{BuiltIn.StartingPool}}, "PerStack": { "Block": {{block}}, "Brace": {{BuiltIn.PerStack[ModifierType.Brace]}} }, "MovementBudget": {{budget}} }""",
+            BuiltIn);
         Assert.Empty(read.Warnings);
-        Assert.Equal(["MovementBudget 200", "PerStack.Block 4"], read.Overrides);
+        Assert.Equal([$"MovementBudget {budget}", $"PerStack.Block {block}"], read.Overrides);
 
         // The load reports the numbers the game plays: a value clamped is what it
         // became, and the fit's raise is a change like any other.
@@ -607,6 +630,6 @@ public class TuningJsonTests
         Assert.Equal(["tuning.json: ApplyPercent.flamming names no enchantment - ignored; did you mean flaming?"], load.Notices);
         Assert.False(load.Content!.Tuning.ApplyPercent.ContainsKey("flamming"));
         Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(load.Content.Tuning));
-        Assert.Equal(20, load.Content.Enchantments["flaming"].ApplyPercent);
+        Assert.Equal(BuiltIn.ApplyPercent["flaming"], load.Content.Enchantments["flaming"].ApplyPercent);
     }
 }

@@ -213,10 +213,14 @@ public class PreReworkSaveTests
                 {
                     // Between runs, the screen it left; and the next run — into the
                     // dungeon the screen offers first — goes three floors down and
-                    // back out like any other, and counts.
+                    // back out like any other, and counts. The run itself stands on
+                    // the numbers the run helpers were written against — the seed's
+                    // depth, the mercy floor (Premise) — so it is walked under them;
+                    // the resume before it and the save after it are the game's own.
                     Assert.Null(saved.Visit);
                     Assert.Null(campaign.Visit);
-                    CampaignRuns.DeepRetreat(campaign, campaign.DefaultNext());
+                    using (TestContent.UsePremise())
+                        CampaignRuns.DeepRetreat(campaign, campaign.DefaultNext());
                     Assert.Equal(saved.RunCounter + 1, campaign.RunCounter);
                 }
 

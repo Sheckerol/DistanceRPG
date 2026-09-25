@@ -38,7 +38,7 @@ public class TuningFitTests
 
         // A carry that already fits is left alone, and says nothing.
         warnings.Clear();
-        Assert.Equal(24, Fit(BuiltIn, warnings).PartyCarrySlots);
+        Assert.Equal(BuiltIn.PartyCarrySlots, Fit(BuiltIn, warnings).PartyCarrySlots);
         Assert.Equal(8, Fit(BuiltIn with { PartyCarrySlots = 8 }, warnings).PartyCarrySlots);
         Assert.Empty(warnings);
 
@@ -133,7 +133,7 @@ public class TuningFitTests
 
         // The shipped numbers need nothing.
         warnings.Clear();
-        Assert.Equal(4, Fit(BuiltIn, warnings).BossStackOffset);
+        Assert.Equal(BuiltIn.BossStackOffset, Fit(BuiltIn, warnings).BossStackOffset);
         Assert.Empty(warnings);
     }
 
@@ -151,13 +151,13 @@ public class TuningFitTests
             ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
             : m).ToList());
         var carry = Fit(BuiltIn, warnings, party: ten);
-        Assert.Equal(24, carry.PartyCarrySlots);
+        Assert.Equal(BuiltIn.PartyCarrySlots, carry.PartyCarrySlots);   // left as it was
         Assert.Equal(ContentValidator.RulePartyBagFits, Assert.Throws<ContentException>(() => Load(carry, party: ten)).Rule);
 
         var deep = new DungeonsData(ShippedContent.Dungeons.Dungeons
             .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 500, BossFloorMax = 500 } : d).ToList());
         var offset = Fit(BuiltIn, warnings, dungeons: deep);
-        Assert.Equal(4, offset.BossStackOffset);
+        Assert.Equal(BuiltIn.BossStackOffset, offset.BossStackOffset);
         var refused = Assert.Throws<ContentException>(() => Load(offset, dungeons: deep));
         Assert.Equal(("spear_hall", ContentValidator.RuleBossPaysLessThanTheFarm), (refused.EntryId, refused.Rule));
 
@@ -167,7 +167,7 @@ public class TuningFitTests
                 .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList(),
         };
         var limit = Fit(BuiltIn, warnings, weapons: forged);
-        Assert.Equal(3, new ModifierRules(limit, ShippedContent.Restricted).MaxForged(CritWindow));
+        Assert.Equal(BuiltIn.MaxForged[CritWindow], new ModifierRules(limit, ShippedContent.Restricted).MaxForged(CritWindow));
         Assert.Equal(("widowmaker", ContentValidator.RuleMaxForged), Refusal(() => Load(limit, weapons: forged)));
 
         Assert.Empty(warnings);

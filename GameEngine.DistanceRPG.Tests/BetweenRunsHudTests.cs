@@ -11,10 +11,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>HudTextTests</c>, the drawing is untested, but what it draws is tested:
 /// the strings, the list's rows in the order the screen draws them, where the
 /// choice starts and how it moves, and the one piece of arithmetic that keeps
-/// the list on the screen.
+/// the list on the screen. The runs behind the lists stand on the numbers they
+/// were written against — the boss floor range, the mercy floor, the lock a
+/// floor (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class BetweenRunsHudTests
+[Collection(TestContent.Collection)]
+public sealed class BetweenRunsHudTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     private static DungeonCatalogue Dungeons => GameContent.Current.Dungeons;
 
     private static string[] Texts(IEnumerable<BetweenRunsHud.ListRow> rows) => rows.Select(r => r.Text).ToArray();

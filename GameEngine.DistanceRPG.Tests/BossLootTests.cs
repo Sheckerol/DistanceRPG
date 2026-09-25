@@ -13,13 +13,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// arithmetic alone. There is no unique roll, and nothing else in the dungeon is
 /// forged with the theme.
 /// <para>
-/// Every named seed is pinned by an assertion before a test leans on it. In the
-/// content collection, because two tests swap the relations or the tuning.
+/// Every named seed is pinned by an assertion before a test leans on it. Every
+/// drop stands on the numbers it was written against — the boss floor range and
+/// offset, the forge limits, the headroom (<see cref="Premise"/>) — made current
+/// for each test, and two tests swap the relations or the tuning over it, so the
+/// content collection holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class BossLootTests
+public sealed class BossLootTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The shipped seed: its tutorial golem holds a Pinning Lance and drops an Assassin's Fang forged with Block.</summary>
     private const long GoldenSeed = 2762136374;
 
@@ -229,7 +236,7 @@ public class BossLootTests
 
         string[] after;
         WeaponClass[] afterClasses;
-        using (TestContent.Use(restricted: braceFreed))
+        using (TestContent.UsePremise(restricted: braceFreed))
         {
             Assert.Equal(new[] { Dagger, Sword, Spear, Axe }, GameContent.Current.Dungeons.ThemeClasses(Brace));
             after = seeds.Select(s => Describe(BossLoot.Roll(boss, s))).ToArray();
@@ -598,7 +605,7 @@ public class BossLootTests
         };
         Assert.Equal(dropped, Describe(BossLoot.Roll(reloaded, bottom.Seed)));
 
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossStackOffset = 2 }))
+        using (TestContent.UsePremise(tuning: t => t with { BossStackOffset = 2 }))
         {
             Assert.Equal(5, DungeonState.PromisedStacksFor(7));             // the tuning now prices floor 7 at five...
             Assert.Equal(3, visit.PromisedStacks);                          // ...and the visit still owes three

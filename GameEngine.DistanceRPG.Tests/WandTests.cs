@@ -9,13 +9,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §1.4's wands: an area cast is one Cast that pays the cast's mana and the
 /// element's trigger once, and one typed hit per actor the shape caught, each
 /// through the full pipeline — the attunement chart at (3,1) before Block,
-/// friendly fire off behind a constant, one roll shared by every target. In
-/// the content collection because tests here swap the current content.
+/// friendly fire off behind a constant, one roll shared by every target. Every
+/// scenario stands on the numbers it was written against — the wands' statline
+/// and shapes, Resonant's tenth, the element's trigger, the ally's share
+/// (<see cref="Premise"/>) — made current for each test, and tests here edit
+/// it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class WandTests
+public sealed class WandTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The centre of tile (row, column), in logic units.</summary>
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
@@ -111,7 +118,7 @@ public class WandTests
         Assert.Equal((8, 8, 8, 0, false), (hit.WeaponShare, hit.Dealt, hit.Taken, hit.EnchantmentShare, hit.OnAlly));
         Assert.Equal(200 - 8, enemy.Hp);
         Assert.Equal(8, Assert.Single(resolutions).Dealt);
-        Assert.Equal(ShippedContent.Budget - 45, a.DistLeft);
+        Assert.Equal(Premise.Budget - 45, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - 18 - 4, a.Mana);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
         Assert.Equal(0, turns.AttacksThisTurn(a));   // a cast is no chosen attack
@@ -361,7 +368,7 @@ public class WandTests
 
         // On: allies inside the shape are hit — the caster never — at half the base, marked on the
         // payload and priced at (1,2); the enemy takes the full 8, and the trigger is still paid once.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { FriendlyFireEnabled = true }))
+        using (TestContent.UsePremise(tuning: t => t with { FriendlyFireEnabled = true }))
         {
             Assert.True(GameContent.Current.Tuning.FriendlyFireEnabled);
             var a = Char("A", 5, 5, "wand_of_the_nova", Flaming);
@@ -431,7 +438,7 @@ public class WandTests
         Assert.Equal(4, casts[0].ManaToSpend);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
         Assert.Equal(TestPools.FixtureMana - 22, a.Mana);
-        Assert.Equal(ShippedContent.Budget - 45, a.DistLeft);
+        Assert.Equal(Premise.Budget - 45, a.DistLeft);
 
         // A one-target Blast pays exactly the same.
         var b = Char("B", 5, 5, "wand_of_the_blast", Flaming);
@@ -461,10 +468,10 @@ public class WandTests
         // at nothing in Phase 1 (its potency is 0), and whatever it is priced at, each target takes the
         // whole of it while the cast pays the trigger once: re-priced to three levels at 100%, six
         // bodies take 8 + 3 each for the one 4.
-        using var _ = TestContent.Use(
+        using var _ = TestContent.UsePremise(
             enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id == "flaming" ? e with { Potency = 3 } : e).ToList()),
-            tuning: TuningValues.With(ShippedContent.Tuning, ("ApplyPercent.flaming", 100)));
+            tuning: t => TuningValues.With(t, ("ApplyPercent.flaming", 100)));
         Assert.Equal(3, TestWeapons.Get("wand_of_the_nova", Flaming).Innate!.LevelsFor(3));
         var d = Char("D", 5, 5, "wand_of_the_nova", Flaming);
         var crowd = new[] { Enemy(5, 6), Enemy(5, 4), Enemy(4, 5), Enemy(6, 5), Enemy(4, 6), Enemy(6, 4) };
@@ -502,7 +509,7 @@ public class WandTests
         Assert.Equal(("test_frostfire_knife", ContentValidator.RuleEnchantmentsExcluded), (ex.EntryId, ex.Rule));
 
         // A wand fixed to one element cannot be instantiated as another, opposed or not.
-        using (TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, UniqueWand("test_ember", ("flaming", 3))] }))
+        using (TestContent.UsePremise(weapons: w => w with { Weapons = [.. w.Weapons, UniqueWand("test_ember", ("flaming", 3))] }))
         {
             Assert.Equal(Flaming, TestWeapons.Get("test_ember").Innate!.Def.DamageType);
             Assert.Equal(Flaming, TestWeapons.Get("test_ember", Flaming).Innate!.Def.DamageType);
@@ -517,9 +524,9 @@ public class WandTests
     {
         // Non-opposing types stack freely: a Flaming-and-Shocking wand is legal content, and so is a
         // Cold-and-Acidic dagger; both instantiate with the elements in attachment order.
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with
+        using var _ = TestContent.UsePremise(weapons: w => w with
         {
-            Weapons = [.. ShippedContent.Weapons.Weapons, UniqueWand("test_candle", "flaming", "shocking"), Dagger("test_rime_knife", "cold", "acidic")],
+            Weapons = [.. w.Weapons, UniqueWand("test_candle", "flaming", "shocking"), Dagger("test_rime_knife", "cold", "acidic")],
         });
 
         var candle = TestWeapons.Get("test_candle");
@@ -550,7 +557,7 @@ public class WandTests
 
         // The rule is the wand's alone: a staff casts one as a matter of course, and a martial weapon may
         // carry one (the counter is transferable) — its Cast never runs.
-        using var _ = TestContent.Use(weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, Dagger("test_venom_knife", "poison", "acidic")] });
+        using var _ = TestContent.UsePremise(weapons: w => w with { Weapons = [.. w.Weapons, Dagger("test_venom_knife", "poison", "acidic")] });
         Assert.Equal(new[] { "poison", "acidic" }, TestWeapons.Get("test_venom_knife").Enchantments.Select(e => e.Id));
         Assert.Equal("regeneration", TestWeapons.Get("staff_of_renewal").Innate!.Id);
         Assert.Equal(32 + 11 + 1, GameContent.Current.Weapons.All.Count);
@@ -682,26 +689,35 @@ public class WandTests
     private static WeaponDef UniqueWand(string id, params string[] enchantmentIds)
         => UniqueWand(id, enchantmentIds.Select(e => (e, 1)).ToArray());
 
-    /// <summary>A test wand unique off the Wand of the Nova, its enchantments at the given tiers.</summary>
+    /// <summary>
+    /// A test wand unique off the Wand of the Nova, its enchantments at the given tiers: the variant's row
+    /// under the premise — its class, statline, shape and Resonant x1, as a caster unique keeps them.
+    /// </summary>
     private static WeaponDef UniqueWand(string id, params (string Id, int Tier)[] enchantments)
-        => new(id, id, WeaponClass.Wand, Role: null, Range: 160, Damage: 8, Cost: 45, ManaCost: 20,
-            Forged: new Dictionary<ModifierType, int> { [Resonant] = 1 },
-            Enchantments: enchantments.Select(e => new EnchantmentRef(e.Id, e.Tier)).ToList(),
-            Shape: AreaShape.Nova(96), Unique: true, DerivedFrom: "wand_of_the_nova");
+        => Premise.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova") with
+        {
+            Id = id, Name = id, Role = null,
+            Enchantments = enchantments.Select(e => new EnchantmentRef(e.Id, e.Tier)).ToList(),
+            Unique = true, DerivedFrom = "wand_of_the_nova",
+        };
 
     /// <summary>
     /// A test unique derived from the Flensing Knife in the Light shape (§1.5): the Dagger signature raised
     /// to x3 buys two souls, the first arriving at tier 3 — the one martial shape that carries catalogue
-    /// entries, since every other martial unique carries exactly one unique enchantment.
+    /// entries, since every other martial unique carries exactly one unique enchantment. Its statline is the
+    /// variant's row under the premise, as a unique's is its variant's.
     /// </summary>
     private static WeaponDef Dagger(string id, params string[] enchantmentIds)
-        => new(id, id, WeaponClass.Dagger, Role: null, Range: 40, Damage: 15, Cost: 30, ManaCost: 0,
-            Forged: new Dictionary<ModifierType, int> { [CritWindow] = 3, [CritMultiplier] = 1, [Light] = 1 },
-            Enchantments: enchantmentIds.Select((e, i) => new EnchantmentRef(e, i == 0 ? 3 : 1)).ToList(),
-            Shape: null, Unique: true, DerivedFrom: "flensing_knife");
+        => Premise.Weapons.Weapons.Single(w => w.Id == "flensing_knife") with
+        {
+            Id = id, Name = id, Role = null,
+            Forged = new Dictionary<ModifierType, int> { [CritWindow] = 3, [CritMultiplier] = 1, [Light] = 1 },
+            Enchantments = enchantmentIds.Select((e, i) => new EnchantmentRef(e, i == 0 ? 3 : 1)).ToList(),
+            Unique = true, DerivedFrom = "flensing_knife",
+        };
 
     private static ContentException LoadWith(WeaponDef extra)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
-            ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, extra] }));
+            Premise.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            Premise.Weapons with { Weapons = [.. Premise.Weapons.Weapons, extra] }, dungeons: Premise.Dungeons));
 }

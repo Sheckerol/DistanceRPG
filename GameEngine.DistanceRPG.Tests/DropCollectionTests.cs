@@ -15,10 +15,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// collection rather than about the boss, so each one throws the switch by hand
 /// exactly where the boss's death throws it.
 /// </para>
+/// <para>
+/// The farms stand on the numbers they were written against — the revival
+/// clock, the unique curve, the carry (<see cref="Premise"/>) — made current for
+/// each test, so the content collection holds it.
+/// </para>
 /// </summary>
-public class DropCollectionTests
+[Collection(TestContent.Collection)]
+public sealed class DropCollectionTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The prototype's own map seed; it overflows int32, which is the interesting case for a stream mix.</summary>
     private const long Seed = 2762136374;

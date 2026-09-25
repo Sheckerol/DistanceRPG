@@ -13,13 +13,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// rise a point per bar with the stat dividing it, and the three integers are
 /// the whole progression.
 /// <para>
-/// In the content collection because one test swaps <see cref="Tuning"/> to show
-/// the starting bar is a key and not a literal.
+/// The pools and ladders are worked in the numbers they were written against —
+/// the starting bar, the weapon ladder's step, the weapons' statlines
+/// (<see cref="Premise"/>) — made current for each test, and one test swaps
+/// <see cref="Tuning"/> over it to show the starting bar is a key and not a
+/// literal, so the content collection holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class ProgressionStateTests
+public sealed class ProgressionStateTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The roster's spread for <paramref name="id"/>: the doc's table, read where the game reads it.</summary>
     private static InnateStats Spread(string id) => GameContent.Current.Party[id].Stats;
 
@@ -60,7 +67,7 @@ public class ProgressionStateTests
         // The 30 is one content key, read by both pools on every read, so a
         // tuning swap moves a member's maxima with no member rebuilt and nothing
         // invalidated.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { StartingPool = 40 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { StartingPool = 40 });
 
         var member = TestPools.Fresh("A", Spread("A"));
         Assert.Equal((40, 40), (member.MaxHp, member.MaxMana));

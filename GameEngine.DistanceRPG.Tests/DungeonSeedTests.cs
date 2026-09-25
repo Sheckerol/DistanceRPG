@@ -7,12 +7,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §4.2 and §4.3's seed arithmetic: the per-floor seed, the three new salts and
 /// the streams they keep apart, and the boss floor's roll — the doc's formulas
 /// verbatim, floor 0 resolving to the map seed exactly so the golden dungeon is
-/// untouched, and the tutorial's pinned depth. In the content collection because
-/// one test swaps the tuning the roll reads its range from.
+/// untouched, and the tutorial's pinned depth. The roll's range is two tuning
+/// keys, and these stand on the 5 to 10 they were written against
+/// (<see cref="Premise"/>), made current for each test; one test swaps the range
+/// over it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class DungeonSeedTests
+public sealed class DungeonSeedTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The shipped seed, which does not fit in an int.</summary>
     private const long GoldenSeed = 2762136374;
 
@@ -391,7 +397,7 @@ public class DungeonSeedTests
         // The 5-10 is two tuning keys, read through the content that is current:
         // swap them and every unpinned dungeon rolls over the new range, by the
         // same one draw.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { BossFloorMin = 3, BossFloorMax = 4 });
         var hall = Dungeon("spear_hall");
         var tutorial = GameContent.Current.Dungeons.Tutorial;
 

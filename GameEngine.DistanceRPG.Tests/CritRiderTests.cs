@@ -7,11 +7,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// §1.6: a crit leaves a mark, a successful block leaves one on the attacker,
 /// and the two riders sit at their own pipeline steps — Weakened subtracts at
-/// step 2, Sundered adds at step 3 — on both sides of the fight.
+/// step 2, Sundered adds at step 3 — on both sides of the fight. Every case
+/// stands on the numbers it was written against — the weapons' damage, the
+/// modifier table, a status's effect a level (<see cref="Premise"/>) — made
+/// current for each test, so the content collection holds it.
 /// </summary>
-public class CritRiderTests
+[Collection(TestContent.Collection)]
+public sealed class CritRiderTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
         => TestPools.Holding(id, weapon);

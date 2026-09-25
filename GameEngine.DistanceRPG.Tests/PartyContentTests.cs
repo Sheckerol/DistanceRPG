@@ -132,10 +132,14 @@ public class PartyContentTests
         Assert.Equal("D", bagged.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, bagged.Rule);
 
-        // One equipped plus six bagged is seven weapons into six slots.
+        // One equipped plus a whole share of the carry bagged is a weapon more
+        // than a member's slots, whatever share tuning.json gives each.
+        int slots = ShippedContent.Tuning.PartyCarrySlots / GameConstants.PartySize;
         var deep = Rejected(With(3, m => m with
         {
-            BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword"],
+            BagWeaponIds = Enumerable.Range(0, slots)
+                .Select(i => new[] { "staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword" }[i % 6])
+                .ToList(),
         }));
         Assert.Equal("D", deep.EntryId);
         Assert.Equal(ContentValidator.RulePartyBagFits, deep.Rule);
@@ -179,11 +183,9 @@ public class PartyContentTests
         Assert.Same(before, GameContent.Current);
         Assert.Equal("Dagger", GameContent.Current.Party["A"].Name);
 
-        // The two tuning keys the roster's pools are measured against, and the
-        // loader's refusal of a bar there is no step off.
-        Assert.Equal(30, GameContent.Current.Tuning.StartingPool);
-        Assert.Equal(100, GameContent.Current.Tuning.WeaponXpPerLevel);
-
+        // The two tuning keys the roster's pools are measured against are
+        // tuning.json's to set; what is the code's is the loader's refusal of a
+        // bar there is no step off.
         var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { StartingPool = 0 }));
         Assert.Equal(ContentValidator.RulePoolBarIsPositive, zeroPool.Rule);
         Assert.Equal(nameof(Tuning.StartingPool), zeroPool.EntryId);

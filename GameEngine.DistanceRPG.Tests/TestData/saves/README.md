@@ -25,7 +25,8 @@ At `febe036` that content is the compiled content exactly. The shipped files
 were pinned byte for byte to the generator's output (`ShippedDataTests`); they
 loaded with nothing to say — no notice, no number fitted or overridden — and
 hashed as the compiled tuning; and the same run checked that the content they
-load dumps to the same text as the compiled content (`ContentDump`).
+load dumps to the same text as the compiled content (`ContentDump`, retired with
+`ContentEquivalenceTests` once the rework was done, at its R5).
 
 ## What reads them
 
@@ -36,3 +37,9 @@ The saves' hash is the hash of `pre-rework-tuning.json`, read by the current
 reader. The game says the numbers have changed exactly when the numbers it ships
 differ from that file's. And the launch resumes each one — the mid-run one in
 the dungeon, on its floor and turn, where its visit plays on.
+
+`pre-rework-tuning.json` has one more reader: the suite's `Premise`, the numbers
+the worked examples were written against. A suite whose scenarios stand on the
+tuning — a push that moves a tile, three Block a stack, a dummy back up in nine
+turns — reads this file over the master copy and makes it current, so a
+designer's edit to `tuning.json` moves the game and fails none of them.

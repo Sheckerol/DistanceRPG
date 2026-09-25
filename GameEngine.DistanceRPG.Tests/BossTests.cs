@@ -14,15 +14,21 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <para>
 /// The scenarios run on real floors, on the shipped seed's tutorial — whose
 /// golem holds a Pinning Lance in its lair at (59, 41) — and every fact a test
-/// leans on is pinned by an assertion before it is used. In the content
-/// collection, because one test edits the relations the boss's hands are
-/// computed from.
+/// leans on is pinned by an assertion before it is used. Every scenario stands
+/// on the numbers it was written against — the golem's statline, the weapons'
+/// damage, the modifier table, the farm's clock, the boss floor range
+/// (<see cref="Premise"/>) — made current for each test, and tests here edit it,
+/// so the content collection holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class BossTests
+public sealed class BossTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The shipped seed: its tutorial golem holds a Pinning Lance in the lair at (59, 41).</summary>
     private const long GoldenSeed = 2762136374;
@@ -399,7 +405,7 @@ public class BossTests
         var before = seeds.Select(s => DungeonState.RollBoss(s, hall)).ToArray();
 
         BossRoll[] after;
-        using (TestContent.Use(restricted: braceFreed))
+        using (TestContent.UsePremise(restricted: braceFreed))
         {
             var edited = GameContent.Current.Dungeons["spear_hall"];
             Assert.Equal(new[] { Dagger, Sword, Spear, Axe }, GameContent.Current.Dungeons.WieldClasses(edited));
@@ -913,7 +919,7 @@ public class BossTests
 
         // Tuned to three runs a floor, the seven-floor Spear Hall locks for
         // twenty-one, and its bottom floor's banner says twenty-one.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { CooldownRunsPerFloor = 3 }))
+        using (TestContent.UsePremise(tuning: t => t with { CooldownRunsPerFloor = 3 }))
         {
             var party = Party();
             var visit = DungeonState.Enter(Dungeons["spear_hall"], 7, party);
@@ -944,9 +950,8 @@ public class BossTests
         // re-roll: on the boss floor's banner, in the way out's question, and in
         // the run's summary. Five floors still reach the mercy floor, so a shallow
         // failure there still names the rule it missed.
-        var pinned = new DungeonsData(ShippedContent.Dungeons.Dungeons
-            .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 5, BossFloorMax = 5 } : d).ToList());
-        using (TestContent.Use(dungeons: pinned))
+        using (TestContent.UsePremise(dungeons: data => new DungeonsData(data.Dungeons
+            .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 5, BossFloorMax = 5 } : d).ToList())))
         {
             var hall = Dungeons["spear_hall"];
             Assert.True(Dungeons.HasFixedDepth(hall));
@@ -968,7 +973,7 @@ public class BossTests
 
         // The two questions are apart: a range of 1 to 2 re-rolls the depth, and
         // never reaches the mercy floor, so its failures never count.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 1, BossFloorMax = 2 }))
+        using (TestContent.UsePremise(tuning: t => t with { BossFloorMin = 1, BossFloorMax = 2 }))
         {
             Assert.False(Dungeons.HasFixedDepth(Dungeons["spear_hall"]));
             var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 1, null, false, false, 0, null, false, [], [], []);
@@ -978,7 +983,7 @@ public class BossTests
         }
 
         // And a range the tuning fixes leaves every dungeon as deep on every visit.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 7, BossFloorMax = 7 }))
+        using (TestContent.UsePremise(tuning: t => t with { BossFloorMin = 7, BossFloorMax = 7 }))
             Assert.All(Dungeons.All, d => Assert.True(Dungeons.HasFixedDepth(d), d.Id));
     }
 }

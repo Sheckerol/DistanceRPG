@@ -4,8 +4,20 @@ using static GameEngine.DistanceRPG.Logic.ModifierType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class ModifierSetTests
+/// <summary>
+/// <see cref="ModifierSet"/>: stacks, the cap an acquisition clamps against, and
+/// the values the stacks resolve to. The caps and values are worked in the numbers
+/// they were written against — the headroom, the per-stack and offset tables
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class ModifierSetTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     [Fact]
     public void With_AddsAndClampsAgainstForged()
     {

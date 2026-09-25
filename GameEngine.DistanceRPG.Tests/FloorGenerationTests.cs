@@ -6,14 +6,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §4.5's <see cref="Floor"/>: one map, the rows placed on it, its own fog and
 /// its stairs, each a pure function of <c>(mapSeed, index, def)</c> — floor 0 of
 /// the shipped seed the shipped dungeon to the tile, every other floor its own
-/// dungeon, and nothing any of it draws on shared with anything else. In the
-/// content collection because one test loads an attuned dungeon.
+/// dungeon, and nothing any of it draws on shared with anything else. The seeds'
+/// depths stand on the floor range they were rolled in (<see cref="Premise"/>),
+/// made current for each test, and one test loads an attuned dungeon over it, so
+/// the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class FloorGenerationTests
+public sealed class FloorGenerationTests : IDisposable
 {
     /// <summary>The shipped seed.</summary>
     private const long GoldenSeed = 2762136374;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static DungeonDef Tutorial => GameContent.Current.Dungeons.Tutorial;
 
@@ -209,7 +215,7 @@ public class FloorGenerationTests
         // every floor, and an unattuned dungeon's carry none. The shipped five
         // are unattuned (attunement is its own field; none is set yet), so the
         // attuned one here is a fixture loaded through the content path.
-        var hall = ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "spear_hall");
+        var hall = Premise.Dungeons.Dungeons.Single(d => d.Id == "spear_hall");
         var frost = hall with
         {
             Id = "frost_hall",
@@ -217,7 +223,7 @@ public class FloorGenerationTests
             Attunement = DamageType.Cold,
             Boss = hall.Boss with { Id = "frost_warden", Name = "Frost Warden" },
         };
-        using var _ = TestContent.Use(dungeons: new DungeonsData([.. ShippedContent.Dungeons.Dungeons, frost]));
+        using var _ = TestContent.UsePremise(dungeons: data => new DungeonsData([.. data.Dungeons, frost]));
         var attuned = GameContent.Current.Dungeons["frost_hall"];
 
         for (int n = 0; n < 3; n++)

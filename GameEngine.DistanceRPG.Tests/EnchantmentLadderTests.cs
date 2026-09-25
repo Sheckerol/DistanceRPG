@@ -146,22 +146,24 @@ public class EnchantmentLadderTests
     {
         // Lock and potency both scale linearly with tier. Potency has no field
         // of its own, deliberately: Tier is already a factor inside LevelsFor,
-        // and a second idiom for the same idea would invite squaring it.
-        Assert.Equal(4, GameContent.Current.Tuning.ArcanePotency);
+        // and a second idiom for the same idea would invite squaring it. The
+        // potency a tier multiplies is tuning.json's ArcanePotency, laid over the
+        // row: whatever it is, tier six is six of it.
+        int potency = GameContent.Current.Tuning.ArcanePotency;
 
         var tier1 = new Enchantment(Arcane, Tier: 1);
         var tier6 = new Enchantment(Arcane, Tier: 6);
 
         Assert.Equal(30, tier1.EffectiveLock);
-        Assert.Equal(4, tier1.LevelsFor(Arcane.Potency));      // 4 damage for a trigger of 8
-        Assert.Equal(180, tier6.EffectiveLock);                // the doc's tier-6 Arcane
-        Assert.Equal(24, tier6.LevelsFor(Arcane.Potency));     // 24 damage for a lock of 180
+        Assert.Equal(potency, tier1.LevelsFor(Arcane.Potency));       // its potency in damage for a trigger of 8
+        Assert.Equal(180, tier6.EffectiveLock);                       // the doc's tier-6 Arcane
+        Assert.Equal(6 * potency, tier6.LevelsFor(Arcane.Potency));   // six times it for a lock of 180
 
         // Nothing in the type expresses a maximum: max mana is the only cap
         // there is, and it is a cap on what you can carry rather than on depth.
         var deep = new Enchantment(Arcane, Tier: 40);
         Assert.Equal(1200, deep.EffectiveLock);
-        Assert.Equal(160, deep.LevelsFor(Arcane.Potency));
+        Assert.Equal(40 * potency, deep.LevelsFor(Arcane.Potency));
         Assert.Equal(40, deep.Tier);
     }
 
