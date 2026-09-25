@@ -11,7 +11,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// naming its full path, and the backup is tried, then nothing is brought back,
 /// a load making no campaign of its own — the title says so first, then what was
 /// set aside; a manual slot's campaign sets a different autosave aside before its
-/// first autosave, never deleting it; NEW CAMPAIGN — the title's, or
+/// first autosave, never deleting it; a campaign that comes into play while the
+/// autosave refuses its writes since an earlier try says so on its first screen;
+/// NEW CAMPAIGN — the title's, or
 /// <c>--new-campaign</c> — sets the save and its backup aside before anything is
 /// read, so neither can come back as the new campaign's; the save's word is shown
 /// whole, the numbers ahead of any file set aside; a quit that cannot save is said
@@ -654,6 +656,85 @@ public sealed class CampaignBootTests : IDisposable
             Assert.NotNull(CampaignBoot.Save(stuck, stuckLoaded));
             Assert.Equal(stuckText, stuck.Read());
             Assert.Equal([SaveStore.FileName], Files(stuck.Folder));
+        });
+    }
+
+    [Fact]
+    public void ARefusalFromAnEarlierTryIsSaidWhenACampaignComesIntoPlay()
+    {
+        InTempFolder(folder =>
+        {
+            // S6's review: a refusal holds for the session (1f) — a file that could be
+            // neither read nor moved refuses its slot's writes as long as the game runs
+            // — and the title lets the player try again. So a campaign that comes into
+            // play after it — loaded by a later try, or begun by NEW CAMPAIGN — says on
+            // its first screen that nothing is autosaved, and why, rather than leave it
+            // to the first autosave to fail (CampaignBoot.InPlayWord, which LoadSlot and
+            // BeginNewCampaign hand their word through). A refusal the load or the new
+            // campaign met itself is said by its stuck notice, once.
+            var slots = new SaveSlots(folder, 3);
+            var autosave = slots.Store(SaveSlots.Autosave);
+            string[] resumed = [BetweenRunsHud.Resumed];
+
+            // Writes not refused: the word is what it was.
+            Assert.Equal(resumed, CampaignBoot.InPlayWord(resumed, autosave));
+
+            // Refused earlier: said after the word — nothing autosaved, why, what to do.
+            const string why = "campaign.json could not be read (another program has it open) and could not be set aside (another program has it open)";
+            autosave.RefuseWrites(why);
+            var said = CampaignBoot.InPlayWord(resumed, autosave);
+            Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.NotAutosaved(why)], said);
+            Assert.Equal("NOTHING IS AUTOSAVED THIS SESSION: EARLIER, CAMPAIGN.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN)"
+                + " AND COULD NOT BE SET ASIDE (ANOTHER PROGRAM HAS IT OPEN) - LAUNCH THE GAME AGAIN TO SAVE", said[1]);
+
+            // Whole on the screen it opens on, in the font, and orange — a warning.
+            var rows = NoticeText.Rows(said, whole: said.Count);
+            Assert.Equal(said.SelectMany(NoticeText.Wrap), rows);
+            Assert.All(rows, row => Assert.Matches("^[A-Z0-9 :,./()-]+$", row));
+            Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(NoticeText.Wrap(said[1])[0]));
+
+            // A stuck notice already in the word says it — a file that would not move as
+            // NEW CAMPAIGN or the room a load made set it aside — so it is not said twice.
+            string[] stuckWord = [CampaignBoot.NewCampaignBegins, CampaignBoot.StuckNotice("campaign.json", "was left for a new campaign", "another program has it open")];
+            Assert.Equal(stuckWord, CampaignBoot.InPlayWord(stuckWord, autosave));
+
+            // Windows only: the review's own case, end to end. CONTINUE while another
+            // program holds the autosave: nothing loads, and the session's store refuses
+            // its writes. The file let go, CONTINUE again through the same store: the
+            // campaign loads, and its word says it is not autosaved — which is true.
+            // Then NEW CAMPAIGN in the same session: the old files move now, and the new
+            // campaign's word says the same.
+            if (!OperatingSystem.IsWindows())
+                return;
+            var held = new SaveSlots(Path.Combine(folder, "held"), 3);
+            var itsAutosave = held.Store(SaveSlots.Autosave);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            Saved(itsAutosave, campaign);
+            SlotLoad first;
+            using (new FileStream(itsAutosave.SavePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                first = CampaignBoot.Load(itsAutosave, GameContent.Current);
+            Assert.False(first.Loaded);
+            Assert.Collection(CampaignBoot.NothingLoadedWord(first, SaveSlots.Autosave),
+                notice => Assert.Equal(CampaignBoot.NothingLoaded(SaveSlots.Autosave), notice),
+                notice => Assert.Equal(CampaignBoot.StuckNotice("campaign.json", "could not be read (another program has it open)", "another program has it open"), notice));
+            string refused = Assert.IsType<string>(itsAutosave.WritesRefused);
+
+            var retry = CampaignBoot.Load(held.Store(SaveSlots.Autosave), GameContent.Current);
+            Assert.True(retry.Loaded);
+            itsAutosave.ClearResuming();   // the loaded screen is up
+            Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.NotAutosaved(refused)], CampaignBoot.InPlayWord(retry.Notices, itsAutosave));
+            string before = itsAutosave.Read()!;
+            Assert.NotNull(CampaignBoot.Save(itsAutosave, retry.Campaign!));
+            Assert.Equal(before, itsAutosave.Read());
+
+            var begun = CampaignBoot.Abandon(itsAutosave, GameContent.Current, how: null);
+            Assert.Collection(CampaignBoot.InPlayWord(begun.Notices, itsAutosave),
+                notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
+                notice => SaysSetAside(notice, "campaign.json", "was left for a new campaign", Path.Combine(itsAutosave.Folder, "campaign.abandoned-1.json")),
+                notice => Assert.Equal(CampaignBoot.NotAutosaved(refused), notice));
+            Assert.NotNull(CampaignBoot.Save(itsAutosave, begun.Campaign));
+            Assert.False(itsAutosave.HasSave);
         });
     }
 

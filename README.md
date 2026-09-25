@@ -167,13 +167,17 @@ play writes a manual slot, though a slot holding a save — one copied into
   revival due under the new numbers happens as the floor opens.) Whatever slot a
   campaign was loaded from, it autosaves into the autosave slot from then on; the
   manual slot keeps the save it had. So a manual slot loaded while the autosave
-  holds a different campaign asks first — `LOADING SLOT 2 SETS THE AUTOSAVE ASIDE
-  - ...` / `AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, once the slot's
-  campaign has come back and before anything is written, sets the autosave's save
-  and backup aside as `campaign.replaced-N.json` (a crashed or unreadable one by
-  that name instead), never deleted, and says so on the screen it opens on:
+  holds a different campaign asks first — `LOADING SLOT 2 SETS THE AUTOSAVE
+  ASIDE - ...` / `AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, once
+  the slot's campaign has come back and before anything is written, sets the
+  autosave's save and backup aside as `campaign.replaced-N.json` (a crashed or
+  unreadable one by that name instead), never deleted, and says so on the screen
+  it opens on:
   `CAMPAIGN.JSON MADE WAY FOR SLOT 2 - SET ASIDE AS ...`. A slot holding the
-  autosave's own save asks nothing.
+  autosave's own save asks nothing. A slot listed `CANNOT BE READ` asks in words
+  that promise nothing — `SLOT 2 CANNOT BE READ - IF IT LOADS, THE AUTOSAVE IS SET
+  ASIDE - ...` — since its load most likely sets its own files aside and brings
+  nothing back, which leaves the autosave as it was.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
@@ -190,7 +194,12 @@ play writes a manual slot, though a slot holding a save — one copied into
   build wrote — is set aside first as `campaign.unreadable-N.json`, and so is such
   a `campaign.bak.json` that the write would otherwise push out. The screen says
   so the way it says a failed save, and the log says why. A file another program
-  holds open is left where it is, and the write fails as above.
+  holds open is left where it is, and the write fails as above. A file that can
+  be neither read nor moved when a load or NEW CAMPAIGN goes to set it aside
+  stays where it is, and nothing is saved into its slot for the rest of that
+  session, so nothing can take its place — even once the other program lets go
+  and a later try from the title loads, whose screen then says `NOTHING IS
+  AUTOSAVED THIS SESSION: EARLIER, ...`. Launch the game again to save.
 - **A save that cannot be played is set aside, never deleted**: one that is not
   a save, one a newer build wrote, one naming content that is gone, one that
   contradicts itself or holds a number past what play can reach (below), or one

@@ -133,8 +133,9 @@ public sealed class TitleHud : IDisposable
     /// <summary>
     /// The ask being put, as its two rows: NEW CAMPAIGN's names what the autosave
     /// holds and how many slots are kept; a load's names the slot and what the
-    /// autosave holds. Each names the autosave by what it holds
-    /// (<see cref="SlotText.Summary"/>).
+    /// autosave holds — promising no set-aside for a slot listed
+    /// <see cref="SlotText.CannotBeRead"/> (<see cref="TitleText.LoadAsk"/>). Each
+    /// names the autosave by what it holds (<see cref="SlotText.Summary"/>).
     /// </summary>
     internal static (string What, string Keys) AskRows(TitleMenu menu, DungeonCatalogue dungeons)
     {
@@ -143,7 +144,8 @@ public sealed class TitleHud : IDisposable
         return menu.Ask switch
         {
             TitleAsk.NewCampaign => TitleText.NewCampaignAsk(autosave, menu.Count),
-            TitleAsk.Load => TitleText.LoadAsk(menu.AskSlot, autosave),
+            TitleAsk.Load => TitleText.LoadAsk(menu.AskSlot, autosave,
+                unreadable: menu.Listing.Slots.Any(slot => slot.Number == menu.AskSlot && slot.State == SlotState.Unreadable)),
             _ => throw new InvalidOperationException("No ask is being put."),
         };
     }

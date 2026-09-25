@@ -97,8 +97,9 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
 
 /// <summary>
 /// What the host hands a dungeon scene playing a visit a save brought back
-/// (1f, Phase 5.8): the view the save carried and what the launch has to say
-/// over the floor it resumes on.
+/// (1f, Phase 5.8) — a slot loaded from the title, by CONTINUE or LOAD GAME: the
+/// view the save carried and what the game has to say over the floor it resumes
+/// on.
 /// </summary>
 /// <param name="View">
 /// The save's view (<see cref="ViewDto"/>): the member who was active, and
@@ -109,7 +110,7 @@ public sealed record GroundItem(EnemyState? Corpse, Drop? Drop, GameObject Marke
 /// the scene arrives on afresh, as it would have.
 /// </param>
 /// <param name="Leading">How many of <paramref name="Notices"/>, from the first, are the save's word on the campaign (<see cref="StartupNotices.Leading"/>): shown whole over the resumed floor, as the screen between runs shows them, where what the data files raised after them is capped (S8's review).</param>
-/// <param name="Notices">What the launch has to say — the save's word on the campaign, then what the data files raised — shown over the resumed floor (<see cref="DungeonHud.ShowResume"/>).</param>
+/// <param name="Notices">What the game has to say — the save's word on the campaign, then what the data files raised — shown over the resumed floor (<see cref="DungeonHud.ShowResume"/>).</param>
 public sealed record ResumeView(ViewDto? View, int Leading, IReadOnlyList<string> Notices);
 
 /// <summary>
@@ -235,7 +236,7 @@ public class DungeonScene : Scene
     private readonly IRunHost _host;
 
     // What the host handed a scene playing a visit a save brought back — the
-    // save's view and what the launch has to say — or null for a visit entered
+    // save's view and what the game has to say — or null for a visit entered
     // fresh. Read once, by the first floor's arrival.
     private readonly ResumeView? _resume;
 
@@ -349,12 +350,13 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// A scene playing a visit a save brought back (1f, Phase 5.8): the campaign
-    /// resumed at launch with its run in progress. The floor, the turn, every
-    /// position and every counter are the visit's, restored; what the scene adds
+    /// A scene playing a visit a save brought back (1f, Phase 5.8): the campaign a
+    /// slot held, loaded from the title — CONTINUE or LOAD GAME — with its run in
+    /// progress. The floor, the turn, every position and every counter are the
+    /// visit's, restored; what the scene adds
     /// is what <paramref name="resumed"/> carries — the save's view, restored on
     /// the first floor's arrival rather than decided afresh — and <c>RESUMED</c>
-    /// over the floor banner with the launch's notices, the save's word among them
+    /// over the floor banner with the game's notices, the save's word among them
     /// shown whole (<see cref="DungeonHud.ShowResume"/>), handed to the HUD here
     /// for the reason the other constructor gives.
     /// </summary>
@@ -362,7 +364,7 @@ public class DungeonScene : Scene
     /// <param name="game">The game window: its size, its shaders, its close.</param>
     /// <param name="campaign">The campaign a save brought back, its visit in progress with no floor's system open (<see cref="SaveGame.Restore"/>).</param>
     /// <param name="host">Who is told when the run is over, and asked for its saves.</param>
-    /// <param name="resumed">The save's view and the launch's notices.</param>
+    /// <param name="resumed">The save's view and the game's notices.</param>
     /// <exception cref="ArgumentException">The campaign has no visit in progress: there is nothing to resume.</exception>
     public DungeonScene(Camera camera, Game game, CampaignState campaign, IRunHost host, ResumeView resumed)
         : this(camera, game, campaign, host)

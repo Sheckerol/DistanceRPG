@@ -501,6 +501,21 @@ public class GameStartupTests
         int madeRoom = inLoadSlot.FindIndex(called => Same(called, makeRoom));
         Assert.True(loaded >= 0 && loaded < madeRoom, "LoadSlot makes room in the autosave slot before its Load has brought a campaign back");
         Assert.Equal(1, Mentions(loadSlot, makeRoom));
+
+        // A refusal the autosave met on an earlier try this session is said on the
+        // first screen of every campaign that comes into play after it (S6's review):
+        // the word a load and the room it made say, or the one a new campaign says, is
+        // handed through CampaignBoot.InPlayWord before it is led — once the load has
+        // made its room, once NEW CAMPAIGN has set its files aside.
+        var inPlay = Method(typeof(CampaignBoot), nameof(CampaignBoot.InPlayWord));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.LoadSlot"], Callers(inPlay));
+        int saidInPlay = inLoadSlot.FindIndex(called => Same(called, inPlay));
+        Assert.True(madeRoom < saidInPlay, "LoadSlot says what the load brought back before the room it made in the autosave slot is known");
+        var inNewCampaign = CallsIn(Method(typeof(DistanceRpgGame), "BeginNewCampaign")).ToList();
+        int abandoned = inNewCampaign.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
+        Assert.True(abandoned >= 0 && abandoned < inNewCampaign.FindIndex(called => Same(called, inPlay)),
+            "BeginNewCampaign says what the new campaign set aside before NEW CAMPAIGN has set it aside");
+        Assert.Equal(1, Mentions(loadSlot, inPlay));
     }
 
     private const BindingFlags Declared = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;

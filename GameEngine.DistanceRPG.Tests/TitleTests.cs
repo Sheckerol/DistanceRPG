@@ -408,7 +408,11 @@ public sealed class TitleTests : IDisposable
         Assert.Equal(H - TitleHud.KeysFromBottom - TitleHud.BottomPitch, drawn[^2].Y);
         Assert.Equal(new TitleStep(TitleAction.Load, 2), menu.Press(Keys.D2));
         Assert.DoesNotContain(Drawn(menu), row => row.Text == "SLOT 1 IS EMPTY");
-        Assert.Equal("W/S OR ARROWS OR 0-9 CHOOSE - ENTER LOADS - ESC BACK", TitleText.LoadKeysLine);
+
+        // The keys line says what the keys do (S6's review): W/S and the arrows only
+        // choose, and a digit loads at once, as ENTER does — never "0-9 CHOOSE",
+        // which a player would read as a digit that only picks.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK", TitleText.LoadKeysLine);
     }
 
     [Fact]
@@ -471,6 +475,28 @@ public sealed class TitleTests : IDisposable
         var noAutosave = Listing(Slot(2, header: Header(At, 1)));
         Assert.Equal(new TitleStep(TitleAction.Load, 2), After(noAutosave, Keys.S, Keys.S, Keys.Enter).Press(Keys.D2));
         Assert.Equal(new TitleStep(TitleAction.Load, 2), new TitleMenu(noAutosave).Press(Keys.Enter));
+
+        // A slot none of whose files read when the list was made is asked too — a file
+        // another program held then can load a moment later, and then the autosave is
+        // set aside — but in words that promise no set-aside, since its load most
+        // likely brings nothing back and leaves the autosave as it was (S6's review).
+        // A slot resumed from its backup keeps the plain words: its load brings the
+        // backup back.
+        var unreadableToo = Listing(SpearHallAutosave(), Slot(1, SlotState.Unreadable), Slot(3, SlotState.FromBackup, Header(At, 2)));
+        Assert.True(unreadableToo.NeedsRoom(1));
+        var unreadable = After(unreadableToo, Keys.S, Keys.S, Keys.Enter);
+        Assert.Equal(default, unreadable.Press(Keys.D1));
+        Assert.Equal((true, TitleAsk.Load, 1), (unreadable.Asking, unreadable.Ask, unreadable.AskSlot));
+        Assert.Equal(("SLOT 1 CANNOT BE READ - IF IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", "AS FILES, NEVER DELETED - ENTER: YES - ESC: NO"),
+            TitleHud.AskRows(unreadable, Dungeons));
+        Assert.Equal([("SLOT 1 CANNOT BE READ - IF IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", DungeonHud.Yellow),
+            ("AS FILES, NEVER DELETED - ENTER: YES - ESC: NO", DungeonHud.Yellow)], Drawn(unreadable).TakeLast(2).Select(row => (row.Text, row.Color)));
+        Assert.Equal(new TitleStep(TitleAction.Load, 1), unreadable.Press(Keys.Enter));   // ENTER alone tries it
+        var declined = After(unreadableToo, Keys.S, Keys.S, Keys.Enter, Keys.D1);
+        Assert.Equal((default(TitleStep), false), (declined.Press(Keys.N), declined.Asking));
+        var fromBackup = After(unreadableToo, Keys.S, Keys.S, Keys.Enter, Keys.D3);
+        Assert.Equal(("LOADING SLOT 3 SETS THE AUTOSAVE ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", "AS FILES, NEVER DELETED - ENTER: YES - ESC: NO"),
+            TitleHud.AskRows(fromBackup, Dungeons));
     }
 
     [Fact]
@@ -500,9 +526,13 @@ public sealed class TitleTests : IDisposable
         Within($"    {markers}", SlotText.Scale);
 
         // Each ask's two rows, at the keys line's scale: NEW CAMPAIGN's at nine slots,
-        // a load's of slot 9, each naming the worst autosave.
+        // a load's of slot 9 — and of slot 9 listed CANNOT BE READ, the longer — each
+        // naming the worst autosave.
         string place = SlotText.Summary(worst with { Number = SaveSlots.Autosave }, Dungeons);
-        foreach (var (what, keys) in new[] { TitleText.NewCampaignAsk(place, SaveSlots.Most), TitleText.LoadAsk(SaveSlots.Most, place) })
+        foreach (var (what, keys) in new[]
+            {
+                TitleText.NewCampaignAsk(place, SaveSlots.Most), TitleText.LoadAsk(SaveSlots.Most, place), TitleText.LoadAsk(SaveSlots.Most, place, unreadable: true),
+            })
         {
             Within(what, TitleHud.KeysScale);
             Within(keys, TitleHud.KeysScale);
@@ -534,6 +564,10 @@ public sealed class TitleTests : IDisposable
             Keys.S, Keys.S, Keys.Enter, Keys.D9);
         Assert.Equal(TitleAsk.Load, overTheList.Ask);
         Fits(Drawn(overTheList, mostNotices));                                                // a load's ask over the list
+        var overAnUnreadable = After(new SaveListing([.. overTheList.Listing.Slots.Select(slot => slot.Number == SaveSlots.Most ? slot with { State = SlotState.Unreadable, Header = null } : slot)], []),
+            Keys.S, Keys.S, Keys.Enter, Keys.D9);
+        Assert.StartsWith("SLOT 9 CANNOT BE READ - IF IT LOADS, ", TitleHud.AskRows(overAnUnreadable, Dungeons).What, StringComparison.Ordinal);
+        Fits(Drawn(overAnUnreadable, mostNotices));                                           // and over a slot that cannot be read, the longer
         Assert.True(Drawn(new TitleMenu(worstListing), mostNotices).Single(row => row.Text.StartsWith("QUIT", StringComparison.Ordinal)).Bottom
             <= H - TitleHud.KeysFromBottom - TitleHud.BottomPitch, "the options run into the bottom rows");
     }

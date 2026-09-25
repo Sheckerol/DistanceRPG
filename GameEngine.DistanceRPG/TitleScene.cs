@@ -90,7 +90,11 @@ internal enum TitleAsk
 /// campaign asks first</strong> (<see cref="SaveListing.NeedsRoom"/>; USER
 /// DECISION 2) — whether it was chosen from the list or is CONTINUE's — since the
 /// campaign it loads autosaves into the autosave slot, and the one there is set
-/// aside, never deleted, before that can happen.</item>
+/// aside, never deleted, before that can happen. A slot listed <c>CANNOT BE
+/// READ</c> is asked too, in words that promise no set-aside
+/// (<see cref="TitleText.LoadAsk"/>): its load most likely brings nothing back,
+/// but a file another program held while the list was read can load a moment
+/// later.</item>
 /// <item><strong>An ask takes exactly the next key, and only ENTER says
 /// yes</strong>: every other key — N, Y, the arrows, a digit — says no and is
 /// spent doing so, so a player pressing N to mean no keeps what the ask named.

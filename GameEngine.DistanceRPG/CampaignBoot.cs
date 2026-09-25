@@ -80,6 +80,11 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// different campaign in the autosave slot is set aside — after the title asked,
 /// once the load has brought a campaign back, before anything is written — never
 /// deleted, and never lost to two autosaves.</item>
+/// <item><strong>A campaign that will not be autosaved says so on its first
+/// screen</strong> (<see cref="InPlayWord"/>): a refusal holds for the session, so
+/// a file stuck on an earlier try from the title refuses the autosave for every
+/// campaign loaded or begun after it, and each says so at once rather than leave
+/// it to the first autosave to fail.</item>
 /// <item><strong>No write costs a file</strong> (1f): a slot can be written without
 /// being loaded, so before any write a <see cref="SaveStore.FileName"/> there
 /// that no save can be read from is set aside first, and so is such a backup the
@@ -182,6 +187,55 @@ internal static class CampaignBoot
         if (load.Loaded)
             throw new ArgumentException("The load brought a campaign back: what it says is its own word, and the campaign is played.", nameof(load));
         return [NothingLoaded(number), .. load.Notices];
+    }
+
+    /// <summary>
+    /// The autosave refused its writes before the campaign now coming into play
+    /// came into play (<see cref="InPlayWord"/>): that nothing is autosaved for the
+    /// rest of the session, why, and what to do —
+    /// <c>NOTHING IS AUTOSAVED THIS SESSION: EARLIER, CAMPAIGN.JSON COULD NOT BE READ
+    /// (ANOTHER PROGRAM HAS IT OPEN) AND COULD NOT BE SET ASIDE (ANOTHER PROGRAM HAS IT
+    /// OPEN) - LAUNCH THE GAME AGAIN TO SAVE</c>.
+    /// </summary>
+    /// <param name="why">Why the autosave refuses its writes (<see cref="SaveStore.WritesRefused"/>).</param>
+    internal static string NotAutosaved(string why)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(why);
+        return $"NOTHING IS AUTOSAVED THIS SESSION: EARLIER, {why.ToUpperInvariant()} - LAUNCH THE GAME AGAIN TO SAVE";
+    }
+
+    /// <summary>
+    /// The save's word on a campaign coming into play — loaded from a slot, with
+    /// the room it made in the autosave slot (<see cref="Load"/>,
+    /// <see cref="MakeRoom"/>), or begun by NEW CAMPAIGN (<see cref="Abandon"/>) — as
+    /// its first screen says it: <paramref name="said"/>, then
+    /// <see cref="NotAutosaved"/> when <paramref name="autosave"/>, where the
+    /// campaign autosaves, refuses its writes and nothing said yet says so.
+    /// <para>
+    /// <strong>A refusal holds for the session</strong> (<see cref="SaveStore.RefuseWrites"/>,
+    /// 1f): a file that could be neither read nor moved is never written over while
+    /// the game runs, even once another program has let go of it. The title lets
+    /// the player try again, so a load that went back to it over a stuck autosave,
+    /// or a NEW CAMPAIGN stopped by one, can be followed by a try that loads, or a
+    /// NEW CAMPAIGN that goes through, with the refusal still standing: a campaign
+    /// played and never autosaved. So its first screen says so, rather than leave it
+    /// to the first autosave to fail; a relaunch is the retry. Letting a retry clear
+    /// the refusal would change 1f's contract, and is the user's call, not taken
+    /// here (S6's review). A refusal the load, the room it made or the new campaign
+    /// met itself — a file that would not move as it was set aside — is said
+    /// already, by its stuck notice (<see cref="StuckNotice"/>), and not twice.
+    /// </para>
+    /// Reads, writes and moves no file.
+    /// </summary>
+    /// <param name="said">What the load and the room it made, or the new campaign, say, in order.</param>
+    /// <param name="autosave">The slot the campaign autosaves into: the autosave slot.</param>
+    internal static IReadOnlyList<string> InPlayWord(IReadOnlyList<string> said, SaveStore autosave)
+    {
+        ArgumentNullException.ThrowIfNull(said);
+        ArgumentNullException.ThrowIfNull(autosave);
+        if (autosave.WritesRefused is not { } refused || said.Any(SaysStuck))
+            return said;
+        return [.. said, NotAutosaved(refused)];
     }
 
     /// <summary>
@@ -814,9 +868,15 @@ internal static class CampaignBoot
     internal static string SetAsideNotice(string file, string what, string path)
         => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} - SET ASIDE AS {path} - {TryAgain}";
 
+    /// <summary>How every stuck notice ends (<see cref="StuckNotice"/>): the slot takes no more saves this session.</summary>
+    private const string NothingSavedThisSession = "NOTHING IS SAVED THIS SESSION, SO IT IS NEVER WRITTEN OVER";
+
     /// <summary>A save that could not be read and could not be moved: it stays, and nothing is saved over it.</summary>
     internal static string StuckNotice(string file, string what, string why)
-        => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} AND COULD NOT BE SET ASIDE ({why.ToUpperInvariant()}) - NOTHING IS SAVED THIS SESSION, SO IT IS NEVER WRITTEN OVER";
+        => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} AND COULD NOT BE SET ASIDE ({why.ToUpperInvariant()}) - {NothingSavedThisSession}";
+
+    /// <summary>Whether <paramref name="notice"/> is a stuck notice (<see cref="StuckNotice"/>), which says already that nothing more is saved this session.</summary>
+    private static bool SaysStuck(string notice) => notice.EndsWith(NothingSavedThisSession, StringComparison.Ordinal);
 
     /// <summary>A write that failed, and why, in a notice: the save before it is kept.</summary>
     internal static string WriteFailed(string why)

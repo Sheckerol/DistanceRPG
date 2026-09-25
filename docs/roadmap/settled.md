@@ -2108,7 +2108,10 @@ player meets.
     scale the list can be read at; split, at the list's one scale (1.4), ten
     slots each with its markers' row fit a 720-pixel window. W/S or the arrows
     move over the slots that hold something, a digit takes its slot (0 the
-    autosave), and an empty slot says `SLOT 2 IS EMPTY` and loads nothing. A slot
+    autosave), and an empty slot says `SLOT 2 IS EMPTY` and loads nothing. A digit
+    loads at once, as ENTER does, and never only picks, so the keys line says so:
+    `W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK` (S6's review; the plan's
+    `W/S OR ARROWS OR 0-9 CHOOSE - ...` read as a digit that only picks). A slot
     whose files none of which reads can be chosen: its load sets them aside and
     says so. Nothing drawn is the file's raw text: a dungeon id the content lacks
     is `AN UNKNOWN DUNGEON`, and a time the player's zone cannot hold is shown in
@@ -2149,16 +2152,39 @@ player meets.
     is autosaved that session. A slot whose text is the autosave's own (a hand save,
     then a quit that changed nothing) asks nothing: continuing it is continuing
     the autosave. The title's ask and the host's load read one question, off the
-    one listing the title showed. The alternative: a loaded manual slot autosaves
-    into itself, the autosave slot kept for the last campaign begun or continued
-    there — no ask and no file set aside, but a manual slot is then written by the
-    game and not by hand alone.
+    one listing the title showed. A slot listed `CANNOT BE READ` is asked too, in
+    words that promise no set-aside — `SLOT 2 CANNOT BE READ - IF IT LOADS, THE
+    AUTOSAVE IS SET ASIDE - ...` — since its load most likely sets its own files
+    aside and brings nothing back, which leaves the autosave as it was (S6's
+    review: the plain words promised a set-aside that would not happen, and could
+    scare a player off trying the slot). It is asked, never skipped: a file
+    another program held while the list was read can load a moment later, and a
+    load that set the autosave aside unasked would break the ask's promise. The
+    alternative: a loaded manual slot autosaves into itself, the autosave slot
+    kept for the last campaign begun or continued there — no ask and no file set
+    aside, but a manual slot is then written by the game and not by hand alone.
   - **A load that restores nothing goes back to the title** — every file of the
     slot set aside — which says so first, whole: `NOTHING COULD BE LOADED FROM
     SLOT 2` (or `FROM THE AUTOSAVE`), then each file set aside, in the load's
     order; the listing is read again (the slot now empty, or its backup's), and
     nothing else is touched. Nothing begins on its own any more: the launch's `A
     NEW CAMPAIGN BEGINS` over what was set aside is gone with the launch's resume.
+  - **A refusal is the session's, and a campaign that will not be autosaved says
+    so on its first screen** (S6's review). A file that can be neither read nor
+    moved refuses its slot's writes for as long as the game runs (the slot's one
+    store, R2 above) — even once another program lets go of it — so nothing
+    written that session takes its place. Before the title there was one load, at
+    launch, and the refusal came with it; the title lets the player try again,
+    and a try that loads once the file is free, or a NEW CAMPAIGN after a stuck
+    one, plays a campaign the autosave will not take. So that campaign's first
+    screen says it, after the load's word or the new campaign's: `NOTHING IS
+    AUTOSAVED THIS SESSION: EARLIER, CAMPAIGN.JSON COULD NOT BE READ (ANOTHER
+    PROGRAM HAS IT OPEN) AND COULD NOT BE SET ASIDE (ANOTHER PROGRAM HAS IT
+    OPEN) - LAUNCH THE GAME AGAIN TO SAVE`, rather than leave it to the first
+    autosave to fail. A relaunch is the retry. A refusal the load or the new
+    campaign met itself is said by its own stuck notice, once. The alternative,
+    not taken: let a retry clear the refusal once the file reads again — which
+    would change the refusal's contract, and is the user's to rule.
   - **The unsaved-quit marker is the title's to say**: it is the autosave's (a
     quit saves there), and the title takes it when it opens, before anything is
     loaded, in words true of the window's close and of leaving play for the title
@@ -2180,7 +2206,13 @@ player meets.
     rarest — the slot resumed from its backup under other numbers, its save set
     aside with a long reason, the autosave's crashed save and its backup set aside
     — about fourteen, the ceiling itself, past which the rows are cut and counted
-    and the log has every word.
+    and the log has every word. S6's review measured that rarest word at about
+    fifteen with a longer user name in the path — a row past the ceiling, cut and
+    counted like any other. Left as recorded: raising the ceiling a row puts a
+    resumed floor's banner exactly at the two-thirds line it keeps above, and
+    shortening the notices (the folder named once) is a change to every
+    set-aside notice; both are left for the step that brings saving by hand,
+    which measures the word again.
 
 ### The numbers: `tuning.json`
 

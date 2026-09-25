@@ -205,7 +205,7 @@ internal sealed class SaveStore
         }
     }
 
-    /// <summary>Whether the resume marker is there: the last launch began a resume that never finished.</summary>
+    /// <summary>Whether the resume marker is there: the last load of this slot began a resume that never finished.</summary>
     public bool WasResuming => File.Exists(ResumingPath);
 
     /// <summary>Write the resume marker: a resume is in flight until <see cref="ClearResuming"/>.</summary>
@@ -213,7 +213,7 @@ internal sealed class SaveStore
     {
         Directory.CreateDirectory(Folder);
         File.WriteAllText(ResumingPath,
-            "A resume is in flight. A launch that finds this file sets the save it was resuming aside as crashed.\n", Utf8);
+            "A resume is in flight. A load that finds this file sets the save it was resuming aside as crashed.\n", Utf8);
     }
 
     /// <summary>Remove the resume marker, if it is there: the resume finished, or nothing is being resumed.</summary>

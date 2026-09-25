@@ -175,7 +175,7 @@ public sealed class DungeonHud
     /// own arrival banner — the dungeon's name over the floor reached, the trade
     /// under it on the boss floor (<see cref="ShowArrival"/>) — with
     /// <see cref="ResumedLine"/> over it all, up long enough to read; and the
-    /// launch's notices over that. First the save's word on the campaign —
+    /// game's notices over that. First the save's word on the campaign —
     /// resumed from its backup, the numbers changed, a file set aside with its
     /// full path and how to try it again — <strong>shown whole</strong>, as the
     /// screen between runs shows it (S8's review: a notice cut off here would hide
@@ -187,7 +187,7 @@ public sealed class DungeonHud
     /// said twice, and is not counted among the notices shown whole.
     /// </summary>
     /// <param name="visit">The visit resumed, standing on the floor it was saved on.</param>
-    /// <param name="notices">What the launch has to say, in order.</param>
+    /// <param name="notices">What the game has to say, in order: the save's word, then what the data files raised.</param>
     /// <param name="leading">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign (<see cref="StartupNotices.Leading"/>).</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="leading"/> is negative.</exception>
     public void ShowResume(DungeonState visit, IReadOnlyList<string> notices, int leading)
@@ -823,7 +823,7 @@ public sealed class DungeonHud
     /// the between-runs screen, and ESC does nothing there — quitting is the
     /// screen between runs' to offer. What the run wrote is saved once the frame
     /// it ended in is over, the summary with it, so the screen between runs shows
-    /// it again after a relaunch.
+    /// it again when the campaign is next loaded from the title.
     /// </summary>
     internal const string ContinueHint = "ENTER TO CONTINUE";
 
@@ -1362,8 +1362,9 @@ public sealed class DungeonHud
     /// The pause menu's second option (1f, Phase 5.8): the run in progress is
     /// saved and the game quits. Opened during the enemies' turn, the menu leaves
     /// the turn running behind it, and the quit plays it out to the next player
-    /// turn before saving — the turn the player would have met. A relaunch resumes
-    /// the run there: the same floor, turn and positions.
+    /// turn before saving — the turn the player would have met. CONTINUE on the
+    /// title, the next time the game opens, resumes the run there: the same floor,
+    /// turn and positions.
     /// </summary>
     internal const string PauseQuitLine = "2  SAVE AND QUIT";
 

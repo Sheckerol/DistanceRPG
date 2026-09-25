@@ -25,7 +25,8 @@ namespace GameEngine.DistanceRPG;
 /// does the title, with what a load that brought nothing back set aside. Those
 /// notices are few by construction (a load sets at most three files aside: its
 /// slot's save, and the autosave's two when a manual slot's campaign makes room
-/// there; NEW CAMPAIGN two), so the screen hands their count in
+/// there; NEW CAMPAIGN two; and either says at most once that nothing is
+/// autosaved this session), so the screen hands their count in
 /// (<see cref="Rows"/>'s <c>whole</c>) and they are shown in full, up to
 /// <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/> is for what
 /// follows them, the data files' notices, which a broken file can make as many
@@ -48,7 +49,8 @@ internal static class NoticeText
     /// about seven to ten rows in the player's own save folder. Its rarest — a
     /// manual slot resumed from its backup under other numbers, its save set aside
     /// with a long reason, and the autosave's crashed save and its backup set aside
-    /// to make room — takes about fourteen, the ceiling itself (Phase 5.S6). Past it
+    /// to make room — takes about fourteen, the ceiling itself (Phase 5.S6), and
+    /// about fifteen with a longer user name in the path (S6's review). Past it
     /// the rows are cut like any others, and the log has every word; with
     /// <see cref="MaxRows"/> after them and the row that counts the rest, the
     /// dungeon list still clears a 720-pixel window, and so does a resumed floor's

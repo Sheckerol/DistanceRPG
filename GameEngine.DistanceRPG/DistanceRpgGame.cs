@@ -411,8 +411,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// campaign autosaves into the autosave slot, so when the title asked to set a
     /// different autosave aside (<see cref="SaveListing.NeedsRoom"/>) that is done
     /// now — once a campaign has come back, and before anything is written
-    /// (<see cref="CampaignBoot.MakeRoom"/>) — and said after the load's word. A load
-    /// that brings nothing back goes back to the title, which says so first and
+    /// (<see cref="CampaignBoot.MakeRoom"/>) — and said after the load's word; and so
+    /// is a refusal the autosave met on an earlier try this session, which no
+    /// autosave of this campaign gets past (<see cref="CampaignBoot.InPlayWord"/>). A
+    /// load that brings nothing back goes back to the title, which says so first and
     /// what was set aside, and leaves the autosave as it was.
     /// </summary>
     public void LoadSlot(int slot)
@@ -426,23 +428,24 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var load = CampaignBoot.Load(store, content, report, slot);
         if (load.Campaign is not { } campaign)
         {
-            var word = CampaignBoot.NothingLoadedWord(load, slot);
-            foreach (string notice in word)
+            var nothing = CampaignBoot.NothingLoadedWord(load, slot);
+            foreach (string notice in nothing)
                 Log.Info($"[Save] {notice}");
-            ShowTitle(word);
+            ShowTitle(nothing);
             return;
         }
 
         var said = new List<string>(load.Notices);
         if (_listing?.NeedsRoom(slot) == true)
             said.AddRange(CampaignBoot.MakeRoom(autosave, slot, report));
+        var word = CampaignBoot.InPlayWord(said, autosave);
         Adopt(campaign);
         _saveRequested = false;
         _loadedFrom = store;
         _resuming = true;   // the loaded screen clears the slot's resume marker once it is up
-        foreach (string notice in said)
+        foreach (string notice in word)
             Log.Info($"[Save] {notice}");
-        _notices.Lead(said);
+        _notices.Lead(word);
         if (campaign.Visit is not null)
             ResumeRun(load.View);   // the save held a run in progress: it goes on in the dungeon
         else
@@ -459,8 +462,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// USER DECISION 3) — the manual slots untouched — and the starting party,
     /// nothing met, every dungeon open, saved at once, so the folder holds it from
     /// the start: a quit mid-run before its first run ends continues it, never the
-    /// old campaign. A store that refuses writes has said why already (a file that
-    /// would not move), so it is only logged. Then the screen between runs over it,
+    /// old campaign. A store that refuses writes saves nothing, and the screen says
+    /// why: a file that would not move as it was set aside, by its own stuck notice;
+    /// a refusal from an earlier try this session, after the new campaign's word
+    /// (<see cref="CampaignBoot.InPlayWord"/>). Then the screen between runs over it,
     /// saying <c>A NEW CAMPAIGN BEGINS</c> and where the old files went; a write
     /// that fails is led too, and the new campaign's word leads it.
     /// </summary>
@@ -470,17 +475,18 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var store = _autosave ?? throw new InvalidOperationException("No autosave slot: the game has not loaded.");
         Log.Info($"[Hub] A new campaign ({how ?? "NEW CAMPAIGN on the title"}): the party from the roster, nothing met, every dungeon open - the autosave's campaign is set aside");
         var boot = CampaignBoot.Abandon(store, GameContent.Current, line => Log.Info(line), how);
+        var word = CampaignBoot.InPlayWord(boot.Notices, store);
         Adopt(boot.Campaign);
         _saveRequested = false;
         _resuming = false;
         _loadedFrom = store;
-        foreach (string notice in boot.Notices)
+        foreach (string notice in word)
             Log.Info($"[Save] {notice}");
         if (store.WritesRefused is { } refused)
             Log.Info($"[Save] The new campaign is not saved this session: {refused}");
         else
             Save(boot.Campaign, store, $"at once, as {how ?? "NEW CAMPAIGN"} began it");
-        _notices.Lead(boot.Notices);
+        _notices.Lead(word);
         ShowBetweenRuns();
     }
 
@@ -621,7 +627,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// nothing is entered — the visit is the save's, every floor it reached stood
     /// back on its regenerated terrain — so the scene that plays it is handed the
     /// save's view (<paramref name="view"/>: the member who was active, whether
-    /// the turn marched) and what the launch has to say — the save's word on the
+    /// the turn marched) and what the game has to say — the save's word on the
     /// campaign shown whole, as the screen between runs shows it — and it opens the
     /// floor the party stands on and goes on with the saved turn
     /// (<see cref="ResumeView"/>). Asked for mid-transition, it waits for the
@@ -705,7 +711,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         }
         catch (Exception error)
         {
-            Log.Warn($"[Save] {store.ResumingPath} could not be cleared - the next launch sets the save aside as crashed: {error}");
+            Log.Warn($"[Save] {store.ResumingPath} could not be cleared - the next load of the slot sets the save aside as crashed: {error}");
         }
     }
 

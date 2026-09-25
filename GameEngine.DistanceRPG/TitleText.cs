@@ -24,8 +24,13 @@ internal static class TitleText
     /// <summary>The keys the options answer, along the bottom.</summary>
     internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER SELECTS - ESC QUITS";
 
-    /// <summary>The keys the load list answers, along the bottom while it is up.</summary>
-    internal const string LoadKeysLine = "W/S OR ARROWS OR 0-9 CHOOSE - ENTER LOADS - ESC BACK";
+    /// <summary>
+    /// The keys the load list answers, along the bottom while it is up: W/S and the
+    /// arrows only move, and a digit loads its slot at once, as ENTER loads the one
+    /// chosen — each asking first when a load does (S6's review: a digit never
+    /// only chooses).
+    /// </summary>
+    internal const string LoadKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK";
 
     /// <summary>CONTINUE with no save to load: drawn dimmed, and passed over.</summary>
     internal const string NoSaveYet = "CONTINUE - NO SAVE YET";
@@ -76,12 +81,26 @@ internal static class TitleText
     /// campaign there is set aside first — <c>LOADING SLOT 2 SETS THE AUTOSAVE
     /// ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS</c> / <c>AS FILES, NEVER DELETED -
     /// ENTER: YES - ESC: NO</c>.
+    /// <para>
+    /// The autosave is set aside only once the slot's campaign has come back, so a
+    /// slot none of whose files read when the list was made — listed
+    /// <see cref="SlotText.CannotBeRead"/>, whose load most likely sets its own files
+    /// aside and brings nothing back, the autosave left as it was — is asked in
+    /// words that promise no set-aside (S6's review): <c>SLOT 2 CANNOT BE READ - IF
+    /// IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS</c>. It
+    /// is still asked, never skipped: a file another program held while the list was
+    /// read can load a moment later, and then the autosave is set aside.
+    /// </para>
     /// </summary>
     /// <param name="slot">The manual slot being loaded.</param>
     /// <param name="autosavePlace">What the autosave holds (<see cref="SlotText.Summary"/>).</param>
-    internal static (string What, string Keys) LoadAsk(int slot, string autosavePlace)
+    /// <param name="unreadable">The slot was listed <see cref="SlotState.Unreadable"/>: nothing of it read.</param>
+    internal static (string What, string Keys) LoadAsk(int slot, string autosavePlace, bool unreadable = false)
     {
         ArgumentNullException.ThrowIfNull(autosavePlace);
-        return ($"LOADING {SaveSlots.Label(slot)} SETS THE AUTOSAVE ASIDE{Joint}{autosavePlace}", $"AS FILES, NEVER DELETED{Joint}{EnterOrEsc}");
+        string what = unreadable
+            ? $"{SaveSlots.Label(slot)} {SlotText.CannotBeRead}{Joint}IF IT LOADS, THE AUTOSAVE IS SET ASIDE{Joint}{autosavePlace}"
+            : $"LOADING {SaveSlots.Label(slot)} SETS THE AUTOSAVE ASIDE{Joint}{autosavePlace}";
+        return (what, $"AS FILES, NEVER DELETED{Joint}{EnterOrEsc}");
     }
 }
