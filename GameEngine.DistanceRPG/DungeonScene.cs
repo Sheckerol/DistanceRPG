@@ -386,8 +386,18 @@ public class DungeonScene : Scene
         _hud = new DungeonHud(game);
     }
 
-    /// <summary>The notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped and capped, the save's word whole over a resumed visit, or none — the startup's, or a resumed visit's.</summary>
+    /// <summary>The notices as the HUD draws them over the first floor (<see cref="NoticeText.Rows"/>): wrapped and capped, the save's word whole over a resumed visit, or none — the startup's, or a resumed visit's — and a save that failed since, over whichever floor (<see cref="SaveFailed"/>).</summary>
     internal IReadOnlyList<string> NoticeRows => _hud.NoticeRows;
+
+    /// <summary>
+    /// The host could not write a save of the run this scene plays (1f): said over
+    /// the floor at once, the save's word shown whole (<see cref="DungeonHud.ShowSaveFailed"/>),
+    /// where the player is — not only on the next screen between runs, at the run's
+    /// end — so a run whose saves fail is never played on, or quit, as though it
+    /// were saved.
+    /// </summary>
+    /// <param name="notice">What the failed write says (<see cref="CampaignBoot.WriteFailed"/>).</param>
+    internal void SaveFailed(string notice) => _hud.ShowSaveFailed(notice);
 
     /// <summary>The banner's lines as the HUD draws them, top to bottom — over a resumed floor, <c>RESUMED</c> first — or none once it is down.</summary>
     internal IReadOnlyList<string> BannerLines => _hud.BannerLines;

@@ -106,6 +106,13 @@ public class TuningJsonTests
         Ignored("""{ "UniqueChanceCeiling": 80 }""", "UniqueChanceCeiling is not a key", "the key is UniqueChanceCeilingPercent");
         Ignored("""{ "UniqueChanceK": 52 }""", "UniqueChanceK is not a key", "the key is UniqueChanceKPercent");
         Ignored("""{ "ManaPerMovementUnit": 0.1 }""", "ManaPerMovementUnit is not a key", "the key is MovementUnitsPerMana", "integer divisor");
+
+        // settled.md's other spellings of two keys point at them the same way: the
+        // Overheal entry's OverhealPerWardLevel is §5.3's OverhealPerWard (the
+        // Phase 5 pass), and the graft formula's StartingWearCapacity is StartingPool
+        // (the Phase 2 pass).
+        Ignored("""{ "OverhealPerWardLevel": 4 }""", "OverhealPerWardLevel is not a key", "the key is OverhealPerWard");
+        Ignored("""{ "StartingWearCapacity": 40 }""", "StartingWearCapacity is not a key", "the key is StartingPool", "wear capacity");
         Ignored("""{ "PerStack": { "Blok": 4 } }""", "PerStack.Blok is not a modifier", "did you mean Block?");
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");

@@ -250,10 +250,12 @@ CAMPAIGN — and on every quit. A quit that finds the enemies taking their turn
 plays it out to the next player turn first, on the game's fixed logic step, and
 saves that. A launch resumes the campaign where it stood, between runs or in the
 dungeon mid-run, guarded by a `campaign.resuming` marker that sets aside a save
-whose resume crashed the game. NEW CAMPAIGN is N, then N, between runs, and
-`--new-campaign` sets the old campaign aside at launch. The dev overrides
-(`DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED`) play in a scratch slot of their own
-and never touch the campaign.
+whose resume crashed the game; a save that fails is said at once, and a quit
+that cannot save leaves a `campaign.unsaved` marker, so the next launch says
+that what it resumes is from before that quit. NEW CAMPAIGN is N, then N,
+between runs, and `--new-campaign` sets the old campaign aside at launch. The
+dev overrides (`DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED`) play in a scratch slot
+of their own and never touch the campaign.
 
 **This is a design the doc left open, so it is the user's to decide.** The
 alternatives: manual save slots beside the autosave; a quit during the enemies'

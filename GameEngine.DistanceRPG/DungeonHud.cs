@@ -129,10 +129,14 @@ public sealed class DungeonHud
     /// </summary>
     internal const float NoticeTopMargin = 62f;
 
-    // The startup notices up now (ShowNotices, ShowResume), as NoticeText laid
-    // them out, how long they have been up and how long they stay; and how far
-    // they sit over the banner's over-line — clear of RESUMED on a resumed floor,
-    // for as long as they are up, which outlasts the banner.
+    // The notices up now (ShowNotices, ShowResume, ShowSaveFailed): what they say
+    // and how many of them, from the first, are shown whole — the save's word — so
+    // a save that fails can be said among them; the rows NoticeText laid them out
+    // as, how long they have been up and how long they stay; and how far they sit
+    // over the banner's over-line — clear of RESUMED on a resumed floor, for as
+    // long as they are up, which outlasts the banner.
+    private IReadOnlyList<string> _notices = [];
+    private int _noticesWhole;
     private IReadOnlyList<string> _noticeRows = [];
     private float _noticeAge;
     private float _noticeSeconds;
@@ -202,7 +206,7 @@ public sealed class DungeonHud
                 whole++;
             said.Add(notices[i]);
         }
-        LayNotices(NoticeText.Rows(said, whole), HeaderLift);   // first: the banner goes up under them
+        LayNotices(said, whole, HeaderLift);   // first: the banner goes up under them
 
         ShowArrival(visit);
         _banner = _banner! with { Header = ResumedLine, Seconds = MathF.Max(_banner.Seconds, ResumedBannerSeconds) };
@@ -256,15 +260,52 @@ public sealed class DungeonHud
     public void ShowNotices(IReadOnlyList<string> notices)
     {
         ArgumentNullException.ThrowIfNull(notices);
-        LayNotices(NoticeText.Rows(notices), lift: 0f);
+        LayNotices(notices, whole: 0, lift: 0f);
     }
 
-    /// <summary>Put <paramref name="rows"/> up over the banner, <paramref name="lift"/> over its over-line, for as long as they take to read (<see cref="NoticeLife"/>).</summary>
-    private void LayNotices(IReadOnlyList<string> rows, float lift)
+    /// <summary>
+    /// Say over the floor being played, at once, that a save could not be written
+    /// (1f): <paramref name="notice"/>, the save's word, shown whole ahead of the
+    /// notices up now, all of them up long enough to read from now
+    /// (<see cref="NoticeLife"/>). The next screen between runs says it too; here it
+    /// is said where the player is, so a run whose saves fail is never played on
+    /// as though it were being saved. A notice already up is not said twice — an
+    /// autosave that fails at every turn's start fails with the same words — and
+    /// only stays up from now. The rows sit clear of <see cref="ResumedLine"/> when
+    /// the banner up now carries it, and a banner up now that went up under fewer
+    /// rows moves down under these (<see cref="BannerLine"/>), so no row is drawn
+    /// over it; it never moves up.
+    /// </summary>
+    /// <param name="notice">The failed write's notice (<see cref="CampaignBoot.WriteFailed"/>).</param>
+    public void ShowSaveFailed(string notice)
     {
-        _noticeRows = rows;
+        ArgumentException.ThrowIfNullOrWhiteSpace(notice);
+        bool up = _noticeRows.Count > 0;
+        IReadOnlyList<string> said = up ? _notices : [];
+        int whole = up ? _noticesWhole : 0;
+        float lift = up ? _noticeLift : _banner is { Header.Length: > 0 } ? HeaderLift : 0f;
+        if (said.Take(whole).Contains(notice, StringComparer.Ordinal))
+            LayNotices(said, whole, lift);
+        else
+            LayNotices([notice, .. said], whole + 1, lift);
+
+        if (_banner is { } banner && _noticeRows.Count > banner.NoticeRows)
+            _banner = banner with { NoticeRows = _noticeRows.Count, NoticeLift = _noticeLift };
+    }
+
+    /// <summary>
+    /// Put <paramref name="notices"/> up over the banner as <see cref="NoticeText.Rows"/>
+    /// lays them out, the first <paramref name="whole"/> of them shown whole,
+    /// <paramref name="lift"/> over its over-line, for as long as they take to read
+    /// (<see cref="NoticeLife"/>).
+    /// </summary>
+    private void LayNotices(IReadOnlyList<string> notices, int whole, float lift)
+    {
+        _notices = notices;
+        _noticesWhole = whole;
+        _noticeRows = NoticeText.Rows(notices, whole);
         _noticeAge = 0f;
-        _noticeSeconds = NoticeLife(rows.Count);
+        _noticeSeconds = NoticeLife(_noticeRows.Count);
         _noticeLift = lift;
     }
 
@@ -278,7 +319,7 @@ public sealed class DungeonHud
     internal static float NoticeLife(int rows)
         => NoticeSeconds + Math.Max(0, rows - (NoticeText.MaxRows + 1)) * NoticeSecondsPerRow;
 
-    /// <summary>The notice rows up now, as <see cref="ShowNotices"/> or <see cref="ShowResume"/> laid them out: what the HUD draws over the banner.</summary>
+    /// <summary>The notice rows up now, as <see cref="ShowNotices"/>, <see cref="ShowResume"/> or <see cref="ShowSaveFailed"/> laid them out: what the HUD draws over the banner.</summary>
     internal IReadOnlyList<string> NoticeRows => _noticeRows;
 
     /// <summary>How far the notice rows up now sit over the banner's over-line: <see cref="HeaderLift"/> on a resumed floor, clear of <see cref="ResumedLine"/>, and none elsewhere.</summary>
@@ -365,7 +406,11 @@ public sealed class DungeonHud
         {
             _noticeAge += deltaTime;
             if (_noticeAge >= _noticeSeconds)
+            {
+                _notices = [];
+                _noticesWhole = 0;
                 _noticeRows = [];
+            }
         }
     }
 
@@ -850,7 +895,8 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The startup notices (<see cref="ShowNotices"/>, <see cref="ShowResume"/>),
+    /// The notices (<see cref="ShowNotices"/>, <see cref="ShowResume"/>, and a save
+    /// that failed, <see cref="ShowSaveFailed"/>),
     /// over the arrival banner — above the line over it, and above
     /// <see cref="ResumedLine"/> on a resumed floor, clear of the top readouts
     /// (<see cref="NoticesTop"/>) — in the warning's orange, fading over their last

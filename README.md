@@ -107,8 +107,14 @@ its own and resumes where you left off.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
-  no rights — costs nothing: the game says `THE CAMPAIGN COULD NOT BE SAVED`, the
-  log says why, and the save on the disk is the last good one.
+  no rights — costs nothing: the save on the disk is the last good one, the log
+  says why, and the game says `THE CAMPAIGN COULD NOT BE SAVED` at once, over the
+  floor you are playing, and again on the screen between runs — once, however
+  many saves failed, and not at all if a later save has gone through by then. A
+  quit that cannot save leaves `campaign.unsaved` beside the save, and the next
+  launch says `THE CAMPAIGN COULD NOT BE SAVED AS THE GAME LAST QUIT` as it
+  resumes, between runs or over the floor: what resumes is the last save from
+  before that quit.
 - **A save that cannot be played is set aside, never deleted**: one that is not
   a save, one a newer build wrote, one naming content that is gone, or one that
   crashed the game as it resumed. A `campaign.resuming` marker sits beside the

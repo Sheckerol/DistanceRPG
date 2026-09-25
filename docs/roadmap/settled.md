@@ -1431,6 +1431,15 @@ out the alternatives, and this pass records the ruling once the user makes it.
   unknown keys whose warning points at the key. `MovementBudget` is the 160 the
   Phase 2 pass named, in logic units, and the party's refill, its bank's cap and
   the enemies' cost scale read it.
+- **`OverhealPerWard` is the key, and `OverhealPerWardLevel` is the other
+  spelling of it.** The Overheal entry above calls its rate
+  `OverhealPerWardLevel`; §5.3 and the provisional-numbers batch call the same
+  constant, at 5, `OverhealPerWard`, which is the `Tuning` property's name and
+  so the key. `OverhealPerWardLevel` in `tuning.json` is an unknown key: it is
+  ignored, and its warning points at `OverhealPerWard`, as the warnings for
+  §5.3's own spellings point at theirs. The graft formula's
+  `StartingWearCapacity` points at `StartingPool` the same way, the one key the
+  Phase 2 pass made it.
 - **`MovementUnitsPerMana` is re-derived by hand, never computed from the
   budget.** It is derived — `(MovementBudget − 40) / (8 + 3)`, the budget less a
   staff's 40 of movement, over the mana one cast moves at Resonant: 10.9, so 10
@@ -1598,17 +1607,39 @@ out the alternatives, and this pass records the ruling once the user makes it.
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
+- **A save that fails is said at once, and a quit that cannot save is said at
+  the next launch.** A write that fails — a full disk, a folder with no rights,
+  another program holding the file — costs nothing, since the save before it is
+  kept, but the player is told straight away: over the floor being played, the
+  save's word shown whole ahead of whatever is up, and again on the next screen
+  between runs — once, however many autosaves failed, and not at all if a later
+  save has gone through by then, since the campaign is on the disk again. No
+  screen follows a quit, so a quit that cannot save — its write fails, or the
+  enemies' turn cannot be played out — leaves `campaign.unsaved` beside the save,
+  and the next launch says, under the resumed line, that what resumes is from
+  before that quit. A marker that cannot be written either leaves the log to say
+  so.
 - **The save's word is shown whole, on the screen between runs and over a floor
   a saved run resumes on; the data files' notices keep their three-row cap after
   it.** The cap is for what a broken file can make without bound; what became of
-  the campaign is bounded by construction, and a notice cut off there would hide
-  the one thing the player has to act on. That holds on a resumed floor too: a
-  backup holding a run resumes in the dungeon, and the file set aside beside it
-  is named there. The floor's banner moves down to make room, so no row is drawn
+  the campaign is bounded by construction — a handful of notices, and a launch
+  sets at most two files aside — and a notice cut off there would hide the one
+  thing the player has to act on. That holds on a resumed floor too: a backup
+  holding a run resumes in the dungeon, and the file set aside beside it is
+  named there. The floor's banner moves down to make room, so no row is drawn
   over the readouts along the top, and the rows stay up longer the more there
   are. A dungeon a dev override boots into and the error screen cap as before,
-  the log keeping every word. The alternative not taken: a shorter notice naming
-  the file and the save folder, the full path in the log alone.
+  the log keeping every word. **The whole rows have a ceiling of their own:
+  fourteen.** What construction bounds is how many notices there are, not how
+  long a path is, and fourteen rows — with the data files' three and the row
+  that counts the rest under them — still leave the dungeon list on a 720-pixel
+  window, and a resumed floor's banner in its upper two thirds. The longest case
+  in the player's own save folder, a new campaign after the save and its backup
+  were both set aside, takes about ten, so only a save folder with an unusually
+  long path (`DISTANCERPG_SAVE_DIR` can name any) reaches the ceiling; past it
+  the rows are cut and counted like any others. The alternative not taken: a
+  shorter notice naming the file and the save folder, the full path in the log
+  alone.
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are

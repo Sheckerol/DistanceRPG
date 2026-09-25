@@ -1068,6 +1068,110 @@ public class CampaignBootTests
     }
 
     [Fact]
+    public void AQuitThatCannotSaveIsSaidAtTheNextLaunch()
+    {
+        InTempFolder(folder =>
+        {
+            // The audit's pass (1f): no screen follows a quit, so a quit that cannot
+            // save — here a folder in the way of the write's temp file — leaves
+            // campaign.unsaved beside the save it keeps, and the next launch says,
+            // under the resumed line, that what resumes is from before that quit. A
+            // player is never resumed behind where they left the game unwarned.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            Saved(store, campaign);
+            string before = store.Read()!;
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);   // played on since: the quit has something to save
+
+            Directory.CreateDirectory(store.TempPath);
+            var log = new List<string>();
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, log.Add));
+            Assert.Equal(before, store.Read());
+            string marker = Assert.IsType<string>(store.ReadUnsaved());
+            Assert.StartsWith("The last quit could not save the campaign: THE CAMPAIGN COULD NOT BE SAVED (", marker, StringComparison.Ordinal);
+            Assert.Contains(log, line => line.StartsWith($"[Save] {store.UnsavedPath} written", StringComparison.Ordinal));
+            Assert.Equal([SaveStore.FileName, SaveStore.UnsavedName], Files(folder));
+            Directory.Delete(store.TempPath);
+
+            // The next launch resumes the save the quit could not replace and says so,
+            // under the resumed line, with what the quit wrote in the log; the marker
+            // goes as it is read, so it is said once.
+            var bootLog = new List<string>();
+            var boot = Boot(store, log: bootLog);
+            Assert.True(boot.Resumed);
+            Assert.Equal(0, boot.Campaign.RunCounter);   // the campaign as the last save left it, not as it was quit
+            Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.QuitUnsaved], boot.Notices);
+            Assert.Null(store.ReadUnsaved());
+            Assert.Contains(bootLog, line => line.StartsWith($"[Save] {store.UnsavedPath} was left by the last quit", StringComparison.Ordinal)
+                && line.Contains("THE CAMPAIGN COULD NOT BE SAVED (", StringComparison.Ordinal));
+            store.ClearResuming();
+            Assert.Equal([BetweenRunsHud.Resumed], Boot(store).Notices);
+            store.ClearResuming();
+
+            // On screen whole, in the warning's orange: it is the save's word, which
+            // leads, and takes two rows.
+            var rows = NoticeText.Rows(boot.Notices, whole: boot.Notices.Count);
+            Assert.Equal(boot.Notices.SelectMany(NoticeText.Wrap), rows);
+            Assert.Equal(2, NoticeText.Wrap(CampaignBoot.QuitUnsaved).Count);
+            Assert.All(rows.Skip(1), row => Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(row)));
+            Assert.Matches("^[A-Z0-9 ,-]+$", CampaignBoot.QuitUnsaved);   // the HUD's font: no apostrophe
+
+            // A quit that saves leaves no marker.
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null));
+            Assert.Equal(Text(campaign), store.Read());
+            Assert.Null(store.ReadUnsaved());
+
+            // Nor does a quit whose save the disk already holds: nothing needed writing.
+            Directory.CreateDirectory(store.TempPath);
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null));
+            Assert.Null(store.ReadUnsaved());
+            Directory.Delete(store.TempPath);
+
+            // A quit during the enemies' turn that cannot be played out writes nothing
+            // and leaves the marker as well. The busiest resume there is — the save
+            // unreadable and set aside, the backup resumed under other numbers — says
+            // it between what resumed and the numbers it plays under, and the save's
+            // word still fits the rows it is shown whole in (NoticeText.MaxWholeRows).
+            var stuck = ReloadDeterminismTests.MidWalk();
+            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }));
+            Assert.Contains("did not come round to the party's", store.ReadUnsaved()!, StringComparison.Ordinal);
+            File.WriteAllText(store.SavePath, "not a save");
+            using (TestContent.Use(tuning: ContentDefaults.Tuning with { MovementBudget = 200 }))
+            {
+                var busiest = Boot(store);
+                Assert.True(busiest.Resumed);
+                Assert.Collection(busiest.Notices,
+                    notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                    notice => Assert.Equal(CampaignBoot.QuitUnsaved, notice),
+                    notice => Assert.Equal(CampaignBoot.TuningChanged, notice),
+                    notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", store)})",
+                        Path.Combine(store.Folder, "campaign.unreadable-1.json")));
+                Assert.InRange(busiest.Notices.SelectMany(NoticeText.Wrap).Count(), NoticeText.MaxRows + 1, NoticeText.MaxWholeRows);
+            }
+            store.ClearResuming();
+            Assert.Null(store.ReadUnsaved());
+
+            // Left for a new campaign, the campaign it spoke of is set aside: the
+            // marker goes, and nothing is said of it.
+            var unplayed = ReloadDeterminismTests.MidWalk();
+            Assert.False(CampaignBoot.SaveOnQuit(store, unplayed.Campaign, () => new ViewDto("A"), step: null));
+            Assert.Contains("with no scene to play it out with", store.ReadUnsaved()!, StringComparison.Ordinal);
+            var abandoned = Boot(store, new BootRequest(NewCampaign: true));
+            Assert.DoesNotContain(CampaignBoot.QuitUnsaved, abandoned.Notices);
+            Assert.Null(store.ReadUnsaved());
+
+            // A marker that cannot be written either — a folder in its way — leaves the
+            // log alone to say so, and the quit is not stopped.
+            Directory.CreateDirectory(store.UnsavedPath);
+            Directory.CreateDirectory(store.TempPath);
+            log.Clear();
+            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, log.Add));
+            Assert.Contains(log, line => line.StartsWith($"[Save] {store.UnsavedPath} could not be written either", StringComparison.Ordinal));
+            Assert.Null(store.ReadUnsaved());
+        });
+    }
+
+    [Fact]
     public void SavingWhatIsSavedWritesNothing_SoTheBackupStaysTheSaveBefore()
     {
         InTempFolder(folder =>

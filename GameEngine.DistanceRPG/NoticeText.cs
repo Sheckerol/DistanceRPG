@@ -45,7 +45,8 @@ internal static class NoticeText
     /// are cut like any others, and with <see cref="MaxRows"/> after them and the
     /// row that counts the rest, the dungeon list still clears a 720-pixel window,
     /// and so does a resumed floor's banner, which moves down under them
-    /// (<see cref="DungeonHud.BannerLine"/>).
+    /// (<see cref="DungeonHud.BannerLine"/>). settled.md's entry on the save's
+    /// word records the ceiling and why.
     /// </summary>
     public const int MaxWholeRows = 14;
 

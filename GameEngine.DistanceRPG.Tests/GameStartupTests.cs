@@ -147,6 +147,50 @@ public class GameStartupTests
         }
     }
 
+    [Fact]
+    public void AFailedSaveIsSaidOnTheFloorAtOnce_AndOnTheNextScreenOnce()
+    {
+        // The audit's pass (1f): a write that fails is said at once over the floor
+        // being played — not only on the screen between runs once the run is over —
+        // and on that next screen once, however many times it failed, and only until
+        // a later save goes through. The holder leads a notice once...
+        var notices = new StartupNotices();
+        notices.Hold(["data"]);
+        string held = CampaignBoot.WriteFailed("another program has it open");
+        notices.Lead([held]);
+        notices.Lead([held]);   // every turn's start and every arrival fail with the same words
+        notices.Lead([held, held]);
+        Assert.Equal(1, notices.Leading);
+        string full = CampaignBoot.WriteFailed("the disk is full");
+        notices.Lead([full]);
+        Assert.Equal(2, notices.Leading);
+        Assert.Equal([full, held, "data"], notices.Take());
+
+        // ...and takes it back once a save goes through, when it is no longer true;
+        // what else leads is left as it was.
+        notices.Hold(["data"]);
+        notices.Lead([held]);
+        notices.Lead(["resumed"]);
+        notices.Withdraw(held);
+        notices.Withdraw("never led");
+        Assert.Equal(1, notices.Leading);
+        Assert.Equal(["resumed", "data"], notices.Take());
+
+        // Read off the IL: the game's one Save says a failure to the scene playing
+        // the run and leads it for the next screen, and takes back what a later save
+        // made untrue; the scene hands it to its HUD, which lays it among the rows.
+        var save = typeof(DistanceRpgGame).GetMethod("Save", Declared)!;
+        var saveFailed = typeof(DungeonScene).GetMethod(nameof(DungeonScene.SaveFailed), Declared)!;
+        var lead = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Lead))!;
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(saveFailed));
+        Assert.Equal(["DungeonScene.SaveFailed"], Callers(typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowSaveFailed))!));
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.Save"], Callers(lead));
+        Assert.Equal(1, Mentions(save, lead));
+        Assert.Equal(1, Mentions(save, typeof(DistanceRpgGame).GetMethod("PlayingScene", Declared)!));
+        Assert.Equal(1, Mentions(save, saveFailed));
+    }
+
     /// <summary>
     /// The constructor that <c>DistanceRpgGame.<paramref name="method"/></c> calls
     /// with what <paramref name="take"/> returns. That is the constructor called by
@@ -282,17 +326,27 @@ public class GameStartupTests
         // in — never inside the turn system's raise that ended the run — when NEW
         // CAMPAIGN is confirmed, or --new-campaign begins a campaign at launch
         // (BootCampaign, S5's review), and on quitting, which every close arrives
-        // at (OnClosing): mid-run through the quit's own door, which settles the
-        // enemies' turn first and then saves (CampaignBoot.SaveOnQuit, Phase 5.8).
-        // The campaign a launch plays is decided at load, once. Read off the IL,
-        // so a save added anywhere else fails here.
+        // at (OnClosing): through the quit's own door, which settles the enemies'
+        // turn first when a run is in progress and then saves (CampaignBoot.SaveOnQuit,
+        // Phase 5.8) — between runs as well since the audit's pass, so a quit that
+        // cannot save leaves its marker for the next launch however it came. The
+        // campaign a launch plays is decided at load, once. Read off the IL, so a
+        // save added anywhere else fails here.
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
         Assert.Equal(["CampaignBoot.SaveOnQuit", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
         Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
-        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.NewCampaign", "DistanceRpgGame.SaveOnQuit", "DistanceRpgGame.WriteRequestedSave"],
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.NewCampaign", "DistanceRpgGame.WriteRequestedSave"],
             Callers(Method(typeof(DistanceRpgGame), "Save")));
+
+        // The unsaved-quit marker is written by the quit's own door alone, and read
+        // and cleared by the boot alone.
+        Assert.Equal(["CampaignBoot.MarkUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.MarkUnsaved))));
+        Assert.Equal(["CampaignBoot.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), "MarkUnsaved")));
+        Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ReadUnsaved))));
+        Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ClearUnsaved))));
+        Assert.Equal(["CampaignBoot.Boot"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
         Assert.Equal(["DistanceRpgGame.OnClosing"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
 

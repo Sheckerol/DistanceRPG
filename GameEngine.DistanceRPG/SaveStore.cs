@@ -17,7 +17,9 @@ namespace GameEngine.DistanceRPG;
 /// campaign. <see cref="BackupName"/> is the save before it, kept by every
 /// write's atomic replace. <see cref="ResumingName"/> is there while a resume is
 /// in flight, so a launch that finds it knows the last resume never finished.
-/// And <c>campaign.&lt;reason&gt;-N.json</c> is a save set aside — unreadable,
+/// <see cref="UnsavedName"/> is there when the last quit could not save the
+/// campaign, so the next launch can say that what it resumes is from before that
+/// quit. And <c>campaign.&lt;reason&gt;-N.json</c> is a save set aside — unreadable,
 /// crashed or abandoned — which nothing here ever deletes or writes over.
 /// </para>
 /// <para>
@@ -25,8 +27,8 @@ namespace GameEngine.DistanceRPG;
 /// <see cref="TempName"/> first, flushed to the disk. Only then does it replace
 /// the save in one step, the old save becoming the backup. A write that fails at
 /// any point leaves <see cref="FileName"/> exactly as it was. The one delete is
-/// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The
-/// resume marker, which is no save, is the only other file this class removes.
+/// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The two
+/// markers, which are no saves, are the only other files this class removes.
 /// </para>
 /// </summary>
 internal sealed class SaveStore
@@ -39,6 +41,9 @@ internal sealed class SaveStore
 
     /// <summary>There while a resume is in flight: a launch that finds it knows the resume before it never finished.</summary>
     public const string ResumingName = "campaign.resuming";
+
+    /// <summary>There when the last quit could not save the campaign: the save beside it is from before that quit, and the next launch says so and removes it.</summary>
+    public const string UnsavedName = "campaign.unsaved";
 
     /// <summary>Set to a folder, the saves live there instead of the player's data folder, the dev-override slot inside it.</summary>
     public const string DirectoryVariable = "DISTANCERPG_SAVE_DIR";
@@ -69,6 +74,9 @@ internal sealed class SaveStore
 
     /// <summary>The resume marker, in full.</summary>
     public string ResumingPath => Path.Combine(Folder, ResumingName);
+
+    /// <summary>The unsaved-quit marker, in full.</summary>
+    public string UnsavedPath => Path.Combine(Folder, UnsavedName);
 
     /// <summary>The temp file a write goes through, in full.</summary>
     internal string TempPath => Path.Combine(Folder, TempName);
@@ -171,6 +179,30 @@ internal sealed class SaveStore
     {
         if (File.Exists(ResumingPath))
             File.Delete(ResumingPath);
+    }
+
+    /// <summary>What the last quit wrote in the unsaved-quit marker (<see cref="MarkUnsaved"/>), or null when there is none: that quit saved, or none has left one here. A marker that is there and cannot be read throws, as the file system says why.</summary>
+    public string? ReadUnsaved() => ReadIfThere(UnsavedPath);
+
+    /// <summary>
+    /// Write the unsaved-quit marker: this quit could not save the campaign, for
+    /// <paramref name="why"/>, so the next launch resumes a save from before it and
+    /// says so. A marker, never a save: it is written even while writes are
+    /// refused (<see cref="RefuseWrites"/>), since it can take no save's place.
+    /// </summary>
+    public void MarkUnsaved(string why)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(why);
+        Directory.CreateDirectory(Folder);
+        File.WriteAllText(UnsavedPath,
+            $"The last quit could not save the campaign: {why}\nThe save beside this file is from before that quit. The next launch says so and removes this file.\n", Utf8);
+    }
+
+    /// <summary>Remove the unsaved-quit marker, if it is there: a launch has read it.</summary>
+    public void ClearUnsaved()
+    {
+        if (File.Exists(UnsavedPath))
+            File.Delete(UnsavedPath);
     }
 
     /// <summary>

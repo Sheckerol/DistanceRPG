@@ -46,6 +46,12 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
 /// whose resume crashed the game last time — the resume marker left behind — is
 /// set aside the same way. Every set-aside notice names the file's full path and
 /// ends <see cref="TryAgain"/>.</item>
+/// <item><strong>A quit that could not save is said at the next launch</strong>
+/// (1f): no screen follows a quit, so the quit's own door leaves
+/// <see cref="SaveStore.UnsavedName"/> beside the save when it cannot save
+/// (<see cref="SaveOnQuit"/>), and the launch that finds it says, under the
+/// resumed line, that what resumes is from before that quit
+/// (<see cref="QuitUnsaved"/>).</item>
 /// <item><strong>A different tuning is said, and plays on</strong> (§5.3,
 /// PHASE5-084): "silently changing a saved game's rules underneath the player is
 /// the failure to avoid", so a campaign saved under other numbers resumes with
@@ -70,6 +76,9 @@ internal static class CampaignBoot
     /// <summary>How every set-aside notice ends: how to try the file again.</summary>
     internal const string TryAgain = "RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN";
 
+    /// <summary>The last quit could not save the campaign (<see cref="SaveStore.UnsavedName"/>): what resumes is a save from before it.</summary>
+    internal const string QuitUnsaved = "THE CAMPAIGN COULD NOT BE SAVED AS THE GAME LAST QUIT - IT RESUMES FROM AN EARLIER SAVE, BEHIND WHERE YOU LEFT IT";
+
     /// <summary>A dev-override launch's word on the campaign it plays.</summary>
     internal const string OverrideNotice = "A DEV OVERRIDE LAUNCH - A SCRATCH CAMPAIGN, SAVED APART - YOUR CAMPAIGN IS UNTOUCHED";
 
@@ -87,6 +96,11 @@ internal static class CampaignBoot
     /// be one) and plays a fresh campaign — straight into the dungeon it names,
     /// its first run on the seed it names. The campaign's own save is never
     /// opened.</item>
+    /// <item>A marker the last quit left because it could not save
+    /// (<see cref="SaveStore.UnsavedName"/>) is read and cleared, so it is said
+    /// once: a campaign resumed says, under the resumed line, that it is from
+    /// before that quit (<see cref="QuitUnsaved"/>). One set aside or left for a
+    /// new campaign has nothing to say it of.</item>
     /// <item><c>--new-campaign</c> sets the backup and the save aside as
     /// <c>abandoned</c> before anything is read, and starts fresh
     /// (<see cref="Abandon"/>).</item>
@@ -129,6 +143,7 @@ internal static class CampaignBoot
 
         if (request.DevOverride)
             return BootOverride(store, content, request, report);
+        bool quitUnsaved = TakeUnsaved(store, report);
         if (request.NewCampaign)
             return Abandon(store, content, report);
 
@@ -154,10 +169,13 @@ internal static class CampaignBoot
             Mark(store, report);   // before the restore, so even a restore that takes the process down is caught next launch
             if (TryResume(store, backup, content, report, out var loaded, out string why))
             {
-                // What plays first, then the numbers it plays under — PHASE5-084
-                // wants that on the screen, whatever else there is to say — then
-                // what became of any save set aside on the way.
+                // What plays first — and that it is from before the last quit, when
+                // that quit could not save — then the numbers it plays under
+                // (PHASE5-084 wants that on the screen, whatever else there is to
+                // say), then what became of any save set aside on the way.
                 var notices = new List<string> { backup ? ResumedFromBackup : BetweenRunsHud.Resumed };
+                if (quitUnsaved)
+                    notices.Add(QuitUnsaved);
                 if (loaded.TuningChanged)
                     notices.Add(TuningChanged);
                 notices.AddRange(setAside);
@@ -327,6 +345,57 @@ internal static class CampaignBoot
     }
 
     /// <summary>
+    /// Whether the last quit here could not save the campaign: its marker
+    /// (<see cref="SaveStore.MarkUnsaved"/>) read, logged with what that quit wrote
+    /// in it, and cleared, so it is said once. A marker that is there and cannot be
+    /// read is one all the same. One that will not go is said again next launch,
+    /// and the log says why.
+    /// </summary>
+    private static bool TakeUnsaved(SaveStore store, Action<string>? report)
+    {
+        string? wrote;
+        try
+        {
+            wrote = store.ReadUnsaved();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            wrote = $"(it could not be read: {error.Message})";
+        }
+        if (wrote is null)
+            return false;
+
+        report?.Invoke($"[Save] {store.UnsavedPath} was left by the last quit, which could not save the campaign - what resumes is from before it: {wrote.ReplaceLineEndings(" ").Trim()}");
+        try
+        {
+            store.ClearUnsaved();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            report?.Invoke($"[Save] {store.UnsavedPath} could not be cleared - the next launch says this again: {error}");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Leave the unsaved-quit marker for the next launch (<see cref="SaveStore.MarkUnsaved"/>):
+    /// this quit could not save the campaign, for <paramref name="why"/>. One that
+    /// cannot be written either leaves the log alone to say so.
+    /// </summary>
+    private static void MarkUnsaved(SaveStore store, string why, Action<string>? report)
+    {
+        try
+        {
+            store.MarkUnsaved(why);
+            report?.Invoke($"[Save] {store.UnsavedPath} written: the next launch says that what it resumes is from before this quit");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            report?.Invoke($"[Save] {store.UnsavedPath} could not be written either - the next launch cannot say this quit went unsaved: {error}");
+        }
+    }
+
+    /// <summary>
     /// Save <paramref name="campaign"/> to <paramref name="store"/> at a safe point
     /// (<see cref="SaveGame.IsSafePoint"/>) — between runs, or with the run in
     /// progress in it (Phase 5.8): right after the entry, or in the player phase
@@ -373,6 +442,13 @@ internal static class CampaignBoot
     /// the enemies wipe the party ends the run in <c>Logic/</c>, and the campaign
     /// is saved between runs, the run's summary with it.
     /// <para>
+    /// <strong>No screen follows a quit</strong>, so a quit that cannot save — the
+    /// write fails, or the enemies' turn cannot be played out — leaves
+    /// <see cref="SaveStore.UnsavedName"/> beside the save it keeps, and the next
+    /// launch says that what it resumes is from before this quit
+    /// (<see cref="QuitUnsaved"/>).
+    /// </para>
+    /// <para>
     /// <strong>The step is the playing scene's own</strong>
     /// (<c>DungeonScene.StepLogic</c>): one fixed logic step of the turn system
     /// plus the enemy-phase sighting the scene feeds back, which decides whose
@@ -387,7 +463,7 @@ internal static class CampaignBoot
     /// <param name="view">What the playing scene shows once the settle is done — read then, since a turn's start re-decides the march and may hand the lead to a living member — or null for nothing to say.</param>
     /// <param name="step">The playing scene's logic step; null when no scene is playing the visit, which leaves nothing to settle.</param>
     /// <param name="report">Where the log lines go.</param>
-    /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, and the save on the disk kept; false when it never got to one, and nothing was written.</returns>
+    /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, the save on the disk kept and the marker left; false when it never got to one, nothing was written, and the marker is left.</returns>
     internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null)
     {
         ArgumentNullException.ThrowIfNull(store);
@@ -398,6 +474,7 @@ internal static class CampaignBoot
             if (step is null)
             {
                 report?.Invoke($"[Save] Quitting {visit.Def.Name} during the enemies' turn ({visit.Turns!.Phase}) with no scene to play it out with - nothing is written, and {store.SavePath} keeps the last save");
+                MarkUnsaved(store, $"the quit came during the enemies' turn in {visit.Def.Name}, with no scene to play it out with", report);
                 return false;
             }
 
@@ -406,6 +483,7 @@ internal static class CampaignBoot
             if (!SaveGame.SettleToSafePoint(campaign, () => { steps++; step(); }))
             {
                 report?.Invoke($"[Save] The enemies' turn did not come round to the party's in {steps} steps - nothing is written, and {store.SavePath} keeps the last save");
+                MarkUnsaved(store, $"the enemies' turn in {visit.Def.Name} did not come round to the party's in {steps} steps", report);
                 return false;
             }
             report?.Invoke(campaign.Visit is { } settled
@@ -417,7 +495,10 @@ internal static class CampaignBoot
         // a settle that ended the run — has none to carry.
         var viewNow = campaign.Visit is null ? null : view?.Invoke();
         if (Save(store, campaign, viewNow, report) is { } failed)
+        {
             report?.Invoke($"[Save] {failed}");
+            MarkUnsaved(store, failed, report);
+        }
         return true;
     }
 

@@ -71,8 +71,11 @@ namespace GameEngine.DistanceRPG;
 /// runs, <c>CAMPAIGN RESUMED</c> under the title, or in the dungeon at the saved
 /// floor and turn, <c>RESUMED</c> over the floor banner (<see cref="ResumeRun"/>).
 /// A save that cannot be read, or whose resume crashed the game, is set aside
-/// where the notice says. A write that fails is a notice and a log line, never a
-/// crash, and never costs the save before it. A dev-override launch plays a fresh
+/// where the notice says. A write that fails is a log line and a notice — at once
+/// over the floor being played, and on the next screen until a later save goes
+/// through — never a crash, and never costs the save before it; a quit that cannot
+/// save leaves a marker, and the next launch says that what it resumes is from
+/// before that quit. A dev-override launch plays a fresh
 /// campaign in a slot of its own and never touches the campaign.
 /// </para>
 /// </summary>
@@ -124,6 +127,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     // notices and the save's at startup, a save that could not be written later.
     // The log has them all.
     private readonly StartupNotices _notices = new();
+
+    // The notices of the saves that failed since the last one that went through,
+    // led for the next screen: a save that goes through takes them back, since the
+    // disk holds the campaign again and they are no longer true.
+    private readonly List<string> _failedSaves = new();
 
     // The boot seed when the override named one, spent by the first BeginRun
     // that actually enters a dungeon.
@@ -551,8 +559,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
 
     /// <summary>
     /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws:
-    /// every line to the log, and a write that failed also to the next screen the
-    /// game shows. The save on the disk is kept whatever happens.
+    /// every line to the log. A write that fails is said at once over the floor
+    /// being played, when a run is (<see cref="DungeonScene.SaveFailed"/>), and on
+    /// the next screen the game shows — there once, however many times it failed,
+    /// and only until a later save goes through, which takes it back
+    /// (<see cref="StartupNotices.Withdraw"/>). The save on the disk is kept
+    /// whatever happens.
     /// </summary>
     private void Save(CampaignState campaign, SaveStore store, string when, ViewDto? view = null)
     {
@@ -561,7 +573,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         {
             Log.Warn($"[Save] {failed}");
             _notices.Lead([failed]);
+            if (!_failedSaves.Contains(failed))
+                _failedSaves.Add(failed);
+            PlayingScene(campaign)?.SaveFailed(failed);
+            return;
         }
+
+        foreach (string stale in _failedSaves)
+            _notices.Withdraw(stale);
+        _failedSaves.Clear();
     }
 
     /// <summary>
@@ -597,14 +617,17 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
     }
 
     /// <summary>
-    /// The quit's save, once however the quit came. Between runs the campaign is
-    /// saved as it stands. Mid-run the run in progress is saved (1f): a quit during
-    /// the enemies' turn plays it out to the next player turn first, one step of
-    /// the playing scene's own logic clock at a time — <c>DungeonScene.StepLogic</c>,
+    /// The quit's save, once however the quit came, through the quit's own door
+    /// (<see cref="CampaignBoot.SaveOnQuit"/>). Between runs the campaign is saved
+    /// as it stands. Mid-run the run in progress is saved (1f): a quit during the
+    /// enemies' turn plays it out to the next player turn first, one step of the
+    /// playing scene's own logic clock at a time — <c>DungeonScene.StepLogic</c>,
     /// the step live play takes — and then saves it with the scene's view as it
-    /// stands after (<see cref="CampaignBoot.SaveOnQuit"/>). With no scene playing
-    /// the run — a quit on the way in, before its first floor has opened — no turn
-    /// is running to play out, and the campaign is saved as the entry left it.
+    /// stands after. With no scene playing the run — a quit on the way in, before
+    /// its first floor has opened — no turn is running to play out, and the
+    /// campaign is saved as the entry left it. No screen follows a quit, so a quit
+    /// that cannot save leaves a marker beside the save instead, and the next
+    /// launch says that what it resumes is from before this quit.
     /// </summary>
     private void SaveOnQuit()
     {
@@ -614,17 +637,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost
         if (_campaign is not { } campaign || _store is not { } store)
             return;   // the content never loaded: no campaign
 
-        if (campaign.Visit is null)
-        {
-            Save(campaign, store, "on quit");
-        }
-        else
-        {
-            var scene = PlayingScene(campaign);
-            Log.Info($"[Save] Saving the campaign on quit, mid-run in {campaign.Visit.Def.Name}");
-            Action? step = scene is null ? null : scene.StepLogic;
-            CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line));
-        }
+        var scene = PlayingScene(campaign);
+        Log.Info(campaign.Visit is { } visit ? $"[Save] Saving the campaign on quit, mid-run in {visit.Def.Name}" : "[Save] Saving the campaign on quit");
+        Action? step = scene is null ? null : scene.StepLogic;
+        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line));
 
         if (_resuming)
         {
