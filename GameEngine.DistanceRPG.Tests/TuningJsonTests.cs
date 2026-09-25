@@ -149,6 +149,70 @@ public class TuningJsonTests
         Ignored("""{ "HealthPotionPercent": 20 }""", "HealthPotionPercent is not a key yet", "Phase 6b");
     }
 
+    /// <summary>
+    /// A row the HUD's font draws whole: the engine's glyphs (A to Z, 0 to 9 and
+    /// <c>. , : - _ ! ? ( ) / &gt; &lt; [ ] + = # *</c>) and the space. The engine
+    /// draws any other character as a blank: a semicolon, an apostrophe, a quote,
+    /// a brace, a backslash.
+    /// </summary>
+    private const string HudFontRow = @"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$";
+
+    [Fact]
+    public void AWarningAboutANameIsDrawnWhole_EveryCharacterInTheHudsFont()
+    {
+        // S2's review: a warning about a name a file got wrong is drawn on screen,
+        // under the between-runs title or over the first floor, so every character
+        // of the whole warning must be one the HUD's font draws: the pointer at
+        // the key as much as an alias's why. Its parts are joined by dashes, as a
+        // content file's refusal's are, never by a semicolon, which the font draws
+        // as a blank. Every branch, read through the load as the screen gets it:
+        // each key still to come, each doc spelling that points at a key, a typo
+        // of a key and a key in the wrong case, a name nothing resembles, a table
+        // member mistyped and one nothing resembles, and an ApplyPercent id the
+        // catalogue lacks, near an id and not.
+        var names = TuningSchema.Deferred.Values.SelectMany(deferred => deferred.Keys)
+            .Concat(TuningSchema.Aliases.Keys)
+            .Concat(["MovmentBudget", "movementBudget", "Wibble"]);
+        var files = names.Select(name => $$"""{ "{{name}}": 1 }""").Concat(
+        [
+            """{ "PerStack": { "Blok": 4 } }""",
+            """{ "PerStack": { "Wibble": 4 } }""",
+            """{ "ApplyPercent": { "flamming": 30 } }""",
+            """{ "ApplyPercent": { "frost_rune": 30 } }""",
+        ]).ToList();
+        Assert.True(files.Count > 20, $"{files.Count} files: the sweep is not reading the schema");
+
+        var said = new List<string>();
+        foreach (string file in files)
+        {
+            var load = ShippedData.Load(ShippedData.Texts with { Tuning = file });
+            Assert.NotNull(load.Content);
+            string notice = Assert.Single(load.Notices);
+            Assert.StartsWith("tuning.json: ", notice);
+            Assert.DoesNotContain(';', notice);
+            Assert.All(NoticeText.Wrap(notice), row => Assert.Matches(HudFontRow, row));
+            said.Add(notice);
+        }
+
+        // Each pointer is there, after its dash: at the key a doc spells otherwise,
+        // with its why; at the key, or the member or id, a typo is nearest.
+        string ladder = said.Single(notice => notice.StartsWith("tuning.json: WearCapacityLadder ", StringComparison.Ordinal));
+        Assert.StartsWith("tuning.json: WearCapacityLadder is not a key - ignored - the key is WearCapacityPerBar, ", ladder);
+        Assert.Contains("tuning.json: MovmentBudget is not a key - ignored - did you mean MovementBudget?", said);
+        Assert.Contains("tuning.json: PerStack.Blok is not a modifier - ignored - did you mean Block?", said);
+        Assert.Contains("tuning.json: ApplyPercent.flamming names no enchantment - ignored - did you mean flaming?", said);
+
+        // The ladder is the docs' spelling a playtester is likeliest to type, the
+        // ruling having replaced it: its warning takes fewer rows than the cap, so
+        // a second notice beside it is still shown, never only counted in the log.
+        var two = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "WearCapacityLadder": [30, 40, 55], "MovementUnitsPerMana": 0 }""" });
+        Assert.Equal([ladder, "tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"], two.Notices);
+        var rows = NoticeText.Rows(two.Notices);
+        Assert.True(NoticeText.Wrap(ladder).Count < NoticeText.MaxRows, $"the ladder's warning takes {NoticeText.Wrap(ladder).Count} rows");
+        Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", rows[^1]);
+        Assert.DoesNotContain(rows, row => row.StartsWith('+'));
+    }
+
     /// <summary>Every whole-number key and every table's first member, one below its range and one above it.</summary>
     public static TheoryData<string, string?, long, int> OutOfRange()
     {
@@ -369,7 +433,7 @@ public class TuningJsonTests
         Assert.Empty(TuningValues.Moved(BuiltIn, table.Tuning));
 
         var ladder = TuningJson.Read("""{ "WearCapacityLadder": [30, 40, 55] }""", BuiltIn);
-        Assert.Contains("WearCapacityLadder is not a key - ignored; the key is WearCapacityPerBar, ", Assert.Single(ladder.Warnings));
+        Assert.Contains("WearCapacityLadder is not a key - ignored - the key is WearCapacityPerBar, ", Assert.Single(ladder.Warnings));
         Assert.Empty(TuningValues.Moved(BuiltIn, ladder.Tuning));
 
         var key = TuningJson.Read("""{ "MovementBudget": [160] }""", BuiltIn);
@@ -701,7 +765,7 @@ public class TuningJsonTests
         Assert.Empty(read.Warnings);
 
         var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "ApplyPercent": { "flamming": 30 } }""" });   // beside the shipped content files
-        Assert.Equal(["tuning.json: ApplyPercent.flamming names no enchantment - ignored; did you mean flaming?"], load.Notices);
+        Assert.Equal(["tuning.json: ApplyPercent.flamming names no enchantment - ignored - did you mean flaming?"], load.Notices);
         Assert.False(load.Content!.Tuning.ApplyPercent.ContainsKey("flamming"));
         Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(load.Content.Tuning));
         Assert.Equal(BuiltIn.ApplyPercent["flaming"], load.Content.Enchantments["flaming"].ApplyPercent);

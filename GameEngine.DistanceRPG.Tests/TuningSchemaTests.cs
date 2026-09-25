@@ -322,9 +322,11 @@ public class TuningSchemaTests
 
         // The Enchanter's two numbers that are not the ruling's still wait with
         // their Phase 6a readers; the two placeholders the ruling replaced are no
-        // longer keys to come but point at the keys that took their place, in
-        // words the HUD's font can draw; and the graft formula's
-        // StartingWearCapacity is still StartingPool, the bar a capacity opens on.
+        // longer keys to come but point at the keys that took their place, each
+        // why in words the HUD's font can draw (the whole warning around it is
+        // held to the font by TuningJsonTests' sweep of every name warning); and
+        // the graft formula's StartingWearCapacity is still StartingPool, the bar
+        // a capacity opens on.
         Assert.Equal(("Phase 6a", "Phase 6a"), (TuningSchema.DeferredPhase("WearPerHit"), TuningSchema.DeferredPhase("GraftBaseChance")));
         foreach (var (placeholder, key) in new[] { ("WearCapacityLadder", nameof(Tuning.WearCapacityPerBar)), ("EnchantmentWearCost", nameof(Tuning.FirstEnchantmentWear)) })
         {

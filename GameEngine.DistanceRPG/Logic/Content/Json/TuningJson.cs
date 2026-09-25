@@ -325,7 +325,7 @@ public static class TuningJson
                 if (key.Members is { } members ? !members.Contains(entry.Name) : entry.Name.Trim().Length == 0)
                 {
                     string? near = key.Members is { } known ? TuningSchema.Nearest(entry.Name, known) : null;
-                    _warnings.Add($"{Prefix}{label} is not a {key.MemberNoun} - ignored" + (near is null ? "" : $"; did you mean {near}?"));
+                    _warnings.Add($"{Prefix}{label} is not a {key.MemberNoun} - ignored" + (near is null ? "" : $" - did you mean {near}?"));
                     continue;
                 }
 
@@ -344,16 +344,18 @@ public static class TuningJson
         /// the code's name for a doc's spelling and why (a placeholder the user's
         /// ruling of 2026-09-25 replaced among them: <c>WearCapacityLadder</c> is
         /// <c>WearCapacityPerBar</c>), or the key a typo is nearest — and never
-        /// read as that key.
+        /// read as that key. The warning is drawn on screen, so its parts are
+        /// joined by a dash, as a content file's refusal joins them, and never by
+        /// a semicolon, which the HUD's font has no glyph for (it draws a blank).
         /// </summary>
         private Tuning Unknown(Tuning tuning, string name)
         {
             if (TuningSchema.DeferredPhase(name) is { } phase)
                 _warnings.Add($"{Prefix}{name} is not a key yet - it arrives with the {phase} code that reads it - ignored");
             else if (TuningSchema.Alias(name) is { } alias)
-                _warnings.Add($"{Prefix}{name} is not a key - ignored; the key is {alias.Key}" + (alias.Why is { } why ? $", {why}" : ""));
+                _warnings.Add($"{Prefix}{name} is not a key - ignored - the key is {alias.Key}" + (alias.Why is { } why ? $", {why}" : ""));
             else if (TuningSchema.Suggest(name) is { } near)
-                _warnings.Add($"{Prefix}{name} is not a key - ignored; did you mean {near}?");
+                _warnings.Add($"{Prefix}{name} is not a key - ignored - did you mean {near}?");
             else
                 _warnings.Add($"{Prefix}{name} is not a key - ignored");
             return tuning;

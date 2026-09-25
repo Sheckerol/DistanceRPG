@@ -273,7 +273,7 @@ public static class ContentFiles
         foreach (string id in strays)
         {
             string? near = TuningSchema.Nearest(id, ids.Order(StringComparer.Ordinal));
-            notices.Add($"{TuningJson.Prefix}{nameof(Tuning.ApplyPercent)}.{id} names no enchantment - ignored" + (near is null ? "" : $"; did you mean {near}?"));
+            notices.Add($"{TuningJson.Prefix}{nameof(Tuning.ApplyPercent)}.{id} names no enchantment - ignored" + (near is null ? "" : $" - did you mean {near}?"));
         }
         var kept = tuning.ApplyPercent.Where(entry => !strays.Contains(entry.Key))
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);

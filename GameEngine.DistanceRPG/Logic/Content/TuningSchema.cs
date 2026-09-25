@@ -134,9 +134,9 @@ public static class TuningSchema
     /// <c>WearCapacityLadder</c> and <c>EnchantmentWearCost</c> are the two
     /// placeholders the user's ruling of 2026-09-25 on the deposit replaced, which
     /// the docs named before it. Each why is shown on screen, in the HUD's font,
-    /// so none has an apostrophe.
+    /// so none has an apostrophe, a quote or a semicolon.
     /// </summary>
-    private static readonly IReadOnlyDictionary<string, (string Key, string? Why)> Aliases =
+    internal static readonly IReadOnlyDictionary<string, (string Key, string? Why)> Aliases =
         new Dictionary<string, (string Key, string? Why)>(StringComparer.OrdinalIgnoreCase)
         {
             ["DotManaPerDamage"] = (nameof(Tuning.DotDamagePerMana), "its integer reciprocal: 3 means a third of a mana for each point of damage"),
@@ -147,7 +147,7 @@ public static class TuningSchema
             ["StartingWearCapacity"] = (nameof(Tuning.StartingPool), "the one bar for HP, mana and wear capacity alike"),
             ["MaxDistance"] = (nameof(Tuning.MovementBudget), null),
             ["DummyResurrectTurns"] = (nameof(Tuning.ResurrectTurnsBase), null),
-            ["WearCapacityLadder"] = (nameof(Tuning.WearCapacityPerBar), "as the user ruled on 2026-09-25: a point of capacity a full bar, never an authored ladder"),
+            ["WearCapacityLadder"] = (nameof(Tuning.WearCapacityPerBar), "one point a full bar, never a ladder"),
             ["EnchantmentWearCost"] = (nameof(Tuning.FirstEnchantmentWear), "attaching enchantment n needs FirstEnchantmentWear + EnchantmentWearStep x (n - 1)"),
         };
 
