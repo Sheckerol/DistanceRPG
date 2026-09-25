@@ -296,12 +296,12 @@ public class ContentFilesTests
         // never pre-empts an earlier file's semantics. A syntax error in
         // weapons.json beside restricted.json's own semantic error reports
         // restricted.json, which is checked before anything reads it (S:207-209);
-        // and a dungeons.json that is not JSON waits behind a weapon the
-        // relations refuse.
+        // and a dungeons.json that is not JSON waits behind a weapon class the
+        // relations refuse — the Sword, whose baseline forges Push beside Block.
         Assert.Equal((RestrictedJson.FileName, false, "Push", ContentValidator.RuleSelfExclusion),
             Stamp(Fails(Shipped with { Restricted = RestrictedSelfExclusion, Weapons = WeaponsSyntax })));
         string dungeonsSyntax = DataTexts.Edit(Shipped.Dungeons!, "\"id\": \"tutorial\",", "\"id\": \"tutorial\"");
-        Assert.Equal((ContentFiles.WeaponsFileName, false, "arming_sword", ContentValidator.RuleForgedNotAllowed),
+        Assert.Equal((ContentFiles.WeaponsFileName, false, "Sword", ContentValidator.RuleForgedNotAllowed),
             Stamp(Fails(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],"), Dungeons = dungeonsSyntax })));
 
         // Each alone is what it is, so the pairs above are decided by the order.
@@ -449,10 +449,11 @@ public class ContentFilesTests
             (Shipped with { Restricted = noSuchSoul }, (RestrictedJson.FileName, false, "frostbite", ContentValidator.RuleUnknownId)),
             // A restricted.json opposing shocking to flaming as well: the code's elements break against it.
             (Shipped with { Restricted = elementsTangled }, (RestrictedJson.FileName, false, "flaming", ContentValidator.RuleOpposition)),
-            // No weapons.json, and a restricted.json that makes a built-in weapon illegal: the built-in weapons break against it.
-            (Shipped with { Restricted = pushBlocks, Weapons = null }, (ContentFiles.WeaponsFileName, true, "arming_sword", ContentValidator.RuleForgedNotAllowed)),
-            // The same edit beside the shipped weapons.json: the file's weapon, stamped with the file.
-            (Shipped with { Restricted = pushBlocks }, (ContentFiles.WeaponsFileName, false, "arming_sword", ContentValidator.RuleForgedNotAllowed)),
+            // No weapons.json, and a restricted.json that makes a built-in weapon illegal: the built-in weapons break against it,
+            // at the Sword row, whose baseline every sword is forged with.
+            (Shipped with { Restricted = pushBlocks, Weapons = null }, (ContentFiles.WeaponsFileName, true, "Sword", ContentValidator.RuleForgedNotAllowed)),
+            // The same edit beside the shipped weapons.json: the file's class row, stamped with the file.
+            (Shipped with { Restricted = pushBlocks }, (ContentFiles.WeaponsFileName, false, "Sword", ContentValidator.RuleForgedNotAllowed)),
             // The dungeons' file, broken on its own: two dungeons that retire.
             (Shipped with { Dungeons = TwoRetiring }, (ContentFiles.DungeonsFileName, false, "spear_hall", ContentValidator.RuleOneRetiringDungeon)),
             // A weapons.json that renames the weapon the code's roster hands A: the roster breaks against it.

@@ -83,6 +83,34 @@ public class TuningFitTests
     }
 
     [Fact]
+    public void ABaselineNoWeaponCarriesIsRaisedToIt_NamingTheClass()
+    {
+        // A class row's baseline is held to the forge limit too (RuleMaxForged on
+        // the row), and every weapon of a class carries it at least as deep, so the
+        // weapons' fit serves it — until a class fields no weapon. Every bow gone,
+        // with the Long Gallery that hunts one, and the Ranged row forging Longshot
+        // x2 under a limit of 1, which the spears' own x1 is within: unfitted, the
+        // row is refused; fitted, the limit is raised to 2 naming the class, and
+        // the content loads.
+        var noBows = ShippedContent.Weapons with
+        {
+            Classes = ShippedContent.Weapons.Classes
+                .Select(row => row.Class == WeaponClass.Ranged ? row with { Baseline = new Dictionary<ModifierType, int> { [CritWindow] = 1, [Longshot] = 2 } } : row)
+                .ToList(),
+            Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Class != WeaponClass.Ranged).ToList(),
+        };
+        var noGallery = new DungeonsData(ShippedContent.Dungeons.Dungeons.Where(d => d.Theme != Longshot).ToList());
+        var low = BuiltIn with { MaxForged = new Dictionary<ModifierType, int>(BuiltIn.MaxForged) { [Longshot] = 1 } };
+        Assert.Equal(("Ranged", ContentValidator.RuleMaxForged), Refusal(() => Load(low, dungeons: noGallery, weapons: noBows)));
+
+        var warnings = new List<string>();
+        var fitted = Fit(low, warnings, weapons: noBows, dungeons: noGallery);
+        Assert.Equal(2, fitted.MaxForged[Longshot]);
+        Assert.Equal(["tuning.json: MaxForged.Longshot 1 is below the Ranged class, whose baseline carries Longshot x2 - using 2"], warnings);
+        Assert.Equal(2, Load(fitted, dungeons: noGallery, weapons: noBows).Modifiers.MaxForged(Longshot));
+    }
+
+    [Fact]
     public void AnOffsetThatLetsAPinnedBossPayTheFarmIsRaised_NamingTheDungeon()
     {
         // A one-floor range at floor 1 with the shallowest farm (headroom 1: a

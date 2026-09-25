@@ -988,8 +988,9 @@ public static class ContentValidator
     /// in <see cref="WeaponClass"/> order, each failure's entry the class
     /// (<see cref="ValidateClasses"/>): one row a class, a kind that casts exactly
     /// for the Staff and the Wand, the stats it levels on, a signature no other
-    /// class has, and a baseline of that signature and one more — or a caster's
-    /// <c>Resonant x1</c> and no signature. Then the weapon rows, each read as the
+    /// class has, a baseline the forge allows (asked what a weapon's spread is
+    /// asked, below), and a baseline of that signature and one more — or a
+    /// caster's <c>Resonant x1</c> and no signature. Then the weapon rows, each read as the
     /// kind its class row gives it: ids are unique; every
     /// enchantment a weapon names resolves; every forged stack count is at least
     /// one; every forged modifier is allowed
@@ -1038,7 +1039,10 @@ public static class ContentValidator
     /// </para>
     /// <para>
     /// <strong>A relations edit that makes a weapon illegal names both</strong>
-    /// (§5.5, S:220-224): the weapon is the entry, and the detail ends with the
+    /// (§5.5, S:220-224): the weapon is the entry (or its class, where the
+    /// relation refuses the class's baseline: the class row alone writes it and
+    /// every weapon of the class is forged with it, so the entry named is the one
+    /// of the two to change), and the detail ends with the
     /// <c>restricted.json</c> relation that refused it — for a forged modifier the
     /// clause <see cref="ModifierRules.Allowed"/> refused on
     /// (<see cref="WhyNotAllowed"/>), for two enchantments the group that
@@ -1057,7 +1061,7 @@ public static class ContentValidator
 
         // The class rows first: every weapon after them is read as the kind its
         // row gives it, and every variant against its row's baseline.
-        ValidateClasses(data);
+        ValidateClasses(data, rules, restricted);
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var def in data.Weapons)
@@ -1067,7 +1071,7 @@ public static class ContentValidator
         var excludes = Closure(restricted.Excludes);
         foreach (var def in data.Weapons)
         {
-            var spread = Spread(def);
+            var spread = Spread(def.Id, def.Forged, "");
             var kind = (data.ClassOf(def.Class)
                 ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row")).Kind;
 
@@ -1134,20 +1138,9 @@ public static class ContentValidator
                         throw new ContentException(def.Id, RuleUniqueSoulOnUnique, $"'{reference.Id}' on a variant");
 
             // Allowed is the question, asked exactly as every graft and roll asks it
-            // (PHASE5-133: "no new validation code exists"); when it refuses, the
-            // detail names the restricted.json relation that refused, read off the
-            // relations in hand (PHASE5-122: the weapon "and the rule that made it
-            // so"). A member outside the table is no relation's doing, and keeps
-            // its detail as it is.
-            foreach (var (t, n) in spread.Entries)
-            {
-                if (!rules.Allowed(t, kind, spread))
-                    throw new ContentException(def.Id, RuleForgedNotAllowed, ModifierRules.NeverStacked.Contains(t)
-                        ? $"{t} x{n}: not in the modifier table, so never a stack on any weapon"
-                        : WithRelation($"{t} x{n} on a {kind} weapon beside {spread}", WhyNotAllowed(t, kind, spread, restricted)));
-                if (n > rules.MaxForged(t))
-                    throw new ContentException(def.Id, RuleMaxForged, $"{t} x{n}, MaxForged {rules.MaxForged(t)}");
-            }
+            // (PHASE5-133: "no new validation code exists"), and then the forge
+            // limit; see the method.
+            RequireForgeable(def.Id, "", spread, kind, rules, restricted);
 
             if (kind == WeaponKind.Caster)
             {
@@ -1363,13 +1356,26 @@ public static class ContentValidator
     /// <item>a signature no class before it in the enum has
     /// (<see cref="RuleClassSignatureDistinct"/>), since a theme finds its class
     /// by signature;</item>
+    /// <item>a baseline the forge allows, asked what a weapon's spread is asked
+    /// and in the same order: every stack count at least one
+    /// (<see cref="RuleForgedStackCount"/>), each modifier allowed beside the rest
+    /// on the row's kind (<see cref="RuleForgedNotAllowed"/>, the detail naming
+    /// the <c>restricted.json</c> relation that refused it), none past its forge
+    /// limit (<see cref="RuleMaxForged"/>). The reader sums the baseline into
+    /// every variant of the class, so a fault in it would otherwise surface on
+    /// the first variant, a row with none of it written in; asked here, it names
+    /// the class, where the baseline is written — and a class that fields no
+    /// variant has its baseline asked all the same;</item>
     /// <item>a martial row's signature and baseline: a signature, and a baseline
     /// of exactly it and one other modifier (<see cref="RuleClassBaseline"/>); a
     /// caster row's: no signature, and a baseline of <c>Resonant x1</c>
     /// (<see cref="RuleCasterForged"/>).</item>
     /// </list>
     /// </summary>
-    private static void ValidateClasses(WeaponsData data)
+    /// <param name="data">The class rows and the weapons.</param>
+    /// <param name="rules">The in-flight rules — the relations and the fitted forge limits — a baseline is asked of, as a weapon's spread is.</param>
+    /// <param name="restricted">The relations <paramref name="rules"/> were built from, which a refusal names.</param>
+    private static void ValidateClasses(WeaponsData data, ModifierRules rules, RestrictedData restricted)
     {
         var signedBy = new Dictionary<ModifierType, WeaponClass>();
         foreach (var cls in Enum.GetValues<WeaponClass>())
@@ -1402,6 +1408,12 @@ public static class ContentValidator
                     throw new ContentException(entry, RuleClassSignatureDistinct, $"{signature} is the signature of the {first} as well");
                 signedBy[signature] = cls;
             }
+
+            // Every weapon of the class is forged with the baseline, so it is the
+            // forge's to allow before the class's shape is asked of it: a stack of
+            // 0, a modifier restricted.json refuses on this kind, or one past its
+            // limit is the row's fault, named here rather than on a variant.
+            RequireForgeable(entry, BaselineDetail, Spread(entry, row.Baseline, BaselineDetail), row.Kind, rules, restricted);
 
             string spread = row.Baseline.Count == 0
                 ? "nothing"
@@ -1651,19 +1663,59 @@ public static class ContentValidator
         => enchantments.Prerequisites(def.Id).Count > 0 || ConvertsSurplusHealing(def);
 
     /// <summary>
-    /// A def's forged spread as a set, unclamped: the forge is bounded by
-    /// MaxForged above, never by the acquisition cap. A zero or negative count
-    /// is refused here, naming the entry, before <see cref="ModifierSet.Of"/>
-    /// would refuse it as an argument: invalid content aborts as content
-    /// (§5.4). The shipped weapons carry none; a file edited can. Walked in
-    /// enum order so the count reported is the same one every run.
+    /// A forged spread as a set, unclamped — a weapon's, or a class row's
+    /// baseline, which every weapon of the class is forged with: the forge is
+    /// bounded by MaxForged above, never by the acquisition cap. A zero or
+    /// negative count is refused here, naming <paramref name="entry"/>, before
+    /// <see cref="ModifierSet.Of"/> would refuse it as an argument: invalid
+    /// content aborts as content (§5.4). The shipped weapons carry none; a file
+    /// edited can. Walked in enum order so the count reported is the same one
+    /// every run; <paramref name="of"/> is what the detail says the count is of
+    /// (<see cref="RequireForgeable"/>).
     /// </summary>
-    private static ModifierSet Spread(WeaponDef def)
+    private static ModifierSet Spread(string entry, IReadOnlyDictionary<ModifierType, int> forged, string of)
     {
-        foreach (var (t, n) in def.Forged.OrderBy(kv => kv.Key))
+        foreach (var (t, n) in forged.OrderBy(kv => kv.Key))
             if (n <= 0)
-                throw new ContentException(def.Id, RuleForgedStackCount, $"{t} x{n}");
-        return ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+                throw new ContentException(entry, RuleForgedStackCount, $"{of}{t} x{n}");
+        return ModifierSet.Of(forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+    }
+
+    /// <summary>
+    /// What a detail about a class row's baseline says its counts are of
+    /// (<c>baseline CritMultiplier x0</c>): the entry is the class, and its row
+    /// holds more than a spread.
+    /// </summary>
+    private const string BaselineDetail = "baseline ";
+
+    /// <summary>
+    /// The forge's questions of <paramref name="spread"/>, forged on a weapon of
+    /// <paramref name="kind"/>, reported against <paramref name="entry"/> in
+    /// <see cref="ModifierType"/> order, so the one reported is the same every
+    /// run: each modifier <see cref="ModifierRules.Allowed"/> beside the whole
+    /// spread — the state every later roll deepens from, so the forge's own
+    /// <c>Charges</c>, whose first stack <c>forgedOnly</c> reserves, is present
+    /// when it is asked — and none past its <see cref="ModifierRules.MaxForged"/>.
+    /// When Allowed refuses, the detail names the <c>restricted.json</c> relation
+    /// that refused, read off <paramref name="restricted"/>, the relations in hand
+    /// (<see cref="WhyNotAllowed"/>; PHASE5-122: "and the rule that made it so");
+    /// a member outside the modifier table is no relation's doing, and says so.
+    /// Asked of every weapon's spread, and of every class row's baseline, which
+    /// each weapon of the class is forged with: <paramref name="of"/> is what the
+    /// detail says the counts are of — nothing for a weapon's own spread,
+    /// <see cref="BaselineDetail"/> for a class's.
+    /// </summary>
+    private static void RequireForgeable(string entry, string of, ModifierSet spread, WeaponKind kind, ModifierRules rules, RestrictedData restricted)
+    {
+        foreach (var (t, n) in spread.Entries)
+        {
+            if (!rules.Allowed(t, kind, spread))
+                throw new ContentException(entry, RuleForgedNotAllowed, ModifierRules.NeverStacked.Contains(t)
+                    ? $"{of}{t} x{n}: not in the modifier table, so never a stack on any weapon"
+                    : WithRelation($"{of}{t} x{n} on a {kind} weapon beside {spread}", WhyNotAllowed(t, kind, spread, restricted)));
+            if (n > rules.MaxForged(t))
+                throw new ContentException(entry, RuleMaxForged, $"{of}{t} x{n}, MaxForged {rules.MaxForged(t)}");
+        }
     }
 
     /// <summary>

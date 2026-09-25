@@ -251,9 +251,11 @@ everything in them is named by a stable string id.
     class is forged with) and the statline its weapons share (`range`, `damage`,
     `cost`, `manaCost`). Re-basing a class is one edit to its row: give the Dagger
     row `"damage": 17` and restart, and every dagger — the uniques made from them
-    too — hits for 17. A class row left out, or one the game cannot level or cast
+    too — hits for 17. A class row left out, one the game cannot level or cast
     with (a `Staff` that is `melee`, `stats` naming `CON`, a signature another class
-    has), stops the game naming `WEAPONS.JSON` and the class.
+    has), or one whose `baseline` the forge refuses (a stack of `0`, one past its
+    forge limit, a modifier `restricted.json` keeps off the class's kind) stops the
+    game naming `WEAPONS.JSON` and the class, whose row the baseline is written in.
   - `variants` lists the thirty-two weapons a drop or a dummy carries, each as its
     `class`, its `role` and the modifiers it `adds` to its class's baseline, with
     the enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier
@@ -319,10 +321,12 @@ everything in them is named by a stable string id.
   since only fixing the master and rebuilding can mend it. A
   `restricted.json` edit that breaks the enchantment catalogue — `neverRolled`
   without `burning`, say — stops on `RESTRICTED.JSON` itself, the file to fix,
-  and one that makes a weapon illegal names both the weapon and the relation that
-  refused it, for modifiers and enchantments alike: add `["Push", "Block"]` to
-  `excludes` and the game opens on `WEAPONS.JSON`, `ARMING_SWORD`, and a detail
-  ending `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`. A
+  and one that makes a weapon illegal names both the weapon — or its class, where
+  the relation refuses the class's baseline — and the relation that refused it,
+  for modifiers and enchantments alike: add `["Push", "Block"]` to `excludes`,
+  and since the Sword's baseline forges both, the game opens on `WEAPONS.JSON`,
+  `SWORD`, and a detail ending
+  `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`. A
   `weapons.json` that renames a weapon only the starting party names — A's
   `weakspot_stiletto`, C's `great_axe` — stops on `WEAPONS.JSON` too, naming the
   member.

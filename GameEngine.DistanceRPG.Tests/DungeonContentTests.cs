@@ -332,8 +332,9 @@ public class DungeonContentTests
         // their own theme's table: the Long Gallery could never drop Stormcrow,
         // and every other dungeon check still passes. Refused -- asked of a
         // catalogue built straight over those relations, because through Load the
-        // bows themselves are refused first; this rule guards what the weapon
-        // rules cannot see (S:322-324).
+        // Ranged row itself is refused first, its baseline forging Longshot on a
+        // ranged class; this rule guards what the weapon rules cannot see
+        // (S:322-324).
         var meleeLongshot = ShippedContent.Restricted with
         {
             Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.MeleeKind },
@@ -344,7 +345,7 @@ public class DungeonContentTests
 
         var viaLoad = Assert.Throws<ContentException>(() =>
             TestContent.Load(ShippedContent.Tuning, meleeLongshot, ShippedContent.Enchantments, ShippedContent.Weapons));
-        Assert.Equal(("hunting_bow", ContentValidator.RuleForgedNotAllowed), (viaLoad.EntryId, viaLoad.Rule));
+        Assert.Equal(("Ranged", ContentValidator.RuleForgedNotAllowed), (viaLoad.EntryId, viaLoad.Rule));
     }
 
     [Fact]

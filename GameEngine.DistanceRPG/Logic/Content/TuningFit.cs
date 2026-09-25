@@ -9,7 +9,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// carries two weapons (<see cref="ContentValidator.RulePartyBagFits"/>); an
 /// offset the tuning's own range is happy with can let a dungeon's pinned floor
 /// pay the farm's stacks (<see cref="ContentValidator.RuleBossPaysLessThanTheFarm"/>);
-/// a forge limit below a weapon's forging breaks <see cref="ContentValidator.RuleMaxForged"/>.
+/// a forge limit below a weapon's forging, or a class's baseline, breaks
+/// <see cref="ContentValidator.RuleMaxForged"/>.
 /// So each is raised against the content in hand, within its own clamp range,
 /// with one warning naming the entry that needed it.
 /// <para>
@@ -51,7 +52,11 @@ internal static class TuningFit
     /// forged with it, naming the first weapon in file order forged that deep —
     /// so after the fit every theme's limit is still its unique's x3, which is
     /// what makes the boss's graft land on the unique by arithmetic
-    /// (<see cref="ContentValidator.RuleThemeHasAUnique"/>).
+    /// (<see cref="ContentValidator.RuleThemeHasAUnique"/>). A class row's
+    /// baseline is held to the limit as well, and every weapon of the class
+    /// carries it at least as deep, so a class is named only where its baseline
+    /// is deeper than every weapon — a class that fields none — the first such in
+    /// the enum's order.
     /// </summary>
     private static Tuning FitForgeLimits(Tuning tuning, WeaponsData weapons, ICollection<string> warnings)
     {
@@ -60,14 +65,23 @@ internal static class TuningFit
         bool raised = false;
         foreach (var type in Enum.GetValues<ModifierType>())
         {
-            WeaponDef? deepest = null;
+            string? deepest = null;   // who needs the limit raised, as the warning names it
             int depth = 0;
             foreach (var weapon in weapons.Weapons)
             {
                 int forged = weapon.Forged is { } spread ? spread.GetValueOrDefault(type) : 0;
                 if (forged > depth)
                 {
-                    deepest = weapon;
+                    deepest = $"{weapon.Id}, which is forged";
+                    depth = forged;
+                }
+            }
+            foreach (var row in weapons.Classes)
+            {
+                int forged = row.Baseline is { } baseline ? baseline.GetValueOrDefault(type) : 0;
+                if (forged > depth)
+                {
+                    deepest = $"the {row.Class} class, whose baseline carries";
                     depth = forged;
                 }
             }
@@ -75,9 +89,9 @@ internal static class TuningFit
             string name = type.ToString();
             int limit = limits[name];
             if (deepest is null || depth <= limit || depth > key.Max)
-                continue;   // served already, or forged past any limit there is: the weapon's own error
+                continue;   // served already, or forged past any limit there is: the weapon's or the class's own error
 
-            warnings.Add($"{TuningJson.Prefix}{key.Name}.{name} {limit} is below {deepest.Id}, which is forged {name} x{depth} - using {depth}");
+            warnings.Add($"{TuningJson.Prefix}{key.Name}.{name} {limit} is below {deepest} {name} x{depth} - using {depth}");
             limits[name] = depth;
             raised = true;
         }

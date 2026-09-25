@@ -257,6 +257,13 @@ public class WeaponClassTests
             // The Ranged row signed CritWindow over its CritWindow and Longshot
             // baseline: a sound baseline, and the Dagger's signature.
             (DataTexts.InClass(ShippedWeapons, Ranged, "\"signature\": \"Longshot\"", "\"signature\": \"CritWindow\""), "Ranged", ContentValidator.RuleClassSignatureDistinct),
+            // A baseline the forge refuses, asked of the row as a weapon's spread is
+            // asked — the reader sums it into every variant, and no variant's row
+            // holds it: a stack of 0; Brace on the Ranged row, which restricted.json
+            // keeps to melee weapons; x4, past any forge limit a tuning can set.
+            (DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 0"), "Dagger", ContentValidator.RuleForgedStackCount),
+            (DataTexts.InClass(ShippedWeapons, Ranged, "\"CritWindow\": 1", "\"Brace\": 1"), "Ranged", ContentValidator.RuleForgedNotAllowed),
+            (DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 4"), "Dagger", ContentValidator.RuleMaxForged),
             // A martial row with no signature, and a Dagger baseline without CritWindow.
             (DataTexts.InClass(ShippedWeapons, Sword, "\"signature\": \"Block\"", "\"signature\": null"), "Sword", ContentValidator.RuleClassBaseline),
             (DataTexts.InClass(ShippedWeapons, Dagger, "\"CritWindow\": ", "\"Pin\": "), "Dagger", ContentValidator.RuleClassBaseline),
@@ -285,6 +292,15 @@ public class WeaponClassTests
         var spear = Fails(WithoutRows(ShippedWeapons, "hoplites_wall", "skirmishers_pike", "phalanx_spear", "halberd", "pinning_lance"));
         Assert.Contains("EnemyPlacer.PlacedClasses", spear.Detail);
 
+        // A baseline's fault says it is the baseline's, and a relation's names the
+        // relation, as a weapon's does.
+        Assert.Equal("baseline CritMultiplier x0",
+            Fails(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 0")).Detail);
+        Assert.Equal("baseline Brace x1 on a Ranged weapon beside Brace x1, Longshot x1 - restricted.json kind Brace: melee",
+            Fails(DataTexts.InClass(ShippedWeapons, Ranged, "\"CritWindow\": 1", "\"Brace\": 1")).Detail);
+        Assert.Equal($"baseline CritMultiplier x4, MaxForged {ShippedContent.Tuning.MaxForged[CritMultiplier]}",
+            Fails(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 4")).Detail);
+
         // Records built in code bypass the reader, and meet the same rule in the
         // validator: a Wand row missing, or a Dagger row given twice.
         var noWandRow = ShippedContent.Weapons with { Classes = ShippedContent.Weapons.Classes.Where(row => row.Class != Wand).ToList() };
@@ -293,5 +309,17 @@ public class WeaponClassTests
         var twoDaggerRows = ShippedContent.Weapons with { Classes = [.. ShippedContent.Weapons.Classes, ShippedContent.Weapons.ClassOf(Dagger)!] };
         Assert.Equal((WeaponsJson.FileName, false, "Dagger", ContentValidator.RuleEveryClassHasARow),
             Stamp(Assert.Throws<ContentException>(() => TestContent.Load(weapons: twoDaggerRows))));
+
+        // And a class that fields no weapon has its baseline asked all the same:
+        // every bow gone, and the Ranged row forging Brace.
+        var noBows = ShippedContent.Weapons with
+        {
+            Classes = ShippedContent.Weapons.Classes
+                .Select(row => row.Class == Ranged ? row with { Baseline = new Dictionary<ModifierType, int> { [Brace] = 1, [Longshot] = 1 } } : row)
+                .ToList(),
+            Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Class != Ranged).ToList(),
+        };
+        Assert.Equal((WeaponsJson.FileName, false, "Ranged", ContentValidator.RuleForgedNotAllowed),
+            Stamp(Assert.Throws<ContentException>(() => TestContent.Load(weapons: noBows))));
     }
 }

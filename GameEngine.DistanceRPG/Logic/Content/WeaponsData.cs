@@ -23,7 +23,7 @@ public sealed record EnchantmentRef(string Id, int Tier = 1);
 /// <param name="Forged">The forged spread: modifier to stack count (§1.1) — the class baseline and what the variant adds, and what a unique raises. Bounded by MaxForged at validation.</param>
 /// <param name="Enchantments">Innate ids in attachment order, which is gameplay and never reordered (§1.7).</param>
 /// <param name="Shape">A wand's geometry; null for everything else.</param>
-/// <param name="Unique">A unique: one modifier at x3 over a variant's spread, carrying a soul.</param>
+/// <param name="Unique">A unique (§1.5): its variant with the modifiers <c>weapons.json</c>'s <c>raises</c> names set to a new stack count — one raised to x3, or on a Light-forged variant the signature to x2 or x3 — and enchantments of its own; a caster unique raises nothing, and differs from its variant in its enchantments alone.</param>
 /// <param name="DerivedFrom">The variant id a unique is derived from; null otherwise.</param>
 public sealed record WeaponDef(
     string Id, string Name, WeaponClass Class, VariantRole? Role,

@@ -110,7 +110,7 @@ public class StartupErrorTests
         var scene = new StartupErrorScene(game: null!, load.Error!, load.TuningOverrides, load.ReadBeside, load.Notices);
         Assert.Equal(StartupErrorScene.Lines(load.Error!, load.TuningOverrides, load.ReadBeside), scene.Rows);
         Assert.Equal("FILE: WEAPONS.JSON (BUILT-IN)", scene.Rows[1]);
-        Assert.Equal("ENTRY: ARMING_SWORD", scene.Rows[2]);
+        Assert.Equal("ENTRY: SWORD", scene.Rows[2]);
         Assert.Contains("RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]", string.Join(" ", scene.Rows.Select(row => row.Trim())));
         Assert.Equal(["weapons.json is missing - the built-in weapons are playing"], load.Notices);
         Assert.Equal(NoticeText.Rows(load.Notices), scene.NoticeRows);

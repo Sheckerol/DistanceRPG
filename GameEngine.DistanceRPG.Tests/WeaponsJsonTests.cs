@@ -12,7 +12,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// modifier it adds, a unique as its variant and what it raises; read strictly,
 /// with a shape's zero dimensions and a tier of 1 left out; and a
 /// <c>restricted.json</c> edit that makes a weapon illegal stopping the game
-/// naming both — the weapon, and the relation that refused it, asked of the one
+/// naming both — the weapon, or its class where the relation refuses the class's
+/// baseline, and the relation that refused it, asked of the one
 /// predicate every graft asks (<see cref="ModifierRules.Allowed"/>) and explained
 /// by <see cref="ContentValidator.WhyNotAllowed"/>. Every case reads text or
 /// builds rules it never makes current; the shipped file is the master copy the
@@ -217,11 +218,15 @@ public class WeaponsJsonTests
     {
         // PHASE5-122: "relations load before content, so a relations edit that
         // invalidates an existing weapon aborts startup naming both" — "the weapon
-        // that is now illegal and the rule that made it so". The weapon is the
-        // entry, weapons.json the file; the detail ends with the restricted.json
-        // relation that refused it, written as the file writes it (S:182: for
-        // modifiers and enchantments alike). Each edit passes every restricted
-        // and enchantment stage first, so it is the weapons' stage that breaks.
+        // that is now illegal and the rule that made it so", so that "the error
+        // tells you which of the two you meant to change". The weapon is the
+        // entry, weapons.json the file — or, where the relation refuses a class's
+        // baseline, the class: its row is where the baseline is written, and every
+        // weapon of it is forged with it, while a variant's row holds only what it
+        // adds. The detail ends with the restricted.json relation that refused it,
+        // written as the file writes it (S:182: for modifiers and enchantments
+        // alike). Each edit passes every restricted and enchantment stage first, so
+        // it is the weapons' stage that breaks.
         ContentException Broken(string restricted)
         {
             var error = Load(restricted: restricted).Error!;
@@ -229,20 +234,22 @@ public class WeaponsJsonTests
             return error;
         }
 
-        // An exclusion group: Push and Block, which every sword forges together.
+        // An exclusion group: Push and Block, which every sword forges together —
+        // the Sword baseline.
         var excluded = Broken(PushBlocks);
-        Assert.Equal(("arming_sword", ContentValidator.RuleForgedNotAllowed), (excluded.EntryId, excluded.Rule));
-        Assert.Equal("Block x1 on a Melee weapon beside Block x1, Light x1, Push x1 - restricted.json excludes [Push, Block]: Push is already forged here", excluded.Detail);
+        Assert.Equal(("Sword", ContentValidator.RuleForgedNotAllowed), (excluded.EntryId, excluded.Rule));
+        Assert.Equal("baseline Block x1 on a Melee weapon beside Block x1, Push x1 - restricted.json excludes [Push, Block]: Push is already forged here", excluded.Detail);
 
         // A dependency: Riposte needing Brace, which the Riposte Blade does not carry.
         var required = Broken(RiposteNeedsBrace);
         Assert.Equal(("riposte_blade", ContentValidator.RuleForgedNotAllowed), (required.EntryId, required.Rule));
         Assert.EndsWith("- restricted.json requires Riposte: [Brace], and this weapon has no Brace", required.Detail);
 
-        // A weapon kind: Push kept to ranged weapons, and a sword is melee.
+        // A weapon kind: Push kept to ranged weapons, and the Sword baseline forges
+        // it on a melee class.
         var kind = Broken(PushIsRanged);
-        Assert.Equal(("arming_sword", ContentValidator.RuleForgedNotAllowed), (kind.EntryId, kind.Rule));
-        Assert.Equal("Push x1 on a Melee weapon beside Block x1, Light x1, Push x1 - restricted.json kind Push: ranged", kind.Detail);
+        Assert.Equal(("Sword", ContentValidator.RuleForgedNotAllowed), (kind.EntryId, kind.Rule));
+        Assert.Equal("baseline Push x1 on a Melee weapon beside Block x1, Push x1 - restricted.json kind Push: ranged", kind.Detail);
 
         // And for enchantments (S:182): Regeneration and Overheal grouped, which
         // the Nameless Renewal carries together...
@@ -271,7 +278,7 @@ public class WeaponsJsonTests
 
         // On the screen that stops the game, the relation is on the detail's rows.
         string screen = string.Join(" ", StartupErrorScene.Lines(excluded, [], []).Select(row => row.Trim()));
-        Assert.Contains("ENTRY: ARMING_SWORD", screen);
+        Assert.Contains("ENTRY: SWORD", screen);
         Assert.Contains("RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]", screen);
     }
 
