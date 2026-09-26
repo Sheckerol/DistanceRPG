@@ -10,10 +10,10 @@ namespace GameEngine.DistanceRPG;
 /// time: there is no parameterless constructor and no default folder here, so
 /// nothing can read or write the player's real saves by accident. One store is
 /// one slot (the user's ruling of 2026-09-25 on the save model): the game hands
-/// it the player's save folder (<see cref="SaveDirectory"/>), which is the
-/// autosave slot, a manual slot's folder inside it (<see cref="SaveSlots"/>), or
-/// the save folder's dev-override slot (<see cref="SlotDirectory"/>); a test hands
-/// it a temporary folder.
+/// it a slot's folder inside the player's save folder (<see cref="SaveDirectory"/>,
+/// <see cref="SaveSlots"/>), the save folder itself — the old autosave — or the
+/// save folder's dev-override slot (<see cref="SlotDirectory"/>); a test hands it
+/// a temporary folder.
 /// <para>
 /// <strong>What lives in the folder.</strong> <see cref="FileName"/> is the
 /// campaign. <see cref="BackupName"/> is the save before it, kept by every

@@ -26,13 +26,16 @@ internal static class TitleText
     /// <summary>
     /// The keys the load list answers, along the bottom while it is up: W/S and the
     /// arrows only move, and a digit loads its slot at once, as ENTER loads the one
-    /// chosen (S6's review: a digit never only chooses). And what a load means,
-    /// said where the choice is made: the campaign it brings back saves into the
-    /// slot it came from, every save of it (the user's ruling of 2026-09-25 on the
-    /// save slots, R5) — so a slot kept as a checkpoint is played forward, and
-    /// written over, from its first load.
+    /// chosen (S6's review: a digit never only chooses) — 1 to 9, and 0 too while
+    /// the old autosave is listed, which 0 loads. And what a load means, said where
+    /// the choice is made: the campaign it brings back saves into the slot it came
+    /// from, every save of it (the user's ruling of 2026-09-25 on the save slots,
+    /// R5) — so a slot kept as a checkpoint is played forward, and written over,
+    /// from its first load.
     /// </summary>
-    internal const string LoadKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK";
+    /// <param name="oldAutosave">The old autosave is listed (<see cref="SaveListing.Read"/>), so 0 loads it.</param>
+    internal static string LoadKeysLine(bool oldAutosave)
+        => $"W/S OR ARROWS CHOOSE - ENTER OR {(oldAutosave ? "0-9" : "1-9")} LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK";
 
     /// <summary>CONTINUE with no save to load: drawn dimmed, and passed over.</summary>
     internal const string NoSaveYet = "CONTINUE - NO SAVE YET";
@@ -52,7 +55,7 @@ internal static class TitleText
     /// <summary>What the second row of every ask ends with: ENTER alone says yes.</summary>
     private const string EnterOrEsc = "ENTER: YES - ESC: NO";
 
-    /// <summary>CONTINUE, naming what it loads: the most recent save's own row (<see cref="SlotText.Row"/>) — <c>CONTINUE - AUTOSAVE - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32</c>.</summary>
+    /// <summary>CONTINUE, naming what it loads: the most recent save's own row (<see cref="SlotText.Row"/>) — <c>CONTINUE - SLOT 2 - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32</c>.</summary>
     internal static string Continue(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -66,7 +69,7 @@ internal static class TitleText
     /// The keys NEW CAMPAIGN's list answers, along the bottom while it is up: W/S
     /// and the arrows only move, and a digit begins in its slot at once, as ENTER
     /// begins in the one chosen — each asking first over a slot that holds anything.
-    /// No 0: the autosave is never offered.
+    /// No 0: the old autosave is never offered.
     /// </summary>
     internal const string NewCampaignKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS - ESC BACK";
 

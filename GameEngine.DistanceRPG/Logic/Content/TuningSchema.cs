@@ -46,7 +46,7 @@ public abstract record TuningKey(string Name, TuningGroup Group)
     /// declared ahead of its reader — a number the user has ruled and wants in the
     /// file before the code that plays it exists: what a deposit costs, until Phase
     /// 6a builds the enchanter — and one that no rule of play reads at all:
-    /// <c>SaveSlots</c>, how many manual save slots the launcher offers. Such a key
+    /// <c>SaveSlots</c>, how many save slots the launcher offers. Such a key
     /// is read exactly as every key — the built-in copy must name it with a whole
     /// number, a copy beside the game merges it, clamps it and warns — and the log
     /// names it among the numbers a file changed (<see cref="TuningJson.Read"/>).
@@ -321,9 +321,9 @@ public static class TuningSchema
         Int(nameof(Tuning.ArcanePotency), TuningGroup.Drops, 0, 1000, t => t.ArcanePotency, (t, v) => t with { ArcanePotency = v }),
 
         // Saves — not in §5.3's list: the user's ruling of 2026-09-25 on the save
-        // model keeps the manual slots' count here, so a change of mind is an edit.
+        // model keeps the save slots' count here, so a change of mind is an edit.
         // The launcher reads it (SaveSlots), never a rule of play, so no save's hash
-        // holds it. At least 1, so saving by hand always has somewhere to go; at most
+        // holds it. At least 1, so a campaign always has a slot to begin in; at most
         // 9, since a digit picks each slot, as the bag's are picked, and the number
         // row stops at 9.
         Unplayed(Int(nameof(Tuning.SaveSlots), TuningGroup.Saves, 1, 9, t => t.SaveSlots, (t, v) => t with { SaveSlots = v })),

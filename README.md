@@ -56,14 +56,15 @@ title.
 | Title: LOAD GAME's slot list | Action |
 | --- | --- |
 | W/S / arrows | Choose a slot (an empty one is skipped) |
-| 0–9 | Load that slot: 0 the autosave, 1–9 the manual slots (an empty one says `SLOT 2 IS EMPTY`). The campaign it brings back saves into that slot from then on, as the keys line says: `PLAY SAVES INTO THE SLOT YOU LOAD` |
+| 1–9 | Load that slot (an empty one says `SLOT 2 IS EMPTY`). The campaign it brings back saves into that slot from then on, as the keys line says: `PLAY SAVES INTO THE SLOT YOU LOAD` |
+| 0 | Load the `OLD AUTOSAVE`, while the list shows it (the keys line then reads `0-9`); otherwise nothing |
 | Enter | Load the chosen slot, the same way |
 | Esc | Back to the options |
 
 | Title: NEW CAMPAIGN's slot list (`NEW CAMPAIGN - CHOOSE A SLOT`) | Action |
 | --- | --- |
 | W/S / arrows | Choose a slot, `SLOT 1` to `SLOT 3` (it starts on the lowest empty one) |
-| 1–9 | Begin the new campaign in that slot, which it saves into from then on: an empty one at once, one that holds anything after asking (a slot above the count in `tuning.json` is never offered, and says `SLOT 5 IS BEYOND THE 3 SLOTS`; 0, the autosave, does nothing) |
+| 1–9 | Begin the new campaign in that slot, which it saves into from then on: an empty one at once, one that holds anything after asking (a slot above the count in `tuning.json` is never offered, and says `SLOT 5 IS BEYOND THE 3 SLOTS`; 0, the old autosave, does nothing) |
 | Enter | Begin in the chosen slot, the same way |
 | Esc | Back to the options (on a question, no) |
 
@@ -120,10 +121,10 @@ manually.
 There is one campaign in play at a time, and the game saves it on its own —
 **into the slot it came from**, as old games keep a campaign to its file: the
 slot you loaded it from, by LOAD GAME or CONTINUE, or the one you chose for it
-on NEW CAMPAIGN. The save folder's own `campaign.json` is the **autosave**, and
-beside it are the **manual save slots**, in one of which every new campaign
-begins (the user's rulings of 2026-09-25 on the save model and on the save
-slots). The game opens on the title screen, where CONTINUE resumes the most
+on NEW CAMPAIGN. Every campaign is in a **save slot**, a folder of its own in the
+save folder, in one of which every new campaign begins; a campaign an earlier
+build autosaved into the save folder itself is the **old autosave** (the user's
+rulings of 2026-09-25 on the save model and on the save slots). The game opens on the title screen, where CONTINUE resumes the most
 recent save, LOAD GAME any slot, and NEW CAMPAIGN starts fresh in the slot you
 choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
 
@@ -132,20 +133,24 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   never beside the exe, which a rebuild or `dotnet clean` replaces. Set
   `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
   names the full path of every save written or read, and says at launch where the
-  saves are and how many slots there are (`[Save] Saves in ...: the autosave and
-  3 slots`).
-- **The slots**: the save folder itself is the autosave slot —
-  `campaign.json`, its backup and the markers and set-aside files below, by the
-  names they always had — so a save written by an earlier build is simply the
-  autosave, and nothing moves. Manual slot *n* is the folder `slot-n` inside it
-  (`saves\slot-1\` to `saves\slot-3\`), holding the same files for its own save:
-  its own backup, its own markers, its own files set aside — and written by the
-  game, and by SAVE GAME, for the campaign loaded from it or begun in it.
-  How many there are is `tuning.json`'s `SaveSlots` (below); lowering it deletes
-  nothing, and a slot above the count keeps its save, loads like any, and goes on
-  saving the campaign played from it; NEW CAMPAIGN never offers it. A folder
-  named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and is
-  never read.
+  saves are and how many slots there are (`[Save] Saves in ...: 3 slots`).
+- **The slots**: slot *n* is the folder `slot-n` in the save folder
+  (`saves\slot-1\` to `saves\slot-3\`), holding its save, `campaign.json`, and
+  its own backup, its own markers and its own files set aside (below) — and
+  written by the game, and by SAVE GAME, for the campaign loaded from it or begun
+  in it. How many there are is `tuning.json`'s `SaveSlots` (below); lowering it
+  deletes nothing, and a slot above the count keeps its save, loads like any, and
+  goes on saving the campaign played from it; NEW CAMPAIGN never offers it. A
+  folder named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and
+  is never read.
+- **The old autosave**: an earlier build saved its campaign in the save folder
+  itself, as the autosave — `campaign.json`, its backup and the markers and
+  set-aside files, by the same names — and there it stays: nothing moves. While
+  the save folder holds a `campaign.json` or a `campaign.bak.json`, LOAD GAME
+  lists it first as `OLD AUTOSAVE`, and 0 loads it; loaded, it saves back there
+  like any slot (`PROGRESS SAVES TO THE OLD AUTOSAVE AT EVERY TURN`). NEW
+  CAMPAIGN never begins a campaign there, and with neither file there it is not
+  listed at all.
 - **A save's time**: every save records when it was written — `"savedAt"`, the
   UTC time, the last entry of `campaign.json` (a save from an earlier build has
   none). A save of the campaign a slot already holds writes nothing, so the time
@@ -155,9 +160,9 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   save is told — what CONTINUE loads: the latest time
   wins; a save with no time counts as older than any with one; a time more than a
   day ahead of this computer's clock counts as none, so a hand edit or a clock
-  once set wrong cannot go on winning; and a tie goes to the autosave, then the
-  lowest slot. File dates are never read, so a clock set back can make an older
-  save look like the newest. A `savedAt` that is no such time is refused like any
+  once set wrong cannot go on winning; and a tie goes to the lowest slot — the
+  old autosave, while it is listed, before slot 1. File dates are never read, so
+  a clock set back can make an older save look like the newest. A `savedAt` that is no such time is refused like any
   field that cannot be trusted (below): the save is set aside, `CAMPAIGN.JSON
   COULD NOT BE READ (SAVEDAT: YESTERDAY IS NO TIME)`.
 - **When**: the campaign's own slot, all the time, on its own. Mid-run the game saves when
@@ -196,14 +201,14 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   anywhere, which saves the campaign in play first. Esc between runs opens the
   menu and never quits.
 - **Resuming**: CONTINUE on the title resumes the most recent save where it was,
-  and LOAD GAME any slot — `AUTOSAVE`, `SLOT 1` to `SLOT 3`, then any slot above
-  the count that holds a save — each row saying where its campaign stands (the
+  and LOAD GAME any slot — the `OLD AUTOSAVE` while there is one, `SLOT 1` to
+  `SLOT 3`, then any slot above the count that holds a save — each row saying where its campaign stands (the
   dungeon and floor, or `BETWEEN RUNS`), the runs counted and when it was saved,
   and under it what a load of it would do that the row cannot say: `FROM ITS
   BACKUP`, `ITS LAST LOAD DID NOT FINISH`, `AHEAD OF THIS CLOCK`, `NO TIME
   RECORDED`, `BEYOND THE 3 SLOTS`; an empty slot says `EMPTY`. Between
-  runs it is the screen between runs, with `CAMPAIGN RESUMED` (or `CAMPAIGN
-  RESUMED FROM SLOT 2`) under the title and the last run's summary above the
+  runs it is the screen between runs, with `CAMPAIGN RESUMED FROM SLOT 2` (or
+  `FROM THE OLD AUTOSAVE`) under the title and the last run's summary above the
   list. Mid-run it is the dungeon: the same floor,
   turn and positions, HP, mana, statuses and movement left, the corpses lying on
   the very weapons they lay on, the weapons left on the floor, the explored fog
@@ -225,20 +230,20 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
   no rights — costs nothing: the save on the disk is the last good one, the log
-  says why, and the game says `THE CAMPAIGN COULD NOT BE SAVED` (for a campaign
-  in slot 2, `SLOT 2 COULD NOT BE SAVED`) at once, over the floor you are
-  playing, and again on the next screen — the screen between runs, or the title
-  after QUIT TO TITLE — once, however many saves failed, and not at all if a
-  later save has gone through by then, the quit's own included. It never saves
+  says why, and the game says `SLOT 2 COULD NOT BE SAVED` (or `THE OLD AUTOSAVE
+  COULD NOT BE SAVED`) at once, over the floor you are playing, and again on the
+  next screen — the screen between runs, or the title after QUIT TO TITLE —
+  once, however many saves failed, and not at all if a later save has gone
+  through by then, the quit's own included. It never saves
   into another slot instead. A quit that cannot save leaves `campaign.unsaved`
   beside the save of the campaign's slot, and the title says so the next time it
   opens — at once, after QUIT TO TITLE — before anything is loaded, for every
   slot that has one: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT
-  HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` (for the autosave, `THE
-  AUTOSAVE COULD NOT BE WRITTEN WHEN ...`). **A slot whose saves keep failing
-  costs what was played since its last save that went through**: every save of
-  the campaign goes into its own slot, SAVE GAME's too, so there is nowhere else
-  to save it meanwhile, and a quit that cannot save loses what came after the
+  HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` (for the old autosave,
+  `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`). **A slot whose saves keep
+  failing costs what was played since its last save that went through**: every
+  save of the campaign goes into its own slot, SAVE GAME's too, so there is
+  nowhere else to save it meanwhile, and a quit that cannot save loses what came after the
   last save. The game says each failure as it happens, and a later save that
   goes through — once the disk has room, or the other program lets go — saves
   all of it. (What should become of such play is the user's to rule: SLOT
@@ -272,11 +277,12 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   `campaign.crashed-N.json`) in its own slot's folder, the backup is tried — one
   save older, so at most a turn or a floor back mid-run — and failing that the
   load goes back to the title, which says `NOTHING COULD BE LOADED FROM SLOT 2`
-  (or `FROM THE AUTOSAVE`) and each file set aside, whole; nothing else is
+  (or `FROM THE OLD AUTOSAVE`) and each file set aside, whole; nothing else is
   touched. A load that resumes says what became of the campaign under the title
-  of the screen between runs, whole: `CAMPAIGN RESUMED`, `THE NUMBERS HAVE
-  CHANGED ...` when they have, and each file set aside by its full path (drawn
-  with forward slashes, since the game's font has no backslash; Windows reads it
+  of the screen between runs, whole: `CAMPAIGN RESUMED FROM THE BACKUP OF SLOT 2,
+  ONE SAVE OLDER` (`FROM THE OLD AUTOSAVE BACKUP, ...` for the old autosave),
+  `THE NUMBERS HAVE CHANGED ...` when they have, and each file set aside by its
+  full path (drawn with forward slashes, since the game's font has no backslash; Windows reads it
   either way). When the backup holds a run in progress, the floor it resumes on
   says the same, whole, over the floor banner; the banner moves down to make
   room, and the words stay up longer the more there are. Only what the data
@@ -304,8 +310,8 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   save, and the list reads its dungeon as open.
 - **Starting over**: NEW CAMPAIGN on the title starts fresh with the starting
   party, in the slot you choose for it: it opens its slot list, `NEW CAMPAIGN -
-  CHOOSE A SLOT` — `SLOT 1` to `SLOT 3`, never the autosave nor a slot above the
-  count — on the lowest empty slot, so Enter pressed at once sets nothing aside
+  CHOOSE A SLOT` — `SLOT 1` to `SLOT 3`, never the old autosave nor a slot above
+  the count — on the lowest empty slot, so Enter pressed at once sets nothing aside
   while a slot is free. An empty slot begins at once. A slot that holds a
   campaign asks first, naming it, as old games ask before they overwrite a file —
   `SLOT 2 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS` (`SLOT 2 CANNOT BE READ` for
@@ -313,7 +319,7 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, on Enter, sets that
   slot's save and its backup aside in the slot's own folder as
   `saves\slot-2\campaign.abandoned-N.json` (the backup first, so the higher number
-  is the later save), never deleted; the autosave and every other slot are
+  is the later save), never deleted; the old autosave and every other slot are
   untouched. **To play the old campaign again, move its file into an empty slot
   folder as `campaign.json`** — `saves\slot-3\campaign.json`, say — where LOAD GAME
   lists it: renamed back where it lies, it would take the new campaign's save's
@@ -406,8 +412,8 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `THE NUMBERS HAVE CHANGED` when a campaign resumes. The docs' older
   `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
   either is told which key took its place.
-- **`SaveSlots`** is how many manual save slots there are beside the autosave
-  (see [Saves](#saves)) — the user ruled it a key, "so that we don't need to fix
+- **`SaveSlots`** is how many save slots there are, each holding one campaign
+  that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that we don't need to fix
   the code every time I change my mind". At least 1 and at most 9, a digit
   choosing each: `"SaveSlots": 12` plays 9 and says `TUNING.JSON: SAVESLOTS 12 IS
   ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above the count keeps

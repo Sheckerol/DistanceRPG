@@ -69,9 +69,10 @@ namespace GameEngine.DistanceRPG;
 /// it</strong> (§5.1, 1f; the user's rulings of 2026-09-25 on the save model, R2,
 /// and on the save slots, R5; <see cref="CampaignBoot"/>, <see cref="SaveStore"/>,
 /// <see cref="SaveSlots"/>, <see cref="SaveListing"/>). One campaign in play,
-/// <strong>bound to one slot</strong> (<see cref="_slot"/>): the save folder
-/// itself — the autosave slot (<c>DISTANCERPG_SAVE_DIR</c> moves it) — or one of
-/// its manual slots, <c>slot-1</c> to <c>slot-N</c>. The title lists the slots
+/// <strong>bound to one slot</strong> (<see cref="_slot"/>): one of the save
+/// folder's slots, <c>slot-1</c> to <c>slot-N</c> (<c>DISTANCERPG_SAVE_DIR</c>
+/// moves the folder), or the save folder itself — the old autosave, where a build
+/// before R5 autosaved — while it holds a campaign. The title lists the slots
 /// (<see cref="ShowTitle"/>): CONTINUE loads the most recent save, LOAD GAME any
 /// slot, and the slot a campaign is loaded from is the slot it saves into from
 /// then on (<see cref="LoadSlot"/>) — "you choose a save slot and any saving
@@ -97,8 +98,8 @@ namespace GameEngine.DistanceRPG;
 /// enemies' turn plays it out to the next player turn first, on the playing
 /// scene's own logic step (<see cref="CampaignBoot.SaveOnQuit"/>), and saves the
 /// turn the player would have met. A load resumes the campaign where it stood: on
-/// the screen between runs, <c>CAMPAIGN RESUMED</c> under the title, or in the
-/// dungeon at the saved floor and turn, <c>RESUMED</c> over the floor banner
+/// the screen between runs, <c>CAMPAIGN RESUMED FROM SLOT 2</c> under the title,
+/// or in the dungeon at the saved floor and turn, <c>RESUMED</c> over the floor banner
 /// (<see cref="ResumeRun"/>); one that brings nothing back goes back to the title,
 /// saying why. A save that cannot be read, or whose resume crashed the game, is
 /// set aside where the notice says. A write that fails is a log line and a notice
@@ -108,7 +109,7 @@ namespace GameEngine.DistanceRPG;
 /// says so; a quit that cannot save leaves a marker, and the title says, the next
 /// time it opens, that what the campaign's slot holds is from before that quit. A
 /// dev-override launch plays a fresh campaign in a slot of its own, with no title
-/// and no manual slots, and never touches the campaign.
+/// and no slots, and never touches the campaign.
 /// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
@@ -158,7 +159,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     // The clock a save's time is read from: the edge's, never Logic's.
     private readonly Func<DateTimeOffset> _clock = () => DateTimeOffset.UtcNow;
 
-    // The save folder's slots: the autosave and the manual ones. Never made on a
+    // The save folder's slots, and the old autosave. Never made on a
     // dev-override launch, whose saves all go to its own slot; null too when the
     // content did not load.
     private SaveSlots? _slots;
@@ -323,7 +324,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <item>a dev override: a scratch campaign bound to the folder's override
     /// slot (<see cref="CampaignBoot.BootOverride"/>), which is where every save of
     /// the session goes — the slots are never made, so nothing of the session
-    /// reaches the autosave or a manual slot — straight into its dungeon, or onto
+    /// reaches a slot or the old autosave — straight into its dungeon, or onto
     /// the screen between runs, with no title;</item>
     /// <item><c>--new-campaign</c>: the slots made, and a new campaign begun at
     /// once (<see cref="BeginNewCampaign(int, string)"/>) in the slot NEW CAMPAIGN's
@@ -363,7 +364,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         var slots = new SaveSlots(saves, content.Tuning.SaveSlots);
         _slots = slots;
-        Log.Info($"[Save] Saves in {slots.Folder}: the autosave and {slots.Count} {(slots.Count == 1 ? "slot" : "slots")}");
+        Log.Info($"[Save] Saves in {slots.Folder}: {slots.Count} {(slots.Count == 1 ? "slot" : "slots")}");
         if (request.NewCampaign)
             BeginNewCampaign(SaveListing.Read(slots, _clock(), line => Log.Info(line)).NewCampaignSlot, Program.NewCampaignOption);
         else
@@ -488,7 +489,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// before any title has said it.
     /// </para>
     /// </summary>
-    /// <param name="number">The slot it begins in: 1 to the count — NEW CAMPAIGN never offers the autosave, nor a slot beyond the count.</param>
+    /// <param name="number">The slot it begins in: 1 to the count — NEW CAMPAIGN never offers the old autosave, nor a slot beyond the count.</param>
     /// <param name="how">What asked for it, which the set-aside notices name: <c>--new-campaign</c>, or null for the title's NEW CAMPAIGN.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to the count.</exception>
     private void BeginNewCampaign(int number, string? how)
@@ -553,7 +554,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>Whether this session has a title and the save folder's slots (<see cref="ISaveHost.HasTitle"/>): it made them, which a dev-override launch never does.</summary>
     public bool HasTitle => _slots is not null;
 
-    /// <summary>The slot the campaign in play is bound to, by its name (<see cref="ISaveHost.SavesInto"/>): <c>SLOT 2</c>, <c>THE AUTOSAVE</c>, or a dev override's <c>THE SCRATCH SLOT</c>, which the menus say under their options; empty with no campaign in play.</summary>
+    /// <summary>The slot the campaign in play is bound to, by its name (<see cref="ISaveHost.SavesInto"/>): <c>SLOT 2</c>, <c>THE OLD AUTOSAVE</c>, or a dev override's <c>THE SCRATCH SLOT</c>, which the menus say under their options; empty with no campaign in play.</summary>
     public string SavesInto => _slot?.Name ?? "";
 
     /// <summary>

@@ -28,8 +28,8 @@ public interface IBetweenRunsHost : ISaveHost
 /// <summary>
 /// The screen between runs (§4.5, §6.7): the hub's dungeon list, and the last
 /// run's summary above it. A campaign continued or loaded from the title opens on
-/// it when it was saved between runs — with <c>CAMPAIGN RESUMED</c> under the
-/// title — and so does a new one; and every run's end comes back to it. The
+/// it when it was saved between runs — with <c>CAMPAIGN RESUMED FROM SLOT 2</c>
+/// under the title — and so does a new one; and every run's end comes back to it. The
 /// campaign's list decides what is offered (<see cref="CampaignState.Listings"/>).
 /// Before the tutorial is beaten that is the tutorial alone, with the warning §4.3
 /// asks for. After, it is every dungeon left, a locked one counting down, and with

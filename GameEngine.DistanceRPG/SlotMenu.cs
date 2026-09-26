@@ -40,10 +40,11 @@ internal enum SlotStep
 /// key is tested (<c>TitleTests</c>), and only the drawing is the screen's.
 /// <para>
 /// <strong>Load mode</strong>, the title's LOAD GAME: every slot the listing
-/// holds, in number order — <c>AUTOSAVE</c>, <c>SLOT 1</c> to the count, then any
-/// slot beyond the count that holds a save. W/S or the arrows move over the rows
-/// that hold something, round the ends; a digit takes its slot (0 the autosave);
-/// ENTER takes the one chosen; a slot that holds nothing is refused with
+/// holds, in number order — the <c>OLD AUTOSAVE</c> while the listing holds it,
+/// <c>SLOT 1</c> to the count, then any slot beyond the count that holds a save.
+/// W/S or the arrows move over the rows that hold something, round the ends; a
+/// digit takes its slot — 0 the old autosave while it is listed, and otherwise
+/// nothing; ENTER takes the one chosen; a slot that holds nothing is refused with
 /// <c>SLOT 2 IS EMPTY</c>, which stays until the next key; ESC goes back. A slot
 /// that holds files none of which reads can be chosen: its load sets them aside
 /// and brings nothing back, and the title says so. A slot is loaded at once: the
@@ -54,12 +55,12 @@ internal enum SlotStep
 /// <strong>NEW CAMPAIGN mode</strong>, the title's NEW CAMPAIGN: the slot the new
 /// campaign begins in, and saves into from then on, is chosen here (the user's
 /// ruling of 2026-09-25 on the save slots, R5: "you choose a save slot"). Slots 1
-/// to the count, every one a row a key can take — never the autosave, and never a
-/// slot beyond the count, so no campaign begins in either. The choice starts on
-/// the lowest empty slot (<see cref="SaveListing.NewCampaignSlot"/>), so an ENTER
-/// pressed without looking sets nothing aside while a slot is free. An empty slot
-/// is chosen at once. One that holds anything — a save, a backup, or files none
-/// of which reads — asks first (<see cref="Asking"/>) whether to begin there,
+/// to the count, every one a row a key can take — never the old autosave, and
+/// never a slot beyond the count, so no campaign begins in either. The choice
+/// starts on the lowest empty slot (<see cref="SaveListing.NewCampaignSlot"/>), so
+/// an ENTER pressed without looking sets nothing aside while a slot is free. An
+/// empty slot is chosen at once. One that holds anything — a save, a backup, or
+/// files none of which reads — asks first (<see cref="Asking"/>) whether to begin there,
 /// setting what it holds aside, and <strong>only ENTER says yes</strong>: the
 /// slot's digit again, N, Y, the arrows, ESC and every other key say no and are
 /// spent. A digit above the count is refused, saying why; 0 does nothing.
@@ -69,7 +70,7 @@ internal sealed class SlotMenu
 {
     /// <param name="mode">What the list is for.</param>
     /// <param name="listing">The slots, as the listing read them.</param>
-    /// <param name="count">How many manual slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
+    /// <param name="count">How many save slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
     public SlotMenu(SlotMenuMode mode, SaveListing listing, int count)
     {
         ArgumentNullException.ThrowIfNull(listing);
@@ -78,7 +79,7 @@ internal sealed class SlotMenu
         Count = count;
         Rows = listing.Slots
             .Where(slot => mode == SlotMenuMode.Load || !slot.Beyond)
-            .Where(slot => mode != SlotMenuMode.NewCampaign || slot.Number != SaveSlots.Autosave)
+            .Where(slot => mode != SlotMenuMode.NewCampaign || slot.Number != SaveSlots.OldAutosave)
             .OrderBy(slot => slot.Number)
             .ToList();
 
@@ -97,23 +98,23 @@ internal sealed class SlotMenu
     }
 
     /// <summary>
-    /// How many manual slots <paramref name="listing"/> offers: the ones it lists up
-    /// to the count — every manual slot to the count is listed, the empty ones
-    /// included — never fewer than one.
+    /// How many slots <paramref name="listing"/> offers: the ones it lists from 1 up
+    /// to the count — every slot to the count is listed, the empty ones included —
+    /// never fewer than one.
     /// </summary>
     internal static int CountOf(SaveListing listing)
     {
         ArgumentNullException.ThrowIfNull(listing);
-        return Math.Max(1, listing.Slots.Count(slot => slot.Number != SaveSlots.Autosave && !slot.Beyond));
+        return Math.Max(1, listing.Slots.Count(slot => slot.Number != SaveSlots.OldAutosave && !slot.Beyond));
     }
 
     /// <summary>What the list is for.</summary>
     public SlotMenuMode Mode { get; }
 
-    /// <summary>How many manual slots there are.</summary>
+    /// <summary>How many save slots there are.</summary>
     public int Count { get; }
 
-    /// <summary>The slots, top to bottom: the autosave (never on NEW CAMPAIGN's list), the manual slots to the count, then — loading — any beyond it that hold a save.</summary>
+    /// <summary>The slots, top to bottom: the old autosave while it is listed (never on NEW CAMPAIGN's list), the slots to the count, then — loading — any beyond it that hold a save.</summary>
     public IReadOnlyList<SlotEntry> Rows { get; }
 
     /// <summary>The index of the row chosen now — always one a key can take (<see cref="Choosable"/>) — or -1 when there is none.</summary>
@@ -166,12 +167,10 @@ internal sealed class SlotMenu
         if (Digit(key) is not { } digit)
             return SlotStep.None;
         int row = IndexOf(digit);
+        if (digit == SaveSlots.OldAutosave && (Mode == SlotMenuMode.NewCampaign || row < 0))
+            return SlotStep.None;   // no campaign begins in the old autosave, and none is loaded from it unless it is listed
         if (Mode == SlotMenuMode.NewCampaign)
-        {
-            if (digit == SaveSlots.Autosave)
-                return SlotStep.None;   // never offered: no campaign begins in the autosave
             return row >= 0 ? Take(row) : Refuse(SlotText.NotOffered(digit, Count));
-        }
         return row >= 0 && Rows[row].State != SlotState.Empty ? Take(row) : Refuse(SlotText.IsEmpty(digit));
     }
 

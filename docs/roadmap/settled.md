@@ -2009,7 +2009,11 @@ superseded whole.
     save: its own backup, markers and set-aside files. The names are built from
     the numbers and the folder is never enumerated, so a folder named any other
     way — `slot-01`, `slot-10`, `slot-x` — is no slot: never read, listed or
-    written, and no folder's spelling or order reaches a choice.
+    written, and no folder's spelling or order reaches a choice. (Superseded by
+    the user's ruling of the same day on the save slots, in the save folder being
+    the autosave: nothing new is saved there, so it is the old autosave — listed,
+    as `OLD AUTOSAVE`, only while it holds a save or a backup, and played in place
+    — and the slots are slot 1 up — R5, the old autosave, below.)
   - **The slot count is `tuning.json`'s `SaveSlots`**: 3, clamped 1–9 with the
     usual warning. At least one, so saving by hand always has somewhere to go; at
     most nine, since a digit picks each slot, as the bag's are picked, and the
@@ -2022,7 +2026,10 @@ superseded whole.
     of the same day on the save slots, in what such a slot takes: loading it is
     choosing it, so the campaign played from it saves into it, marked `BEYOND THE
     3 SLOTS` and no longer `- LOAD ONLY`; NEW CAMPAIGN never offers it — R5, the
-    slot, and R5, NEW CAMPAIGN, below.)
+    slot, and R5, NEW CAMPAIGN, below. And in what it counts: every slot, 3
+    places where there were 4, and at least one so that a campaign always has a
+    slot to begin in, since saving by hand chooses none — R5, the old autosave,
+    below.)
   - **Every save carries its time** — `savedAt`, the document's last member: the
     UTC instant as round-trip text, from the edge's clock. `Logic/` never reads a
     clock; the game hands the time in, and a test a fixed one. A save written
@@ -2046,7 +2053,10 @@ superseded whole.
     slot number, by number and never by a folder's order. File times are never
     read — a copy or a sync tool rewrites them, and a test cannot fix them — at
     the price the README states: a clock set back can make an older save look
-    newer. A counter would need every slot read at every write.
+    newer. A counter would need every slot read at every write. (Superseded by the
+    user's ruling of the same day on the save slots, in the tie: it goes to the
+    lower number, the old autosave's 0 while it is listed, with no autosave slot
+    apart from the others — R5, the old autosave, below.)
   - **The listing reads and never moves**: each slot's save and backup are read
     and parsed for a header — when it was saved, the runs counted, and the
     dungeon, floor and turn of a run in progress — and never restored, since a
@@ -2062,7 +2072,11 @@ superseded whole.
     that brings nothing back hands the choice to its caller: the launch begins a
     campaign, saying `A NEW CAMPAIGN BEGINS` ahead of whatever was set aside.
     (Superseded by the title, below: the launch no longer loads, and a load that
-    brings nothing back goes back to the title, saying so.)
+    brings nothing back goes back to the title, saying so. And by the user's
+    ruling of the same day on the save slots, in the autosave's words: every load
+    names its slot, the old autosave's too — `CAMPAIGN RESUMED FROM THE OLD
+    AUTOSAVE`, `... FROM THE OLD AUTOSAVE BACKUP, ONE SAVE OLDER` — R5, the old
+    autosave, below.)
   - **No write costs a file.** Until the slots, every launch set an unreadable,
     crashed or newer-build `campaign.json` aside before anything wrote there. A
     slot can now be written without being loaded — the autosave after a manual
@@ -2117,6 +2131,9 @@ superseded whole.
     time in the player's own zone. With nothing to load it is `CONTINUE - NO SAVE
     YET`, dimmed and passed over, and the choice starts on NEW CAMPAIGN; otherwise
     it starts on CONTINUE, so ENTER at launch is one key to where the game stood.
+    (Superseded by the user's ruling of the same day on the save slots, in its
+    example: `CONTINUE - SLOT 2 - ...`, or `CONTINUE - OLD AUTOSAVE - ...` while
+    the save folder itself holds a campaign — R5, the old autosave, below.)
   - **LOAD GAME lists every slot** in the options' place and the notices', so the
     list never contends with the save's word for height: `AUTOSAVE`, `SLOT 1` to
     the count, then any slot beyond it that holds a save. A slot is its own row —
@@ -2138,7 +2155,11 @@ superseded whole.
     UTC. (Superseded by the user's ruling of the same day on the save slots, in
     the marker and the keys line: `BEYOND THE 3 SLOTS`, no longer `- LOAD ONLY` or
     dimmed, and `W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE
-    SLOT YOU LOAD - ESC BACK` — R5, the slot, below.)
+    SLOT YOU LOAD - ESC BACK` — R5, the slot, below. And in the `AUTOSAVE` row and
+    the digit 0: the save folder itself is the `OLD AUTOSAVE`, listed first only
+    while it holds a save or a backup; 0 loads it then and does nothing
+    otherwise, and the keys line reads `... ENTER OR 1-9 LOADS ...`, `0-9` while
+    it is listed — R5, the old autosave, below.)
   - **Every ask is two rows, where the keys stand, and only ENTER says yes**:
     what it does, then `... - ENTER: YES - ESC: NO`. N, Y and every other key say
     no and are spent, so a player pressing N to mean no keeps what the ask named —
@@ -2201,6 +2222,8 @@ superseded whole.
     order; the listing is read again (the slot now empty, or its backup's), and
     nothing else is touched. Nothing begins on its own any more: the launch's `A
     NEW CAMPAIGN BEGINS` over what was set aside is gone with the launch's resume.
+    (Superseded by the user's ruling of the same day on the save slots, in `FROM
+    THE AUTOSAVE`: `... FROM THE OLD AUTOSAVE` — R5, the old autosave, below.)
   - **A refusal is the session's, and a campaign that will not be autosaved says
     so on its first screen** (S6's review). A file that can be neither read nor
     moved refuses its slot's writes for as long as the game runs (the slot's one
@@ -2233,8 +2256,9 @@ superseded whole.
     and nothing of the marker. (Superseded by the user's ruling of the same day on
     the save slots, in whose marker it is: the quit saves into the campaign's own
     slot, so the marker is left there, and the title takes every slot's, each
-    named — `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - ...`, the
-    autosave's in the words above — R5, the slot, below.)
+    named — `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - ...` — R5, the
+    slot, below; the save folder's own by its name too, `THE OLD AUTOSAVE COULD
+    NOT BE SAVED WHEN ...`, the words above gone — R5, the old autosave, below.)
   - **What went with the title** (R2(e)): the launch's resume — CONTINUE is its
     replacement — and the screen between runs' NEW CAMPAIGN, N then N, whose keys
     line now reads `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS`.
@@ -2494,7 +2518,9 @@ out each alternative.
     LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK` — **bends the plan, needs
     no ruling**: a slot saved by hand under R2 to keep a checkpoint is played
     forward from its first load, and written over one save deep, and the line is
-    the one place the player meets that before it happens.
+    the one place the player meets that before it happens. (Superseded in its
+    digits: `... ENTER OR 1-9 LOADS ...`, `0-9` only while the old autosave is
+    listed — R5, the old autosave, below.)
   - **A slot above the count saves into itself**, which follows from the ruling:
     loading it is choosing it. Its marker is `BEYOND THE 3 SLOTS` (`BEYOND THE 1
     SLOT`), no longer `- LOAD ONLY`, and LOAD GAME no longer dims it. The save
@@ -2540,7 +2566,9 @@ out each alternative.
     autosave's and slot 1 to 9's, before it lists them, each said once, in slot
     order: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS
     FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` — two rows at slot 9 — and the
-    autosave's in the words it has always had.
+    autosave's in the words it has always had. (Superseded in the autosave's
+    words: `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`, two rows — R5, the old
+    autosave, below.)
   - **The save list, transitional — bends the plan, needs no ruling**: SAVE GAME's
     list stays in its S7 form until SAVE GAME saves the campaign's own slot, and
     is keyed to that slot meanwhile: its row ends `SAVES ITSELF` and is never
@@ -2648,6 +2676,8 @@ out each alternative.
     options, `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — `... TO THE AUTOSAVE
     ...` for a campaign in the save folder itself, `... TO THE SCRATCH SLOT ...`
     on a dev override — so the player always knows which slot is theirs.
+    (Superseded in the save folder's name: `... TO THE OLD AUTOSAVE ...`, and
+    `SAVED TO THE OLD AUTOSAVE` — R5, the old autosave, below.)
   - **A dev override's SAVE GAME saves its scratch slot — bends the plan, needs
     no ruling**: its campaign's slot is the scratch slot, so "any saving happens
     on that save slot" puts a save by hand there, and nowhere else: the player's
@@ -2666,6 +2696,51 @@ out each alternative.
   - **What R5 costs, again**: no COPY is built, so a campaign can no longer be
     saved into a second slot to keep a checkpoint (the R5 paragraph, above); the
     user is asked to confirm it.
+- **R5, the old autosave — the save folder's own campaign, until it moves.**
+  NEW CAMPAIGN begins in a slot it chooses (R5, NEW CAMPAIGN, above), so nothing
+  new is saved in the save folder itself, and the folder is no autosave slot: what
+  it holds is the campaign a build before the ruling autosaved there — the **old
+  autosave** — played in place, as it has been since R5, the slot, until a launch
+  moves it into a slot of its own (R5, the move, as it lands):
+  - **It is named as a slot is named, and every word names it**: `OLD AUTOSAVE`
+    on the lists and CONTINUE's row, `THE OLD AUTOSAVE` in the words —
+    `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE`, `NOTHING COULD BE LOADED FROM THE
+    OLD AUTOSAVE`, `THE OLD AUTOSAVE COULD NOT BE SAVED (...) - WHAT IT HELD IS
+    KEPT - SEE THE LOG`, `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN YOU LAST LEFT
+    PLAY - ...`, `SAVED TO THE OLD AUTOSAVE`, `PROGRESS SAVES TO THE OLD AUTOSAVE
+    AT EVERY TURN`. From its backup it is `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE
+    BACKUP, ONE SAVE OLDER`, 61 characters and one notice row, where `... FROM THE
+    BACKUP OF THE OLD AUTOSAVE, ...`, a numbered slot's shape, would run to 68 and
+    draw its second row in the warning's orange; a numbered slot's words are as
+    they were. The autosave's words that named no slot — `CAMPAIGN RESUMED`, `...
+    FROM ITS BACKUP, ONE SAVE OLDER`, `THE CAMPAIGN COULD NOT BE SAVED (...) - THE
+    LAST SAVE IS KEPT`, `THE AUTOSAVE COULD NOT BE WRITTEN WHEN ...` — are gone,
+    and a dev override's scratch slot, which spoke them too, is named the same way
+    (`THE SCRATCH SLOT COULD NOT BE SAVED (...)`). A save that stops at a file it
+    could not set aside says so in the failed save's words, naming the slot and
+    why, as a numbered slot's always did.
+  - **It is listed only while it holds a campaign**: LOAD GAME shows the `OLD
+    AUTOSAVE` first while the save folder holds a `campaign.json` or a
+    `campaign.bak.json` — a marker or a file set aside alone is nothing to load —
+    and otherwise starts at `SLOT 1`. Loaded, by LOAD GAME or CONTINUE, it saves
+    back into the save folder, the slot it came from; NEW CAMPAIGN never begins
+    there.
+  - **0 loads it, and only while it is listed**: LOAD GAME's keys line reads `W/S
+    OR ARROWS CHOOSE - ENTER OR 1-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC
+    BACK`, and `... 0-9 ...` while the old autosave is listed. With none listed, 0
+    does nothing and says nothing, where it said `AUTOSAVE IS EMPTY`.
+  - **A tie goes to the lower number — bends the plan, needs no ruling**: the old
+    autosave, 0, while it is listed, then slot 1 up, where it went to the autosave
+    first, then the lower slot — the same order, with no slot apart from the
+    others. A slot loaded and left with nothing played and no SAVE GAME keeps its
+    time, as a file an old game loaded and did not save keeps its own, so CONTINUE
+    may then name another slot whose save is newer; SAVE GAME stamps the time
+    (R5, SAVE GAME, above).
+  - **`SaveSlots` counts every slot — bends the plan, needs no ruling**: 3
+    places where there were 4, the autosave and three manual slots. At least one,
+    so that a campaign always has a slot to begin in, where it read "so saving by
+    hand always has somewhere to go", which chooses no slot now. The launch log
+    says `[Save] Saves in ...: 3 slots`.
 
 ### The numbers: `tuning.json`
 
@@ -2725,7 +2800,8 @@ out each alternative.
   never says the numbers changed, and declaring them moved no save's hash: R4's
   keys, above. And by the ruling of the same day on the save model, `SaveSlots`,
   which the launcher reads and no rule of play does, is left out the same way:
-  R2, the folder, above.)
+  R2, the folder, above — every slot's count since the ruling on the save slots,
+  R5, the old autosave, above.)
 - **The `…Percent` key names — bends the phase doc** (§5.3 fixes
   `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
   `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
@@ -2928,7 +3004,10 @@ out each alternative.
   TITLE, in place of the pause menu's save-and-quit and ESC's between runs
   (R2, saving by hand). What still stands of it: saves in the player's data
   folder, the autosave's triggers, the resume marker, `--new-campaign` and the
-  dev overrides' scratch slot.)
+  dev overrides' scratch slot. And by the ruling of the same day on the save
+  slots, in the autosave slot: the save folder itself is only the old autosave,
+  the slots are slot 1 up, and `SaveSlots` counts every one — R5, the old
+  autosave, above.)
 - **A save that cannot be played is set aside, never deleted or written over** —
   unreadable, crashed on its own resume, or retired by `--new-campaign` — named
   by its full path with how to try it again, and the backup is tried.
@@ -2948,7 +3027,10 @@ out each alternative.
   before that quit. A marker that cannot be written either leaves the log to say
   so. (Superseded by the user's ruling, 2026-09-25, in who says it and how: the
   title, when it opens and before anything is loaded, that what the autosave
-  holds is from before the last time play was left — R2, the title, above.)
+  holds is from before the last time play was left — R2, the title, above. And
+  by the ruling of the same day on the save slots, in whose: every slot's, each
+  by its name, the save folder's `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`
+  — R5, the slot, and R5, the old autosave, above.)
 - **The save's word is shown whole, on the screen between runs and over a floor
   a saved run resumes on; the data files' notices keep their three-row cap after
   it.** The cap is for what a broken file can make without bound; what became of

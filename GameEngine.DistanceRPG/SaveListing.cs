@@ -40,17 +40,18 @@ public sealed record SlotHeader(DateTimeOffset? SavedAt, int RunCounter, string?
 /// <summary>
 /// One slot of the listing (<see cref="SaveListing"/>).
 /// </summary>
-/// <param name="Number">The slot's number: 0 the autosave, 1 up the manual slots.</param>
+/// <param name="Number">The slot's number: 1 up, or 0 the old autosave, the save folder itself.</param>
 /// <param name="State">What it holds.</param>
 /// <param name="Header">The header of the file a load would bring back — the save's, or the backup's when the slot is <see cref="SlotState.FromBackup"/> — or null when nothing reads.</param>
 /// <param name="Unfinished">Its resume marker is there: the last load of it never finished, and the next sets the save it guarded aside as crashed.</param>
-/// <param name="Beyond">A manual slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to NEW CAMPAIGN.</param>
+/// <param name="Beyond">A slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to NEW CAMPAIGN.</param>
 /// <param name="AheadOfClock">Its time is more than a day ahead of the clock the listing was read at: shown, and counted as no time when the newest save is chosen.</param>
 public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock);
 
 /// <summary>
-/// Every slot of the save folder and what each holds (the user's ruling of
-/// 2026-09-25 on the save model, R2): the autosave, the manual slots up to
+/// Every slot of the save folder and what each holds (the user's rulings of
+/// 2026-09-25 on the save model, R2, and on the save slots, R5): the old autosave
+/// while the save folder itself holds a save or a backup, the slots up to
 /// <c>tuning.json</c>'s count — the empty ones included — and any above it that
 /// hold a save, in number order; and what the listing could not say in a row.
 /// <list type="bullet">
@@ -64,31 +65,26 @@ public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, 
 /// slots that would load something; a save with no time is older than any with
 /// one; a time more than a day ahead of the clock counts as none, so a hand edit
 /// or a clock once set wrong can never pin the choice on one slot through every
-/// later autosave; and a tie goes to the autosave, then the lower slot number —
-/// by number, never by any folder's order. File times are never read: a copy or a
+/// later autosave; and a tie goes to the lower number — the old autosave's, 0,
+/// the lowest while it is listed — by number, never by any folder's order. File times are never read: a copy or a
 /// sync rewrites them, and a test cannot fix them.</item>
 /// </list>
 /// Public, as <see cref="ResumeView"/> is: a scene's constructor and a host's
 /// interface hand it across. Its reader stays internal, as the stores are.
 /// </summary>
-/// <param name="Slots">Every slot listed, in number order: the autosave first.</param>
+/// <param name="Slots">Every slot listed, in number order: the old autosave first, while it is listed.</param>
 /// <param name="Notices">What the rows cannot say: a file the file system would not let the game read, and why.</param>
 public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<string> Notices)
 {
     /// <summary>How far ahead of the clock a save's time may be and still count: a day, for a save carried from a machine whose clock runs a little fast.</summary>
     public static readonly TimeSpan ClockSlack = TimeSpan.FromDays(1);
 
-    /// <summary>The autosave's entry — always listed, first — or an empty one for a listing that leaves it out. The game no longer reads it: NEW CAMPAIGN never begins in the autosave (R5).</summary>
-    public SlotEntry Autosave
-        => Slots.FirstOrDefault(slot => slot.Number == SaveSlots.Autosave)
-            ?? new SlotEntry(SaveSlots.Autosave, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false);
-
     /// <summary>
     /// The most recent save — what CONTINUE loads — or null when no slot would load
     /// anything: the latest time among the slots whose save, or failing that whose
     /// backup, reads; a save with no time, or one ahead of the clock, older than any
-    /// with one; a tie to the lower number, the autosave first. A slot beyond the
-    /// count is chosen like any other.
+    /// with one; a tie to the lower number. A slot beyond the count is chosen like
+    /// any other, and so is the old autosave while it is listed.
     /// </summary>
     public SlotEntry? Newest
     {
@@ -111,12 +107,12 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     /// and where <c>--new-campaign</c> begins one, asking nothing: the lowest
     /// <see cref="SlotState.Empty"/> slot from 1 to the count, so an ENTER pressed
     /// without looking sets nothing aside while a slot is free; with none empty,
-    /// slot 1. Never the autosave, and never a slot beyond the count (the user's
+    /// slot 1. Never the old autosave, and never a slot beyond the count (the user's
     /// ruling of 2026-09-25 on the save slots, R5). A slot holding only files set
     /// aside is empty: nothing of it would load.
     /// </summary>
     public int NewCampaignSlot
-        => Slots.Where(slot => slot.Number != SaveSlots.Autosave && !slot.Beyond && slot.State == SlotState.Empty)
+        => Slots.Where(slot => slot.Number != SaveSlots.OldAutosave && !slot.Beyond && slot.State == SlotState.Empty)
             .Select(slot => slot.Number)
             .DefaultIfEmpty(FirstSlot)
             .Min();
@@ -138,8 +134,10 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
         };
 
     /// <summary>
-    /// Read every slot of <paramref name="slots"/>: the autosave, slots 1 to the
-    /// count, and those beyond it that hold a save (<see cref="SaveSlots.Beyond"/>).
+    /// Read every slot of <paramref name="slots"/>: the old autosave — the save
+    /// folder itself, where a build before the user's ruling on the save slots
+    /// (R5) autosaved — only while it holds a save or a backup; slots 1 to the
+    /// count; and those beyond it that hold a save (<see cref="SaveSlots.Beyond"/>).
     /// Each slot's save and backup are read and parsed for their headers, never
     /// restored; a file the file system will not let the game read is listed as
     /// not reading, and said in <see cref="Notices"/>. Nothing is moved, deleted
@@ -152,7 +150,9 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     {
         ArgumentNullException.ThrowIfNull(slots);
         var notices = new List<string>();
-        var entries = Enumerable.Range(SaveSlots.Autosave, slots.Count + 1).Concat(slots.Beyond())
+        var root = slots.Store(SaveSlots.OldAutosave);
+        IEnumerable<int> numbers = root.HasSave || root.HasBackup ? [SaveSlots.OldAutosave] : [];
+        var entries = numbers.Concat(Enumerable.Range(1, slots.Count)).Concat(slots.Beyond())
             .Select(number => ReadSlot(slots, number, notices, report))
             .Select(slot => new SlotEntry(
                 slot.Number, slot.State, slot.Header, slot.Unfinished,

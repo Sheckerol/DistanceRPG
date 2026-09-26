@@ -339,12 +339,12 @@
 
   /* ---- Saves ---- */
 
-  /* How many manual save slots there are beside the autosave: slot-1 to slot-N in the save
-     folder, as the user ruled on 2026-09-25 - the count lives here so a change of mind is an edit,
-     not a rebuild. At least 1 and at most 9, a digit choosing each: a number outside is brought to
-     the nearer end, with a warning. Lowering it deletes nothing - a slot above the count keeps its
-     save where it is, and goes on saving the campaign played from it; NEW CAMPAIGN never offers
-     it. The launcher reads it, never a rule of play, so turning it never says the numbers have
-     changed. */
+  /* How many save slots there are, each holding one campaign that saves only there: slot-1 to
+     slot-N in the save folder, as the user ruled on 2026-09-25 - the count lives here so a change
+     of mind is an edit, not a rebuild. At least 1, so a campaign always has a slot to begin in, and
+     at most 9, a digit choosing each: a number outside is brought to the nearer end, with a
+     warning. Lowering it deletes nothing - a slot above the count keeps its save where it is, and
+     goes on saving the campaign played from it; NEW CAMPAIGN never offers it. The launcher reads
+     it, never a rule of play, so turning it never says the numbers have changed. */
   "SaveSlots": 3
 }

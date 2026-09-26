@@ -133,7 +133,7 @@ public sealed class TitleHud : IDisposable
         {
             null => TitleText.KeysLine,
             { Mode: SlotMenuMode.NewCampaign } => TitleText.NewCampaignKeysLine,
-            _ => TitleText.LoadKeysLine,
+            { Rows: var slots } => TitleText.LoadKeysLine(oldAutosave: slots.Any(slot => slot.Number == SaveSlots.OldAutosave)),
         };
         rows.Add(new TitleRow(keysLine, keysY, KeysScale, DungeonHud.Grey));
         return rows;

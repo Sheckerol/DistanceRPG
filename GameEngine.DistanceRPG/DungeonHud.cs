@@ -1366,7 +1366,7 @@ public sealed class DungeonHud
     /// turn's start and every arrival — into the slot the campaign came from, which
     /// SAVE GAME saves too, so the player always knows which slot is theirs (the
     /// user's ruling of 2026-09-25 on the save slots, R5): <c>PROGRESS SAVES TO SLOT
-    /// 2 AT EVERY TURN</c>, <c>... TO THE AUTOSAVE ...</c>, <c>... TO THE SCRATCH
+    /// 2 AT EVERY TURN</c>, <c>... TO THE OLD AUTOSAVE ...</c>, <c>... TO THE SCRATCH
     /// SLOT ...</c>. With no slot to name, <c>PROGRESS SAVES AT EVERY TURN</c>.
     /// </summary>
     /// <param name="savesInto">The slot the campaign saves into, by its name (<see cref="ISaveHost.SavesInto"/>).</param>

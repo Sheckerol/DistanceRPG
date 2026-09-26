@@ -16,9 +16,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// resolves — and, opened as a resume opens it, writes back the same document;
 /// its tuning hash is the hash of the tuning it was played under, read by the
 /// current reader; the game says the numbers changed exactly when the numbers
-/// it ships are not those; and a launch resumes each — the save folder being the
-/// autosave slot, where the listing finds it the most recent save, with no time —
-/// the mid-run one in the dungeon, where its visit plays on. In the content
+/// it ships are not those; and a launch resumes each — the save folder itself
+/// being the old autosave, where the listing finds it the most recent save, with
+/// no time — the mid-run one in the dungeon, where its visit plays on. In the content
 /// collection, since a restore runs under the current content and the tuning
 /// cases swap it.
 /// </summary>
@@ -214,28 +214,31 @@ public class PreReworkSaveTests
             try
             {
                 // The save as the game finds it at launch: the campaign's file in the
-                // save folder, which is the autosave slot — the save folder itself, so
-                // a save written before the slots is the autosave as it stands, and no
-                // file moves. The listing finds it there, with no time recorded and
-                // nothing else saved: the most recent save. Loaded, it resumes and says
-                // so — and says the numbers have changed only while they have.
+                // save folder itself — the old autosave, where a build before the
+                // slots saved it — and no file moves. The listing finds it there, first,
+                // with no time recorded and nothing else saved: the most recent save.
+                // Loaded, it resumes and says so, by the old autosave's name — and says
+                // the numbers have changed only while they have.
                 var slots = new SaveSlots(folder.FullName, GameContent.Current.Tuning.SaveSlots);
-                var store = slots.Store(SaveSlots.Autosave);
+                var store = slots.Store(SaveSlots.OldAutosave);
                 Assert.Equal(Path.GetFullPath(folder.FullName), store.Folder);
                 File.Copy(PathOf(name), store.SavePath);
                 var saved = SaveCodec.Read(TextOf(name)).Campaign;
                 var listing = SaveListing.Read(slots, new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero));
-                Assert.Equal(SlotState.Readable, listing.Autosave.State);
-                Assert.Equal(new SlotHeader(null, saved.RunCounter, saved.Visit?.DungeonId, saved.Visit?.FloorIndex + 1, saved.Visit?.Turn), listing.Autosave.Header);
-                Assert.Same(listing.Autosave, listing.Newest);
+                var old = listing.Slots.Single(slot => slot.Number == SaveSlots.OldAutosave);
+                Assert.Same(old, listing.Slots[0]);
+                Assert.Equal(SlotState.Readable, old.State);
+                Assert.Equal(new SlotHeader(null, saved.RunCounter, saved.Visit?.DungeonId, saved.Visit?.FloorIndex + 1, saved.Visit?.Turn), old.Header);
+                Assert.Same(old, listing.Newest);
                 Assert.All(listing.Slots.Skip(1), slot => Assert.Equal(SlotState.Empty, slot.State));
                 Assert.Empty(listing.Notices);
 
-                var boot = CampaignBoot.Load(slots.Slot(SaveSlots.Autosave), GameContent.Current);
+                var boot = CampaignBoot.Load(slots.Slot(SaveSlots.OldAutosave), GameContent.Current);
                 Assert.True(boot.Loaded);
+                const string resumed = "CAMPAIGN RESUMED FROM THE OLD AUTOSAVE";
                 string[] notices = NumbersMoved(GameContent.Current.Tuning)
-                    ? [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged]
-                    : [BetweenRunsHud.Resumed];
+                    ? [resumed, CampaignBoot.TuningChanged]
+                    : [resumed];
                 Assert.Equal(notices, boot.Notices);
                 Assert.True(store.WasResuming);
                 store.ClearResuming();
@@ -279,8 +282,8 @@ public class PreReworkSaveTests
 
                 // Played on, it saves as any campaign does — under the numbers played
                 // now — and the next launch resumes that, with nothing more to say.
-                Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign));
-                Assert.Equal([BetweenRunsHud.Resumed], CampaignBoot.Load(slots.Slot(SaveSlots.Autosave), GameContent.Current).Notices);
+                Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.OldAutosave), campaign));
+                Assert.Equal([resumed], CampaignBoot.Load(slots.Slot(SaveSlots.OldAutosave), GameContent.Current).Notices);
                 store.ClearResuming();
             }
             finally

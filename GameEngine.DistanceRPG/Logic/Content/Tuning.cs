@@ -467,11 +467,12 @@ public sealed record Tuning
     // ---- Saves (the user's ruling of 2026-09-25 on the save model) ----
 
     /// <summary>
-    /// How many manual save slots there are beside the autosave: the save folder's
-    /// <c>slot-1</c> to <c>slot-N</c>. The user ruled the count a key — "the number
-    /// of saves should live on the tuning.json so that we don't need to fix the
-    /// code every time I change my mind". At least one, so saving by hand always
-    /// has somewhere to go, and at most nine, a digit picking each. A count lowered
+    /// How many save slots there are, each holding one campaign that saves only
+    /// there: the save folder's <c>slot-1</c> to <c>slot-N</c>. The user ruled the
+    /// count a key — "the number of saves should live on the tuning.json so that we
+    /// don't need to fix the code every time I change my mind". At least one, so a
+    /// campaign always has a slot to begin in, and at most nine, a digit picking
+    /// each. A count lowered
     /// below a slot that holds a save deletes nothing: the slot is kept, listed, and
     /// goes on saving the campaign played from it; NEW CAMPAIGN never offers it. The
     /// launcher reads it, never a rule of play, so a save's hash leaves it out

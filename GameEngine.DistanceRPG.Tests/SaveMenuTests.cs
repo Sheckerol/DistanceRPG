@@ -353,10 +353,10 @@ public sealed class SaveMenuTests : IDisposable
         Assert.Equal((2, true, 0, 0), (hubHost.HandSaves, hub.MenuOpen, hubHost.Descended.Count, hub.Chosen));
 
         // The menu says which slot is the campaign's, under its options: the slot it
-        // was loaded from or begun in — the autosave's, for a campaign still in the
+        // was loaded from or begun in — the old autosave, for a campaign still in the
         // save folder — or a dev override's scratch slot.
         Assert.Equal("PROGRESS SAVES TO SLOT 2 AT EVERY TURN", DungeonHud.PauseSavesLine(scene.SavesInto));
-        Assert.Equal("PROGRESS SAVES TO THE AUTOSAVE AT EVERY TURN", DungeonHud.PauseSavesLine(Named(SaveSlots.Autosave).Name));
+        Assert.Equal("PROGRESS SAVES TO THE OLD AUTOSAVE AT EVERY TURN", DungeonHud.PauseSavesLine(Named(SaveSlots.OldAutosave).Name));
         Assert.Equal("PROGRESS SAVES TO THE SCRATCH SLOT AT EVERY TURN", DungeonHud.PauseSavesLine(Named(null).Name));
         Assert.Contains(Laid(PauseMenu.Options(hasTitle: true), scene.CanSaveNow, answer: null, DungeonHud.PauseSavesLine(scene.SavesInto)),
             row => row.Text == "PROGRESS SAVES TO SLOT 2 AT EVERY TURN");
@@ -467,13 +467,13 @@ public sealed class SaveMenuTests : IDisposable
             Assert.Equal(NoticeText.Wrap(notice), answer.Select(row => row.Text));
             Assert.DoesNotContain(answer, row => row.Text.Contains('\\', StringComparison.Ordinal));
 
-            // The slot loads its new campaign; the autosave was never touched; and a
+            // The slot loads its new campaign; the old autosave was never touched; and a
             // second save by hand into the slot rotates as every save does.
             var load = CampaignBoot.Load(slots.Slot(3), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 3"], load.Notices);
             slot3.ClearResuming();
-            Assert.False(slots.Store(SaveSlots.Autosave).HasSave);
+            Assert.False(slots.Store(SaveSlots.OldAutosave).HasSave);
             Assert.Null(CampaignBoot.Save(slots.Slot(3), Cleared(), savedAt: At.AddHours(2), byHand: true));
             Assert.Equal("SAVED TO SLOT 3", CampaignBoot.SaveAnswer(slots.Slot(3), failed: null, []));
             Assert.True(slot3.HasBackup);
@@ -631,7 +631,7 @@ public sealed class SaveMenuTests : IDisposable
         var drawn = Laid(PauseMenu.Options(hasTitle: true), scene.CanSaveNow, scene.MenuAnswer);
         Assert.Contains(drawn, row => row.Text == "SAVED TO SLOT 2" && row.Color == DungeonHud.Green);
         Assert.True(drawn.Single(row => row.Text == "SAVED TO SLOT 2").Y > drawn.Single(row => row.Text == DungeonHud.EscToClose).Bottom);
-        scene.SaveFailed(CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full"));   // a failed autosave is a notice, over the floor: the answer stays
+        scene.SaveFailed(CampaignBoot.NotSaved(Named(SaveSlots.OldAutosave), "the disk is full"));   // a failed autosave is a notice, over the floor: the answer stays
         Assert.Equal("SAVED TO SLOT 2", scene.MenuAnswer);
         scene.AnyKey(Keys.X);
         Assert.Null(scene.MenuAnswer);   // the next key
@@ -704,11 +704,11 @@ public sealed class SaveMenuTests : IDisposable
         }
 
         // The line names the slot the campaign saves into (R5), so the player always
-        // knows which slot is theirs: every slot's name, the autosave's and the
+        // knows which slot is theirs: every slot's name, the old autosave's and the
         // scratch slot's, in the font and within 1280 at the line's scale, the
         // longest answer under it too. With none to name, it says only that the run
         // saves itself.
-        var names = Enumerable.Range(SaveSlots.Autosave, SaveSlots.Most + 1).Select(n => Named(n).Name).Append(Named(null).Name).ToList();
+        var names = Enumerable.Range(SaveSlots.OldAutosave, SaveSlots.Most + 1).Select(n => Named(n).Name).Append(Named(null).Name).ToList();
         foreach (string name in names)
         {
             string line = DungeonHud.PauseSavesLine(name);
@@ -780,10 +780,10 @@ public sealed class SaveMenuTests : IDisposable
             // what takes it back.
             var store = new SaveStore(folder);
             var campaign = NewCampaign();
-            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, savedAt: At));
+            Assert.Null(CampaignBoot.Save(AsOldAutosave(store), campaign, savedAt: At));
             CampaignRuns.ShallowRetreat(campaign, "tutorial");   // played on since: the quit has something to write
 
-            string failed = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full");   // what an autosave since then said
+            string failed = CampaignBoot.NotSaved(AsOldAutosave(store), "the disk is full");   // what an autosave since then said
             var notices = new StartupNotices();
             notices.Hold(["data"]);
             notices.Lead([failed]);
@@ -797,7 +797,7 @@ public sealed class SaveMenuTests : IDisposable
             // A quit whose write fails tells nothing: the failure stays for the title,
             // beside the marker the title says too.
             Directory.CreateDirectory(store.TempPath);
-            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(1), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsOldAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(1), saved: TakeBack));
             Assert.Equal(0, told);
             Assert.NotNull(store.ReadUnsaved());
             Directory.Delete(store.TempPath);
@@ -806,14 +806,14 @@ public sealed class SaveMenuTests : IDisposable
             // Nor does a quit during the enemies' turn that never comes round to the
             // party's, or that has no scene to play it out with: nothing is written.
             var stuck = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => new ViewDto("A"), () => { }, saved: TakeBack));
-            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => new ViewDto("A"), step: null, saved: TakeBack));
+            Assert.False(CampaignBoot.SaveOnQuit(AsOldAutosave(store), stuck.Campaign, () => new ViewDto("A"), () => { }, saved: TakeBack));
+            Assert.False(CampaignBoot.SaveOnQuit(AsOldAutosave(store), stuck.Campaign, () => new ViewDto("A"), step: null, saved: TakeBack));
             Assert.Equal(0, told);
             Assert.True(CampaignBoot.TakeUnsaved(store, report: null));
 
             // A quit whose save goes through tells, once: the title is handed nothing of
             // the failure, and what else leads it stays.
-            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsOldAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: TakeBack));
             Assert.Equal(1, told);
             Assert.Equal(SaveCodec.Write(SaveGame.Capture(campaign, savedAt: At.AddMinutes(2))), store.Read());
             Assert.Null(store.ReadUnsaved());
@@ -821,7 +821,7 @@ public sealed class SaveMenuTests : IDisposable
 
             // So does one whose save the disk holds already: nothing needed writing, and
             // the disk holds the campaign as it was left.
-            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(3), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsOldAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(3), saved: TakeBack));
             Assert.Equal(2, told);
         });
 
@@ -931,12 +931,12 @@ public sealed class SaveMenuTests : IDisposable
 
         InTempFolder(folder =>
         {
-            // On a folder: the player's autosave and a slot hold saves; the dev
+            // On a folder: the player's old autosave and a slot hold saves; the dev
             // override's campaign, saved by hand into its scratch slot — twice, the
             // second time the campaign unchanged, which restamps it — changes
             // override/ alone.
             var slots = new SaveSlots(folder, 3);
-            Assert.Null(CampaignBoot.Save(AsAutosave(slots.Store(SaveSlots.Autosave)), Retreated(), savedAt: At));
+            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.OldAutosave), Retreated(), savedAt: At));
             Assert.Null(CampaignBoot.Save(slots.Slot(1), Cleared(), savedAt: At));
             var before = Snapshot(folder);
 

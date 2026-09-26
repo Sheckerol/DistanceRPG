@@ -1222,12 +1222,12 @@ public sealed class HudTextTests : IDisposable
         // numbers; the data files' notices after them are capped at three rows and
         // the rest counted, as over any floor.
         var hud = new DungeonHud(game: null!);
-        string[] many = [CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged, "one", "two", "three", "four"];
+        string[] many = [CampaignBoot.Resumed(Named(1), backup: true), CampaignBoot.TuningChanged, "one", "two", "three", "four"];
         hud.ShowResume(loaded.Campaign.Visit, many, leading: 2);
         Assert.Equal(NoticeText.Rows(many, whole: 2), hud.NoticeRows);
-        Assert.Equal(CampaignBoot.ResumedFromBackup, hud.NoticeRows[0]);
+        Assert.Equal(CampaignBoot.Resumed(Named(1), backup: true), hud.NoticeRows[0]);
         Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", hud.NoticeRows.Skip(1).Take(2).Select(row => row.Trim())));
-        Assert.Equal([.. NoticeText.Rows([CampaignBoot.ResumedFromBackup, CampaignBoot.TuningChanged]), "ONE", "TWO", "THREE", NoticeText.More(1)],
+        Assert.Equal([.. NoticeText.Rows([CampaignBoot.Resumed(Named(1), backup: true), CampaignBoot.TuningChanged]), "ONE", "TWO", "THREE", NoticeText.More(1)],
             hud.NoticeRows);
 
         // On the boss floor the trade stays under it; a floor entered fresh has no
@@ -1269,7 +1269,7 @@ public sealed class HudTextTests : IDisposable
         const string path = @"C:\Users\a-player\AppData\Local\DistanceRPG\saves\campaign.crashed-1.json";
         string[] saysWhole =
         [
-            CampaignBoot.ResumedFromBackup,
+            CampaignBoot.Resumed(Named(1), backup: true),
             CampaignBoot.TuningChanged,
             CampaignBoot.SetAsideNotice(SaveStore.FileName, "crashed the game the last time it was resumed", path),
         ];
@@ -1352,7 +1352,7 @@ public sealed class HudTextTests : IDisposable
         // only on the screen between runs once the run is over — as the save's
         // word, shown whole ahead of whatever is up. Built with no window, as a
         // scene is read.
-        string held = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "another program has it open");
+        string held = CampaignBoot.NotSaved(Named(SaveSlots.OldAutosave), "another program has it open");
         var campaign = CampaignState.Start(GameContent.Current);
         var visit = campaign.Enter("spear_hall", mapSeed: 4);
         visit.OpenTurns(campaign.Party, () => 10);
@@ -1385,7 +1385,7 @@ public sealed class HudTextTests : IDisposable
         // Once the rows are down it is said alone; another reason leads the one up.
         hud.ShowSaveFailed(held);
         Assert.Equal(NoticeText.Wrap(held), hud.NoticeRows);
-        string full = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full");
+        string full = CampaignBoot.NotSaved(Named(SaveSlots.OldAutosave), "the disk is full");
         hud.ShowSaveFailed(full);
         Assert.Equal([.. NoticeText.Wrap(full), .. NoticeText.Wrap(held)], hud.NoticeRows);
 
@@ -1413,7 +1413,7 @@ public sealed class HudTextTests : IDisposable
         const string path = @"C:\Users\a-player\AppData\Local\DistanceRPG\saves\campaign.crashed-1.json";
         string[] saysWhole =
         [
-            CampaignBoot.ResumedFromBackup,
+            CampaignBoot.Resumed(Named(1), backup: true),
             CampaignBoot.TuningChanged,
             CampaignBoot.SetAsideNotice(SaveStore.FileName, "crashed the game the last time it was resumed", path),
         ];

@@ -834,20 +834,20 @@ public sealed class SaveConsistencyTests : IDisposable
                 var store = new SaveStore(folder.FullName);
                 var campaign = NewCampaign();
                 CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
-                Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
+                Assert.Null(CampaignBoot.Save(AsSlot1(store), campaign));
                 CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
-                Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
+                Assert.Null(CampaignBoot.Save(AsSlot1(store), campaign));
                 string broken = Edited(store.Read()!, edit);
                 File.WriteAllText(store.SavePath, broken);
 
                 var log = new List<string>();
-                var boot = CampaignBoot.Load(AsAutosave(store), GameContent.Current, log.Add);
+                var boot = CampaignBoot.Load(AsSlot1(store), GameContent.Current, log.Add);
                 Assert.True(boot.Loaded);
                 Assert.Equal(1, boot.Campaign!.RunCounter);   // the backup
                 string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");
                 Assert.Equal(broken, File.ReadAllText(aside));
                 Assert.Collection(boot.Notices,
-                    notice => Assert.Equal(CampaignBoot.ResumedFromBackup, notice),
+                    notice => Assert.Equal(CampaignBoot.Resumed(Named(1), backup: true), notice),
                     notice =>
                     {
                         Assert.Equal(CampaignBoot.SetAsideNotice(SaveStore.FileName, $"could not be read ({why})", aside), notice);

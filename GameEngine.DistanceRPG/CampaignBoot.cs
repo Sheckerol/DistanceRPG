@@ -138,15 +138,12 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// <item><strong>The dev overrides play in their own slot</strong>: a launch
 /// with <c>DISTANCERPG_DUNGEON</c> or <c>DISTANCERPG_SEED</c> empties
 /// <see cref="SaveStore.OverrideSlot"/> and plays a fresh campaign there, so it
-/// is as repeatable as it ever was and the campaign — the autosave and every
-/// manual slot — is untouched.</item>
+/// is as repeatable as it ever was and the campaign — every slot, and the old
+/// autosave — is untouched.</item>
 /// </list>
 /// </summary>
 internal static class CampaignBoot
 {
-    /// <summary>A resume from the autosave's backup, one save older than the campaign's own file.</summary>
-    internal const string ResumedFromBackup = BetweenRunsHud.Resumed + " FROM ITS BACKUP, ONE SAVE OLDER";
-
     /// <summary>NEW CAMPAIGN began one — on the title, or <c>--new-campaign</c> at launch — whatever was set aside for it.</summary>
     internal const string NewCampaignBegins = "A NEW CAMPAIGN BEGINS";
 
@@ -176,32 +173,27 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// Whether the words speak of <paramref name="slot"/> as the campaign's own
-    /// save, naming no slot: the autosave, and the dev override's scratch slot,
-    /// whose saves have always been said the autosave's way. A manual slot is
-    /// named.
-    /// </summary>
-    private static bool Unnamed(SaveSlot slot) => slot.Number is null or SaveSlots.Autosave;
-
-    /// <summary>
-    /// What loading a slot says first, in green: <c>CAMPAIGN RESUMED</c> for the
-    /// autosave, <c>CAMPAIGN RESUMED FROM SLOT 2</c> for a manual one; and from a
-    /// backup, <see cref="ResumedFromBackup"/>, or <c>CAMPAIGN RESUMED FROM THE
-    /// BACKUP OF SLOT 2, ONE SAVE OLDER</c>. Each starts with
-    /// <see cref="BetweenRunsHud.Resumed"/>, so each is news, not a warning. The
-    /// scratch slot, which no title loads, is spoken of as the autosave is.
+    /// What loading a slot says first, in green, the slot by its name
+    /// (<see cref="SaveSlot.Name"/>): <c>CAMPAIGN RESUMED FROM SLOT 2</c>, or
+    /// <c>... FROM THE OLD AUTOSAVE</c>; and from a backup, <c>CAMPAIGN RESUMED FROM
+    /// THE BACKUP OF SLOT 2, ONE SAVE OLDER</c>, or — for a slot whose name is no
+    /// number, which "the backup of" would push past one notice row —
+    /// <c>CAMPAIGN RESUMED FROM THE OLD AUTOSAVE BACKUP, ONE SAVE OLDER</c>. Each
+    /// starts with <see cref="BetweenRunsHud.Resumed"/>, so each is news, not a
+    /// warning, and each is one notice row (<see cref="NoticeText.LineChars"/>).
+    /// The scratch slot, which no title loads, is named the same way.
     /// </summary>
     internal static string Resumed(SaveSlot slot, bool backup)
     {
         ArgumentNullException.ThrowIfNull(slot);
-        if (Unnamed(slot))
-            return backup ? ResumedFromBackup : BetweenRunsHud.Resumed;
-        return backup
+        if (!backup)
+            return $"{BetweenRunsHud.Resumed} FROM {slot.Name}";
+        return slot.Number is > SaveSlots.OldAutosave
             ? $"{BetweenRunsHud.Resumed} FROM THE BACKUP OF {slot.Name}, ONE SAVE OLDER"
-            : $"{BetweenRunsHud.Resumed} FROM {slot.Name}";
+            : $"{BetweenRunsHud.Resumed} FROM {slot.Name} BACKUP, ONE SAVE OLDER";
     }
 
-    /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE AUTOSAVE</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE OLD AUTOSAVE</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
     internal static string NothingLoaded(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);
@@ -258,7 +250,7 @@ internal static class CampaignBoot
         return $"{slot.Name} TAKES NO SAVES THIS SESSION: EARLIER, {why.ToUpperInvariant()} - LAUNCH THE GAME AGAIN TO PLAY IN IT";
     }
 
-    /// <summary>What the title says first when NEW CAMPAIGN did not begin one: <c>NO NEW CAMPAIGN BEGAN IN SLOT 2</c> — the slot by its name (<see cref="SaveSlot.Name"/>), 1 to the count (NEW CAMPAIGN never begins in the autosave).</summary>
+    /// <summary>What the title says first when NEW CAMPAIGN did not begin one: <c>NO NEW CAMPAIGN BEGAN IN SLOT 2</c> — the slot by its name (<see cref="SaveSlot.Name"/>), 1 to the count (NEW CAMPAIGN never begins in the old autosave).</summary>
     internal static string NoNewCampaignIn(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);
@@ -389,7 +381,7 @@ internal static class CampaignBoot
     /// A dev-override launch: its scratch slot (<paramref name="scratch"/>, its
     /// store from <see cref="StoreFor"/>) emptied, a fresh campaign, straight into
     /// the dungeon when one is named, its first run on the seed when one is. The
-    /// campaign's own saves — the autosave and every manual slot — are never opened.
+    /// campaign's own saves — every slot, and the old autosave — are never opened.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="request"/> is no dev override, or <paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
     /// <exception cref="InvalidOperationException"><paramref name="scratch"/>'s store is not a dev-override slot: it is never emptied.</exception>
@@ -442,7 +434,7 @@ internal static class CampaignBoot
     /// (<see cref="Save"/>), and a new campaign that never begins leaves it
     /// guarding the save put back, as it guarded it before.
     /// </summary>
-    /// <param name="slot">The slot the new campaign begins in: the one chosen on the title's NEW CAMPAIGN list, or, for <c>--new-campaign</c>, the one that list would start on (<see cref="SaveListing.NewCampaignSlot"/>) — 1 to the count, never the autosave.</param>
+    /// <param name="slot">The slot the new campaign begins in: the one chosen on the title's NEW CAMPAIGN list, or, for <c>--new-campaign</c>, the one that list would start on (<see cref="SaveListing.NewCampaignSlot"/>) — 1 to the count, never the old autosave.</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: the new campaign is built under it.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="how">What asked for it, which each set-aside notice names: <c>--new-campaign</c> by default; null for NEW CAMPAIGN on the title, which the player has just chosen and the notice need not name.</param>
@@ -651,7 +643,7 @@ internal static class CampaignBoot
     {
         ArgumentNullException.ThrowIfNull(slots);
         var said = new List<string>();
-        for (int number = SaveSlots.Autosave; number <= SaveSlots.Most; number++)
+        for (int number = SaveSlots.OldAutosave; number <= SaveSlots.Most; number++)
         {
             var slot = slots.Slot(number);
             if (TakeUnsaved(slot.Store, report))
@@ -745,12 +737,12 @@ internal static class CampaignBoot
     /// file this session wrote or read whole is not read again
     /// (<see cref="SaveStore.SaveVouched"/>). What the guard sets aside is said in
     /// <paramref name="said"/>, a fact about a file that no later save withdraws;
-    /// one that will not move refuses the store's writes, and its notice comes back
-    /// as the failure. And a write clears the slot's resume marker, since the file
-    /// it guarded is gone.
+    /// one that will not move refuses the store's writes, and the failure's words
+    /// say why. And a write clears the slot's resume marker, since the file it
+    /// guarded is gone.
     /// </para>
     /// </summary>
-    /// <param name="slot">The slot: its store, and its name, which a failure's words name (<see cref="NotSaved"/>) — the slot the campaign came from, where a file that would not move is said the same way, by what refuses the slot's writes; the autosave's and the scratch slot's failures name no slot.</param>
+    /// <param name="slot">The slot: its store, and its name, which a failure's words name (<see cref="NotSaved"/>) — the slot the campaign came from, where a file that would not move is said the same way, by what refuses the slot's writes.</param>
     /// <param name="campaign">The campaign, at a safe point.</param>
     /// <param name="view">What the scene shows, carried for it; null for nothing to say.</param>
     /// <param name="report">Where the log lines go.</param>
@@ -780,7 +772,7 @@ internal static class CampaignBoot
                 return null;
             }
             if (store.WritesRefused is null && MakeWay(store, report, said) is { } stuck)
-                return Unnamed(slot) ? stuck : NotSaved(slot, store.WritesRefused ?? stuck);
+                return NotSaved(slot, store.WritesRefused ?? stuck);
             store.Write(text);
             report?.Invoke($"[Save] Wrote {store.SavePath}");
             Written(store, report);
@@ -1013,42 +1005,37 @@ internal static class CampaignBoot
     /// holds is from before then. The title says it, before anything is loaded —
     /// true of the window's close, and of leaving play for the title, alike:
     /// <c>SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM
-    /// BEFORE THAT, BEHIND WHERE YOU LEFT IT</c>, and the autosave's in the words it
-    /// has always had, <c>THE AUTOSAVE COULD NOT BE WRITTEN WHEN ...</c>. Two notice
-    /// rows, at slot 9 too.
+    /// BEFORE THAT, BEHIND WHERE YOU LEFT IT</c>, or <c>THE OLD AUTOSAVE COULD NOT BE
+    /// SAVED WHEN ...</c> — the slot by its name (<see cref="SaveSlot.Name"/>). Two
+    /// notice rows, at slot 9 and the old autosave too.
     /// </summary>
     internal static string QuitUnsaved(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);
-        const string behind = "WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT";
-        return slot.Number == SaveSlots.Autosave
-            ? $"THE AUTOSAVE COULD NOT BE WRITTEN {behind}"
-            : $"{slot.Name} COULD NOT BE SAVED {behind}";
+        return $"{slot.Name} COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT";
     }
 
     /// <summary>
     /// A write into <paramref name="slot"/> that failed, and why, in a notice:
-    /// what the slot held before is kept. A manual slot — the game's own save of
-    /// its campaign, the quit's, or one by hand — is named —
-    /// <c>SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS
-    /// KEPT - SEE THE LOG</c> — and the autosave and the scratch slot are the
-    /// campaign's own save: <c>THE CAMPAIGN COULD NOT BE SAVED (THE DISK IS FULL) -
-    /// THE LAST SAVE IS KEPT - SEE THE LOG</c>. A blank why is taken as it is:
-    /// <see cref="Save"/>, which never throws, hands it the file system's.
+    /// what the slot held before is kept. The slot is named
+    /// (<see cref="SaveSlot.Name"/>) — whichever save it was, the game's own, the
+    /// quit's, or one by hand — <c>SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT
+    /// OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG</c>, <c>THE OLD AUTOSAVE COULD NOT
+    /// BE SAVED (THE DISK IS FULL) - ...</c>, <c>THE SCRATCH SLOT COULD NOT BE SAVED
+    /// (...) - ...</c>. A blank why is taken as it is: <see cref="Save"/>, which
+    /// never throws, hands it the file system's.
     /// </summary>
     internal static string NotSaved(SaveSlot slot, string why)
     {
         ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(why);
-        return Unnamed(slot)
-            ? $"THE CAMPAIGN COULD NOT BE SAVED ({why.ToUpperInvariant()}) - THE LAST SAVE IS KEPT - SEE THE LOG"
-            : $"{slot.Name} COULD NOT BE SAVED ({why.ToUpperInvariant()}) - WHAT IT HELD IS KEPT - SEE THE LOG";
+        return $"{slot.Name} COULD NOT BE SAVED ({why.ToUpperInvariant()}) - WHAT IT HELD IS KEPT - SEE THE LOG";
     }
 
     /// <summary>How a save by hand that went through starts (<see cref="SavedTo"/>): the menu draws it green.</summary>
     internal const string SavedPrefix = "SAVED TO ";
 
-    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c>, <c>SAVED TO THE AUTOSAVE</c>, <c>SAVED TO THE SCRATCH SLOT</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c>, <c>SAVED TO THE OLD AUTOSAVE</c>, <c>SAVED TO THE SCRATCH SLOT</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
     internal static string SavedTo(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);

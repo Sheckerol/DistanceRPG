@@ -13,7 +13,7 @@ namespace GameEngine.DistanceRPG;
 public interface ITitleHost
 {
     /// <summary>
-    /// Load slot <paramref name="slot"/> (0 the autosave) and play the campaign it
+    /// Load slot <paramref name="slot"/> (0 the old autosave) and play the campaign it
     /// brings back, which saves into that slot from then on (the user's ruling of
     /// 2026-09-25 on the save slots, R5) — no other slot is touched — or, when
     /// nothing comes back, show the title again saying why. Called once, never

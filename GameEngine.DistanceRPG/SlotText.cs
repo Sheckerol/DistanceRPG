@@ -76,7 +76,7 @@ internal static class SlotText
     /// no markers: nothing of it would load.
     /// </summary>
     /// <param name="entry">The slot, as the listing read it.</param>
-    /// <param name="count">How many manual slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
+    /// <param name="count">How many save slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
     /// <param name="dungeons">The content's dungeons, whose names the row reads.</param>
     /// <param name="zone">The player's time zone, which the time is shown in.</param>
     internal static IReadOnlyList<string> Rows(SlotEntry entry, int count, DungeonCatalogue dungeons, TimeZoneInfo zone)
@@ -92,7 +92,8 @@ internal static class SlotText
     /// <summary>
     /// A slot's own row: <c>SLOT 2 - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32</c>,
     /// the time left off when the save records none; <c>SLOT 2 - EMPTY</c>;
-    /// <c>SLOT 2 - CANNOT BE READ</c>. The CONTINUE option is this row of the most
+    /// <c>SLOT 2 - CANNOT BE READ</c>; <c>OLD AUTOSAVE - BETWEEN RUNS - 1 RUN - ...</c>
+    /// for the save folder itself. The CONTINUE option is this row of the most
     /// recent save (<see cref="TitleText.Continue"/>).
     /// </summary>
     internal static string Row(SlotEntry entry, DungeonCatalogue dungeons, TimeZoneInfo zone)
@@ -168,7 +169,7 @@ internal static class SlotText
     internal static string Beyond(int count)
         => count == 1 ? "BEYOND THE 1 SLOT" : $"BEYOND THE {count.ToString(CultureInfo.InvariantCulture)} SLOTS";
 
-    /// <summary>What a digit or ENTER on a slot that holds nothing says: <c>SLOT 2 IS EMPTY</c>, <c>AUTOSAVE IS EMPTY</c>.</summary>
+    /// <summary>What a digit or ENTER on a slot that holds nothing says: <c>SLOT 2 IS EMPTY</c>. (The old autosave is listed only while it holds something, so 0 never says it.)</summary>
     internal static string IsEmpty(int number) => $"{SaveSlots.Label(number)} IS EMPTY";
 
     /// <summary>What a digit above the count says on NEW CAMPAIGN's list, which never offers such a slot: <c>SLOT 7 IS BEYOND THE 3 SLOTS</c>, <c>... THE 1 SLOT</c>.</summary>

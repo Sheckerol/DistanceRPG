@@ -10,11 +10,11 @@ namespace GameEngine.DistanceRPG;
 /// Engine-free, and it touches no file: the store does.
 /// </summary>
 /// <param name="Store">The slot's store: the session's one for a slot of the save folder (<see cref="SaveSlots.Store"/>), or the dev override's (<see cref="CampaignBoot.StoreFor"/>).</param>
-/// <param name="Number">The slot's number — <see cref="SaveSlots.Autosave"/> for the save folder itself, 1 to <see cref="SaveSlots.Most"/> for <c>slot-n</c> — or null for the dev override's scratch slot, which has none.</param>
+/// <param name="Number">The slot's number — 1 to <see cref="SaveSlots.Most"/> for <c>slot-n</c>, <see cref="SaveSlots.OldAutosave"/> for the save folder itself — or null for the dev override's scratch slot, which has none.</param>
 internal sealed record SaveSlot(SaveStore Store, int? Number)
 {
-    /// <summary>What the words call the autosave slot, the save folder itself.</summary>
-    internal const string AutosaveName = "THE AUTOSAVE";
+    /// <summary>What the words call the old autosave: the save folder itself, which a build before the user's ruling on the save slots (R5) saved into as the autosave.</summary>
+    internal const string OldAutosaveName = "THE OLD AUTOSAVE";
 
     /// <summary>What the words call a dev-override launch's scratch slot.</summary>
     internal const string ScratchName = "THE SCRATCH SLOT";
@@ -24,15 +24,15 @@ internal sealed record SaveSlot(SaveStore Store, int? Number)
 
     /// <summary>The slot's number, or null for the scratch slot.</summary>
     /// <exception cref="ArgumentOutOfRangeException">It is outside 0 to <see cref="SaveSlots.Most"/>.</exception>
-    public int? Number { get; } = Number is < SaveSlots.Autosave || Number > SaveSlots.Most
-        ? throw new ArgumentOutOfRangeException(nameof(Number), Number, $"A slot is numbered from {SaveSlots.Autosave} to {SaveSlots.Most}, or has no number: the scratch slot.")
+    public int? Number { get; } = Number is < SaveSlots.OldAutosave || Number > SaveSlots.Most
+        ? throw new ArgumentOutOfRangeException(nameof(Number), Number, $"A slot is numbered from {SaveSlots.OldAutosave} to {SaveSlots.Most}, or has no number: the scratch slot.")
         : Number;
 
-    /// <summary>What the words call the slot: <c>SLOT 2</c>, <see cref="AutosaveName"/>, or <see cref="ScratchName"/>.</summary>
+    /// <summary>What the words call the slot: <c>SLOT 2</c>, <see cref="OldAutosaveName"/>, or <see cref="ScratchName"/>. Every word of a slot is built from it.</summary>
     public string Name => Number switch
     {
         null => ScratchName,
-        SaveSlots.Autosave => AutosaveName,
+        SaveSlots.OldAutosave => OldAutosaveName,
         { } number => SaveSlots.Label(number),
     };
 

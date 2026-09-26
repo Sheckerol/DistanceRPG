@@ -5,8 +5,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// ask a <see cref="SaveSlots"/> for one (<see cref="SaveSlots.Slot"/>, the
 /// game's way): every one of them takes a <see cref="SaveSlot"/>, its store and
 /// its name together. A store in a slot folder that a test saves into or loads
-/// goes in as its own slot, <see cref="SaveSlots.Slot"/>, but for the few whose
-/// tests assert the autosave's words of it (<see cref="AsAutosave"/>).
+/// goes in as its own slot, <see cref="SaveSlots.Slot"/>; a store in a folder of
+/// the test's own goes in as slot 1 (<see cref="AsSlot1"/>), whose words are the
+/// ones a player sees of a numbered slot — or, made the save folder, as the old
+/// autosave (<see cref="AsOldAutosave"/>).
 /// </summary>
 internal static class TestSlots
 {
@@ -19,12 +21,17 @@ internal static class TestSlots
         => new(new SaveStore(Path.Combine(Path.GetTempPath(), "distancerpg-words-only")), number);
 
     /// <summary>
-    /// <paramref name="store"/> as the autosave slot, number
-    /// <see cref="SaveSlots.Autosave"/>: the save folder's own store, as most of
-    /// the save's tests make it — the slot <see cref="SaveSlots.Slot"/> gives for
-    /// it — or a store in a slot folder whose test asserts the words the
-    /// autosave's saves say, not a manual slot's. No other store in a slot folder
-    /// goes in as the autosave.
+    /// <paramref name="store"/>, in a folder of the test's own, as slot 1: loaded
+    /// from and saved into as a slot is, and named as a player sees a numbered
+    /// slot named — <c>CAMPAIGN RESUMED FROM SLOT 1</c>, <c>SLOT 1 COULD NOT BE SAVED
+    /// (...)</c> — whatever folder the store is in.
     /// </summary>
-    internal static SaveSlot AsAutosave(SaveStore store) => new(store, SaveSlots.Autosave);
+    internal static SaveSlot AsSlot1(SaveStore store) => new(store, 1);
+
+    /// <summary>
+    /// <paramref name="store"/> — a folder of the test's own, made the save folder
+    /// — as the old autosave, number <see cref="SaveSlots.OldAutosave"/>: the slot
+    /// <see cref="SaveSlots.Slot"/> gives for the save folder's own store.
+    /// </summary>
+    internal static SaveSlot AsOldAutosave(SaveStore store) => new(store, SaveSlots.OldAutosave);
 }

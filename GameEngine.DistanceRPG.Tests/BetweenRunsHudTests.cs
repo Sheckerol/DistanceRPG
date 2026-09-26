@@ -352,7 +352,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         // warning — and every other notice keeps the warning's orange.
         Assert.Equal("CAMPAIGN RESUMED", BetweenRunsHud.Resumed);
         Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([BetweenRunsHud.Resumed])[0]));
-        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.ResumedFromBackup])[0]));
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.Resumed(Named(1), backup: true)])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.TuningChanged])[0]));
         Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"));
     }

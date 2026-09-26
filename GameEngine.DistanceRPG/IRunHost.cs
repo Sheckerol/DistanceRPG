@@ -24,7 +24,7 @@ namespace GameEngine.DistanceRPG;
 /// </summary>
 public interface ISaveHost
 {
-    /// <summary>The slot the campaign in play saves into, by its name — <c>SLOT 2</c>, <c>THE AUTOSAVE</c>, <c>THE SCRATCH SLOT</c> — which the menu says under its options; empty with no campaign in play.</summary>
+    /// <summary>The slot the campaign in play saves into, by its name — <c>SLOT 2</c>, <c>THE OLD AUTOSAVE</c>, <c>THE SCRATCH SLOT</c> — which the menu says under its options; empty with no campaign in play.</summary>
     string SavesInto { get; }
 
     /// <summary>
