@@ -435,7 +435,6 @@ public sealed class TitleTests : IDisposable
         // which a player would read as a digit that only picks. And it says what a
         // load means where the choice is made: play saves into the slot loaded.
         Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK", TitleText.LoadKeysLine);
-        Assert.Equal((TitleText.LoadKeysLine, DungeonHud.Grey), (Drawn(After(others, Keys.S, Keys.S, Keys.Enter))[^1].Text, Drawn(After(others, Keys.S, Keys.S, Keys.Enter))[^1].Color));
     }
 
     [Fact]

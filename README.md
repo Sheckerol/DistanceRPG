@@ -187,8 +187,9 @@ it.
   — `SAVED TO SLOT 2` in green (and any file set aside, and where), or `SLOT 2
   COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE LOG` in orange —
   until the next key. The campaign's own slot's digit says `SLOT 2 SAVES ITSELF`
-  (`THE AUTOSAVE SAVES ITSELF` for a campaign in the autosave), and a slot above
-  the count is never offered. A save by hand is a copy written into the slot
+  (`THE AUTOSAVE SAVES ITSELF` for a campaign in the autosave) — and so does
+  Enter when there is no other slot to offer, at a count of one with the campaign
+  in slot 1 — and a slot above the count is never offered. A save by hand is a copy written into the slot
   alone: the campaign goes on saving into its own slot as ever, and CONTINUE
   loads whichever of the two is newer.
 - **Leaving play**: `3  QUIT TO TITLE`, on the menu in a dungeon or between
@@ -315,11 +316,13 @@ it.
   --new-campaign` — does the same at launch without asking, past the title
   (developer tooling). A new campaign that cannot be saved there is never begun,
   since every save of it would fail: when another program holds either file open
-  so it cannot be moved, or that first save fails, what was set aside goes back
-  where it was — the autosave exactly as it was — and the title says `NO NEW
-  CAMPAIGN BEGAN IN THE AUTOSAVE`, then why (`--new-campaign` then opens on the
-  title). Deleting `campaign.json` by hand leaves CONTINUE the backup instead, if
-  there is one.
+  so it cannot be moved, or that first save fails, the save and its backup go
+  back where they were, and the title says `NO NEW CAMPAIGN BEGAN IN THE
+  AUTOSAVE`, then why (`--new-campaign` then opens on the title). The marker of
+  a load that never finished stays beside them, as it was, and a quit's unsaved
+  marker that `--new-campaign` took is said on that title, as it would have been.
+  Deleting `campaign.json` by hand leaves CONTINUE the backup instead, if there
+  is one.
 - **The dev overrides play apart**: a launch with `DISTANCERPG_DUNGEON` (a
   dungeon's id: straight into it) or `DISTANCERPG_SEED` (the first run's map
   seed) plays a fresh campaign in `saves\override\`, emptied at every such

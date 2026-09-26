@@ -588,7 +588,10 @@ public sealed class CampaignBootTests : IDisposable
             Assert.EndsWith(") - WHAT IT HELD IS KEPT - SEE THE LOG", failed, StringComparison.Ordinal);
             var putBackLog = new List<string>();
             Assert.Empty(CampaignBoot.PutBack(slot3, abandoned, putBackLog.Add));
-            Assert.Equal(2, putBackLog.Count(line => line.EndsWith(": no new campaign began there", StringComparison.Ordinal)));
+            const string PutBackAs = " put back as ", NoneBegan = ": no new campaign began there";
+            Assert.Equal([slot3.Store.SavePath, slot3.Store.BackupPath],   // the save first: the reverse of the order the two left in
+                putBackLog.Where(line => line.EndsWith(NoneBegan, StringComparison.Ordinal))
+                    .Select(line => line[(line.IndexOf(PutBackAs, StringComparison.Ordinal) + PutBackAs.Length)..^NoneBegan.Length]));
             Directory.Delete(slot3.Store.TempPath);
             Assert.Equal(three, Bytes(slot3.Store));
             Assert.Equal(["NO NEW CAMPAIGN BEGAN IN SLOT 3", failed], CampaignBoot.NotBegunWord(slot3, [failed]));
@@ -608,6 +611,58 @@ public sealed class CampaignBootTests : IDisposable
             Assert.True(slot3.Store.HasSave);
             Directory.Delete(slot3.Store.BackupPath);
             Assert.Throws<ArgumentException>(() => slot3.Store.PutBack(Path.Combine(slots.Store(1).Folder, SaveStore.FileName), backup: false));
+
+            // And the other way round: the save's name taken since, the save stays set
+            // aside and its notice is said again, and the backup goes back all the
+            // same — so the slot lists FROM ITS BACKUP, one save older, which is what
+            // its next load would resume.
+            File.Move(again.Abandoned[0].Path, slot3.Store.BackupPath);   // the slot as it was before that NEW CAMPAIGN
+            var mirror = CampaignBoot.Abandon(slot3, GameContent.Current, how: null);
+            Directory.CreateDirectory(slot3.Store.SavePath);
+            Assert.Equal([mirror.Abandoned[1].Notice], CampaignBoot.PutBack(slot3, mirror));
+            Assert.True(File.Exists(mirror.Abandoned[1].Path));
+            Assert.True(slot3.Store.HasBackup);
+            Assert.Equal(SlotState.FromBackup, SaveListing.Read(slots, DateTimeOffset.UtcNow).Slots.Single(slot => slot.Number == 3).State);
+            Directory.Delete(slot3.Store.SavePath);
+
+            // The markers stay the slot's (the T2 review): a NEW CAMPAIGN that is not
+            // begun leaves the marker of a load that never finished where it was —
+            // the new campaign's first save is what clears it — so it still guards the
+            // save put back, which the next load sets aside as crashed, as it would
+            // have; and the quit's unsaved marker, which --new-campaign takes before any
+            // title has said it, is said with the word that nothing began.
+            var markedSlots = new SaveSlots(Path.Combine(folder, "marked"), 3);
+            var marked = markedSlots.Slot(1);
+            Assert.Null(CampaignBoot.Save(marked, NewCampaign()));
+            Assert.Null(CampaignBoot.Save(marked, campaign));
+            marked.Store.MarkResuming();                    // its last load crashed the game
+            marked.Store.MarkUnsaved("the disk is full");   // and before that, a quit could not save it
+            var markedBytes = Bytes(marked.Store);
+            var markedAside = CampaignBoot.Abandon(marked, GameContent.Current);
+            Assert.True(markedAside.TookUnsaved);
+            Assert.True(marked.Store.WasResuming);
+            Directory.CreateDirectory(marked.Store.TempPath);
+            Assert.NotNull(CampaignBoot.Save(marked, markedAside.Campaign));
+            Assert.Equal([CampaignBoot.QuitUnsaved(marked)], CampaignBoot.PutBack(marked, markedAside));
+            Directory.Delete(marked.Store.TempPath);
+            markedBytes.Remove(SaveStore.UnsavedName);
+            Assert.Equal(markedBytes, Bytes(marked.Store));   // the save, the backup and the resume marker as they were
+            Assert.True(SaveListing.Read(markedSlots, DateTimeOffset.UtcNow).Slots.Single(slot => slot.Number == 1).Unfinished);
+            var crashedAgain = CampaignBoot.Load(marked, GameContent.Current);
+            Assert.Equal(CampaignBoot.Resumed(marked, backup: true), crashedAgain.Notices[0]);
+            SaysSetAside(crashedAgain.Notices[1], "campaign.json", "crashed the game the last time it was resumed",
+                Path.Combine(marked.Store.Folder, "campaign.crashed-1.json"));
+            marked.Store.ClearResuming();
+
+            // Begun, its first save clears the marker as it goes through, so the new
+            // campaign's next load is never set aside as crashed; and the title took
+            // the unsaved marker before NEW CAMPAIGN, so there is none to take.
+            marked.Store.MarkResuming();
+            var begun = CampaignBoot.Abandon(marked, GameContent.Current, how: null);
+            Assert.False(begun.TookUnsaved);
+            Assert.True(marked.Store.WasResuming);
+            Assert.Null(CampaignBoot.Save(marked, begun.Campaign));
+            Assert.False(marked.Store.WasResuming);
 
             // Windows only: a stuck NEW CAMPAIGN. Another program holds the save, so it
             // will not move once the backup has; the slot takes no saves from then on,

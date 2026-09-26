@@ -38,6 +38,14 @@ internal sealed record BootResult(CampaignState Campaign, bool Resumed, ViewDto?
     /// should the new campaign never begin. None for a dev override's campaign.
     /// </summary>
     public IReadOnlyList<(string Path, bool Backup, string Notice)> Abandoned { get; init; } = [];
+
+    /// <summary>
+    /// Whether NEW CAMPAIGN took the slot's unsaved-quit marker, without a word
+    /// (<see cref="CampaignBoot.TakeUnsaved"/>) — <c>--new-campaign</c> does, before
+    /// any title has said it — which <see cref="CampaignBoot.PutBack"/> says should
+    /// the new campaign never begin.
+    /// </summary>
+    public bool TookUnsaved { get; init; }
 }
 
 /// <summary>
@@ -411,8 +419,12 @@ internal static class CampaignBoot
     /// session (<see cref="SetAside"/>), so no campaign begins in the slot, and
     /// what is left of the old campaign — its save, still in place — is what
     /// CONTINUE finds next time. Every other slot is never touched. The old
-    /// campaign's unsaved-quit marker goes with it, logged and never said: there is
-    /// nothing left to say it of.
+    /// campaign's unsaved-quit marker goes with it, logged and not said — there is
+    /// nothing left to say it of, unless the new campaign never begins
+    /// (<see cref="BootResult.TookUnsaved"/>). Its resume marker is left where it
+    /// is: the new campaign's first save clears it as it goes through
+    /// (<see cref="Save"/>), and a new campaign that never begins leaves it
+    /// guarding the save put back, as it guarded it before.
     /// </summary>
     /// <param name="slot">The slot the new campaign begins in: the autosave slot.</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: the new campaign is built under it.</param>
@@ -424,7 +436,7 @@ internal static class CampaignBoot
         ArgumentNullException.ThrowIfNull(slot);
         RequireCurrent(content);
         var store = slot.Store;
-        TakeUnsaved(store, report);
+        bool tookUnsaved = TakeUnsaved(store, report);
 
         string asked = how ?? "NEW CAMPAIGN";
         string what = how is null ? "was left for a new campaign" : $"was left for a new campaign ({how})";
@@ -442,12 +454,12 @@ internal static class CampaignBoot
                 break;
             }
         }
-        Unmark(store, report);   // nothing is being resumed
         if (!stuck)
             report?.Invoke($"[Save] {asked}: a new campaign begins in {store.Folder}");
         return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, [NewCampaignBegins, .. setAside])
         {
             Abandoned = moved,
+            TookUnsaved = tookUnsaved,
         };
     }
 
@@ -459,15 +471,18 @@ internal static class CampaignBoot
     /// file goes back where it was, the save before the backup — the reverse of
     /// the order they left in — by a move that refuses a name that is taken
     /// (<see cref="SaveStore.PutBack"/>), so nothing is deleted or written over and
-    /// the slot is as it was, its backup one save deep. The markers
-    /// <see cref="Abandon"/> took are not put back: they are markers, and each was
-    /// logged as it went. A file that will not go back stays set aside, and the
-    /// notice that said where is said again.
+    /// the slot is as it was, its backup one save deep, and the resume marker
+    /// <see cref="Abandon"/> left there guarding it as before. A file that will not
+    /// go back stays set aside, and the notice that said where is said again. The
+    /// unsaved-quit marker Abandon took without a word
+    /// (<see cref="BootResult.TookUnsaved"/>) is said now, once, as the title would
+    /// have said it (<see cref="QuitUnsaved"/>), since what the slot holds again is
+    /// from before that quit.
     /// </summary>
     /// <param name="slot">The slot NEW CAMPAIGN was to begin in.</param>
     /// <param name="abandoned">What <see cref="Abandon"/> handed back for it.</param>
     /// <param name="report">Where the log lines go.</param>
-    /// <returns>The set-aside notice of each file that would not go back, in the order they were set aside; none when all went back.</returns>
+    /// <returns>The set-aside notice of each file that would not go back, in the order they were set aside, then the unsaved-quit word Abandon took, when the slot holds the old campaign again; none when all went back and there was no such word.</returns>
     internal static IReadOnlyList<string> PutBack(SaveSlot slot, BootResult abandoned, Action<string>? report = null)
     {
         ArgumentNullException.ThrowIfNull(slot);
@@ -487,6 +502,11 @@ internal static class CampaignBoot
                 report?.Invoke($"[Save] {path} could not be put back as {to} - it stays set aside, never deleted or written over: {error}");
                 kept.Insert(0, notice);
             }
+        }
+        if (abandoned.TookUnsaved && (store.HasSave || store.HasBackup))
+        {
+            report?.Invoke($"[Save] The unsaved-quit marker taken from {store.Folder} is said after all: no new campaign began there, and what it holds is from before that quit");
+            kept.Add(QuitUnsaved(slot));
         }
         return kept;
     }
@@ -629,9 +649,10 @@ internal static class CampaignBoot
     /// quit wrote in it, and cleared, so it is said once. The title takes every
     /// slot's when it opens, before anything is loaded, and says each
     /// (<see cref="TakeEveryUnsaved"/>); NEW CAMPAIGN takes its slot's as it sets
-    /// the campaign it spoke of aside, and says nothing. A marker that is there and
-    /// cannot be read is one all the same. One that will not go is said again the
-    /// next time, and the log says why.
+    /// the campaign it spoke of aside, and says nothing — unless the new campaign
+    /// never begins, and the old one is put back (<see cref="PutBack"/>). A marker
+    /// that is there and cannot be read is one all the same. One that will not go
+    /// is said again the next time, and the log says why.
     /// </summary>
     internal static bool TakeUnsaved(SaveStore store, Action<string>? report)
     {

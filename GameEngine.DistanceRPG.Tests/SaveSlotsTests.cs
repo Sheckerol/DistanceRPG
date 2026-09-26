@@ -435,7 +435,10 @@ public sealed class SaveSlotsTests : IDisposable
             // and slot 2 loaded, as the title loads it. Its campaign's saves, the
             // game's own at every safe point and the quit's, all go into slot 2: the
             // autosave and slots 1 and 3 are byte for byte as they were, and nothing is
-            // set aside anywhere.
+            // set aside anywhere. This pins what the boot's doors write for the slot
+            // they are handed: that the game hands them the slot it loaded, and no
+            // other, for as long as the campaign is in play, is read off the IL
+            // (GameStartupTests.ACampaignComesIntoPlayBoundToOneSlot_AndNothingRebindsIt).
             var slots = new SaveSlots(folder, 3);
             CampaignState[] campaigns = [NewCampaign(), Retreated(), Cleared(), Retreated()];
             for (int n = SaveSlots.Autosave; n <= 3; n++)
@@ -530,11 +533,14 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.Equal(seeded.Where(file => OtherThanFive(file.Key)).ToDictionary(file => file.Key, file => file.Value, StringComparer.Ordinal), Snapshot(folder, OtherThanFive));
             Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(three.Store(5).Folder));
             Assert.Equal([4, 5], three.Beyond());
+            var asLeft = Snapshot(folder);
 
-            // Raised to five again, they are ordinary slots.
+            // Raised to five again, they are ordinary slots, and the raise and its
+            // listing move nothing.
             var again = new SaveSlots(folder, 5);
             Assert.Empty(again.Beyond());
             Assert.All(SaveListing.Read(again, Now).Slots, slot => Assert.False(slot.Beyond));
+            Assert.Equal(asLeft, Snapshot(folder));
         });
     }
 

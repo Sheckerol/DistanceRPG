@@ -29,8 +29,9 @@ namespace GameEngine.DistanceRPG;
 /// slot takes no saves this session, since a campaign saves into the slot it
 /// came from and no load touches another slot's files (the user's ruling of
 /// 2026-09-25 on the save slots, R5); NEW CAMPAIGN sets two aside, or says why it
-/// began nothing and what would not go back), so the screen hands their count in
-/// (<see cref="Rows"/>'s <c>whole</c>) and they are shown in full, up to
+/// began nothing, what would not go back, and the quit's word on the slot it
+/// took), so the screen hands their count in (<see cref="Rows"/>'s
+/// <c>whole</c>) and they are shown in full, up to
 /// <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/> is for what
 /// follows them, the data files' notices, which a broken file can make as many
 /// of as it likes.

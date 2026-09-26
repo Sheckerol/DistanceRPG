@@ -528,18 +528,49 @@ public class GameStartupTests
         // the title after a NEW CAMPAIGN that did not begin saves nothing.
         var begin = Method(typeof(DistanceRpgGame), "BeginNewCampaign");
         var inBegin = CallsIn(begin).ToList();
-        int refusedRead = inBegin.FindIndex(called => Same(called, typeof(SaveStore).GetProperty(nameof(SaveStore.WritesRefused))!.GetMethod!));
+        var refusal = typeof(SaveStore).GetProperty(nameof(SaveStore.WritesRefused))!.GetMethod!;
+        int refusedRead = inBegin.FindIndex(called => Same(called, refusal));
         int abandon = inBegin.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
         int firstSave = inBegin.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        var showTitle = Method(typeof(DistanceRpgGame), "ShowTitle");
         int adopt = inBegin.FindIndex(called => Same(called, Method(typeof(DistanceRpgGame), "Adopt")));
-        int titled = inBegin.FindIndex(called => Same(called, Method(typeof(DistanceRpgGame), "ShowTitle")));
+        int titled = inBegin.FindIndex(called => Same(called, showTitle));
         Assert.True(refusedRead >= 0 && refusedRead < abandon && abandon < firstSave && firstSave < adopt,
             "BeginNewCampaign does not read the refusal, set the old campaign aside, save the new one and bind it, in that order");
+        // The refusal is read twice: before anything is set aside, and again after,
+        // since a setting aside that stuck refuses the slot's writes — which goes
+        // back to the title before any first save is tried.
+        var refusedReads = inBegin.Select((called, at) => (called, at)).Where(call => Same(call.called, refusal)).Select(call => call.at).ToList();
+        Assert.Equal(2, refusedReads.Count);
+        Assert.True(refusedReads[0] < abandon && abandon < refusedReads[1] && refusedReads[1] < firstSave,
+            "BeginNewCampaign does not read the refusal again after setting the old campaign aside and before its first save");
         Assert.True(firstSave < titled && titled < adopt, "BeginNewCampaign does not go back to the title, on the way that never binds the campaign, after its first save");
         Assert.Equal(2, Mentions(begin, putBack));   // a setting aside that stuck, and a first save that failed
         Assert.All(inBegin.Select((called, at) => (called, at)).Where(call => Same(call.called, putBack)), call => Assert.InRange(call.at, abandon + 1, adopt - 1));
         Assert.Equal(1, Mentions(begin, Method(typeof(DistanceRpgGame), "Adopt")));
+        Assert.Equal(1, Mentions(begin, showTitle));
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.NotBegunWord))));
+
+        // And the way that never binds the campaign ends at the title: past the
+        // ShowTitle call — over any nop, and any branch followed to where it goes —
+        // the next instruction is the method's return, so nothing after it adopts a
+        // campaign that did not begin.
+        byte[] beginIl = Body(begin)!;
+        var beginAt = InstructionsAt(beginIl).ToList();
+        int next = beginAt.FindIndex(i => i.Token != 0 && Resolve(begin, i.Token) is { } called && Same(called, showTitle)) + 1;
+        for (int hops = 0; beginAt[next].Op != OpCodes.Ret; hops++)
+        {
+            var (op, _, at) = beginAt[next];
+            Assert.True(hops < beginAt.Count, "BeginNewCampaign's way back to the title runs in a loop");
+            if (op == OpCodes.Nop)
+            {
+                next++;
+                continue;
+            }
+            Assert.True(op == OpCodes.Br || op == OpCodes.Br_S, $"BeginNewCampaign goes on past ShowTitle ({op}) on the way that never binds the campaign");
+            int target = op == OpCodes.Br_S ? at + 1 + (sbyte)beginIl[at] : at + 4 + BitConverter.ToInt32(beginIl, at);
+            next = beginAt.FindIndex(i => i.At - i.Op.Size == target);
+        }
     }
 
     private const BindingFlags Declared = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
@@ -751,14 +782,32 @@ public class GameStartupTests
 
         // Every write of the campaign in play, and the marker's clearing, go through
         // _slot, and never ask the save folder's slots for another.
+        var slotsField = game.GetField("_slots", Declared)!;
         foreach (string writes in new[] { "WriteRequestedSave", "SaveOnQuit", "ClearResumeMarker" })
         {
             var method = game.GetMethod(writes, Declared)!;
             var walked = Walk(method);
             Assert.Contains(walked, i => i.Op == OpCodes.Ldfld && SameField(i.Field, slotField));
             Assert.DoesNotContain(walked, i => i.Called?.DeclaringType == typeof(SaveSlots));
-            Assert.DoesNotContain(walked, i => i.Op == OpCodes.Ldfld && SameField(i.Field, game.GetField("_slots", Declared)!));
+            Assert.DoesNotContain(walked, i => i.Op == OpCodes.Ldfld && SameField(i.Field, slotsField));
         }
+
+        // And the frame's end's door (Save), which WriteRequestedSave hands _slot,
+        // writes the slot it is handed and no other: it reads neither field, asks the
+        // save folder's slots for nothing, makes no slot, and hands CampaignBoot.Save
+        // its own `slot` argument, then the campaign.
+        var save = game.GetMethod("Save", Declared)!;
+        Assert.Equal(typeof(SaveSlot), save.GetParameters()[1].ParameterType);
+        var saving = Walk(save);
+        Assert.DoesNotContain(saving, i => i.Op == OpCodes.Ldfld && (SameField(i.Field, slotField) || SameField(i.Field, slotsField)));
+        Assert.DoesNotContain(saving, i => i.Called?.DeclaringType == typeof(SaveSlots)
+            || (i.Called is MethodInfo named && named.ReturnType == typeof(SaveSlot))
+            || (i.Called is ConstructorInfo made && made.DeclaringType == typeof(SaveSlot)));
+        int written = saving.FindIndex(i => i.Called is { } called && Same(called, typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.Save), Declared)!));
+        Assert.True(written >= 0, "Save never calls CampaignBoot.Save");
+        int handed = saving.FindLastIndex(written, i => i.Op == OpCodes.Ldarg_2);
+        Assert.True(handed >= 0 && saving[handed + 1].Op == OpCodes.Ldarg_1, "Save does not hand CampaignBoot.Save the slot it was handed, then the campaign");
+        Assert.Equal(1, saving.Count(i => i.Op == OpCodes.Ldarg_2));
     }
 
     /// <summary>Whether <paramref name="a"/> names the field <paramref name="b"/> is.</summary>

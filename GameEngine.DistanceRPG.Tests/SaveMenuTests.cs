@@ -387,6 +387,19 @@ public sealed class SaveMenuTests : IDisposable
             boundRows.Where(row => !row.Text.StartsWith("    ", StringComparison.Ordinal)).Select(row => row.Color));
         var skipsOwn = new SlotMenu(SlotMenuMode.Save, Listing(3, Slot(1)), 3, own: 2);
         Assert.Equal(3, skipsOwn.Rows[skipsOwn.Cursor].Number);   // slots 2 and 3 empty: the lowest empty other than the campaign's own
+
+        // At a count of one, a campaign bound to slot 1 leaves the list nothing to
+        // choose: the choice is on no row, W/S do nothing, and ENTER, like the digit,
+        // says the slot saves itself — never the load list's EVERY SLOT IS EMPTY,
+        // with both slots holding a save.
+        var alone = new SlotMenu(SlotMenuMode.Save, Listing(1, Slot(0), Slot(1)), 1, own: 1);
+        Assert.Equal([0, 1], alone.Rows.Select(row => row.Number));
+        Assert.Equal(-1, alone.Cursor);
+        Assert.Equal((SlotStep.None, -1), (alone.Press(Keys.S), alone.Cursor));
+        Assert.Equal((SlotStep.None, -1), (alone.Press(Keys.W), alone.Cursor));
+        Assert.Equal((SlotStep.Refused, "SLOT 1 SAVES ITSELF", (int?)null, (SlotEntry?)null), (alone.Press(Keys.Enter), alone.Said, alone.Chosen, alone.Asking));
+        Assert.Equal((SlotStep.Refused, "SLOT 1 SAVES ITSELF"), (alone.Press(Keys.KeyPadEnter), alone.Said));
+        Assert.Equal((SlotStep.Refused, "SLOT 1 SAVES ITSELF"), (alone.Press(Keys.D1), alone.Said));
         var boundHost = new RecordingHost(listing, ownSlot: 2);
         var boundScene = new DungeonScene(camera: null!, game: null!, Entered(), boundHost);
         boundScene.HandleEscape();

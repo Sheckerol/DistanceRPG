@@ -67,7 +67,8 @@ internal enum SlotStep
 /// saves itself, a digit above the count is refused, saying why, and 0 — for a
 /// campaign that saves elsewhere — does nothing. The choice starts on the first
 /// empty slot, so an ENTER pressed without looking saves over nothing; with none
-/// empty, on the first that can be chosen.
+/// empty, on the first that can be chosen; with none that can — a count of one,
+/// and slot 1 the campaign's own — on none, and ENTER says the slot saves itself.
 /// </para>
 /// </summary>
 internal sealed class SlotMenu
@@ -167,7 +168,11 @@ internal sealed class SlotMenu
             case Keys.S or Keys.Down:
                 return Move(+1);
             case Keys.Enter or Keys.KeyPadEnter:
-                return Cursor >= 0 ? Take(Cursor) : Refuse(SlotText.NothingToLoad);
+                if (Cursor >= 0)
+                    return Take(Cursor);
+                // Nothing a key can take: loading, every slot is empty; saving, the
+                // one slot to the count is the campaign's own, which saves itself.
+                return Refuse(Mode == SlotMenuMode.Save ? SlotText.SlotSavesItself(Own) : SlotText.NothingToLoad);
         }
 
         if (Digit(key) is not { } digit)

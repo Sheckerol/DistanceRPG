@@ -474,8 +474,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// session, and nothing was touched; or a file there would not move as it was
     /// set aside, by its stuck notice alone; or the first save failed. In the last
     /// two, what was set aside is put back first (<see cref="CampaignBoot.PutBack"/>),
-    /// so the slot is as it was, its backup one save deep — and a file that would
-    /// not go back is said.
+    /// so the slot is as it was, its backup one save deep and its resume marker
+    /// still guarding it — and a file that would not go back is said, and so is the
+    /// unsaved-quit marker the setting aside took, which <c>--new-campaign</c> takes
+    /// before any title has said it.
     /// </para>
     /// </summary>
     /// <param name="how">What asked for it, which the set-aside notices name: <c>--new-campaign</c>, or null for the title's NEW CAMPAIGN.</param>
@@ -951,15 +953,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// about a file, whatever the saves after it do. The save on the disk is kept
     /// whatever happens.
     /// </summary>
-    /// <returns>Why the write failed, or null when it went through; and each file the write set aside first.</returns>
-    private (string? Failed, IReadOnlyList<string> SetAside) Save(CampaignState campaign, SaveSlot slot, string when, ViewDto? view = null)
+    private void Save(CampaignState campaign, SaveSlot slot, string when, ViewDto? view = null)
     {
         Log.Info($"[Save] Saving the campaign {when}");
-        var setAside = new List<string>();
-        string? failed = CampaignBoot.Save(slot, campaign, view, line => Log.Info(line), _clock(), setAside);
-        foreach (string notice in setAside)
-            Log.Warn($"[Save] {notice}");
-        var said = new List<string>(setAside);
+        var said = new List<string>();
+        string? failed = CampaignBoot.Save(slot, campaign, view, line => Log.Info(line), _clock(), said);
+        foreach (string setAside in said)
+            Log.Warn($"[Save] {setAside}");
         if (failed is null)
         {
             TakeBackFailedSaves();
@@ -972,7 +972,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             said.Add(failed);
         }
         if (said.Count == 0)
-            return (failed, setAside);
+            return;
 
         // Led for the next screen, and shown at once over the floor being played,
         // each whole ahead of what is up — so the first said is laid last, on top.
@@ -980,7 +980,6 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var scene = PlayingScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
             scene?.SaveFailed(said[i]);
-        return (failed, setAside);
     }
 
     /// <summary>

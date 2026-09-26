@@ -1471,8 +1471,8 @@ manual slots whose count is a `tuning.json` key — built in three steps and now
 whole (R2, below), its entry below superseded, and superseded in part by the
 user's ruling of the same day on the save slots (R5, below): a campaign saves
 into the slot it came from. Choices of its building ship provisionally, the
-user's to rule — USER DECISION 1, and R5's SLOT DECISIONS — and open-questions.md
-sets out their alternatives.
+user's to rule — USER DECISIONS 1 and 3, and R5's SLOT DECISIONS — and
+open-questions.md sets out their alternatives.
 
 ### The user's ruling on content (2026-09-25)
 
@@ -2127,7 +2127,10 @@ superseded whole.
     whose files none of which reads can be chosen: its load sets them aside and
     says so. Nothing drawn is the file's raw text: a dungeon id the content lacks
     is `AN UNKNOWN DUNGEON`, and a time the player's zone cannot hold is shown in
-    UTC.
+    UTC. (Superseded by the user's ruling of the same day on the save slots, in
+    the marker and the keys line: `BEYOND THE 3 SLOTS`, no longer `- LOAD ONLY` or
+    dimmed, and `W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE
+    SLOT YOU LOAD - ESC BACK` — R5, the slot, below.)
   - **Every ask is two rows, where the keys stand, and only ENTER says yes**:
     what it does, then `... - ENTER: YES - ESC: NO`. N, Y and every other key say
     no and are spent, so a player pressing N to mean no keeps what the ask named —
@@ -2328,7 +2331,10 @@ superseded whole.
     fade, went on taking 1 and 2 — a slot listing read, the menu closed and the
     turn played on, all on a campaign the host had let go — where the hub's never
     did); the menu stays up, so nothing behind it acts either. A second ask anyway
-    finds no campaign in play and does nothing.
+    finds no campaign in play and does nothing. (Superseded by the user's ruling
+    of the same day on the save slots, in what the quit writes: the campaign's own
+    slot — the one it was loaded from or begun in — and the unsaved marker beside
+    that slot's save — R5, the slot, below.)
   - **A dev-override session has no title and saves apart**: its menu's 3 reads
     `3  QUIT GAME` — the window's close, saving its scratch slot as ever — and its
     2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`; the host refuses a
@@ -2475,18 +2481,24 @@ out each alternative.
     ...` read as the whole game while the player is meant to go on in another slot
     — **bends the plan, needs no ruling** — and the word that leads it names the
     slot.
-  - **A NEW CAMPAIGN whose first save fails is not begun — needs no ruling, for
-    the same reason.** The new campaign's first save is written into the slot
-    before the campaign is bound to it. When it fails, or when setting the old
-    campaign aside stops at a file that will not move, nothing is played, and what
-    NEW CAMPAIGN set aside goes back where it was, the save before the backup
-    (`CampaignBoot.PutBack`: a move, refusing a name that is taken, deleting
-    nothing), so the slot is as it was, its backup one save deep. The title says
-    `NO NEW CAMPAIGN BEGAN IN THE AUTOSAVE`, then the failed save's word — or the
-    stuck notice alone — then the set-aside notice of any file that would not go
-    back. `--new-campaign` is the same, and the game then opens on the title. The
-    markers NEW CAMPAIGN took are not put back: they are markers, each logged as
-    it went.
+  - **A NEW CAMPAIGN whose first save fails is not begun — bends the plan, needs
+    no ruling, for the same reason.** The new campaign's first save is written
+    into the slot before the campaign is bound to it. When it fails, or when
+    setting the old campaign aside stops at a file that will not move, nothing is
+    played, and what NEW CAMPAIGN set aside goes back where it was, the save
+    before the backup (`CampaignBoot.PutBack`: a move, refusing a name that is
+    taken, deleting nothing), so the slot is as it was, its backup one save deep.
+    The title says `NO NEW CAMPAIGN BEGAN IN THE AUTOSAVE`, then the failed save's
+    word — or the stuck notice alone — then the set-aside notice of any file that
+    would not go back. `--new-campaign` is the same, and the game then opens on
+    the title. The slot's markers stay with it (the review of this step): the
+    marker of a load that never finished is cleared by the new campaign's first
+    save as it goes through, and not before, so a NEW CAMPAIGN that is not begun
+    leaves it guarding the save put back, whose next load sets that save aside as
+    crashed, as it would have — cleared, it would have let the save that crashed
+    the game be resumed unguarded again; and the quit's unsaved marker, which
+    `--new-campaign` takes before any title has said it, is said last, as the
+    title would have said it.
   - **The unsaved-quit marker is the campaign's slot's**: the quit leaves it
     beside the save it could not replace, and the title takes every slot's, the
     autosave's and slot 1 to 9's, before it lists them, each said once, in slot
@@ -2498,8 +2510,11 @@ out each alternative.
     is keyed to that slot meanwhile: its row ends `SAVES ITSELF` and is never
     chosen, its digit says `SLOT 2 SAVES ITSELF` (`THE AUTOSAVE SAVES ITSELF` for a
     campaign in the autosave), 0 does nothing for a campaign that saves elsewhere,
-    and the list starts on the lowest empty slot other than it. Another slot
-    chosen there takes a copy, and the campaign goes on saving into its own.
+    and the list starts on the lowest empty slot other than it — or on none, when
+    it has no other slot to offer (a count of one, the campaign in slot 1), and
+    ENTER then says `SLOT 1 SAVES ITSELF` too, never the load list's `EVERY SLOT
+    IS EMPTY`. Another slot chosen there takes a copy, and the campaign goes on
+    saving into its own.
 
 ### The numbers: `tuning.json`
 

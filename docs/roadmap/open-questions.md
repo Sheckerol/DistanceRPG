@@ -319,9 +319,8 @@ slot may be played at all.
 
 **Shipped provisionally: yes.** It is loaded and continued like any slot, and
 LOAD GAME marks it `BEYOND THE 3 SLOTS`, no longer `- LOAD ONLY` and no longer
-dimmed. NEW CAMPAIGN never begins a campaign there and the save list never
-offers it, so the count limits where campaigns begin and where one is saved by
-hand, and lowering the count strands nothing.
+dimmed. NEW CAMPAIGN never begins a campaign there, so the count limits where
+campaigns begin, and lowering the count strands nothing.
 
 **This decides what the slot count limits, so it is the user's to decide.** The
 alternative: it stays load-only, as R2's folder had it — loading it first moves
