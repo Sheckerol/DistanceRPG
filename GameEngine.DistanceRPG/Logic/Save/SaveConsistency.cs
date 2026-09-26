@@ -33,8 +33,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// which play writes when <c>dungeons.json</c> moves <c>retiresOnClear</c> onto a
 /// dungeon already locked; hit points or mana over a maximum the load derives
 /// from today's tuning and content; a soul's tier, which its pin plays at 1; and
-/// the counts no clamp or rule gives an honest ceiling short of the largest whole
-/// number.
+/// the counts no clamp or rule gives an honest ceiling, which
+/// <see cref="SaveMapper"/> holds only to the sanity bound past which the next
+/// step of play would wrap (<see cref="ContentBounds.MostCount"/>).
 /// </para>
 /// </summary>
 internal static class SaveConsistency

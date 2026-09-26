@@ -613,13 +613,13 @@ public sealed class SaveConsistencyTests : IDisposable
             RefusedAt(Edited(text, past), where, problem);
         }
 
-        // The member's ceiling is summed as a long: HP XP near the largest whole
-        // number cannot wrap it below the hit points it allows.
+        // The member's ceiling is summed as a long: HP XP at its own ceiling, the
+        // count sanity bound, cannot wrap it below the hit points it allows.
         Restores(Edited(hall, tree =>
         {
-            MemberNode(tree, 2)["hpXp"] = int.MaxValue - 5;
-            MemberNode(tree, 2)["body"]!["hp"] = int.MaxValue;
-        }), "hit points under a ceiling past the largest whole number");
+            MemberNode(tree, 2)["hpXp"] = ContentBounds.MostCount;
+            MemberNode(tree, 2)["body"]!["hp"] = bar + ContentBounds.MostCount;
+        }), "hit points under the ceiling of the most HP XP");
 
         // 0h. A row's hit points: the largest bar plus what its revivals added — the
         // Flagship's halberd, standing on floor 4, given a revival's gain.
@@ -651,6 +651,100 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal(int.MaxValue / (Top(nameof(Tuning.ApplyPercent)) * Top(nameof(Tuning.ArcanePotency))), ContentBounds.DeepestTier);
         Assert.Equal(int.MaxValue - Top(nameof(Tuning.BossFloorMax)) * Top(nameof(Tuning.CooldownRunsPerFloor)), ContentBounds.MostRuns);
         Assert.Equal(Top(nameof(Tuning.EnchantmentSlots)), ContentBounds.MostEnchantments);
+        Assert.Equal(int.MaxValue / (2 * Top(nameof(Tuning.EffectPerLevel))), ContentBounds.MostLevels);
+        Assert.Equal(Top(nameof(Tuning.Offset)) + Top(nameof(Tuning.PerStack)) * ContentBounds.DeepestStack, ContentBounds.MostHeldShots);
+    }
+
+    [Fact]
+    public void ACountPlayGrowsStopsShortOfItsWrap_ABodyStandsOnTheMap_AndABudgetNests()
+    {
+        // The audit's gaps (Phase 5.S): every count play grows a step at a time is
+        // held to the sanity bound below which the next step cannot wrap
+        // (ContentBounds.MostCount); a status's levels below where their effect
+        // wraps, a hold below the largest Overwatch value; a row's spawn index
+        // inside its floor's rows; a float finite — the next save could not write
+        // infinity — a body on the map, and a member's four budgets as a turn
+        // leaves them. At each ceiling the save loads; one past it is refused at
+        // the field's own path.
+        const string countWhy = "a count play grows a turn or a gain at a time never nears it, and past it the next step would pass the largest whole number";
+        const string offTheMap = "that way, and a body stands on it";
+        int most = ContentBounds.MostCount;
+        string hall = Save(HallCleared());
+        string mid = Save(VisitSaveTests.Flagship().Campaign);
+        int rows = FloorNode(JsonNode.Parse(mid)!.AsObject(), 3)["enemies"]!.AsArray().Count;
+        float width = MapGenerator.Cols * GameConstants.Tile, height = MapGenerator.Rows * GameConstants.Tile;
+        float longest = ContentBounds.Distance * 1.5f;
+        void Budgets(JsonObject tree, float whole, float cap, float left)
+        {
+            var member = MemberNode(tree, 0);
+            member["budgetBeforeMire"] = whole;
+            member["effectiveMax"] = cap;
+            member["distLeft"] = left;
+        }
+        void Turn(JsonObject tree, int turn)
+        {
+            VisitNode(tree)["turn"] = turn;
+            if (VisitNode(tree)["carry"] is JsonObject carry)
+                carry["turn"] = turn;   // the turn's counters are this turn's
+        }
+
+        (string What, string Text, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] ceilings =
+        [
+            ("HP XP", hall, tree => MemberNode(tree, 1)["hpXp"] = most, tree => MemberNode(tree, 1)["hpXp"] = most + 1,
+                "campaign.party[1].hpXp", $"{most + 1} is above {most}: {countWhy}"),
+            ("weapon XP", hall, tree => MemberNode(tree, 1)["weaponXp"]!["Dagger"] = most, tree => MemberNode(tree, 1)["weaponXp"]!["Dagger"] = most + 1,
+                "campaign.party[1].weaponXp.Dagger", $"{most + 1} is above {most}: {countWhy}"),
+            ("an entry's XP", hall,
+                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most,
+                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most + 1,
+                "campaign.party[3].inventory[0].enchantments[0].xp", $"{most + 1} is above {most}: {countWhy}"),
+            ("mana", hall, tree => MemberNode(tree, 3)["body"]!["mana"] = most, tree => MemberNode(tree, 3)["body"]!["mana"] = most + 1,
+                "campaign.party[3].body.mana", $"{most + 1} is above {most}: {countWhy}"),
+            ("a held shot", hall,
+                tree => MemberNode(tree, 0)["body"]!["heldShots"] = ContentBounds.MostHeldShots,
+                tree => MemberNode(tree, 0)["body"]!["heldShots"] = ContentBounds.MostHeldShots + 1,
+                "campaign.party[0].body.heldShots",
+                $"{ContentBounds.MostHeldShots + 1} is above {ContentBounds.MostHeldShots}: a hold is the Overwatch value of the wielder, no more than its offset plus a stack worth for the deepest stack (Offset, PerStack, MaxForged and AcquiredHeadroom at their most)"),
+            ("a status's levels", hall,
+                tree => MemberNode(tree, 0)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels}} } ]"""),
+                tree => MemberNode(tree, 0)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels + 1}} } ]"""),
+                "campaign.party[0].body.statuses[0].levels",
+                $"{ContentBounds.MostLevels + 1} is above {ContentBounds.MostLevels}: levels are uncapped and land a hit at a time, but past it the levels times their largest effect (EffectPerLevel at its most) would pass the largest whole number"),
+            ("x", hall, tree => MemberNode(tree, 0)["body"]!["x"] = width, tree => MemberNode(tree, 0)["body"]!["x"] = width + 1,
+                "campaign.party[0].body.x", $"{width + 1} is off the map, 0 to {width}: a map is {MapGenerator.Cols} tiles of {GameConstants.Tile} {offTheMap}"),
+            ("y", hall, tree => MemberNode(tree, 0)["body"]!["y"] = 0, tree => MemberNode(tree, 0)["body"]!["y"] = -1,
+                "campaign.party[0].body.y", $"-1 is off the map, 0 to {height}: a map is {MapGenerator.Rows} tiles of {GameConstants.Tile} {offTheMap}"),
+            ("an infinite x", hall, tree => { }, tree => MemberNode(tree, 0)["body"]!["x"] = JsonNode.Parse("1e39"),
+                "campaign.party[0].body.x", "infinity is no number play writes: a position or a budget is a finite number"),
+            ("the whole a turn cut from", hall,
+                tree => Budgets(tree, longest, 0, 0), tree => Budgets(tree, longest + 1, 0, 0),
+                "campaign.party[0].budgetBeforeMire",
+                $"{longest + 1} is above {longest}: a turn opens on the budget plus the bank, at most half the budget again, and no budget is longer than tuning.json measures (MovementBudget at its most)"),
+            ("a cap past its whole", hall, tree => Budgets(tree, 100, 100, 0), tree => Budgets(tree, 100, 101, 0),
+                "campaign.party[0].effectiveMax", "101 is above 100: a cap is the whole this turn cut it from less what Mire took (budgetBeforeMire)"),
+            ("movement left past the cap", hall, tree => Budgets(tree, 100, 90, 90), tree => Budgets(tree, 100, 90, 91),
+                "campaign.party[0].distLeft", "91 is above 90: movement left is what is left of the cap this turn (effectiveMax)"),
+            ("a negative bank", hall, tree => MemberNode(tree, 0)["savedMovement"] = 0, tree => MemberNode(tree, 0)["savedMovement"] = -1,
+                "campaign.party[0].savedMovement", "-1 is below 0: movement is spent to nothing at most"),
+            ("the visit's turn", mid, tree => Turn(tree, most), tree => Turn(tree, most + 1),
+                "campaign.visit.turn", $"{most + 1} is above {most}: {countWhy}"),
+            ("the dice rolled", mid, tree => VisitNode(tree)["diceRolled"] = most, tree => VisitNode(tree)["diceRolled"] = most + 1,
+                "campaign.visit.diceRolled", $"{most + 1} is above {most}: {countWhy}"),
+            ("a row's defeats", mid,
+                tree => FloorNode(tree, 3)["enemies"]![0]!["defeatCount"] = most,
+                tree => FloorNode(tree, 3)["enemies"]![0]!["defeatCount"] = most + 1,
+                "campaign.visit.floors[3].enemies[0].defeatCount", $"{most + 1} is above {most}: {countWhy}"),
+            ("a row's spawn index", mid, tree => { }, tree => FloorNode(tree, 3)["enemies"]![0]!["spawnIndex"] = rows,
+                "campaign.visit.floors[3].enemies[0].spawnIndex",
+                $"{rows} is above {rows - 1}: a floor numbers its rows from 0 in the order it placed them, the boss last, and never loses one"),
+            ("a row off the map", mid, tree => { }, tree => FloorNode(tree, 3)["enemies"]![0]!["body"]!["x"] = -1e30,
+                "campaign.visit.floors[3].enemies[0].body.x", $"{-1e30f} is off the map, 0 to {width}: a map is {MapGenerator.Cols} tiles of {GameConstants.Tile} {offTheMap}"),
+        ];
+        foreach (var (what, text, atCeiling, past, where, problem) in ceilings)
+        {
+            Restores(Edited(text, atCeiling), $"{what} at its ceiling");
+            RefusedAt(Edited(text, past), where, problem);
+        }
     }
 
     [Fact]

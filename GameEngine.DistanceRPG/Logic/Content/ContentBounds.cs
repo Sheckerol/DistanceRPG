@@ -64,7 +64,9 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// — the deepest tier an entry's arithmetic stays whole at
 /// (<see cref="DeepestTier"/>), the run count a run's end could carry past the
 /// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
-/// weapon holds (<see cref="MostEnchantments"/>). One accessor each, read once,
+/// weapon holds (<see cref="MostEnchantments"/>); and the save's sanity bounds,
+/// where a count's arithmetic stops being whole (<see cref="MostCount"/>,
+/// <see cref="MostLevels"/>, <see cref="MostHeldShots"/>). One accessor each, read once,
 /// so the content and the save never disagree about how deep a number goes.
 /// </para>
 /// <para>
@@ -136,6 +138,36 @@ internal static class ContentBounds
     /// </summary>
     internal static int MostEnchantments { get; } = Int(nameof(Tuning.EnchantmentSlots)).Max;
 
+    /// <summary>
+    /// The largest count play grows a bounded step at a time, <strong>a sanity
+    /// bound</strong>: half the largest whole number. A visit's turn and its dice,
+    /// a turn's counters, the farm's numbers, a body's mana and every XP pool are
+    /// each added to by a turn, a die, a defeat or a gain — none of them near a
+    /// million — and have no ceiling of their own. At the largest whole number the
+    /// next step would wrap negative; below half of it a billion steps remain, and
+    /// no play counts a billion turns or earns a billion XP.
+    /// </summary>
+    internal const int MostCount = int.MaxValue / 2;
+
+    /// <summary>
+    /// The most levels a saved status holds, <strong>a sanity bound</strong>:
+    /// levels are uncapped by design (§1.5, they are magnitude and duration at
+    /// once), and this is only where their arithmetic stops being whole — a
+    /// level's effect is the levels times <c>EffectPerLevel</c> (at its clamp
+    /// ceiling here), and a hit is added to that, so both stay inside an int.
+    /// Play never nears it: a level lands a hit at a time.
+    /// </summary>
+    internal static int MostLevels { get; } = int.MaxValue / (2 * Table(nameof(Tuning.EffectPerLevel)).Max);
+
+    /// <summary>
+    /// The most shots a body holds on Overwatch: a hold is the wielder's
+    /// Overwatch value (<see cref="ModifierRules.Resolve"/>), its offset plus a
+    /// stack's worth a stack, so no hold of any tuning is larger than
+    /// <c>Offset</c>'s and <c>PerStack</c>'s clamp ceilings over the deepest stack
+    /// (<see cref="DeepestStack"/>).
+    /// </summary>
+    internal static int MostHeldShots { get; } = Table(nameof(Tuning.Offset)).Max + Table(nameof(Tuning.PerStack)).Max * DeepestStack;   // PerStack read here: Magnitude is initialised below
+
     /// <summary>The most a magnitude is: the ceiling <c>tuning.json</c>'s magnitudes clamp at, <c>PerStack</c>'s.</summary>
     internal static int Magnitude { get; } = Table(nameof(Tuning.PerStack)).Max;
 
@@ -205,7 +237,8 @@ internal static class ContentBounds
     /// A weapon's forged stack, as the reader composes it — a variant's class
     /// baseline plus its adds, a unique's <c>raises</c> set over its variant — kept
     /// as a baseline's is (<see cref="Baseline"/>). A unique's <c>raises</c> is set,
-    /// not summed, so its raw number is the composed one, refused here.
+    /// not summed, so its raw number is the composed one, refused here — and
+    /// named <c>raises.M</c>, the field the file wrote it in.
     /// </summary>
     internal static NumberBound Forged { get; } = new(WeaponsJson.FileName, "forged.M", 1, DeepestForge, ForgedWhy,
         KeptBy: ContentValidator.RuleForgedStackCount);

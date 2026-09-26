@@ -1235,7 +1235,8 @@ public static class ContentValidator
         var excludes = Closure(restricted.Excludes);
         foreach (var def in data.Weapons)
         {
-            var spread = Spread(def.Id, def.Forged, OfAWeapon, rules);
+            var of = OfAWeaponIn(def, data);
+            var spread = Spread(def.Id, def.Forged, of, rules);
             var row = data.ClassOf(def.Class)
                 ?? throw new ContentException(def.Id, RuleEveryClassHasARow, $"its class {def.Class} has no row");
             var kind = row.Kind;
@@ -1305,7 +1306,7 @@ public static class ContentValidator
             // Allowed is the question, asked exactly as every graft and roll asks it
             // (PHASE5-133: "no new validation code exists"), and then the forge
             // limit; see the method.
-            RequireForgeable(def.Id, OfAWeapon, spread, kind, rules, restricted);
+            RequireForgeable(def.Id, of, spread, kind, rules, restricted);
 
             if (kind == WeaponKind.Caster)
             {
@@ -1913,7 +1914,7 @@ public static class ContentValidator
     /// (<c>baseline.CritMultiplier</c>, <c>forged.Light</c>) and the row of
     /// <see cref="ContentBounds"/> it is held to.
     /// </summary>
-    private sealed record SpreadOf(string Words, string Field, NumberBound Bound)
+    private sealed record SpreadOf(string Words, string Field, NumberBound Bound, IReadOnlySet<ModifierType>? Raised = null)
     {
         /// <summary>
         /// <paramref name="n"/> stacks of <paramref name="t"/> as a range fault,
@@ -1921,7 +1922,7 @@ public static class ContentValidator
         /// the whole range, its top the tuned <see cref="ModifierRules.MaxForged"/> of the modifier.
         /// </summary>
         public string Outside(ModifierType t, int n, ModifierRules rules)
-            => ContentBounds.Detail(Bound with { Max = rules.MaxForged(t) }, $"{Field}{t}", n);
+            => ContentBounds.Detail(Bound with { Max = rules.MaxForged(t) }, Raised?.Contains(t) == true ? $"raises.{t}" : $"{Field}{t}", n);
     }
 
     /// <summary>
@@ -1933,6 +1934,25 @@ public static class ContentValidator
 
     /// <summary>A weapon's forged spread as the reader composed it (<see cref="ContentBounds.Forged"/>): the entry is the weapon.</summary>
     private static readonly SpreadOf OfAWeapon = new("", "forged.", ContentBounds.Forged);
+
+    /// <summary>
+    /// <paramref name="def"/>'s spread as <see cref="OfAWeapon"/>, but a unique's
+    /// count its <c>raises</c> set — one its variant does not hold at that count —
+    /// named as the file writes it, <c>raises.Block</c>, the number the file
+    /// wrote: <c>raises</c> is set over the variant, not summed onto it
+    /// (<see cref="ContentBounds.Forged"/>).
+    /// </summary>
+    private static SpreadOf OfAWeaponIn(WeaponDef def, WeaponsData data)
+    {
+        if (!def.Unique || def.DerivedFrom is not { } from
+            || data.Weapons.FirstOrDefault(w => !w.Unique && w.Id == from) is not { } variant)
+            return OfAWeapon;
+        var raised = def.Forged
+            .Where(kv => !variant.Forged.TryGetValue(kv.Key, out int kept) || kept != kv.Value)
+            .Select(kv => kv.Key)
+            .ToHashSet();
+        return OfAWeapon with { Raised = raised };
+    }
 
     /// <summary>
     /// The forge's questions of <paramref name="spread"/>, forged on a weapon of

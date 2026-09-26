@@ -517,7 +517,7 @@ public class ContentBoundsTests
         // and entries, each detail now naming the field and the whole range, the top
         // the tuned limit of the modifier. A class row's baseline says it is the
         // baseline's; a unique's raises, set rather than summed, is its composed
-        // spread's number. Past the deepest forge there is, no tuning can be fitted
+        // spread's number, named as the file writes it (raises.CritWindow). Past the deepest forge there is, no tuning can be fitted
         // to it.
         string text = Shipped.Weapons!;
         var tuning = ShippedContent.Tuning;
@@ -540,10 +540,10 @@ public class ContentBoundsTests
         int window = tuning.MaxForged[CritWindow];
         var none = Raises(0);
         Assert.Equal((WeaponsJson.FileName, false, "widowmaker", ContentValidator.RuleForgedStackCount), Stamp(none));
-        Assert.Equal($"forged.CritWindow 0 is outside 1 to {window} - {ContentBounds.Forged.Why}", none.Detail);
+        Assert.Equal($"raises.CritWindow 0 is outside 1 to {window} - {ContentBounds.Forged.Why}", none.Detail);
         var raised = Raises(pastAnyForge);
         Assert.Equal((WeaponsJson.FileName, false, "widowmaker", ContentValidator.RuleMaxForged), Stamp(raised));
-        Assert.Equal($"forged.CritWindow {pastAnyForge} is outside 1 to {window} - {ContentBounds.Forged.Why}", raised.Detail);
+        Assert.Equal($"raises.CritWindow {pastAnyForge} is outside 1 to {window} - {ContentBounds.Forged.Why}", raised.Detail);
 
         // Every one of them is drawn in the font of the screen that stops the game.
         foreach (var error in new[] { zero, deep, none, raised })

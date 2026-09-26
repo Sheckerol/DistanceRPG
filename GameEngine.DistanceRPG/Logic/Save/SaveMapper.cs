@@ -34,7 +34,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// count from its floor, and every count whose larger value would wrap the
 /// arithmetic that reads it up to a ceiling, beside its floor: a forged stack,
 /// a live one, a member's innate, an entry's tier, a weapon's entries, the run
-/// counter, a body's hit points, the boss floor. A lock wraps nothing, so it
+/// counter, a body's hit points, the boss floor, a status's levels, a hold, and
+/// every count play grows a step at a time (<see cref="Count"/>). A float is
+/// finite, a body stands on the map, and a member's movement budgets nest as a
+/// turn leaves them. A lock wraps nothing, so it
 /// keeps its floor alone (<see cref="LockedUntil"/>). Each ceiling is read off
 /// <see cref="ContentBounds"/> — a <c>tuning.json</c> clamp's ceiling or a rule,
 /// never the tuning in hand — so no tuning in range and no content that loads
@@ -374,9 +377,9 @@ internal static class SaveMapper
         var member = PartyMemberState.Restore(row.Id, row.ColorIndex, stats, bag.Count);
 
         foreach (var (name, xp) in Required(row.WeaponXp, $"{at}.weaponXp"))
-            member.WeaponXp[EnumOf<WeaponClass>(name, $"{at}.weaponXp.{name}", "weapon class")] = NotNegative(xp, $"{at}.weaponXp.{name}");
-        member.HpXp = NotNegative(row.HpXp, $"{at}.hpXp");
-        member.ManaXp = NotNegative(row.ManaXp, $"{at}.manaXp");
+            member.WeaponXp[EnumOf<WeaponClass>(name, $"{at}.weaponXp.{name}", "weapon class")] = Count(xp, $"{at}.weaponXp.{name}");
+        member.HpXp = Count(row.HpXp, $"{at}.hpXp");
+        member.ManaXp = Count(row.ManaXp, $"{at}.manaXp");
         member.Innate = Modifiers(row.Innate, $"{at}.innate", _ => (ContentBounds.DeepestStack, DeepestStackWhy));
         member.Attunement = row.Attunement is { } attunement ? EnumOf<DamageType>(attunement, $"{at}.attunement", "damage type") : null;
         // A member's maximum is its bar plus a point for each HP XP at most (each
@@ -387,10 +390,17 @@ internal static class SaveMapper
         for (int slot = 0; slot < bag.Count; slot++)
             member.Inventory[slot] = bag[slot] is { } carried ? Weapon(carried, content, $"{at}.inventory[{slot}]") : null;
 
-        member.DistLeft = row.DistLeft;
-        member.EffectiveMax = row.EffectiveMax;
-        member.SavedMovement = row.SavedMovement;
-        member.BudgetBeforeMire = row.BudgetBeforeMire;
+        // A turn's start cashes the bank into the whole (the budget plus up to half
+        // of it again), Mire cuts the cap from the whole and never adds, and moving
+        // and acting only spend from the cap: so each is no more than the one
+        // before it, and the whole no more than the longest budget any tuning
+        // gives and half of it again.
+        member.BudgetBeforeMire = Movement(row.BudgetBeforeMire, ContentBounds.Distance * 1.5f, $"{at}.budgetBeforeMire", BudgetBeforeMireWhy);
+        member.EffectiveMax = Movement(row.EffectiveMax, member.BudgetBeforeMire, $"{at}.effectiveMax",
+            "a cap is the whole this turn cut it from less what Mire took (budgetBeforeMire)");
+        member.DistLeft = Movement(row.DistLeft, member.EffectiveMax, $"{at}.distLeft",
+            "movement left is what is left of the cap this turn (effectiveMax)");
+        member.SavedMovement = Movement(row.SavedMovement, ContentBounds.Distance / 2f, $"{at}.savedMovement", SavedMovementWhy);
         return member;
     }
 
@@ -414,12 +424,12 @@ internal static class SaveMapper
     /// </summary>
     private static void Body(ActorState actor, ActorDto body, string at, long mostHp, string mostHpWhy)
     {
-        actor.X = body.X;
-        actor.Y = body.Y;
+        actor.X = Coordinate(body.X, MapGenerator.Cols, $"{at}.x");
+        actor.Y = Coordinate(body.Y, MapGenerator.Rows, $"{at}.y");
         actor.RawHp = body.Hp is { } hp ? AtMost(NotNegative(hp, $"{at}.hp"), mostHp, $"{at}.hp", mostHpWhy) : null;
-        actor.RawMana = body.Mana is { } mana ? NotNegative(mana, $"{at}.mana") : null;
+        actor.RawMana = body.Mana is { } mana ? Count(mana, $"{at}.mana") : null;
         actor.Alive = body.Alive;
-        actor.HeldShots = NotNegative(body.HeldShots, $"{at}.heldShots");
+        actor.HeldShots = AtMost(NotNegative(body.HeldShots, $"{at}.heldShots"), ContentBounds.MostHeldShots, $"{at}.heldShots", HeldShotsWhy);
 
         var statuses = Rows(body.Statuses, $"{at}.statuses", "status");
         var landed = new HashSet<(StatusEffectType, DamageType?)>();
@@ -440,6 +450,7 @@ internal static class SaveMapper
             }
             if (status.Levels < 1)
                 throw new SaveFormatException($"{where}.levels", $"{status.Levels}: a status on an actor has a level or more, and at none it is gone");
+            AtMost(status.Levels, ContentBounds.MostLevels, $"{where}.levels", LevelsWhy);
             if (!landed.Add((type, element)))
                 throw new SaveFormatException(where, $"{type}{(element is null ? "" : $" ({element})")} is already on the actor: one entry per status");
 
@@ -482,7 +493,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.tier", $"{entry.Tier} is no tier: an entry is attached at tier 1 or deeper");
             AtMost(entry.Tier, ContentBounds.DeepestTier, $"{where}.tier", DeepestTierWhy);
             // The content's own def — the tuned one — so a unique's pin holds whatever the text says.
-            entries[i] = new Enchantment(entryDef, entry.Tier) { Xp = NotNegative(entry.Xp, $"{where}.xp") };
+            entries[i] = new Enchantment(entryDef, entry.Tier) { Xp = Count(entry.Xp, $"{where}.xp") };
         }
 
         if (row.ForgedEnchantments < 0 || row.ForgedEnchantments > entries.Length)
@@ -581,7 +592,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.memberId", $"'{clawback.MemberId}' is no member of the party");
             if (clawback.Pool is not (XpSnapshot.HpPool or XpSnapshot.ManaPool) && !Enum.GetNames<WeaponClass>().Contains(clawback.Pool, StringComparer.Ordinal))
                 throw new SaveFormatException($"{where}.pool", $"'{clawback.Pool}' is no XP pool: a weapon class, {XpSnapshot.HpPool} or {XpSnapshot.ManaPool}");
-            taken[i] = new XpClawback(clawback.MemberId, clawback.Pool, NotNegative(clawback.Before, $"{where}.before"), NotNegative(clawback.After, $"{where}.after"));
+            taken[i] = new XpClawback(clawback.MemberId, clawback.Pool, Count(clawback.Before, $"{where}.before"), NotNegative(clawback.After, $"{where}.after"));
         }
 
         return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
@@ -618,8 +629,12 @@ internal static class SaveMapper
         if (row.BossFloor < 1 || row.BossFloor > DeepestBossFloor)
             throw new SaveFormatException($"{at}.bossFloor", $"{row.BossFloor} is no boss floor: a boss waits on floor 1 to {DeepestBossFloor}");
         NotNegative(row.PromisedStacks, $"{at}.promisedStacks");
-        NotNegative(row.Turn, $"{at}.turn");
-        NotNegative(row.DiceRolled, $"{at}.diceRolled");
+        Count(row.Turn, $"{at}.turn");
+        Count(row.DiceRolled, $"{at}.diceRolled");
+        // The map seed is any long by design: every floor's seed and every stream
+        // is mixed from it, so no value is out of range — a seed whose terrain the
+        // saved rows and items do not stand on is refused by the floors it
+        // rebuilds (Floor.Restore).
         if (row.DeepestFloorIndex < 0 || row.DeepestFloorIndex >= row.BossFloor)
             throw new SaveFormatException($"{at}.deepestFloorIndex",
                 $"{row.DeepestFloorIndex} is no floor of a dungeon {row.BossFloor} deep: a floor index runs 0 to {row.BossFloor - 1}");
@@ -669,8 +684,8 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.memberId", $"'{member.MemberId}' where the party's member {i} is '{party[i].Id}': the snapshot holds the party in roster order");
             var weaponXp = new int[classes.Length];
             foreach (var (name, xp) in Required(member.WeaponXp, $"{where}.weaponXp"))
-                weaponXp[Array.IndexOf(classes, EnumOf<WeaponClass>(name, $"{where}.weaponXp.{name}", "weapon class"))] = NotNegative(xp, $"{where}.weaponXp.{name}");
-            pools[i] = new MemberXp(member.MemberId, Array.AsReadOnly(weaponXp), NotNegative(member.HpXp, $"{where}.hpXp"), NotNegative(member.ManaXp, $"{where}.manaXp"));
+                weaponXp[Array.IndexOf(classes, EnumOf<WeaponClass>(name, $"{where}.weaponXp.{name}", "weapon class"))] = Count(xp, $"{where}.weaponXp.{name}");
+            pools[i] = new MemberXp(member.MemberId, Array.AsReadOnly(weaponXp), Count(member.HpXp, $"{where}.hpXp"), Count(member.ManaXp, $"{where}.manaXp"));
         }
         return new XpSnapshot(pools);
     }
@@ -696,6 +711,9 @@ internal static class SaveMapper
             string where = $"{at}.enemies[{i}]";
             var enemy = saved[i];
             NotNegative(enemy.SpawnIndex, $"{where}.spawnIndex");
+            if (enemy.SpawnIndex >= saved.Count)
+                throw new SaveFormatException($"{where}.spawnIndex",
+                    $"{enemy.SpawnIndex} is above {saved.Count - 1}: a floor numbers its rows from 0 in the order it placed them, the boss last, and never loses one");
             if (!spawns.Add(enemy.SpawnIndex))
                 throw new SaveFormatException($"{where}.spawnIndex", $"{enemy.SpawnIndex} is already a row of this floor: each row has its own spawn index");
             if (enemy.Boss && !bottom)
@@ -764,13 +782,13 @@ internal static class SaveMapper
         if (row.DefeatedAtTurn < -1 || row.DefeatedAtTurn > visit.Turn)
             throw new SaveFormatException($"{at}.defeatedAtTurn", $"{row.DefeatedAtTurn}: a row falls on a turn the visit has had, 0 to {visit.Turn}, or never (-1)");
         enemy.DefeatedAtTurn = row.DefeatedAtTurn;
-        enemy.TurnsSinceSeen = NotNegative(row.TurnsSinceSeen, $"{at}.turnsSinceSeen");
-        enemy.DefeatCount = NotNegative(row.DefeatCount, $"{at}.defeatCount");
+        enemy.TurnsSinceSeen = Count(row.TurnsSinceSeen, $"{at}.turnsSinceSeen");
+        enemy.DefeatCount = Count(row.DefeatCount, $"{at}.defeatCount");
         if (row.RevivalsRolled < 0 || row.RevivalsRolled > row.DefeatCount)
             throw new SaveFormatException($"{at}.revivalsRolled", $"{row.RevivalsRolled}: the cycles rolled run 0 to the defeats, {row.DefeatCount}");
         enemy.RevivalsRolled = row.RevivalsRolled;
-        enemy.RevivalDamage = NotNegative(row.RevivalDamage, $"{at}.revivalDamage");
-        enemy.RevivalMaxHp = NotNegative(row.RevivalMaxHp, $"{at}.revivalMaxHp");
+        enemy.RevivalDamage = Count(row.RevivalDamage, $"{at}.revivalDamage");
+        enemy.RevivalMaxHp = Count(row.RevivalMaxHp, $"{at}.revivalMaxHp");
         enemy.DropTaken = row.DropTaken;
 
         if (row.GroundItem is { } lying)
@@ -889,7 +907,7 @@ internal static class SaveMapper
             for (int i = 0; i < rows.Count; i++)
             {
                 var actor = Actor(rows[i].Actor, $"{where}[{i}].actor");
-                if (!counts.TryAdd(actor, NotNegative(rows[i].Count, $"{where}[{i}].count")))
+                if (!counts.TryAdd(actor, Count(rows[i].Count, $"{where}[{i}].count")))
                     throw new SaveFormatException($"{where}[{i}].actor", "already counted: an actor is named once");
             }
             return counts;
@@ -902,7 +920,7 @@ internal static class SaveMapper
             string where = $"{at}.reactionUses[{i}]";
             var actor = Actor(uses[i].Actor, $"{where}.actor");
             var type = EnumOf<ModifierType>(uses[i].Modifier, $"{where}.modifier", "modifier");
-            if (!reactions.TryAdd((actor, type), NotNegative(uses[i].Count, $"{where}.count")))
+            if (!reactions.TryAdd((actor, type), Count(uses[i].Count, $"{where}.count")))
                 throw new SaveFormatException(where, $"{type} is already counted for this actor: an actor's reaction is named once");
         }
 
@@ -954,6 +972,44 @@ internal static class SaveMapper
         => value <= most ? value : throw new SaveFormatException(at, $"{value} is above {most}: {why}");
 
     /// <summary>
+    /// A count play grows a bounded step at a time — a turn, a die, a defeat, an
+    /// XP gain — not negative, and no larger than <see cref="ContentBounds.MostCount"/>,
+    /// the sanity bound below which the next step cannot wrap.
+    /// </summary>
+    private static int Count(int value, string at)
+        => AtMost(NotNegative(value, at), ContentBounds.MostCount, at, CountWhy);
+
+    /// <summary>
+    /// A float play writes finite: never infinite and never not a number, which
+    /// the next save could not write — JSON has no word for either — asked before
+    /// any range, so the refusal says which it is.
+    /// </summary>
+    private static void Finite(float value, string at)
+    {
+        if (!float.IsFinite(value))   // named in words: the HUD's font has no glyph for infinity
+            throw new SaveFormatException(at, $"{(float.IsNaN(value) ? "not a number" : value > 0 ? "infinity" : "minus infinity")} is no number play writes: a position or a budget is a finite number");
+    }
+
+    /// <summary>Where a body stands on one axis, in logic units: on the map, from its near edge at 0 to its far edge <paramref name="tiles"/> tiles on.</summary>
+    private static float Coordinate(float value, int tiles, string at)
+    {
+        Finite(value, at);
+        float most = tiles * GameConstants.Tile;
+        return value is >= 0f && value <= most
+            ? value
+            : throw new SaveFormatException(at, $"{value} is off the map, 0 to {most}: a map is {tiles} tiles of {GameConstants.Tile} that way, and a body stands on it");
+    }
+
+    /// <summary>A movement budget, in logic units: finite, not negative, and no more than <paramref name="most"/>, and why.</summary>
+    private static float Movement(float value, float most, string at, string why)
+    {
+        Finite(value, at);
+        if (value < 0f)
+            throw new SaveFormatException(at, $"{value} is below 0: movement is spent to nothing at most");
+        return value <= most ? value : throw new SaveFormatException(at, $"{value} is above {most}: {why}");
+    }
+
+    /// <summary>
     /// The run counter — the campaign's, or its last run's copy of it — not
     /// negative, and below <see cref="ContentBounds.MostRuns"/>: a run's end adds
     /// one to it and locks a clear until it plus up to 99 × 99 runs, so from there
@@ -984,6 +1040,16 @@ internal static class SaveMapper
     private const string DeepestForgeWhy = "no forge goes deeper (MaxForged at its most)";
 
     private const string DeepestStackWhy = "no stack grows deeper than the deepest forge plus the most headroom (MaxForged and AcquiredHeadroom at their most)";
+
+    private const string CountWhy = "a count play grows a turn or a gain at a time never nears it, and past it the next step would pass the largest whole number";
+
+    private const string LevelsWhy = "levels are uncapped and land a hit at a time, but past it the levels times their largest effect (EffectPerLevel at its most) would pass the largest whole number";
+
+    private const string HeldShotsWhy = "a hold is the Overwatch value of the wielder, no more than its offset plus a stack worth for the deepest stack (Offset, PerStack, MaxForged and AcquiredHeadroom at their most)";
+
+    private const string BudgetBeforeMireWhy = "a turn opens on the budget plus the bank, at most half the budget again, and no budget is longer than tuning.json measures (MovementBudget at its most)";
+
+    private const string SavedMovementWhy = "a turn banks half its budget at most, and no budget is longer than tuning.json measures (MovementBudget at its most)";
 
     private const string DeepestTierWhy = "tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number";
 
