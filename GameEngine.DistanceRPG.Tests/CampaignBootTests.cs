@@ -1766,12 +1766,19 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(1, SaveListing.Read(slots, at.AddHours(3)).Newest!.Number);
 
             // B by hand at 13:00: its time rewritten, the rest of it as it was, the
-            // backup A byte for byte, nothing left in the temp file's place.
+            // backup A byte for byte, nothing left in the temp file's place. The file
+            // is replaced, so a resume marker standing in the slot is cleared, as
+            // every write clears it (the T4 review): in play none stands by then — no
+            // save reaches a slot before its loaded screen is up — but one whose
+            // clearing failed once that screen was up, which this takes away.
+            slot2.Store.MarkResuming();
             var log = new List<string>();
             Assert.Null(CampaignBoot.Save(slot2, campaign, report: log.Add, savedAt: at.AddHours(3), byHand: true));
             Assert.Equal(SaveCodec.Write(SaveGame.Capture(campaign, savedAt: at.AddHours(3))), slot2.Store.Read());
             Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
-            Assert.Equal([$"[Save] {slot2.Store.SavePath} already held this campaign - saved by hand, so its time alone is rewritten, and the backup kept"], log);
+            Assert.Equal([$"[Save] {slot2.Store.SavePath} already held this campaign - saved by hand, so its time alone is rewritten, and the backup kept",
+                $"[Save] {slot2.Store.ResumingPath} cleared: the save it guarded has been written over"], log);
+            Assert.False(slot2.Store.WasResuming);
             Assert.False(File.Exists(slot2.Store.TempPath));
             Assert.Equal(2, SaveListing.Read(slots, at.AddHours(3)).Newest!.Number);   // CONTINUE names the slot just saved by hand
             string stamped = slot2.Store.Read()!;
@@ -1781,6 +1788,29 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Null(CampaignBoot.Save(slot2, campaign, savedAt: at.AddHours(4)));
             Assert.Equal(stamped, slot2.Store.Read());
             Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
+
+            // A slot with no backup — a campaign's first save alone — is restamped
+            // with none made.
+            var slot3 = slots.Slot(3);
+            Assert.Null(CampaignBoot.Save(slot3, other, savedAt: at));
+            Assert.Null(CampaignBoot.Save(slot3, other, savedAt: at.AddHours(4), byHand: true));
+            Assert.Equal(SaveCodec.Write(SaveGame.Capture(other, savedAt: at.AddHours(4))), slot3.Store.Read());
+            Assert.Equal([SaveStore.FileName], Files(slot3.Store.Folder));
+
+            // Windows only: a restamp that fails — the save held open by another
+            // program that does not share its deletion — says so, and the save and
+            // its backup are what they were, each under its own name: what the
+            // answer says is kept is kept (the T4 review).
+            if (OperatingSystem.IsWindows())
+            {
+                string? held;
+                using (new FileStream(slot2.Store.SavePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    held = CampaignBoot.Save(slot2, campaign, savedAt: at.AddHours(4.5), byHand: true);
+                Assert.StartsWith("SLOT 2 COULD NOT BE SAVED (", held, StringComparison.Ordinal);
+                Assert.EndsWith(" - WHAT IT HELD IS KEPT - SEE THE LOG", held, StringComparison.Ordinal);
+                Assert.Equal(stamped, slot2.Store.Read());
+                Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
+            }
 
             // A store that refuses its writes this session restamps nothing, and says
             // why.

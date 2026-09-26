@@ -965,8 +965,10 @@ internal static class CampaignBoot
     /// Whether the save on the disk is already <paramref name="text"/> but for its
     /// time (<see cref="SaveCodec.Untimed"/>): then nothing is written, the backup
     /// stays the save before it, and the save keeps the time its state was first
-    /// written. A save that cannot be read never holds it, and the write guard
-    /// deals with it first (<see cref="MakeWay"/>).
+    /// written — but for a save by hand, which rewrites the time alone, the backup
+    /// still kept (<see cref="Save"/>, <see cref="SaveStore.Restamp"/>). A save that
+    /// cannot be read never holds it, and the write guard deals with it first
+    /// (<see cref="MakeWay"/>).
     /// </summary>
     private static bool Holds(SaveStore store, string text)
     {

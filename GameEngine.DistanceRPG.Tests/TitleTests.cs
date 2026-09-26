@@ -387,7 +387,6 @@ public sealed class TitleTests : IDisposable
         Assert.Equal("SLOT 1 - AN UNKNOWN DUNGEON FLOOR 2 - 1 RUN - 2026-09-25 14:32", Rows(Slot(1, header: Header(At, 1, "no_such_dungeon", 2))));
         Assert.Equal("SLOT 1 - THE SPEAR HALL - 1 RUN - 2026-09-25 14:32", Rows(Slot(1, header: Header(At, 1, "spear_hall", null))));
         Assert.Equal("9999-12-31 23:59", SlotText.When(DateTimeOffset.MaxValue, PlusTwo));
-        Assert.Equal("NO TIME RECORDED", SlotText.When(null, PlusTwo));
 
         // The list stands in the options' place, and the notices': ten slots, each
         // with its markers' row, the chosen one marked in yellow and the empty ones

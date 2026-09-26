@@ -36,7 +36,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// that records none, as every save written before it does. The most recent
 /// save is the one with the latest time. A save of the campaign a slot already
 /// holds writes nothing (<see cref="SaveCodec.Untimed"/>), so a save keeps the
-/// time its state was first written. Raw text a hand can edit, so a restore
+/// time its state was first written — but for a save by hand, which rewrites
+/// this time alone (the user's ruling of 2026-09-25 on the save slots, R5). Raw
+/// text a hand can edit, so a restore
 /// refuses one that is no such time (<see cref="SaveGame.SavedAtOf"/>). Appended
 /// by Phase 5.S5, with its default, last: a document written before it reads as
 /// a save with no time.

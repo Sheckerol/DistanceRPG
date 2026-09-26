@@ -130,6 +130,37 @@ public sealed class SaveMenuTests : IDisposable
 
     private static bool Names(FieldInfo? field, FieldInfo named) => field is not null && field.Module == named.Module && field.MetadataToken == named.MetadataToken;
 
+    /// <summary>
+    /// <paramref name="method"/>'s body in step with <see cref="Walk"/>, an instruction at a time: where it
+    /// starts, and what its operand says as a number — a local's index, a branch's target as an offset into
+    /// the body, a string's token — or -1 for anything else.
+    /// </summary>
+    private static List<(int Start, int Operand)> Operands(MethodBase method)
+    {
+        byte[] il = Body(method)!;
+        return InstructionsAt(il)
+            .Select(i => (i.At - i.Op.Size, i.Op.OperandType switch
+            {
+                OperandType.ShortInlineVar => il[i.At],
+                OperandType.InlineVar => BitConverter.ToUInt16(il, i.At),
+                OperandType.ShortInlineBrTarget => i.At + 1 + (sbyte)il[i.At],
+                OperandType.InlineBrTarget => i.At + 4 + BitConverter.ToInt32(il, i.At),
+                OperandType.InlineString => BitConverter.ToInt32(il, i.At),
+                _ => -1,
+            }))
+            .ToList();
+    }
+
+    /// <summary>The local an instruction loads — or, with <paramref name="load"/> false, stores — by its index; null for one that does neither.</summary>
+    private static int? Local(OpCode op, int operand, bool load)
+    {
+        OpCode[] numbered = load ? [OpCodes.Ldloc_0, OpCodes.Ldloc_1, OpCodes.Ldloc_2, OpCodes.Ldloc_3] : [OpCodes.Stloc_0, OpCodes.Stloc_1, OpCodes.Stloc_2, OpCodes.Stloc_3];
+        int at = Array.IndexOf(numbered, op);
+        if (at >= 0)
+            return at;
+        return op == (load ? OpCodes.Ldloc_S : OpCodes.Stloc_S) || op == (load ? OpCodes.Ldloc : OpCodes.Stloc) ? operand : null;
+    }
+
     /// <summary>Every method in the game assembly that calls <paramref name="target"/>, as <c>Type.Method</c> of its outermost type.</summary>
     private static string[] Callers(MethodBase target)
         => Calls(typeof(DistanceRpgGame).Assembly).Where(c => Same(c.Target, target))
@@ -246,14 +277,71 @@ public sealed class SaveMenuTests : IDisposable
         // the answer, and no key after it reaches what is behind the menu: nothing is
         // asked twice, nothing is left, and between runs nothing moves or descends.
         var host = new RecordingHost();
-        var scene = new DungeonScene(camera: null!, game: null!, Entered(), host);
+        var entered = Entered();
+        var scene = new DungeonScene(camera: null!, game: null!, entered, host);
         scene.HandleEscape();
         scene.AnyKey(Keys.D2);
         scene.AnyKey(Keys.D2);
         Assert.Equal((2, GameMenu.Pause), (host.HandSaves, scene.ActiveMenu));
-        foreach (var key in new[] { Keys.D0, Keys.D4, Keys.D9, Keys.Enter, Keys.G, Keys.X, Keys.Tab, Keys.Space })
+        int active = scene.ActiveIndex;
+
+        // In the dungeon the menu takes the number keys alone, through the one
+        // handler every key goes through (AnyKey): the digits it does not use do
+        // nothing — 0, which it passes to no one, among them.
+        foreach (var key in new[] { Keys.D0, Keys.D4, Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9 })
             scene.AnyKey(key);
-        Assert.Equal((2, 0, GameMenu.Pause), (host.HandSaves, host.QuitsToTitle, scene.ActiveMenu));
+        Assert.Equal((2, 0, GameMenu.Pause, true, active), (host.HandSaves, host.QuitsToTitle, scene.ActiveMenu, scene.CanSaveNow, scene.ActiveIndex));
+
+        // Every other key has a handler of its own (WireInput), which the menu never
+        // routes, each doing nothing behind a menu (the T4 review). Each is pressed
+        // with the menu up — the window's own call, since a scene built with no
+        // window has none, over the turn system the visit opens as a floor's would
+        // be — and leaves the scene as it was: the menu up, the turn the party's,
+        // the same member active, the host asked for nothing more. The held movement
+        // keys only mark a key held, which the frame reads behind no menu.
+        var turns = entered.Visit!.OpenTurns(entered.Party, CampaignRuns.Ten);
+        typeof(DungeonScene).GetField("_turns", Declared)!.SetValue(scene, turns);
+        Assert.True(scene.CanSaveNow);
+        var wire = Walk(typeof(DungeonScene).GetMethod("WireInput", Declared)!);
+        var pressed = new List<MethodInfo>();
+        MethodInfo? handler = null;
+        foreach (var instruction in wire)
+        {
+            if (instruction.Op == OpCodes.Ldftn)
+            {
+                handler = (MethodInfo)instruction.Called!;
+            }
+            else if (instruction.Called?.DeclaringType == typeof(GameEngine.Core.InputContext))
+            {
+                if (instruction.Called.Name == nameof(GameEngine.Core.InputContext.SubscribeToKeyPressed))
+                    pressed.Add(handler!);
+                handler = null;   // each subscription hands over the handler made just before it
+            }
+        }
+        var anyKey = typeof(DungeonScene).GetMethod(nameof(DungeonScene.AnyKey), Declared)!;
+        pressed.RemoveAll(method => Walk(method).Any(i => Same(i.Called, anyKey)));   // walked above, key by key
+        Assert.True(pressed.Count >= 10, $"WireInput subscribes {pressed.Count} key presses beside AnyKey's");
+        foreach (var press in pressed)
+            press.Invoke(scene, [null]);
+        Assert.Equal((2, 0, GameMenu.Pause, TurnPhase.Player, true, active), (host.HandSaves, host.QuitsToTitle, scene.ActiveMenu, turns.Phase, scene.CanSaveNow, scene.ActiveIndex));
+
+        // And the three keys that act at once, in the lambda WireInput hands them —
+        // TAB picks the next member (with no floor built there is no party here to
+        // pick from), SPACE ends the turn, G picks up — ask whether a menu is open
+        // before they act.
+        var menuOpen = typeof(DungeonScene).GetProperty(nameof(DungeonScene.AnyMenuOpen))!.GetMethod!;
+        foreach (var act in new MethodBase[]
+                 {
+                     typeof(DungeonScene).GetMethod("CycleActiveCharacter", Declared)!,
+                     typeof(TurnSystem).GetMethod(nameof(TurnSystem.EndTurn))!,
+                     typeof(DungeonScene).GetMethod("PickUp", Declared)!,
+                 })
+        {
+            var acting = pressed.Select(Walk).Where(walked => walked.Any(i => Same(i.Called, act))).ToList();
+            Assert.Single(acting);
+            int asked = acting[0].FindIndex(i => Same(i.Called, menuOpen));
+            Assert.True(asked >= 0 && asked < acting[0].FindIndex(i => Same(i.Called, act)), $"a key's handler reaches {act.Name} without asking whether a menu is open");
+        }
 
         var hubHost = new RecordingHost();
         var hub = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), hubHost, shownWhole: 0);
@@ -265,8 +353,8 @@ public sealed class SaveMenuTests : IDisposable
         Assert.Equal((2, true, 0, 0), (hubHost.HandSaves, hub.MenuOpen, hubHost.Descended.Count, hub.Chosen));
 
         // The menu says which slot is the campaign's, under its options: the slot it
-        // was loaded from or begun in — the autosave's, until NEW CAMPAIGN's list —
-        // or a dev override's scratch slot.
+        // was loaded from or begun in — the autosave's, for a campaign still in the
+        // save folder — or a dev override's scratch slot.
         Assert.Equal("PROGRESS SAVES TO SLOT 2 AT EVERY TURN", DungeonHud.PauseSavesLine(scene.SavesInto));
         Assert.Equal("PROGRESS SAVES TO THE AUTOSAVE AT EVERY TURN", DungeonHud.PauseSavesLine(Named(SaveSlots.Autosave).Name));
         Assert.Equal("PROGRESS SAVES TO THE SCRATCH SLOT AT EVERY TURN", DungeonHud.PauseSavesLine(Named(null).Name));
@@ -306,6 +394,15 @@ public sealed class SaveMenuTests : IDisposable
                 CampaignBoot.SaveAnswer(refusing.Slot(2), refused, []));
             Assert.Equal(before, File.ReadAllBytes(refusing.Store(2).SavePath));
             Assert.Equal(DungeonHud.Orange, DungeonHud.AnswerColor(refused!));
+
+            // A save that failed after the guard set a file aside says both, the
+            // failure first, in orange — the file is set aside whichever way the save
+            // went — and lays out clear (the T4 review).
+            string failedAfter = CampaignBoot.NotSaved(slot2, "the disk is full");
+            string both = CampaignBoot.SaveAnswer(slot2, failedAfter, said);
+            Assert.Equal($"{failedAfter} - {said[0]}", both);
+            Assert.Equal(DungeonHud.Orange, DungeonHud.AnswerColor(both));
+            Clear(Laid(PauseMenu.Options(hasTitle: true), canSave: true, both));
 
             // A dev override's scratch slot says its own name.
             var scratch = SaveSlot.Scratch(CampaignBoot.StoreFor(folder, new BootRequest("spear_hall")));
@@ -395,7 +492,9 @@ public sealed class SaveMenuTests : IDisposable
         // safe point would wait for — and the hand request is stored true nowhere
         // else; the door takes it and clears it before it asks the safe point, and
         // off one answers it and returns, so a save by hand off a safe point is
-        // answered SAVE ON YOUR OWN TURN and written neither then nor later.
+        // answered SAVE ON YOUR OWN TURN and written neither then nor later. The
+        // automatic request is cleared only past the safe point, so one that finds
+        // the campaign off it is kept for the next frame that stands at one.
         var game = typeof(DistanceRpgGame);
         var hand = game.GetField("_handSaveRequested", Declared)!;
         var automatic = game.GetField("_saveRequested", Declared)!;
@@ -419,10 +518,39 @@ public sealed class SaveMenuTests : IDisposable
         Assert.True(safe >= 0 && safe < written, "WriteRequestedSave writes before it asks the safe point");
         Assert.True(handTaken < handCleared && handCleared < safe, "WriteRequestedSave does not take and clear the save by hand before it asks the safe point");
         Assert.Equal(OpCodes.Ldc_I4_0, write[handCleared - 1].Op);
+        int autoCleared = write.FindLastIndex(i => i.Op == OpCodes.Stfld && Names(i.Field, automatic));
+        Assert.True(safe < autoCleared && autoCleared < written, "WriteRequestedSave drops an automatic request off a safe point");
+        Assert.Equal(OpCodes.Ldc_I4_0, write[autoCleared - 1].Op);
         var answered = write.Select((instruction, at) => (instruction, at)).Where(i => Same(i.instruction.Called, answer)).Select(i => i.at).ToList();
         Assert.Equal(2, answered.Count);
         Assert.True(safe < answered[0] && answered[0] < written && written < answered[1],
             "WriteRequestedSave does not answer a save by hand off a safe point before it could write, and one that was written after");
+
+        // What the door says, and to whom (the T4 review): off a safe point, the
+        // menu's own SAVE ON YOUR OWN TURN, as it stands; and each answer, and the
+        // byHand that Save is handed, is the hand request's own — the local the door
+        // took it into — so the menu is answered, and an unchanged save restamped,
+        // for a save by hand alone.
+        var operands = Operands(writeMethod);
+        int? Loaded(int at) => Local(write[at].Op, operands[at].Operand, load: true);
+        int? Stored(int at) => Local(write[at].Op, operands[at].Operand, load: false);
+        Assert.Equal(OpCodes.Ldstr, write[answered[0] - 1].Op);
+        Assert.Equal(PauseMenu.SaveOnYourTurn, writeMethod.Module.ResolveString(operands[answered[0] - 1].Operand));
+        Assert.True(Stored(handTaken + 1) is not null, "WriteRequestedSave does not take the save by hand into a local of its own");
+        int byHand = Stored(handTaken + 1)!.Value;
+        Assert.True(Loaded(written - 1) == byHand, "WriteRequestedSave does not hand Save the save by hand's own request as byHand");
+        bool OnTheHandRequest(int branch)   // the value a branch tests, followed back through any temporaries it passed through
+        {
+            int at = branch - 1;
+            int? local = Loaded(at);
+            while (local is { } temporary && temporary != byHand && at >= 2 && Stored(at - 1) == temporary)
+                local = Loaded(at -= 2);
+            return local == byHand;
+        }
+        foreach (int call in answered)
+            Assert.True(Enumerable.Range(0, call).Any(branch => (write[branch].Op == OpCodes.Brfalse_S || write[branch].Op == OpCodes.Brfalse)
+                    && operands[branch].Operand > operands[call].Start && OnTheHandRequest(branch)),
+                "WriteRequestedSave answers a save that was not asked for by hand");
 
         // A campaign between runs carries no view: the door reads the campaign's
         // visit, past the safe point, before it asks the playing scene for its view.
@@ -437,9 +565,11 @@ public sealed class SaveMenuTests : IDisposable
 
         InTempFolder(folder =>
         {
-            // Asked straight at the door anyway, off a safe point — the lance
-            // mid-stride — a save by hand writes nothing, not even the slot's
-            // folder, settles nothing, and says why.
+            // CampaignBoot.Save asked straight, off a safe point — the lance
+            // mid-stride — which the door above never does: a save by hand writes
+            // nothing, not even the slot's folder, settles nothing, and says it could
+            // not save, in its catch-all words. SAVE ON YOUR OWN TURN is the door's,
+            // pinned above by the IL alone.
             var slots = new SaveSlots(folder, 3);
             var walking = ReloadDeterminismTests.MidWalk();
             Assert.False(SaveGame.IsSafePoint(walking.Campaign));
@@ -462,8 +592,10 @@ public sealed class SaveMenuTests : IDisposable
             Assert.Equal(text, SaveCodec.Write(SaveGame.Capture(load.Campaign!, load.View, At)));
             slots.Store(1).ClearResuming();
 
-            // Between runs is always a safe point, and saved as the door saves a
-            // campaign between runs — with no view — it comes back with none.
+            // Between runs is always a safe point, and a campaign saved between runs
+            // with no view comes back with none. That the door hands it none, whatever
+            // the playing scene holds, is pinned above by the IL alone: CampaignBoot.Save
+            // keeps whatever view it is handed.
             Assert.Null(CampaignBoot.Save(slots.Slot(2), Retreated(), view: null, savedAt: At, byHand: true));
             Assert.Null(SaveCodec.Read(slots.Store(2).Read()!).View);
 
@@ -542,10 +674,20 @@ public sealed class SaveMenuTests : IDisposable
         // and the answer under them; nothing overlaps, and the block keeps clear of
         // the line along the bottom (the dungeon's help line, the hub's keys).
         Assert.True(DungeonHud.MenuBottomMargin >= BetweenRunsHud.KeysLineFromBottom);
-        const string answer = "SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG";
+        const string failure = "SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG";
+
+        // The longest answer a save by hand comes to (the T4 review): slot 9's
+        // failure after the write guard set a file aside first — one at most: once
+        // the save is set aside, the write moves into place and the backup is left
+        // unread — its full path under the player's own folder.
+        string aside = CampaignBoot.SetAsideNotice(SaveStore.FileName,
+            $"could not be read (version: {SaveCodec.CurrentVersion + 1} is newer than this build reads ({SaveCodec.CurrentVersion}))",
+            @"C:\Users\a-player-with-a-long-name\AppData\Local\DistanceRPG\saves\slot-9\campaign.unreadable-10.json");
+        string answer = CampaignBoot.SaveAnswer(Named(9), CampaignBoot.NotSaved(Named(9), "another program has it open"), [aside]);
+        Assert.StartsWith("SLOT 9 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG - CAMPAIGN.JSON COULD NOT BE READ", answer, StringComparison.Ordinal);
         foreach (var options in new IReadOnlyList<string>[] { [PauseMenu.CloseLine, PauseMenu.SaveLine], PauseMenu.Options(hasTitle: true), PauseMenu.Options(hasTitle: false) })
         {
-            foreach (string? said in new[] { null, answer })
+            foreach (string? said in new[] { null, failure, answer })
             {
                 var rows = Laid(options, canSave: true, said);
                 Clear(rows);

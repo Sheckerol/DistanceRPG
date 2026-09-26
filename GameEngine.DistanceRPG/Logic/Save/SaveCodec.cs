@@ -90,11 +90,13 @@ public static class SaveCodec
     /// out — the root's last member, on a line of its own — so two saves of one
     /// campaign taken at different times are one text, and so is a save written
     /// before the member existed and one written after it. What says whether a save
-    /// would write anything (a slot already holding the campaign keeps its save, its
-    /// backup and the time its state was first written) and whether two slots hold
-    /// the same save. A text laid out any other way — a hand edit, a text that is
-    /// no save — comes back as it is, so it compares as the bytes it holds: never
-    /// the same as a save it is not. Pure text: nothing is parsed.
+    /// would write anything: a slot already holding the campaign keeps its save, its
+    /// backup and the time its state was first written — but for a save by hand,
+    /// which rewrites the time alone and keeps the backup (the user's ruling of
+    /// 2026-09-25 on the save slots, R5; <c>CampaignBoot.Save</c>). A text laid out
+    /// any other way — a hand edit, a text that is no save — comes back as it is,
+    /// so it compares as the bytes it holds: never the same as a save it is not.
+    /// Pure text: nothing is parsed.
     /// </summary>
     internal static string Untimed(string text)
     {

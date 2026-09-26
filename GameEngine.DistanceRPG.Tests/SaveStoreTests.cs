@@ -86,6 +86,73 @@ public class SaveStoreTests
     }
 
     [Fact]
+    public void ARestampRewritesTheSaveAlone_AndOneThatFailsLeavesItAsItWas()
+    {
+        InTempFolder(folder =>
+        {
+            // A save by hand of an unchanged campaign (the user's ruling of
+            // 2026-09-25 on the save slots, R5): the save's text replaced in one step,
+            // the backup never rotated, and no temp file left behind.
+            var store = new SaveStore(folder);
+            store.Write("first");
+            store.Write("second");
+            byte[] backup = File.ReadAllBytes(store.BackupPath);
+            store.Restamp("second, stamped");
+            Assert.Equal(("second, stamped", "first"), (store.Read(), store.ReadBackup()));
+            Assert.Equal(backup, File.ReadAllBytes(store.BackupPath));
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(folder));
+
+            // A restamp that fails leaves the save and its backup as they were, each
+            // under its own name: a folder where the temp file goes ...
+            byte[] save = File.ReadAllBytes(store.SavePath);
+            void AsItWas()
+            {
+                Assert.Equal(save, File.ReadAllBytes(store.SavePath));
+                Assert.Equal(backup, File.ReadAllBytes(store.BackupPath));
+            }
+            Directory.CreateDirectory(store.TempPath);
+            Assert.ThrowsAny<Exception>(() => store.Restamp("second, stamped again"));
+            AsItWas();
+            Directory.Delete(store.TempPath);
+
+            // ... and, on Windows, the save held open by another program that does
+            // not share its deletion, so the step that puts the temp file in its place
+            // fails at the save itself.
+            if (OperatingSystem.IsWindows())
+            {
+                using (new FileStream(store.SavePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    Assert.ThrowsAny<Exception>(() => store.Restamp("second, stamped again"));
+                AsItWas();
+            }
+
+            // With no save there is nothing to restamp, and nothing is written; a
+            // store that refuses its writes writes nothing either.
+            var empty = new SaveStore(Path.Combine(folder, "empty"));
+            Assert.Throws<FileNotFoundException>(() => empty.Restamp("text"));
+            Assert.False(Directory.Exists(empty.Folder));
+            store.RefuseWrites("campaign.json is in the way");
+            Assert.Equal("campaign.json is in the way", Assert.Throws<IOException>(() => store.Restamp("second, stamped again")).Message);
+            AsItWas();
+        });
+
+        // The step that puts the text in place is one rename over the save
+        // (File.Move, overwriting), never a replace: a replace that names no backup
+        // is documented to fail, at times, with the save already gone and the text
+        // in the temp file alone (ReplaceFile's ERROR_UNABLE_TO_MOVE_REPLACEMENT),
+        // which no test can bring about on demand — so read off the IL (the T4
+        // review).
+        var restamp = typeof(SaveStore).GetMethod(nameof(SaveStore.Restamp))!;
+        var called = Instructions(Body(restamp)!)
+            .Where(i => i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt)
+            .Select(i => Resolve(restamp, i.Token))
+            .OfType<MethodBase>()
+            .Where(method => method.DeclaringType == typeof(File))
+            .Select(method => $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
+            .ToArray();
+        Assert.Equal(["Exists(String)", "Move(String, String, Boolean)"], called);
+    }
+
+    [Fact]
     public void AnUnreadableSaveIsSetAside_NeverOverwritten()
     {
         InTempFolder(folder =>

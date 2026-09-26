@@ -945,9 +945,11 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.True(CampaignBoot.Load(slots.Slot(1), GameContent.Current).Loaded);
             Assert.True(slot1.WasResuming);
 
-            // Another campaign written into it — a save by hand into the slot, or the
-            // autosave after a load of another — replaces the file the marker guarded,
-            // so the marker goes with it, and the log says so.
+            // Another campaign written into it — the campaign's own later save, or NEW
+            // CAMPAIGN's first save once Abandon has set the old one aside, the ways a
+            // slot's file is replaced now that every save goes into its campaign's
+            // own slot (R5) — replaces the file the marker guarded, so the marker goes
+            // with it, and the log says so.
             var other = Cleared();
             var log = new List<string>();
             Assert.Null(CampaignBoot.Save(slots.Slot(1), other, report: log.Add, savedAt: T2));
@@ -961,8 +963,11 @@ public sealed class SaveSlotsTests : IDisposable
             StateAssert.Equivalent(other, next.Campaign!, "campaign");
             Assert.DoesNotContain(Files(slot1.Folder), name => name.Contains("crashed", StringComparison.Ordinal));
 
-            // A save that writes nothing — the slot already holds the campaign —
-            // replaces nothing, and the marker stands; so does a write that fails.
+            // The game's own save that writes nothing — the slot already holds the
+            // campaign — replaces nothing, and the marker stands; so does a write that
+            // fails. (A save by hand of it replaces the file with its time alone
+            // rewritten, and clears the marker as every write does: CampaignBootTests'
+            // ASaveByHandOfAnUnchangedCampaignStampsItsTime_KeepingTheBackup.)
             Assert.True(slot1.WasResuming);
             Assert.Null(CampaignBoot.Save(slots.Slot(1), other, savedAt: T3));
             Assert.True(slot1.WasResuming);

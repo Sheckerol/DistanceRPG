@@ -139,23 +139,22 @@ internal static class SlotText
 
     /// <summary>
     /// When a save was written, to the minute, in <paramref name="zone"/> —
-    /// <c>2026-09-25 14:32</c> — or <see cref="NoTimeRecorded"/> for none. A time
-    /// the zone cannot hold (a hand edit at the very ends of the calendar) is shown
-    /// in UTC rather than throw.
+    /// <c>2026-09-25 14:32</c>. A save that records no time has no such words: its
+    /// row leaves the time off, and its markers say <see cref="NoTimeRecorded"/>. A
+    /// time the zone cannot hold (a hand edit at the very ends of the calendar) is
+    /// shown in UTC rather than throw.
     /// </summary>
-    internal static string When(DateTimeOffset? at, TimeZoneInfo zone)
+    internal static string When(DateTimeOffset at, TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(zone);
-        if (at is not { } time)
-            return NoTimeRecorded;
         DateTimeOffset shown;
         try
         {
-            shown = TimeZoneInfo.ConvertTime(time, zone);
+            shown = TimeZoneInfo.ConvertTime(at, zone);
         }
         catch (ArgumentException)
         {
-            shown = time.ToUniversalTime();
+            shown = at.ToUniversalTime();
         }
         return shown.ToString(TimeFormat, CultureInfo.InvariantCulture);
     }

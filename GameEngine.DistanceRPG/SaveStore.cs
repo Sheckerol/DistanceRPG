@@ -177,7 +177,7 @@ internal sealed class SaveStore
     /// <summary>
     /// Write <paramref name="text"/> in place of the save <strong>without rotating
     /// the backup</strong>: into <see cref="TempName"/>, flushed to the disk, then
-    /// in place of the save in one step, the save it replaces kept nowhere. Only for
+    /// renamed over the save in one step, the save it replaces kept nowhere. Only for
     /// a save that holds <paramref name="text"/> already but for its time — a save
     /// by hand of an unchanged campaign (the user's ruling of 2026-09-25 on the save
     /// slots, R5), which stamps the file's time as old games' saves do — so the
@@ -185,6 +185,13 @@ internal sealed class SaveStore
     /// what is replaced differs from what replaces it in its time alone. The caller
     /// decides that (<c>CampaignBoot.Save</c>). The save is then one this session
     /// knows, and the backup is known as it was.
+    /// <para>
+    /// A rename, never <see cref="Write"/>'s replace: a replace that makes no
+    /// backup can, by the operating system's own account, fail at its last step
+    /// with the save already gone and the text left in the temp file alone, where a
+    /// rename that fails leaves the save as it was, under its own name (the T4
+    /// review).
+    /// </para>
     /// </summary>
     /// <exception cref="IOException">The write failed, or writes are refused; the save on the disk is what it was.</exception>
     /// <exception cref="FileNotFoundException">There is no save to restamp; nothing is written.</exception>
@@ -202,7 +209,7 @@ internal sealed class SaveStore
             stream.Write(Utf8.GetBytes(text));
             stream.Flush(flushToDisk: true);
         }
-        File.Replace(TempPath, SavePath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+        File.Move(TempPath, SavePath, overwrite: true);   // one rename: a failure leaves the save where and what it was
         SaveVouched = true;
     }
 

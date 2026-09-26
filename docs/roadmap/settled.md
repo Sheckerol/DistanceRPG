@@ -2021,8 +2021,8 @@ superseded whole.
     count raised again makes it an ordinary slot. (Superseded by the user's ruling
     of the same day on the save slots, in what such a slot takes: loading it is
     choosing it, so the campaign played from it saves into it, marked `BEYOND THE
-    3 SLOTS` and no longer `- LOAD ONLY`; the save list never offers it — R5, the
-    slot, below.)
+    3 SLOTS` and no longer `- LOAD ONLY`; NEW CAMPAIGN never offers it — R5, the
+    slot, and R5, NEW CAMPAIGN, below.)
   - **Every save carries its time** — `savedAt`, the document's last member: the
     UTC instant as round-trip text, from the edge's clock. `Logic/` never reads a
     clock; the game hands the time in, and a test a fixed one. A save written
@@ -2629,13 +2629,21 @@ out each alternative.
     slot holds already writes nothing and keeps the time (R2, the folder). Left
     at that, a player who loads the older of two slots, presses SAVE GAME and
     quits would find CONTINUE naming the other slot, a different campaign. So a
-    save by hand rewrites the save's time alone — a temp file flushed, then put
-    in the save's place with no backup made (`SaveStore.Restamp`) — as old games'
-    saves stamp their file, and the slot just saved by hand is the one CONTINUE
-    names. The backup is not rotated: it stays the save before, a different
-    state, so one save deep holds. "A save keeps the time its state was first
-    written" now holds for the game's own saves alone. A slot that takes no saves
-    this session restamps nothing.
+    save by hand rewrites the save's time alone — a temp file flushed, then
+    renamed over the save in one step with no backup made (`SaveStore.Restamp`) —
+    as old games' saves stamp their file, and the slot just saved by hand is the
+    one CONTINUE names. The backup is not rotated: it stays the save before, a
+    different state, so one save deep holds. "A save keeps the time its state was
+    first written" now holds for the game's own saves alone. A slot that takes no
+    saves this session restamps nothing. The step is a rename, not the replace
+    a write over a save takes (the review of this step): a replace that makes no
+    backup can fail at its last step with the save already gone, where a rename
+    that fails leaves the save as it was, so `WHAT IT HELD IS KEPT` stays true.
+    The file is replaced all the same, so, like every write, a restamp clears a
+    resume marker standing in the slot. In play none stands by then — no save
+    reaches a slot before its loaded screen is up — but one whose clearing
+    failed once that screen was up, which the restamp takes away (the review of
+    this step).
   - **The menu names the slot — bends the plan, needs no ruling**: under the
     options, `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — `... TO THE AUTOSAVE
     ...` for a campaign in the save folder itself, `... TO THE SCRATCH SLOT ...`
