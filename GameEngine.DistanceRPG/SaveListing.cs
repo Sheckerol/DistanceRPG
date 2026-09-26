@@ -66,8 +66,9 @@ public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, 
 /// one; a time more than a day ahead of the clock counts as none, so a hand edit
 /// or a clock once set wrong can never pin the choice on one slot through every
 /// later autosave; and a tie goes to the lower number — the old autosave's, 0,
-/// the lowest while it is listed — by number, never by any folder's order. File times are never read: a copy or a
-/// sync rewrites them, and a test cannot fix them.</item>
+/// the lowest while it is listed — by number, never by any folder's order. File
+/// times are never read: a copy or a sync rewrites them, and a test cannot fix
+/// them.</item>
 /// </list>
 /// Public, as <see cref="ResumeView"/> is: a scene's constructor and a host's
 /// interface hand it across. Its reader stays internal, as the stores are.

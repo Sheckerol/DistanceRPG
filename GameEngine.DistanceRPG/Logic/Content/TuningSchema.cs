@@ -8,9 +8,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <see cref="Enchanter"/> holds what a deposit costs, the user's ruling of
 /// 2026-09-25, as keys no rule of play reads until Phase 6a builds the enchanter
 /// (<see cref="TuningKey.Played"/>); its other two keys arrive with their Phase 6a
-/// readers. <see cref="Saves"/> holds how many manual save slots there are, the
-/// user's ruling of the same day on the save model: the launcher's number, never a
-/// rule of play's. The file's heading for each group names the keys still to come,
+/// readers. <see cref="Saves"/> holds how many save slots there are, the user's
+/// ruling of the same day on the save model: the launcher's number, never a rule
+/// of play's. The file's heading for each group names the keys still to come,
 /// so §5.3's one screen stays whole.
 /// </summary>
 public enum TuningGroup

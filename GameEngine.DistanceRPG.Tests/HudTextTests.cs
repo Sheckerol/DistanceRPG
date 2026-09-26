@@ -1193,12 +1193,13 @@ public sealed class HudTextTests : IDisposable
     {
         // 1f, 1i: a load from the title that resumes a run in progress opens on the
         // floor the save stood on, with RESUMED over the floor banner — where the
-        // screen between runs says CAMPAIGN RESUMED — and the load's notices over
-        // it: the save's word whole, as the screen between runs shows it (S8's
-        // review), then what the data files raised, capped as every screen caps
-        // it (1h). The plain CAMPAIGN RESUMED is the banner's own word there, so it
-        // is not said twice; resumed from the backup, the notice says so. Built
-        // with no window, as a scene is read.
+        // screen between runs says CAMPAIGN RESUMED FROM SLOT 2 — and the load's
+        // notices over it: the save's word whole, as the screen between runs shows
+        // it (S8's review), then what the data files raised, capped as every screen
+        // caps it (1h). The load's word that it resumed the slot's own save,
+        // whatever slot it names, is the banner's own word there, so it is not said
+        // twice; resumed from the backup, the notice says so. Built with no window,
+        // as a scene is read.
         var campaign = CampaignState.Start(GameContent.Current);
         var visit = campaign.Enter("spear_hall", mapSeed: 4);
         Assert.Equal(5, visit.BossFloor);   // seed 4 rolls the Spear Hall five deep
@@ -1208,8 +1209,9 @@ public sealed class HudTextTests : IDisposable
             GameContent.Current);
         Assert.Equal((1, (TurnSystem?)null), (loaded.Campaign.Visit!.FloorIndex, loaded.Campaign.Visit.Turns));
 
-        // The save's word is the first two, as the game counts it (StartupNotices.Leading).
-        string[] notices = [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, "tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"];
+        // The save's word is the first two, as the game counts it: slot 2 resumed
+        // from its own save, and the numbers changed (StartupNotices.Leading).
+        string[] notices = [CampaignBoot.Resumed(Named(2), backup: false), CampaignBoot.TuningChanged, "tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"];
         var scene = new DungeonScene(camera: null!, game: null!, loaded.Campaign, new NoRunHost(), new ResumeView(loaded.View, 2, notices));
         Assert.Equal([DungeonHud.ResumedLine, "THE SPEAR HALL", "FLOOR 2"], scene.BannerLines);
         Assert.Equal("RESUMED", DungeonHud.ResumedLine);
@@ -1217,6 +1219,43 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(CampaignBoot.TuningChanged, string.Join(" ", scene.NoticeRows.Take(2).Select(row => row.Trim())));
         Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", scene.NoticeRows[^1]);
         Assert.DoesNotContain(scene.NoticeRows, row => row.Contains(BetweenRunsHud.Resumed, StringComparison.Ordinal));
+
+        // So is every slot's word from its own save, the old autosave's and the
+        // scratch slot's too, now that every load names its slot (the user's ruling
+        // of 2026-09-25 on the save slots, R5): neither shown nor counted among the
+        // words shown whole.
+        var every = new DungeonHud(game: null!);
+        foreach (var slot in Enumerable.Range(SaveSlots.OldAutosave, SaveSlots.Most + 1).Select(n => Named(n)).Append(Named(null)))
+        {
+            every.ShowResume(loaded.Campaign.Visit, [CampaignBoot.Resumed(slot, backup: false), CampaignBoot.TuningChanged, "one", "two", "three", "four"], leading: 2);
+            Assert.Equal(NoticeText.Rows([CampaignBoot.TuningChanged, "one", "two", "three", "four"], whole: 1), every.NoticeRows);
+        }
+
+        // And as the game hands them over: a mid-run save loaded from the old
+        // autosave, from slot 2 and from the scratch slot (CampaignBoot.Load), its
+        // word led as the game leads it (StartupNotices), and the floor it resumes
+        // on says RESUMED over its banner, and nothing more.
+        var folder = Directory.CreateTempSubdirectory("distancerpg-");
+        try
+        {
+            var slots = new SaveSlots(folder.FullName, 3);
+            var scratch = SaveSlot.Scratch(CampaignBoot.StoreFor(folder.FullName, new BootRequest("spear_hall")));
+            foreach (var slot in new[] { slots.Slot(SaveSlots.OldAutosave), slots.Slot(2), scratch })
+            {
+                Assert.Null(CampaignBoot.Save(slot, campaign, new ViewDto("B", MarchingThisTurn: true)));
+                var load = CampaignBoot.Load(slot, GameContent.Current);
+                Assert.Equal([CampaignBoot.Resumed(slot, backup: false)], load.Notices);
+                var led = new StartupNotices();
+                led.Lead(load.Notices);
+                var floor = new DungeonScene(camera: null!, game: null!, load.Campaign!, new NoRunHost(), new ResumeView(load.View, led.Leading, led.Take()));
+                Assert.Equal([DungeonHud.ResumedLine, "THE SPEAR HALL", "FLOOR 2"], floor.BannerLines);
+                Assert.Empty(floor.NoticeRows);
+            }
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
 
         // From the backup it says so, the longer line kept and shown whole with the
         // numbers; the data files' notices after them are capped at three rows and
@@ -1287,11 +1326,12 @@ public sealed class HudTextTests : IDisposable
         // numbers, and of the file set aside only a count of the notices in the log.
         Assert.Equal([.. whole.Take(NoticeText.MaxRows), NoticeText.More(6)], NoticeText.Rows([.. saysWhole, .. data]));
 
-        // The plain CAMPAIGN RESUMED is RESUMED over the banner, and is not counted
-        // among what is shown whole. Resumed from campaign.json itself, the numbers
-        // are the save's word, and the data files' notices are capped after them.
+        // Resumed from campaign.json itself — CAMPAIGN RESUMED FROM THE OLD
+        // AUTOSAVE, FROM SLOT 1 — the load's word is RESUMED over the banner, and
+        // is not counted among what is shown whole: the numbers are the save's
+        // word, and the data files' notices are capped after them.
         var hud = new DungeonHud(game: null!);
-        hud.ShowResume(resumed, [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, .. data], leading: 2);
+        hud.ShowResume(resumed, [CampaignBoot.Resumed(Named(SaveSlots.OldAutosave), backup: false), CampaignBoot.TuningChanged, .. data], leading: 2);
         Assert.Equal([.. NoticeText.Wrap(CampaignBoot.TuningChanged), .. NoticeText.Rows(data).Take(NoticeText.MaxRows), NoticeText.More(2)],
             hud.NoticeRows);
 
@@ -1299,7 +1339,7 @@ public sealed class HudTextTests : IDisposable
         // the banner, which stays where it has always been, a third of the way down,
         // and the rows are lifted clear of RESUMED over it.
         const float h = 720f;
-        hud.ShowResume(resumed, [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged, "one"], leading: 2);
+        hud.ShowResume(resumed, [CampaignBoot.Resumed(Named(1), backup: false), CampaignBoot.TuningChanged, "one"], leading: 2);
         Assert.Equal(3, hud.NoticeRows.Count);
         Assert.Equal(DungeonHud.HeaderLift, hud.NoticeLift);
         Assert.Equal(h / 3f, hud.BannerLineIn(h));

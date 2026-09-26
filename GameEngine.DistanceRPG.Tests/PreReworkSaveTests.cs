@@ -18,9 +18,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// current reader; the game says the numbers changed exactly when the numbers
 /// it ships are not those; and a launch resumes each — the save folder itself
 /// being the old autosave, where the listing finds it the most recent save, with
-/// no time — the mid-run one in the dungeon, where its visit plays on. In the content
-/// collection, since a restore runs under the current content and the tuning
-/// cases swap it.
+/// no time — the mid-run one in the dungeon, where its visit plays on. In the
+/// content collection, since a restore runs under the current content and the
+/// tuning cases swap it.
 /// </summary>
 [Collection(TestContent.Collection)]
 public class PreReworkSaveTests
@@ -50,8 +50,8 @@ public class PreReworkSaveTests
     /// The keys added since <c>febe036</c>, which <see cref="PlayedTuning"/> is
     /// frozen before and so lacks — each one no rule of play reads, and so none a
     /// save's hash covers: what a deposit costs, the user's ruling of 2026-09-25,
-    /// declared ahead of Phase 6a's enchanter; and how many manual save slots there
-    /// are, the ruling of the same day on the save model, the launcher's.
+    /// declared ahead of Phase 6a's enchanter; and how many save slots there are,
+    /// the ruling of the same day on the save model, the launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [

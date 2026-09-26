@@ -467,8 +467,8 @@ public sealed class SaveMenuTests : IDisposable
             Assert.Equal(NoticeText.Wrap(notice), answer.Select(row => row.Text));
             Assert.DoesNotContain(answer, row => row.Text.Contains('\\', StringComparison.Ordinal));
 
-            // The slot loads its new campaign; the old autosave was never touched; and a
-            // second save by hand into the slot rotates as every save does.
+            // The slot loads its new campaign; the old autosave was never touched;
+            // and a second save by hand into the slot rotates as every save does.
             var load = CampaignBoot.Load(slots.Slot(3), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 3"], load.Notices);

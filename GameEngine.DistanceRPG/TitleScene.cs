@@ -114,7 +114,7 @@ internal sealed class TitleMenu
     /// <summary>The slots the title offers, as they were read when it opened.</summary>
     public SaveListing Listing { get; }
 
-    /// <summary>How many manual slots there are: those the listing holds up to the count, beyond which a slot is listed as beyond it.</summary>
+    /// <summary>How many save slots there are: those the listing holds up to the count, beyond which a slot is listed as beyond it.</summary>
     public int Count { get; }
 
     /// <summary>The option chosen now, as its index in <see cref="Options"/>.</summary>

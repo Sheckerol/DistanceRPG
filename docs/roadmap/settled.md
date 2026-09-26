@@ -2719,6 +2719,16 @@ out each alternative.
     (`THE SCRATCH SLOT COULD NOT BE SAVED (...)`). A save that stops at a file it
     could not set aside says so in the failed save's words, naming the slot and
     why, as a numbered slot's always did.
+  - **A floor resumed mid-run says `RESUMED` over its banner, and no more, from
+    whichever slot — bends the plan, needs no ruling**: a load's word that it
+    resumed the slot's own save, `CAMPAIGN RESUMED FROM SLOT 2` or `... FROM THE
+    OLD AUTOSAVE`, is the banner's own word there, as the autosave's plain
+    `CAMPAIGN RESUMED` was, so it is not said again among the floor's notices,
+    which are drawn in the warning's orange; from the backup it is news the
+    banner does not carry, and is shown whole, as ever. A numbered slot's floor
+    had shown `CAMPAIGN RESUMED FROM SLOT 2` there, in orange, since the slots,
+    where every account of the resume says `RESUMED` over the floor banner; the
+    old autosave's did the same once its word named it, until this step's review.
   - **It is listed only while it holds a campaign**: LOAD GAME shows the `OLD
     AUTOSAVE` first while the save folder holds a `campaign.json` or a
     `campaign.bak.json` — a marker or a file set aside alone is nothing to load —

@@ -187,10 +187,31 @@ internal static class CampaignBoot
     {
         ArgumentNullException.ThrowIfNull(slot);
         if (!backup)
-            return $"{BetweenRunsHud.Resumed} FROM {slot.Name}";
+            return $"{ResumedFrom}{slot.Name}";
         return slot.Number is > SaveSlots.OldAutosave
-            ? $"{BetweenRunsHud.Resumed} FROM THE BACKUP OF {slot.Name}, ONE SAVE OLDER"
-            : $"{BetweenRunsHud.Resumed} FROM {slot.Name} BACKUP, ONE SAVE OLDER";
+            ? $"{ResumedFrom}THE BACKUP OF {slot.Name}{OneSaveOlder}"
+            : $"{ResumedFrom}{slot.Name} BACKUP{OneSaveOlder}";
+    }
+
+    /// <summary>How every word of <see cref="Resumed"/> starts, before the slot.</summary>
+    private const string ResumedFrom = BetweenRunsHud.Resumed + " FROM ";
+
+    /// <summary>How <see cref="Resumed"/>'s word from a backup ends.</summary>
+    private const string OneSaveOlder = ", ONE SAVE OLDER";
+
+    /// <summary>
+    /// Whether <paramref name="notice"/> is <see cref="Resumed"/>'s word for a load
+    /// of the slot's own save, whatever slot it names — <c>CAMPAIGN RESUMED FROM
+    /// SLOT 2</c>, <c>... FROM THE OLD AUTOSAVE</c> — and not its backup's. A floor
+    /// resumed mid-run says it by <see cref="DungeonHud.ResumedLine"/> over the
+    /// banner, and does not say it again among the notices
+    /// (<see cref="DungeonHud.ShowResume"/>); from the backup, the word is news the
+    /// banner does not carry, and is shown whole.
+    /// </summary>
+    internal static bool SaysResumedFromItsSave(string notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        return notice.StartsWith(ResumedFrom, StringComparison.Ordinal) && !notice.EndsWith(OneSaveOlder, StringComparison.Ordinal);
     }
 
     /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE OLD AUTOSAVE</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
@@ -771,8 +792,8 @@ internal static class CampaignBoot
                 Written(store, report);
                 return null;
             }
-            if (store.WritesRefused is null && MakeWay(store, report, said) is { } stuck)
-                return NotSaved(slot, store.WritesRefused ?? stuck);
+            if (store.WritesRefused is null && !MakeWay(store, report, said))
+                return NotSaved(slot, store.WritesRefused!);   // the file that would not move refused the store's writes, and says why
             store.Write(text);
             report?.Invoke($"[Save] Wrote {store.SavePath}");
             Written(store, report);
@@ -792,8 +813,8 @@ internal static class CampaignBoot
     /// the codec refuses its text and it is not one this session knows
     /// (<see cref="SaveStore.SaveVouched"/>). Silent unless it acts.
     /// </summary>
-    /// <returns>Null to go on and write; or the stuck notice, when a file the codec refuses would not move — the store refuses its writes from then on.</returns>
-    private static string? MakeWay(SaveStore store, Action<string>? report, List<string>? said)
+    /// <returns>Whether to go on and write: false when a file the codec refuses would not move — the store refuses its writes from then on (<see cref="SaveStore.RefuseWrites"/>), the file and why in its refusal, which the failure's words say.</returns>
+    private static bool MakeWay(SaveStore store, Action<string>? report, List<string>? said)
     {
         foreach (bool backup in new[] { false, true })
         {
@@ -803,10 +824,10 @@ internal static class CampaignBoot
                 continue;
             var notices = new List<string>();
             if (!SetAside(store, backup, "unreadable", $"could not be read ({why})", notices, report))
-                return notices[^1];
+                return false;   // stuck where it is: the store refuses its writes, and its refusal says why
             said?.AddRange(notices);
         }
-        return null;
+        return true;
     }
 
     /// <summary>

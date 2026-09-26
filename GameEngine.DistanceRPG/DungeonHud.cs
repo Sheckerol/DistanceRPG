@@ -91,7 +91,7 @@ public sealed class DungeonHud
     private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds, string Header = "",
         int NoticeRows = 0, float NoticeLift = 0f);
 
-    /// <summary>What a resumed visit's banner says over the floor banner (1f): <c>RESUMED</c>, where the screen between runs says <c>CAMPAIGN RESUMED</c>.</summary>
+    /// <summary>What a resumed visit's banner says over the floor banner (1f): <c>RESUMED</c>, where the screen between runs says <c>CAMPAIGN RESUMED FROM SLOT 2</c>.</summary>
     internal const string ResumedLine = "RESUMED";
 
     /// <summary>How long a resumed floor's banner stays up: long enough to read what it resumed and the trade under it.</summary>
@@ -183,9 +183,12 @@ public sealed class DungeonHud
     /// the one thing the player has to act on). Then what the data files raised,
     /// capped as every screen caps it (<see cref="NoticeText.Rows"/>), the log
     /// keeping every word. The banner moves down to make room when the word runs
-    /// long (<see cref="BannerLine"/>). The plain <c>CAMPAIGN RESUMED</c> the
-    /// screen between runs leads with is the banner's own word here, so it is not
-    /// said twice, and is not counted among the notices shown whole.
+    /// long (<see cref="BannerLine"/>). The load's word that it resumed the slot's
+    /// own save, which the screen between runs leads with — <c>CAMPAIGN RESUMED
+    /// FROM SLOT 2</c>, <c>... FROM THE OLD AUTOSAVE</c>, whatever slot it names
+    /// (<see cref="CampaignBoot.SaysResumedFromItsSave"/>) — is the banner's own
+    /// word here, so it is not said twice, and is not counted among the notices
+    /// shown whole; resumed from the backup, the word says so, whole.
     /// </summary>
     /// <param name="visit">The visit resumed, standing on the floor it was saved on.</param>
     /// <param name="notices">What the game has to say, in order: the save's word, then what the data files raised.</param>
@@ -201,7 +204,7 @@ public sealed class DungeonHud
         int whole = 0;
         for (int i = 0; i < notices.Count; i++)
         {
-            if (notices[i] == BetweenRunsHud.Resumed)
+            if (CampaignBoot.SaysResumedFromItsSave(notices[i]))
                 continue;   // RESUMED over the banner says it
             if (i < leading)
                 whole++;

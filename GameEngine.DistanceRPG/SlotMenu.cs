@@ -60,10 +60,10 @@ internal enum SlotStep
 /// starts on the lowest empty slot (<see cref="SaveListing.NewCampaignSlot"/>), so
 /// an ENTER pressed without looking sets nothing aside while a slot is free. An
 /// empty slot is chosen at once. One that holds anything — a save, a backup, or
-/// files none of which reads — asks first (<see cref="Asking"/>) whether to begin there,
-/// setting what it holds aside, and <strong>only ENTER says yes</strong>: the
-/// slot's digit again, N, Y, the arrows, ESC and every other key say no and are
-/// spent. A digit above the count is refused, saying why; 0 does nothing.
+/// files none of which reads — asks first (<see cref="Asking"/>) whether to begin
+/// there, setting what it holds aside, and <strong>only ENTER says yes</strong>:
+/// the slot's digit again, N, Y, the arrows, ESC and every other key say no and
+/// are spent. A digit above the count is refused, saying why; 0 does nothing.
 /// </para>
 /// </summary>
 internal sealed class SlotMenu

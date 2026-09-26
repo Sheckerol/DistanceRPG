@@ -99,17 +99,17 @@ namespace GameEngine.DistanceRPG;
 /// scene's own logic step (<see cref="CampaignBoot.SaveOnQuit"/>), and saves the
 /// turn the player would have met. A load resumes the campaign where it stood: on
 /// the screen between runs, <c>CAMPAIGN RESUMED FROM SLOT 2</c> under the title,
-/// or in the dungeon at the saved floor and turn, <c>RESUMED</c> over the floor banner
-/// (<see cref="ResumeRun"/>); one that brings nothing back goes back to the title,
-/// saying why. A save that cannot be read, or whose resume crashed the game, is
-/// set aside where the notice says. A write that fails is a log line and a notice
-/// — at once over the floor being played, and on the next screen until a later
-/// save goes through — never a crash, and never costs the save before it, nor a
-/// file of the slot that cannot be read, which the write sets aside first and
-/// says so; a quit that cannot save leaves a marker, and the title says, the next
-/// time it opens, that what the campaign's slot holds is from before that quit. A
-/// dev-override launch plays a fresh campaign in a slot of its own, with no title
-/// and no slots, and never touches the campaign.
+/// or in the dungeon at the saved floor and turn, <c>RESUMED</c> over the floor
+/// banner (<see cref="ResumeRun"/>); one that brings nothing back goes back to
+/// the title, saying why. A save that cannot be read, or whose resume crashed the
+/// game, is set aside where the notice says. A write that fails is a log line and
+/// a notice — at once over the floor being played, and on the next screen until a
+/// later save goes through — never a crash, and never costs the save before it,
+/// nor a file of the slot that cannot be read, which the write sets aside first
+/// and says so; a quit that cannot save leaves a marker, and the title says, the
+/// next time it opens, that what the campaign's slot holds is from before that
+/// quit. A dev-override launch plays a fresh campaign in a slot of its own, with
+/// no title and no slots, and never touches the campaign.
 /// </para>
 /// </summary>
 public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost

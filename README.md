@@ -38,14 +38,14 @@ dotnet test GameEngine.DistanceRPG.Tests/GameEngine.DistanceRPG.Tests.csproj
 The game opens on the title screen: `DISTANCE RPG`, then `CONTINUE`,
 `NEW CAMPAIGN`, `LOAD GAME` and `QUIT`, in that order. CONTINUE names the most
 recent save and resumes it where it was left: on the screen between runs, with
-`CAMPAIGN RESUMED` under the title, or back in the dungeon mid-run, with
-`RESUMED` over the floor banner (see [Saves](#saves)); with no save yet it reads
-`CONTINUE - NO SAVE YET`, dimmed, and is passed over. The screen between runs is
-the dungeon list, with the last run's summary above it once a run has ended;
-until the tutorial's golem is beaten it lists the tutorial alone. In play — in a
-dungeon or between runs — Esc opens the menu, where the campaign is saved by hand
-into its own slot, the one it saves into all the time, and play is left for the
-title.
+`CAMPAIGN RESUMED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title, or
+back in the dungeon mid-run, with `RESUMED` over the floor banner (see
+[Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
+is passed over. The screen between runs is the dungeon list, with the last run's
+summary above it once a run has ended; until the tutorial's golem is beaten it
+lists the tutorial alone. In play — in a dungeon or between runs — Esc opens the
+menu, where the campaign is saved by hand into its own slot, the one it saves
+into all the time, and play is left for the title.
 
 | Title | Action |
 | --- | --- |
@@ -124,9 +124,10 @@ slot you loaded it from, by LOAD GAME or CONTINUE, or the one you chose for it
 on NEW CAMPAIGN. Every campaign is in a **save slot**, a folder of its own in the
 save folder, in one of which every new campaign begins; a campaign an earlier
 build autosaved into the save folder itself is the **old autosave** (the user's
-rulings of 2026-09-25 on the save model and on the save slots). The game opens on the title screen, where CONTINUE resumes the most
-recent save, LOAD GAME any slot, and NEW CAMPAIGN starts fresh in the slot you
-choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
+rulings of 2026-09-25 on the save model and on the save slots). The game opens on
+the title screen, where CONTINUE resumes the most recent save, LOAD GAME any
+slot, and NEW CAMPAIGN starts fresh in the slot you choose; the menu's QUIT TO
+TITLE comes back to it, and the game quits from it.
 
 - **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\campaign.json` on Windows
   (`~/.local/share/DistanceRPG/saves/` on Linux) — the player's data folder,
@@ -157,14 +158,14 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   is when that state was first saved — but for `2  SAVE GAME`, which stamps the
   save with the time you saved it, as old games stamp their file, rewriting the
   time alone and keeping the backup as it was. The time is how the most recent
-  save is told — what CONTINUE loads: the latest time
-  wins; a save with no time counts as older than any with one; a time more than a
-  day ahead of this computer's clock counts as none, so a hand edit or a clock
-  once set wrong cannot go on winning; and a tie goes to the lowest slot — the
-  old autosave, while it is listed, before slot 1. File dates are never read, so
-  a clock set back can make an older save look like the newest. A `savedAt` that is no such time is refused like any
-  field that cannot be trusted (below): the save is set aside, `CAMPAIGN.JSON
-  COULD NOT BE READ (SAVEDAT: YESTERDAY IS NO TIME)`.
+  save is told — what CONTINUE loads: the latest time wins; a save with no time
+  counts as older than any with one; a time more than a day ahead of this
+  computer's clock counts as none, so a hand edit or a clock once set wrong
+  cannot go on winning; and a tie goes to the lowest slot — the old autosave,
+  while it is listed, before slot 1. File dates are never read, so a clock set
+  back can make an older save look like the newest. A `savedAt` that is no such
+  time is refused like any field that cannot be trusted (below): the save is set
+  aside, `CAMPAIGN.JSON COULD NOT BE READ (SAVEDAT: YESTERDAY IS NO TIME)`.
 - **When**: the campaign's own slot, all the time, on its own. Mid-run the game saves when
   a run is entered, at the start of every one of your turns, and every time the
   party arrives on a floor; it saves at a run's end (the summary with it), when
@@ -202,18 +203,18 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   menu and never quits.
 - **Resuming**: CONTINUE on the title resumes the most recent save where it was,
   and LOAD GAME any slot — the `OLD AUTOSAVE` while there is one, `SLOT 1` to
-  `SLOT 3`, then any slot above the count that holds a save — each row saying where its campaign stands (the
-  dungeon and floor, or `BETWEEN RUNS`), the runs counted and when it was saved,
-  and under it what a load of it would do that the row cannot say: `FROM ITS
-  BACKUP`, `ITS LAST LOAD DID NOT FINISH`, `AHEAD OF THIS CLOCK`, `NO TIME
-  RECORDED`, `BEYOND THE 3 SLOTS`; an empty slot says `EMPTY`. Between
-  runs it is the screen between runs, with `CAMPAIGN RESUMED FROM SLOT 2` (or
-  `FROM THE OLD AUTOSAVE`) under the title and the last run's summary above the
-  list. Mid-run it is the dungeon: the same floor,
-  turn and positions, HP, mana, statuses and movement left, the corpses lying on
-  the very weapons they lay on, the weapons left on the floor, the explored fog
-  and what the party could already see this turn, the same member active and
-  the party marching or not as it was — with `RESUMED` over the floor banner.
+  `SLOT 3`, then any slot above the count that holds a save — each row saying
+  where its campaign stands (the dungeon and floor, or `BETWEEN RUNS`), the runs
+  counted and when it was saved, and under it what a load of it would do that the
+  row cannot say: `FROM ITS BACKUP`, `ITS LAST LOAD DID NOT FINISH`, `AHEAD OF
+  THIS CLOCK`, `NO TIME RECORDED`, `BEYOND THE 3 SLOTS`; an empty slot says
+  `EMPTY`. Between runs it is the screen between runs, with `CAMPAIGN RESUMED
+  FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title and the last run's
+  summary above the list. Mid-run it is the dungeon: the same floor, turn and
+  positions, HP, mana, statuses and movement left, the corpses lying on the very
+  weapons they lay on, the weapons left on the floor, the explored fog and what
+  the party could already see this turn, the same member active and the party
+  marching or not as it was — with `RESUMED` over the floor banner.
   The dice fall as they would have without the quit: the d20 is the run's own,
   seeded by the run and saved, so reloading never rerolls a turn — on purpose,
   to protect players from themselves: a bad roll is never reloaded away. A campaign
@@ -243,10 +244,10 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`). **A slot whose saves keep
   failing costs what was played since its last save that went through**: every
   save of the campaign goes into its own slot, SAVE GAME's too, so there is
-  nowhere else to save it meanwhile, and a quit that cannot save loses what came after the
-  last save. The game says each failure as it happens, and a later save that
-  goes through — once the disk has room, or the other program lets go — saves
-  all of it. (What should become of such play is the user's to rule: SLOT
+  nowhere else to save it meanwhile, and a quit that cannot save loses what came
+  after the last save. The game says each failure as it happens, and a later save
+  that goes through — once the disk has room, or the other program lets go —
+  saves all of it. (What should become of such play is the user's to rule: SLOT
   DECISION 3 in `docs/roadmap/open-questions.md`.)
 - **No write costs a file**: before any save goes into a slot, a `campaign.json`
   there that no save can be read from — one that is not a save, or one a newer
@@ -282,14 +283,14 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   of the screen between runs, whole: `CAMPAIGN RESUMED FROM THE BACKUP OF SLOT 2,
   ONE SAVE OLDER` (`FROM THE OLD AUTOSAVE BACKUP, ...` for the old autosave),
   `THE NUMBERS HAVE CHANGED ...` when they have, and each file set aside by its
-  full path (drawn with forward slashes, since the game's font has no backslash; Windows reads it
-  either way). When the backup holds a run in progress, the floor it resumes on
-  says the same, whole, over the floor banner; the banner moves down to make
-  room, and the words stay up longer the more there are. Only what the data
-  files raised after that is cut to three rows (`+N MORE - SEE THE LOG`). The log
-  has every word. **Rename it back to `campaign.json` to try it again** (what NEW
-  CAMPAIGN set aside is moved instead: Starting over, below). Nothing ever writes
-  over a file set aside.
+  full path (drawn with forward slashes, since the game's font has no backslash;
+  Windows reads it either way). When the backup holds a run in progress, the
+  floor it resumes on says the same, whole, over the floor banner; the banner
+  moves down to make room, and the words stay up longer the more there are. Only
+  what the data files raised after that is cut to three rows (`+N MORE - SEE THE
+  LOG`). The log has every word. **Rename it back to `campaign.json` to try it
+  again** (what NEW CAMPAIGN set aside is moved instead: Starting over, below).
+  Nothing ever writes over a file set aside.
 - **No field of a save is trusted** (the user's ruling of 2026-09-25: "since we
   are storing in raw json we should probably not trust the fields"). Each is
   checked on its own — an id the content has, a count no smaller than play
@@ -413,14 +414,14 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
   either is told which key took its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
-  that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that we don't need to fix
-  the code every time I change my mind". At least 1 and at most 9, a digit
-  choosing each: `"SaveSlots": 12` plays 9 and says `TUNING.JSON: SAVESLOTS 12 IS
-  ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above the count keeps
-  its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and loaded, it goes on
-  saving the campaign played from it; NEW CAMPAIGN never offers it. The launcher
-  reads it and no rule of play does, so, like
-  the Enchanter's keys, turning it never says `THE NUMBERS HAVE CHANGED`.
+  that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
+  we don't need to fix the code every time I change my mind". At least 1 and at
+  most 9, a digit choosing each: `"SaveSlots": 12` plays 9 and says `TUNING.JSON:
+  SAVESLOTS 12 IS ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above
+  the count keeps its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and
+  loaded, it goes on saving the campaign played from it; NEW CAMPAIGN never
+  offers it. The launcher reads it and no rule of play does, so, like the
+  Enchanter's keys, turning it never says `THE NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`

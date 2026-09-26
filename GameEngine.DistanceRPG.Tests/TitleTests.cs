@@ -319,10 +319,10 @@ public sealed class TitleTests : IDisposable
         Assert.Equal(((int)TitleOption.NewCampaign, (SlotMenu?)null), (escaped.Cursor, escaped.List));
         Assert.False(escaped.Escape());
 
-        // Never the old autosave, and never a slot beyond the count: 0 and the keypad do
-        // nothing, and a digit above the count says why — in the HUD's font, in
-        // orange above the keys — until the next key. Slot 5 holds a save beyond the
-        // count, and is still never offered.
+        // Never the old autosave, and never a slot beyond the count: 0 and the
+        // keypad do nothing, and a digit above the count says why — in the HUD's
+        // font, in orange above the keys — until the next key. Slot 5 holds a save
+        // beyond the count, and is still never offered.
         var never = Opened();
         foreach (var key in new[] { Keys.D0, Keys.KeyPad0, Keys.KeyPad1, Keys.KeyPad2, Keys.KeyPad5 })
             Assert.Equal((default(TitleStep), (string?)null, false, 2), (never.Press(key), never.List!.Said, never.Asking, never.List.Rows[never.List.Cursor].Number));

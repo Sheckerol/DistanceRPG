@@ -23,11 +23,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// and never touches the campaign; a tuning changed since the save is said on
 /// screen; and a write that fails is a notice, never an exception, and never
 /// costs the save before it. Every case runs on a temporary folder of its own,
-/// deleted after, whose store is slot 1's, named as a player sees it. The runs behind the saves
-/// stand on the numbers they were written against — the seeds' depths, the mercy
-/// floor (<see cref="Premise"/>) — made current for each test, and a campaign is
-/// built and restored under it and some cases change the numbers over it, so the
-/// content collection holds it.
+/// deleted after, whose store is slot 1's, named as a player sees it. The runs
+/// behind the saves stand on the numbers they were written against — the seeds'
+/// depths, the mercy floor (<see cref="Premise"/>) — made current for each test,
+/// and a campaign is built and restored under it and some cases change the numbers
+/// over it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
 public sealed class CampaignBootTests : IDisposable
@@ -401,8 +401,8 @@ public sealed class CampaignBootTests : IDisposable
             Assert.False(crashes.WasResuming);
             TheAutosaveUntouched();
 
-            // The old autosave itself, when nothing of it loads: the title says so of
-            // the old autosave, by its name, then what was set aside.
+            // The old autosave itself, when nothing of it loads: the title says so
+            // of the old autosave, by its name, then what was set aside.
             var autosaveBroken = new SaveSlots(Path.Combine(folder, "autosave-broken"), 3);
             var itsAutosave = autosaveBroken.Store(SaveSlots.OldAutosave);
             Directory.CreateDirectory(itsAutosave.Folder);

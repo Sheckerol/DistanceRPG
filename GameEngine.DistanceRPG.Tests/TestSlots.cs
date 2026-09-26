@@ -23,8 +23,8 @@ internal static class TestSlots
     /// <summary>
     /// <paramref name="store"/>, in a folder of the test's own, as slot 1: loaded
     /// from and saved into as a slot is, and named as a player sees a numbered
-    /// slot named — <c>CAMPAIGN RESUMED FROM SLOT 1</c>, <c>SLOT 1 COULD NOT BE SAVED
-    /// (...)</c> — whatever folder the store is in.
+    /// slot named — <c>CAMPAIGN RESUMED FROM SLOT 1</c>, <c>SLOT 1 COULD NOT BE
+    /// SAVED (...)</c> — whatever folder the store is in.
     /// </summary>
     internal static SaveSlot AsSlot1(SaveStore store) => new(store, 1);
 
