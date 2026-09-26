@@ -1,6 +1,7 @@
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
 using static GameEngine.DistanceRPG.Logic.StatusEffectType;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -1350,7 +1351,7 @@ public sealed class HudTextTests : IDisposable
         // only on the screen between runs once the run is over — as the save's
         // word, shown whole ahead of whatever is up. Built with no window, as a
         // scene is read.
-        string held = CampaignBoot.WriteFailed("another program has it open");
+        string held = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "another program has it open");
         var campaign = CampaignState.Start(GameContent.Current);
         var visit = campaign.Enter("spear_hall", mapSeed: 4);
         visit.OpenTurns(campaign.Party, () => 10);
@@ -1383,7 +1384,7 @@ public sealed class HudTextTests : IDisposable
         // Once the rows are down it is said alone; another reason leads the one up.
         hud.ShowSaveFailed(held);
         Assert.Equal(NoticeText.Wrap(held), hud.NoticeRows);
-        string full = CampaignBoot.WriteFailed("the disk is full");
+        string full = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full");
         hud.ShowSaveFailed(full);
         Assert.Equal([.. NoticeText.Wrap(full), .. NoticeText.Wrap(held)], hud.NoticeRows);
 

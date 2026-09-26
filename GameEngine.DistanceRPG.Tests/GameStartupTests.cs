@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Tests.TestIl;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -276,12 +277,12 @@ public class GameStartupTests
         // a later save goes through. The holder leads a notice once...
         var notices = new StartupNotices();
         notices.Hold(["data"]);
-        string held = CampaignBoot.WriteFailed("another program has it open");
+        string held = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "another program has it open");
         notices.Lead([held]);
         notices.Lead([held]);   // every turn's start and every arrival fail with the same words
         notices.Lead([held, held]);
         Assert.Equal(1, notices.Leading);
-        string full = CampaignBoot.WriteFailed("the disk is full");
+        string full = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full");
         notices.Lead([full]);
         Assert.Equal(2, notices.Leading);
         Assert.Equal([full, held, "data"], notices.Take());

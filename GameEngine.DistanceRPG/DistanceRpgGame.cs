@@ -158,14 +158,14 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private SaveSlots? _slots;
 
     // Where this session's campaign autosaves — at a run's entry, every turn's
-    // start, every arrival, a run's end and every quit: the autosave slot's store,
-    // or the dev override's own. Null only when the content did not load.
-    private SaveStore? _autosave;
+    // start, every arrival, a run's end and every quit: the autosave slot, or the
+    // dev override's scratch slot. Null only when the content did not load.
+    private SaveSlot? _autosave;
 
     // The slot this session's campaign was loaded from, whose resume marker is
     // cleared once the loaded screen is up: the slot the title loaded, the
-    // autosave's for a new campaign, or the dev override's.
-    private SaveStore? _loadedFrom;
+    // autosave for a new campaign, or the dev override's scratch slot.
+    private SaveSlot? _loadedFrom;
 
     // The slots as the title last listed them: what its asks were put on, and so
     // what a load it chose reads NeedsRoom from — the one question both read.
@@ -340,10 +340,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         {
             // The scratch slot is where this session loads from and saves to: the
             // slots are never made, so no save of the session reaches them.
-            var scratch = CampaignBoot.StoreFor(saves, request);
+            var scratch = SaveSlot.Scratch(CampaignBoot.StoreFor(saves, request));
             _autosave = scratch;
             _loadedFrom = scratch;
-            Log.Info($"[Save] Saves in {scratch.Folder} - the dev override's own slot");
+            Log.Info($"[Save] Saves in {scratch.Store.Folder} - the dev override's own slot");
             var boot = CampaignBoot.BootOverride(scratch, content, request, line => Log.Info(line));
             Adopt(boot.Campaign);
             foreach (string notice in boot.Notices)
@@ -359,7 +359,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         var slots = new SaveSlots(saves, content.Tuning.SaveSlots);
         _slots = slots;
-        _autosave = slots.Store(SaveSlots.Autosave);
+        _autosave = slots.Slot(SaveSlots.Autosave);
         _loadedFrom = _autosave;
         Log.Info($"[Save] Saves in {slots.Folder}: the autosave and {slots.Count} {(slots.Count == 1 ? "slot" : "slots")}");
         if (request.NewCampaign)
@@ -433,12 +433,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var autosave = _autosave ?? throw new InvalidOperationException("No autosave slot: the game has not loaded.");
         var content = GameContent.Current;
         Action<string> report = line => Log.Info(line);
-        var store = slots.Store(slot);
-        Log.Info($"[Save] Loading {SaveSlots.Label(slot)} from {store.Folder}");
-        var load = CampaignBoot.Load(store, content, report, slot);
+        var chosen = slots.Slot(slot);
+        Log.Info($"[Save] Loading {SaveSlots.Label(slot)} from {chosen.Store.Folder}");
+        var load = CampaignBoot.Load(chosen, content, report);
         if (load.Campaign is not { } campaign)
         {
-            var nothing = CampaignBoot.NothingLoadedWord(load, slot);
+            var nothing = CampaignBoot.NothingLoadedWord(load, chosen);
             foreach (string notice in nothing)
                 Log.Info($"[Save] {notice}");
             ShowTitle(nothing);
@@ -447,11 +447,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         var said = new List<string>(load.Notices);
         if (_listing?.NeedsRoom(slot) == true)
-            said.AddRange(CampaignBoot.MakeRoom(autosave, slot, report));
+            said.AddRange(CampaignBoot.MakeRoom(autosave.Store, slot, report));
         var word = CampaignBoot.InPlayWord(said, autosave);
         Adopt(campaign);
         _saveRequested = false;
-        _loadedFrom = store;
+        _loadedFrom = chosen;
         _resuming = true;   // the loaded screen clears the slot's resume marker once it is up
         foreach (string notice in word)
             Log.Info($"[Save] {notice}");
@@ -482,20 +482,20 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <param name="how">What asked for it, which the set-aside notices name: <c>--new-campaign</c>, or null for the title's NEW CAMPAIGN.</param>
     private void BeginNewCampaign(string? how)
     {
-        var store = _autosave ?? throw new InvalidOperationException("No autosave slot: the game has not loaded.");
+        var autosave = _autosave ?? throw new InvalidOperationException("No autosave slot: the game has not loaded.");
         Log.Info($"[Hub] A new campaign ({how ?? "NEW CAMPAIGN on the title"}): the party from the roster, nothing met, every dungeon open - the autosave's campaign is set aside");
-        var boot = CampaignBoot.Abandon(store, GameContent.Current, line => Log.Info(line), how);
-        var word = CampaignBoot.InPlayWord(boot.Notices, store);
+        var boot = CampaignBoot.Abandon(autosave, GameContent.Current, line => Log.Info(line), how);
+        var word = CampaignBoot.InPlayWord(boot.Notices, autosave);
         Adopt(boot.Campaign);
         _saveRequested = false;
         _resuming = false;
-        _loadedFrom = store;
+        _loadedFrom = autosave;
         foreach (string notice in word)
             Log.Info($"[Save] {notice}");
-        if (store.WritesRefused is { } refused)
+        if (autosave.Store.WritesRefused is { } refused)
             Log.Info($"[Save] The new campaign is not saved this session: {refused}");
         else
-            Save(boot.Campaign, store, $"at once, as {how ?? "NEW CAMPAIGN"} began it");
+            Save(boot.Campaign, autosave, $"at once, as {how ?? "NEW CAMPAIGN"} began it");
         _notices.Lead(word);
         ShowBetweenRuns();
     }
@@ -564,7 +564,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         Log.Info(campaign.Visit is { } visit
             ? $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
             : $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, between runs");
-        var (saved, notice) = CampaignBoot.SaveTo(slots.Store(slot), campaign, PlayingScene(campaign)?.View, slot, line => Log.Info(line), _clock());
+        var (saved, notice) = CampaignBoot.SaveTo(slots.Slot(slot), campaign, PlayingScene(campaign)?.View, line => Log.Info(line), _clock());
         if (saved)
             Log.Info($"[Save] {notice}");
         else
@@ -852,7 +852,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>Clear the resume marker of the slot the campaign was loaded from, saying why; a marker that will not go is a log line, never a crash.</summary>
     private void ClearResumeMarker(string why)
     {
-        if (_loadedFrom is not { } store)
+        if (_loadedFrom?.Store is not { } store)
             return;
         try
         {
@@ -878,7 +878,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void WriteRequestedSave()
     {
-        if (_campaign is not { } campaign || _autosave is not { } store)
+        if (_campaign is not { } campaign || _autosave is not { } slot)
         {
             _saveRequested = false;
             return;
@@ -887,9 +887,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return;
         _saveRequested = false;
         if (campaign.Visit is { } visit)
-            Save(campaign, store, $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}", PlayingScene(campaign)?.View);
+            Save(campaign, slot, $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}", PlayingScene(campaign)?.View);
         else
-            Save(campaign, store, "at the run's end");
+            Save(campaign, slot, "at the run's end");
     }
 
     /// <summary>
@@ -905,11 +905,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// about a file, whatever the saves after it do. The save on the disk is kept
     /// whatever happens.
     /// </summary>
-    private void Save(CampaignState campaign, SaveStore store, string when, ViewDto? view = null)
+    private void Save(CampaignState campaign, SaveSlot slot, string when, ViewDto? view = null)
     {
         Log.Info($"[Save] Saving the campaign {when}");
         var said = new List<string>();
-        string? failed = CampaignBoot.Save(store, campaign, view, line => Log.Info(line), _clock(), said);
+        string? failed = CampaignBoot.Save(slot, campaign, view, line => Log.Info(line), _clock(), said);
         foreach (string setAside in said)
             Log.Warn($"[Save] {setAside}");
         if (failed is null)
@@ -1007,13 +1007,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         if (_quitSaved)
             return;
         _quitSaved = true;
-        if (_campaign is not { } campaign || _autosave is not { } store)
+        if (_campaign is not { } campaign || _autosave is not { } slot)
             return;   // the title, or the content never loaded: no campaign in play
 
         var scene = PlayingScene(campaign);
         Log.Info(campaign.Visit is { } visit ? $"[Save] Saving the campaign on quit, mid-run in {visit.Def.Name}" : "[Save] Saving the campaign on quit");
         Action? step = scene is null ? null : scene.StepLogic;
-        CampaignBoot.SaveOnQuit(store, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock(),
+        CampaignBoot.SaveOnQuit(slot, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock(),
             saved: TakeBackFailedSaves);
 
         if (_resuming)

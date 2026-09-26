@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using static GameEngine.DistanceRPG.Tests.TestIl;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -382,7 +383,7 @@ public sealed class SaveMenuTests : IDisposable
 
             var campaign = Retreated();
             var log = new List<string>();
-            var (saved, notice) = CampaignBoot.SaveTo(slot3, campaign, view: null, 3, log.Add, At.AddHours(1));
+            var (saved, notice) = CampaignBoot.SaveTo(slots.Slot(3), campaign, view: null, log.Add, At.AddHours(1));
             string aside = Path.Combine(slot3.Folder, "campaign.unreadable-1.json");
             Assert.True(saved);
             Assert.Equal(old, File.ReadAllBytes(aside));
@@ -400,12 +401,12 @@ public sealed class SaveMenuTests : IDisposable
 
             // The slot loads its new campaign; the autosave was never touched; and a
             // second save into the slot rotates as every save does.
-            var load = CampaignBoot.Load(slot3, GameContent.Current, number: 3);
+            var load = CampaignBoot.Load(slots.Slot(3), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 3"], load.Notices);
             slot3.ClearResuming();
             Assert.False(slots.Store(SaveSlots.Autosave).HasSave);
-            Assert.Equal((true, "SAVED TO SLOT 3"), CampaignBoot.SaveTo(slot3, Cleared(), view: null, 3, savedAt: At.AddHours(2)));
+            Assert.Equal((true, "SAVED TO SLOT 3"), CampaignBoot.SaveTo(slots.Slot(3), Cleared(), view: null, savedAt: At.AddHours(2)));
             Assert.True(slot3.HasBackup);
             Assert.Equal(old, File.ReadAllBytes(aside));
         });
@@ -422,8 +423,8 @@ public sealed class SaveMenuTests : IDisposable
             var earlier = new SaveSlots(folder, 3);
             foreach (int number in new[] { 2, 3 })
             {
-                Assert.Null(CampaignBoot.Save(earlier.Store(number), Cleared(), savedAt: At));
-                Assert.Null(CampaignBoot.Save(earlier.Store(number), Retreated(), savedAt: At.AddHours(1)));
+                Assert.Null(CampaignBoot.Save(earlier.Slot(number), Cleared(), savedAt: At));
+                Assert.Null(CampaignBoot.Save(earlier.Slot(number), Retreated(), savedAt: At.AddHours(1)));
             }
             var stale = SaveListing.Read(earlier, At.AddHours(2));   // read before slot 2 broke: it says Readable
             Assert.Equal(SlotState.Readable, stale.Slots.Single(slot => slot.Number == 2).State);
@@ -446,7 +447,7 @@ public sealed class SaveMenuTests : IDisposable
             // moved into place, and the backup's bytes as they were — a replace would
             // have rotated the broken save over it.
             var campaign = NewCampaign();
-            var (saved, notice) = CampaignBoot.SaveTo(session.Store(3), campaign, view: null, 3, savedAt: At.AddHours(3));
+            var (saved, notice) = CampaignBoot.SaveTo(session.Slot(3), campaign, view: null, savedAt: At.AddHours(3));
             var slot3 = session.Store(3);
             Assert.True(saved);
             Assert.StartsWith("SAVED TO SLOT 3 - CAMPAIGN.JSON COULD NOT BE READ (", notice, StringComparison.Ordinal);
@@ -460,7 +461,7 @@ public sealed class SaveMenuTests : IDisposable
             var staleList = new SlotMenu(SlotMenuMode.Save, stale, 3);
             staleList.Press(Keys.D2);
             Assert.StartsWith("SLOT 2 HOLDS ", SlotText.AskAbout(staleList.Asking!, Dungeons, PlusTwo).What, StringComparison.Ordinal);
-            var (again, said) = CampaignBoot.SaveTo(session.Store(2), campaign, view: null, 2, savedAt: At.AddHours(3));
+            var (again, said) = CampaignBoot.SaveTo(session.Slot(2), campaign, view: null, savedAt: At.AddHours(3));
             Assert.True(again);
             Assert.StartsWith("SAVED TO SLOT 2 - CAMPAIGN.JSON COULD NOT BE READ (", said, StringComparison.Ordinal);
             Assert.Equal(broken[2], File.ReadAllBytes(Path.Combine(session.Store(2).Folder, "campaign.unreadable-1.json")));
@@ -480,7 +481,7 @@ public sealed class SaveMenuTests : IDisposable
             var walking = ReloadDeterminismTests.MidWalk();
             Assert.False(SaveGame.IsSafePoint(walking.Campaign));
             var log = new List<string>();
-            Assert.Equal((false, "SAVE ON YOUR OWN TURN"), CampaignBoot.SaveTo(slots.Store(1), walking.Campaign, new ViewDto("A"), 1, log.Add, At));
+            Assert.Equal((false, "SAVE ON YOUR OWN TURN"), CampaignBoot.SaveTo(slots.Slot(1), walking.Campaign, new ViewDto("A"), log.Add, At));
             Assert.False(Directory.Exists(slots.Store(1).Folder));
             Assert.Contains(log, line => line.Contains("off a safe point", StringComparison.Ordinal));
             Assert.Equal(TurnPhase.EnemyMoving, walking.Turns.Phase);   // and nothing was settled: a save by hand never plays the enemies' turn out
@@ -490,10 +491,10 @@ public sealed class SaveMenuTests : IDisposable
             var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep, visitsOwnDie: true);
             Assert.True(SaveGame.IsSafePoint(script.Campaign));
             var view = new ViewDto("B", MarchingThisTurn: true);
-            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Store(1), script.Campaign, view, 1, savedAt: At));
+            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Slot(1), script.Campaign, view, savedAt: At));
             string text = slots.Store(1).Read()!;
             Assert.Equal(SaveCodec.Write(SaveGame.Capture(script.Campaign, view, At)), text);
-            var load = CampaignBoot.Load(slots.Store(1), GameContent.Current, number: 1);
+            var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(view, load.View);
             Assert.Equal("CAMPAIGN RESUMED FROM SLOT 1", load.Notices[0]);
@@ -502,11 +503,11 @@ public sealed class SaveMenuTests : IDisposable
 
             // Between runs is always a safe point, and a campaign between runs carries no
             // view, whatever it is handed.
-            Assert.Equal((true, "SAVED TO SLOT 2"), CampaignBoot.SaveTo(slots.Store(2), Retreated(), new ViewDto("A"), 2, savedAt: At));
+            Assert.Equal((true, "SAVED TO SLOT 2"), CampaignBoot.SaveTo(slots.Slot(2), Retreated(), new ViewDto("A"), savedAt: At));
             Assert.Null(SaveCodec.Read(slots.Store(2).Read()!).View);
 
             // The autosave is never saved into by hand.
-            Assert.Throws<ArgumentOutOfRangeException>(() => CampaignBoot.SaveTo(slots.Store(SaveSlots.Autosave), Retreated(), null, SaveSlots.Autosave));
+            Assert.Throws<ArgumentOutOfRangeException>(() => CampaignBoot.SaveTo(slots.Slot(SaveSlots.Autosave), Retreated(), null));
 
             // A slot whose store refuses its writes this session — a file there would
             // neither read nor move — answers with why, and writes nothing (S6's review:
@@ -514,7 +515,7 @@ public sealed class SaveMenuTests : IDisposable
             var refusing = slots.Store(3);
             refusing.RefuseWrites("campaign.json could not be read (x) and could not be set aside (another program has it open)");
             Assert.Equal((false, "SLOT 3 COULD NOT BE SAVED (CAMPAIGN.JSON COULD NOT BE READ (X) AND COULD NOT BE SET ASIDE (ANOTHER PROGRAM HAS IT OPEN)) - WHAT IT HELD IS KEPT - SEE THE LOG"),
-                CampaignBoot.SaveTo(refusing, Retreated(), null, 3, savedAt: At));
+                CampaignBoot.SaveTo(slots.Slot(3), Retreated(), null, savedAt: At));
             Assert.False(refusing.HasSave);
         });
     }
@@ -536,34 +537,34 @@ public sealed class SaveMenuTests : IDisposable
         scene.AnyKey(Keys.D1);
         Assert.Equal([1], host.SavedTo);
         Assert.Equal((true, false), (scene.PauseMenuOpen, scene.SavesOpen));
-        scene.SlotSaved(CampaignBoot.SavedTo(1));
+        scene.SlotSaved(CampaignBoot.SavedTo(Named(1)));
         Assert.Equal("SAVED TO SLOT 1", scene.MenuAnswer);
         Assert.Equal(notices, scene.NoticeRows);   // no notice added
         var drawn = Laid(PauseMenu.Options(hasTitle: true), scene.CanSaveNow, scene.MenuAnswer, scene.SaveList);
         Assert.Contains(drawn, row => row.Text == "SAVED TO SLOT 1" && row.Color == DungeonHud.Green);
         Assert.True(drawn.Single(row => row.Text == "SAVED TO SLOT 1").Y > drawn.Single(row => row.Text == DungeonHud.EscToClose).Bottom);
-        scene.SaveFailed(CampaignBoot.WriteFailed("the disk is full"));   // a failed autosave is a notice, over the floor: the answer stays
+        scene.SaveFailed(CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full"));   // a failed autosave is a notice, over the floor: the answer stays
         Assert.Equal("SAVED TO SLOT 1", scene.MenuAnswer);
         scene.AnyKey(Keys.X);
         Assert.Null(scene.MenuAnswer);   // the next key
 
-        scene.SlotSaved(CampaignBoot.SavedTo(1));
+        scene.SlotSaved(CampaignBoot.SavedTo(Named(1)));
         scene.HandleEscape();
         Assert.Null(scene.MenuAnswer);   // the menu closing
         scene.HandleEscape();
         Assert.Null(scene.MenuAnswer);   // and opened again, it has nothing to say
         scene.HandleEscape();
-        scene.SlotSaved(CampaignBoot.SavedTo(1));
+        scene.SlotSaved(CampaignBoot.SavedTo(Named(1)));
         Assert.Null(scene.MenuAnswer);   // with the menu closed by the time the save is written, only the log keeps it
 
         // A save that failed, and 2 off a safe point, answer in the warning's orange.
-        string failed = CampaignBoot.SlotNotSaved(2, "another program has it open");
+        string failed = CampaignBoot.NotSaved(Named(2), "another program has it open");
         Assert.Equal("SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG", failed);
         var failedRows = Laid(PauseMenu.Options(hasTitle: true), canSave: true, failed, list: null).Where(row => row.Scale == 1.5f && row.Color == DungeonHud.Orange).ToList();
         Assert.Equal(NoticeText.Wrap(failed), failedRows.Select(row => row.Text));
         Assert.Equal(DungeonHud.Orange, DungeonHud.AnswerColor(PauseMenu.SaveOnYourTurn));
         Assert.Equal(DungeonHud.Orange, DungeonHud.AnswerColor(PauseMenu.NoSaveInOverride));
-        Assert.Equal(DungeonHud.Green, DungeonHud.AnswerColor(CampaignBoot.SavedTo(9)));
+        Assert.Equal(DungeonHud.Green, DungeonHud.AnswerColor(CampaignBoot.SavedTo(Named(9))));
 
         // Off a safe point the menu dims SAVE GAME, and 2 says why inside it.
         var ending = Entered();
@@ -696,10 +697,10 @@ public sealed class SaveMenuTests : IDisposable
             // what takes it back.
             var store = new SaveStore(folder);
             var campaign = NewCampaign();
-            Assert.Null(CampaignBoot.Save(store, campaign, savedAt: At));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, savedAt: At));
             CampaignRuns.ShallowRetreat(campaign, "tutorial");   // played on since: the quit has something to write
 
-            string failed = CampaignBoot.WriteFailed("the disk is full");   // what an autosave since then said
+            string failed = CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full");   // what an autosave since then said
             var notices = new StartupNotices();
             notices.Hold(["data"]);
             notices.Lead([failed]);
@@ -713,7 +714,7 @@ public sealed class SaveMenuTests : IDisposable
             // A quit whose write fails tells nothing: the failure stays for the title,
             // beside the marker the title says too.
             Directory.CreateDirectory(store.TempPath);
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(1), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(1), saved: TakeBack));
             Assert.Equal(0, told);
             Assert.NotNull(store.ReadUnsaved());
             Directory.Delete(store.TempPath);
@@ -722,14 +723,14 @@ public sealed class SaveMenuTests : IDisposable
             // Nor does a quit during the enemies' turn that never comes round to the
             // party's, or that has no scene to play it out with: nothing is written.
             var stuck = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }, saved: TakeBack));
-            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), step: null, saved: TakeBack));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => new ViewDto("A"), () => { }, saved: TakeBack));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => new ViewDto("A"), step: null, saved: TakeBack));
             Assert.Equal(0, told);
             Assert.True(CampaignBoot.TakeUnsaved(store, report: null));
 
             // A quit whose save goes through tells, once: the title is handed nothing of
             // the failure, and what else leads it stays.
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: TakeBack));
             Assert.Equal(1, told);
             Assert.Equal(SaveCodec.Write(SaveGame.Capture(campaign, savedAt: At.AddMinutes(2))), store.Read());
             Assert.Null(store.ReadUnsaved());
@@ -737,7 +738,7 @@ public sealed class SaveMenuTests : IDisposable
 
             // So does one whose save the disk holds already: nothing needed writing, and
             // the disk holds the campaign as it was left.
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, savedAt: At.AddMinutes(3), saved: TakeBack));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, savedAt: At.AddMinutes(3), saved: TakeBack));
             Assert.Equal(2, told);
         });
 
@@ -835,10 +836,10 @@ public sealed class SaveMenuTests : IDisposable
             var slots = new SaveSlots(folder, 3);
             var autosave = slots.Store(SaveSlots.Autosave);
             var campaign = Retreated();
-            Assert.Null(CampaignBoot.Save(autosave, campaign, savedAt: At));   // the autosave at the turn's start
-            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Store(1), campaign, view: null, 1, savedAt: At.AddMinutes(1)));
+            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign, savedAt: At));   // the autosave at the turn's start
+            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Slot(1), campaign, view: null, savedAt: At.AddMinutes(1)));
             int told = 0;
-            Assert.True(CampaignBoot.SaveOnQuit(autosave, campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: () => told++));
+            Assert.True(CampaignBoot.SaveOnQuit(slots.Slot(SaveSlots.Autosave), campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: () => told++));
             Assert.Equal(1, told);   // the quit went through: the disk holds the campaign as it was left
             Assert.False(autosave.HasBackup);   // and wrote nothing: no save rotated into the backup
 
@@ -848,7 +849,7 @@ public sealed class SaveMenuTests : IDisposable
             Assert.Equal((1, true, (DateTimeOffset?)At.AddMinutes(1)), (newest.Number, newest.SameAsAutosave, newest.Header!.SavedAt));
             Assert.False(listing.NeedsRoom(1));
 
-            var load = CampaignBoot.Load(slots.Store(1), GameContent.Current, number: 1);
+            var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(SaveCodec.Untimed(autosave.Read()!), SaveCodec.Untimed(SaveCodec.Write(SaveGame.Capture(load.Campaign!))));
             slots.Store(1).ClearResuming();
@@ -888,7 +889,7 @@ public sealed class SaveMenuTests : IDisposable
         int readSlots = writing.FindIndex(i => i.Op == OpCodes.Ldfld && Names(i.Field, slots));
         int savedTo = writing.FindIndex(i => Same(i.Called, saveTo));
         Assert.True(readSlots >= 0 && readSlots < savedTo, "WriteRequestedSlot saves before it has read the slots");
-        Assert.Contains(writing, i => Same(i.Called, typeof(SaveSlots).GetMethod(nameof(SaveSlots.Store))!));
+        Assert.Contains(writing, i => Same(i.Called, typeof(SaveSlots).GetMethod(nameof(SaveSlots.Slot))!));
         Assert.DoesNotContain(writing, i => i.Op == OpCodes.Ldfld && Names(i.Field, game.GetField("_autosave", Declared)!));
 
         // Both screens ask the host whether it has a title before 2 does anything.

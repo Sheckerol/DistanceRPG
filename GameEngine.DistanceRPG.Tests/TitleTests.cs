@@ -159,7 +159,7 @@ public sealed class TitleTests : IDisposable
             var campaign = CampaignState.Start(GameContent.Current);
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
             VisitScript.Enter(campaign, "spear_hall", CampaignRuns.FiveDeep).Down();
-            Assert.Null(CampaignBoot.Save(slots.Store(SaveSlots.Autosave), campaign, new ViewDto("A"), savedAt: At));
+            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign, new ViewDto("A"), savedAt: At));
             var listing = SaveListing.Read(slots, At.AddHours(1));
             string midRun = Assert.Single(Options(new TitleMenu(listing)), option => option.Contains("CONTINUE", StringComparison.Ordinal));
             Assert.Equal("> CONTINUE - AUTOSAVE - THE SPEAR HALL FLOOR 2 - 1 RUN - 2026-09-25 14:32 <", midRun);
@@ -168,7 +168,7 @@ public sealed class TitleTests : IDisposable
             var betweenRuns = CampaignState.Start(GameContent.Current);
             CampaignRuns.Clear(betweenRuns, "tutorial", CampaignRuns.GoldenSeed);
             CampaignRuns.DeepRetreat(betweenRuns, "spear_hall");
-            Assert.Null(CampaignBoot.Save(slots.Store(2), betweenRuns, savedAt: At.AddMinutes(10)));
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), betweenRuns, savedAt: At.AddMinutes(10)));
             var newer = SaveListing.Read(slots, At.AddHours(1));
             Assert.Equal(2, newer.Newest!.Number);
             Assert.Equal("CONTINUE - SLOT 2 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:42",
@@ -182,8 +182,8 @@ public sealed class TitleTests : IDisposable
             // From a backup — the save cannot be read, the backup can — CONTINUE names
             // what the load brings back: the backup's own campaign and time, where the
             // save that cannot be read was the later.
-            Assert.Null(CampaignBoot.Save(slots.Store(3), betweenRuns, savedAt: At.AddMinutes(20)));
-            Assert.Null(CampaignBoot.Save(slots.Store(3), campaign, new ViewDto("A"), savedAt: At.AddMinutes(30)));
+            Assert.Null(CampaignBoot.Save(slots.Slot(3), betweenRuns, savedAt: At.AddMinutes(20)));
+            Assert.Null(CampaignBoot.Save(slots.Slot(3), campaign, new ViewDto("A"), savedAt: At.AddMinutes(30)));
             File.WriteAllText(slots.Store(3).SavePath, "not a save");
             var backupNewest = SaveListing.Read(slots, At.AddHours(1));
             Assert.Equal((3, SlotState.FromBackup), (backupNewest.Newest!.Number, backupNewest.Newest.State));

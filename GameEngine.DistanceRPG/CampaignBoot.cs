@@ -151,33 +151,40 @@ internal static class CampaignBoot
     }
 
     /// <summary>
+    /// Whether the words speak of <paramref name="slot"/> as the campaign's own
+    /// save, naming no slot: the autosave, and the dev override's scratch slot,
+    /// whose saves have always been said the autosave's way. A manual slot is
+    /// named.
+    /// </summary>
+    private static bool Unnamed(SaveSlot slot) => slot.Number is null or SaveSlots.Autosave;
+
+    /// <summary>
     /// What loading a slot says first, in green: <c>CAMPAIGN RESUMED</c> for the
     /// autosave, <c>CAMPAIGN RESUMED FROM SLOT 2</c> for a manual one; and from a
     /// backup, <see cref="ResumedFromBackup"/>, or <c>CAMPAIGN RESUMED FROM THE
     /// BACKUP OF SLOT 2, ONE SAVE OLDER</c>. Each starts with
-    /// <see cref="BetweenRunsHud.Resumed"/>, so each is news, not a warning.
+    /// <see cref="BetweenRunsHud.Resumed"/>, so each is news, not a warning. The
+    /// scratch slot, which no title loads, is spoken of as the autosave is.
     /// </summary>
-    internal static string Resumed(int number, bool backup)
+    internal static string Resumed(SaveSlot slot, bool backup)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(number);
-        if (number == SaveSlots.Autosave)
+        ArgumentNullException.ThrowIfNull(slot);
+        if (Unnamed(slot))
             return backup ? ResumedFromBackup : BetweenRunsHud.Resumed;
         return backup
-            ? $"{BetweenRunsHud.Resumed} FROM THE BACKUP OF {SaveSlots.Label(number)}, ONE SAVE OLDER"
-            : $"{BetweenRunsHud.Resumed} FROM {SaveSlots.Label(number)}";
+            ? $"{BetweenRunsHud.Resumed} FROM THE BACKUP OF {slot.Name}, ONE SAVE OLDER"
+            : $"{BetweenRunsHud.Resumed} FROM {slot.Name}";
     }
 
-    /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE AUTOSAVE</c>.</summary>
-    internal static string NothingLoaded(int number)
+    /// <summary>What the title says first when a load brought nothing back: <c>NOTHING COULD BE LOADED FROM SLOT 2</c>, or <c>... FROM THE AUTOSAVE</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    internal static string NothingLoaded(SaveSlot slot)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(number);
-        return number == SaveSlots.Autosave
-            ? "NOTHING COULD BE LOADED FROM THE AUTOSAVE"
-            : $"NOTHING COULD BE LOADED FROM {SaveSlots.Label(number)}";
+        ArgumentNullException.ThrowIfNull(slot);
+        return $"NOTHING COULD BE LOADED FROM {slot.Name}";
     }
 
     /// <summary>
-    /// The title's word on a load of slot <paramref name="number"/> that brought
+    /// The title's word on a load of <paramref name="slot"/> that brought
     /// nothing back (R2): <see cref="NothingLoaded"/> first, then every file the
     /// load set aside, whole and in the load's order — the save, then its backup —
     /// or the file it could neither read nor move. The game goes back to the title
@@ -187,14 +194,15 @@ internal static class CampaignBoot
     /// file: the load has done all of that.
     /// </summary>
     /// <param name="load">What <see cref="Load"/> brought back from the slot: nothing.</param>
-    /// <param name="number">The slot's number.</param>
+    /// <param name="slot">The slot loaded.</param>
     /// <exception cref="ArgumentException"><paramref name="load"/> brought a campaign back: its word is its own.</exception>
-    internal static IReadOnlyList<string> NothingLoadedWord(SlotLoad load, int number)
+    internal static IReadOnlyList<string> NothingLoadedWord(SlotLoad load, SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(load);
+        ArgumentNullException.ThrowIfNull(slot);
         if (load.Loaded)
             throw new ArgumentException("The load brought a campaign back: what it says is its own word, and the campaign is played.", nameof(load));
-        return [NothingLoaded(number), .. load.Notices];
+        return [NothingLoaded(slot), .. load.Notices];
     }
 
     /// <summary>
@@ -237,18 +245,18 @@ internal static class CampaignBoot
     /// </summary>
     /// <param name="said">What the load and the room it made, or the new campaign, say, in order.</param>
     /// <param name="autosave">The slot the campaign autosaves into: the autosave slot.</param>
-    internal static IReadOnlyList<string> InPlayWord(IReadOnlyList<string> said, SaveStore autosave)
+    internal static IReadOnlyList<string> InPlayWord(IReadOnlyList<string> said, SaveSlot autosave)
     {
         ArgumentNullException.ThrowIfNull(said);
         ArgumentNullException.ThrowIfNull(autosave);
-        if (autosave.WritesRefused is not { } refused || said.Any(SaysStuck))
+        if (autosave.Store.WritesRefused is not { } refused || said.Any(SaysStuck))
             return said;
         return [.. said, NotAutosaved(refused)];
     }
 
     /// <summary>
-    /// Load slot <paramref name="number"/> (<paramref name="slot"/>), Boot's resume
-    /// as it always was, in this order:
+    /// Load <paramref name="slot"/>, Boot's resume as it always was, in this
+    /// order:
     /// <list type="number">
     /// <item>A resume marker left behind means the last load crashed the game: the
     /// save it guarded — the save, or the backup when there was no save — is set
@@ -280,74 +288,74 @@ internal static class CampaignBoot
     /// before anything is loaded (<see cref="TakeUnsaved"/>).
     /// </para>
     /// </summary>
-    /// <param name="slot">The slot's store (<see cref="SaveSlots.Store"/>).</param>
+    /// <param name="slot">The slot (<see cref="SaveSlots.Slot"/>): its store, and its name for what the load says.</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: a campaign is restored under it.</param>
     /// <param name="report">Where the log lines go: every file read, set aside or found wanting, with the whole error.</param>
-    /// <param name="number">The slot's number, for what the load says: <see cref="SaveSlots.Autosave"/>, or a manual slot's.</param>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    internal static SlotLoad Load(SaveStore slot, GameContent content, Action<string>? report = null, int number = SaveSlots.Autosave)
+    internal static SlotLoad Load(SaveSlot slot, GameContent content, Action<string>? report = null)
     {
         ArgumentNullException.ThrowIfNull(slot);
         RequireCurrent(content);
-        ArgumentOutOfRangeException.ThrowIfNegative(number);
+        var store = slot.Store;
 
         var setAside = new List<string>();
-        if (slot.WasResuming)
+        if (store.WasResuming)
         {
             // The save it guarded is the one a resume reads first: the save when
             // there is one, and the backup when the resume had only that to read.
-            bool save = slot.HasSave;
-            if (save || slot.HasBackup)
+            bool save = store.HasSave;
+            if (save || store.HasBackup)
             {
-                report?.Invoke($"[Save] {slot.ResumingPath} was left behind: resuming {(save ? slot.SavePath : slot.BackupPath)} crashed the game last time");
-                if (!SetAside(slot, backup: !save, "crashed", "crashed the game the last time it was resumed", setAside, report))
+                report?.Invoke($"[Save] {store.ResumingPath} was left behind: resuming {(save ? store.SavePath : store.BackupPath)} crashed the game last time");
+                if (!SetAside(store, backup: !save, "crashed", "crashed the game the last time it was resumed", setAside, report))
                     return new SlotLoad(null, null, setAside);
             }
-            Unmark(slot, report);
+            Unmark(store, report);
         }
 
         foreach (bool backup in new[] { false, true })
         {
-            if (!(backup ? slot.HasBackup : slot.HasSave))
+            if (!(backup ? store.HasBackup : store.HasSave))
                 continue;
-            Mark(slot, report);   // before the restore, so even a restore that takes the process down is caught next time
-            if (TryResume(slot, backup, content, report, out var loaded, out string why))
+            Mark(store, report);   // before the restore, so even a restore that takes the process down is caught next time
+            if (TryResume(store, backup, content, report, out var loaded, out string why))
             {
-                slot.Vouch(backup);
+                store.Vouch(backup);
 
                 // What plays first, then the numbers it plays under (PHASE5-084
                 // wants that on the screen, whatever else there is to say), then
                 // what became of any save set aside on the way.
-                var notices = new List<string> { Resumed(number, backup) };
+                var notices = new List<string> { Resumed(slot, backup) };
                 if (loaded.TuningChanged)
                     notices.Add(TuningChanged);
                 notices.AddRange(setAside);
                 return new SlotLoad(loaded.Campaign, loaded.View, notices);
             }
-            if (!SetAside(slot, backup, "unreadable", $"could not be read ({why})", setAside, report))
+            if (!SetAside(store, backup, "unreadable", $"could not be read ({why})", setAside, report))
                 break;   // stuck where it is: writes are refused, and nothing else is resumed
         }
 
-        Unmark(slot, report);
+        Unmark(store, report);
         report?.Invoke(setAside.Count == 0
-            ? $"[Save] No campaign to load in {slot.Folder}"
-            : $"[Save] Nothing could be loaded from {slot.Folder}");
+            ? $"[Save] No campaign to load in {store.Folder}"
+            : $"[Save] Nothing could be loaded from {store.Folder}");
         return new SlotLoad(null, null, setAside);
     }
 
     /// <summary>
-    /// A dev-override launch: its slot (<paramref name="store"/>, from
-    /// <see cref="StoreFor"/>) emptied, a fresh campaign, straight into the dungeon
-    /// when one is named, its first run on the seed when one is. The campaign's own
-    /// saves — the autosave and every manual slot — are never opened.
+    /// A dev-override launch: its scratch slot (<paramref name="scratch"/>, its
+    /// store from <see cref="StoreFor"/>) emptied, a fresh campaign, straight into
+    /// the dungeon when one is named, its first run on the seed when one is. The
+    /// campaign's own saves — the autosave and every manual slot — are never opened.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="request"/> is no dev override, or <paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    /// <exception cref="InvalidOperationException"><paramref name="store"/> is not a dev-override slot: it is never emptied.</exception>
-    internal static BootResult BootOverride(SaveStore store, GameContent content, BootRequest request, Action<string>? report = null)
+    /// <exception cref="InvalidOperationException"><paramref name="scratch"/>'s store is not a dev-override slot: it is never emptied.</exception>
+    internal static BootResult BootOverride(SaveSlot scratch, GameContent content, BootRequest request, Action<string>? report = null)
     {
-        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(scratch);
         RequireCurrent(content);
         ArgumentNullException.ThrowIfNull(request);
+        var store = scratch.Store;
         if (!request.DevOverride)
             throw new ArgumentException("A launch with no dev override plays the campaign's own saves, never the override's slot.", nameof(request));
         try
@@ -383,15 +391,16 @@ internal static class CampaignBoot
     /// slots are never touched. The old campaign's unsaved-quit marker goes with it,
     /// logged and never said: there is nothing left to say it of.
     /// </summary>
-    /// <param name="store">The autosave slot.</param>
+    /// <param name="slot">The autosave slot.</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: the new campaign is built under it.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="how">What asked for it, which each set-aside notice names: <c>--new-campaign</c> by default; null for NEW CAMPAIGN on the title, which the player has just chosen and the notice need not name.</param>
     /// <exception cref="ArgumentException"><paramref name="content"/> is not <see cref="GameContent.Current"/>.</exception>
-    internal static BootResult Abandon(SaveStore store, GameContent content, Action<string>? report = null, string? how = Program.NewCampaignOption)
+    internal static BootResult Abandon(SaveSlot slot, GameContent content, Action<string>? report = null, string? how = Program.NewCampaignOption)
     {
-        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(slot);
         RequireCurrent(content);
+        var store = slot.Store;
         TakeUnsaved(store, report);
 
         string asked = how ?? "NEW CAMPAIGN";
@@ -635,7 +644,7 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// Save <paramref name="campaign"/> to <paramref name="store"/> at a safe point
+    /// Save <paramref name="campaign"/> to <paramref name="slot"/> at a safe point
     /// (<see cref="SaveGame.IsSafePoint"/>) — between runs, or with the run in
     /// progress in it (Phase 5.8): right after the entry, or in the player phase
     /// with nothing in flight — with the tuning's hash, the scene's
@@ -663,19 +672,19 @@ internal static class CampaignBoot
     /// it guarded is gone.
     /// </para>
     /// </summary>
-    /// <param name="store">The slot.</param>
+    /// <param name="slot">The slot: its store, and its name, which a failure's words name (<see cref="NotSaved"/>) — the autosave's and the scratch slot's, or a manual slot's, saved by hand, where a file that would not move is said the same way, by what refuses the slot's writes.</param>
     /// <param name="campaign">The campaign, at a safe point.</param>
     /// <param name="view">What the scene shows, carried for it; null for nothing to say.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="savedAt">When it is saved, the edge's clock: written as the save's time. Null records none.</param>
     /// <param name="said">Where the notices of what the guard set aside go, a list the caller hands in; null to leave them to the log.</param>
-    /// <param name="slot">The slot's number, which a failure's words name: the autosave's (<see cref="WriteFailed"/>, the default), or a manual slot's, saved by hand (<see cref="SlotNotSaved"/>) — where a file that would not move is said the same way, by what refuses the slot's writes.</param>
     /// <returns>Null when saved, or the notice a failed write shows.</returns>
-    internal static string? Save(SaveStore store, CampaignState campaign, ViewDto? view = null, Action<string>? report = null,
-        DateTimeOffset? savedAt = null, List<string>? said = null, int slot = SaveSlots.Autosave)
+    internal static string? Save(SaveSlot slot, CampaignState campaign, ViewDto? view = null, Action<string>? report = null,
+        DateTimeOffset? savedAt = null, List<string>? said = null)
     {
-        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(campaign);
+        var store = slot.Store;
         try
         {
             string text = SaveCodec.Write(SaveGame.Capture(campaign, view, savedAt));
@@ -685,7 +694,7 @@ internal static class CampaignBoot
                 return null;
             }
             if (store.WritesRefused is null && MakeWay(store, report, said) is { } stuck)
-                return slot == SaveSlots.Autosave ? stuck : SlotNotSaved(slot, store.WritesRefused ?? stuck);
+                return Unnamed(slot) ? stuck : NotSaved(slot, store.WritesRefused ?? stuck);
             store.Write(text);
             report?.Invoke($"[Save] Wrote {store.SavePath}");
             Written(store, report);
@@ -695,18 +704,18 @@ internal static class CampaignBoot
         {
             report?.Invoke($"[Save] Could not write {store.SavePath} - the save there is kept: {error}");
             string why = store.WritesRefused ?? SaveStore.Why(error, store.Folder, writing: true);
-            return slot == SaveSlots.Autosave ? WriteFailed(why) : SlotNotSaved(slot, why);
+            return NotSaved(slot, why);
         }
     }
 
     /// <summary>
-    /// A save by hand into manual slot <paramref name="number"/>
-    /// (<paramref name="slot"/>) — the save list's choice on the pause menu or the
-    /// menu between runs (the user's ruling of 2026-09-25 on the save model, R2(d):
-    /// "a manual save can be made at ANY SAFE POINT"). Refused off a safe point
-    /// (<see cref="SaveGame.IsSafePoint"/>) — never while the enemies are moving —
-    /// with the words the menu says there, writing nothing: the menu opens the list
-    /// only on one, and this asks again when the write comes. Otherwise written
+    /// A save by hand into a manual <paramref name="slot"/> — the save list's
+    /// choice on the pause menu or the menu between runs (the user's ruling of
+    /// 2026-09-25 on the save model, R2(d): "a manual save can be made at ANY SAFE
+    /// POINT"). Refused off a safe point (<see cref="SaveGame.IsSafePoint"/>) —
+    /// never while the enemies are moving — with the words the menu says there,
+    /// writing nothing: the menu opens the list only on one, and this asks again
+    /// when the write comes. Otherwise written
     /// through <see cref="Save"/>, the one door every write goes through, whose guard
     /// sets aside a <see cref="SaveStore.FileName"/> the codec refuses — and such a
     /// backup the replace would rotate away — <strong>whatever the list said of the
@@ -715,30 +724,30 @@ internal static class CampaignBoot
     /// write moved into place, and the backup untouched. A slot whose store refuses
     /// its writes this session answers with why.
     /// </summary>
-    /// <param name="slot">The manual slot's store (<see cref="SaveSlots.Store"/>).</param>
+    /// <param name="slot">The manual slot (<see cref="SaveSlots.Slot"/>): its store, and its name, which the words name.</param>
     /// <param name="campaign">The campaign in play.</param>
     /// <param name="view">What the playing scene shows, carried for it mid-run; null between runs.</param>
-    /// <param name="number">The manual slot's number, which the words name.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="savedAt">When it is saved, the edge's clock.</param>
     /// <returns>Whether it was saved, and what the menu says: <c>SAVED TO SLOT 2</c> — then each file the write set aside first, where, and how to try it again — or why not.</returns>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is not a manual slot's: the autosave is written by the game alone.</exception>
-    internal static (bool Saved, string Notice) SaveTo(SaveStore slot, CampaignState campaign, ViewDto? view, int number,
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is no manual slot: the autosave is written by the game alone, and the scratch slot by its dev override.</exception>
+    internal static (bool Saved, string Notice) SaveTo(SaveSlot slot, CampaignState campaign, ViewDto? view,
         Action<string>? report = null, DateTimeOffset? savedAt = null)
     {
         ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(campaign);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+        if (slot.Number is not > SaveSlots.Autosave)
+            throw new ArgumentOutOfRangeException(nameof(slot), slot.Number, "A save by hand goes into a manual slot: the autosave is written by the game alone, and the scratch slot by its dev override.");
         if (!SaveGame.IsSafePoint(campaign))
         {
-            report?.Invoke($"[Save] Not saving into {SaveSlots.Label(number)}: the campaign is off a safe point ({campaign.Visit!.Turns!.Phase}) - nothing is written, and {slot.SavePath} keeps what it holds");
+            report?.Invoke($"[Save] Not saving into {slot.Name}: the campaign is off a safe point ({campaign.Visit!.Turns!.Phase}) - nothing is written, and {slot.Store.SavePath} keeps what it holds");
             return (false, PauseMenu.SaveOnYourTurn);
         }
 
         var said = new List<string>();
-        if (Save(slot, campaign, campaign.Visit is null ? null : view, report, savedAt, said, number) is { } failed)
+        if (Save(slot, campaign, campaign.Visit is null ? null : view, report, savedAt, said) is { } failed)
             return (false, failed);
-        return (true, string.Join(" - ", [SavedTo(number), .. said]));
+        return (true, string.Join(" - ", [SavedTo(slot), .. said]));
     }
 
     /// <summary>
@@ -856,7 +865,7 @@ internal static class CampaignBoot
     /// safe point is not settled and not saved, and the last save stands.
     /// </para>
     /// </summary>
-    /// <param name="store">The slot the quit saves to: the autosave's.</param>
+    /// <param name="slot">The slot the quit saves to: the autosave, or a dev override's scratch slot.</param>
     /// <param name="campaign">The campaign being quit.</param>
     /// <param name="view">What the playing scene shows once the settle is done — read then, since a turn's start re-decides the march and may hand the lead to a living member — or null for nothing to say.</param>
     /// <param name="step">The playing scene's logic step; null when no scene is playing the visit, which leaves nothing to settle.</param>
@@ -864,11 +873,12 @@ internal static class CampaignBoot
     /// <param name="savedAt">When the quit saves, the edge's clock; null records no time.</param>
     /// <param name="saved">Told, once, when the campaign stands on the disk as it was left — the save written, or held there already — and never when the quit could not save; null to tell nobody.</param>
     /// <returns>True once the campaign stood at a safe point and the save was made — a write that fails is logged, never thrown, the save on the disk kept and the marker left; false when it never got to one, nothing was written, and the marker is left.</returns>
-    internal static bool SaveOnQuit(SaveStore store, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null,
+    internal static bool SaveOnQuit(SaveSlot slot, CampaignState campaign, Func<ViewDto?>? view, Action? step, Action<string>? report = null,
         DateTimeOffset? savedAt = null, Action? saved = null)
     {
-        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(campaign);
+        var store = slot.Store;
         if (!SaveGame.IsSafePoint(campaign))
         {
             var visit = campaign.Visit!;   // off a safe point there is a visit, and a system open on it
@@ -895,7 +905,7 @@ internal static class CampaignBoot
         // A view is the run's: a campaign between runs — a quit on the summary, or
         // a settle that ended the run — has none to carry.
         var viewNow = campaign.Visit is null ? null : view?.Invoke();
-        if (Save(store, campaign, viewNow, report, savedAt) is { } failed)
+        if (Save(slot, campaign, viewNow, report, savedAt) is { } failed)
         {
             report?.Invoke($"[Save] {failed}");
             MarkUnsaved(store, failed, report);
@@ -942,21 +952,32 @@ internal static class CampaignBoot
     /// <summary>Whether <paramref name="notice"/> is a stuck notice (<see cref="StuckNotice"/>), which says already that nothing more is saved this session.</summary>
     private static bool SaysStuck(string notice) => notice.EndsWith(NothingSavedThisSession, StringComparison.Ordinal);
 
-    /// <summary>A write that failed, and why, in a notice: the save before it is kept.</summary>
-    internal static string WriteFailed(string why)
-        => $"THE CAMPAIGN COULD NOT BE SAVED ({why.ToUpperInvariant()}) - THE LAST SAVE IS KEPT - SEE THE LOG";
+    /// <summary>
+    /// A write into <paramref name="slot"/> that failed, and why, in a notice:
+    /// what the slot held before is kept. A manual slot, saved by hand, is named —
+    /// <c>SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS
+    /// KEPT - SEE THE LOG</c> — and the autosave and the scratch slot are the
+    /// campaign's own save: <c>THE CAMPAIGN COULD NOT BE SAVED (THE DISK IS FULL) -
+    /// THE LAST SAVE IS KEPT - SEE THE LOG</c>. A blank why is taken as it is:
+    /// <see cref="Save"/>, which never throws, hands it the file system's.
+    /// </summary>
+    internal static string NotSaved(SaveSlot slot, string why)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(why);
+        return Unnamed(slot)
+            ? $"THE CAMPAIGN COULD NOT BE SAVED ({why.ToUpperInvariant()}) - THE LAST SAVE IS KEPT - SEE THE LOG"
+            : $"{slot.Name} COULD NOT BE SAVED ({why.ToUpperInvariant()}) - WHAT IT HELD IS KEPT - SEE THE LOG";
+    }
 
     /// <summary>How a save by hand that went through starts (<see cref="SavedTo"/>): the menu draws it green.</summary>
     internal const string SavedPrefix = "SAVED TO ";
 
-    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c>.</summary>
-    internal static string SavedTo(int number) => $"{SavedPrefix}{SaveSlots.Label(number)}";
-
-    /// <summary>A save by hand that failed, and why: <c>SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS KEPT - SEE THE LOG</c>. What the slot held before is untouched.</summary>
-    internal static string SlotNotSaved(int number, string why)
+    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    internal static string SavedTo(SaveSlot slot)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(why);
-        return $"{SaveSlots.Label(number)} COULD NOT BE SAVED ({why.ToUpperInvariant()}) - WHAT IT HELD IS KEPT - SEE THE LOG";
+        ArgumentNullException.ThrowIfNull(slot);
+        return $"{SavedPrefix}{slot.Name}";
     }
 
     /// <summary>

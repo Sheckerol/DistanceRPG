@@ -442,7 +442,7 @@ public class DungeonScene : Scene
     /// were saved. A file of the slot the host's write set aside first, since no
     /// save could be read from it, is said the same way (<see cref="CampaignBoot.Save"/>).
     /// </summary>
-    /// <param name="notice">What the failed write says (<see cref="CampaignBoot.WriteFailed"/>), or what the write set aside (<see cref="CampaignBoot.SetAsideNotice"/>).</param>
+    /// <param name="notice">What the failed write says (<see cref="CampaignBoot.NotSaved"/>), or what the write set aside (<see cref="CampaignBoot.SetAsideNotice"/>).</param>
     internal void SaveFailed(string notice) => _hud.ShowSaveFailed(notice);
 
     /// <summary>The banner's lines as the HUD draws them, top to bottom — over a resumed floor, <c>RESUMED</c> first — or none once it is down.</summary>

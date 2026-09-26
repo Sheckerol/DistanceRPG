@@ -231,7 +231,7 @@ public class PreReworkSaveTests
                 Assert.All(listing.Slots.Skip(1), slot => Assert.Equal(SlotState.Empty, slot.State));
                 Assert.Empty(listing.Notices);
 
-                var boot = CampaignBoot.Load(store, GameContent.Current);
+                var boot = CampaignBoot.Load(slots.Slot(SaveSlots.Autosave), GameContent.Current);
                 Assert.True(boot.Loaded);
                 string[] notices = NumbersMoved(GameContent.Current.Tuning)
                     ? [BetweenRunsHud.Resumed, CampaignBoot.TuningChanged]
@@ -279,8 +279,8 @@ public class PreReworkSaveTests
 
                 // Played on, it saves as any campaign does — under the numbers played
                 // now — and the next launch resumes that, with nothing more to say.
-                Assert.Null(CampaignBoot.Save(store, campaign));
-                Assert.Equal([BetweenRunsHud.Resumed], CampaignBoot.Load(store, GameContent.Current).Notices);
+                Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign));
+                Assert.Equal([BetweenRunsHud.Resumed], CampaignBoot.Load(slots.Slot(SaveSlots.Autosave), GameContent.Current).Notices);
                 store.ClearResuming();
             }
             finally

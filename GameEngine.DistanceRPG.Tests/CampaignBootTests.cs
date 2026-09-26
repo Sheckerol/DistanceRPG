@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using GameEngine.DistanceRPG.Logic;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -52,10 +53,10 @@ public sealed class CampaignBootTests : IDisposable
 
     /// <summary>What loading <paramref name="store"/> — the autosave slot — brings back, under the current content.</summary>
     private static SlotLoad Load(SaveStore store, List<string>? log = null)
-        => CampaignBoot.Load(store, GameContent.Current, log is null ? null : log.Add);
+        => CampaignBoot.Load(AsAutosave(store), GameContent.Current, log is null ? null : log.Add);
 
-    /// <summary>Save <paramref name="campaign"/>, and it saved.</summary>
-    private static void Saved(SaveStore store, CampaignState campaign) => Assert.Null(CampaignBoot.Save(store, campaign));
+    /// <summary>Save <paramref name="campaign"/>, and it saved: a save that goes through says nothing, so the store goes in as the autosave, whichever slot's it is.</summary>
+    private static void Saved(SaveStore store, CampaignState campaign) => Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
 
     /// <summary>The text <paramref name="campaign"/> saves as.</summary>
     private static string Text(CampaignState campaign) => SaveCodec.Write(SaveGame.Capture(campaign));
@@ -292,9 +293,9 @@ public sealed class CampaignBootTests : IDisposable
             // campaign began. Every case is a slot of one save folder whose autosave
             // holds a campaign, which a load of another slot that brings nothing back
             // leaves exactly as it was.
-            Assert.Equal("NOTHING COULD BE LOADED FROM SLOT 2", CampaignBoot.NothingLoaded(2));
-            Assert.Equal("NOTHING COULD BE LOADED FROM THE AUTOSAVE", CampaignBoot.NothingLoaded(SaveSlots.Autosave));
-            Assert.All(Enumerable.Range(0, SaveSlots.Most + 1).Select(CampaignBoot.NothingLoaded), word => Assert.Matches("^[A-Z0-9 ]+$", word));
+            Assert.Equal("NOTHING COULD BE LOADED FROM SLOT 2", CampaignBoot.NothingLoaded(Named(2)));
+            Assert.Equal("NOTHING COULD BE LOADED FROM THE AUTOSAVE", CampaignBoot.NothingLoaded(Named(SaveSlots.Autosave)));
+            Assert.All(Enumerable.Range(0, SaveSlots.Most + 1).Select(n => CampaignBoot.NothingLoaded(Named(n))), word => Assert.Matches("^[A-Z0-9 ]+$", word));
 
             var slots = new SaveSlots(folder, SaveSlots.Most);
             var autosave = slots.Store(SaveSlots.Autosave);
@@ -310,13 +311,13 @@ public sealed class CampaignBootTests : IDisposable
                 Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(folder));
             }
 
-            SlotLoad LoadSlot(int number) => CampaignBoot.Load(slots.Store(number), GameContent.Current, number: number);
+            SlotLoad LoadSlot(int number) => CampaignBoot.Load(slots.Slot(number), GameContent.Current);
             IReadOnlyList<string> Word(int number, SlotLoad load)
             {
                 Assert.False(load.Loaded);
                 Assert.Null(load.View);
-                var word = CampaignBoot.NothingLoadedWord(load, number);
-                Assert.Equal([CampaignBoot.NothingLoaded(number), .. load.Notices], word);
+                var word = CampaignBoot.NothingLoadedWord(load, Named(number));
+                Assert.Equal([CampaignBoot.NothingLoaded(Named(number)), .. load.Notices], word);
 
                 // On the title whole: the save's word leads there, every row of it shown.
                 Assert.Equal(word.SelectMany(NoticeText.Wrap), NoticeText.Rows(word, whole: word.Count));
@@ -327,7 +328,7 @@ public sealed class CampaignBootTests : IDisposable
             // title says only that nothing could be loaded. Nothing is written, not
             // even the slot's folder.
             var emptied = Word(1, LoadSlot(1));
-            Assert.Equal([CampaignBoot.NothingLoaded(1)], emptied);
+            Assert.Equal([CampaignBoot.NothingLoaded(slots.Slot(1))], emptied);
             Assert.False(Directory.Exists(slots.Store(1).Folder));
             TheAutosaveUntouched();
 
@@ -338,16 +339,16 @@ public sealed class CampaignBootTests : IDisposable
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
             var script = VisitScript.Enter(campaign, "spear_hall", CampaignRuns.FiveDeep);
             script.Down();
-            Assert.Null(CampaignBoot.Save(resumes, campaign, new ViewDto("B")));   // a player turn's start
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), campaign, new ViewDto("B")));   // a player turn's start
             script.EndTurn(SaveGame.LogicStepSeconds);
-            Assert.Null(CampaignBoot.Save(resumes, campaign, new ViewDto("B")));   // the next one: the save before it is the backup
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), campaign, new ViewDto("B")));   // the next one: the save before it is the backup
             File.WriteAllText(resumes.SavePath, "not a save");
             var load = LoadSlot(2);
             Assert.True(load.Loaded);
             Assert.Equal(new ViewDto("B"), load.View);
             Assert.Equal(2, load.Notices.Count);
-            Assert.Equal(CampaignBoot.Resumed(2, backup: true), load.Notices[0]);
-            Assert.Throws<ArgumentException>(() => CampaignBoot.NothingLoadedWord(load, 2));
+            Assert.Equal(CampaignBoot.Resumed(slots.Slot(2), backup: true), load.Notices[0]);
+            Assert.Throws<ArgumentException>(() => CampaignBoot.NothingLoadedWord(load, slots.Slot(2)));
             resumes.ClearResuming();
             TheAutosaveUntouched();
 
@@ -397,7 +398,7 @@ public sealed class CampaignBootTests : IDisposable
             var itsAutosave = autosaveBroken.Store(SaveSlots.Autosave);
             Directory.CreateDirectory(itsAutosave.Folder);
             File.WriteAllText(itsAutosave.SavePath, "not a save");
-            Assert.Collection(Word(SaveSlots.Autosave, CampaignBoot.Load(itsAutosave, GameContent.Current)),
+            Assert.Collection(Word(SaveSlots.Autosave, CampaignBoot.Load(autosaveBroken.Slot(SaveSlots.Autosave), GameContent.Current)),
                 notice => Assert.Equal("NOTHING COULD BE LOADED FROM THE AUTOSAVE", notice),
                 notice => SaysSetAside(notice, "campaign.json", $"could not be read ({WhyOf("not a save", itsAutosave)})",
                     Path.Combine(itsAutosave.Folder, "campaign.unreadable-1.json")));
@@ -455,7 +456,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(2, manual.Count);
 
             var log = new List<string>();
-            var begun = CampaignBoot.Abandon(autosave, GameContent.Current, log.Add, how: null);
+            var begun = CampaignBoot.Abandon(slots.Slot(SaveSlots.Autosave), GameContent.Current, log.Add, how: null);
 
             // A new campaign: the roster's four, nothing met but their loadout, nothing
             // played, every dungeon but the tutorial behind it — and nothing of a save
@@ -500,7 +501,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(manual, Manual());
 
             // --new-campaign's words still name it (the launch's developer tooling).
-            var again = CampaignBoot.Abandon(autosave, GameContent.Current);
+            var again = CampaignBoot.Abandon(slots.Slot(SaveSlots.Autosave), GameContent.Current);
             SaysSetAside(again.Notices[1], "campaign.json", "was left for a new campaign (--new-campaign)",
                 Path.Combine(autosave.Folder, "campaign.abandoned-3.json"));
             Assert.Equal(manual, Manual());
@@ -532,7 +533,7 @@ public sealed class CampaignBootTests : IDisposable
                 Saved(slot1, inSlot);
                 var autosave = slots.Store(SaveSlots.Autosave);
                 seed(autosave);
-                var load = CampaignBoot.Load(slot1, GameContent.Current, number: 1);
+                var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
                 Assert.True(load.Loaded);
                 Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1"], load.Notices);
                 slot1.ClearResuming();   // the loaded screen is up
@@ -541,9 +542,9 @@ public sealed class CampaignBootTests : IDisposable
 
             void AutosavedTwice(SaveStore autosave, CampaignState campaign, params (string Path, byte[] Bytes)[] kept)
             {
-                Assert.Null(CampaignBoot.Save(autosave, campaign));   // the loaded screen's first autosave
+                Assert.Null(CampaignBoot.Save(AsAutosave(autosave), campaign));   // the loaded screen's first autosave
                 CampaignRuns.DeepRetreat(campaign, "spear_hall");
-                Assert.Null(CampaignBoot.Save(autosave, campaign));   // and a run's end
+                Assert.Null(CampaignBoot.Save(AsAutosave(autosave), campaign));   // and a run's end
                 Assert.True(autosave.HasBackup);
                 foreach (var (path, bytes) in kept)
                     Assert.Equal(bytes, File.ReadAllBytes(path));
@@ -623,7 +624,7 @@ public sealed class CampaignBootTests : IDisposable
             {
                 Saved(autosave, NewCampaign());
                 Saved(autosave, other);
-                Assert.True(CampaignBoot.Load(autosave, GameContent.Current).Loaded);   // and the game went down before its screen was up
+                Assert.True(CampaignBoot.Load(AsAutosave(autosave), GameContent.Current).Loaded);   // and the game went down before its screen was up
                 Assert.True(autosave.WasResuming);
             });
             byte[] fourthSave = File.ReadAllBytes(fourth.SavePath), fourthBackup = File.ReadAllBytes(fourth.BackupPath);
@@ -653,7 +654,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Collection(stuckSaid,
                 notice => Assert.Equal(CampaignBoot.StuckNotice("campaign.json", "was to make way for slot 1", "another program has it open"), notice));
             Assert.NotNull(stuck.WritesRefused);
-            Assert.NotNull(CampaignBoot.Save(stuck, stuckLoaded));
+            Assert.NotNull(CampaignBoot.Save(AsAutosave(stuck), stuckLoaded));
             Assert.Equal(stuckText, stuck.Read());
             Assert.Equal([SaveStore.FileName], Files(stuck.Folder));
         });
@@ -673,7 +674,7 @@ public sealed class CampaignBootTests : IDisposable
             // BeginNewCampaign hand their word through). A refusal the load or the new
             // campaign met itself is said by its stuck notice, once.
             var slots = new SaveSlots(folder, 3);
-            var autosave = slots.Store(SaveSlots.Autosave);
+            var autosave = slots.Slot(SaveSlots.Autosave);
             string[] resumed = [BetweenRunsHud.Resumed];
 
             // Writes not refused: the word is what it was.
@@ -681,7 +682,7 @@ public sealed class CampaignBootTests : IDisposable
 
             // Refused earlier: said after the word — nothing autosaved, why, what to do.
             const string why = "campaign.json could not be read (another program has it open) and could not be set aside (another program has it open)";
-            autosave.RefuseWrites(why);
+            autosave.Store.RefuseWrites(why);
             var said = CampaignBoot.InPlayWord(resumed, autosave);
             Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.NotAutosaved(why)], said);
             Assert.Equal("NOTHING IS AUTOSAVED THIS SESSION: EARLIER, CAMPAIGN.JSON COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN)"
@@ -708,32 +709,33 @@ public sealed class CampaignBootTests : IDisposable
                 return;
             var held = new SaveSlots(Path.Combine(folder, "held"), 3);
             var itsAutosave = held.Store(SaveSlots.Autosave);
+            var itsSlot = held.Slot(SaveSlots.Autosave);
             var campaign = NewCampaign();
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
             Saved(itsAutosave, campaign);
             SlotLoad first;
             using (new FileStream(itsAutosave.SavePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                first = CampaignBoot.Load(itsAutosave, GameContent.Current);
+                first = CampaignBoot.Load(itsSlot, GameContent.Current);
             Assert.False(first.Loaded);
-            Assert.Collection(CampaignBoot.NothingLoadedWord(first, SaveSlots.Autosave),
-                notice => Assert.Equal(CampaignBoot.NothingLoaded(SaveSlots.Autosave), notice),
+            Assert.Collection(CampaignBoot.NothingLoadedWord(first, itsSlot),
+                notice => Assert.Equal(CampaignBoot.NothingLoaded(itsSlot), notice),
                 notice => Assert.Equal(CampaignBoot.StuckNotice("campaign.json", "could not be read (another program has it open)", "another program has it open"), notice));
             string refused = Assert.IsType<string>(itsAutosave.WritesRefused);
 
-            var retry = CampaignBoot.Load(held.Store(SaveSlots.Autosave), GameContent.Current);
+            var retry = CampaignBoot.Load(held.Slot(SaveSlots.Autosave), GameContent.Current);
             Assert.True(retry.Loaded);
             itsAutosave.ClearResuming();   // the loaded screen is up
-            Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.NotAutosaved(refused)], CampaignBoot.InPlayWord(retry.Notices, itsAutosave));
+            Assert.Equal([BetweenRunsHud.Resumed, CampaignBoot.NotAutosaved(refused)], CampaignBoot.InPlayWord(retry.Notices, itsSlot));
             string before = itsAutosave.Read()!;
-            Assert.NotNull(CampaignBoot.Save(itsAutosave, retry.Campaign!));
+            Assert.NotNull(CampaignBoot.Save(itsSlot, retry.Campaign!));
             Assert.Equal(before, itsAutosave.Read());
 
-            var begun = CampaignBoot.Abandon(itsAutosave, GameContent.Current, how: null);
-            Assert.Collection(CampaignBoot.InPlayWord(begun.Notices, itsAutosave),
+            var begun = CampaignBoot.Abandon(itsSlot, GameContent.Current, how: null);
+            Assert.Collection(CampaignBoot.InPlayWord(begun.Notices, itsSlot),
                 notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
                 notice => SaysSetAside(notice, "campaign.json", "was left for a new campaign", Path.Combine(itsAutosave.Folder, "campaign.abandoned-1.json")),
                 notice => Assert.Equal(CampaignBoot.NotAutosaved(refused), notice));
-            Assert.NotNull(CampaignBoot.Save(itsAutosave, begun.Campaign));
+            Assert.NotNull(CampaignBoot.Save(itsSlot, begun.Campaign));
             Assert.False(itsAutosave.HasSave);
         });
     }
@@ -762,7 +764,7 @@ public sealed class CampaignBootTests : IDisposable
             script.Down();
             script.EndTurn(SaveGame.LogicStepSeconds);          // a turn played out on the logic clock's own step
             var view = new ViewDto("C", MarchingThisTurn: true);
-            Assert.Null(CampaignBoot.Save(store, campaign, view));   // a player turn's start: the game writes it
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, view));   // a player turn's start: the game writes it
             string midRun = store.Read()!;
             Assert.NotNull(JsonNode.Parse(midRun)!["campaign"]!["visit"]);
             Assert.Equal(entered, store.ReadBackup());
@@ -827,9 +829,9 @@ public sealed class CampaignBootTests : IDisposable
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
             var script = VisitScript.Enter(campaign, "spear_hall", CampaignRuns.FiveDeep);
             script.Down();
-            Assert.Null(CampaignBoot.Save(store, campaign, new ViewDto("B")));   // a player turn's start
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, new ViewDto("B")));   // a player turn's start
             script.EndTurn(SaveGame.LogicStepSeconds);
-            Assert.Null(CampaignBoot.Save(store, campaign, new ViewDto("B")));   // the next one: the save before it is the backup
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, new ViewDto("B")));   // the next one: the save before it is the backup
             File.WriteAllText(store.SavePath, "not a save");
 
             var boot = Load(store);
@@ -900,11 +902,11 @@ public sealed class CampaignBootTests : IDisposable
             // the turn has come round, and saves what live play reached.
             var quitting = ReloadDeterminismTests.MidWalk();
             Assert.False(SaveGame.IsSafePoint(quitting.Campaign));
-            Assert.NotNull(CampaignBoot.Save(store, quitting.Campaign));
+            Assert.NotNull(CampaignBoot.Save(AsAutosave(store), quitting.Campaign));
             Assert.False(store.HasSave);
             int calls = 0;
             var log = new List<string>();
-            Assert.True(CampaignBoot.SaveOnQuit(store, quitting.Campaign,
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), quitting.Campaign,
                 () =>
                 {
                     Assert.Equal(TurnPhase.Player, quitting.Turns.Phase);   // the view is the settled turn's
@@ -931,23 +933,23 @@ public sealed class CampaignBootTests : IDisposable
             // is settled and nothing written: the last save stands. Logic's own
             // default step is a test's, never the game's.
             var unplayed = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(store, unplayed.Campaign, () => view, step: null));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), unplayed.Campaign, () => view, step: null));
             Assert.Equal(reached, store.Read());
             Assert.Equal(TurnPhase.EnemyMoving, unplayed.Turns.Phase);
 
             // A step that never brings the turn round is given up on, and nothing is
             // written either.
             var stuck = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => view, () => { }));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => view, () => { }));
             Assert.Equal(reached, store.Read());
 
             // At a safe point already the quit takes no step and saves as it stands;
             // a campaign between runs carries no view.
-            Assert.True(CampaignBoot.SaveOnQuit(store, live.Campaign, () => view with { ActiveMemberId = "B" },
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), live.Campaign, () => view with { ActiveMemberId = "B" },
                 () => throw new Xunit.Sdk.XunitException("a player turn needs no step")));
             Assert.Equal("B", SaveCodec.Read(store.Read()!).View!.ActiveMemberId);
             var between = NewCampaign();
-            Assert.True(CampaignBoot.SaveOnQuit(store, between, () => throw new Xunit.Sdk.XunitException("a campaign between runs has no view"), step: null));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), between, () => throw new Xunit.Sdk.XunitException("a campaign between runs has no view"), step: null));
             Assert.Null(SaveCodec.Read(store.Read()!).View);
         });
     }
@@ -974,7 +976,7 @@ public sealed class CampaignBootTests : IDisposable
             turns.EndTurn();
             Assert.False(SaveGame.IsSafePoint(script.Campaign));
 
-            Assert.True(CampaignBoot.SaveOnQuit(store, script.Campaign,
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), script.Campaign,
                 () => throw new Xunit.Sdk.XunitException("a run that ended has no view"),
                 () => turns.Update(SaveGame.LogicStepSeconds)));
             Assert.Null(script.Campaign.Visit);
@@ -999,7 +1001,7 @@ public sealed class CampaignBootTests : IDisposable
             var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep);
             foreach (var view in new[] { new ViewDto("C", MarchingThisTurn: true), new ViewDto("B"), new ViewDto() })
             {
-                Assert.Null(CampaignBoot.Save(store, script.Campaign, view));
+                Assert.Null(CampaignBoot.Save(AsAutosave(store), script.Campaign, view));
                 var boot = Load(store);
                 Assert.Equal(view, boot.View);
                 store.ClearResuming();
@@ -1013,7 +1015,7 @@ public sealed class CampaignBootTests : IDisposable
             script.EndTurn(SaveGame.LogicStepSeconds);
             var granted = new ViewDto("A", MarchingThisTurn: true);
             Assert.False(script.Turns.AnyLiveEnemySeenThisTurn);   // the turn's start: nobody seen yet
-            Assert.Null(CampaignBoot.Save(store, script.Campaign, granted));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), script.Campaign, granted));
             var calm = Load(store);
             store.ClearResuming();
             Assert.True(calm.View!.MarchingThisTurn);
@@ -1022,7 +1024,7 @@ public sealed class CampaignBootTests : IDisposable
             var sighted = script.Floor.Enemies.First(row => row.Alive);
             script.Turns.NotifyEnemyVisible(sighted, true);   // a live enemy in sight, as the scene tells it: the march is revoked this turn
             Assert.True(script.Turns.AnyLiveEnemySeenThisTurn);
-            Assert.Null(CampaignBoot.Save(store, script.Campaign, granted));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), script.Campaign, granted));
             var revoked = Load(store);
             store.ClearResuming();
             Assert.True(revoked.View!.MarchingThisTurn);
@@ -1061,7 +1063,7 @@ public sealed class CampaignBootTests : IDisposable
             script.Walk("A", (10, 24));   // out of the room: a fog box's edge crossed
             script.Look();
             Assert.True(script.Floor.Fog.Visible[r, c]);
-            Assert.Null(CampaignBoot.Save(store, script.Campaign, new ViewDto("A")));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), script.Campaign, new ViewDto("A")));
 
             (int R, int C)[] Living(CampaignState campaign) => campaign.Party.Where(member => member.Alive).Select(Displacer.TileOf).ToArray();
             bool[] Lit(FogState fog) => fog.Visible.Cast<bool>().ToArray();
@@ -1233,7 +1235,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.True(request.DevOverride);
             var slot = CampaignBoot.StoreFor(folder, request);
             Assert.Equal(Path.Combine(own.Folder, SaveStore.OverrideSlot), slot.Folder);
-            var boot = CampaignBoot.BootOverride(slot, GameContent.Current, request);
+            var boot = CampaignBoot.BootOverride(SaveSlot.Scratch(slot), GameContent.Current, request);
             Assert.False(boot.Resumed);
             Assert.Equal("spear_hall", boot.StraightInto);
             Assert.Equal(7L, boot.FirstSeed);
@@ -1245,7 +1247,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(7L, visit.MapSeed);
             visit.OpenTurns(boot.Campaign.Party, CampaignRuns.Ten);
             CampaignRuns.Exit(boot.Campaign);
-            Saved(slot, boot.Campaign);
+            Assert.Null(CampaignBoot.Save(SaveSlot.Scratch(slot), boot.Campaign));
             Assert.Equal([SaveStore.FileName], Files(slot.Folder));
 
             // The campaign's own save: the same bytes, and nothing beside it but the slot.
@@ -1254,14 +1256,14 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal([SaveStore.OverrideSlot], Directory.GetDirectories(folder).Select(path => Path.GetFileName(path)!));
 
             // A second such launch starts afresh: the slot emptied, nothing resumed.
-            var again = CampaignBoot.BootOverride(slot, GameContent.Current, request);
+            var again = CampaignBoot.BootOverride(SaveSlot.Scratch(slot), GameContent.Current, request);
             Assert.False(again.Resumed);
             Assert.Null(again.Campaign.LastResult);
             Assert.Empty(Files(slot.Folder));
 
             // A seed alone is a dev override too: its own slot, the screen between runs first.
             var seeded = new BootRequest(Seed: 7);
-            var bySeed = CampaignBoot.BootOverride(CampaignBoot.StoreFor(folder, seeded), GameContent.Current, seeded);
+            var bySeed = CampaignBoot.BootOverride(SaveSlot.Scratch(CampaignBoot.StoreFor(folder, seeded)), GameContent.Current, seeded);
             Assert.False(bySeed.Resumed);
             Assert.Null(bySeed.StraightInto);
             Assert.Equal(7L, bySeed.FirstSeed);
@@ -1270,8 +1272,8 @@ public sealed class CampaignBootTests : IDisposable
             // either, and an override on the campaign's own folder is refused rather
             // than emptying it.
             var both = new BootRequest("spear_hall", NewCampaign: true);
-            Assert.False(CampaignBoot.BootOverride(CampaignBoot.StoreFor(folder, both), GameContent.Current, both).Resumed);
-            Assert.Throws<InvalidOperationException>(() => CampaignBoot.BootOverride(own, GameContent.Current, request));
+            Assert.False(CampaignBoot.BootOverride(SaveSlot.Scratch(CampaignBoot.StoreFor(folder, both)), GameContent.Current, both).Resumed);
+            Assert.Throws<InvalidOperationException>(() => CampaignBoot.BootOverride(SaveSlot.Scratch(own), GameContent.Current, request));
             Assert.Equal(saved, File.ReadAllBytes(own.SavePath));
             Assert.Equal([SaveStore.FileName], Files(folder));
 
@@ -1302,7 +1304,7 @@ public sealed class CampaignBootTests : IDisposable
             byte[] saved = File.ReadAllBytes(store.SavePath);
             byte[] backup = File.ReadAllBytes(store.BackupPath);
 
-            var boot = CampaignBoot.Abandon(store, GameContent.Current);
+            var boot = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             Assert.False(boot.Resumed);
             StateAssert.Equivalent(NewCampaign(), boot.Campaign, "campaign");
             string backupAside = Path.Combine(store.Folder, "campaign.abandoned-1.json");
@@ -1335,17 +1337,17 @@ public sealed class CampaignBootTests : IDisposable
 
             // Again: the next number, and the first two untouched. The new
             // campaign's first save had no backup to keep, so there is none to set aside.
-            var again = CampaignBoot.Abandon(store, GameContent.Current);
+            var again = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             Assert.Equal(Text(boot.Campaign), File.ReadAllText(Path.Combine(store.Folder, "campaign.abandoned-3.json")));
             BothStillWhole();
             Assert.Equal(2, again.Notices.Count);
 
             // With neither there is nothing to set aside, and a new campaign all the same.
-            Assert.Equal([CampaignBoot.NewCampaignBegins], CampaignBoot.Abandon(store, GameContent.Current).Notices);
+            Assert.Equal([CampaignBoot.NewCampaignBegins], CampaignBoot.Abandon(AsAutosave(store), GameContent.Current).Notices);
 
             // A backup alone — its save deleted by hand — is set aside the same way.
             File.Copy(backupAside, store.BackupPath);
-            var alone = CampaignBoot.Abandon(store, GameContent.Current);
+            var alone = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             string fourth = Path.Combine(store.Folder, "campaign.abandoned-4.json");
             Assert.Equal(backup, File.ReadAllBytes(fourth));
             Assert.Collection(alone.Notices,
@@ -1372,7 +1374,7 @@ public sealed class CampaignBootTests : IDisposable
             // in the new campaign's first run before any save was written. The next
             // load brings nothing back — never the old campaign's backup, as though
             // it were the new one's — and says nothing.
-            var abandoned = CampaignBoot.Abandon(store, GameContent.Current);
+            var abandoned = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             Assert.False(abandoned.Resumed);
             abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);   // its first run begun, then down: nothing saved
             var next = Load(store);
@@ -1384,7 +1386,7 @@ public sealed class CampaignBootTests : IDisposable
             // The game saves the new campaign at once (DistanceRpgGame.BeginNewCampaign),
             // so after the same crash the next load resumes that campaign — the new
             // one, as it stood when its run began.
-            var fresh = CampaignBoot.Abandon(store, GameContent.Current);
+            var fresh = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             Saved(store, fresh.Campaign);
             fresh.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
             var resumed = Load(store);
@@ -1427,14 +1429,14 @@ public sealed class CampaignBootTests : IDisposable
 
             BootResult boot;
             using (new FileStream(store.BackupPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                boot = CampaignBoot.Abandon(store, GameContent.Current);
+                boot = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
 
             Assert.False(boot.Resumed);
             Assert.Collection(boot.Notices,
                 line => Assert.Equal(CampaignBoot.NewCampaignBegins, line),
                 line => Assert.Equal(CampaignBoot.StuckNotice("campaign.bak.json", "was left for a new campaign (--new-campaign)", "another program has it open"), line));
             Assert.NotNull(store.WritesRefused);
-            Assert.NotNull(CampaignBoot.Save(store, boot.Campaign));
+            Assert.NotNull(CampaignBoot.Save(AsAutosave(store), boot.Campaign));
             Assert.Equal(saved, store.Read());
             Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(folder));
 
@@ -1515,7 +1517,7 @@ public sealed class CampaignBootTests : IDisposable
             // nothing, and the save before it is exactly what it was.
             Directory.CreateDirectory(store.TempPath);
             var log = new List<string>();
-            string? notice = CampaignBoot.Save(store, campaign, report: log.Add);
+            string? notice = CampaignBoot.Save(AsAutosave(store), campaign, report: log.Add);
             Assert.NotNull(notice);
             Assert.StartsWith("THE CAMPAIGN COULD NOT BE SAVED (", notice, StringComparison.Ordinal);
             Assert.EndsWith(") - THE LAST SAVE IS KEPT - SEE THE LOG", notice, StringComparison.Ordinal);
@@ -1526,7 +1528,7 @@ public sealed class CampaignBootTests : IDisposable
             // Freed, the same save goes through, and the one before it is the backup.
             Directory.Delete(store.TempPath);
             log.Clear();
-            Assert.Null(CampaignBoot.Save(store, campaign, report: log.Add));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, report: log.Add));
             Assert.Equal((Text(campaign), previous), (store.Read(), store.ReadBackup()));
             Assert.Equal([$"[Save] Wrote {store.SavePath}"], log);
 
@@ -1536,7 +1538,7 @@ public sealed class CampaignBootTests : IDisposable
             string between = store.Read()!;
             campaign.Enter("spear_hall", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten).EndTurn();
             Assert.False(SaveGame.IsSafePoint(campaign));
-            Assert.NotNull(CampaignBoot.Save(store, campaign));
+            Assert.NotNull(CampaignBoot.Save(AsAutosave(store), campaign));
             Assert.Equal((between, previous), (store.Read(), store.ReadBackup()));
         });
     }
@@ -1561,7 +1563,7 @@ public sealed class CampaignBootTests : IDisposable
 
             Directory.CreateDirectory(store.TempPath);
             var log = new List<string>();
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, log.Add));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, log.Add));
             Assert.Equal(before, store.Read());
             string marker = Assert.IsType<string>(store.ReadUnsaved());
             Assert.StartsWith("Leaving play could not write the autosave: THE CAMPAIGN COULD NOT BE SAVED (", marker, StringComparison.Ordinal);
@@ -1599,13 +1601,13 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Matches("^[A-Z0-9 ,-]+$", CampaignBoot.QuitUnsaved);   // the HUD's font: no apostrophe
 
             // A quit that saves leaves no marker.
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null));
             Assert.Equal(Text(campaign), store.Read());
             Assert.Null(store.ReadUnsaved());
 
             // Nor does a quit whose save the disk already holds: nothing needed writing.
             Directory.CreateDirectory(store.TempPath);
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null));
             Assert.Null(store.ReadUnsaved());
             Directory.Delete(store.TempPath);
 
@@ -1616,7 +1618,7 @@ public sealed class CampaignBootTests : IDisposable
             // what was set aside, and the save's word still fits the rows it is shown
             // whole in (NoticeText.MaxWholeRows).
             var stuck = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(store, stuck.Campaign, () => new ViewDto("A"), () => { }));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), stuck.Campaign, () => new ViewDto("A"), () => { }));
             Assert.Contains("did not come round to the party's", store.ReadUnsaved()!, StringComparison.Ordinal);
             File.WriteAllText(store.SavePath, "not a save");
             using (TestContent.UsePremise(tuning: t => t with { MovementBudget = 200 }))
@@ -1637,9 +1639,9 @@ public sealed class CampaignBootTests : IDisposable
             // Left for a new campaign, the campaign it spoke of is set aside: the
             // marker goes, and nothing is said of it.
             var unplayed = ReloadDeterminismTests.MidWalk();
-            Assert.False(CampaignBoot.SaveOnQuit(store, unplayed.Campaign, () => new ViewDto("A"), step: null));
+            Assert.False(CampaignBoot.SaveOnQuit(AsAutosave(store), unplayed.Campaign, () => new ViewDto("A"), step: null));
             Assert.Contains("with no scene to play it out with", store.ReadUnsaved()!, StringComparison.Ordinal);
-            var abandoned = CampaignBoot.Abandon(store, GameContent.Current);
+            var abandoned = CampaignBoot.Abandon(AsAutosave(store), GameContent.Current);
             Assert.DoesNotContain(CampaignBoot.QuitUnsaved, abandoned.Notices);
             Assert.Null(store.ReadUnsaved());
 
@@ -1648,7 +1650,7 @@ public sealed class CampaignBootTests : IDisposable
             Directory.CreateDirectory(store.UnsavedPath);
             Directory.CreateDirectory(store.TempPath);
             log.Clear();
-            Assert.True(CampaignBoot.SaveOnQuit(store, campaign, view: null, step: null, log.Add));
+            Assert.True(CampaignBoot.SaveOnQuit(AsAutosave(store), campaign, view: null, step: null, log.Add));
             Assert.Contains(log, line => line.StartsWith($"[Save] {store.UnsavedPath} could not be written either", StringComparison.Ordinal));
             Assert.Null(store.ReadUnsaved());
         });
@@ -1670,7 +1672,7 @@ public sealed class CampaignBootTests : IDisposable
             Saved(store, campaign);
             string before = store.ReadBackup()!;
             var log = new List<string>();
-            Assert.Null(CampaignBoot.Save(store, campaign, report: log.Add));
+            Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign, report: log.Add));
             Assert.Equal((Text(campaign), before), (store.Read(), store.ReadBackup()));
             Assert.Equal([$"[Save] {store.SavePath} already holds this campaign - nothing written, the backup kept"], log);
 
@@ -1707,7 +1709,7 @@ public sealed class CampaignBootTests : IDisposable
             using (new FileStream(store.SavePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             {
                 load = Load(store);
-                notice = CampaignBoot.Save(store, fresh);
+                notice = CampaignBoot.Save(AsAutosave(store), fresh);
             }
 
             Assert.False(load.Loaded);
@@ -1719,7 +1721,7 @@ public sealed class CampaignBootTests : IDisposable
             // Freed, this session still saves nothing over it: it is the save, byte
             // for byte, and nothing was set aside or written beside it. The next
             // launch reads it as ever.
-            Assert.NotNull(CampaignBoot.Save(store, fresh));
+            Assert.NotNull(CampaignBoot.Save(AsAutosave(store), fresh));
             Assert.Equal(saved, store.Read());
             Assert.Equal([SaveStore.FileName], Files(folder));
             Assert.True(Load(new SaveStore(folder)).Loaded);

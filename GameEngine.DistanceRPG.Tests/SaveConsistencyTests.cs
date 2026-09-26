@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using GameEngine.DistanceRPG.Logic;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -833,14 +834,14 @@ public sealed class SaveConsistencyTests : IDisposable
                 var store = new SaveStore(folder.FullName);
                 var campaign = NewCampaign();
                 CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
-                Assert.Null(CampaignBoot.Save(store, campaign));
+                Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
                 CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
-                Assert.Null(CampaignBoot.Save(store, campaign));
+                Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
                 string broken = Edited(store.Read()!, edit);
                 File.WriteAllText(store.SavePath, broken);
 
                 var log = new List<string>();
-                var boot = CampaignBoot.Load(store, GameContent.Current, log.Add);
+                var boot = CampaignBoot.Load(AsAutosave(store), GameContent.Current, log.Add);
                 Assert.True(boot.Loaded);
                 Assert.Equal(1, boot.Campaign!.RunCounter);   // the backup
                 string aside = Path.Combine(store.Folder, "campaign.unreadable-1.json");

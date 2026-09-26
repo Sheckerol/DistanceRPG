@@ -1,5 +1,6 @@
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -415,7 +416,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Enter);
         Assert.Equal([1], host.SavedTo);
         Assert.Equal((true, (SlotMenu?)null), (scene.MenuOpen, scene.SaveList));
-        scene.SlotSaved(CampaignBoot.SavedTo(1));
+        scene.SlotSaved(CampaignBoot.SavedTo(Named(1)));
         Assert.Equal("SAVED TO SLOT 1", scene.MenuAnswer);
         var menuRows = DungeonHud.PauseMenuLayout(1280f, 720f, PauseMenu.Options(hasTitle: true), true, scene.MenuAnswer, scene.SaveList, Dungeons, TimeZoneInfo.Utc);
         Assert.Contains(menuRows, row => row.Text == "SAVED TO SLOT 1" && row.Color == DungeonHud.Green);

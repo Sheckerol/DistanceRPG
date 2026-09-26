@@ -92,6 +92,10 @@ internal sealed class SaveSlots
         return store;
     }
 
+    /// <summary>Slot <paramref name="number"/> — its store (<see cref="Store"/>), the same one every ask, and its name — for every load, save and word of it.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 0 to <see cref="Most"/>.</exception>
+    public SaveSlot Slot(int number) => new(Store(number), number);
+
     /// <summary>The manual slots above <see cref="Count"/> — up to <see cref="Most"/> — that hold a save or a backup, in number order: kept where they are, listed, and never saved into.</summary>
     public IReadOnlyList<int> Beyond()
         => Enumerable.Range(Count + 1, Most - Count).Where(number => Store(number) is { } store && (store.HasSave || store.HasBackup)).ToList();
