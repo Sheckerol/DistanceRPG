@@ -8,22 +8,25 @@ namespace GameEngine.DistanceRPG;
 /// The title screen's text (the user's ruling of 2026-09-25 on the save model,
 /// R2(a)), drawn with the engine's bitmap <see cref="TextRenderer"/> as the other
 /// screens are: <c>DISTANCE RPG</c> across the top, the notices under it, the four
-/// options — or the load list in their place — and the keys along the bottom, or
-/// an ask in their place.
+/// options — or a slot list in their place, LOAD GAME's or NEW CAMPAIGN's — and
+/// the keys along the bottom, or an ask in their place.
 /// <list type="bullet">
 /// <item><strong>The options</strong> sit centred under the notices, the chosen
 /// one marked <c>&gt; ... &lt;</c> in yellow, CONTINUE dimmed while there is
 /// nothing to continue.</item>
-/// <item><strong>The load list stands in the options' place, and the notices'
-/// </strong>, so it never contends with the save's word for height: a slot a row,
+/// <item><strong>A slot list stands in the options' place, and the notices'
+/// </strong>, so it never contends with the save's word for height: its heading
+/// — <c>LOAD GAME</c>, or <c>NEW CAMPAIGN - CHOOSE A SLOT</c> — then a slot a row,
 /// with its markers' row under it in grey when any apply (<see cref="SlotText"/>),
 /// at the list's one scale, left-aligned and centred on its widest row as the
 /// screen a broken file stops the game on lays its block. The chosen slot is
-/// marked <c>&gt; ... &lt;</c> in yellow; an empty slot is dimmed. Ten slots, each
-/// with its markers' row, fit a 720-pixel window.</item>
+/// marked <c>&gt; ... &lt;</c> in yellow; on the load list an empty slot is
+/// dimmed, and on NEW CAMPAIGN's none is, since every one can be begun in. Ten
+/// slots, each with its markers' row, fit a 720-pixel window.</item>
 /// <item><strong>An ask is drawn where the keys stand</strong>, two rows in
 /// yellow — what it does, then what the keys do — and what the list said about a
-/// key (<c>SLOT 2 IS EMPTY</c>) sits just above the keys, in orange.</item>
+/// key (<c>SLOT 2 IS EMPTY</c>, <c>SLOT 5 IS BEYOND THE 3 SLOTS</c>) sits just
+/// above the keys, in orange.</item>
 /// </list>
 /// Every row comes from <see cref="Layout"/>, a pure function of the menu, the
 /// notices and the window, which the tests read; only the drawing is not.
@@ -39,7 +42,7 @@ public sealed class TitleHud : IDisposable
     internal const float TitleY = 44f;
     internal const float TitleScale = 6f;
 
-    /// <summary>The notices under the title, a row a pitch; and the load list's heading, in their place while it is up.</summary>
+    /// <summary>The notices under the title, a row a pitch; and a slot list's heading, in their place while it is up.</summary>
     internal const float NoticeTop = 104f;
     internal const float NoticePitch = 16f;
     internal const float NoticeScale = 1.4f;
@@ -50,7 +53,7 @@ public sealed class TitleHud : IDisposable
     internal const float OptionScale = 2.2f;
     internal const float OptionPitch = 40f;
 
-    /// <summary>The load list: its heading, then a slot row a pitch — a markers' row just under its slot's, and the next slot a pitch under that.</summary>
+    /// <summary>A slot list: its heading, then a slot row a pitch — a markers' row just under its slot's, and the next slot a pitch under that.</summary>
     internal const float ListHeadingScale = 2f;
     internal const float ListTop = 136f;
     internal const float SlotPitch = 24f;
@@ -92,9 +95,9 @@ public sealed class TitleHud : IDisposable
     /// <summary>
     /// Every row the screen draws, top to bottom, in a window
     /// <paramref name="width"/> by <paramref name="height"/>: the title; then the
-    /// notices and the options, or — while the load list is up — its heading and
+    /// notices and the options, or — while a slot list is up — its heading and
     /// the slots in their place; then, along the bottom, the ask's two rows, or the
-    /// keys with what the list said just above them.
+    /// keys — the options', or the list's — with what the list said just above them.
     /// </summary>
     /// <param name="menu">The title's choices, and where they stand.</param>
     /// <param name="notices">The notices as the screen lays them out (<see cref="TitleScene.NoticeRows"/>).</param>
@@ -111,7 +114,7 @@ public sealed class TitleHud : IDisposable
         ArgumentNullException.ThrowIfNull(zone);
 
         var rows = new List<TitleRow> { new(TitleText.Title, TitleY, TitleScale, DungeonHud.Cyan) };
-        if (menu.Loading is { } list)
+        if (menu.List is { } list)
             rows.AddRange(ListRows(list, width, dungeons, zone));
         else
             rows.AddRange(OptionRows(menu, notices, height, dungeons, zone));
@@ -124,24 +127,30 @@ public sealed class TitleHud : IDisposable
             rows.Add(new TitleRow(keys, keysY, KeysScale, DungeonHud.Yellow));
             return rows;
         }
-        if (menu.Loading?.Said is { } said)
+        if (menu.List?.Said is { } said)
             rows.Add(new TitleRow(said, keysY - BottomPitch, KeysScale, DungeonHud.Orange));
-        rows.Add(new TitleRow(menu.Loading is null ? TitleText.KeysLine : TitleText.LoadKeysLine, keysY, KeysScale, DungeonHud.Grey));
+        string keysLine = menu.List switch
+        {
+            null => TitleText.KeysLine,
+            { Mode: SlotMenuMode.NewCampaign } => TitleText.NewCampaignKeysLine,
+            _ => TitleText.LoadKeysLine,
+        };
+        rows.Add(new TitleRow(keysLine, keysY, KeysScale, DungeonHud.Grey));
         return rows;
     }
 
     /// <summary>
-    /// The ask being put, as its two rows: NEW CAMPAIGN's, naming the autosave by
-    /// what it holds (<see cref="SlotText.Summary"/>) and how many slots are kept.
+    /// The ask being put, as its two rows: NEW CAMPAIGN's list's, naming the slot
+    /// chosen and what it holds (<see cref="SlotText.Summary"/>), or that nothing in
+    /// it reads (<see cref="TitleText.NewCampaignAsk"/>).
     /// </summary>
+    /// <exception cref="InvalidOperationException">No ask is being put.</exception>
     internal static (string What, string Keys) AskRows(TitleMenu menu, DungeonCatalogue dungeons)
     {
         ArgumentNullException.ThrowIfNull(menu);
-        return menu.Ask switch
-        {
-            TitleAsk.NewCampaign => TitleText.NewCampaignAsk(SlotText.Summary(menu.Listing.Autosave, dungeons), menu.Count),
-            _ => throw new InvalidOperationException("No ask is being put."),
-        };
+        if (menu.List?.Asking is not { } asked)
+            throw new InvalidOperationException("No ask is being put.");
+        return TitleText.NewCampaignAsk(asked.Number, SlotText.Summary(asked, dungeons), unreadable: asked.State == SlotState.Unreadable);
     }
 
     /// <summary>An option as its row says it: CONTINUE naming the most recent save's own row, or that there is none yet; the rest by name.</summary>
@@ -177,18 +186,20 @@ public sealed class TitleHud : IDisposable
     }
 
     /// <summary>
-    /// The load list: its heading where the notices stand, then its slots
-    /// (<see cref="SlotRows"/>) from <see cref="ListTop"/> down.
+    /// A slot list: its heading where the notices stand — <c>LOAD GAME</c>, or
+    /// <c>NEW CAMPAIGN - CHOOSE A SLOT</c> — then its slots (<see cref="SlotRows"/>)
+    /// from <see cref="ListTop"/> down.
     /// </summary>
     private static IEnumerable<TitleRow> ListRows(SlotMenu list, float width, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
-        yield return new TitleRow(TitleText.LoadGame, NoticeTop, ListHeadingScale, DungeonHud.Grey);
+        string heading = list.Mode == SlotMenuMode.NewCampaign ? TitleText.NewCampaignHeading : TitleText.LoadGame;
+        yield return new TitleRow(heading, NoticeTop, ListHeadingScale, DungeonHud.Grey);
         foreach (var row in SlotRows(list, width, ListTop, dungeons, zone))
             yield return row;
     }
 
     /// <summary>
-    /// A slot list's rows, the title's load list and the menus' save list alike:
+    /// A slot list's rows, the title's two lists and the menus' save list alike:
     /// each slot's rows (<see cref="SlotText.Rows"/>, in the list's mode) as one
     /// left-aligned block centred on its widest row in a window
     /// <paramref name="width"/> wide, from <paramref name="top"/> down — a slot a
@@ -196,9 +207,11 @@ public sealed class TitleHud : IDisposable
     /// a pitch under that. The chosen slot's row is marked <c>&gt; ... &lt;</c> and
     /// in yellow; a slot no key can take (<see cref="SlotMenu.Choosable"/>) is
     /// dimmed — loading, an empty slot; saving, the autosave and the campaign's own
-    /// slot, which saves itself — and every other is white: loading, a slot beyond
-    /// the count among them, which loads and plays like any; saving, an empty slot,
-    /// since it is where a save goes first.
+    /// slot, which saves itself; on NEW CAMPAIGN's list, none — and every other is
+    /// white: loading, a slot beyond the count among them, which loads and plays
+    /// like any; saving, an empty slot, since it is where a save goes first; and
+    /// every slot NEW CAMPAIGN offers, empty or held, since a campaign can begin in
+    /// each.
     /// </summary>
     internal static IReadOnlyList<TitleRow> SlotRows(SlotMenu list, float width, float top, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {

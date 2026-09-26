@@ -1,12 +1,10 @@
-using System.Globalization;
-
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
 /// The title screen's words (the user's ruling of 2026-09-25 on the save model,
 /// R2(a)): the game's name, the four options in the ruling's order — CONTINUE,
-/// NEW CAMPAIGN, LOAD GAME, QUIT — the keys, and NEW CAMPAIGN's ask. Every one is here
-/// and tested (<c>TitleTests</c>), in the HUD's font: capitals, digits and
+/// NEW CAMPAIGN, LOAD GAME, QUIT — the keys, the heading and keys of NEW
+/// CAMPAIGN's slot list, and its ask. Every one is here and tested (<c>TitleTests</c>), in the HUD's font: capitals, digits and
 /// <c>. , : - ( ) / &gt; &lt;</c>, never an apostrophe, a quote or a brace, which
 /// the engine's font cannot draw.
 /// <para>
@@ -60,21 +58,33 @@ internal static class TitleText
         return $"CONTINUE{Joint}{row}";
     }
 
+    /// <summary>NEW CAMPAIGN's list's heading, where the notices stand while it is up: the slot the new campaign begins in, and saves into, is chosen there (the user's ruling of 2026-09-25 on the save slots, R5).</summary>
+    internal const string NewCampaignHeading = "NEW CAMPAIGN - CHOOSE A SLOT";
+
     /// <summary>
-    /// NEW CAMPAIGN's ask, when the autosave slot holds a save or a backup (USER
-    /// DECISION 3): what it sets aside — <c>NEW CAMPAIGN SETS THE AUTOSAVE ASIDE -
-    /// THE SPEAR HALL FLOOR 4 - 3 RUNS</c> — and that it is never deleted and the
-    /// manual slots are kept: <c>AS FILES, NEVER DELETED - SLOTS 1 TO 3 ARE KEPT -
-    /// ENTER: YES - ESC: NO</c>.
+    /// The keys NEW CAMPAIGN's list answers, along the bottom while it is up: W/S
+    /// and the arrows only move, and a digit begins in its slot at once, as ENTER
+    /// begins in the one chosen — each asking first over a slot that holds anything.
+    /// No 0: the autosave is never offered.
     /// </summary>
-    /// <param name="place">What the autosave holds (<see cref="SlotText.Summary"/>).</param>
-    /// <param name="count">How many manual slots there are, every one of which is kept.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is below 1: there is always a manual slot.</exception>
-    internal static (string What, string Keys) NewCampaignAsk(string place, int count)
+    internal const string NewCampaignKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS - ESC BACK";
+
+    /// <summary>
+    /// NEW CAMPAIGN's ask, over a slot that holds a save, a backup, or files none of
+    /// which reads (SLOT DECISION 2): the campaign in the slot is the subject, as the
+    /// old games ask whether to overwrite a file — <c>SLOT 2 HOLDS THE SPEAR HALL
+    /// FLOOR 4 - 3 RUNS</c>, or <c>SLOT 2 CANNOT BE READ</c> — then that beginning
+    /// there takes it off LOAD GAME, set aside and never deleted: <c>BEGIN HERE -
+    /// WHAT IT HOLDS LEAVES LOAD GAME, KEPT AS FILES, NEVER DELETED - ENTER: YES -
+    /// ESC: NO</c>.
+    /// </summary>
+    /// <param name="slot">The slot the new campaign would begin in.</param>
+    /// <param name="place">What it holds (<see cref="SlotText.Summary"/>); unread when <paramref name="unreadable"/>.</param>
+    /// <param name="unreadable">Nothing in it reads (<see cref="SlotState.Unreadable"/>): there is no campaign to name.</param>
+    internal static (string What, string Keys) NewCampaignAsk(int slot, string place, bool unreadable = false)
     {
         ArgumentNullException.ThrowIfNull(place);
-        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
-        string kept = count == 1 ? "SLOT 1 IS KEPT" : $"SLOTS 1 TO {count.ToString(CultureInfo.InvariantCulture)} ARE KEPT";
-        return ($"NEW CAMPAIGN SETS THE AUTOSAVE ASIDE{Joint}{place}", $"AS FILES, NEVER DELETED{Joint}{kept}{Joint}{EnterOrEsc}");
+        string what = unreadable ? $"{SaveSlots.Label(slot)} {SlotText.CannotBeRead}" : $"{SaveSlots.Label(slot)} HOLDS {place}";
+        return (what, $"BEGIN HERE{Joint}WHAT IT HOLDS LEAVES LOAD GAME, KEPT AS FILES, NEVER DELETED{Joint}{EnterOrEsc}");
     }
 }

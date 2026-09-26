@@ -1471,7 +1471,7 @@ manual slots whose count is a `tuning.json` key — built in three steps and now
 whole (R2, below), its entry below superseded, and superseded in part by the
 user's ruling of the same day on the save slots (R5, below): a campaign saves
 into the slot it came from. Choices of its building ship provisionally, the
-user's to rule — USER DECISIONS 1 and 3, and R5's SLOT DECISIONS — and
+user's to rule — USER DECISION 1, and R5's SLOT DECISIONS — and
 open-questions.md sets out their alternatives.
 
 ### The user's ruling on content (2026-09-25)
@@ -2102,7 +2102,10 @@ superseded whole.
     as ever — and `--new-campaign` begins a campaign at launch, straight to the
     screen between runs: both developer tooling. No campaign is in play at the
     title, so a close from it saves nothing. The data files' notices are the
-    title's, as the first scene's.
+    title's, as the first scene's. (Superseded by the user's ruling of the same
+    day on the save slots, in `--new-campaign`'s clause: it begins in a slot, the
+    lowest empty one within the count, else slot 1, never the autosave — R5, NEW
+    CAMPAIGN, below.)
   - **CONTINUE loads the most recent save** — the listing's choice (R2, the
     folder), the autosave or a manual slot — and names it by its own row:
     `CONTINUE - AUTOSAVE - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32`, the
@@ -2145,7 +2148,11 @@ superseded whole.
     naming no command line — the manual slots untouched, the new campaign saved
     at once, and the screen between runs saying `A NEW CAMPAIGN BEGINS` and where
     the old files went. The alternative: it asks, then saves over the autosave
-    (the old save one save deep as the backup, then gone).
+    (the old save one save deep as the backup, then gone). (Superseded by the
+    user's ruling of the same day on the save slots, whole: NEW CAMPAIGN chooses
+    its slot, 1 to the count, never the autosave, and asks only over a slot in
+    use, which alone it sets aside; USER DECISION 3's question is asked again of
+    that slot, SLOT DECISION 2 — R5, NEW CAMPAIGN, below.)
   - **A manual slot loaded over a different autosave asks first, then sets that
     autosave aside — never a silent loss** (USER DECISION 2, shipped
     provisionally). Whatever slot a campaign is loaded from, it autosaves into the
@@ -2354,7 +2361,8 @@ superseded whole.
     CAMPAIGN over a held autosave setting it aside rather than saving over it
     (USER DECISION 3). (Superseded by the user's ruling of the same day on the
     save slots, in USER DECISION 2, which it answers: a loaded slot saves into
-    itself — R5, below.)
+    itself; and in USER DECISION 3, whose question it asks again of the slot NEW
+    CAMPAIGN is begun in, SLOT DECISION 2 — R5, below.)
   - **The save's word, measured again, and its ceiling kept at fourteen rows**:
     the rarest word — a manual slot resumed from its backup under changed
     numbers, its save set aside with a long reason, the autosave's crashed save and
@@ -2438,13 +2446,13 @@ out each alternative.
   stood:
   - **A campaign is bound to one slot as it comes into play, and nothing
     rebinds it**: the slot LOAD GAME or CONTINUE loaded, above the count too; the
-    one NEW CAMPAIGN began it in — the autosave slot, until NEW CAMPAIGN chooses
-    its slot; a dev override's scratch slot. The game holds it in one field, set
-    as the campaign comes into play and cleared as it goes (`_slot`, `Adopt`,
-    `DropCampaign`, pinned off the IL), and every save of the campaign goes there
-    — a run's entry, every player turn's start, every arrival, a run's end and the
-    quit — so play from one slot leaves the autosave and every other slot byte for
-    byte as they were. The slot a load reads is now the slot its campaign writes,
+    one NEW CAMPAIGN began it in — the autosave slot, until NEW CAMPAIGN chose its
+    slot (R5, NEW CAMPAIGN, below); a dev override's scratch slot. The game holds
+    it in one field, set as the campaign comes into play and cleared as it goes
+    (`_slot`, `Adopt`, `DropCampaign`, pinned off the IL), and every save of the
+    campaign goes there — a run's entry, every player turn's start, every arrival,
+    a run's end and the quit — so play from one slot leaves the autosave and every
+    other slot byte for byte as they were. The slot a load reads is now the slot its campaign writes,
     so S5's wait — no write before the loaded screen is up — is what keeps a write
     off a slot whose own load is in flight. A close during a loaded campaign's fade
     in, before its screen is up, writes the campaign as it was loaded, or nothing
@@ -2473,10 +2481,10 @@ out each alternative.
     nothing — no marker, nothing read or set aside — and the title says
     `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES THIS SESSION:
     EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`. NEW CAMPAIGN there reads
-    the refusal first, touches nothing, and says `NO NEW CAMPAIGN BEGAN IN THE
-    AUTOSAVE`, then the same. A refusal is its slot's alone: another slot loads
-    in the same session. Clearing a refusal mid-session stays the user's call, as
-    S6's review left it. The stuck notice ends `- THIS SLOT TAKES NO SAVES THIS
+    the refusal first, touches nothing, and says `NO NEW CAMPAIGN BEGAN IN SLOT 2`,
+    then the same. A refusal is its slot's alone: another slot loads in the same
+    session. Clearing a refusal mid-session stays the user's call, as S6's review
+    left it. The stuck notice ends `- THIS SLOT TAKES NO SAVES THIS
     SESSION, SO IT IS NEVER WRITTEN OVER`, where `- NOTHING IS SAVED THIS SESSION,
     ...` read as the whole game while the player is meant to go on in another slot
     — **bends the plan, needs no ruling** — and the word that leads it names the
@@ -2488,9 +2496,9 @@ out each alternative.
     played, and what NEW CAMPAIGN set aside goes back where it was, the save
     before the backup (`CampaignBoot.PutBack`: a move, refusing a name that is
     taken, deleting nothing), so the slot is as it was, its backup one save deep.
-    The title says `NO NEW CAMPAIGN BEGAN IN THE AUTOSAVE`, then the failed save's
-    word — or the stuck notice alone — then the set-aside notice of any file that
-    would not go back. `--new-campaign` is the same, and the game then opens on
+    The title says `NO NEW CAMPAIGN BEGAN IN SLOT 2`, then the failed save's word
+    — or the stuck notice alone — then the set-aside notice of any file that would
+    not go back. `--new-campaign` is the same, and the game then opens on
     the title. The slot's markers stay with it (the review of this step): the
     marker of a load that never finished is cleared by the new campaign's first
     save as it goes through, and not before, so a NEW CAMPAIGN that is not begun
@@ -2515,6 +2523,54 @@ out each alternative.
     ENTER then says `SLOT 1 SAVES ITSELF` too, never the load list's `EVERY SLOT
     IS EMPTY`. Another slot chosen there takes a copy, and the campaign goes on
     saving into its own.
+- **R5, NEW CAMPAIGN — the title chooses its slot.** The ruling's "you choose a
+  save slot", at a campaign's start; from here no campaign is begun in the save
+  folder itself:
+  - **NEW CAMPAIGN opens a slot list** in the options' place, as LOAD GAME does:
+    `NEW CAMPAIGN - CHOOSE A SLOT`, then slots 1 to the count, each as LOAD GAME
+    shows it and none dimmed, since a campaign can begin in any — never the
+    autosave, and never a slot beyond the count, so the count limits where
+    campaigns begin — and the keys, `W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS -
+    ESC BACK`. The choice starts on the lowest empty slot, else slot 1
+    (`SaveListing.NewCampaignSlot`), so an ENTER pressed without looking sets
+    nothing aside while a slot is free: the save list's rule, kept. A digit above
+    the count says `SLOT 5 IS BEYOND THE 3 SLOTS` (`... THE 1 SLOT`); 0 and the
+    keypad do nothing. ESC answers an ask no, then closes the list.
+  - **An empty slot begins at once; one in use asks** — SLOT DECISION 2, shipped
+    provisionally, USER DECISION 3's question asked of a slot. The campaign in the
+    slot is the ask's subject, as old games ask whether to overwrite a file:
+    `SLOT 2 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS` (`SLOT 2 CANNOT BE READ` for
+    files none of which reads) / `BEGIN HERE - WHAT IT HOLDS LEAVES LOAD GAME,
+    KEPT AS FILES, NEVER DELETED - ENTER: YES - ESC: NO`, the widest of them well
+    inside the keys row. Only ENTER says yes; the slot's digit again, N, Y, the
+    arrows and every other key say no and are spent — the ENTER-only guarantee,
+    moved over from the save list, whose asking this is. On yes, that slot's
+    backup and save are set aside as `slot-2/campaign.abandoned-N.json`, never
+    deleted, and the save folder and every other slot are untouched; the new
+    campaign's first save is written into the slot before it is bound there (R5,
+    the slot, above), and the screen between runs says `A NEW CAMPAIGN BEGINS`,
+    then where the old files went. The words that name the slot name the one
+    chosen: `NO NEW CAMPAIGN BEGAN IN SLOT 2`. The alternative, in
+    open-questions.md: ask, then save over it, the old save one save deep as the
+    new campaign's backup.
+  - **An abandoned file's notice says to move it, not to rename it — bends the
+    plan, needs no ruling**: `... WAS LEFT FOR A NEW CAMPAIGN - SET ASIDE AS ... -
+    TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS CAMPAIGN.JSON`. The new
+    campaign's save takes `campaign.json` in that same folder at once, so renaming
+    the file back where it lies, as every other set-aside notice says
+    (`RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN`, kept), would collide with it. A
+    slot folder holding only files set aside lists as `EMPTY`, and moved into one
+    the old campaign lists, loads and plays. The notice is 29 characters longer;
+    the notices' ceiling is measured again once the ruling is whole.
+  - **`--new-campaign` begins in the lowest empty slot within the count, else
+    slot 1 — bends the plan, needs no ruling**: developer tooling, which asks
+    nothing, takes the slot NEW CAMPAIGN's list would start on, so it sets nothing
+    aside while a slot is free, and with none free sets slot 1 aside, never
+    deleted, as the title would on ENTER. `--new-campaign <n>`, naming the slot, is
+    a possible later addition.
+  - **The save list stays transitional**: SAVE GAME's list, keyed to the
+    campaign's own slot, stands until SAVE GAME saves that slot (R5, the slot,
+    above).
 
 ### The numbers: `tuning.json`
 

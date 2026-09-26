@@ -78,7 +78,7 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     /// <summary>How far ahead of the clock a save's time may be and still count: a day, for a save carried from a machine whose clock runs a little fast.</summary>
     public static readonly TimeSpan ClockSlack = TimeSpan.FromDays(1);
 
-    /// <summary>The autosave's entry — always listed, first — or an empty one for a listing that leaves it out.</summary>
+    /// <summary>The autosave's entry — always listed, first — or an empty one for a listing that leaves it out. The game no longer reads it: NEW CAMPAIGN never begins in the autosave (R5).</summary>
     public SlotEntry Autosave
         => Slots.FirstOrDefault(slot => slot.Number == SaveSlots.Autosave)
             ?? new SlotEntry(SaveSlots.Autosave, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false);
@@ -105,6 +105,24 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
             return newest;
         }
     }
+
+    /// <summary>
+    /// The slot a new campaign is offered first — where NEW CAMPAIGN's list starts,
+    /// and where <c>--new-campaign</c> begins one, asking nothing: the lowest
+    /// <see cref="SlotState.Empty"/> slot from 1 to the count, so an ENTER pressed
+    /// without looking sets nothing aside while a slot is free; with none empty,
+    /// slot 1. Never the autosave, and never a slot beyond the count (the user's
+    /// ruling of 2026-09-25 on the save slots, R5). A slot holding only files set
+    /// aside is empty: nothing of it would load.
+    /// </summary>
+    public int NewCampaignSlot
+        => Slots.Where(slot => slot.Number != SaveSlots.Autosave && !slot.Beyond && slot.State == SlotState.Empty)
+            .Select(slot => slot.Number)
+            .DefaultIfEmpty(FirstSlot)
+            .Min();
+
+    /// <summary>The first slot a campaign can begin in: slot 1.</summary>
+    private const int FirstSlot = 1;
 
     /// <summary>The time a slot's choice is made by: its save's, unless there is none or it is ahead of the clock.</summary>
     private static DateTimeOffset? TimeOf(SlotEntry slot) => slot.AheadOfClock ? null : slot.Header?.SavedAt;

@@ -2,7 +2,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
-/// <summary>What a slot list is for: the title's LOAD GAME list, or the menus' save list, which saving by hand opens.</summary>
+/// <summary>What a slot list is for: the title's LOAD GAME list, the title's NEW CAMPAIGN list, or the menus' save list, which saving by hand opens.</summary>
 internal enum SlotMenuMode
 {
     /// <summary>Loading: every slot listed, a slot that holds something chosen to be loaded.</summary>
@@ -10,6 +10,9 @@ internal enum SlotMenuMode
 
     /// <summary>Saving by hand: the campaign's own slot and the autosave shown and never chosen, the other manual slots to the count chosen to be saved into, asking before one that holds anything.</summary>
     Save,
+
+    /// <summary>A new campaign: slots 1 to the count, every one chosen to begin the campaign in, asking before one that holds anything.</summary>
+    NewCampaign,
 }
 
 /// <summary>What one key press did to a slot list (<see cref="SlotMenu.Press"/>).</summary>
@@ -21,10 +24,10 @@ internal enum SlotStep
     /// <summary>The choice moved to another slot.</summary>
     Moved,
 
-    /// <summary>A slot that holds something was chosen on the save list, which asks first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
+    /// <summary>A slot that holds something was chosen on the save list or NEW CAMPAIGN's, which ask first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
     Asking,
 
-    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or saves into it.</summary>
+    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, saves into it, or begins a campaign in it.</summary>
     Chosen,
 
     /// <summary>A slot the list cannot take was asked for, and the list says so (<see cref="SlotMenu.Said"/>).</summary>
@@ -70,6 +73,20 @@ internal enum SlotStep
 /// empty, on the first that can be chosen; with none that can — a count of one,
 /// and slot 1 the campaign's own — on none, and ENTER says the slot saves itself.
 /// </para>
+/// <para>
+/// <strong>NEW CAMPAIGN mode</strong>, the title's NEW CAMPAIGN: the slot the new
+/// campaign begins in, and saves into from then on, is chosen here (the user's
+/// ruling of 2026-09-25 on the save slots, R5: "you choose a save slot"). Slots 1
+/// to the count, every one a row a key can take — never the autosave, and never a
+/// slot beyond the count, so no campaign begins in either. The choice starts on
+/// the lowest empty slot (<see cref="SaveListing.NewCampaignSlot"/>), so an ENTER
+/// pressed without looking sets nothing aside while a slot is free. An empty slot
+/// is chosen at once. One that holds anything — a save, a backup, or files none
+/// of which reads — asks first (<see cref="Asking"/>) whether to begin there,
+/// setting what it holds aside, and <strong>only ENTER says yes</strong>, as on
+/// the save list, whose asking this is. A digit above the count is refused,
+/// saying why; 0 does nothing.
+/// </para>
 /// </summary>
 internal sealed class SlotMenu
 {
@@ -87,8 +104,17 @@ internal sealed class SlotMenu
         Own = own;
         Rows = listing.Slots
             .Where(slot => mode == SlotMenuMode.Load || !slot.Beyond)
+            .Where(slot => mode != SlotMenuMode.NewCampaign || slot.Number is not SaveSlots.Autosave && slot.Number <= count)
             .OrderBy(slot => slot.Number)
             .ToList();
+
+        if (mode == SlotMenuMode.NewCampaign)
+        {
+            // The lowest empty slot, so an ENTER pressed without looking sets
+            // nothing aside; with none, slot 1.
+            Cursor = IndexOf(listing.NewCampaignSlot);
+            return;
+        }
 
         if (mode == SlotMenuMode.Save)
         {
@@ -125,7 +151,7 @@ internal sealed class SlotMenu
     /// <summary>Saving: the slot the campaign in play saves into, which the list shows and never offers.</summary>
     public int Own { get; }
 
-    /// <summary>The slots, top to bottom: the autosave, the manual slots to the count, then — loading — any beyond it that hold a save.</summary>
+    /// <summary>The slots, top to bottom: the autosave (never on NEW CAMPAIGN's list), the manual slots to the count, then — loading — any beyond it that hold a save.</summary>
     public IReadOnlyList<SlotEntry> Rows { get; }
 
     /// <summary>The index of the row chosen now — always one a key can take (<see cref="Choosable"/>) — or -1 when there is none.</summary>
@@ -137,7 +163,7 @@ internal sealed class SlotMenu
     /// <summary>What the list says under itself — <c>SLOT 2 IS EMPTY</c> — until the next key; null for nothing.</summary>
     public string? Said { get; private set; }
 
-    /// <summary>The slot the save list is asking about — whether to save over it, or set it aside and save there — until the next key, which answers; null for no ask.</summary>
+    /// <summary>The slot the save list is asking about — whether to save over it, or set it aside and save there — or NEW CAMPAIGN's list — whether to begin there, setting what it holds aside — until the next key, which answers; null for no ask.</summary>
     public SlotEntry? Asking { get; private set; }
 
     /// <summary>
@@ -172,12 +198,24 @@ internal sealed class SlotMenu
                     return Take(Cursor);
                 // Nothing a key can take: loading, every slot is empty; saving, the
                 // one slot to the count is the campaign's own, which saves itself.
-                return Refuse(Mode == SlotMenuMode.Save ? SlotText.SlotSavesItself(Own) : SlotText.NothingToLoad);
+                // (NEW CAMPAIGN's list always has a row: slot 1 at the least.)
+                return Mode switch
+                {
+                    SlotMenuMode.Save => Refuse(SlotText.SlotSavesItself(Own)),
+                    SlotMenuMode.Load => Refuse(SlotText.NothingToLoad),
+                    _ => SlotStep.None,
+                };
         }
 
         if (Digit(key) is not { } digit)
             return SlotStep.None;
         int row = IndexOf(digit);
+        if (Mode == SlotMenuMode.NewCampaign)
+        {
+            if (digit == SaveSlots.Autosave)
+                return SlotStep.None;   // never offered: no campaign begins in the autosave
+            return row >= 0 ? Take(row) : Refuse(SlotText.NotOffered(digit, Count));
+        }
         if (Mode == SlotMenuMode.Save)
         {
             if (digit == Own)
@@ -198,11 +236,16 @@ internal sealed class SlotMenu
     /// </summary>
     internal static int? Digit(Keys key) => key is >= Keys.D0 and <= Keys.D9 ? key - Keys.D0 : null;
 
-    /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; saving, a manual slot other than the campaign's own, the empty ones included. A row no key can take is drawn dimmed.</summary>
+    /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; saving, a manual slot other than the campaign's own, the empty ones included; beginning a new campaign, every row there is. A row no key can take is drawn dimmed.</summary>
     internal bool Choosable(SlotEntry row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return Mode == SlotMenuMode.Save ? row.Number != SaveSlots.Autosave && row.Number != Own : row.State != SlotState.Empty;
+        return Mode switch
+        {
+            SlotMenuMode.Save => row.Number != SaveSlots.Autosave && row.Number != Own,
+            SlotMenuMode.NewCampaign => true,
+            _ => row.State != SlotState.Empty,
+        };
     }
 
     private SlotStep Move(int step)
@@ -218,9 +261,9 @@ internal sealed class SlotMenu
     {
         Cursor = row;
         var entry = Rows[row];
-        if (Mode == SlotMenuMode.Save && entry.State != SlotState.Empty)
+        if (Mode != SlotMenuMode.Load && entry.State != SlotState.Empty)
         {
-            Asking = entry;   // it holds something: the next key answers
+            Asking = entry;   // saving over it, or beginning there: it holds something, and the next key answers
             return SlotStep.Asking;
         }
         Chosen = entry.Number;

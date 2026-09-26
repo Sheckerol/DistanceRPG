@@ -49,15 +49,22 @@ into a slot and play is left for the title.
 | Title | Action |
 | --- | --- |
 | W/S / arrows | Choose an option (CONTINUE is passed over while there is nothing to continue) |
-| Enter | CONTINUE: load the most recent save. NEW CAMPAIGN: the starting party (`Logic/Content/StartingParty.cs`), nothing played — it asks first when the autosave holds a campaign, which it sets aside, never deleted. LOAD GAME: the slot list. QUIT: close the game |
-| Esc | Quit (on the slot list, back to the options; on a question, no) |
+| Enter | CONTINUE: load the most recent save. NEW CAMPAIGN: the slot list to begin a campaign in — the starting party (`Logic/Content/StartingParty.cs`), nothing played — which it saves into from then on (below). LOAD GAME: the slot list to load from. QUIT: close the game |
+| Esc | Quit (on a slot list, back to the options; on a question, no) |
 
-| Title: the slot list | Action |
+| Title: LOAD GAME's slot list | Action |
 | --- | --- |
 | W/S / arrows | Choose a slot (an empty one is skipped) |
 | 0–9 | Load that slot: 0 the autosave, 1–9 the manual slots (an empty one says `SLOT 2 IS EMPTY`). The campaign it brings back saves into that slot from then on, as the keys line says: `PLAY SAVES INTO THE SLOT YOU LOAD` |
 | Enter | Load the chosen slot, the same way |
 | Esc | Back to the options |
+
+| Title: NEW CAMPAIGN's slot list (`NEW CAMPAIGN - CHOOSE A SLOT`) | Action |
+| --- | --- |
+| W/S / arrows | Choose a slot, `SLOT 1` to `SLOT 3` (it starts on the lowest empty one) |
+| 1–9 | Begin the new campaign in that slot, which it saves into from then on: an empty one at once, one that holds anything after asking (a slot above the count in `tuning.json` is never offered, and says `SLOT 5 IS BEYOND THE 3 SLOTS`; 0, the autosave, does nothing) |
+| Enter | Begin in the chosen slot, the same way |
+| Esc | Back to the options (on a question, no) |
 
 | Between runs | Action |
 | --- | --- |
@@ -79,10 +86,10 @@ into a slot and play is left for the title.
 | Enter | Save into the chosen slot, the same way |
 | Esc | Back to the menu (on a question, no) |
 
-A question on the title or on the save list — NEW CAMPAIGN over a held
-autosave, a slot saved over or set aside — takes the next key: **Enter alone
-says yes**, as the question says, and every other key, N and Y and the slot's
-own digit included, says no. Loading a slot asks nothing. While
+A question on the title or on the save list — NEW CAMPAIGN over a slot in
+use, a slot saved over or set aside — takes the next key: **Enter alone says
+yes**, as the question says, and every other key, N and Y and the slot's own
+digit included, says no. Loading a slot asks nothing. While
 the menu or the save list is up every key is theirs: nothing behind them moves,
 descends, ends the turn or opens the bag.
 
@@ -117,13 +124,13 @@ manually.
 
 There is one campaign in play at a time, and the game saves it on its own —
 **into the slot it came from**, as old games keep a campaign to its file: the
-slot you loaded it from, by LOAD GAME or CONTINUE, or, for a campaign NEW
-CAMPAIGN begins, the **autosave**, the save folder's `campaign.json`. Beside the
-autosave are the **manual save slots** (the user's rulings of 2026-09-25 on the
-save model and on the save slots). The game opens on the title screen, where
-CONTINUE resumes the most recent save, LOAD GAME any slot, and NEW CAMPAIGN
-starts fresh; the menu's QUIT TO TITLE comes back to it, and the game quits from
-it.
+slot you loaded it from, by LOAD GAME or CONTINUE, or the one you chose for it
+on NEW CAMPAIGN. The save folder's own `campaign.json` is the **autosave**, and
+beside it are the **manual save slots**, in one of which every new campaign
+begins (the user's rulings of 2026-09-25 on the save model and on the save
+slots). The game opens on the title screen, where CONTINUE resumes the most
+recent save, LOAD GAME any slot, and NEW CAMPAIGN starts fresh in the slot you
+choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
 
 - **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\campaign.json` on Windows
   (`~/.local/share/DistanceRPG/saves/` on Linux) — the player's data folder,
@@ -138,10 +145,11 @@ it.
   autosave, and nothing moves. Manual slot *n* is the folder `slot-n` inside it
   (`saves\slot-1\` to `saves\slot-3\`), holding the same files for its own save:
   its own backup, its own markers, its own files set aside — and written by the
-  game for the campaign loaded from it, and by a save by hand. How many there are
-  is `tuning.json`'s `SaveSlots` (below); lowering it deletes nothing, and a slot
-  above the count keeps its save, loads like any, and goes on saving the campaign
-  played from it; NEW CAMPAIGN never offers it, and nor does the save list. A
+  game for the campaign loaded from it or begun in it, and by a save by hand.
+  How many there are is `tuning.json`'s `SaveSlots` (below); lowering it deletes
+  nothing, and a slot above the count keeps its save, loads like any, and goes on
+  saving the campaign played from it; NEW CAMPAIGN never offers it, and nor does
+  the save list. A
   folder named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and
   is never read.
 - **A save's time**: every save records when it was written — `"savedAt"`, the
@@ -257,7 +265,7 @@ it.
   session, where it could never be saved: a later try from the title loads
   nothing and says `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES
   THIS SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`, and NEW
-  CAMPAIGN there begins nothing (`NO NEW CAMPAIGN BEGAN IN THE AUTOSAVE`, then
+  CAMPAIGN there begins nothing (`NO NEW CAMPAIGN BEGAN IN SLOT 2`, then
   why). Every other slot plays as ever; a save by hand into such a slot says why
   it saved nothing. Launch the game again to play in it.
 - **A save that cannot be played is set aside, never deleted**: one that is not
@@ -281,8 +289,9 @@ it.
   says the same, whole, over the floor banner; the banner moves down to make
   room, and the words stay up longer the more there are. Only what the data
   files raised after that is cut to three rows (`+N MORE - SEE THE LOG`). The log
-  has every word. **Rename it back to `campaign.json` to try it again.** Nothing
-  ever writes over a file set aside.
+  has every word. **Rename it back to `campaign.json` to try it again** (what NEW
+  CAMPAIGN set aside is moved instead: Starting over, below). Nothing ever writes
+  over a file set aside.
 - **No field of a save is trusted** (the user's ruling of 2026-09-25: "since we
   are storing in raw json we should probably not trust the fields"). Each is
   checked on its own — an id the content has, a count no smaller than play
@@ -302,27 +311,36 @@ it.
   2147`. A lock that has already lifted is no contradiction: it stays in the
   save, and the list reads its dungeon as open.
 - **Starting over**: NEW CAMPAIGN on the title starts fresh with the starting
-  party. When the autosave slot holds nothing it begins at once; when it holds a
-  campaign it asks first — `NEW CAMPAIGN SETS THE AUTOSAVE ASIDE - ...` / `AS
-  FILES, NEVER DELETED - SLOTS 1 TO 3 ARE KEPT - ENTER: YES - ESC: NO` — and, on
-  Enter, sets the autosave's save and its backup aside as
-  `campaign.abandoned-N.json` (the backup first, so the higher number is the
-  later save), never deleted, and the manual slots are untouched. The new
-  campaign is saved into the autosave at once, before it is played, and the
-  screen between runs says `A NEW CAMPAIGN BEGINS` and where the old files went:
-  even a crash before its next save continues the new campaign, never the old
-  one. `DistanceRPG --new-campaign` —
+  party, in the slot you choose for it: it opens its slot list, `NEW CAMPAIGN -
+  CHOOSE A SLOT` — `SLOT 1` to `SLOT 3`, never the autosave nor a slot above the
+  count — on the lowest empty slot, so Enter pressed at once sets nothing aside
+  while a slot is free. An empty slot begins at once. A slot that holds a
+  campaign asks first, naming it, as old games ask before they overwrite a file —
+  `SLOT 2 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS` (`SLOT 2 CANNOT BE READ` for
+  files none of which reads) / `BEGIN HERE - WHAT IT HOLDS LEAVES LOAD GAME, KEPT
+  AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, on Enter, sets that
+  slot's save and its backup aside in the slot's own folder as
+  `saves\slot-2\campaign.abandoned-N.json` (the backup first, so the higher number
+  is the later save), never deleted; the autosave and every other slot are
+  untouched. **To play the old campaign again, move its file into an empty slot
+  folder as `campaign.json`** — `saves\slot-3\campaign.json`, say — where LOAD GAME
+  lists it: renamed back where it lies, it would take the new campaign's save's
+  name. The new campaign is saved into its slot at once, before it is played,
+  and saves there from then on; the screen between runs says `A NEW CAMPAIGN
+  BEGINS` and where the old files went: even a crash before its next save
+  continues the new campaign, never the old one. `DistanceRPG --new-campaign` —
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj --
   --new-campaign` — does the same at launch without asking, past the title
-  (developer tooling). A new campaign that cannot be saved there is never begun,
-  since every save of it would fail: when another program holds either file open
-  so it cannot be moved, or that first save fails, the save and its backup go
-  back where they were, and the title says `NO NEW CAMPAIGN BEGAN IN THE
-  AUTOSAVE`, then why (`--new-campaign` then opens on the title). The marker of
-  a load that never finished stays beside them, as it was, and a quit's unsaved
-  marker that `--new-campaign` took is said on that title, as it would have been.
-  Deleting `campaign.json` by hand leaves CONTINUE the backup instead, if there
-  is one.
+  (developer tooling), in the slot the list would start on: the lowest empty
+  slot, or slot 1, set aside, when every slot is in use. A new campaign that
+  cannot be saved in its slot is never begun, since every save of it would fail:
+  when another program holds either file open so it cannot be moved, or that
+  first save fails, the save and its backup go back where they were, and the
+  title says `NO NEW CAMPAIGN BEGAN IN SLOT 2`, then why (`--new-campaign` then
+  opens on the title). The marker of a load that never finished stays beside
+  them, as it was, and a quit's unsaved marker that `--new-campaign` took is said
+  on that title, as it would have been. Deleting `campaign.json` by hand leaves
+  CONTINUE the backup instead, if there is one.
 - **The dev overrides play apart**: a launch with `DISTANCERPG_DUNGEON` (a
   dungeon's id: straight into it) or `DISTANCERPG_SEED` (the first run's map
   seed) plays a fresh campaign in `saves\override\`, emptied at every such

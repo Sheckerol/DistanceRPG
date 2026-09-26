@@ -6,8 +6,9 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// A save slot as the lists draw it (the user's ruling of 2026-09-25 on the save
 /// model, R2(d): "the slot list shows, per slot, enough to choose by"): the title's
-/// LOAD GAME list and CONTINUE's row, and the menus' save list, which saving by
-/// hand opens (<see cref="SlotMenuMode.Save"/>). Every string comes from here and
+/// LOAD GAME list and CONTINUE's row, the title's NEW CAMPAIGN list
+/// (<see cref="SlotMenuMode.NewCampaign"/>), and the menus' save list, which saving
+/// by hand opens (<see cref="SlotMenuMode.Save"/>). Every string comes from here and
 /// is tested (<c>TitleTests</c>, <c>SaveMenuTests</c>); the drawing is the screens'
 /// own.
 /// <list type="bullet">
@@ -202,7 +203,7 @@ internal static class SlotText
     internal static string SlotSavesItself(int own)
         => own == SaveSlots.Autosave ? AutosaveSavesItself : $"{SaveSlots.Label(own)} {SavesItself}";
 
-    /// <summary>What a digit above the count says on the save list, which never offers such a slot: <c>SLOT 7 IS BEYOND THE 3 SLOTS</c>, <c>... THE 1 SLOT</c>.</summary>
+    /// <summary>What a digit above the count says on the save list and NEW CAMPAIGN's, which never offer such a slot: <c>SLOT 7 IS BEYOND THE 3 SLOTS</c>, <c>... THE 1 SLOT</c>.</summary>
     internal static string NotOffered(int number, int count)
         => count == 1
             ? $"{SaveSlots.Label(number)} IS BEYOND THE 1 SLOT"

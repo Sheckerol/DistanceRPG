@@ -9,7 +9,7 @@ namespace GameEngine.DistanceRPG;
 /// was given.
 /// </summary>
 /// <param name="WriteDataDirectory">The folder the data files are written to, instead of playing; null when none was named.</param>
-/// <param name="NewCampaign">Set the campaign aside and start fresh at launch.</param>
+/// <param name="NewCampaign">Start fresh at launch, in the lowest empty slot — else slot 1, what it holds set aside.</param>
 internal sealed record LaunchOptions(string? WriteDataDirectory, bool NewCampaign);
 
 internal class Program
@@ -30,11 +30,14 @@ internal class Program
     internal const string WriteDataOption = "--write-data";
 
     /// <summary>
-    /// <c>DistanceRPG --new-campaign</c> sets the campaign's backup and its save
-    /// aside as <c>campaign.abandoned-N.json</c> — never deleted — and starts a
-    /// fresh campaign, saved at once (1f), straight to the screen between runs past
-    /// the title: developer tooling, beside the title's NEW CAMPAIGN, which asks
-    /// first. Neither file is left to come back as the new campaign's own.
+    /// <c>DistanceRPG --new-campaign</c> starts a fresh campaign in the slot the
+    /// title's NEW CAMPAIGN list would start on — the lowest empty slot within
+    /// <c>tuning.json</c>'s <c>SaveSlots</c>, else slot 1, whose backup and save it
+    /// sets aside as <c>campaign.abandoned-N.json</c>, never deleted — saved there
+    /// at once (1f), and saving there from then on, straight to the screen between
+    /// runs past the title: developer tooling, beside the title's NEW CAMPAIGN,
+    /// where the player chooses the slot and is asked before one in use is set
+    /// aside. Neither file is left to come back as the new campaign's own.
     /// </summary>
     internal const string NewCampaignOption = "--new-campaign";
 

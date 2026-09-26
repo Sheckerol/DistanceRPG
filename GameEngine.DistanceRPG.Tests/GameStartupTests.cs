@@ -513,6 +513,18 @@ public class GameStartupTests
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(Method(typeof(DistanceRpgGame), "BootCampaign")));
 
+        // NEW CAMPAIGN begins in the slot chosen on the title's list, and
+        // --new-campaign in the slot that list starts on (the user's ruling on the
+        // save slots, R5): the listing's NewCampaignSlot, read by the list and by the
+        // launch alone — the record's own printing aside — the launch reading it
+        // before it begins the campaign.
+        var newCampaignSlot = typeof(SaveListing).GetProperty(nameof(SaveListing.NewCampaignSlot))!.GetMethod!;
+        Assert.Equal(["DistanceRpgGame.BootCampaign", "SaveListing.PrintMembers", "SlotMenu..ctor"], Callers(newCampaignSlot));
+        var inBoot = CallsIn(Method(typeof(DistanceRpgGame), "BootCampaign")).ToList();
+        int slotRead = inBoot.FindIndex(called => Same(called, newCampaignSlot));
+        Assert.True(slotRead >= 0 && slotRead < inBoot.FindIndex(called => Same(called, Method(typeof(DistanceRpgGame), "BeginNewCampaign"))),
+            "BootCampaign does not read the slot --new-campaign begins in before it begins the campaign");
+
         // What NEW CAMPAIGN set aside is put back by NEW CAMPAIGN alone, when the new
         // campaign never began, and only ever through the one door that moves a file
         // back where it was set aside, refusing a name that is taken.

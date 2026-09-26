@@ -21,8 +21,16 @@ public interface ITitleHost
     /// </summary>
     void LoadSlot(int slot);
 
-    /// <summary>Begin a campaign with the starting party: the autosave's files set aside, never deleted, the new campaign saved there before it is played, and the screen between runs over it — or, when it cannot be saved there, the title again saying why, the files put back. Called once, never mid-fade.</summary>
-    void BeginNewCampaign();
+    /// <summary>
+    /// Begin a campaign with the starting party in slot <paramref name="slot"/> —
+    /// one from 1 to the count, chosen on NEW CAMPAIGN's list — which it saves into
+    /// from then on (the user's ruling of 2026-09-25 on the save slots, R5): what
+    /// that slot holds set aside, never deleted, every other slot untouched, the new
+    /// campaign saved there before it is played, and the screen between runs over it
+    /// — or, when it cannot be saved there, the title again saying why, the files put
+    /// back. Called once, never mid-fade.
+    /// </summary>
+    void BeginNewCampaign(int slot);
 
     /// <summary>Close the game: no campaign is in play at the title, so nothing is saved.</summary>
     void Quit();
@@ -46,25 +54,15 @@ internal enum TitleAction
     /// <summary>Load a slot (<see cref="TitleStep.Slot"/>).</summary>
     Load,
 
-    /// <summary>Begin a new campaign.</summary>
+    /// <summary>Begin a new campaign in a slot (<see cref="TitleStep.Slot"/>).</summary>
     NewCampaign,
 
     /// <summary>Close the game.</summary>
     Quit,
 }
 
-/// <summary>What one key press on the title comes to (<see cref="TitleMenu.Press"/>): an action for the host, and the slot a load loads.</summary>
+/// <summary>What one key press on the title comes to (<see cref="TitleMenu.Press"/>): an action for the host, and the slot a load loads or a new campaign begins in.</summary>
 internal readonly record struct TitleStep(TitleAction Action, int Slot = 0);
-
-/// <summary>Which ask the title is putting (<see cref="TitleMenu.Ask"/>).</summary>
-internal enum TitleAsk
-{
-    /// <summary>None: the options, or the load list, answer the keys.</summary>
-    None,
-
-    /// <summary>NEW CAMPAIGN, which sets the autosave aside (USER DECISION 3).</summary>
-    NewCampaign,
-}
 
 /// <summary>
 /// The title's choices (the user's ruling of 2026-09-25 on the save model,
@@ -78,20 +76,25 @@ internal enum TitleAsk
 /// it is dimmed and W/S pass over it. The choice starts on CONTINUE when it is
 /// on — ENTER at launch is one key to where the game stood — and otherwise on
 /// NEW CAMPAIGN.</item>
-/// <item><strong>NEW CAMPAIGN</strong> begins at once when the autosave slot
-/// holds nothing; when it holds a save or a backup it asks first, since the new
-/// campaign sets them aside (USER DECISION 3).</item>
-/// <item><strong>LOAD GAME</strong> opens the slot list (<see cref="SlotMenu"/>),
-/// in the options' place.</item>
+/// <item><strong>NEW CAMPAIGN opens its slot list</strong>
+/// (<see cref="SlotMenuMode.NewCampaign"/>), in the options' place: the slot the
+/// new campaign begins in, and saves into from then on, is chosen there (the
+/// user's ruling of 2026-09-25 on the save slots, R5) — slots 1 to the count, the
+/// choice on the lowest empty one. An empty slot begins at once; one that holds
+/// anything asks first, since the new campaign sets what it holds aside
+/// (SLOT DECISION 2).</item>
+/// <item><strong>LOAD GAME</strong> opens the load list
+/// (<see cref="SlotMenuMode.Load"/>), in the options' place.</item>
 /// <item><strong>A slot chosen loads at once</strong> — from the list, or
 /// CONTINUE's — asking nothing: the campaign it brings back saves into that slot
 /// from then on (the user's ruling of 2026-09-25 on the save slots, R5), and no
 /// other slot is set aside. The load list's keys line says so, where the choice
 /// is made (<see cref="TitleText.LoadKeysLine"/>).</item>
 /// <item><strong>An ask takes exactly the next key, and only ENTER says
-/// yes</strong>: every other key — N, Y, the arrows, a digit — says no and is
-/// spent doing so, so a player pressing N to mean no keeps what the ask named.
-/// ESC says no too (<see cref="Escape"/>).</item>
+/// yes</strong>: every other key — N, Y, the arrows, a digit, the slot's own
+/// among them — says no and is spent doing so, so a player pressing N to mean no
+/// keeps what the ask named. ESC says no too (<see cref="Escape"/>). The one ask
+/// is NEW CAMPAIGN's list's (<see cref="SlotMenu.Asking"/>).</item>
 /// </list>
 /// </summary>
 internal sealed class TitleMenu
@@ -120,39 +123,30 @@ internal sealed class TitleMenu
     /// <summary>Whether CONTINUE is on: some slot would load something.</summary>
     public bool ContinueOn => Listing.Newest is not null;
 
-    /// <summary>The ask being put, or <see cref="TitleAsk.None"/>.</summary>
-    public TitleAsk Ask { get; private set; }
+    /// <summary>Whether an ask is up — NEW CAMPAIGN's, over a slot that holds anything: the next key is its alone.</summary>
+    public bool Asking => List?.Asking is not null;
 
-    /// <summary>Whether an ask is up: the next key is its alone.</summary>
-    public bool Asking => Ask != TitleAsk.None;
-
-    /// <summary>The load list while it is up, in the options' place; null otherwise.</summary>
-    public SlotMenu? Loading { get; private set; }
+    /// <summary>The slot list while it is up, in the options' place — LOAD GAME's or NEW CAMPAIGN's, by its mode; null otherwise.</summary>
+    public SlotMenu? List { get; private set; }
 
     /// <summary>
-    /// One key press, once. An ask takes it first: ENTER says yes and hands the
-    /// host its action, and any other key says no and is spent. Then the load list,
-    /// while it is up. Then the options: W/S or the arrows move (past CONTINUE when
-    /// it is off, round the ends), and ENTER takes the one chosen. ESC comes through
+    /// One key press, once. The slot list takes it while it is up — an ask on it
+    /// first, where ENTER says yes and any other key says no and is spent — and a
+    /// slot it chooses is loaded, or a new campaign begun there, by the list's
+    /// mode. Then the options: W/S or the arrows move (past CONTINUE when it is
+    /// off, round the ends), and ENTER takes the one chosen. ESC comes through
     /// <see cref="Escape"/>, which the game asks first.
     /// </summary>
     public TitleStep Press(Keys key)
     {
-        if (Asking)
-        {
-            bool yes = key is Keys.Enter or Keys.KeyPadEnter;
-            Ask = TitleAsk.None;
-            return yes ? new TitleStep(TitleAction.NewCampaign) : default;
-        }
-
-        if (Loading is { } list)
+        if (List is { } list)
         {
             switch (list.Press(key))
             {
                 case SlotStep.Chosen:
-                    return new TitleStep(TitleAction.Load, list.Chosen!.Value);
+                    return new TitleStep(list.Mode == SlotMenuMode.NewCampaign ? TitleAction.NewCampaign : TitleAction.Load, list.Chosen!.Value);
                 case SlotStep.Back:
-                    Loading = null;
+                    List = null;
                     break;
             }
             return default;
@@ -173,23 +167,18 @@ internal sealed class TitleMenu
     }
 
     /// <summary>
-    /// ESC, asked by the game before it does anything else with it: an ask says
-    /// no, the load list goes back to the options — each true, ESC spent — and on
-    /// the options it is not the title's, so false: the game quits, as QUIT does.
+    /// ESC, asked by the game before it does anything else with it: on the slot
+    /// list, an ask says no, and otherwise the list goes back to the options — each
+    /// true, ESC spent — and on the options it is not the title's, so false: the
+    /// game quits, as QUIT does.
     /// </summary>
     public bool Escape()
     {
-        if (Asking)
-        {
-            Ask = TitleAsk.None;
-            return true;
-        }
-        if (Loading is not null)
-        {
-            Loading = null;
-            return true;
-        }
-        return false;
+        if (List is not { } list)
+            return false;
+        if (list.Press(Keys.Escape) == SlotStep.Back)
+            List = null;
+        return true;
     }
 
     /// <summary>ENTER on the option chosen now.</summary>
@@ -200,12 +189,10 @@ internal sealed class TitleMenu
             case TitleOption.Continue:
                 return Listing.Newest is { } newest ? new TitleStep(TitleAction.Load, newest.Number) : default;
             case TitleOption.NewCampaign:
-                if (Listing.Autosave.State == SlotState.Empty)
-                    return new TitleStep(TitleAction.NewCampaign);
-                Ask = TitleAsk.NewCampaign;
+                List = new SlotMenu(SlotMenuMode.NewCampaign, Listing, Count);
                 return default;
             case TitleOption.LoadGame:
-                Loading = new SlotMenu(SlotMenuMode.Load, Listing, Count);
+                List = new SlotMenu(SlotMenuMode.Load, Listing, Count);
                 return default;
             default:
                 return new TitleStep(TitleAction.Quit);
@@ -236,11 +223,12 @@ internal sealed class TitleMenu
 /// brought nothing back or a NEW CAMPAIGN that did not begin, why — the save's
 /// word whole and the rest capped
 /// (<see cref="NoticeText.Rows"/>); then the options (<see cref="TitleMenu"/>) or
-/// the load list in their place; the keys, or an ask, along the bottom.
+/// a slot list in their place — LOAD GAME's, or NEW CAMPAIGN's; the keys, or an
+/// ask, along the bottom.
 /// <para>
 /// No campaign is in play here: the game holds none until a slot loads or a
 /// new one begins, so a close from the title saves nothing. ESC is the game's: it
-/// asks <see cref="HandleEscape"/> first, which backs out of an ask or the list,
+/// asks <see cref="HandleEscape"/> first, which backs out of an ask or a list,
 /// and otherwise the game closes. Single-use, as every scene is: the host shows a
 /// fresh one each time.
 /// </para>
@@ -302,18 +290,18 @@ public sealed class TitleScene : Scene
 
     /// <summary>
     /// ESC, asked by the game before it does anything else with it: true when it
-    /// said no to an ask or closed the load list, and is spent; false on the
+    /// said no to an ask or closed a slot list, and is spent; false on the
     /// options, and the game closes (<c>DistanceRpgGame</c>).
     /// </summary>
     public bool HandleEscape()
     {
         if (_leaving)
             return true;   // on its way out: the host has what it asked for
-        var ask = Menu.Ask;
-        bool listed = Menu.Loading is not null;
+        var asked = Menu.List?.Asking;
+        var list = Menu.List;
         if (!Menu.Escape())
             return false;
-        Log.Info(ask != TitleAsk.None ? $"[Title] {Asked(ask)} not taken (Escape)" : listed ? "[Title] Back from the load list" : "[Title] Escape");
+        Log.Info(asked is not null ? $"[Title] {Asked(asked)} not taken (Escape)" : list is not null ? $"[Title] Back from the {Named(list)}" : "[Title] Escape");
         return true;
     }
 
@@ -322,13 +310,13 @@ public sealed class TitleScene : Scene
         if (key == Keys.Escape) return;   // the game's to route: it asks HandleEscape
         if (_leaving || SceneManager.Instance.IsTransitioning) return;
 
-        var ask = Menu.Ask;
+        var asked = Menu.List?.Asking;
         var step = Menu.Press(key);
-        if (ask != TitleAsk.None && step.Action == TitleAction.None)
-            Log.Info($"[Title] {Asked(ask)} not taken ({key})");
-        else if (ask == TitleAsk.None && Menu.Ask != TitleAsk.None)
-            Log.Info($"[Title] {Asked(Menu.Ask)}? - ENTER to confirm, any other key to keep the autosave");
-        if (Menu.Loading?.Said is { } said)
+        if (asked is not null && step.Action == TitleAction.None)
+            Log.Info($"[Title] {Asked(asked)} not taken ({key})");
+        else if (asked is null && Menu.List?.Asking is { } asking)
+            Log.Info($"[Title] {Asked(asking)}? - ENTER to confirm, any other key to keep what it holds");
+        if (Menu.List?.Said is { } said)
             Log.Info($"[Title] {said}");
 
         switch (step.Action)
@@ -340,8 +328,8 @@ public sealed class TitleScene : Scene
                 break;
             case TitleAction.NewCampaign:
                 _leaving = true;
-                Log.Info("[Title] NEW CAMPAIGN");
-                _host.BeginNewCampaign();
+                Log.Info($"[Title] NEW CAMPAIGN in {SaveSlots.Label(step.Slot)}");
+                _host.BeginNewCampaign(step.Slot);
                 break;
             case TitleAction.Quit:
                 _leaving = true;
@@ -351,7 +339,9 @@ public sealed class TitleScene : Scene
         }
     }
 
-    /// <summary>An ask, for the log: NEW CAMPAIGN's, the one there is.</summary>
-    private static string Asked(TitleAsk ask)
-        => ask == TitleAsk.NewCampaign ? "NEW CAMPAIGN over the autosave" : throw new ArgumentOutOfRangeException(nameof(ask), ask, "No ask is being put.");
+    /// <summary>An ask, for the log: NEW CAMPAIGN's, over the slot it names — the one there is.</summary>
+    private static string Asked(SlotEntry slot) => $"NEW CAMPAIGN over {SaveSlots.Label(slot.Number)}, which holds {(slot.State == SlotState.Unreadable ? "files none of which reads" : "a campaign")}";
+
+    /// <summary>A slot list, for the log: LOAD GAME's, or NEW CAMPAIGN's.</summary>
+    private static string Named(SlotMenu list) => list.Mode == SlotMenuMode.NewCampaign ? "NEW CAMPAIGN list" : "load list";
 }

@@ -290,22 +290,6 @@ starts at; or split a weapon's starting capacity into a key of its own,
 un-ruling the Phase 2 pass's one key. settled.md's Phase 5 implementation pass
 records the ruling.
 
-## What NEW CAMPAIGN does to a held autosave (the save model, R2) — USER DECISION 3
-
-The ruling asks NEW CAMPAIGN to "confirm before it can overwrite anything, and
-say what it will do". It does not say what becomes of the campaign in the
-autosave slot.
-
-**Shipped provisionally: it asks, then sets the autosave's save and backup
-aside** as `campaign.abandoned-N.json` — never deleted, renamed back to try again
-— as `--new-campaign` does, so nothing of the old campaign can come back as the
-new one's. The manual slots are untouched.
-
-**This decides whether starting over can lose a campaign, so it is the user's
-to decide.** The alternative: it asks, then saves over the autosave, the old save
-kept one save deep as the backup and then gone. settled.md's Phase 5
-implementation pass records the ruling.
-
 ## Whether a slot above the count may be played in place (the save slots, R5) — SLOT DECISION 1
 
 The user's ruling of 2026-09-25 on the save slots (R5, settled.md) binds a
@@ -327,3 +311,29 @@ alternative: it stays load-only, as R2's folder had it — loading it first move
 its campaign into the lowest empty slot within the count, which is then its
 slot, and with none empty it does not load, saying `SLOT 5 IS BEYOND THE 3
 SLOTS`. settled.md's Phase 5 implementation pass records the ruling.
+
+## What NEW CAMPAIGN does to a slot in use (the save slots, R5) — SLOT DECISION 2
+
+The user's ruling of 2026-09-25 on the save slots (R5, settled.md) has NEW
+CAMPAIGN choose the slot a campaign begins in — "you choose a save slot and any
+saving happens on that save slot" — from 1 to `tuning.json`'s `SaveSlots`. The
+save model's ruling (R2) asks NEW CAMPAIGN to "confirm before it can overwrite
+anything, and say what it will do". Neither says what becomes of the campaign in
+the slot chosen: USER DECISION 3's question of the autosave, asked now of a slot.
+
+**Shipped provisionally: it asks, then sets that slot's save and backup
+aside.** An empty slot begins at once. Over a slot in use it asks, naming the
+campaign there as the old games ask before they overwrite a file: `SLOT 2 HOLDS
+THE SPEAR HALL FLOOR 4 - 3 RUNS` / `BEGIN HERE - WHAT IT HOLDS LEAVES LOAD GAME,
+KEPT AS FILES, NEVER DELETED - ENTER: YES - ESC: NO`. On ENTER the slot's backup
+and save become `slot-2/campaign.abandoned-N.json`, never deleted: moved into an
+empty slot folder as `campaign.json`, the old campaign loads and plays again
+(renamed back where it lies, it would take the new campaign's save's name).
+Every other slot is untouched, and the list starts on the lowest empty slot, so
+an ENTER pressed without looking sets nothing aside while a slot is free.
+
+**This decides whether starting over can lose a campaign, so it is the user's
+to decide.** The alternative: it asks, then saves over it, as the old games
+overwrite a file — the old save kept one save deep as the new campaign's
+backup, and gone at its next save. settled.md's Phase 5 implementation pass
+records the ruling.

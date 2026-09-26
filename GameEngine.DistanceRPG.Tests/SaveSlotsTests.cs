@@ -545,6 +545,73 @@ public sealed class SaveSlotsTests : IDisposable
     }
 
     [Fact]
+    public void NewCampaignBeginsInTheLowestEmptySlotWithinTheCount()
+    {
+        InTempFolder(folder =>
+        {
+            // The user's ruling of 2026-09-25 on the save slots (R5): NEW CAMPAIGN
+            // chooses the slot a campaign begins in, from 1 to the count. Its list
+            // starts — and --new-campaign begins, asking nothing — on the lowest empty
+            // one, so an ENTER pressed without looking sets nothing aside while a slot
+            // is free; with none empty, slot 1. The autosave and a slot beyond the
+            // count are never it, whatever they hold.
+            var slots = new SaveSlots(folder, 3);
+            int First() => SaveListing.Read(slots, Now).NewCampaignSlot;
+            SlotState StateOf(int number) => SaveListing.Read(slots, Now).Slots.Single(slot => slot.Number == number).State;
+            Assert.Equal(1, First());   // nothing anywhere
+
+            // The autosave, empty or holding a campaign, is never it.
+            Saved(slots.Slot(SaveSlots.Autosave), Cleared(), T1);
+            Assert.Equal(1, First());
+
+            // Slot 1 in use: slot 2.
+            Saved(slots.Slot(1), Retreated(), T2);
+            Assert.Equal(2, First());
+
+            // A slot holding only files set aside is empty — nothing of it would load
+            // — and a campaign begins there as in any empty slot.
+            Saved(slots.Slot(2), NewCampaign(), T1);
+            Assert.Equal(3, First());
+            Assert.Equal([CampaignBoot.NewCampaignBegins, CampaignBoot.SetAsideNotice(SaveStore.FileName, "was left for a new campaign",
+                Path.Combine(slots.Store(2).Folder, "campaign.abandoned-1.json"), CampaignBoot.MoveToPlay)],
+                CampaignBoot.Abandon(slots.Slot(2), GameContent.Current, how: null).Notices);
+            Assert.Equal(["campaign.abandoned-1.json"], Files(slots.Store(2).Folder));
+            Assert.Equal(SlotState.Empty, StateOf(2));
+            Assert.Equal(2, First());
+
+            // A slot holding files none of which reads is not empty: there is something
+            // to set aside. Nor is one whose save cannot be read beside a backup that
+            // can.
+            Put(slots.Store(2), SaveStore.FileName, "not a save");
+            Assert.Equal((SlotState.Unreadable, 3), (StateOf(2), First()));
+            Saved(slots.Slot(3), Cleared(), T1);
+            Saved(slots.Slot(3), Retreated(), T2);
+            Put(slots.Store(3), SaveStore.FileName, "not a save either");
+            Assert.Equal(SlotState.FromBackup, StateOf(3));
+
+            // Every slot within the count in use: slot 1 — never one beyond the count,
+            // whatever it holds, nor the empty ones above it.
+            Saved(slots.Slot(5), Cleared(), T3);
+            Assert.Equal([5], slots.Beyond());
+            Assert.Equal(1, First());
+
+            // At a count of one, slot 1 alone, in use or not; the slots above it are
+            // beyond the count, and never it.
+            var one = new SaveSlots(folder, 1);
+            Assert.Equal([2, 3, 5], one.Beyond());
+            Assert.Equal(1, SaveListing.Read(one, Now).NewCampaignSlot);
+
+            // And off the listing alone: an empty autosave, and an empty slot beyond the
+            // count, are never it.
+            SlotEntry Entry(int number, SlotState state, bool beyond = false)
+                => new(number, state, state == SlotState.Empty ? null : new SlotHeader(T1, 1, null, null, null), Unfinished: false, beyond, AheadOfClock: false);
+            Assert.Equal(1, new SaveListing([Entry(0, SlotState.Empty), Entry(1, SlotState.Readable), Entry(2, SlotState.Readable), Entry(4, SlotState.Empty, beyond: true)], []).NewCampaignSlot);
+            Assert.Equal(2, new SaveListing([Entry(0, SlotState.Empty), Entry(1, SlotState.Unreadable), Entry(2, SlotState.Empty), Entry(3, SlotState.Empty)], []).NewCampaignSlot);
+            Assert.Equal(1, new SaveListing([], []).NewCampaignSlot);
+        });
+    }
+
+    [Fact]
     public void EachSlotRoundTrips_AndSetsAsideInItsOwnFolder()
     {
         InTempFolder(folder =>

@@ -92,14 +92,17 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// set aside, never deleted or written over, and the backup is tried. A save
 /// whose load crashed the game last time — the resume marker left behind — is set
 /// aside the same way. Every set-aside notice names the file's full path and ends
-/// <see cref="TryAgain"/>. A slot that brings nothing back makes no campaign: the
+/// <see cref="TryAgain"/> — but NEW CAMPAIGN's, which end <see cref="MoveToPlay"/>.
+/// A slot that brings nothing back makes no campaign: the
 /// game goes back to the title, which says so first, then what was set aside
 /// (<see cref="NothingLoadedWord"/>).</item>
 /// <item><strong>A campaign saves into the slot it came from</strong> (the user's
 /// ruling of 2026-09-25 on the save slots, R5: "you choose a save slot and any
 /// saving happens on that save slot"): the slot it was loaded from, or the one
-/// NEW CAMPAIGN began it in, takes every save of it — the game's own and the
-/// quit's — and no load sets another slot's files aside.</item>
+/// NEW CAMPAIGN began it in — chosen on the title, 1 to the count — takes every
+/// save of it — the game's own and the quit's — and no load sets another slot's
+/// files aside, nor does NEW CAMPAIGN, which sets aside what its own slot held
+/// alone.</item>
 /// <item><strong>A slot that takes no saves brings no campaign into
 /// play</strong>: a refusal holds for the session, and a campaign played in a
 /// slot that refuses its writes could never be saved, so its load loads nothing
@@ -147,8 +150,17 @@ internal static class CampaignBoot
     /// <summary>PHASE5-084: the save's tuning hash is not the loaded tuning's.</summary>
     internal const string TuningChanged = "THE NUMBERS HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED - IT PLAYS ON UNDER THE NEW ONES";
 
-    /// <summary>How every set-aside notice ends: how to try the file again.</summary>
+    /// <summary>How every set-aside notice ends but NEW CAMPAIGN's: how to try the file again, where it lies.</summary>
     internal const string TryAgain = "RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN";
+
+    /// <summary>
+    /// How NEW CAMPAIGN's set-aside notices end (<see cref="Abandon"/>): how to play
+    /// the old campaign again. Renamed back where it lies it would take the name of
+    /// the new campaign's save, which is written into that same folder at once, so
+    /// it is moved into an empty slot folder instead — a slot folder holding only
+    /// files set aside lists as empty — and loads from there like any slot.
+    /// </summary>
+    internal const string MoveToPlay = "TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS CAMPAIGN.JSON";
 
     /// <summary>A dev-override launch's word on the campaign it plays.</summary>
     internal const string OverrideNotice = "A DEV OVERRIDE LAUNCH - A SCRATCH CAMPAIGN, SAVED APART - YOUR CAMPAIGN IS UNTOUCHED";
@@ -405,10 +417,11 @@ internal static class CampaignBoot
     }
 
     /// <summary>
-    /// NEW CAMPAIGN — on the title, or <c>--new-campaign</c> at launch: the slot's
-    /// backup and then its save are set aside as <c>abandoned</c> — never deleted —
+    /// NEW CAMPAIGN — on the title, or <c>--new-campaign</c> at launch: the slot the
+    /// new campaign begins in has its backup and then its save set aside as
+    /// <c>abandoned</c> — never deleted — each notice ending <see cref="MoveToPlay"/>,
     /// and a new campaign is handed back, which the game saves into the slot before
-    /// it plays it (<c>DistanceRpgGame.BeginNewCampaign</c>; USER DECISION 3). Both
+    /// it plays it (<c>DistanceRpgGame.BeginNewCampaign</c>; SLOT DECISION 2). Both
     /// go. A backup left behind would be resumed as though it were the new
     /// campaign's own the first time no save stood beside it: after a quit mid-run
     /// before the new campaign was ever saved, or a crash, or a first save that
@@ -426,7 +439,7 @@ internal static class CampaignBoot
     /// (<see cref="Save"/>), and a new campaign that never begins leaves it
     /// guarding the save put back, as it guarded it before.
     /// </summary>
-    /// <param name="slot">The slot the new campaign begins in: the autosave slot.</param>
+    /// <param name="slot">The slot the new campaign begins in: the one chosen on the title's NEW CAMPAIGN list, or, for <c>--new-campaign</c>, the one that list would start on (<see cref="SaveListing.NewCampaignSlot"/>) — 1 to the count, never the autosave.</param>
     /// <param name="content">The content loaded, which must be <see cref="GameContent.Current"/>: the new campaign is built under it.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="how">What asked for it, which each set-aside notice names: <c>--new-campaign</c> by default; null for NEW CAMPAIGN on the title, which the player has just chosen and the notice need not name.</param>
@@ -447,7 +460,7 @@ internal static class CampaignBoot
         {
             if (!(backup ? store.HasBackup : store.HasSave))
                 continue;
-            if (!SetAside(store, backup, "abandoned", what, setAside, report, moved))
+            if (!SetAside(store, backup, "abandoned", what, setAside, report, moved, MoveToPlay))
             {
                 report?.Invoke($"[Save] {asked} stops there: nothing more is set aside, and {store.Folder} takes no saves this session - no new campaign begins there, and the campaign still in it is what CONTINUE finds next time");
                 stuck = true;
@@ -559,13 +572,14 @@ internal static class CampaignBoot
 
     /// <summary>
     /// Set the save, or the backup, aside as <paramref name="reason"/>, saying so
-    /// in <paramref name="notices"/> by its new full path — and in
-    /// <paramref name="moved"/>, when handed one, what went where. False when it
-    /// could not be moved: then it stays where it is, the store refuses every write
-    /// this session so nothing takes its place, and the notice says that instead.
+    /// in <paramref name="notices"/> by its new full path, ending
+    /// <paramref name="tail"/> — and in <paramref name="moved"/>, when handed one,
+    /// what went where. False when it could not be moved: then it stays where it
+    /// is, the store refuses every write this session so nothing takes its place,
+    /// and the notice says that instead.
     /// </summary>
     private static bool SetAside(SaveStore store, bool backup, string reason, string what, List<string> notices, Action<string>? report,
-        List<(string Path, bool Backup, string Notice)>? moved = null)
+        List<(string Path, bool Backup, string Notice)>? moved = null, string tail = TryAgain)
     {
         string file = backup ? SaveStore.BackupName : SaveStore.FileName;
         string from = backup ? store.BackupPath : store.SavePath;
@@ -573,7 +587,7 @@ internal static class CampaignBoot
         {
             string path = store.SetAside(reason, backup);
             report?.Invoke($"[Save] {from} {what} - set aside as {path}, never deleted or written over");
-            string notice = SetAsideNotice(file, what, path);
+            string notice = SetAsideNotice(file, what, path, tail);
             notices.Add(notice);
             moved?.Add((path, backup, notice));
             return true;
@@ -996,9 +1010,9 @@ internal static class CampaignBoot
 
     // ── What the screen says ─────────────────────────────────────────────────
 
-    /// <summary>A save set aside: which file, what became of it, the full path it has now, and <see cref="TryAgain"/>.</summary>
-    internal static string SetAsideNotice(string file, string what, string path)
-        => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} - SET ASIDE AS {path} - {TryAgain}";
+    /// <summary>A save set aside: which file, what became of it, the full path it has now, and how to play it again — <see cref="TryAgain"/>, or NEW CAMPAIGN's <see cref="MoveToPlay"/>.</summary>
+    internal static string SetAsideNotice(string file, string what, string path, string tail = TryAgain)
+        => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} - SET ASIDE AS {path} - {tail}";
 
     /// <summary>
     /// How every stuck notice ends (<see cref="StuckNotice"/>): its slot takes no
