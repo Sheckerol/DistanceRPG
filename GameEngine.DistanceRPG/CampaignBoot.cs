@@ -255,7 +255,7 @@ internal static class CampaignBoot
         return $"{slot.Name} TAKES NO SAVES THIS SESSION: EARLIER, {why.ToUpperInvariant()} - LAUNCH THE GAME AGAIN TO PLAY IN IT";
     }
 
-    /// <summary>What the title says first when NEW CAMPAIGN did not begin one: <c>NO NEW CAMPAIGN BEGAN IN SLOT 2</c>, or <c>... IN THE AUTOSAVE</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    /// <summary>What the title says first when NEW CAMPAIGN did not begin one: <c>NO NEW CAMPAIGN BEGAN IN SLOT 2</c> — the slot by its name (<see cref="SaveSlot.Name"/>), 1 to the count (NEW CAMPAIGN never begins in the autosave).</summary>
     internal static string NoNewCampaignIn(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);

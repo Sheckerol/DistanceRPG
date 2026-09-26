@@ -4,7 +4,8 @@ namespace GameEngine.DistanceRPG;
 /// The title screen's words (the user's ruling of 2026-09-25 on the save model,
 /// R2(a)): the game's name, the four options in the ruling's order — CONTINUE,
 /// NEW CAMPAIGN, LOAD GAME, QUIT — the keys, the heading and keys of NEW
-/// CAMPAIGN's slot list, and its ask. Every one is here and tested (<c>TitleTests</c>), in the HUD's font: capitals, digits and
+/// CAMPAIGN's slot list, and its ask. Every one is here and tested
+/// (<c>TitleTests</c>), in the HUD's font: capitals, digits and
 /// <c>. , : - ( ) / &gt; &lt;</c>, never an apostrophe, a quote or a brace, which
 /// the engine's font cannot draw.
 /// <para>

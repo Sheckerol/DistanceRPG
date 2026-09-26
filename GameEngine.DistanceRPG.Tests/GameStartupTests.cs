@@ -792,6 +792,52 @@ public class GameStartupTests
         Assert.Equal(1, Mentions(loadSlot, adopt));
         Assert.Equal(0, Mentions(loadSlot, typeof(SaveListing).GetMethod(nameof(SaveListing.Read), Declared)!));   // no listing decides anything of a load
 
+        // A new campaign binds the one slot chosen for it (T3; the T3 review): the
+        // title hands the host the slot its step names, and nothing else calls the
+        // host's NEW CAMPAIGN; the host's title door hands that number on as it is;
+        // and BeginNewCampaign refuses any number outside 1 to the count, then asks
+        // the save folder for that slot alone, once, before it reads anything of it,
+        // and has no other slot from anywhere — so the one it binds once the first
+        // save has gone through is the one it was handed.
+        var hostBegins = typeof(ITitleHost).GetMethod(nameof(ITitleHost.BeginNewCampaign))!;
+        var onKey = typeof(TitleScene).GetMethod("OnKey", Declared)!;
+        Assert.Equal(["TitleScene.OnKey"], Callers(hostBegins));
+        Assert.Equal(1, Mentions(onKey, hostBegins));
+        var keyed = Walk(onKey);
+        int told = keyed.FindIndex(i => i.Called is { } called && Same(called, hostBegins));
+        Assert.True(told > 0 && keyed[told - 1].Called is { } stepSlot && Same(stepSlot, typeof(TitleStep).GetProperty(nameof(TitleStep.Slot))!.GetMethod!),
+            "The title does not hand the host's NEW CAMPAIGN the slot its step names");
+
+        var begin = game.GetMethod("BeginNewCampaign", Declared)!;
+        var map = game.GetInterfaceMap(typeof(ITitleHost));
+        var door = map.TargetMethods[Array.IndexOf(map.InterfaceMethods, hostBegins)];
+        var opening = Walk(door);
+        Assert.Equal(1, Mentions(door, begin));
+        int handedOn = opening.FindIndex(i => i.Called is { } called && Same(called, begin));
+        Assert.True(handedOn >= 2 && opening[handedOn - 2].Op == OpCodes.Ldarg_1 && opening[handedOn - 1].Op == OpCodes.Ldnull,
+            "The host's NEW CAMPAIGN does not hand BeginNewCampaign the slot it was handed, naming no command line");
+
+        var beginning = Walk(begin);
+        Assert.Equal(1, Mentions(begin, slotOf));
+        int asked = beginning.FindIndex(i => i.Called is { } called && Same(called, slotOf));
+        Assert.Equal(OpCodes.Ldarg_1, beginning[asked - 1].Op);   // `number`, as it was handed
+        bool Guard(MethodBase? called, string name) => called is MethodInfo { IsGenericMethod: true } guard
+            && guard.DeclaringType == typeof(ArgumentOutOfRangeException) && guard.Name == name && guard.GetGenericArguments().SequenceEqual([typeof(int)]);
+        int below = beginning.FindIndex(i => Guard(i.Called, nameof(ArgumentOutOfRangeException.ThrowIfLessThan)));
+        int above = beginning.FindIndex(i => Guard(i.Called, nameof(ArgumentOutOfRangeException.ThrowIfGreaterThan)));
+        Assert.True(below >= 3 && beginning[below - 3].Op == OpCodes.Ldarg_1 && beginning[below - 2].Op == OpCodes.Ldc_I4_1,
+            "BeginNewCampaign does not refuse a number below 1");
+        Assert.True(above >= 4 && beginning[above - 4].Op == OpCodes.Ldarg_1
+            && beginning[above - 2].Called is { } counted && Same(counted, typeof(SaveSlots).GetProperty(nameof(SaveSlots.Count))!.GetMethod!),
+            "BeginNewCampaign does not refuse a number above the count");
+        var refusalRead = typeof(SaveStore).GetProperty(nameof(SaveStore.WritesRefused))!.GetMethod!;
+        int firstRead = beginning.FindIndex(i => i.Called is { } called && Same(called, refusalRead));
+        Assert.True(below < asked && above < asked && asked < firstRead,
+            "BeginNewCampaign asks for its slot before it has refused a number outside 1 to the count, or after it has read the slot");
+        Assert.DoesNotContain(beginning, i => i.Field?.FieldType == typeof(SaveSlot)
+            || (i.Called is MethodInfo named && named.ReturnType == typeof(SaveSlot) && !Same(named, slotOf))
+            || (i.Called is ConstructorInfo made && made.DeclaringType == typeof(SaveSlot)));
+
         // Every write of the campaign in play, and the marker's clearing, go through
         // _slot, and never ask the save folder's slots for another.
         var slotsField = game.GetField("_slots", Declared)!;

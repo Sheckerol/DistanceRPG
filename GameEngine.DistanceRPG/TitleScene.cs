@@ -340,7 +340,7 @@ public sealed class TitleScene : Scene
     }
 
     /// <summary>An ask, for the log: NEW CAMPAIGN's, over the slot it names — the one there is.</summary>
-    private static string Asked(SlotEntry slot) => $"NEW CAMPAIGN over {SaveSlots.Label(slot.Number)}, which holds {(slot.State == SlotState.Unreadable ? "files none of which reads" : "a campaign")}";
+    private static string Asked(SlotEntry slot) => $"NEW CAMPAIGN over {SaveSlots.Label(slot.Number)} (it holds {(slot.State == SlotState.Unreadable ? "files none of which reads" : "a campaign")})";
 
     /// <summary>A slot list, for the log: LOAD GAME's, or NEW CAMPAIGN's.</summary>
     private static string Named(SlotMenu list) => list.Mode == SlotMenuMode.NewCampaign ? "NEW CAMPAIGN list" : "load list";

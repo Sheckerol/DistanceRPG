@@ -104,7 +104,7 @@ internal sealed class SlotMenu
         Own = own;
         Rows = listing.Slots
             .Where(slot => mode == SlotMenuMode.Load || !slot.Beyond)
-            .Where(slot => mode != SlotMenuMode.NewCampaign || slot.Number is not SaveSlots.Autosave && slot.Number <= count)
+            .Where(slot => mode != SlotMenuMode.NewCampaign || slot.Number != SaveSlots.Autosave)
             .OrderBy(slot => slot.Number)
             .ToList();
 
