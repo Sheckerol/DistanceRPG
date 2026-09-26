@@ -20,10 +20,13 @@ namespace GameEngine.DistanceRPG;
 /// write's atomic replace. <see cref="ResumingName"/> is there while a resume is
 /// in flight, so a load that finds it knows the last resume never finished.
 /// <see cref="UnsavedName"/> is there when the last time play was left the
-/// autosave could not be written, so the title can say that what the autosave
+/// campaign could not be saved here, so the title can say that what the slot
 /// holds is from before then. And <c>campaign.&lt;reason&gt;-N.json</c> is a save
-/// set aside — unreadable, crashed, abandoned, or replaced to make room for a
-/// manual slot's campaign — which nothing here ever deletes or writes over.
+/// set aside — unreadable, crashed or abandoned, or, by a build before the user's
+/// ruling on the save slots, replaced to make room for a manual slot's campaign —
+/// which nothing here ever deletes or writes over; the one move back is
+/// <see cref="PutBack"/>'s, of a file set aside for a new campaign that never
+/// began.
 /// </para>
 /// <para>
 /// <strong>A write never costs the save before it.</strong> The text goes to
@@ -53,7 +56,7 @@ internal sealed class SaveStore
     /// <summary>There while a resume is in flight: a load that finds it knows the resume before it never finished.</summary>
     public const string ResumingName = "campaign.resuming";
 
-    /// <summary>There when the last time play was left the autosave could not be written: the save beside it is from before then, and the title says so and removes it.</summary>
+    /// <summary>There when the last time play was left the campaign could not be saved in this slot: the save beside it is from before then, and the title says so and removes it.</summary>
     public const string UnsavedName = "campaign.unsaved";
 
     /// <summary>Set to a folder, the saves live there instead of the player's data folder, the dev-override slot inside it.</summary>
@@ -176,7 +179,7 @@ internal sealed class SaveStore
     /// written over: the move refuses a name that is taken. Renaming the file back
     /// to <see cref="FileName"/> is how it is tried again.
     /// </summary>
-    /// <param name="reason">Why, in one lower-case word: <c>unreadable</c>, <c>crashed</c>, <c>abandoned</c>, <c>replaced</c>.</param>
+    /// <param name="reason">Why, in one lower-case word: <c>unreadable</c>, <c>crashed</c>, <c>abandoned</c>.</param>
     /// <param name="backup">Set the backup aside rather than the save.</param>
     /// <returns>The full path it now has.</returns>
     /// <exception cref="ArgumentException"><paramref name="reason"/> is not one lower-case word.</exception>
@@ -205,6 +208,33 @@ internal sealed class SaveStore
         }
     }
 
+    /// <summary>
+    /// Put a file set aside back where it was — as the backup with
+    /// <paramref name="backup"/>, and otherwise as the save — when what it was set
+    /// aside for never happened: a new campaign whose first save did not go
+    /// through, or whose setting aside stopped at a file that would not move
+    /// (<c>CampaignBoot.PutBack</c>). A move, never a copy, and it refuses a name
+    /// that is taken, so nothing is deleted or written over. What this session
+    /// knew of the file went when it was set aside and does not come back: the next
+    /// write reads it first, as it reads any file it does not know.
+    /// </summary>
+    /// <param name="setAside">The file's full path: one set aside in this folder.</param>
+    /// <param name="backup">Put it back as the backup rather than the save.</param>
+    /// <exception cref="ArgumentException"><paramref name="setAside"/> is not in this folder: a file is only ever put back where it was set aside.</exception>
+    /// <exception cref="IOException">The name is taken, or the move failed; the file stays where it was set aside.</exception>
+    /// <exception cref="UnauthorizedAccessException">No permission to move it; it stays where it was set aside.</exception>
+    public void PutBack(string setAside, bool backup)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(setAside);
+        if (!string.Equals(Path.GetDirectoryName(Path.GetFullPath(setAside)), Path.TrimEndingDirectorySeparator(Folder), StringComparison.Ordinal))
+            throw new ArgumentException($"{setAside} is not in {Folder}: a file is put back only where it was set aside.", nameof(setAside));
+        File.Move(setAside, backup ? BackupPath : SavePath, overwrite: false);
+        if (backup)
+            BackupVouched = false;   // a file this session has not read
+        else
+            SaveVouched = false;
+    }
+
     /// <summary>Whether the resume marker is there: the last load of this slot began a resume that never finished.</summary>
     public bool WasResuming => File.Exists(ResumingPath);
 
@@ -227,18 +257,19 @@ internal sealed class SaveStore
     public string? ReadUnsaved() => ReadIfThere(UnsavedPath);
 
     /// <summary>
-    /// Write the unsaved-quit marker: leaving play could not write the autosave,
-    /// for <paramref name="why"/>, so what it holds is from before then, and the
-    /// title says so the next time it opens — before anything is loaded — and
-    /// removes this file. A marker, never a save: it is written even while writes
-    /// are refused (<see cref="RefuseWrites"/>), since it can take no save's place.
+    /// Write the unsaved-quit marker: leaving play could not save the campaign in
+    /// this slot, for <paramref name="why"/>, so what the slot holds is from before
+    /// then, and the title says so the next time it opens — before anything is
+    /// loaded — and removes this file. A marker, never a save: it is written even
+    /// while writes are refused (<see cref="RefuseWrites"/>), since it can take no
+    /// save's place.
     /// </summary>
     public void MarkUnsaved(string why)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(why);
         Directory.CreateDirectory(Folder);
         File.WriteAllText(UnsavedPath,
-            $"Leaving play could not write the autosave: {why}\nWhat the autosave holds is from before that. The title says so and removes this file.\n", Utf8);
+            $"Leaving play could not save the campaign in this folder: {why}\nWhat this folder holds is from before that. The title says so and removes this file.\n", Utf8);
     }
 
     /// <summary>Remove the unsaved-quit marker, if it is there: the title has read it, or NEW CAMPAIGN has set aside the campaign it spoke of.</summary>

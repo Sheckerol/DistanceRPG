@@ -19,8 +19,8 @@ namespace GameEngine.DistanceRPG;
 /// with its markers' row under it in grey when any apply (<see cref="SlotText"/>),
 /// at the list's one scale, left-aligned and centred on its widest row as the
 /// screen a broken file stops the game on lays its block. The chosen slot is
-/// marked <c>&gt; ... &lt;</c> in yellow; an empty slot, or one beyond the count,
-/// is dimmed. Ten slots, each with its markers' row, fit a 720-pixel window.</item>
+/// marked <c>&gt; ... &lt;</c> in yellow; an empty slot is dimmed. Ten slots, each
+/// with its markers' row, fit a 720-pixel window.</item>
 /// <item><strong>An ask is drawn where the keys stand</strong>, two rows in
 /// yellow — what it does, then what the keys do — and what the list said about a
 /// key (<c>SLOT 2 IS EMPTY</c>) sits just above the keys, in orange.</item>
@@ -131,21 +131,15 @@ public sealed class TitleHud : IDisposable
     }
 
     /// <summary>
-    /// The ask being put, as its two rows: NEW CAMPAIGN's names what the autosave
-    /// holds and how many slots are kept; a load's names the slot and what the
-    /// autosave holds — promising no set-aside for a slot listed
-    /// <see cref="SlotText.CannotBeRead"/> (<see cref="TitleText.LoadAsk"/>). Each
-    /// names the autosave by what it holds (<see cref="SlotText.Summary"/>).
+    /// The ask being put, as its two rows: NEW CAMPAIGN's, naming the autosave by
+    /// what it holds (<see cref="SlotText.Summary"/>) and how many slots are kept.
     /// </summary>
     internal static (string What, string Keys) AskRows(TitleMenu menu, DungeonCatalogue dungeons)
     {
         ArgumentNullException.ThrowIfNull(menu);
-        string autosave = SlotText.Summary(menu.Listing.Autosave, dungeons);
         return menu.Ask switch
         {
-            TitleAsk.NewCampaign => TitleText.NewCampaignAsk(autosave, menu.Count),
-            TitleAsk.Load => TitleText.LoadAsk(menu.AskSlot, autosave,
-                unreadable: menu.Listing.Slots.Any(slot => slot.Number == menu.AskSlot && slot.State == SlotState.Unreadable)),
+            TitleAsk.NewCampaign => TitleText.NewCampaignAsk(SlotText.Summary(menu.Listing.Autosave, dungeons), menu.Count),
             _ => throw new InvalidOperationException("No ask is being put."),
         };
     }
@@ -200,10 +194,11 @@ public sealed class TitleHud : IDisposable
     /// <paramref name="width"/> wide, from <paramref name="top"/> down — a slot a
     /// row, its markers' row just under it in grey and indented, and the next slot
     /// a pitch under that. The chosen slot's row is marked <c>&gt; ... &lt;</c> and
-    /// in yellow; a slot no key can take is dimmed — loading, an empty slot or one
-    /// beyond the count; saving, the autosave, which saves itself — and every other
-    /// is white, an empty slot on the save list among them, since it is where a save
-    /// goes first.
+    /// in yellow; a slot no key can take (<see cref="SlotMenu.Choosable"/>) is
+    /// dimmed — loading, an empty slot; saving, the autosave and the campaign's own
+    /// slot, which saves itself — and every other is white: loading, a slot beyond
+    /// the count among them, which loads and plays like any; saving, an empty slot,
+    /// since it is where a save goes first.
     /// </summary>
     internal static IReadOnlyList<TitleRow> SlotRows(SlotMenu list, float width, float top, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
@@ -212,12 +207,9 @@ public sealed class TitleHud : IDisposable
         for (int i = 0; i < list.Rows.Count; i++)
         {
             var entry = list.Rows[i];
-            var texts = SlotText.Rows(entry, list.Count, dungeons, zone, list.Mode);
+            var texts = SlotText.Rows(entry, list.Count, dungeons, zone, list.Mode, list.Own);
             bool chosen = i == list.Cursor;
-            bool dimmed = list.Mode == SlotMenuMode.Save
-                ? entry.Number == SaveSlots.Autosave
-                : entry.State == SlotState.Empty || entry.Beyond;
-            var color = chosen ? DungeonHud.Yellow : dimmed ? DungeonHud.DarkGrey : DungeonHud.White;
+            var color = chosen ? DungeonHud.Yellow : list.Choosable(entry) ? DungeonHud.White : DungeonHud.DarkGrey;
             block.Add((chosen ? $"> {texts[0]} <" : Unmarked + texts[0], color, false));
             foreach (string marker in texts.Skip(1))
                 block.Add((MarkerIndent + marker, DungeonHud.Grey, true));

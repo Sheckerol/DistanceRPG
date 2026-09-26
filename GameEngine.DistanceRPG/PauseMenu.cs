@@ -15,7 +15,7 @@ internal enum PauseAction
     /// <summary>2 where nothing can be saved by hand: the menu says why (<see cref="PauseMenu.Press"/>'s <c>Said</c>), saving nothing.</summary>
     Refuse,
 
-    /// <summary>3: the autosave written, and play left for the title.</summary>
+    /// <summary>3: the campaign's slot written, and play left for the title.</summary>
     QuitToTitle,
 
     /// <summary>3 in a dev-override session, which has no title: the window closes, saving the scratch slot as ever.</summary>
@@ -34,7 +34,7 @@ internal enum PauseAction
 /// with nothing in flight, never while the enemies move; between runs always. Off
 /// one, 2 answers <see cref="SaveOnYourTurn"/> and saves nothing; on one it opens
 /// the save list (<see cref="SlotMenu"/>, save mode).</item>
-/// <item><strong>QUIT TO TITLE</strong> writes the autosave through the window
+/// <item><strong>QUIT TO TITLE</strong> writes the campaign's slot through the window
 /// close's own door and shows the title (<see cref="ISaveHost.QuitToTitle"/>). There
 /// is no QUIT GAME in a session with a title: the title's QUIT, or the window's
 /// close button, ends the game.</item>
@@ -52,7 +52,7 @@ internal static class PauseMenu
     /// <summary>The second option: the save list, at a safe point.</summary>
     internal const string SaveLine = "2  SAVE GAME";
 
-    /// <summary>The third option, in a session with a title: the autosave, then the title.</summary>
+    /// <summary>The third option, in a session with a title: the campaign's slot written, then the title.</summary>
     internal const string QuitToTitleLine = "3  QUIT TO TITLE";
 
     /// <summary>The third option in a dev-override session, which has no title: the window closes.</summary>

@@ -210,11 +210,14 @@ public class GameStartupTests
 
         // The title is the first scene's door (S6): the launch shows it unless a dev
         // override or --new-campaign skips it, a load that brings nothing back shows
-        // it again, and leaving play shows it (S7's QUIT TO TITLE, the autosave
-        // written first); nothing else does. (A title asked for mid-fade is shown by
-        // a lambda of ShowTitle's own, once the fade is done.)
+        // it again, a NEW CAMPAIGN that could not save into its slot shows it again
+        // (the user's ruling on the save slots, R5 — --new-campaign's among them,
+        // which then opens on it), and leaving play shows it (S7's QUIT TO TITLE, the
+        // campaign's slot written first); nothing else does. (A title asked for
+        // mid-fade is shown by a lambda of ShowTitle's own, once the fade is done.)
         var showTitle = typeof(DistanceRpgGame).GetMethod("ShowTitle", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        Assert.Equal(["DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.QuitToTitle"], Callers(showTitle).Where(caller => !caller.Contains('<')));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.QuitToTitle"],
+            Callers(showTitle).Where(caller => !caller.Contains('<')));
         var bootCampaign = typeof(DistanceRpgGame).GetMethod("BootCampaign", BindingFlags.NonPublic | BindingFlags.Instance)!;
         Assert.Equal(1, Mentions(bootCampaign, showTitle));
         Assert.Equal(["TitleScene..ctor"], Callers(typeof(TitleMenu).GetConstructor([typeof(SaveListing)])!));
@@ -229,7 +232,7 @@ public class GameStartupTests
         // notices, and the screen between runs shows it whole, capping only what
         // the data files raised after it. So does a floor a saved run resumes on
         // (S8's review), and so does the title (S6), whose word is what a load that
-        // brought nothing back set aside, the autosave left unwritten, a file the
+        // brought nothing back set aside, a slot a quit left unsaved, a file the
         // listing could not read. The holder counts what was led. The three methods
         // that open those screens read that count, and nothing else does. Each
         // reads it before the take that hands the notices over.
@@ -463,23 +466,32 @@ public class GameStartupTests
         // cannot save leaves its marker for the title however it came. The
         // campaign in play is decided by the title — a slot loaded, or a new one
         // begun — or by a dev override at launch. Read off the IL, so a save added
-        // anywhere else fails here.
+        // anywhere else fails here. NEW CAMPAIGN's first save is written straight
+        // through CampaignBoot.Save, before the campaign is played (the user's ruling
+        // on the save slots, R5), so the game's own Save is the frame's end's alone.
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
-        Assert.Equal(["CampaignBoot.SaveOnQuit", "CampaignBoot.SaveTo", "DistanceRpgGame.Save"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        Assert.Equal(["CampaignBoot.SaveOnQuit", "CampaignBoot.SaveTo", "DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.Save"],
+            Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
         Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
-        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.WriteRequestedSave"],
-            Callers(Method(typeof(DistanceRpgGame), "Save")));
+        Assert.Equal(["DistanceRpgGame.WriteRequestedSave"], Callers(Method(typeof(DistanceRpgGame), "Save")));
 
         // The unsaved-quit marker is written by the quit's own door alone, and read
-        // and cleared by the title alone, before anything is loaded — and by NEW
-        // CAMPAIGN, which sets the campaign it spoke of aside and says nothing of it.
+        // and cleared by the title alone — every slot's, before the slots are listed
+        // and anything is loaded — and by NEW CAMPAIGN, which sets the campaign it
+        // spoke of aside and says nothing of it.
         Assert.Equal(["CampaignBoot.MarkUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.MarkUnsaved))));
         Assert.Equal(["CampaignBoot.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), "MarkUnsaved")));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ReadUnsaved))));
         Assert.Equal(["CampaignBoot.TakeUnsaved"], Callers(Method(typeof(SaveStore), nameof(SaveStore.ClearUnsaved))));
-        Assert.Equal(["CampaignBoot.Abandon", "DistanceRpgGame.ShowTitle"], Callers(Method(typeof(CampaignBoot), "TakeUnsaved")));
+        Assert.Equal(["CampaignBoot.Abandon", "CampaignBoot.TakeEveryUnsaved"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.TakeUnsaved))));
+        var takeEvery = Method(typeof(CampaignBoot), nameof(CampaignBoot.TakeEveryUnsaved));
+        Assert.Equal(["DistanceRpgGame.ShowTitle"], Callers(takeEvery));
+        var inTitle = CallsIn(Method(typeof(DistanceRpgGame), "ShowTitle")).ToList();
+        int taken = inTitle.FindIndex(called => Same(called, takeEvery));
+        Assert.True(taken >= 0 && taken < inTitle.FindIndex(called => Same(called, Method(typeof(SaveListing), nameof(SaveListing.Read)))),
+            "ShowTitle lists the slots before it has taken their unsaved-quit markers");
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(Method(typeof(DistanceRpgGame), "WriteRequestedSave")));
         Assert.Equal(["DistanceRpgGame.OnClosing", "DistanceRpgGame.QuitToTitle"], Callers(Method(typeof(DistanceRpgGame), "SaveOnQuit")));
 
@@ -501,33 +513,33 @@ public class GameStartupTests
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
         Assert.Equal(["DistanceRpgGame.OnLoad"], Callers(Method(typeof(DistanceRpgGame), "BootCampaign")));
 
-        // A manual slot's campaign makes room in the autosave slot (S6, USER DECISION
-        // 2) in the title's load alone, and only once its Load has brought a campaign
-        // back: a load that restores nothing leaves the autosave as it was.
-        var load = Method(typeof(CampaignBoot), nameof(CampaignBoot.Load));
-        var makeRoom = Method(typeof(CampaignBoot), nameof(CampaignBoot.MakeRoom));
-        var loadSlot = Method(typeof(DistanceRpgGame), nameof(DistanceRpgGame.LoadSlot));
-        Assert.Equal(["DistanceRpgGame.LoadSlot"], Callers(makeRoom));
-        var inLoadSlot = CallsIn(loadSlot).ToList();
-        int loaded = inLoadSlot.FindIndex(called => Same(called, load));
-        int madeRoom = inLoadSlot.FindIndex(called => Same(called, makeRoom));
-        Assert.True(loaded >= 0 && loaded < madeRoom, "LoadSlot makes room in the autosave slot before its Load has brought a campaign back");
-        Assert.Equal(1, Mentions(loadSlot, makeRoom));
+        // What NEW CAMPAIGN set aside is put back by NEW CAMPAIGN alone, when the new
+        // campaign never began, and only ever through the one door that moves a file
+        // back where it was set aside, refusing a name that is taken.
+        var putBack = Method(typeof(CampaignBoot), nameof(CampaignBoot.PutBack));
+        Assert.Equal(["CampaignBoot.PutBack"], Callers(Method(typeof(SaveStore), nameof(SaveStore.PutBack))));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(putBack));
 
-        // A refusal the autosave met on an earlier try this session is said on the
-        // first screen of every campaign that comes into play after it (S6's review):
-        // the word a load and the room it made say, or the one a new campaign says, is
-        // handed through CampaignBoot.InPlayWord before it is led — once the load has
-        // made its room, once NEW CAMPAIGN has set its files aside.
-        var inPlay = Method(typeof(CampaignBoot), nameof(CampaignBoot.InPlayWord));
-        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.LoadSlot"], Callers(inPlay));
-        int saidInPlay = inLoadSlot.FindIndex(called => Same(called, inPlay));
-        Assert.True(madeRoom < saidInPlay, "LoadSlot says what the load brought back before the room it made in the autosave slot is known");
-        var inNewCampaign = CallsIn(Method(typeof(DistanceRpgGame), "BeginNewCampaign")).ToList();
-        int abandoned = inNewCampaign.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
-        Assert.True(abandoned >= 0 && abandoned < inNewCampaign.FindIndex(called => Same(called, inPlay)),
-            "BeginNewCampaign says what the new campaign set aside before NEW CAMPAIGN has set it aside");
-        Assert.Equal(1, Mentions(loadSlot, inPlay));
+        // A campaign never comes into play in a slot that takes no saves (R5): NEW
+        // CAMPAIGN reads the slot's refusal before it sets anything aside, writes the
+        // new campaign's first save after it has set the old one aside and before it
+        // binds the campaign to the slot (Adopt), and on the way that never binds it
+        // puts back what it set aside and goes back to the title — so a close from
+        // the title after a NEW CAMPAIGN that did not begin saves nothing.
+        var begin = Method(typeof(DistanceRpgGame), "BeginNewCampaign");
+        var inBegin = CallsIn(begin).ToList();
+        int refusedRead = inBegin.FindIndex(called => Same(called, typeof(SaveStore).GetProperty(nameof(SaveStore.WritesRefused))!.GetMethod!));
+        int abandon = inBegin.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));
+        int firstSave = inBegin.FindIndex(called => Same(called, Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
+        int adopt = inBegin.FindIndex(called => Same(called, Method(typeof(DistanceRpgGame), "Adopt")));
+        int titled = inBegin.FindIndex(called => Same(called, Method(typeof(DistanceRpgGame), "ShowTitle")));
+        Assert.True(refusedRead >= 0 && refusedRead < abandon && abandon < firstSave && firstSave < adopt,
+            "BeginNewCampaign does not read the refusal, set the old campaign aside, save the new one and bind it, in that order");
+        Assert.True(firstSave < titled && titled < adopt, "BeginNewCampaign does not go back to the title, on the way that never binds the campaign, after its first save");
+        Assert.Equal(2, Mentions(begin, putBack));   // a setting aside that stuck, and a first save that failed
+        Assert.All(inBegin.Select((called, at) => (called, at)).Where(call => Same(call.called, putBack)), call => Assert.InRange(call.at, abandon + 1, adopt - 1));
+        Assert.Equal(1, Mentions(begin, Method(typeof(DistanceRpgGame), "Adopt")));
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.NotBegunWord))));
     }
 
     private const BindingFlags Declared = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
@@ -684,6 +696,69 @@ public class GameStartupTests
         Assert.True(clears >= 0 && clears < writes, "OnUpdateFrame writes a kept request before it clears a resume whose screen is up");
         Assert.Contains(Walk(clearOnceUp), i => i.Op == OpCodes.Stfld && SameField(i.Field, resuming));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(clearOnceUp));
+    }
+
+    [Fact]
+    public void ACampaignComesIntoPlayBoundToOneSlot_AndNothingRebindsIt()
+    {
+        // The user's ruling of 2026-09-25 on the save slots (R5): "you choose a save
+        // slot and any saving happens on that save slot". The game holds the slot
+        // the campaign in play is bound to in one field, _slot. It is set in one
+        // place, Adopt — as a campaign comes into play: a slot loaded (LoadSlot), a
+        // new campaign begun once its first save has gone through (BeginNewCampaign),
+        // a dev override's scratch campaign (BootCampaign) — to the slot handed in,
+        // and cleared in one, DropCampaign, as the campaign goes. The frame's end's
+        // saves, the quit's, and the resume marker's clearing reach the slot through
+        // that field alone and never ask the save folder's slots for one, so nothing
+        // between a campaign's coming into play and its going can point its saves
+        // anywhere else. Read off the IL.
+        var game = typeof(DistanceRpgGame);
+        var slotField = game.GetField("_slot", Declared)!;
+        Assert.Equal(typeof(SaveSlot), slotField.FieldType);
+        var adopt = game.GetMethod("Adopt", Declared)!;
+        var drop = game.GetMethod("DropCampaign", Declared)!;
+
+        // _slot is private, so only the game's own code — its methods, and the
+        // lambdas and closures nested in it — can store it: each is read.
+        var stores = new[] { game }.Concat(game.GetNestedTypes(Declared))
+            .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+            .Where(method => Body(method) is not null)
+            .Where(method => Walk(method).Any(i => i.Op == OpCodes.Stfld && SameField(i.Field, slotField)))
+            .Select(method => method.Name)
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(["Adopt", "DropCampaign"], stores);
+        var adopting = Walk(adopt);
+        int setAt = adopting.FindIndex(i => i.Op == OpCodes.Stfld && SameField(i.Field, slotField));
+        Assert.Equal(OpCodes.Ldarg_2, adopting[setAt - 1].Op);   // the slot handed in, and nothing else
+        Assert.Equal(1, adopting.Count(i => i.Op == OpCodes.Stfld && SameField(i.Field, slotField)));
+        var dropping = Walk(drop);
+        int clearedAt = dropping.FindIndex(i => i.Op == OpCodes.Stfld && SameField(i.Field, slotField));
+        Assert.Equal(OpCodes.Ldnull, dropping[clearedAt - 1].Op);
+        Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot"], Callers(adopt));
+        Assert.Equal(["DistanceRpgGame.QuitToTitle"], Callers(drop));
+
+        // A load binds the one slot it asked the save folder for, and only once Load
+        // has brought a campaign back: a load that brings nothing back binds nothing.
+        var loadSlot = game.GetMethod(nameof(DistanceRpgGame.LoadSlot))!;
+        var slotOf = typeof(SaveSlots).GetMethod(nameof(SaveSlots.Slot))!;
+        var loading = CallsIn(loadSlot).ToList();
+        Assert.Equal(1, Mentions(loadSlot, slotOf));
+        int loaded = loading.FindIndex(called => Same(called, typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.Load), Declared)!));
+        int bound = loading.FindIndex(called => Same(called, adopt));
+        Assert.True(loading.FindIndex(called => Same(called, slotOf)) < loaded && loaded < bound, "LoadSlot binds a slot before its Load has brought a campaign back");
+        Assert.Equal(1, Mentions(loadSlot, adopt));
+        Assert.Equal(0, Mentions(loadSlot, typeof(SaveListing).GetMethod(nameof(SaveListing.Read), Declared)!));   // no listing decides anything of a load
+
+        // Every write of the campaign in play, and the marker's clearing, go through
+        // _slot, and never ask the save folder's slots for another.
+        foreach (string writes in new[] { "WriteRequestedSave", "SaveOnQuit", "ClearResumeMarker" })
+        {
+            var method = game.GetMethod(writes, Declared)!;
+            var walked = Walk(method);
+            Assert.Contains(walked, i => i.Op == OpCodes.Ldfld && SameField(i.Field, slotField));
+            Assert.DoesNotContain(walked, i => i.Called?.DeclaringType == typeof(SaveSlots));
+            Assert.DoesNotContain(walked, i => i.Op == OpCodes.Ldfld && SameField(i.Field, game.GetField("_slots", Declared)!));
+        }
     }
 
     /// <summary>Whether <paramref name="a"/> names the field <paramref name="b"/> is.</summary>

@@ -18,8 +18,8 @@ namespace GameEngine.DistanceRPG;
 /// <see cref="CannotBeRead"/>; and under it, only when one applies, its markers:
 /// what a load of it would do that the row cannot say. One row of both would run
 /// past a 1280-pixel window at any scale the list can be read at. On the save
-/// list the autosave's own row ends <see cref="SavesItself"/>: it is shown, never
-/// chosen.</item>
+/// list the row of the slot the campaign saves into ends
+/// <see cref="SavesItself"/>: it is shown, never chosen.</item>
 /// <item><strong>Every ask is two rows</strong> — what it does, then what the keys
 /// do — and only ENTER says yes, as each second row says: the title's
 /// (<see cref="TitleText"/>) and the save list's, before a slot is saved over
@@ -44,10 +44,10 @@ internal static class SlotText
     /// </summary>
     internal const string SaveKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 1-9 SAVES - ESC BACK";
 
-    /// <summary>How the save list's autosave row ends: the autosave is written by the game alone, so it is shown and never chosen.</summary>
+    /// <summary>How the save list's row of the campaign's own slot ends: every save of the campaign goes there already (the user's ruling of 2026-09-25 on the save slots, R5), so it is shown and never chosen.</summary>
     internal const string SavesItself = "SAVES ITSELF";
 
-    /// <summary>What 0 says on the save list: the autosave is never saved into by hand.</summary>
+    /// <summary>What 0 says on the save list when the campaign saves into the autosave (<see cref="SlotSavesItself"/>).</summary>
     internal const string AutosaveSavesItself = "THE AUTOSAVE SAVES ITSELF";
 
     /// <summary>What the second row of every save-list ask ends with: ENTER alone says yes.</summary>
@@ -98,12 +98,14 @@ internal static class SlotText
     /// <param name="count">How many manual slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
     /// <param name="dungeons">The content's dungeons, whose names the row reads.</param>
     /// <param name="zone">The player's time zone, which the time is shown in.</param>
-    /// <param name="mode">Which list draws it: on the save list the autosave's own row ends <see cref="SavesItself"/>.</param>
-    internal static IReadOnlyList<string> Rows(SlotEntry entry, int count, DungeonCatalogue dungeons, TimeZoneInfo zone, SlotMenuMode mode = SlotMenuMode.Load)
+    /// <param name="mode">Which list draws it: on the save list the row of the campaign's own slot ends <see cref="SavesItself"/>.</param>
+    /// <param name="own">Saving: the slot the campaign saves into (<see cref="SlotMenu.Own"/>); the autosave's by default.</param>
+    internal static IReadOnlyList<string> Rows(SlotEntry entry, int count, DungeonCatalogue dungeons, TimeZoneInfo zone, SlotMenuMode mode = SlotMenuMode.Load,
+        int own = SaveSlots.Autosave)
     {
         ArgumentNullException.ThrowIfNull(entry);
         string row = Row(entry, dungeons, zone);
-        if (mode == SlotMenuMode.Save && entry.Number == SaveSlots.Autosave)
+        if (mode == SlotMenuMode.Save && entry.Number == own)
             row = $"{row}{Joint}{SavesItself}";
         var rows = new List<string> { row };
         var markers = Markers(entry, count);
@@ -183,14 +185,24 @@ internal static class SlotText
         return shown.ToString(TimeFormat, CultureInfo.InvariantCulture);
     }
 
-    /// <summary>A slot above the count: kept, listed for loading, never saved into — <c>BEYOND THE 3 SLOTS - LOAD ONLY</c>, or <c>BEYOND THE 1 SLOT - LOAD ONLY</c>.</summary>
+    /// <summary>
+    /// A slot above the count: kept, listed, loaded, and saved into by the campaign
+    /// played from it, since loading a slot is choosing it (the user's ruling of
+    /// 2026-09-25 on the save slots, R5) — <c>BEYOND THE 3 SLOTS</c>, or <c>BEYOND
+    /// THE 1 SLOT</c>. Never offered to save into by hand.
+    /// </summary>
     internal static string Beyond(int count)
-        => count == 1 ? "BEYOND THE 1 SLOT - LOAD ONLY" : $"BEYOND THE {count.ToString(CultureInfo.InvariantCulture)} SLOTS - LOAD ONLY";
+        => count == 1 ? "BEYOND THE 1 SLOT" : $"BEYOND THE {count.ToString(CultureInfo.InvariantCulture)} SLOTS";
 
     /// <summary>What a digit or ENTER on a slot that holds nothing says: <c>SLOT 2 IS EMPTY</c>, <c>AUTOSAVE IS EMPTY</c>.</summary>
     internal static string IsEmpty(int number) => $"{SaveSlots.Label(number)} IS EMPTY";
 
-    /// <summary>What a digit above the count says on the save list, which never offers such a slot (a slot there keeps its save for loading): <c>SLOT 7 IS BEYOND THE 3 SLOTS</c>, <c>... THE 1 SLOT</c>.</summary>
+    /// <summary>What the digit of the campaign's own slot says on the save list, which never offers it: <c>SLOT 2 SAVES ITSELF</c>, or <see cref="AutosaveSavesItself"/>.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="own"/> is negative.</exception>
+    internal static string SlotSavesItself(int own)
+        => own == SaveSlots.Autosave ? AutosaveSavesItself : $"{SaveSlots.Label(own)} {SavesItself}";
+
+    /// <summary>What a digit above the count says on the save list, which never offers such a slot: <c>SLOT 7 IS BEYOND THE 3 SLOTS</c>, <c>... THE 1 SLOT</c>.</summary>
     internal static string NotOffered(int number, int count)
         => count == 1
             ? $"{SaveSlots.Label(number)} IS BEYOND THE 1 SLOT"

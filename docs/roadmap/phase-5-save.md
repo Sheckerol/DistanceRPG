@@ -22,10 +22,12 @@ restore saved states afterwards.
 `Logic/` stops being clean.
 
 Where the saves live, how many there are, when one is taken and how a player
-gets back to one is settled.md's (the user's ruling of 2026-09-25 on the save
-model, R2): a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT;
-one autosave slot that saves itself at every safe point; and manual slots, saved
-into by hand at a safe point, whose count is `tuning.json`'s `SaveSlots`.
+gets back to one is settled.md's (the user's rulings of 2026-09-25 on the save
+model, R2, and on the save slots, R5): a title screen offering CONTINUE, NEW
+CAMPAIGN, LOAD GAME and QUIT; save slots whose count is `tuning.json`'s
+`SaveSlots`; and a campaign bound to the slot it was begun in or loaded from,
+into which every save of it goes — the game's own at every safe point, and SAVE
+GAME's.
 
 Round-trip test: save, reload, and assert that a fixed sequence of turns
 produces an identical world state — in the shipped game too, since its dice are

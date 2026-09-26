@@ -18,7 +18,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// listing reads every slot's header and never moves a file; the most recent
 /// save is chosen by its own time, deterministically. A slot carries its own
 /// name: every load, save and word takes the slot, its store and its name
-/// together. A load is per slot and never makes a campaign. No write into any
+/// together. A load is per slot and never makes a campaign, and the campaign it
+/// brings back saves into that slot alone (the user's ruling of 2026-09-25 on the
+/// save slots, R5), above the count too. No write into any
 /// slot rotates away a file that cannot be read, and a write clears its slot's
 /// resume marker. A dev-override session never touches a slot. Every case runs
 /// on a temporary folder of its own, deleted after, under the numbers the runs
@@ -287,11 +289,10 @@ public sealed class SaveSlotsTests : IDisposable
             var listing = SaveListing.Read(slots, Now);
             var autosave = listing.Autosave;
             Assert.Equal((SaveSlots.Autosave, SlotState.Readable), (autosave.Number, autosave.State));
-            Assert.Equal((false, false, false, false), (autosave.Unfinished, autosave.Beyond, autosave.AheadOfClock, autosave.SameAsAutosave));
+            Assert.Equal((false, false, false), (autosave.Unfinished, autosave.Beyond, autosave.AheadOfClock));
             Assert.Equal(new SlotHeader(null, 1, null, null, null), autosave.Header);
             Assert.Same(autosave, listing.Newest);
             Assert.Equal([SlotState.Empty, SlotState.Empty, SlotState.Empty], listing.Slots.Skip(1).Select(slot => slot.State));
-            Assert.False(listing.NeedsRoom(SaveSlots.Autosave));
             Assert.Equal(seeded, Snapshot(folder));
 
             // Loaded, it resumes, saying so, and nothing moved: no migration.
@@ -420,21 +421,61 @@ public sealed class SaveSlotsTests : IDisposable
             var withStray = SaveListing.Read(stray, Now);
             Assert.Equal(0, withStray.Newest!.Number);
             Assert.Equal([0, 1, 2, 3], withStray.Slots.Select(slot => slot.Number));
+        });
+    }
 
-            // The same as the autosave: a manual slot holding the autosave's own save,
-            // written at another time, is it; one holding another campaign is not. A
-            // load of the first needs no room made; of the second it does; of the
-            // autosave, never. With the autosave empty, nothing needs room.
-            var same = Fresh();
-            Saved(same.Slot(0), a, T1);
-            Saved(same.Slot(1), a, T2);
-            Saved(same.Slot(2), b, T3);
-            var sameListing = SaveListing.Read(same, Now);
-            Assert.Equal([false, true, false, false], sameListing.Slots.Select(slot => slot.SameAsAutosave));
-            Assert.Equal((false, false, true), (sameListing.NeedsRoom(0), sameListing.NeedsRoom(1), sameListing.NeedsRoom(2)));
-            var noAutosave = Fresh();
-            Saved(noAutosave.Slot(2), b, T3);
-            Assert.False(SaveListing.Read(noAutosave, Now).NeedsRoom(2));
+    [Fact]
+    public void ALoadedSlotIsTheOnlyOneItsCampaignWritesInto()
+    {
+        InTempFolder(folder =>
+        {
+            // The user's ruling of 2026-09-25 on the save slots (R5): "you choose a save
+            // slot and any saving happens on that save slot". Four campaigns — the
+            // autosave's and slots 1 to 3, each saved twice, so each has a backup —
+            // and slot 2 loaded, as the title loads it. Its campaign's saves, the
+            // game's own at every safe point and the quit's, all go into slot 2: the
+            // autosave and slots 1 and 3 are byte for byte as they were, and nothing is
+            // set aside anywhere.
+            var slots = new SaveSlots(folder, 3);
+            CampaignState[] campaigns = [NewCampaign(), Retreated(), Cleared(), Retreated()];
+            for (int n = SaveSlots.Autosave; n <= 3; n++)
+            {
+                Saved(slots.Slot(n), n == SaveSlots.Autosave ? Cleared() : NewCampaign(), T1.AddMinutes(n));
+                Saved(slots.Slot(n), campaigns[n], T2.AddMinutes(n));
+            }
+            static bool NotSlot2(string path) => !path.StartsWith("slot-2", StringComparison.Ordinal);
+            var others = Snapshot(folder, NotSlot2);
+            Assert.Equal(8, Snapshot(folder).Count);
+
+            var load = CampaignBoot.Load(slots.Slot(2), GameContent.Current);
+            Assert.True(load.Loaded);
+            Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 2"], load.Notices);
+            slots.Store(2).ClearResuming();   // the loaded screen is up
+            var played = load.Campaign!;
+
+            // A run entered, a floor gone down, and the quit: three saves, each into
+            // slot 2, the backup always the save before.
+            var script = VisitScript.Enter(played, "spear_hall", CampaignRuns.FiveDeep);
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), played, savedAt: T3));
+            string entered = slots.Store(2).Read()!;
+            script.Down();
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), played, new ViewDto("A"), savedAt: T3.AddMinutes(1)));
+            string down = slots.Store(2).Read()!;
+            Assert.Equal(entered, slots.Store(2).ReadBackup());
+            CampaignRuns.Exit(played);
+            Assert.True(CampaignBoot.SaveOnQuit(slots.Slot(2), played, view: null, step: null, savedAt: T3.AddMinutes(2)));
+            Assert.Equal((Text(played, T3.AddMinutes(2)), down), (slots.Store(2).Read(), slots.Store(2).ReadBackup()));
+
+            Assert.Equal(others, Snapshot(folder, NotSlot2));
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(slots.Store(2).Folder));
+            Assert.All(Snapshot(folder).Keys, path => Assert.Contains(Path.GetFileName(path), new[] { SaveStore.FileName, SaveStore.BackupName }));
+
+            // The next load of slot 2 brings back the campaign as it was left; the
+            // autosave still holds its own.
+            var again = CampaignBoot.Load(slots.Slot(2), GameContent.Current);
+            StateAssert.Equivalent(played, again.Campaign!, "campaign");
+            slots.Store(2).ClearResuming();
+            Assert.Equal(Text(campaigns[0], T2), slots.Store(SaveSlots.Autosave).Read());
         });
     }
 
@@ -462,6 +503,9 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.Equal(5, listing.Newest!.Number);
             Assert.Equal(seeded, Snapshot(folder));
 
+            // Marked as beyond the count, and nothing more: it is no less a slot to load.
+            Assert.Equal("BEYOND THE 3 SLOTS", SlotText.Rows(listing.Slots.Single(slot => slot.Number == 5), 3, GameContent.Current.Dungeons, TimeZoneInfo.Utc)[^1]);
+
             // And one beyond the count still loads.
             var load = CampaignBoot.Load(three.Slot(5), GameContent.Current);
             Assert.True(load.Loaded);
@@ -470,11 +514,27 @@ public sealed class SaveSlotsTests : IDisposable
             three.Store(5).ClearResuming();
             Assert.Equal(seeded, Snapshot(folder));
 
+            // Loaded, it is chosen, so it saves into itself (the user's ruling of
+            // 2026-09-25 on the save slots, R5): played on and saved, then quit, slot 5
+            // holds the campaign as it was left, its save before it the backup, and
+            // every other slot's every byte as it was — nothing deleted, nothing set
+            // aside, and the count still three.
+            var played = load.Campaign!;
+            CampaignRuns.ShallowRetreat(played, "spear_hall");
+            Assert.Null(CampaignBoot.Save(three.Slot(5), played, savedAt: T2));
+            string second = three.Store(5).Read()!;
+            CampaignRuns.DeepRetreat(played, "spear_hall");
+            Assert.True(CampaignBoot.SaveOnQuit(three.Slot(5), played, view: null, step: null, savedAt: T3));
+            Assert.Equal((Text(played, T3), second), (three.Store(5).Read(), three.Store(5).ReadBackup()));
+            static bool OtherThanFive(string path) => !path.StartsWith("slot-5", StringComparison.Ordinal);
+            Assert.Equal(seeded.Where(file => OtherThanFive(file.Key)).ToDictionary(file => file.Key, file => file.Value, StringComparer.Ordinal), Snapshot(folder, OtherThanFive));
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName], Files(three.Store(5).Folder));
+            Assert.Equal([4, 5], three.Beyond());
+
             // Raised to five again, they are ordinary slots.
             var again = new SaveSlots(folder, 5);
             Assert.Empty(again.Beyond());
             Assert.All(SaveListing.Read(again, Now).Slots, slot => Assert.False(slot.Beyond));
-            Assert.Equal(seeded, Snapshot(folder));
         });
     }
 
@@ -870,30 +930,36 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.Equal(seeded, Snapshot(folder, Campaigns));
 
             // And the game's launch keeps it so: its override branch makes the
-            // session's store the override's (CampaignBoot.StoreFor), and asks the
-            // slots for nothing before the scratch campaign is begun — the slots are
-            // made only on the other branch, after it, which opens on the title.
+            // session's store the override's (CampaignBoot.StoreFor), its slot the
+            // scratch slot (SaveSlot.Scratch), and binds the scratch campaign to it
+            // (Adopt) once it is begun, asking the slots for nothing before — the
+            // slots are made only on the other branch, after it, which opens on the
+            // title.
             var bootCampaign = typeof(DistanceRpgGame).GetMethod("BootCampaign", Declared)!;
             byte[] il = Body(bootCampaign)!;
             var instructions = InstructionsAt(il).ToList();
             MethodBase? Called((OpCode Op, int Token, int At) i) => IsCall(i.Op) ? Resolve(bootCampaign, i.Token) : null;
-            var autosaveField = typeof(DistanceRpgGame).GetField("_autosave", Declared)!;
             var slotsField = typeof(DistanceRpgGame).GetField("_slots", Declared)!;
             bool Stores((OpCode Op, int Token, int At) i, FieldInfo field)
                 => i.Op == OpCodes.Stfld && BitConverter.ToInt32(il, i.At) is int token && bootCampaign.Module.ResolveField(token) is { } stored
                     && stored.Module == field.Module && stored.MetadataToken == field.MetadataToken;
             var storeFor = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.StoreFor), Declared)!;
+            var scratchMade = typeof(SaveSlot).GetMethod(nameof(SaveSlot.Scratch), Declared)!;
             var bootOverride = typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.BootOverride), Declared)!;
+            var adopt = typeof(DistanceRpgGame).GetMethod("Adopt", Declared)!;
             var slotStore = typeof(SaveSlots).GetMethod(nameof(SaveSlots.Store), Declared)!;
             var slotSlot = typeof(SaveSlots).GetMethod(nameof(SaveSlots.Slot), Declared)!;
             var slotsMade = typeof(SaveSlots).GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single();
 
             int atStoreFor = instructions.FindIndex(i => Same(Called(i), storeFor));
+            int atScratch = instructions.FindIndex(i => Same(Called(i), scratchMade));
             int atOverride = instructions.FindIndex(i => Same(Called(i), bootOverride));
-            Assert.True(atStoreFor >= 0 && atStoreFor < atOverride, "BootCampaign does not take its override store from StoreFor before it boots the override");
-            Assert.Contains(instructions.Skip(atStoreFor).Take(atOverride - atStoreFor), i => Stores(i, autosaveField));
-            Assert.DoesNotContain(instructions.Take(atOverride), i => Same(Called(i), slotStore) || Same(Called(i), slotSlot) || Same(Called(i), slotsMade) || Stores(i, slotsField));
-            Assert.Contains(instructions.Skip(atOverride), i => Same(Called(i), slotsMade));
+            int atAdopt = instructions.FindIndex(i => Same(Called(i), adopt));
+            Assert.True(atStoreFor >= 0 && atStoreFor < atScratch && atScratch < atOverride && atOverride < atAdopt,
+                "BootCampaign does not make its scratch slot from StoreFor's store, boot the override and then bind its campaign to it, in that order");
+            Assert.Single(instructions, i => Same(Called(i), adopt));
+            Assert.DoesNotContain(instructions.Take(atAdopt + 1), i => Same(Called(i), slotStore) || Same(Called(i), slotSlot) || Same(Called(i), slotsMade) || Stores(i, slotsField));
+            Assert.Contains(instructions.Skip(atAdopt), i => Same(Called(i), slotsMade));
             Assert.Equal(["DistanceRpgGame.BootCampaign"], Calls(typeof(DistanceRpgGame).Assembly)
                 .Where(call => Same(call.Target, slotsMade)).Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct());
 

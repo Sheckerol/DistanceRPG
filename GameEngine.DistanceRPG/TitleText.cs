@@ -5,7 +5,7 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The title screen's words (the user's ruling of 2026-09-25 on the save model,
 /// R2(a)): the game's name, the four options in the ruling's order — CONTINUE,
-/// NEW CAMPAIGN, LOAD GAME, QUIT — the keys, and the two asks. Every one is here
+/// NEW CAMPAIGN, LOAD GAME, QUIT — the keys, and NEW CAMPAIGN's ask. Every one is here
 /// and tested (<c>TitleTests</c>), in the HUD's font: capitals, digits and
 /// <c>. , : - ( ) / &gt; &lt;</c>, never an apostrophe, a quote or a brace, which
 /// the engine's font cannot draw.
@@ -27,10 +27,13 @@ internal static class TitleText
     /// <summary>
     /// The keys the load list answers, along the bottom while it is up: W/S and the
     /// arrows only move, and a digit loads its slot at once, as ENTER loads the one
-    /// chosen — each asking first when a load does (S6's review: a digit never
-    /// only chooses).
+    /// chosen (S6's review: a digit never only chooses). And what a load means,
+    /// said where the choice is made: the campaign it brings back saves into the
+    /// slot it came from, every save of it (the user's ruling of 2026-09-25 on the
+    /// save slots, R5) — so a slot kept as a checkpoint is played forward, and
+    /// written over, from its first load.
     /// </summary>
-    internal const string LoadKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK";
+    internal const string LoadKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK";
 
     /// <summary>CONTINUE with no save to load: drawn dimmed, and passed over.</summary>
     internal const string NoSaveYet = "CONTINUE - NO SAVE YET";
@@ -73,34 +76,5 @@ internal static class TitleText
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
         string kept = count == 1 ? "SLOT 1 IS KEPT" : $"SLOTS 1 TO {count.ToString(CultureInfo.InvariantCulture)} ARE KEPT";
         return ($"NEW CAMPAIGN SETS THE AUTOSAVE ASIDE{Joint}{place}", $"AS FILES, NEVER DELETED{Joint}{kept}{Joint}{EnterOrEsc}");
-    }
-
-    /// <summary>
-    /// A manual slot's ask, when the autosave holds a different campaign (USER
-    /// DECISION 2): the loaded campaign autosaves into the autosave slot, so the
-    /// campaign there is set aside first — <c>LOADING SLOT 2 SETS THE AUTOSAVE
-    /// ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS</c> / <c>AS FILES, NEVER DELETED -
-    /// ENTER: YES - ESC: NO</c>.
-    /// <para>
-    /// The autosave is set aside only once the slot's campaign has come back, so a
-    /// slot none of whose files read when the list was made — listed
-    /// <see cref="SlotText.CannotBeRead"/>, whose load most likely sets its own files
-    /// aside and brings nothing back, the autosave left as it was — is asked in
-    /// words that promise no set-aside (S6's review): <c>SLOT 2 CANNOT BE READ - IF
-    /// IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS</c>. It
-    /// is still asked, never skipped: a file another program held while the list was
-    /// read can load a moment later, and then the autosave is set aside.
-    /// </para>
-    /// </summary>
-    /// <param name="slot">The manual slot being loaded.</param>
-    /// <param name="autosavePlace">What the autosave holds (<see cref="SlotText.Summary"/>).</param>
-    /// <param name="unreadable">The slot was listed <see cref="SlotState.Unreadable"/>: nothing of it read.</param>
-    internal static (string What, string Keys) LoadAsk(int slot, string autosavePlace, bool unreadable = false)
-    {
-        ArgumentNullException.ThrowIfNull(autosavePlace);
-        string what = unreadable
-            ? $"{SaveSlots.Label(slot)} {SlotText.CannotBeRead}{Joint}IF IT LOADS, THE AUTOSAVE IS SET ASIDE{Joint}{autosavePlace}"
-            : $"LOADING {SaveSlots.Label(slot)} SETS THE AUTOSAVE ASIDE{Joint}{autosavePlace}";
-        return (what, $"AS FILES, NEVER DELETED{Joint}{EnterOrEsc}");
     }
 }

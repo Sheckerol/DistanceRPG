@@ -48,7 +48,7 @@ public interface IBetweenRunsHost : ISaveHost
 /// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
 /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e);
 /// <see cref="PauseMenu"/>): 1 closes it, 2 opens the save list — between runs is
-/// always a safe point — and 3 quits to the title, the host writing the autosave
+/// always a safe point — and 3 quits to the title, the host writing the campaign's slot
 /// first (<see cref="ISaveHost.QuitToTitle"/>), or, in a dev-override session,
 /// which has no title, closes the game. <strong>While the menu is up every key is
 /// its</strong> — 1, 2 and 3 act and every other key does nothing, so ENTER never
@@ -267,7 +267,7 @@ public sealed class BetweenRunsScene : Scene
                 break;
             case PauseAction.OpenSaves:
                 var listing = _host.Slots();
-                _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing));
+                _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing), _host.OwnSlot);
                 Log.Info("[Save] The save list: " + string.Join("; ", _saves.Rows.Select(row => $"{SaveSlots.Label(row.Number)} {row.State}")));
                 break;
             case PauseAction.Refuse:

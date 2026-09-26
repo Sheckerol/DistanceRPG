@@ -22,11 +22,14 @@ namespace GameEngine.DistanceRPG;
 /// aside, by its full path, and how to try it again — and a notice cut off
 /// there would hide the one thing the player has to act on. A floor a saved run
 /// resumes on leads with the same word, over its banner (S8's review), and so
-/// does the title, with what a load that brought nothing back set aside. Those
-/// notices are few by construction (a load sets at most three files aside: its
-/// slot's save, and the autosave's two when a manual slot's campaign makes room
-/// there; NEW CAMPAIGN two; and either says at most once that nothing is
-/// autosaved this session), so the screen hands their count in
+/// does the title, with what a load that brought nothing back set aside, or why a
+/// NEW CAMPAIGN did not begin, and each slot whose campaign a quit could not
+/// save. Those notices are few by construction (a load sets at most its own
+/// slot's two files aside — its save, then its backup — or says only that the
+/// slot takes no saves this session, since a campaign saves into the slot it
+/// came from and no load touches another slot's files (the user's ruling of
+/// 2026-09-25 on the save slots, R5); NEW CAMPAIGN sets two aside, or says why it
+/// began nothing and what would not go back), so the screen hands their count in
 /// (<see cref="Rows"/>'s <c>whole</c>) and they are shown in full, up to
 /// <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/> is for what
 /// follows them, the data files' notices, which a broken file can make as many
@@ -43,17 +46,18 @@ internal static class NoticeText
 
     /// <summary>
     /// The most rows the notices shown whole take (<see cref="Rows"/>): the save's
-    /// word on the campaign. Its common long cases — a new campaign after the save
-    /// and its backup were both set aside, or a manual slot's campaign that made
-    /// room in the autosave slot, each notice naming its file's full path — take
-    /// about seven to ten rows in the player's own save folder. Its rarest — a
-    /// manual slot resumed from its backup under other numbers, its save set aside
-    /// with a long reason, and the autosave's crashed save and its backup set aside
-    /// to make room — measured fifteen rows under a five-letter user name, one past
-    /// the ceiling, and eighteen under a twenty-letter one (Phase 5.S7). The
-    /// ceiling is kept: fifteen would put a resumed floor's banner exactly on the
-    /// two-thirds line it keeps above, with no slack, and still cut the longer
-    /// name's word. Past it the rows are cut like any others, and the log has every
+    /// word on the campaign. Its common long case — a new campaign after the save
+    /// and its backup were both set aside, each notice naming its file's full path
+    /// — takes about seven to ten rows in the player's own save folder. The rarest
+    /// measured — a manual slot resumed from its backup under other numbers, its
+    /// save set aside with a long reason, and the autosave's crashed save and its
+    /// backup set aside to make room — took fifteen rows under a five-letter user
+    /// name, one past the ceiling, and eighteen under a twenty-letter one (Phase
+    /// 5.S7). No load makes room in another slot since the user's ruling on the
+    /// save slots, so that word has lost its last two notices; the ceiling is kept
+    /// all the same: fifteen would put a resumed floor's banner exactly on the
+    /// two-thirds line it keeps above, with no slack. Past it the rows are cut like
+    /// any others, and the log has every
     /// word; with <see cref="MaxRows"/> after them and the row that counts the rest,
     /// the dungeon list still clears a 720-pixel window, and so does a resumed
     /// floor's banner, which moves down under them (<see cref="DungeonHud.BannerLine"/>).

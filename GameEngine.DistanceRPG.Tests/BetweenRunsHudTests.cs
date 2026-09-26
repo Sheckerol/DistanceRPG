@@ -393,9 +393,9 @@ public sealed class BetweenRunsHudTests : IDisposable
         // Walked through the screen itself, built with no window over a new campaign,
         // the tutorial chosen: its host records what it is asked for.
         var at = new DateTimeOffset(2026, 9, 24, 18, 10, 0, TimeSpan.Zero);
-        var saved = new SlotEntry(2, SlotState.Readable, new SlotHeader(at, 2, null, null, null), Unfinished: false, Beyond: false, AheadOfClock: false, SameAsAutosave: false);
+        var saved = new SlotEntry(2, SlotState.Readable, new SlotHeader(at, 2, null, null, null), Unfinished: false, Beyond: false, AheadOfClock: false);
         var listing = new SaveListing([.. Enumerable.Range(0, 4).Select(n => n == 2 ? saved
-            : new SlotEntry(n, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false, SameAsAutosave: false))], []);
+            : new SlotEntry(n, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false))], []);
         var host = new RecordingHost(listing);
         var scene = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), host, shownWhole: 0);
         Assert.Equal((0, false), (scene.Chosen, scene.MenuOpen));

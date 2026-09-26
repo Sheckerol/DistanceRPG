@@ -21,8 +21,11 @@ namespace GameEngine.DistanceRPG;
 /// listed or written, and no folder's spelling or order reaches the list.</item>
 /// <item><strong>A count lowered below a slot that holds a save deletes
 /// nothing</strong>: the slots above the count up to <see cref="Most"/> that hold a
-/// save or a backup are <see cref="Beyond"/> it — listed for loading, never saved
-/// into — and a count raised again makes them ordinary slots.</item>
+/// save or a backup are <see cref="Beyond"/> it — listed, loaded, and saved into
+/// by the campaign played from each, since a campaign saves into the slot it came
+/// from (the user's ruling of 2026-09-25 on the save slots, R5), but never offered
+/// to save into by hand — and a count raised again makes them ordinary
+/// slots.</item>
 /// <item><strong>One store per slot for the session</strong>
 /// (<see cref="Store"/>): made on its first ask and handed back after, so a store
 /// that refused its writes over a file that would not move
@@ -63,7 +66,8 @@ internal sealed class SaveSlots
     /// <summary>
     /// The most manual slots there can be, and so the highest slot number:
     /// <c>SaveSlots</c>' clamp ceiling, read off its key, so the two cannot drift
-    /// apart. A slot above <see cref="Count"/> and at most this is kept and listed.
+    /// apart. A slot above <see cref="Count"/> and at most this is kept, listed and
+    /// played.
     /// </summary>
     public static int Most { get; } = ((IntKey)TuningSchema.Find(nameof(Tuning.SaveSlots))!).Max;
 
@@ -96,7 +100,7 @@ internal sealed class SaveSlots
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 0 to <see cref="Most"/>.</exception>
     public SaveSlot Slot(int number) => new(Store(number), number);
 
-    /// <summary>The manual slots above <see cref="Count"/> — up to <see cref="Most"/> — that hold a save or a backup, in number order: kept where they are, listed, and never saved into.</summary>
+    /// <summary>The manual slots above <see cref="Count"/> — up to <see cref="Most"/> — that hold a save or a backup, in number order: kept where they are, listed, and saved into only by the campaign played from each.</summary>
     public IReadOnlyList<int> Beyond()
         => Enumerable.Range(Count + 1, Most - Count).Where(number => Store(number) is { } store && (store.HasSave || store.HasBackup)).ToList();
 

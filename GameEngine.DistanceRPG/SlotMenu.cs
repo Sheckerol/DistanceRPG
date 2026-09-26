@@ -8,7 +8,7 @@ internal enum SlotMenuMode
     /// <summary>Loading: every slot listed, a slot that holds something chosen to be loaded.</summary>
     Load,
 
-    /// <summary>Saving by hand: the autosave shown and never chosen, the manual slots to the count chosen to be saved into, asking before one that holds anything.</summary>
+    /// <summary>Saving by hand: the campaign's own slot and the autosave shown and never chosen, the other manual slots to the count chosen to be saved into, asking before one that holds anything.</summary>
     Save,
 }
 
@@ -24,7 +24,7 @@ internal enum SlotStep
     /// <summary>A slot that holds something was chosen on the save list, which asks first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
     Asking,
 
-    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or asks first; or saves into it.</summary>
+    /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or saves into it.</summary>
     Chosen,
 
     /// <summary>A slot the list cannot take was asked for, and the list says so (<see cref="SlotMenu.Said"/>).</summary>
@@ -47,22 +47,27 @@ internal enum SlotStep
 /// ENTER takes the one chosen; a slot that holds nothing is refused with
 /// <c>SLOT 2 IS EMPTY</c>, which stays until the next key; ESC goes back. A slot
 /// that holds files none of which reads can be chosen: its load sets them aside
-/// and brings nothing back, and the title says so. The list decides nothing about
-/// the autosave: whether loading a slot sets it aside first is its owner's ask.
+/// and brings nothing back, and the title says so. A slot is loaded at once: the
+/// campaign it brings back saves into it from then on (the user's ruling of
+/// 2026-09-25 on the save slots, R5), and no other slot is touched.
 /// </para>
 /// <para>
-/// <strong>Save mode</strong>, the menus' SAVE GAME: the autosave's row, shown
-/// and never chosen — it saves itself — then the manual slots 1 to the count; a
-/// slot beyond the count keeps its save for loading and is never offered here. W/S
-/// or the arrows move over the manual slots, round the ends; a digit takes its
-/// slot and ENTER the one chosen. An empty slot is chosen at once. One that holds
-/// anything asks first (<see cref="Asking"/>, R2(d): "saving into an occupied slot
-/// asks before overwriting") — over a save that reads, whether to save over it;
-/// over one that cannot be read, whether to set it aside and save there — and
-/// <strong>only ENTER says yes</strong>: the slot's digit again, N, ESC and every
-/// other key say no and are spent, as on the title. 0 and a digit above the count
-/// are refused, saying why. The choice starts on the first empty slot, so an
-/// ENTER pressed without looking saves over nothing; with none empty, on slot 1.
+/// <strong>Save mode</strong>, the menus' SAVE GAME: the autosave's row and the
+/// campaign's own slot (<see cref="Own"/>), each shown and never chosen — the
+/// campaign's own slot ends <c>SAVES ITSELF</c>, since every save of the campaign
+/// goes there already (R5) — then the other manual slots 1 to the count; a slot
+/// beyond the count is never offered here. W/S or the arrows move over the slots
+/// that can be chosen, round the ends; a digit takes its slot and ENTER the one
+/// chosen. An empty slot is chosen at once. One that holds anything asks first
+/// (<see cref="Asking"/>, R2(d): "saving into an occupied slot asks before
+/// overwriting") — over a save that reads, whether to save over it; over one that
+/// cannot be read, whether to set it aside and save there — and <strong>only
+/// ENTER says yes</strong>: the slot's digit again, N, ESC and every other key say
+/// no and are spent, as on the title. The campaign's own slot's digit says it
+/// saves itself, a digit above the count is refused, saying why, and 0 — for a
+/// campaign that saves elsewhere — does nothing. The choice starts on the first
+/// empty slot, so an ENTER pressed without looking saves over nothing; with none
+/// empty, on the first that can be chosen.
 /// </para>
 /// </summary>
 internal sealed class SlotMenu
@@ -70,12 +75,15 @@ internal sealed class SlotMenu
     /// <param name="mode">What the list is for.</param>
     /// <param name="listing">The slots, as the listing read them.</param>
     /// <param name="count">How many manual slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
-    public SlotMenu(SlotMenuMode mode, SaveListing listing, int count)
+    /// <param name="own">Saving: the slot the campaign in play saves into (<see cref="ISaveHost.OwnSlot"/>), shown and never chosen. The autosave's by default.</param>
+    public SlotMenu(SlotMenuMode mode, SaveListing listing, int count, int own = SaveSlots.Autosave)
     {
         ArgumentNullException.ThrowIfNull(listing);
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(own);
         Mode = mode;
         Count = count;
+        Own = own;
         Rows = listing.Slots
             .Where(slot => mode == SlotMenuMode.Load || !slot.Beyond)
             .OrderBy(slot => slot.Number)
@@ -113,10 +121,13 @@ internal sealed class SlotMenu
     /// <summary>How many manual slots there are.</summary>
     public int Count { get; }
 
+    /// <summary>Saving: the slot the campaign in play saves into, which the list shows and never offers.</summary>
+    public int Own { get; }
+
     /// <summary>The slots, top to bottom: the autosave, the manual slots to the count, then — loading — any beyond it that hold a save.</summary>
     public IReadOnlyList<SlotEntry> Rows { get; }
 
-    /// <summary>The index of the row chosen now — always one a key can take: loading, one that holds something; saving, a manual slot — or -1 when there is none.</summary>
+    /// <summary>The index of the row chosen now — always one a key can take (<see cref="Choosable"/>) — or -1 when there is none.</summary>
     public int Cursor { get; private set; }
 
     /// <summary>The slot the last key chose, by number, or null: set by a <see cref="SlotStep.Chosen"/> step, cleared by the next key.</summary>
@@ -164,8 +175,10 @@ internal sealed class SlotMenu
         int row = IndexOf(digit);
         if (Mode == SlotMenuMode.Save)
         {
+            if (digit == Own)
+                return Refuse(SlotText.SlotSavesItself(Own));
             if (digit == SaveSlots.Autosave)
-                return Refuse(SlotText.AutosaveSavesItself);
+                return SlotStep.None;   // never offered, and not the campaign's: nothing to say
             return row >= 0 ? Take(row) : Refuse(SlotText.NotOffered(digit, Count));
         }
         return row >= 0 && Rows[row].State != SlotState.Empty ? Take(row) : Refuse(SlotText.IsEmpty(digit));
@@ -180,9 +193,12 @@ internal sealed class SlotMenu
     /// </summary>
     internal static int? Digit(Keys key) => key is >= Keys.D0 and <= Keys.D9 ? key - Keys.D0 : null;
 
-    /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; saving, a manual slot, the empty ones included.</summary>
-    private bool Choosable(SlotEntry row)
-        => Mode == SlotMenuMode.Save ? row.Number != SaveSlots.Autosave : row.State != SlotState.Empty;
+    /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; saving, a manual slot other than the campaign's own, the empty ones included. A row no key can take is drawn dimmed.</summary>
+    internal bool Choosable(SlotEntry row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return Mode == SlotMenuMode.Save ? row.Number != SaveSlots.Autosave && row.Number != Own : row.State != SlotState.Empty;
+    }
 
     private SlotStep Move(int step)
     {

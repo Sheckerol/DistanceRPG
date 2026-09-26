@@ -11,17 +11,22 @@ namespace GameEngine.DistanceRPG;
 /// <strong>A save by hand is only asked for</strong>, as the autosaves are
 /// (<see cref="IRunHost.RequestSave"/>): the host writes it once the frame is
 /// over, re-asking the safe point there (<c>CampaignBoot.SaveTo</c>), and tells the
-/// screen how it went — the words the menu draws under itself. <strong>Leaving
-/// play</strong> is the host's too: the autosave written through the window close's
-/// own door, then the title. A dev-override session has no title
-/// (<see cref="HasTitle"/>): it saves only its scratch slot, and its menu quits the
-/// game instead.
+/// screen how it went — the words the menu draws under itself. The campaign's own
+/// slot, which every save of it goes into already (the user's ruling of 2026-09-25
+/// on the save slots, R5), is shown on the list and never offered
+/// (<see cref="OwnSlot"/>). <strong>Leaving play</strong> is the host's too: the
+/// campaign's slot written through the window close's own door, then the title. A
+/// dev-override session has no title (<see cref="HasTitle"/>): it saves only its
+/// scratch slot, and its menu quits the game instead.
 /// </para>
 /// </summary>
 public interface ISaveHost
 {
     /// <summary>The save folder's slots as they stand now, read afresh (the listing never moves a file): what the save list offers. A dev-override session has none to offer.</summary>
     SaveListing Slots();
+
+    /// <summary>The slot the campaign in play saves into, by number — the one it was loaded from or begun in — which the save list shows as saving itself and never offers; 0 for the autosave, and for a dev override's scratch slot, which has no list.</summary>
+    int OwnSlot { get; }
 
     /// <summary>
     /// Save the campaign into manual slot <paramref name="slot"/>, chosen on the save
@@ -31,9 +36,9 @@ public interface ISaveHost
     void SaveToSlot(int slot);
 
     /// <summary>
-    /// Leave play for the title: the autosave written as the window's close writes
-    /// it — a quit during the enemies' turn played out to the next player turn
-    /// first — the campaign dropped, and the title shown. Never asked in a
+    /// Leave play for the title: the campaign's slot written as the window's close
+    /// writes it — a quit during the enemies' turn played out to the next player
+    /// turn first — the campaign dropped, and the title shown. Never asked in a
     /// dev-override session, whose menu closes the game instead.
     /// </summary>
     void QuitToTitle();

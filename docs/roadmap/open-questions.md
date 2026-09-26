@@ -290,31 +290,6 @@ starts at; or split a weapon's starting capacity into a key of its own,
 un-ruling the Phase 2 pass's one key. settled.md's Phase 5 implementation pass
 records the ruling.
 
-## Where a campaign loaded from a manual slot autosaves (the save model, R2) — USER DECISION 2
-
-The user's ruling of 2026-09-25 on the save model (R2, settled.md) gives the
-game one autosave slot, "that keeps saving on its own exactly where the game
-autosaves today", beside manual slots saved by hand. It does not say where a
-campaign loaded from a manual slot autosaves.
-
-**Shipped provisionally: into the one autosave slot**, R2(b) read literally:
-load slot 2 and play, and the autosaves follow slot 2's campaign into the
-autosave slot, while slot 2 changes only when saved into by hand. Nothing is lost
-to it silently. Left at that, the autosave slot's own campaign — for a player who
-never saved by hand, their only copy — would be the backup after the first
-autosave and gone after the second, so a load of a manual slot while the
-autosave slot holds any other save asks first — `LOADING SLOT 2 SETS THE
-AUTOSAVE ASIDE - ...` / `AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and,
-once slot 2's campaign has come back, sets the autosave's save and backup aside
-(`campaign.replaced-N.json`, or `unreadable` or `crashed` as a load would name
-them), never deleted. A slot holding the autosave's own save asks nothing.
-
-**This decides what a manual slot is, so it is the user's to decide.** The
-alternative: a loaded manual slot autosaves into itself, the autosave slot kept
-for the last campaign begun or continued there — no ask and no file set aside,
-but a manual slot is then written by the game, and not by hand alone.
-settled.md's Phase 5 implementation pass records the ruling.
-
 ## What NEW CAMPAIGN does to a held autosave (the save model, R2) — USER DECISION 3
 
 The ruling asks NEW CAMPAIGN to "confirm before it can overwrite anything, and
@@ -330,3 +305,26 @@ new one's. The manual slots are untouched.
 to decide.** The alternative: it asks, then saves over the autosave, the old save
 kept one save deep as the backup and then gone. settled.md's Phase 5
 implementation pass records the ruling.
+
+## Whether a slot above the count may be played in place (the save slots, R5) — SLOT DECISION 1
+
+The user's ruling of 2026-09-25 on the save slots (R5, settled.md) binds a
+campaign to the slot it was loaded from or begun in: "you choose a save slot and
+any saving happens on that save slot". A slot above `tuning.json`'s `SaveSlots`
+— one that holds a save from before the count was lowered — was listed for
+loading and never saved into (R2). Loading it is choosing it, so under R5 a
+campaign loaded from it saves into it: that follows from the ruling, and no
+second choice of a slot is offered. What the words leave open is whether such a
+slot may be played at all.
+
+**Shipped provisionally: yes.** It is loaded and continued like any slot, and
+LOAD GAME marks it `BEYOND THE 3 SLOTS`, no longer `- LOAD ONLY` and no longer
+dimmed. NEW CAMPAIGN never begins a campaign there and the save list never
+offers it, so the count limits where campaigns begin and where one is saved by
+hand, and lowering the count strands nothing.
+
+**This decides what the slot count limits, so it is the user's to decide.** The
+alternative: it stays load-only, as R2's folder had it — loading it first moves
+its campaign into the lowest empty slot within the count, which is then its
+slot, and with none empty it does not load, saying `SLOT 5 IS BEYOND THE 3
+SLOTS`. settled.md's Phase 5 implementation pass records the ruling.

@@ -472,9 +472,10 @@ public sealed record Tuning
     /// of saves should live on the tuning.json so that we don't need to fix the
     /// code every time I change my mind". At least one, so saving by hand always
     /// has somewhere to go, and at most nine, a digit picking each. A count lowered
-    /// below a slot that holds a save deletes nothing: the slot is kept, listed for
-    /// loading and never saved into. The launcher reads it, never a rule of play,
-    /// so a save's hash leaves it out (<see cref="TuningKey.Played"/>).
+    /// below a slot that holds a save deletes nothing: the slot is kept, listed, and
+    /// goes on saving the campaign played from it; NEW CAMPAIGN never offers it. The
+    /// launcher reads it, never a rule of play, so a save's hash leaves it out
+    /// (<see cref="TuningKey.Played"/>).
     /// </summary>
     public int SaveSlots { get; init; }
 }

@@ -14,14 +14,14 @@ public interface ITitleHost
 {
     /// <summary>
     /// Load slot <paramref name="slot"/> (0 the autosave) and play the campaign it
-    /// brings back — setting a different autosave aside first when the title asked
-    /// to (<see cref="SaveListing.NeedsRoom"/>) — or, when nothing comes back, show
-    /// the title again saying why. Called once, never while the engine is fading
-    /// between scenes.
+    /// brings back, which saves into that slot from then on (the user's ruling of
+    /// 2026-09-25 on the save slots, R5) — no other slot is touched — or, when
+    /// nothing comes back, show the title again saying why. Called once, never
+    /// while the engine is fading between scenes.
     /// </summary>
     void LoadSlot(int slot);
 
-    /// <summary>Begin a campaign with the starting party: the autosave's files set aside, never deleted, the new campaign saved at once, and the screen between runs over it. Called once, never mid-fade.</summary>
+    /// <summary>Begin a campaign with the starting party: the autosave's files set aside, never deleted, the new campaign saved there before it is played, and the screen between runs over it — or, when it cannot be saved there, the title again saying why, the files put back. Called once, never mid-fade.</summary>
     void BeginNewCampaign();
 
     /// <summary>Close the game: no campaign is in play at the title, so nothing is saved.</summary>
@@ -64,9 +64,6 @@ internal enum TitleAsk
 
     /// <summary>NEW CAMPAIGN, which sets the autosave aside (USER DECISION 3).</summary>
     NewCampaign,
-
-    /// <summary>Loading a manual slot, which sets a different autosave aside (USER DECISION 2).</summary>
-    Load,
 }
 
 /// <summary>
@@ -86,15 +83,11 @@ internal enum TitleAsk
 /// campaign sets them aside (USER DECISION 3).</item>
 /// <item><strong>LOAD GAME</strong> opens the slot list (<see cref="SlotMenu"/>),
 /// in the options' place.</item>
-/// <item><strong>A manual slot chosen while the autosave holds a different
-/// campaign asks first</strong> (<see cref="SaveListing.NeedsRoom"/>; USER
-/// DECISION 2) — whether it was chosen from the list or is CONTINUE's — since the
-/// campaign it loads autosaves into the autosave slot, and the one there is set
-/// aside, never deleted, before that can happen. A slot listed <c>CANNOT BE
-/// READ</c> is asked too, in words that promise no set-aside
-/// (<see cref="TitleText.LoadAsk"/>): its load most likely brings nothing back,
-/// but a file another program held while the list was read can load a moment
-/// later.</item>
+/// <item><strong>A slot chosen loads at once</strong> — from the list, or
+/// CONTINUE's — asking nothing: the campaign it brings back saves into that slot
+/// from then on (the user's ruling of 2026-09-25 on the save slots, R5), and no
+/// other slot is set aside. The load list's keys line says so, where the choice
+/// is made (<see cref="TitleText.LoadKeysLine"/>).</item>
 /// <item><strong>An ask takes exactly the next key, and only ENTER says
 /// yes</strong>: every other key — N, Y, the arrows, a digit — says no and is
 /// spent doing so, so a player pressing N to mean no keeps what the ask named.
@@ -118,7 +111,7 @@ internal sealed class TitleMenu
     /// <summary>The slots the title offers, as they were read when it opened.</summary>
     public SaveListing Listing { get; }
 
-    /// <summary>How many manual slots there are: those the listing holds up to the count, beyond which a slot is load-only.</summary>
+    /// <summary>How many manual slots there are: those the listing holds up to the count, beyond which a slot is listed as beyond it.</summary>
     public int Count { get; }
 
     /// <summary>The option chosen now, as its index in <see cref="Options"/>.</summary>
@@ -129,9 +122,6 @@ internal sealed class TitleMenu
 
     /// <summary>The ask being put, or <see cref="TitleAsk.None"/>.</summary>
     public TitleAsk Ask { get; private set; }
-
-    /// <summary>The slot a load ask would load; meaningful only while <see cref="Ask"/> is <see cref="TitleAsk.Load"/>.</summary>
-    public int AskSlot { get; private set; }
 
     /// <summary>Whether an ask is up: the next key is its alone.</summary>
     public bool Asking => Ask != TitleAsk.None;
@@ -151,9 +141,8 @@ internal sealed class TitleMenu
         if (Asking)
         {
             bool yes = key is Keys.Enter or Keys.KeyPadEnter;
-            var asked = Ask == TitleAsk.NewCampaign ? new TitleStep(TitleAction.NewCampaign) : new TitleStep(TitleAction.Load, AskSlot);
             Ask = TitleAsk.None;
-            return yes ? asked : default;
+            return yes ? new TitleStep(TitleAction.NewCampaign) : default;
         }
 
         if (Loading is { } list)
@@ -161,7 +150,7 @@ internal sealed class TitleMenu
             switch (list.Press(key))
             {
                 case SlotStep.Chosen:
-                    return Choose(list.Chosen!.Value);
+                    return new TitleStep(TitleAction.Load, list.Chosen!.Value);
                 case SlotStep.Back:
                     Loading = null;
                     break;
@@ -209,7 +198,7 @@ internal sealed class TitleMenu
         switch (Options[Cursor])
         {
             case TitleOption.Continue:
-                return Listing.Newest is { } newest ? Choose(newest.Number) : default;
+                return Listing.Newest is { } newest ? new TitleStep(TitleAction.Load, newest.Number) : default;
             case TitleOption.NewCampaign:
                 if (Listing.Autosave.State == SlotState.Empty)
                     return new TitleStep(TitleAction.NewCampaign);
@@ -221,16 +210,6 @@ internal sealed class TitleMenu
             default:
                 return new TitleStep(TitleAction.Quit);
         }
-    }
-
-    /// <summary>Load <paramref name="slot"/> — asking first when that sets a different autosave aside.</summary>
-    private TitleStep Choose(int slot)
-    {
-        if (!Listing.NeedsRoom(slot))
-            return new TitleStep(TitleAction.Load, slot);
-        Ask = TitleAsk.Load;
-        AskSlot = slot;
-        return default;
     }
 
     /// <summary>The option one step from the chosen one, up or down, round the ends, past CONTINUE while it is off.</summary>
@@ -251,10 +230,11 @@ internal sealed class TitleMenu
 /// The title screen (the user's ruling of 2026-09-25 on the save model, R2(a)):
 /// the game opens on it, unless a dev override boots straight into play or
 /// <c>--new-campaign</c> begins a campaign at launch. <c>DISTANCE RPG</c> across
-/// the top; under it what the game has to say — the data files' notices, that
-/// the last time play was left the autosave could not be written, a slot's file
-/// the file system would not let the game read, and, back from a load that
-/// brought nothing back, why — the save's word whole and the rest capped
+/// the top; under it what the game has to say — the data files' notices, each
+/// slot whose campaign could not be saved the last time play was left, a slot's
+/// file the file system would not let the game read, and, back from a load that
+/// brought nothing back or a NEW CAMPAIGN that did not begin, why — the save's
+/// word whole and the rest capped
 /// (<see cref="NoticeText.Rows"/>); then the options (<see cref="TitleMenu"/>) or
 /// the load list in their place; the keys, or an ask, along the bottom.
 /// <para>
@@ -371,7 +351,7 @@ public sealed class TitleScene : Scene
         }
     }
 
-    /// <summary>An ask, for the log.</summary>
-    private string Asked(TitleAsk ask)
-        => ask == TitleAsk.NewCampaign ? "NEW CAMPAIGN over the autosave" : $"Loading {SaveSlots.Label(Menu.AskSlot)} over the autosave";
+    /// <summary>An ask, for the log: NEW CAMPAIGN's, the one there is.</summary>
+    private static string Asked(TitleAsk ask)
+        => ask == TitleAsk.NewCampaign ? "NEW CAMPAIGN over the autosave" : throw new ArgumentOutOfRangeException(nameof(ask), ask, "No ask is being put.");
 }

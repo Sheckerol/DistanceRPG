@@ -44,10 +44,9 @@ public sealed record SlotHeader(DateTimeOffset? SavedAt, int RunCounter, string?
 /// <param name="State">What it holds.</param>
 /// <param name="Header">The header of the file a load would bring back — the save's, or the backup's when the slot is <see cref="SlotState.FromBackup"/> — or null when nothing reads.</param>
 /// <param name="Unfinished">Its resume marker is there: the last load of it never finished, and the next sets the save it guarded aside as crashed.</param>
-/// <param name="Beyond">A manual slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed for loading, never saved into.</param>
+/// <param name="Beyond">A manual slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to save into by hand.</param>
 /// <param name="AheadOfClock">Its time is more than a day ahead of the clock the listing was read at: shown, and counted as no time when the newest save is chosen.</param>
-/// <param name="SameAsAutosave">A manual slot whose text a load would bring back is, but for its time, the autosave's own save: continuing it is continuing the autosave. Always false for the autosave itself.</param>
-public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock, bool SameAsAutosave);
+public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock);
 
 /// <summary>
 /// Every slot of the save folder and what each holds (the user's ruling of
@@ -82,7 +81,7 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     /// <summary>The autosave's entry — always listed, first — or an empty one for a listing that leaves it out.</summary>
     public SlotEntry Autosave
         => Slots.FirstOrDefault(slot => slot.Number == SaveSlots.Autosave)
-            ?? new SlotEntry(SaveSlots.Autosave, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false, SameAsAutosave: false);
+            ?? new SlotEntry(SaveSlots.Autosave, SlotState.Empty, null, Unfinished: false, Beyond: false, AheadOfClock: false);
 
     /// <summary>
     /// The most recent save — what CONTINUE loads — or null when no slot would load
@@ -105,21 +104,6 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
             }
             return newest;
         }
-    }
-
-    /// <summary>
-    /// Whether loading slot <paramref name="slot"/> means setting the autosave
-    /// aside first: a manual slot, while the autosave holds something and that is
-    /// not this slot's own save. The loaded campaign autosaves into the autosave
-    /// slot, so a different campaign there would be the backup after one autosave
-    /// and gone after the second; so the load asks, then sets it aside, never
-    /// deleted. The one question the asking and the loading both read.
-    /// </summary>
-    public bool NeedsRoom(int slot)
-    {
-        if (slot == SaveSlots.Autosave || Autosave.State == SlotState.Empty)
-            return false;
-        return Slots.FirstOrDefault(entry => entry.Number == slot) is not { SameAsAutosave: true };
     }
 
     /// <summary>The time a slot's choice is made by: its save's, unless there is none or it is ahead of the clock.</summary>
@@ -150,25 +134,20 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     {
         ArgumentNullException.ThrowIfNull(slots);
         var notices = new List<string>();
-        var found = Enumerable.Range(SaveSlots.Autosave, slots.Count + 1).Concat(slots.Beyond())
+        var entries = Enumerable.Range(SaveSlots.Autosave, slots.Count + 1).Concat(slots.Beyond())
             .Select(number => ReadSlot(slots, number, notices, report))
-            .ToList();
-
-        // The autosave's own save as it stands, untimed: what a manual slot is the same as.
-        string? autosave = found[0].SaveText is { } text ? SaveCodec.Untimed(text) : null;
-        var entries = found.Select(slot => new SlotEntry(
+            .Select(slot => new SlotEntry(
                 slot.Number, slot.State, slot.Header, slot.Unfinished,
                 Beyond: slot.Number > slots.Count,
-                AheadOfClock: slot.Header?.SavedAt is { } at && at.UtcDateTime > (now + ClockSlack).UtcDateTime,
-                SameAsAutosave: slot.Number != SaveSlots.Autosave && autosave is not null && slot.LoadText is { } load && SaveCodec.Untimed(load) == autosave))
+                AheadOfClock: slot.Header?.SavedAt is { } at && at.UtcDateTime > (now + ClockSlack).UtcDateTime))
             .ToList();
         foreach (var entry in entries.Where(entry => entry.State != SlotState.Empty))
             report?.Invoke($"[Save] {SaveSlots.Label(entry.Number)}: {Describe(entry)}");
         return new SaveListing(entries, notices);
     }
 
-    /// <summary>A slot as read: what it holds and the header of what would load, the texts of its save and of what would load, and whether its last load finished.</summary>
-    private sealed record Found(int Number, SlotState State, SlotHeader? Header, bool Unfinished, string? SaveText, string? LoadText);
+    /// <summary>A slot as read: what it holds, the header of what would load, and whether its last load finished.</summary>
+    private sealed record Found(int Number, SlotState State, SlotHeader? Header, bool Unfinished);
 
     private static Found ReadSlot(SaveSlots slots, int number, List<string> notices, Action<string>? report)
     {
@@ -176,16 +155,16 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
         bool unfinished = store.WasResuming;
         bool saveThere = store.HasSave, backupThere = store.HasBackup;
         if (!saveThere && !backupThere)
-            return new Found(number, SlotState.Empty, null, unfinished, null, null);
+            return new Found(number, SlotState.Empty, null, unfinished);
 
         string? save = Text(store, number, backup: false, notices, report);
         if (save is not null && HeaderOf(save) is { } header)
-            return new Found(number, SlotState.Readable, header, unfinished, save, save);
+            return new Found(number, SlotState.Readable, header, unfinished);
 
         string? backup = Text(store, number, backup: true, notices, report);
         if (backup is not null && HeaderOf(backup) is { } older)
-            return new Found(number, SlotState.FromBackup, older, unfinished, save, backup);
-        return new Found(number, SlotState.Unreadable, null, unfinished, save, null);
+            return new Found(number, SlotState.FromBackup, older, unfinished);
+        return new Found(number, SlotState.Unreadable, null, unfinished);
     }
 
     /// <summary>The save's, or the backup's, text; null when it is not there, or when the file system will not let it be read — which is said, since no row can say why.</summary>
@@ -246,7 +225,6 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
                 + (header.DungeonId is { } dungeon ? $", a run in progress in {dungeon}, floor {header.Floor?.ToString(CultureInfo.InvariantCulture) ?? "?"}, turn {header.Turn?.ToString(CultureInfo.InvariantCulture) ?? "?"}" : ", between runs");
         return state + where
             + (entry.Unfinished ? " - its last load did not finish" : "")
-            + (entry.Beyond ? " - beyond the slot count, kept for loading" : "")
-            + (entry.SameAsAutosave ? " - the autosave's own save" : "");
+            + (entry.Beyond ? " - beyond the slot count, kept, and saved into by its own campaign" : "");
     }
 }

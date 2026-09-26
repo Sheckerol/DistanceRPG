@@ -1492,6 +1492,8 @@ public sealed class HudTextTests : IDisposable
 
         public SaveListing Slots() => throw new InvalidOperationException("A scene built to be read is never played, so its menu never lists the slots.");
 
+        public int OwnSlot => throw new InvalidOperationException("A scene built to be read is never played, so its menu never lists the slots.");
+
         public void SaveToSlot(int slot) => throw new InvalidOperationException("A scene built to be read is never played, so it never saves by hand.");
 
         public void QuitToTitle() => throw new InvalidOperationException("A scene built to be read is never played, so it is never left.");

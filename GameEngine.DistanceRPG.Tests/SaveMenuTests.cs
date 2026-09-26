@@ -52,7 +52,7 @@ public sealed class SaveMenuTests : IDisposable
 
     private static SlotEntry Slot(int number, SlotState state = SlotState.Readable, SlotHeader? header = null, bool unfinished = false,
         bool beyond = false, bool ahead = false)
-        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead, SameAsAutosave: false);
+        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead);
 
     /// <summary>A listing of the autosave and slots 1 to <paramref name="count"/>, each as given or empty, and any given beyond them.</summary>
     private static SaveListing Listing(int count, params SlotEntry[] slots)
@@ -356,6 +356,44 @@ public sealed class SaveMenuTests : IDisposable
         scene.AnyKey(Keys.D1);
         Assert.Equal([2, 1], host.SavedTo);
         Assert.Equal((true, false), (scene.PauseMenuOpen, scene.SavesOpen));               // the 1 saved, and closed nothing more
+
+        // The user's ruling on the save slots (R5): a campaign saves into the slot it
+        // came from, so the list is keyed to that slot (ISaveHost.OwnSlot) — here slot
+        // 2, loaded. Its row ends SAVES ITSELF and is never chosen, its digit says so,
+        // and 0 — the autosave's row, shown and never chosen as ever — does nothing
+        // for a campaign that saves elsewhere. W/S pass over both. The cursor starts on
+        // the lowest empty slot other than the campaign's own. Another slot chosen
+        // takes a copy, and the campaign goes on saving into slot 2.
+        var bound = new SlotMenu(SlotMenuMode.Save, listing, 3, own: 2);
+        Assert.Equal([0, 1, 2, 3], bound.Rows.Select(row => row.Number));
+        Assert.Equal((2, 1), (bound.Own, bound.Rows[bound.Cursor].Number));
+        Assert.Equal([false, true, false, true], bound.Rows.Select(bound.Choosable));
+        int WalkedBound(Keys key)
+        {
+            bound.Press(key);
+            return bound.Rows[bound.Cursor].Number;
+        }
+        Assert.Equal([3, 1, 3, 1], new[] { Keys.S, Keys.S, Keys.W, Keys.Down }.Select(WalkedBound));
+        Assert.Equal((SlotStep.Refused, "SLOT 2 SAVES ITSELF", (int?)null, (SlotEntry?)null), (bound.Press(Keys.D2), bound.Said, bound.Chosen, bound.Asking));
+        Assert.Equal((SlotStep.None, (string?)null, (int?)null), (bound.Press(Keys.D0), bound.Said, bound.Chosen));
+        Assert.Equal((SlotStep.Chosen, (int?)1), (bound.Press(Keys.D1), bound.Chosen));
+        Assert.Equal((SlotStep.Refused, "SLOT 5 IS BEYOND THE 3 SLOTS"), (bound.Press(Keys.D5), bound.Said));
+        Assert.Equal((SlotStep.Asking, 3), (bound.Press(Keys.D3), bound.Asking!.Number));
+        Assert.Equal("SLOT 2 - BETWEEN RUNS - 2 RUNS - 2026-09-24 20:10 - SAVES ITSELF", SlotText.Rows(listing.Slots[2], 3, Dungeons, PlusTwo, SlotMenuMode.Save, own: 2)[0]);
+        Assert.Equal("AUTOSAVE - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-24 20:10", SlotText.Rows(listing.Slots[0], 3, Dungeons, PlusTwo, SlotMenuMode.Save, own: 2)[0]);
+        Assert.Equal(("THE AUTOSAVE SAVES ITSELF", "SLOT 9 SAVES ITSELF"), (SlotText.SlotSavesItself(SaveSlots.Autosave), SlotText.SlotSavesItself(9)));
+        var boundRows = TitleHud.SlotRows(new SlotMenu(SlotMenuMode.Save, listing, 3, own: 2), W, 0f, Dungeons, PlusTwo);
+        Assert.Equal([DungeonHud.DarkGrey, DungeonHud.Yellow, DungeonHud.DarkGrey, DungeonHud.White],
+            boundRows.Where(row => !row.Text.StartsWith("    ", StringComparison.Ordinal)).Select(row => row.Color));
+        var skipsOwn = new SlotMenu(SlotMenuMode.Save, Listing(3, Slot(1)), 3, own: 2);
+        Assert.Equal(3, skipsOwn.Rows[skipsOwn.Cursor].Number);   // slots 2 and 3 empty: the lowest empty other than the campaign's own
+        var boundHost = new RecordingHost(listing, ownSlot: 2);
+        var boundScene = new DungeonScene(camera: null!, game: null!, Entered(), boundHost);
+        boundScene.HandleEscape();
+        boundScene.AnyKey(Keys.D2);
+        Assert.Equal((2, 1), (boundScene.SaveList!.Own, boundScene.SaveList.Rows[boundScene.SaveList.Cursor].Number));
+        boundScene.AnyKey(Keys.D2);
+        Assert.Equal(("SLOT 2 SAVES ITSELF", 0), (boundScene.SaveList!.Said, boundHost.SavedTo.Count));
     }
 
     [Fact]
@@ -821,42 +859,6 @@ public sealed class SaveMenuTests : IDisposable
     }
 
     [Fact]
-    public void ASaveByHandThenAQuitWithNothingPlayedContinuesTheSlot()
-    {
-        InTempFolder(folder =>
-        {
-            // S7's review, accepted as it stands (settled.md, R2, saving by hand): a
-            // save by hand into an empty slot, then QUIT TO TITLE with nothing played
-            // since. The autosave holds that campaign already, so the quit writes
-            // nothing and the autosave keeps the time its state was first written (R2,
-            // the folder), while the slot carries the later time of the save by hand:
-            // CONTINUE — the most recent save by its own time — names the slot. It holds
-            // the autosave's own campaign, so loading it asks nothing and sets nothing
-            // aside, and the campaign it brings back is the autosave's.
-            var slots = new SaveSlots(folder, 3);
-            var autosave = slots.Store(SaveSlots.Autosave);
-            var campaign = Retreated();
-            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign, savedAt: At));   // the autosave at the turn's start
-            Assert.Equal((true, "SAVED TO SLOT 1"), CampaignBoot.SaveTo(slots.Slot(1), campaign, view: null, savedAt: At.AddMinutes(1)));
-            int told = 0;
-            Assert.True(CampaignBoot.SaveOnQuit(slots.Slot(SaveSlots.Autosave), campaign, view: null, step: null, savedAt: At.AddMinutes(2), saved: () => told++));
-            Assert.Equal(1, told);   // the quit went through: the disk holds the campaign as it was left
-            Assert.False(autosave.HasBackup);   // and wrote nothing: no save rotated into the backup
-
-            var listing = SaveListing.Read(slots, At.AddMinutes(3));
-            Assert.Equal((DateTimeOffset?)At, listing.Autosave.Header!.SavedAt);
-            var newest = listing.Newest!;
-            Assert.Equal((1, true, (DateTimeOffset?)At.AddMinutes(1)), (newest.Number, newest.SameAsAutosave, newest.Header!.SavedAt));
-            Assert.False(listing.NeedsRoom(1));
-
-            var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
-            Assert.True(load.Loaded);
-            Assert.Equal(SaveCodec.Untimed(autosave.Read()!), SaveCodec.Untimed(SaveCodec.Write(SaveGame.Capture(load.Campaign!))));
-            slots.Store(1).ClearResuming();
-        });
-    }
-
-    [Fact]
     public void ADevOverrideSessionNeverSavesToASlot()
     {
         // A dev-override session plays a scratch campaign apart from the player's
@@ -868,7 +870,9 @@ public sealed class SaveMenuTests : IDisposable
         // Read off the IL: SaveToSlot asks HasTitle before it asks for anything, and
         // HasTitle is whether the session made the save folder's slots, which a dev
         // override never does; the write is the frame's end's, which reads the slots
-        // before it saves, into a slot's own store, never the session's autosave.
+        // before it saves, into a slot's own store, never through the slot the
+        // session's campaign is bound to — a dev override's, its scratch slot
+        // (SaveSlotsTests.ADevOverrideSessionNeverTouchesTheSlots).
         var game = typeof(DistanceRpgGame);
         var saveToSlot = game.GetMethod(nameof(DistanceRpgGame.SaveToSlot))!;
         var hasTitle = game.GetProperty(nameof(DistanceRpgGame.HasTitle))!.GetMethod!;
@@ -890,7 +894,7 @@ public sealed class SaveMenuTests : IDisposable
         int savedTo = writing.FindIndex(i => Same(i.Called, saveTo));
         Assert.True(readSlots >= 0 && readSlots < savedTo, "WriteRequestedSlot saves before it has read the slots");
         Assert.Contains(writing, i => Same(i.Called, typeof(SaveSlots).GetMethod(nameof(SaveSlots.Slot))!));
-        Assert.DoesNotContain(writing, i => i.Op == OpCodes.Ldfld && Names(i.Field, game.GetField("_autosave", Declared)!));
+        Assert.DoesNotContain(writing, i => i.Op == OpCodes.Ldfld && Names(i.Field, game.GetField("_slot", Declared)!));
 
         // Both screens ask the host whether it has a title before 2 does anything.
         foreach (var (scene, menu) in new[] { (typeof(DungeonScene), "NumberKey"), (typeof(BetweenRunsScene), "MenuKey") })
@@ -919,13 +923,17 @@ internal sealed class RecordingHost : IRunHost, IBetweenRunsHost
 {
     private readonly SaveListing _listing;
 
-    public RecordingHost(SaveListing listing, bool hasTitle = true)
+    public RecordingHost(SaveListing listing, bool hasTitle = true, int ownSlot = SaveSlots.Autosave)
     {
         _listing = listing;
         HasTitle = hasTitle;
+        OwnSlot = ownSlot;
     }
 
     public bool HasTitle { get; }
+
+    /// <summary>The slot the campaign in play saves into, as the host was handed it.</summary>
+    public int OwnSlot { get; }
 
     /// <summary>How many times the slots were listed.</summary>
     public int SlotsListed { get; private set; }

@@ -9,8 +9,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// Phase 5.S6): CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT, in that order;
 /// CONTINUE naming what it loads, off with nothing to load; NEW CAMPAIGN asking
 /// before it sets the autosave aside; LOAD GAME's list naming every slot, the
-/// empty ones marked; a manual slot loaded over a different autosave asking first;
-/// every ask taking ENTER alone as yes; ESC backing out, then quitting. As with
+/// empty ones marked; a slot chosen loading at once, the campaign it brings back
+/// saving into it (the user's ruling of 2026-09-25 on the save slots, R5); every
+/// ask taking ENTER alone as yes; ESC backing out, then quitting. As with
 /// <c>BetweenRunsHudTests</c>, the drawing is untested, but what it draws is: the
 /// strings, the keys, and where every row goes — all of it pure, off the menu
 /// (<see cref="TitleMenu"/>, <see cref="SlotMenu"/>), the words
@@ -45,8 +46,8 @@ public sealed class TitleTests : IDisposable
         => new(at, runs, dungeon, floor, dungeon is null ? null : 3);
 
     private static SlotEntry Slot(int number, SlotState state = SlotState.Readable, SlotHeader? header = null, bool unfinished = false,
-        bool beyond = false, bool ahead = false, bool same = false)
-        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead, same);
+        bool beyond = false, bool ahead = false)
+        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead);
 
     private static SlotEntry Empty(int number) => Slot(number, SlotState.Empty);
 
@@ -286,11 +287,13 @@ public sealed class TitleTests : IDisposable
         Assert.Equal("SLOT 1 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | ITS LAST LOAD DID NOT FINISH", Rows(Slot(1, header: Header(At, 2), unfinished: true)));
         Assert.Equal("SLOT 1 - BETWEEN RUNS - 2 RUNS - 2027-09-25 14:32 | AHEAD OF THIS CLOCK", Rows(Slot(1, header: Header(At.AddYears(1), 2), ahead: true)));
         Assert.Equal("SLOT 1 - BETWEEN RUNS - 2 RUNS | NO TIME RECORDED", Rows(Slot(1, header: Header(null, 2))));
-        Assert.Equal("SLOT 5 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | BEYOND THE 3 SLOTS - LOAD ONLY", Rows(Slot(5, header: Header(At, 2), beyond: true)));
-        Assert.Equal("SLOT 2 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | BEYOND THE 1 SLOT - LOAD ONLY", Rows(Slot(2, header: Header(At, 2), beyond: true), count: 1));
-        Assert.Equal("SLOT 9 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | FROM ITS BACKUP - ITS LAST LOAD DID NOT FINISH - AHEAD OF THIS CLOCK - BEYOND THE 3 SLOTS - LOAD ONLY",
+        // A slot above the count is marked as beyond it, and nothing more: loaded,
+        // it is chosen, and saves into itself (R5).
+        Assert.Equal("SLOT 5 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | BEYOND THE 3 SLOTS", Rows(Slot(5, header: Header(At, 2), beyond: true)));
+        Assert.Equal("SLOT 2 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | BEYOND THE 1 SLOT", Rows(Slot(2, header: Header(At, 2), beyond: true), count: 1));
+        Assert.Equal("SLOT 9 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | FROM ITS BACKUP - ITS LAST LOAD DID NOT FINISH - AHEAD OF THIS CLOCK - BEYOND THE 3 SLOTS",
             Rows(Slot(9, SlotState.FromBackup, Header(At, 2), unfinished: true, beyond: true, ahead: true)));
-        Assert.Equal("SLOT 4 - CANNOT BE READ | ITS LAST LOAD DID NOT FINISH - BEYOND THE 3 SLOTS - LOAD ONLY",
+        Assert.Equal("SLOT 4 - CANNOT BE READ | ITS LAST LOAD DID NOT FINISH - BEYOND THE 3 SLOTS",
             Rows(Slot(4, SlotState.Unreadable, unfinished: true, beyond: true)));
 
         // Nothing drawn is the file's raw text: a dungeon the content does not have is
@@ -301,8 +304,9 @@ public sealed class TitleTests : IDisposable
         Assert.Equal("NO TIME RECORDED", SlotText.When(null, PlusTwo));
 
         // The list stands in the options' place, and the notices': ten slots, each
-        // with its markers' row, the chosen one marked in yellow and the empty or
-        // beyond ones dimmed, fit a 720-pixel window between the title and the keys.
+        // with its markers' row, the chosen one marked in yellow and the empty ones
+        // dimmed — never one beyond the count, which loads like any — fit a
+        // 720-pixel window between the title and the keys.
         // (Every time here is ahead of the clock, so none counts, and the most recent
         // save is the tie's: the autosave, where the list starts.)
         var all = Enumerable.Range(0, SaveSlots.Most + 1)
@@ -319,7 +323,7 @@ public sealed class TitleTests : IDisposable
         Assert.Equal(SaveSlots.Autosave, menu.Loading!.Rows[menu.Loading.Cursor].Number);
         Assert.Equal((DungeonHud.Yellow, true), (listed[0].Color, listed[0].Text.StartsWith("> AUTOSAVE - ", StringComparison.Ordinal) && listed[0].Text.EndsWith(" <", StringComparison.Ordinal)));
         Assert.Equal((DungeonHud.White, true), (listed[2].Color, listed[2].Text.StartsWith("  SLOT 1 - ", StringComparison.Ordinal)));
-        Assert.Equal(DungeonHud.DarkGrey, listed[8].Color);   // slot 4, beyond the count
+        Assert.Equal(DungeonHud.White, listed[8].Color);   // slot 4, beyond the count: loaded like any, and played
         Assert.All(listed.Where((_, i) => i % 2 == 1), row => Assert.Equal(DungeonHud.Grey, row.Color));
         Assert.Single(listed.Select(row => row.Left).Distinct());   // one left-aligned block
         Fits(drawn);
@@ -400,7 +404,7 @@ public sealed class TitleTests : IDisposable
         Assert.Equal("AUTOSAVE IS EMPTY", (empty.Press(Keys.D0), empty.Said).Said);
 
         // Through the title: what the list said is drawn above its keys, in orange,
-        // until the next key; a slot chosen with no autosave to set aside loads.
+        // until the next key; a slot chosen loads.
         var menu = After(Listing(Slot(2, header: Header(At, 2))), Keys.S, Keys.S, Keys.Enter);
         Assert.Equal(default, menu.Press(Keys.D1));
         var drawn = Drawn(menu);
@@ -409,94 +413,29 @@ public sealed class TitleTests : IDisposable
         Assert.Equal(new TitleStep(TitleAction.Load, 2), menu.Press(Keys.D2));
         Assert.DoesNotContain(Drawn(menu), row => row.Text == "SLOT 1 IS EMPTY");
 
+        // A slot loads at once, whatever another slot holds (the user's ruling of
+        // 2026-09-25 on the save slots, R5): the campaign it brings back saves into
+        // it, and no other slot is set aside, so nothing asks — chosen from the list
+        // by its digit or by ENTER, a slot listed CANNOT BE READ too, or by CONTINUE,
+        // with the autosave holding a different campaign.
+        var others = Listing(SpearHallAutosave(), Slot(2, header: Header(At.AddHours(1), 1)), Slot(3, SlotState.Unreadable), Slot(5, header: Header(At, 4), beyond: true));
+        foreach (var (key, slot) in new[] { (Keys.D2, 2), (Keys.Enter, 2), (Keys.D3, 3), (Keys.D5, 5), (Keys.D0, SaveSlots.Autosave) })
+        {
+            var chosen = After(others, Keys.S, Keys.S, Keys.Enter);
+            Assert.Equal(new TitleStep(TitleAction.Load, slot), chosen.Press(key));
+            Assert.False(chosen.Asking);
+        }
+        var continued = new TitleMenu(others);
+        Assert.Equal((int)TitleOption.Continue, continued.Cursor);
+        Assert.Equal(new TitleStep(TitleAction.Load, 2), continued.Press(Keys.Enter));
+        Assert.False(continued.Asking);
+
         // The keys line says what the keys do (S6's review): W/S and the arrows only
         // choose, and a digit loads at once, as ENTER does — never "0-9 CHOOSE",
-        // which a player would read as a digit that only picks.
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK", TitleText.LoadKeysLine);
-    }
-
-    [Fact]
-    public void LoadingASlotOverAnotherAutosaveAsksFirst()
-    {
-        // USER DECISION 2: a manual slot's campaign autosaves into the autosave slot,
-        // so loading one while the autosave holds a different campaign asks first —
-        // from the list (a digit, or ENTER) or from CONTINUE, when the manual slot is
-        // the newest — and only ENTER loads it; every other key answers no, loads
-        // nothing, and is spent, and the list stays up.
-        var listing = Listing(SpearHallAutosave(), Slot(2, header: Header(At.AddHours(1), 1)), Slot(3, header: Header(At.AddMinutes(-5), 3), same: true));
-        Assert.True(listing.NeedsRoom(2));
-        TitleMenu AskedFromTheList(Keys choose)
-        {
-            var menu = After(listing, Keys.S, Keys.S, Keys.Enter);
-            Assert.NotNull(menu.Loading);
-            if (choose is Keys.Enter)
-                Assert.Equal(2, menu.Loading!.Rows[menu.Loading.Cursor].Number);   // the newest, where the list starts
-            Assert.Equal(default, menu.Press(choose));
-            Assert.Equal((true, TitleAsk.Load, 2), (menu.Asking, menu.Ask, menu.AskSlot));
-            return menu;
-        }
-
-        var asked = AskedFromTheList(Keys.D2);
-        Assert.Equal(("LOADING SLOT 2 SETS THE AUTOSAVE ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", "AS FILES, NEVER DELETED - ENTER: YES - ESC: NO"),
-            TitleHud.AskRows(asked, Dungeons));
-        Assert.Equal([("LOADING SLOT 2 SETS THE AUTOSAVE ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", DungeonHud.Yellow), ("AS FILES, NEVER DELETED - ENTER: YES - ESC: NO", DungeonHud.Yellow)],
-            Drawn(asked).TakeLast(2).Select(row => (row.Text, row.Color)));
-        Assert.Contains(Drawn(asked), row => row.Scale == SlotText.Scale);   // over the list, which stays
-
-        // ENTER alone loads it — then the host sets the autosave aside, once slot 2's
-        // campaign has come back (CampaignBootTests.ALoadedSlotSetsTheAutosaveAside_NeverDeleted).
-        Assert.Equal(new TitleStep(TitleAction.Load, 2), AskedFromTheList(Keys.D2).Press(Keys.Enter));
-        Assert.Equal(new TitleStep(TitleAction.Load, 2), AskedFromTheList(Keys.Enter).Press(Keys.KeyPadEnter));
-
-        foreach (var key in new[] { Keys.N, Keys.Y, Keys.D2, Keys.D0, Keys.Escape, Keys.W, Keys.S, Keys.Space, Keys.Tab })
-        {
-            var menu = AskedFromTheList(Keys.D2);
-            Assert.Equal(default, menu.Press(key));
-            Assert.False(menu.Asking);
-            Assert.NotNull(menu.Loading);
-            Assert.Equal(2, menu.Loading!.Rows[menu.Loading.Cursor].Number);   // spent: nothing moved
-        }
-        var escaped = AskedFromTheList(Keys.D2);
-        Assert.True(escaped.Escape());
-        Assert.Equal((false, true), (escaped.Asking, escaped.Loading is not null));
-
-        // CONTINUE on slot 2, the newest, asks the same from the options.
-        var continued = new TitleMenu(listing);
-        Assert.Equal((int)TitleOption.Continue, continued.Cursor);
-        Assert.Equal(default, continued.Press(Keys.Enter));
-        Assert.Equal((TitleAsk.Load, 2, (SlotMenu?)null), (continued.Ask, continued.AskSlot, continued.Loading));
-        Assert.Equal(new TitleStep(TitleAction.Load, 2), continued.Press(Keys.Enter));
-
-        // No ask when nothing would be set aside: the autosave itself chosen; a slot
-        // holding the autosave's own save (a hand save, then a quit that changed
-        // nothing); an autosave slot that holds nothing.
-        Assert.Equal(new TitleStep(TitleAction.Load, SaveSlots.Autosave), After(listing, Keys.S, Keys.S, Keys.Enter).Press(Keys.D0));
-        Assert.Equal(new TitleStep(TitleAction.Load, 3), After(listing, Keys.S, Keys.S, Keys.Enter).Press(Keys.D3));
-        var noAutosave = Listing(Slot(2, header: Header(At, 1)));
-        Assert.Equal(new TitleStep(TitleAction.Load, 2), After(noAutosave, Keys.S, Keys.S, Keys.Enter).Press(Keys.D2));
-        Assert.Equal(new TitleStep(TitleAction.Load, 2), new TitleMenu(noAutosave).Press(Keys.Enter));
-
-        // A slot none of whose files read when the list was made is asked too — a file
-        // another program held then can load a moment later, and then the autosave is
-        // set aside — but in words that promise no set-aside, since its load most
-        // likely brings nothing back and leaves the autosave as it was (S6's review).
-        // A slot resumed from its backup keeps the plain words: its load brings the
-        // backup back.
-        var unreadableToo = Listing(SpearHallAutosave(), Slot(1, SlotState.Unreadable), Slot(3, SlotState.FromBackup, Header(At, 2)));
-        Assert.True(unreadableToo.NeedsRoom(1));
-        var unreadable = After(unreadableToo, Keys.S, Keys.S, Keys.Enter);
-        Assert.Equal(default, unreadable.Press(Keys.D1));
-        Assert.Equal((true, TitleAsk.Load, 1), (unreadable.Asking, unreadable.Ask, unreadable.AskSlot));
-        Assert.Equal(("SLOT 1 CANNOT BE READ - IF IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", "AS FILES, NEVER DELETED - ENTER: YES - ESC: NO"),
-            TitleHud.AskRows(unreadable, Dungeons));
-        Assert.Equal([("SLOT 1 CANNOT BE READ - IF IT LOADS, THE AUTOSAVE IS SET ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", DungeonHud.Yellow),
-            ("AS FILES, NEVER DELETED - ENTER: YES - ESC: NO", DungeonHud.Yellow)], Drawn(unreadable).TakeLast(2).Select(row => (row.Text, row.Color)));
-        Assert.Equal(new TitleStep(TitleAction.Load, 1), unreadable.Press(Keys.Enter));   // ENTER alone tries it
-        var declined = After(unreadableToo, Keys.S, Keys.S, Keys.Enter, Keys.D1);
-        Assert.Equal((default(TitleStep), false), (declined.Press(Keys.N), declined.Asking));
-        var fromBackup = After(unreadableToo, Keys.S, Keys.S, Keys.Enter, Keys.D3);
-        Assert.Equal(("LOADING SLOT 3 SETS THE AUTOSAVE ASIDE - THE SPEAR HALL FLOOR 4 - 3 RUNS", "AS FILES, NEVER DELETED - ENTER: YES - ESC: NO"),
-            TitleHud.AskRows(fromBackup, Dungeons));
+        // which a player would read as a digit that only picks. And it says what a
+        // load means where the choice is made: play saves into the slot loaded.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK", TitleText.LoadKeysLine);
+        Assert.Equal((TitleText.LoadKeysLine, DungeonHud.Grey), (Drawn(After(others, Keys.S, Keys.S, Keys.Enter))[^1].Text, Drawn(After(others, Keys.S, Keys.S, Keys.Enter))[^1].Color));
     }
 
     [Fact]
@@ -522,21 +461,15 @@ public sealed class TitleTests : IDisposable
         // The worst markers' row: every marker that can stand together, indented.
         var everyMarker = Slot(SaveSlots.Most, SlotState.FromBackup, Header(At, 1), unfinished: true, beyond: true, ahead: true);
         string markers = SlotText.Rows(everyMarker, 3, Dungeons, PlusTwo)[1];
-        Assert.Equal(101, markers.Length);
+        Assert.Equal(89, markers.Length);
         Within($"    {markers}", SlotText.Scale);
 
-        // Each ask's two rows, at the keys line's scale: NEW CAMPAIGN's at nine slots,
-        // a load's of slot 9 — and of slot 9 listed CANNOT BE READ, the longer — each
-        // naming the worst autosave.
+        // The ask's two rows, at the keys line's scale: NEW CAMPAIGN's at nine slots,
+        // naming the worst autosave. (A load asks nothing: R5.)
         string place = SlotText.Summary(worst with { Number = SaveSlots.Autosave }, Dungeons);
-        foreach (var (what, keys) in new[]
-            {
-                TitleText.NewCampaignAsk(place, SaveSlots.Most), TitleText.LoadAsk(SaveSlots.Most, place), TitleText.LoadAsk(SaveSlots.Most, place, unreadable: true),
-            })
-        {
-            Within(what, TitleHud.KeysScale);
-            Within(keys, TitleHud.KeysScale);
-        }
+        var (what, keys) = TitleText.NewCampaignAsk(place, SaveSlots.Most);
+        Within(what, TitleHud.KeysScale);
+        Within(keys, TitleHud.KeysScale);
 
         // CONTINUE with the longest name, marked, at the options' scale; and the keys.
         var newest = worst with { Number = SaveSlots.Autosave };
@@ -551,7 +484,7 @@ public sealed class TitleTests : IDisposable
         // And laid out, every screen the title can show fits a 720-pixel window: the
         // options under the most notices the screen can be handed (the save's word
         // whole to its ceiling, three more rows and the row that counts the rest);
-        // the list of ten worst slots; each ask over them.
+        // the list of ten worst slots; the ask.
         var worstListing = new SaveListing(
             [.. Enumerable.Range(0, SaveSlots.Most + 1).Select(n => Slot(n, SlotState.FromBackup, Header(At.AddMinutes(n), 123, longest.Id, 12), unfinished: true, beyond: n > 3, ahead: true))], []);
         var mostNotices = NoticeText.Rows([.. Enumerable.Range(1, NoticeText.MaxWholeRows).Select(i => $"the save word row {i}"),
@@ -560,14 +493,6 @@ public sealed class TitleTests : IDisposable
         Fits(Drawn(new TitleMenu(worstListing), mostNotices));
         Fits(Drawn(After(worstListing, Keys.S, Keys.Enter), mostNotices));                    // NEW CAMPAIGN's ask, at nine slots
         Fits(Drawn(After(worstListing, Keys.S, Keys.S, Keys.Enter), mostNotices));            // the list
-        var overTheList = After(new SaveListing([.. worstListing.Slots.Select(slot => slot.Number == 0 ? slot with { State = SlotState.Readable } : slot)], []),
-            Keys.S, Keys.S, Keys.Enter, Keys.D9);
-        Assert.Equal(TitleAsk.Load, overTheList.Ask);
-        Fits(Drawn(overTheList, mostNotices));                                                // a load's ask over the list
-        var overAnUnreadable = After(new SaveListing([.. overTheList.Listing.Slots.Select(slot => slot.Number == SaveSlots.Most ? slot with { State = SlotState.Unreadable, Header = null } : slot)], []),
-            Keys.S, Keys.S, Keys.Enter, Keys.D9);
-        Assert.StartsWith("SLOT 9 CANNOT BE READ - IF IT LOADS, ", TitleHud.AskRows(overAnUnreadable, Dungeons).What, StringComparison.Ordinal);
-        Fits(Drawn(overAnUnreadable, mostNotices));                                           // and over a slot that cannot be read, the longer
         Assert.True(Drawn(new TitleMenu(worstListing), mostNotices).Single(row => row.Text.StartsWith("QUIT", StringComparison.Ordinal)).Bottom
             <= H - TitleHud.KeysFromBottom - TitleHud.BottomPitch, "the options run into the bottom rows");
     }
@@ -576,7 +501,7 @@ public sealed class TitleTests : IDisposable
     public void EscapeBacksOutThenQuits()
     {
         // ESC is the game's to route: it asks the title first. The list goes back to
-        // the options; an ask says no — over the list, the list stays; and on the
+        // the options; an ask — NEW CAMPAIGN's, the one there is — says no; and on the
         // options it is not the title's, so the game closes, as QUIT does.
         var listing = Listing(SpearHallAutosave(), Slot(2, header: Header(At.AddHours(1), 1)));
         var menu = new TitleMenu(listing);
@@ -592,25 +517,24 @@ public sealed class TitleTests : IDisposable
         Assert.False(menu.Escape());
 
         menu.Press(Keys.Enter);
-        menu.Press(Keys.D2);
-        Assert.True(menu.Asking);
-        Assert.True(menu.Escape());                          // the ask: no
-        Assert.Equal((false, true), (menu.Asking, menu.Loading is not null));
+        Assert.NotNull(menu.Loading);
         Assert.True(menu.Escape());                          // the list: back
         Assert.False(menu.Escape());                         // the options: the game's
 
         menu.Press(Keys.W);
         menu.Press(Keys.Enter);
         Assert.Equal(TitleAsk.NewCampaign, menu.Ask);
-        Assert.True(menu.Escape());
-        Assert.False(menu.Escape());
+        Assert.True(menu.Escape());                          // the ask: no
+        Assert.Equal((false, (int)TitleOption.NewCampaign, (SlotMenu?)null), (menu.Asking, menu.Cursor, menu.Loading));
+        Assert.False(menu.Escape());                         // the options: the game's
 
         // The scene routes it the same, built and read, never played: the notices it
         // was handed laid out under the title, the save's word whole.
         var host = new NoTitleHost();
-        string[] notices = [CampaignBoot.QuitUnsaved, "tuning.json: MovementBudget 20000 is above 10000 - using 10000"];
+        string quitUnsaved = CampaignBoot.QuitUnsaved(TestSlots.Named(SaveSlots.Autosave));
+        string[] notices = [quitUnsaved, "tuning.json: MovementBudget 20000 is above 10000 - using 10000"];
         var scene = new TitleScene(game: null!, host, listing, shownWhole: 1, notices);
-        Assert.Equal([.. NoticeText.Wrap(CampaignBoot.QuitUnsaved), "TUNING.JSON: MOVEMENTBUDGET 20000 IS ABOVE 10000 - USING 10000"], scene.NoticeRows);
+        Assert.Equal([.. NoticeText.Wrap(quitUnsaved), "TUNING.JSON: MOVEMENTBUDGET 20000 IS ABOVE 10000 - USING 10000"], scene.NoticeRows);
         Assert.False(scene.HandleEscape());
         scene.Menu.Press(Keys.S);
         scene.Menu.Press(Keys.S);

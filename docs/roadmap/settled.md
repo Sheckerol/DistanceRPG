@@ -1468,9 +1468,11 @@ JSON, and the class baselines are a section of `weapons.json`, which withdraws
 that bend; the dice stay the visit's own, seeded and saved; and **the save
 model**, the fourth, is the user's R2 — a title screen, one autosave slot and
 manual slots whose count is a `tuning.json` key — built in three steps and now
-whole (R2, below), its entry below superseded. Three choices of its building ship
-provisionally, the user's to rule, and open-questions.md sets out their
-alternatives.
+whole (R2, below), its entry below superseded, and superseded in part by the
+user's ruling of the same day on the save slots (R5, below): a campaign saves
+into the slot it came from. Choices of its building ship provisionally, the
+user's to rule — USER DECISION 1, and R5's SLOT DECISIONS — and open-questions.md
+sets out their alternatives.
 
 ### The user's ruling on content (2026-09-25)
 
@@ -2016,7 +2018,11 @@ superseded whole.
     of play, so the save's hash leaves it out and turning it never says the
     numbers changed. A count lowered below a slot that holds a save deletes
     nothing: the slot is kept, listed for loading and never saved into, and a
-    count raised again makes it an ordinary slot.
+    count raised again makes it an ordinary slot. (Superseded by the user's ruling
+    of the same day on the save slots, in what such a slot takes: loading it is
+    choosing it, so the campaign played from it saves into it, marked `BEYOND THE
+    3 SLOTS` and no longer `- LOAD ONLY`; the save list never offers it — R5, the
+    slot, below.)
   - **Every save carries its time** — `savedAt`, the document's last member: the
     UTC instant as round-trip text, from the edge's clock. `Logic/` never reads a
     clock; the game hands the time in, and a test a fixed one. A save written
@@ -2069,7 +2075,11 @@ superseded whole.
     or read whole is not read again. What it sets aside is said like a failed
     save, at once over the floor and on the next screen, and never taken back: it
     is a fact about a file. A file that will not move refuses the slot's writes,
-    as a load's does, and its notice is the failure.
+    as a load's does, and its notice is the failure. (Superseded by the user's
+    ruling of the same day on the save slots, in its example: no autosave follows a
+    manual load now — the slot loaded is the slot written — but a save by hand
+    into another slot still writes a slot unloaded, and the guard stands — R5,
+    the slot, below.)
   - **A write clears its slot's resume marker.** The marker guards the file a
     load was resuming; once a write has replaced that file, a marker left standing
     would set the new save aside as crashed at the next load and resume the
@@ -2165,6 +2175,11 @@ superseded whole.
     alternative: a loaded manual slot autosaves into itself, the autosave slot
     kept for the last campaign begun or continued there — no ask and no file set
     aside, but a manual slot is then written by the game and not by hand alone.
+    (Superseded by the user's ruling of the same day on the save slots, whole: a
+    loaded slot saves into itself, every save of its campaign, so no load asks and
+    none sets another slot's files aside — `MakeRoom`, `NeedsRoom`,
+    `SameAsAutosave` and the ask are gone, and USER DECISION 2 is answered — R5,
+    the slot, below.)
   - **A load that restores nothing goes back to the title** — every file of the
     slot set aside — which says so first, whole: `NOTHING COULD BE LOADED FROM
     SLOT 2` (or `FROM THE AUTOSAVE`), then each file set aside, in the load's
@@ -2186,14 +2201,25 @@ superseded whole.
     autosave to fail. A relaunch is the retry. A refusal the load or the new
     campaign met itself is said by its own stuck notice, once. The alternative,
     not taken: let a retry clear the refusal once the file reads again — which
-    would change the refusal's contract, and is the user's to rule.
+    would change the refusal's contract, and is the user's to rule. (Superseded by
+    the user's ruling of the same day on the save slots, in whose refusal it is
+    and what is played: a refusal is its slot's alone, and a slot that takes no
+    saves brings no campaign into play — its load loads nothing and says `SLOT 2
+    TAKES NO SAVES THIS SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN
+    IT`, and NEW CAMPAIGN begins nothing there — so `NOTHING IS AUTOSAVED THIS
+    SESSION` is gone; clearing a refusal stays the user's call — R5, the slot,
+    below.)
   - **The unsaved-quit marker is the title's to say**: it is the autosave's (a
     quit saves there), and the title takes it when it opens, before anything is
     loaded, in words true of the window's close and of leaving play for the title
     alike, and of a manual slot's campaign that a quit was writing into the
     autosave: `THE AUTOSAVE COULD NOT BE WRITTEN WHEN YOU LAST LEFT PLAY - WHAT IT
     HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT`. A load says what resumed,
-    and nothing of the marker.
+    and nothing of the marker. (Superseded by the user's ruling of the same day on
+    the save slots, in whose marker it is: the quit saves into the campaign's own
+    slot, so the marker is left there, and the title takes every slot's, each
+    named — `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - ...`, the
+    autosave's in the words above — R5, the slot, below.)
   - **What went with the title** (R2(e)): the launch's resume — CONTINUE is its
     replacement — and the screen between runs' NEW CAMPAIGN, N then N, whose keys
     line now reads `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS`.
@@ -2218,7 +2244,10 @@ superseded whole.
     shortening the notices (the folder named once) is a change to every
     set-aside notice; both are left for the step that brings saving by hand,
     which measures the word again. (Measured, and the ceiling kept: saving by
-    hand, below.)
+    hand, below. Superseded by the user's ruling of the same day on the save
+    slots, in the three files: no load sets another slot's files aside, so a load
+    names at most its own slot's two; the fourteen-row ceiling stands — R5, the
+    slot, below.)
 - **R2, saving by hand — SAVE GAME, and QUIT TO TITLE.** The ruling's third part:
   "a manual save can be made at ANY SAFE POINT: from the pause menu on the
   player's own turn during a run, or on the between-runs screen — never while
@@ -2233,7 +2262,11 @@ superseded whole.
     menu's two lines sit under its last option, however many there are, where
     they had sat at a fixed height a third option would have landed on. Between
     runs the hub's keys line gives way to the menu's while it is up, and ESC never
-    quits there any more.
+    quits there any more. (Superseded by the user's ruling of the same day on the
+    save slots, in what saves itself: the campaign's own slot — the one it was
+    loaded from or begun in — goes on saving itself, whatever is saved by hand
+    into another, and the save list shows that slot's row as `SAVES ITSELF` —
+    R5, the slot, below.)
   - **SAVE GAME only at a safe point, the autosave's**: in a dungeon the party's
     own turn with nothing in flight — never while the enemies move or their
     turn's banner is up, never on a run's summary or during a stair's fade;
@@ -2313,7 +2346,9 @@ superseded whole.
     autosaving into the one autosave slot, a load over a different autosave
     asking and then setting it aside (USER DECISION 2; R2, the title); and NEW
     CAMPAIGN over a held autosave setting it aside rather than saving over it
-    (USER DECISION 3).
+    (USER DECISION 3). (Superseded by the user's ruling of the same day on the
+    save slots, in USER DECISION 2, which it answers: a loaded slot saves into
+    itself — R5, below.)
   - **The save's word, measured again, and its ceiling kept at fourteen rows**:
     the rarest word — a manual slot resumed from its backup under changed
     numbers, its save set aside with a long reason, the autosave's crashed save and
@@ -2323,7 +2358,10 @@ superseded whole.
     it keeps above, with no slack, and would still cut the longer name's word;
     naming the folder once would reword every set-aside notice, for a case that
     needs five rare things at once. Past the ceiling the rows are cut and counted
-    (`+1 MORE - SEE THE LOG`), and the log has every word.
+    (`+1 MORE - SEE THE LOG`), and the log has every word. (Superseded by the
+    user's ruling of the same day on the save slots, in the files that word names:
+    no load sets the autosave's two aside any more, so that rarest word has lost
+    them; the ceiling stands — R5, the slot, below.)
   - **A quit whose save goes through takes back a failed autosave's word** (S7's
     review, which licensed the change to the take-back's pin): a save that fails
     is said on the next screen until a later save goes through, which takes it
@@ -2352,6 +2390,116 @@ superseded whole.
     have to read the resume markers too, or it would send CONTINUE to an autosave
     whose last load crashed the game (its marker sets that save aside and resumes
     the backup, one save older) over a slot holding the same campaign cleanly.
+    (Superseded by the user's ruling of the same day on the save slots, in what
+    loading that slot does: no load asks, and the slot loaded is the slot its
+    campaign saves into from then on, so `SameAsAutosave` is gone and the
+    campaign continued from slot 1 saves into slot 1 — R5, the slot, below.)
+
+### The user's ruling of 2026-09-25 on the save slots: each campaign saves in its own slot (R5)
+
+Later the same day the user ruled on the save model again: "save slots should
+work more like the old games, where you choose a save slot and any saving happens
+on that save slot instead of choosing a save slot everytime you save." **R5**
+supersedes R2 wherever the two differ, and the phase docs, the entries above and
+the rest of this pass with it. **A campaign is bound to one slot** — the one NEW
+CAMPAIGN begins it in, or the one LOAD GAME or CONTINUE loads — **and every save
+of it goes there**: the game's own at every safe point, the quit's, and SAVE
+GAME's, which no longer lists the slots. So there is no autosave slot apart from
+the others, which reverses R2's "one autosave slot that saves itself where the
+game autosaves today": the game's own saves are saving too. There is no list to
+save by, and no question over the campaign's own slot, which retires R2's "saving
+into an occupied slot asks before overwriting" for saving. `SaveSlots` counts
+every slot. A slot above the count that is loaded saves into itself, since
+loading it is choosing it. What stands: R2's title and its four options, CONTINUE
+loading the most recent save, a save only at a safe point, never deleted, one save
+deep, cross-checked on load (R3(b)), and the dice saved (R1). **What R5 costs:** a
+campaign can no longer be copied into a second slot to keep a checkpoint, which a
+save by hand into another slot did under R2. No COPY is built, and a slot a player
+saved by hand under R2 plays forward from its first load. USER DECISION 2 is
+answered by the first half of its listed alternative — a loaded slot saves into
+itself — and leaves open-questions.md; its other half, an autosave slot kept for
+the last campaign begun or continued there, goes with R5. USER DECISION 3's
+question, what becomes of the campaign in the slot NEW CAMPAIGN begins in, is asked
+again of a slot (SLOT DECISION 2). Built in five steps, each written below as it
+lands — the binding (R5, the slot), the title's NEW CAMPAIGN (R5, NEW CAMPAIGN),
+saving by hand (R5, SAVE GAME), the save folder's name (R5, the old autosave) and
+its move (R5, the move) — and its choices ship provisionally, each labelled SLOT
+DECISION, never USER DECISION, which names Phase 5's list; open-questions.md sets
+out each alternative.
+
+- **R5, the slot — every save of a campaign goes into the slot it came from.**
+  The ruling's first half, built beneath NEW CAMPAIGN and SAVE GAME as they
+  stood:
+  - **A campaign is bound to one slot as it comes into play, and nothing
+    rebinds it**: the slot LOAD GAME or CONTINUE loaded, above the count too; the
+    one NEW CAMPAIGN began it in — the autosave slot, until NEW CAMPAIGN chooses
+    its slot; a dev override's scratch slot. The game holds it in one field, set
+    as the campaign comes into play and cleared as it goes (`_slot`, `Adopt`,
+    `DropCampaign`, pinned off the IL), and every save of the campaign goes there
+    — a run's entry, every player turn's start, every arrival, a run's end and the
+    quit — so play from one slot leaves the autosave and every other slot byte for
+    byte as they were. The slot a load reads is now the slot its campaign writes,
+    so S5's wait — no write before the loaded screen is up — is what keeps a write
+    off a slot whose own load is in flight. A close during a loaded campaign's fade
+    in, before its screen is up, writes the campaign as it was loaded, or nothing
+    when the slot holds it already, and clears the resume marker as ever: the game
+    quit cleanly, and the marker guards a screen that crashes. Accepted as it
+    stands.
+  - **No load asks, and none sets another slot's files aside**: the load's ask,
+    `MakeRoom`, `NeedsRoom` and `SameAsAutosave` are gone, and a slot chosen on
+    the list, or by CONTINUE, loads at once. What a load means is said where the
+    choice is made, on LOAD GAME's keys line — `W/S OR ARROWS CHOOSE - ENTER OR 0-9
+    LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK` — **bends the plan, needs
+    no ruling**: a slot saved by hand under R2 to keep a checkpoint is played
+    forward from its first load, and written over one save deep, and the line is
+    the one place the player meets that before it happens.
+  - **A slot above the count saves into itself**, which follows from the ruling:
+    loading it is choosing it. Its marker is `BEYOND THE 3 SLOTS` (`BEYOND THE 1
+    SLOT`), no longer `- LOAD ONLY`, and LOAD GAME no longer dims it. The save
+    list never offers it. Whether such a slot may be played at all, rather than
+    first moved within the count, is SLOT DECISION 1, shipped as yes
+    (open-questions.md).
+  - **A campaign never comes into play in a slot that takes no saves this
+    session — bends S6's review, needs no ruling.** A refusal holds for the
+    session, and the ruling removed the other place such a campaign could be
+    saved, so playing it would lose what was played at the quit, where not
+    beginning it loses nothing. A load of such a slot loads nothing and touches
+    nothing — no marker, nothing read or set aside — and the title says
+    `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES THIS SESSION:
+    EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`. NEW CAMPAIGN there reads
+    the refusal first, touches nothing, and says `NO NEW CAMPAIGN BEGAN IN THE
+    AUTOSAVE`, then the same. A refusal is its slot's alone: another slot loads
+    in the same session. Clearing a refusal mid-session stays the user's call, as
+    S6's review left it. The stuck notice ends `- THIS SLOT TAKES NO SAVES THIS
+    SESSION, SO IT IS NEVER WRITTEN OVER`, where `- NOTHING IS SAVED THIS SESSION,
+    ...` read as the whole game while the player is meant to go on in another slot
+    — **bends the plan, needs no ruling** — and the word that leads it names the
+    slot.
+  - **A NEW CAMPAIGN whose first save fails is not begun — needs no ruling, for
+    the same reason.** The new campaign's first save is written into the slot
+    before the campaign is bound to it. When it fails, or when setting the old
+    campaign aside stops at a file that will not move, nothing is played, and what
+    NEW CAMPAIGN set aside goes back where it was, the save before the backup
+    (`CampaignBoot.PutBack`: a move, refusing a name that is taken, deleting
+    nothing), so the slot is as it was, its backup one save deep. The title says
+    `NO NEW CAMPAIGN BEGAN IN THE AUTOSAVE`, then the failed save's word — or the
+    stuck notice alone — then the set-aside notice of any file that would not go
+    back. `--new-campaign` is the same, and the game then opens on the title. The
+    markers NEW CAMPAIGN took are not put back: they are markers, each logged as
+    it went.
+  - **The unsaved-quit marker is the campaign's slot's**: the quit leaves it
+    beside the save it could not replace, and the title takes every slot's, the
+    autosave's and slot 1 to 9's, before it lists them, each said once, in slot
+    order: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS
+    FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` — two rows at slot 9 — and the
+    autosave's in the words it has always had.
+  - **The save list, transitional — bends the plan, needs no ruling**: SAVE GAME's
+    list stays in its S7 form until SAVE GAME saves the campaign's own slot, and
+    is keyed to that slot meanwhile: its row ends `SAVES ITSELF` and is never
+    chosen, its digit says `SLOT 2 SAVES ITSELF` (`THE AUTOSAVE SAVES ITSELF` for a
+    campaign in the autosave), 0 does nothing for a campaign that saves elsewhere,
+    and the list starts on the lowest empty slot other than it. Another slot
+    chosen there takes a copy, and the campaign goes on saving into its own.
 
 ### The numbers: `tuning.json`
 
@@ -2659,7 +2807,10 @@ superseded whole.
   of a manual slot can set three aside, the title shows the save's word whole
   too, and the rarest such word reaches the ceiling in an ordinary save folder —
   R2, the title, above — and runs a row past it, measured when saving by hand
-  was built, which kept the ceiling: R2, saving by hand, above.)
+  was built, which kept the ceiling: R2, saving by hand, above. Superseded by the
+  user's ruling of the same day on the save slots, in those three: no load sets
+  another slot's files aside, so a load names at most its own slot's two, and the
+  ceiling of fourteen stands — R5, the slot, above.)
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are

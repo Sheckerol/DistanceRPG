@@ -16,7 +16,7 @@ public enum GameMenu
     /// <summary>
     /// The pause menu (<see cref="PauseMenu"/>): 1 closes it, 2 opens the save list
     /// on the party's own turn — and off it says why not — and 3 quits to the title,
-    /// the autosave written first. ESC opens and closes it. What a save by hand came
+    /// the campaign's slot written first. ESC opens and closes it. What a save by hand came
     /// to is drawn inside it, under its lines, until the next key.
     /// </summary>
     Pause,
@@ -182,7 +182,7 @@ public sealed record ResumeView(ViewDto? View, int Leading, IReadOnlyList<string
 /// (<see cref="CanSaveNow"/>) — never while the enemies move — and the slot chosen
 /// is saved by the host at the frame's end (<see cref="ISaveHost.SaveToSlot"/>),
 /// which tells the menu how it went (<see cref="SlotSaved"/>); 3 quits to the
-/// title, the host writing the autosave first (<see cref="ISaveHost.QuitToTitle"/>),
+/// title, the host writing the campaign's slot first (<see cref="ISaveHost.QuitToTitle"/>),
 /// and the scene takes no key after it while it fades out.
 /// </para>
 /// </summary>
@@ -1618,7 +1618,7 @@ public class DungeonScene : Scene
     /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
     /// on the pause menu (<see cref="PauseMenu.Press"/>), 1 closes it, 2 opens the
     /// save list on the party's own turn and otherwise says why not, and 3 quits to
-    /// the title — the host writes the autosave first, playing out the enemies' turn
+    /// the title — the host writes the campaign's slot first, playing out the enemies' turn
     /// if the menu was opened during it (<see cref="ISaveHost.QuitToTitle"/>) — or,
     /// in a dev-override session, which has no title, closes the game, whose close
     /// saves its scratch slot as ever — either way play is left, and the scene takes
@@ -1642,7 +1642,7 @@ public class DungeonScene : Scene
                 case PauseAction.OpenSaves:
                     var listing = _host.Slots();
                     ActiveMenu = GameMenu.Saves;
-                    _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing));
+                    _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing), _host.OwnSlot);
                     Log.Info("[Save] The save list: " + string.Join("; ", _saves.Rows.Select(row => $"{SaveSlots.Label(row.Number)} {row.State}")));
                     break;
                 case PauseAction.Refuse:
