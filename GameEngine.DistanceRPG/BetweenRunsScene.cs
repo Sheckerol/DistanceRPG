@@ -7,8 +7,8 @@ namespace GameEngine.DistanceRPG;
 
 /// <summary>
 /// What the between-runs screen reaches the game through: a dungeon chosen, and —
-/// from the menu ESC opens (<see cref="ISaveHost"/>) — a save by hand and the way
-/// back to the title. The screen never holds the concrete game that hosts it
+/// from the menu ESC opens (<see cref="ISaveHost"/>) — a save by hand into the
+/// campaign's own slot and the way back to the title. The screen never holds the concrete game that hosts it
 /// (§6.7: the campaign outlives every scene, and the scenes are views of it). It
 /// is the dungeon list's half of what <see cref="IRunHost"/> is to a dungeon scene.
 /// A new campaign is the title's to begin (<see cref="ITitleHost.BeginNewCampaign"/>),
@@ -47,15 +47,15 @@ public interface IBetweenRunsHost : ISaveHost
 /// <para>
 /// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
 /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e);
-/// <see cref="PauseMenu"/>): 1 closes it, 2 opens the save list — between runs is
-/// always a safe point — and 3 quits to the title, the host writing the campaign's slot
-/// first (<see cref="ISaveHost.QuitToTitle"/>), or, in a dev-override session,
-/// which has no title, closes the game. <strong>While the menu is up every key is
-/// its</strong> — 1, 2 and 3 act and every other key does nothing, so ENTER never
-/// descends behind it — and while the save list is up every key but ESC is the
-/// list's (<see cref="Route"/>). ESC answers the list's ask no, then goes back from
-/// the list to the menu, then closes the menu: always consumed here, so the game
-/// never quits from this screen but by the menu or the window's close.
+/// <see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign into its own slot,
+/// asking nothing (the user's ruling of 2026-09-25 on the save slots, R5) —
+/// between runs is always a safe point — and 3 quits to the title, the host
+/// writing the campaign's slot first (<see cref="ISaveHost.QuitToTitle"/>), or, in
+/// a dev-override session, which has no title, closes the game. <strong>While the
+/// menu is up every key is its</strong> — 1, 2 and 3 act and every other key does
+/// nothing, so ENTER never descends behind it (<see cref="Route"/>). ESC closes
+/// the menu: always consumed here, so the game never quits from this screen but by
+/// the menu or the window's close.
 /// </para>
 /// <para>
 /// Like every gameplay scene it is single-use: the host registers a fresh one
@@ -86,9 +86,6 @@ public sealed class BetweenRunsScene : Scene
 
         /// <summary>The menu's: 1, 2 and 3 act, and every other key does nothing — ENTER and the arrows included.</summary>
         Menu,
-
-        /// <summary>The save list's: every key but ESC.</summary>
-        Saves,
     }
 
     private readonly Game _game;
@@ -103,12 +100,10 @@ public sealed class BetweenRunsScene : Scene
     // quit to the title. After it every key is ignored while the screen fades out.
     private bool _leaving;
 
-    // The menu is up (ESC opens it), with the save list in its options' place
-    // while that is up, and what the menu answers under its lines — what a save by
-    // hand came to, or why 2 saved nothing — until the next key or until the menu
-    // closes. Menus: never saved.
+    // The menu is up (ESC opens it), and what it answers under its lines — what a
+    // save by hand came to — until the next key or until the menu closes. Menus:
+    // never saved.
     private bool _menu;
-    private SlotMenu? _saves;
     private string? _answer;
 
     /// <param name="game">The game window: its size and its shaders, for the text, and its close, which a dev-override session's QUIT GAME is. A screen built to be read, never shown, is handed none.</param>
@@ -147,17 +142,17 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>How the last run ended, which the screen shows above the list, or null before the first.</summary>
     public RunResult? LastResult => _campaign.LastResult;
 
-    /// <summary>Whether the menu is up: over the hub, its options or the save list in their place.</summary>
+    /// <summary>Whether the menu is up, over the hub.</summary>
     internal bool MenuOpen => _menu;
 
-    /// <summary>The save list while it is up, in the menu's options' place, or null.</summary>
-    internal SlotMenu? SaveList => _saves;
-
-    /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>), or why 2 saved nothing — until the next key or until the menu closes; null for nothing.</summary>
+    /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>) — until the next key or until the menu closes; null for nothing.</summary>
     internal string? MenuAnswer => _answer;
 
-    /// <summary>Whether this session has a title to quit to and slots to save into (<see cref="ISaveHost.HasTitle"/>): a dev-override session has neither.</summary>
+    /// <summary>Whether this session has a title to quit to (<see cref="ISaveHost.HasTitle"/>): a dev-override session has none.</summary>
     internal bool HasTitle => _host.HasTitle;
+
+    /// <summary>The slot the campaign saves into, by its name (<see cref="ISaveHost.SavesInto"/>), which the menu says under its options.</summary>
+    internal string SavesInto => _host.SavesInto;
 
     public override void Initialize()
     {
@@ -182,10 +177,9 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// Every key press, once, through one handler: the menu and the save list read
-    /// it first while they are up (<see cref="Route"/>), so a key they take never
-    /// also moves the choice or descends. KeyPressed fires once per physical press,
-    /// so a held key acts once.
+    /// Every key press, once, through one handler: the menu reads it first while it
+    /// is up (<see cref="Route"/>), so a key it takes never also moves the choice or
+    /// descends. KeyPressed fires once per physical press, so a held key acts once.
     /// </summary>
     private void WireInput() => Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
 
@@ -198,14 +192,11 @@ public sealed class BetweenRunsScene : Scene
     {
         if (_leaving || SceneManager.Instance.IsTransitioning) return;
 
-        var route = Route(_menu, _saves is not null, key);
+        var route = Route(_menu, key);
         if (route != KeyRoute.Game)
             _answer = null;
         switch (route)
         {
-            case KeyRoute.Saves:
-                SaveListKey(_saves!, key);
-                break;
             case KeyRoute.Menu:
                 MenuKey(key);
                 break;
@@ -217,18 +208,15 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// Where one key press goes between runs: ESC to the game, which asks
-    /// <see cref="HandleEscape"/>; with the save list up, every other key to the
-    /// list; with the menu up, every other key to the menu — 1, 2 and 3 act, and
-    /// ENTER, W/S and the arrows do nothing, so nothing descends behind the menu; and
-    /// otherwise to the dungeon list. Pure, so it is walked key by key
-    /// (<c>BetweenRunsHudTests</c>).
+    /// <see cref="HandleEscape"/>; with the menu up, every other key to the menu —
+    /// 1, 2 and 3 act, and ENTER, W/S and the arrows do nothing, so nothing descends
+    /// behind the menu; and otherwise to the dungeon list. Pure, so it is walked key
+    /// by key (<c>BetweenRunsHudTests</c>).
     /// </summary>
     /// <param name="menu">Whether the menu is up.</param>
-    /// <param name="saves">Whether the save list is up, in the menu's options' place.</param>
     /// <param name="key">The key pressed.</param>
-    internal static KeyRoute Route(bool menu, bool saves, Keys key)
+    internal static KeyRoute Route(bool menu, Keys key)
         => key == Keys.Escape ? KeyRoute.Game
-            : saves ? KeyRoute.Saves
             : menu ? KeyRoute.Menu
             : KeyRoute.List;
 
@@ -250,10 +238,11 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// The menu's keys (<see cref="PauseMenu.Press"/>): 1 closes it, 2 opens the
-    /// save list — between runs is always a safe point — and 3 quits to the title,
-    /// or, in a dev-override session, closes the game, whose close saves its scratch
-    /// slot as ever. Every other key does nothing.
+    /// The menu's keys (<see cref="PauseMenu.Press"/>): 1 closes it, 2 asks the host
+    /// to save the campaign into its own slot — between runs is always a safe point
+    /// — the menu kept up for the answer, and 3 quits to the title, or, in a
+    /// dev-override session, closes the game, whose close saves its scratch slot as
+    /// ever. Every other key does nothing.
     /// </summary>
     private void MenuKey(Keys key)
     {
@@ -265,10 +254,9 @@ public sealed class BetweenRunsScene : Scene
             case PauseAction.Close:
                 _menu = false;
                 break;
-            case PauseAction.OpenSaves:
-                var listing = _host.Slots();
-                _saves = new SlotMenu(SlotMenuMode.Save, listing, SlotMenu.CountOf(listing), _host.OwnSlot);
-                Log.Info("[Save] The save list: " + string.Join("; ", _saves.Rows.Select(row => $"{SaveSlots.Label(row.Number)} {row.State}")));
+            case PauseAction.Save:
+                Log.Info($"[Save] SAVE GAME: saving by hand into {_host.SavesInto}, at the frame's end");
+                _host.SaveNow();
                 break;
             case PauseAction.Refuse:
                 _answer = said;
@@ -288,33 +276,8 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// A key on the save list: a slot chosen — an empty one at once, one that holds
-    /// anything once its ask is answered ENTER — closes the list back to the menu,
-    /// and the host saves into it at the frame's end and tells the menu how it went
-    /// (<see cref="SlotSaved"/>). Every other key the list answers itself, an ask's
-    /// no among them.
-    /// </summary>
-    private void SaveListKey(SlotMenu list, Keys key)
-    {
-        var asked = list.Asking;
-        var step = list.Press(key);
-        if (asked is not null && step != SlotStep.Chosen)
-            Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken ({key})");
-        else if (step == SlotStep.Asking && list.Asking is { } asking)
-            Log.Info($"[Save] Saving into {SaveSlots.Label(asking.Number)}, which holds {(asking.State == SlotState.Readable ? "a save" : "a save that cannot be read")}? - ENTER to confirm, any other key to keep it");
-        if (list.Said is { } said)
-            Log.Info($"[Save] {said}");
-        if (step != SlotStep.Chosen || list.Chosen is not { } slot)
-            return;
-
-        _saves = null;   // the list closes back to the menu, where the answer is drawn
-        Log.Info($"[Save] Saving into {SaveSlots.Label(slot)} by hand");
-        _host.SaveToSlot(slot);
-    }
-
-    /// <summary>
     /// What a save by hand came to, from the host once it is written at the frame's
-    /// end (<see cref="ISaveHost.SaveToSlot"/>): drawn inside the menu, under its
+    /// end (<see cref="ISaveHost.SaveNow"/>): drawn inside the menu, under its
     /// lines, until the next key or until the menu closes. With the menu closed by
     /// then, only the log keeps it.
     /// </summary>
@@ -328,8 +291,7 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// ESC, asked by the game before it does anything else with it, and always
-    /// taken here: on the save list it answers an ask no, and otherwise goes back to
-    /// the menu; on the menu it closes it; with nothing up it opens the menu. So
+    /// taken here: on the menu it closes it; with nothing up it opens the menu. So
     /// the game never quits from this screen but by the menu's QUIT TO TITLE, a
     /// dev-override session's QUIT GAME, or the window's close.
     /// </summary>
@@ -338,15 +300,6 @@ public sealed class BetweenRunsScene : Scene
         if (_leaving)
             return true;   // on its way out: the host has what it asked for
         _answer = null;
-        if (_saves is { } list)
-        {
-            var asked = list.Asking;
-            if (list.Press(Keys.Escape) == SlotStep.Back)
-                _saves = null;   // back to the menu
-            else if (asked is not null)
-                Log.Info($"[Save] Saving into {SaveSlots.Label(asked.Number)} not taken (Escape)");
-            return true;
-        }
         _menu = !_menu;
         return true;
     }

@@ -44,7 +44,8 @@ recent save and resumes it where it was left: on the screen between runs, with
 the dungeon list, with the last run's summary above it once a run has ended;
 until the tutorial's golem is beaten it lists the tutorial alone. In play — in a
 dungeon or between runs — Esc opens the menu, where the campaign is saved by hand
-into a slot and play is left for the title.
+into its own slot, the one it saves into all the time, and play is left for the
+title.
 
 | Title | Action |
 | --- | --- |
@@ -75,23 +76,17 @@ into a slot and play is left for the title.
 | The menu (Esc, in a dungeon or between runs) | Action |
 | --- | --- |
 | 1 | `1  CLOSE`: close the menu |
-| 2 | `2  SAVE GAME`: the save list (below) — on your own turn; during the enemies' turn it is dimmed and says `SAVE ON YOUR OWN TURN` |
+| 2 | `2  SAVE GAME`: save the campaign into its own slot at once, asking nothing (below) — on your own turn; during the enemies' turn it is dimmed and says `SAVE ON YOUR OWN TURN` |
 | 3 | `3  QUIT TO TITLE`: the campaign's slot — the one it was loaded from or begun in — is written (the enemies' turn played out first, if it is theirs), and the title opens |
 | Esc | Close the menu |
 
-| The save list (the menu's 2) | Action |
-| --- | --- |
-| W/S / arrows | Choose a slot (your campaign's own slot, which `SAVES ITSELF`, is skipped, and so is the `AUTOSAVE` row) |
-| 1–9 | Save a copy into that slot: an empty one at once, one that holds anything after asking (your campaign's own slot says it saves itself, and a slot above the count in `tuning.json` is never offered, and says so) |
-| Enter | Save into the chosen slot, the same way |
-| Esc | Back to the menu (on a question, no) |
-
-A question on the title or on the save list — NEW CAMPAIGN over a slot in
-use, a slot saved over or set aside — takes the next key: **Enter alone says
-yes**, as the question says, and every other key, N and Y and the slot's own
-digit included, says no. Loading a slot asks nothing. While
-the menu or the save list is up every key is theirs: nothing behind them moves,
-descends, ends the turn or opens the bag.
+The menu says under its options which slot is the campaign's: `PROGRESS SAVES
+TO SLOT 2 AT EVERY TURN`. The one question left — NEW CAMPAIGN over a slot in
+use, on the title — takes the next key: **Enter alone says yes**, as the
+question says, and every other key, N and Y and the slot's own digit included,
+says no. Loading a slot asks nothing, and nor does saving. While the menu is up
+every key is its: nothing behind it moves, descends, ends the turn or opens the
+bag.
 
 | In a dungeon | Action |
 | --- | --- |
@@ -107,7 +102,7 @@ descends, ends the turn or opens the bag.
 | I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
 | X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
 | Scroll wheel | Zoom |
-| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn. Does nothing on a run's summary |
+| Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
 
 Outside combat the rest of the party marches behind the active character in a
@@ -145,18 +140,19 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   autosave, and nothing moves. Manual slot *n* is the folder `slot-n` inside it
   (`saves\slot-1\` to `saves\slot-3\`), holding the same files for its own save:
   its own backup, its own markers, its own files set aside — and written by the
-  game for the campaign loaded from it or begun in it, and by a save by hand.
+  game, and by SAVE GAME, for the campaign loaded from it or begun in it.
   How many there are is `tuning.json`'s `SaveSlots` (below); lowering it deletes
   nothing, and a slot above the count keeps its save, loads like any, and goes on
-  saving the campaign played from it; NEW CAMPAIGN never offers it, and nor does
-  the save list. A
-  folder named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and
-  is never read.
+  saving the campaign played from it; NEW CAMPAIGN never offers it. A folder
+  named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and is
+  never read.
 - **A save's time**: every save records when it was written — `"savedAt"`, the
   UTC time, the last entry of `campaign.json` (a save from an earlier build has
   none). A save of the campaign a slot already holds writes nothing, so the time
-  is when that state was first saved. The time is how the most recent save is
-  told — what CONTINUE loads: the latest time
+  is when that state was first saved — but for `2  SAVE GAME`, which stamps the
+  save with the time you saved it, as old games stamp their file, rewriting the
+  time alone and keeping the backup as it was. The time is how the most recent
+  save is told — what CONTINUE loads: the latest time
   wins; a save with no time counts as older than any with one; a time more than a
   day ahead of this computer's clock counts as none, so a hand edit or a clock
   once set wrong cannot go on winning; and a tie goes to the autosave, then the
@@ -175,40 +171,30 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   would have played — and saves that. If the enemies wipe the party on the way,
   the run ends and the campaign is saved between runs with its summary.
 - **Saving by hand**: `2  SAVE GAME` on the menu Esc opens — in a dungeon on
-  your own turn, or between runs, where it always can — opens the save list,
-  for now in the form it had before the user's ruling on the save slots, which
-  takes the list away: `AUTOSAVE`, then `SLOT 1` to `SLOT 3`, each row as the
-  title's list shows it, the campaign's own slot ending `SAVES ITSELF` — shown
-  and never chosen, like the `AUTOSAVE` row — since every save of the campaign
-  goes there already. During the enemies' turn the
-  option is dimmed and 2 says `SAVE ON YOUR OWN TURN`, saving nothing. A digit, or
-  Enter on the chosen row, saves into an empty slot at once. A slot that holds a
-  save asks first — `SLOT 2 HOLDS BETWEEN RUNS - 2 RUNS - 2026-09-24 20:10` /
-  `ENTER: SAVE OVER IT - ESC: NO` — and the save it held becomes the slot's
-  backup, one save deep, as every save's does. A slot whose save cannot be read
-  asks `SLOT 3 CANNOT BE READ` (`- ITS BACKUP IS KEPT` when its backup reads) /
-  `ENTER: SET IT ASIDE AND SAVE HERE - ESC: NO`, and saving there sets the file
-  that cannot be read aside in the slot's own folder as
-  `campaign.unreadable-N.json`, never deleted, a backup that reads kept where it
-  is. Only Enter says yes; N, Esc, the slot's own digit and every other key say no.
-  The list closes back to the menu, and the menu says under its lines how it went
-  — `SAVED TO SLOT 2` in green (and any file set aside, and where), or `SLOT 2
-  COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE LOG` in orange —
-  until the next key. The campaign's own slot's digit says `SLOT 2 SAVES ITSELF`
-  (`THE AUTOSAVE SAVES ITSELF` for a campaign in the autosave) — and so does
-  Enter when there is no other slot to offer, at a count of one with the campaign
-  in slot 1 — and a slot above the count is never offered. A save by hand is a copy written into the slot
-  alone: the campaign goes on saving into its own slot as ever, and CONTINUE
-  loads whichever of the two is newer.
+  your own turn, or between runs, where it always can — saves the campaign at
+  once into its own slot, the one it saves into all the time, **asking
+  nothing**: there is no list of slots to choose from (the user's ruling on the
+  save slots: "instead of choosing a save slot everytime you save"). The menu
+  names that slot under its options — `PROGRESS SAVES TO SLOT 2 AT EVERY TURN`
+  — stays up, and says under its lines how the save went: `SAVED TO SLOT 2` in
+  green (and any file set aside first, and where), or `SLOT 2 COULD NOT BE SAVED
+  (...) - WHAT IT HELD IS KEPT - SEE THE LOG` in orange, until the next key.
+  During the enemies' turn the option is dimmed and 2 says `SAVE ON YOUR OWN
+  TURN`, saving nothing, then or later. Since the game saves the slot at every
+  turn already, SAVE GAME mostly finds it holding the campaign as it stands:
+  then it rewrites the save's time alone, keeping the backup, so the slot you
+  just saved is the one CONTINUE names. A file in the slot that cannot be read —
+  put there behind the game's back — is set aside first in the slot's own folder
+  as `campaign.unreadable-N.json`, never deleted, a backup that reads kept where
+  it is. There is no way in the game to save a second copy of a campaign into
+  another slot.
 - **Leaving play**: `3  QUIT TO TITLE`, on the menu in a dungeon or between
   runs, writes the campaign's own slot as the window's close does — the enemies'
   turn played out first when it is theirs — and opens the title (no key acts
-  while the screen fades to it), where CONTINUE resumes the campaign. Saved by
-  hand into another slot and left with nothing played since, CONTINUE names that
-  slot instead: the campaign's own slot had nothing new to write, so it keeps its
-  older time; loading the copy plays it on in that slot. The game quits from the
-  title (QUIT, or Esc) or by the window's close button from anywhere, which saves
-  the campaign in play first. Esc between runs opens the menu and never quits.
+  while the screen fades to it), where CONTINUE resumes the campaign. The game
+  quits from the title (QUIT, or Esc) or by the window's close button from
+  anywhere, which saves the campaign in play first. Esc between runs opens the
+  menu and never quits.
 - **Resuming**: CONTINUE on the title resumes the most recent save where it was,
   and LOAD GAME any slot — `AUTOSAVE`, `SLOT 1` to `SLOT 3`, then any slot above
   the count that holds a save — each row saying where its campaign stands (the
@@ -249,7 +235,14 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   opens — at once, after QUIT TO TITLE — before anything is loaded, for every
   slot that has one: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT
   HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` (for the autosave, `THE
-  AUTOSAVE COULD NOT BE WRITTEN WHEN ...`).
+  AUTOSAVE COULD NOT BE WRITTEN WHEN ...`). **A slot whose saves keep failing
+  costs what was played since its last save that went through**: every save of
+  the campaign goes into its own slot, SAVE GAME's too, so there is nowhere else
+  to save it meanwhile, and a quit that cannot save loses what came after the
+  last save. The game says each failure as it happens, and a later save that
+  goes through — once the disk has room, or the other program lets go — saves
+  all of it. (What should become of such play is the user's to rule: SLOT
+  DECISION 3 in `docs/roadmap/open-questions.md`.)
 - **No write costs a file**: before any save goes into a slot, a `campaign.json`
   there that no save can be read from — one that is not a save, or one a newer
   build wrote — is set aside first as `campaign.unreadable-N.json`, and so is such
@@ -266,8 +259,7 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   nothing and says `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES
   THIS SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`, and NEW
   CAMPAIGN there begins nothing (`NO NEW CAMPAIGN BEGAN IN SLOT 2`, then
-  why). Every other slot plays as ever; a save by hand into such a slot says why
-  it saved nothing. Launch the game again to play in it.
+  why). Every other slot plays as ever. Launch the game again to play in it.
 - **A save that cannot be played is set aside, never deleted**: one that is not
   a save, one a newer build wrote, one naming content that is gone, one that
   contradicts itself or holds a number past what play can reach (below), or one
@@ -347,8 +339,8 @@ choose; the menu's QUIT TO TITLE comes back to it, and the game quits from it.
   launch, with no title, and never reads or writes `campaign.json` or a slot —
   every override launch is as repeatable as ever, and your campaign is untouched.
   Its menu's 3 reads `3  QUIT GAME` — the window closes, saving the scratch slot —
-  and its 2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`, saving
-  nothing. Unset them to go back to it.
+  and its 2 saves the scratch slot too (`SAVED TO THE SCRATCH SLOT`), nothing
+  else. Unset them to go back to it.
 
 ## Tuning the numbers: `tuning.json`
 
@@ -420,8 +412,8 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   choosing each: `"SaveSlots": 12` plays 9 and says `TUNING.JSON: SAVESLOTS 12 IS
   ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above the count keeps
   its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and loaded, it goes on
-  saving the campaign played from it; NEW CAMPAIGN and the save list never offer
-  it. The launcher reads it and no rule of play does, so, like
+  saving the campaign played from it; NEW CAMPAIGN never offers it. The launcher
+  reads it and no rule of play does, so, like
   the Enchanter's keys, turning it never says `THE NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:

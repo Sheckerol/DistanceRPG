@@ -1741,6 +1741,65 @@ public sealed class CampaignBootTests : IDisposable
     }
 
     [Fact]
+    public void ASaveByHandOfAnUnchangedCampaignStampsItsTime_KeepingTheBackup()
+    {
+        InTempFolder(folder =>
+        {
+            // The user's ruling of 2026-09-25 on the save slots (R5): SAVE GAME saves
+            // the campaign's own slot, which the game's own saves keep up to date, so
+            // a save by hand mostly finds the slot holding the campaign as it stands.
+            // It stamps the save's time all the same, as old games' saves stamp their
+            // file — so the slot just saved by hand is the one CONTINUE names — and
+            // rewrites the time alone: the backup is not rotated, so it stays the save
+            // before, a different state, one save deep.
+            var at = new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
+            var slots = new SaveSlots(folder, 3);
+            var slot2 = slots.Slot(2);
+            var campaign = NewCampaign();
+            Assert.Null(CampaignBoot.Save(slot2, campaign, savedAt: at));                // A, at 10:00
+            CampaignRuns.ShallowRetreat(campaign, "tutorial");
+            Assert.Null(CampaignBoot.Save(slot2, campaign, savedAt: at.AddHours(2)));    // B, at 12:00: A is the backup
+            byte[] backup = File.ReadAllBytes(slot2.Store.BackupPath);
+            var other = NewCampaign();
+            CampaignRuns.Clear(other, "tutorial", CampaignRuns.GoldenSeed);
+            Assert.Null(CampaignBoot.Save(slots.Slot(1), other, savedAt: at.AddHours(2.5)));   // another campaign, saved later
+            Assert.Equal(1, SaveListing.Read(slots, at.AddHours(3)).Newest!.Number);
+
+            // B by hand at 13:00: its time rewritten, the rest of it as it was, the
+            // backup A byte for byte, nothing left in the temp file's place.
+            var log = new List<string>();
+            Assert.Null(CampaignBoot.Save(slot2, campaign, report: log.Add, savedAt: at.AddHours(3), byHand: true));
+            Assert.Equal(SaveCodec.Write(SaveGame.Capture(campaign, savedAt: at.AddHours(3))), slot2.Store.Read());
+            Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
+            Assert.Equal([$"[Save] {slot2.Store.SavePath} already held this campaign - saved by hand, so its time alone is rewritten, and the backup kept"], log);
+            Assert.False(File.Exists(slot2.Store.TempPath));
+            Assert.Equal(2, SaveListing.Read(slots, at.AddHours(3)).Newest!.Number);   // CONTINUE names the slot just saved by hand
+            string stamped = slot2.Store.Read()!;
+
+            // The game's own save of it, unchanged, writes nothing, as ever: the time
+            // stays the hand save's, and the backup A.
+            Assert.Null(CampaignBoot.Save(slot2, campaign, savedAt: at.AddHours(4)));
+            Assert.Equal(stamped, slot2.Store.Read());
+            Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
+
+            // A store that refuses its writes this session restamps nothing, and says
+            // why.
+            var refusing = new SaveSlots(folder, 3);
+            refusing.Store(2).RefuseWrites("campaign.json is in the way");
+            Assert.Equal(CampaignBoot.NotSaved(refusing.Slot(2), "campaign.json is in the way"),
+                CampaignBoot.Save(refusing.Slot(2), campaign, savedAt: at.AddHours(5), byHand: true));
+            Assert.Equal(stamped, slot2.Store.Read());
+            Assert.Equal(backup, File.ReadAllBytes(slot2.Store.BackupPath));
+
+            // A campaign that changed is written by hand as ever, the save before it
+            // becoming the backup.
+            CampaignRuns.DeepRetreat(campaign, "spear_hall");
+            Assert.Null(CampaignBoot.Save(slot2, campaign, savedAt: at.AddHours(6), byHand: true));
+            Assert.Equal(stamped, slot2.Store.ReadBackup());
+        });
+    }
+
+    [Fact]
     public void ASaveThatCanBeNeitherReadNorMovedIsNeverWrittenOver()
     {
         // Windows only: another program holding the save open without sharing it

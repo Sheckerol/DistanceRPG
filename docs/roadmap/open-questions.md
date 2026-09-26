@@ -337,3 +337,31 @@ to decide.** The alternative: it asks, then saves over it, as the old games
 overwrite a file — the old save kept one save deep as the new campaign's
 backup, and gone at its next save. settled.md's Phase 5 implementation pass
 records the ruling.
+
+## What becomes of play in a slot whose writes keep failing (the save slots, R5) — SLOT DECISION 3
+
+The user's ruling of 2026-09-25 on the save slots (R5, settled.md) puts every
+save of a campaign into the slot it came from, SAVE GAME's too: "any saving
+happens on that save slot instead of choosing a save slot everytime you save".
+Under R2 a player whose slot would not take a save — a full disk, a
+`campaign.json` another program holds, a folder with no rights — could save by
+hand into another slot meanwhile. R5 removes that way out, and says nothing of
+what replaces it.
+
+**Shipped provisionally: nothing more than today's words.** Each failed save
+says `SLOT 2 COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE LOG` over
+the floor and on the next screen, and a later save that goes through takes it
+back. A quit that cannot save leaves the unsaved marker, and the title says
+`SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM BEFORE
+THAT, BEHIND WHERE YOU LEFT IT`. What was played since the last save that went
+through is lost at the quit. A slot that refuses its writes before play begins
+brings no campaign into play, so that case loses nothing.
+
+**This decides whether a slot that stops taking saves can cost play, so it is
+the user's to decide.** The alternatives: (a) at the quit, when the slot's write
+fails for anything but a full disk, what could not be saved is written into the
+same slot folder as a new file, `campaign.stranded-N.json`, overwriting nothing,
+and the title's unsaved word names it, with `TO PLAY IT AGAIN, MOVE IT INTO AN
+EMPTY SLOT FOLDER AS CAMPAIGN.JSON`; or (b) while the slot's writes are failing,
+and only then, SAVE GAME offers an empty slot to move the campaign into, which
+becomes its slot. settled.md's Phase 5 implementation pass records the ruling.

@@ -24,8 +24,7 @@ namespace GameEngine.DistanceRPG;
 /// save or a backup are <see cref="Beyond"/> it — listed, loaded, and saved into
 /// by the campaign played from each, since a campaign saves into the slot it came
 /// from (the user's ruling of 2026-09-25 on the save slots, R5), but never offered
-/// to save into by hand — and a count raised again makes them ordinary
-/// slots.</item>
+/// to NEW CAMPAIGN — and a count raised again makes them ordinary slots.</item>
 /// <item><strong>One store per slot for the session</strong>
 /// (<see cref="Store"/>): made on its first ask and handed back after, so a store
 /// that refused its writes over a file that would not move

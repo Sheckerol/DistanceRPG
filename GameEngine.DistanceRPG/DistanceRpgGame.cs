@@ -81,8 +81,9 @@ namespace GameEngine.DistanceRPG;
 /// is set as it comes into play (<see cref="Adopt"/>) and let go with it
 /// (<see cref="DropCampaign"/>), and a slot that takes no saves this session
 /// brings no campaign into play. SAVE GAME on the pause menu or the menu between
-/// runs still writes a copy into another manual slot, at a safe point
-/// (<see cref="SaveToSlot"/>). Every save carries
+/// runs saves into that slot too, at a safe point, asking nothing
+/// (<see cref="SaveNow"/>): "instead of choosing a save slot everytime you save".
+/// Every save carries
 /// its time, from the clock here (<see cref="_clock"/>), never read in
 /// <c>Logic/</c>. It is written only at a safe point
 /// (<see cref="SaveGame.IsSafePoint"/>) and only once the frame a save was asked
@@ -90,7 +91,7 @@ namespace GameEngine.DistanceRPG;
 /// entered, at every player turn's start and after every floor arrival (the
 /// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, when NEW
 /// CAMPAIGN begins one — on the title, or <c>--new-campaign</c> at launch — by
-/// hand into a slot, and on leaving play — the menus' QUIT TO TITLE
+/// hand, and on leaving play — the menus' QUIT TO TITLE
 /// (<see cref="QuitToTitle"/>) or the window's close button (<see cref="OnClosing"/>),
 /// both through the quit's own door (<see cref="SaveOnQuit"/>). A quit during the
 /// enemies' turn plays it out to the next player turn first, on the playing
@@ -196,9 +197,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     // raise is running, and not before the campaign stands at a safe point.
     private bool _saveRequested;
 
-    // A save by hand was asked for — the save list's choice, the slot's number:
-    // written at the end of the frame, where the safe point is asked again.
-    private int? _slotRequested;
+    // A save by hand was asked for — SAVE GAME, into the campaign's own slot:
+    // written at the end of the frame, through the same door as the requests
+    // above, where the safe point is asked again. Off one it is answered and
+    // dropped, never kept for later.
+    private bool _handSaveRequested;
 
     // A resumed campaign whose first screen is not up yet: the resume marker is
     // cleared once it is.
@@ -442,6 +445,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         Adopt(campaign, chosen);
         _saveRequested = false;
+        _handSaveRequested = false;
         _resuming = true;   // the loaded screen clears the slot's resume marker once it is up
         Log.Info($"[Save] The campaign saves into {chosen.Store.Folder} from now on");
         foreach (string notice in load.Notices)
@@ -534,6 +538,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         Adopt(boot.Campaign, slot);
         _saveRequested = false;
+        _handSaveRequested = false;
         _resuming = false;
         string[] begun = [.. boot.Notices, .. said];
         foreach (string notice in begun)
@@ -545,81 +550,26 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>QUIT on the title: the window closes. No campaign is in play there, so the close saves nothing (<see cref="OnClosing"/>).</summary>
     public void Quit() => Close();
 
-    /// <summary>Whether this session has a title and manual slots (<see cref="ISaveHost.HasTitle"/>): it made the save folder's slots, which a dev-override launch never does.</summary>
+    /// <summary>Whether this session has a title and the save folder's slots (<see cref="ISaveHost.HasTitle"/>): it made them, which a dev-override launch never does.</summary>
     public bool HasTitle => _slots is not null;
 
-    /// <summary>The slot the campaign in play is bound to, by number (<see cref="ISaveHost.OwnSlot"/>): the save list shows it as saving itself, and never offers it. The autosave's for a dev override's scratch slot, which has no list, and with no campaign in play.</summary>
-    public int OwnSlot => _slot?.Number ?? SaveSlots.Autosave;
+    /// <summary>The slot the campaign in play is bound to, by its name (<see cref="ISaveHost.SavesInto"/>): <c>SLOT 2</c>, <c>THE AUTOSAVE</c>, or a dev override's <c>THE SCRATCH SLOT</c>, which the menus say under their options; empty with no campaign in play.</summary>
+    public string SavesInto => _slot?.Name ?? "";
 
     /// <summary>
-    /// The save folder's slots as they stand now, for the save list the menus open
-    /// (<see cref="ISaveHost.Slots"/>): read afresh at the clock's time, never a file
-    /// moved, a file the file system would not let the game read logged. A
-    /// dev-override session has none to offer, and its menu never asks.
+    /// SAVE GAME, on the pause menu or the menu between runs (the user's ruling of
+    /// 2026-09-25 on the save slots, R5: "any saving happens on that save slot
+    /// instead of choosing a save slot everytime you save"): the campaign saved by
+    /// hand into its own slot — the one it was loaded from or begun in, a dev
+    /// override's scratch slot among them — asking nothing. Only asked for here,
+    /// as the autosaves are, and written at the end of the frame through their
+    /// door (<see cref="WriteRequestedSave"/>), where the safe point is asked again
+    /// and the menu told how it went.
     /// </summary>
-    public SaveListing Slots()
-    {
-        if (_slots is not { } slots)
-            return new SaveListing([], []);
-        var listing = SaveListing.Read(slots, _clock(), line => Log.Info(line));
-        foreach (string notice in listing.Notices)
-            Log.Warn($"[Save] {notice}");
-        return listing;
-    }
-
-    /// <summary>
-    /// The save list chose manual slot <paramref name="slot"/> (R2(d)): a copy of
-    /// the campaign, which goes on saving into its own slot — the save by
-    /// hand is only asked for here, and written at the end of the frame
-    /// (<see cref="WriteRequestedSlot"/>), where the safe point is asked again. A
-    /// dev-override session, which has no slots, is refused outright — whatever
-    /// asked — and the menu says so, so no path puts a scratch campaign in the
-    /// player's slots.
-    /// </summary>
-    public void SaveToSlot(int slot)
-    {
-        if (!HasTitle)
-        {
-            Log.Warn($"[Save] A save by hand into slot {slot} was asked for in a dev-override session, which saves only its scratch slot - nothing is written");
-            AnswerSlotSave(PauseMenu.NoSaveInOverride);
-            return;
-        }
-        _slotRequested = slot;
-    }
-
-    /// <summary>
-    /// The save by hand the save list asked for, written now that the frame is over
-    /// (<see cref="CampaignBoot.SaveTo"/>) into the slot the session holds for it
-    /// (<see cref="SaveSlots.Slot"/>), with the playing scene's view mid-run; and the
-    /// menu told how it went, inside itself (<c>SlotSaved</c>). Off a safe point it
-    /// writes nothing and says so. One that arrives while a loaded campaign's first
-    /// screen is not up yet waits for it, as the autosaves do.
-    /// </summary>
-    private void WriteRequestedSlot()
-    {
-        if (_resuming)
-            return;   // kept: written the frame the loaded screen is up
-        int slot = _slotRequested!.Value;
-        _slotRequested = null;
-        if (_campaign is not { } campaign || _slots is not { } slots || slot < 1 || slot > slots.Count)
-        {
-            Log.Warn($"[Save] A save by hand into slot {slot} found no campaign in play or no such slot - nothing is written");
-            return;
-        }
-
-        Log.Info(campaign.Visit is { } visit
-            ? $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
-            : $"[Save] Saving the campaign into {SaveSlots.Label(slot)} by hand, between runs");
-        var (saved, notice) = CampaignBoot.SaveTo(slots.Slot(slot), campaign, PlayingScene(campaign)?.View, line => Log.Info(line), _clock());
-        if (saved)
-            Log.Info($"[Save] {notice}");
-        else
-            Log.Warn($"[Save] {notice}");
-        AnswerSlotSave(notice);
-    }
+    public void SaveNow() => _handSaveRequested = true;
 
     /// <summary>Tell the screen up now — the dungeon's pause menu, or the menu between runs — what a save by hand came to, drawn inside the menu.</summary>
-    private static void AnswerSlotSave(string notice)
+    private static void AnswerHandSave(string notice)
     {
         switch (SceneManager.Instance.CurrentScene)
         {
@@ -684,7 +634,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         _campaign = null;
         _slot = null;
         _saveRequested = false;
-        _slotRequested = null;
+        _handSaveRequested = false;
         _failedSaves.Clear();
     }
 
@@ -882,10 +832,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         // The frame is over, and no raise is running: what it asked of the save is done now.
         if (_resuming)
             ClearResumeOnceUp();
-        if (_saveRequested)
+        if (_saveRequested || _handSaveRequested)
             WriteRequestedSave();
-        if (_slotRequested is not null)
-            WriteRequestedSlot();
     }
 
     /// <summary>
@@ -921,31 +869,60 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
     /// <summary>
     /// The save a run's end, a run's entry, a player turn's start or a floor
-    /// arrival asked for, written into the campaign's slot now that the frame is
-    /// over — with the playing scene's view when a run is in progress. A request
-    /// that finds the campaign off a safe point — the enemies' turn begun in the
-    /// same frame, the party out of movement on a march — waits for the next frame
-    /// that stands at one. And one that arrives while a loaded campaign's first
-    /// screen is not up yet waits for it: kept, and written the frame the resume
-    /// marker clears, so a load whose first screen crashes never writes the slot
-    /// it was loading, and the marker left there sets that save aside next time.
-    /// The slot a load reads is the slot its campaign then saves into (R5), so
-    /// this wait is what keeps a write off a slot whose own load is in flight.
+    /// arrival asked for — or SAVE GAME (<see cref="SaveNow"/>) — written into the
+    /// campaign's slot now that the frame is over, with the playing scene's view
+    /// when a run is in progress: <strong>the one door every save of the campaign
+    /// in play goes through</strong> but the quit's (the user's ruling of
+    /// 2026-09-25 on the save slots, R5), so both kinds of request that arrive in
+    /// one frame are one write, answered once. An automatic request that finds the
+    /// campaign off a safe point — the enemies' turn begun in the same frame, the
+    /// party out of movement on a march — waits for the next frame that stands at
+    /// one; a save by hand is answered <see cref="PauseMenu.SaveOnYourTurn"/> and
+    /// dropped, written neither then nor later, and never settles the enemies' turn
+    /// to reach one. A save by hand that goes through is answered inside the menu
+    /// (<see cref="CampaignBoot.SaveAnswer"/>), and restamps a save that holds the
+    /// campaign already (<see cref="CampaignBoot.Save"/>). And a request that
+    /// arrives while a loaded campaign's first screen is not up yet waits for it:
+    /// kept, and written the frame the resume marker clears, so a load whose first
+    /// screen crashes never writes the slot it was loading, and the marker left
+    /// there sets that save aside next time. The slot a load reads is the slot its
+    /// campaign then saves into (R5), so this wait is what keeps a write off a slot
+    /// whose own load is in flight.
     /// </summary>
     private void WriteRequestedSave()
     {
         if (_campaign is not { } campaign || _slot is not { } slot)
         {
             _saveRequested = false;
+            _handSaveRequested = false;
             return;
         }
-        if (_resuming || !SaveGame.IsSafePoint(campaign))
-            return;
-        _saveRequested = false;
-        if (campaign.Visit is { } visit)
-            Save(campaign, slot, $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}", PlayingScene(campaign)?.View);
-        else
-            Save(campaign, slot, "at the run's end");
+        if (_resuming)
+            return;   // kept: written the frame the loaded screen is up
+        bool byHand = _handSaveRequested;
+        _handSaveRequested = false;   // answered now, whatever comes of it
+        if (!SaveGame.IsSafePoint(campaign))
+        {
+            if (byHand)
+            {
+                Log.Info("[Save] SAVE GAME found the campaign off a safe point by the frame's end - nothing is written, now or later");
+                AnswerHandSave(PauseMenu.SaveOnYourTurn);
+            }
+            return;   // an automatic request waits for the next safe point
+        }
+        _saveRequested = false;   // cleared once, past the _resuming read, before the write
+        var (failed, setAside) = Save(campaign, slot, When(campaign, byHand), campaign.Visit is null ? null : PlayingScene(campaign)?.View, byHand);
+        if (byHand)
+            AnswerHandSave(CampaignBoot.SaveAnswer(slot, failed, setAside));
+    }
+
+    /// <summary>What a save's log line says of it: where the campaign stands — mid-run, the dungeon, floor and turn; between runs, the run's end the game's own save follows — and whether it is saved by hand.</summary>
+    private static string When(CampaignState campaign, bool byHand)
+    {
+        string where = campaign.Visit is { } visit
+            ? $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
+            : byHand ? "between runs" : "at the run's end";
+        return byHand ? $"by hand, {where}" : where;
     }
 
     /// <summary>
@@ -959,15 +936,18 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// write set aside first, since no save could be read from it, is said the same
     /// way — at once, and on the next screen — and never taken back: it is a fact
     /// about a file, whatever the saves after it do. The save on the disk is kept
-    /// whatever happens.
+    /// whatever happens. A save by hand (<paramref name="byHand"/>) restamps a save
+    /// that holds the campaign already, rather than write nothing.
     /// </summary>
-    private void Save(CampaignState campaign, SaveSlot slot, string when, ViewDto? view = null)
+    /// <returns>What <see cref="CampaignBoot.Save"/> handed back — null when saved, or the failure's word — and every file the write set aside first, for the menu's answer to a save by hand.</returns>
+    private (string? Failed, IReadOnlyList<string> SetAside) Save(CampaignState campaign, SaveSlot slot, string when, ViewDto? view = null, bool byHand = false)
     {
         Log.Info($"[Save] Saving the campaign {when}");
         var said = new List<string>();
-        string? failed = CampaignBoot.Save(slot, campaign, view, line => Log.Info(line), _clock(), said);
-        foreach (string setAside in said)
-            Log.Warn($"[Save] {setAside}");
+        string? failed = CampaignBoot.Save(slot, campaign, view, line => Log.Info(line), _clock(), said, byHand);
+        var setAside = said.ToList();
+        foreach (string notice in setAside)
+            Log.Warn($"[Save] {notice}");
         if (failed is null)
         {
             TakeBackFailedSaves();
@@ -980,7 +960,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             said.Add(failed);
         }
         if (said.Count == 0)
-            return;
+            return (failed, setAside);
 
         // Led for the next screen, and shown at once over the floor being played,
         // each whole ahead of what is up — so the first said is laid last, on top.
@@ -988,6 +968,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var scene = PlayingScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
             scene?.SaveFailed(said[i]);
+        return (failed, setAside);
     }
 
     /// <summary>

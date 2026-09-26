@@ -4,36 +4,36 @@ namespace GameEngine.DistanceRPG;
 /// What both screens with a campaign in play reach the game through for its
 /// saves and for leaving play (the user's ruling of 2026-09-25 on the save model,
 /// R2(d), R2(e)): the menu ESC opens — in the dungeon the pause menu, between runs
-/// the same menu over the hub (<see cref="PauseMenu"/>) — saves into a manual slot
-/// at a safe point and quits to the title. The screens never hold the concrete
-/// game that hosts them (§6.7).
+/// the same menu over the hub (<see cref="PauseMenu"/>) — saves the campaign by
+/// hand at a safe point and quits to the title. The screens never hold the
+/// concrete game that hosts them (§6.7).
 /// <para>
-/// <strong>A save by hand is only asked for</strong>, as the autosaves are
-/// (<see cref="IRunHost.RequestSave"/>): the host writes it once the frame is
-/// over, re-asking the safe point there (<c>CampaignBoot.SaveTo</c>), and tells the
-/// screen how it went — the words the menu draws under itself. The campaign's own
-/// slot, which every save of it goes into already (the user's ruling of 2026-09-25
-/// on the save slots, R5), is shown on the list and never offered
-/// (<see cref="OwnSlot"/>). <strong>Leaving play</strong> is the host's too: the
-/// campaign's slot written through the window close's own door, then the title. A
-/// dev-override session has no title (<see cref="HasTitle"/>): it saves only its
-/// scratch slot, and its menu quits the game instead.
+/// <strong>A save by hand goes where the campaign saves, asking nothing</strong>
+/// (the user's ruling of 2026-09-25 on the save slots, R5: "any saving happens on
+/// that save slot instead of choosing a save slot everytime you save"): into the
+/// slot the campaign was loaded from or begun in, which the menu names
+/// (<see cref="SavesInto"/>). It is only asked for, as the autosaves are
+/// (<see cref="IRunHost.RequestSave"/>): the host writes it once the frame is over,
+/// re-asking the safe point there, and tells the screen how it went — the words
+/// the menu draws under itself. <strong>Leaving play</strong> is the host's too:
+/// the campaign's slot written through the window close's own door, then the
+/// title. A dev-override session has no title (<see cref="HasTitle"/>): its
+/// campaign's slot is its scratch slot, which SAVE GAME saves, and its menu quits
+/// the game instead.
 /// </para>
 /// </summary>
 public interface ISaveHost
 {
-    /// <summary>The save folder's slots as they stand now, read afresh (the listing never moves a file): what the save list offers. A dev-override session has none to offer.</summary>
-    SaveListing Slots();
-
-    /// <summary>The slot the campaign in play saves into, by number — the one it was loaded from or begun in — which the save list shows as saving itself and never offers; 0 for the autosave, and for a dev override's scratch slot, which has no list.</summary>
-    int OwnSlot { get; }
+    /// <summary>The slot the campaign in play saves into, by its name — <c>SLOT 2</c>, <c>THE AUTOSAVE</c>, <c>THE SCRATCH SLOT</c> — which the menu says under its options; empty with no campaign in play.</summary>
+    string SavesInto { get; }
 
     /// <summary>
-    /// Save the campaign into manual slot <paramref name="slot"/>, chosen on the save
-    /// list — once the frame is over, and only at a safe point — then tell the screen
-    /// how it went. Asked once per choice; a dev-override session refuses it.
+    /// Save the campaign by hand into its own slot (<see cref="SavesInto"/>) — once
+    /// the frame is over, and only at a safe point — then tell the screen how it
+    /// went. Asked once per press of SAVE GAME; one that finds the campaign off a
+    /// safe point by then is answered so, and written neither then nor later.
     /// </summary>
-    void SaveToSlot(int slot);
+    void SaveNow();
 
     /// <summary>
     /// Leave play for the title: the campaign's slot written as the window's close
@@ -43,14 +43,14 @@ public interface ISaveHost
     /// </summary>
     void QuitToTitle();
 
-    /// <summary>Whether this session has a title to quit to and slots to save into: false for a dev-override launch, which plays a scratch campaign apart from both.</summary>
+    /// <summary>Whether this session has a title to quit to and the save folder's slots: false for a dev-override launch, which plays a scratch campaign apart from both.</summary>
     bool HasTitle { get; }
 }
 
 /// <summary>
 /// What a dungeon scene reaches the game through: the run is over, or the
-/// campaign should be saved — by itself, or by hand into a slot, and play left
-/// for the title (<see cref="ISaveHost"/>). The scene never holds the concrete
+/// campaign should be saved — by itself, or by hand, and play left for the title
+/// (<see cref="ISaveHost"/>). The scene never holds the concrete
 /// game that hosts it (§6.7 — the campaign outlives every scene, and the scenes
 /// are views of it).
 /// <para>

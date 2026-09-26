@@ -16,8 +16,8 @@ namespace GameEngine.DistanceRPG;
 /// aside and where), and then anything else, capped; on a later one, a save that
 /// could not be written. While the menu ESC opens is up, the hub dims under it and
 /// the menu is drawn over it as the dungeon's pause menu is
-/// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, or the save list in
-/// their place, and what a save by hand came to — and the keys line along the
+/// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, the slot the campaign
+/// saves into, and what a save by hand came to — and the keys line along the
 /// bottom gives way to the menu's (<see cref="BottomLine"/>).
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
@@ -381,16 +381,13 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The line along the bottom, and its colour, in grey: the keys the screen
-    /// answers (<see cref="KeysLine"/>); while the menu is up, the menu's
-    /// (<see cref="MenuKeysLine"/>) in their place; and while the save list is up,
-    /// nothing — the list's own keys are under it (<see cref="SlotText.SaveKeysLine"/>),
-    /// and its digits choose slots, not the menu's options.
+    /// answers (<see cref="KeysLine"/>), and while the menu is up, the menu's
+    /// (<see cref="MenuKeysLine"/>) in their place.
     /// </summary>
     /// <param name="menu">Whether the menu is up.</param>
-    /// <param name="saves">Whether the save list is up, in the menu's options' place.</param>
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
-    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool saves = false, bool hasTitle = true)
-        => (saves ? "" : menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
+    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool hasTitle = true)
+        => (menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -485,14 +482,13 @@ public sealed class BetweenRunsHud : IDisposable
             // and the menu is drawn over it.
             _text.Flush(_game.ShaderManager);
             _fade.Draw(_game.ShaderManager, MenuDim);
-            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), scene.HasTitle, scene.MenuAnswer, scene.SaveList,
-                         GameContent.Current.Dungeons, TimeZoneInfo.Local))
-                _text.DrawText(row.Text, row.Left ?? w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
+                         scene.MenuAnswer))
+                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.SaveList is not null, scene.HasTitle);
-        if (bottom.Length > 0)
-            DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
+        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.HasTitle);
+        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
 

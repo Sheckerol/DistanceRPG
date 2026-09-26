@@ -31,7 +31,9 @@ namespace GameEngine.DistanceRPG;
 /// <para>
 /// <strong>A write never costs the save before it.</strong> The text goes to
 /// <see cref="TempName"/> first, flushed to the disk. Only then does it replace
-/// the save in one step, the old save becoming the backup. A write that fails at
+/// the save in one step, the old save becoming the backup — or, for a save by
+/// hand of the campaign the save holds already, its time alone rewritten and the
+/// backup kept (<see cref="Restamp"/>). A write that fails at
 /// any point leaves <see cref="FileName"/> exactly as it was. The one delete is
 /// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The two
 /// markers, which are no saves, are the only other files this class removes.
@@ -169,6 +171,38 @@ internal sealed class SaveStore
         {
             File.Move(TempPath, SavePath);
         }
+        SaveVouched = true;
+    }
+
+    /// <summary>
+    /// Write <paramref name="text"/> in place of the save <strong>without rotating
+    /// the backup</strong>: into <see cref="TempName"/>, flushed to the disk, then
+    /// in place of the save in one step, the save it replaces kept nowhere. Only for
+    /// a save that holds <paramref name="text"/> already but for its time — a save
+    /// by hand of an unchanged campaign (the user's ruling of 2026-09-25 on the save
+    /// slots, R5), which stamps the file's time as old games' saves do — so the
+    /// backup stays the save before it, a different state, and one save deep holds:
+    /// what is replaced differs from what replaces it in its time alone. The caller
+    /// decides that (<c>CampaignBoot.Save</c>). The save is then one this session
+    /// knows, and the backup is known as it was.
+    /// </summary>
+    /// <exception cref="IOException">The write failed, or writes are refused; the save on the disk is what it was.</exception>
+    /// <exception cref="FileNotFoundException">There is no save to restamp; nothing is written.</exception>
+    /// <exception cref="UnauthorizedAccessException">No permission to write there; the save on the disk is what it was.</exception>
+    public void Restamp(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (WritesRefused is { } refused)
+            throw new IOException(refused);
+        if (!File.Exists(SavePath))
+            throw new FileNotFoundException("There is no save to restamp.", SavePath);
+
+        using (var stream = new FileStream(TempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            stream.Write(Utf8.GetBytes(text));
+            stream.Flush(flushToDisk: true);
+        }
+        File.Replace(TempPath, SavePath, destinationBackupFileName: null, ignoreMetadataErrors: true);
         SaveVouched = true;
     }
 

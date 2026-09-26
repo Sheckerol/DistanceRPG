@@ -246,23 +246,26 @@ public sealed class SaveSlotsTests : IDisposable
 
             // A save by hand names the slot it went into as every word names it: THE
             // AUTOSAVE and THE SCRATCH SLOT too, where the autosave's once read SAVED
-            // TO AUTOSAVE, the list's label. No player sees either yet: a save by hand
-            // into them is refused outright (below).
+            // TO AUTOSAVE, the list's label. SAVE GAME saves the campaign's own slot,
+            // whichever it is (the user's ruling on the save slots, R5), so a player
+            // sees each: its answer names the slot the same way (below).
             Assert.Equal(("SAVED TO SLOT 1", "SAVED TO SLOT 9"), (CampaignBoot.SavedTo(Named(1)), CampaignBoot.SavedTo(Named(9))));
             Assert.Equal(("SAVED TO THE AUTOSAVE", "SAVED TO THE SCRATCH SLOT"), (CampaignBoot.SavedTo(Named(SaveSlots.Autosave)), CampaignBoot.SavedTo(scratch)));
 
             // The name goes where the slot goes: one store refusing its writes, handed
             // in as slot 3 and as the autosave, fails in each one's words — and
-            // touches no file either way. A save by hand is refused outright into the
-            // autosave and the scratch slot, which are written by the game alone.
+            // touches no file either way, by hand or not; and a save by hand's answer
+            // names the slot it saved, the autosave and the scratch slot among them.
             var refusing = slots.Store(3);
             refusing.RefuseWrites("campaign.json is in the way");
             var campaign = Retreated();
             Assert.Equal(CampaignBoot.NotSaved(slots.Slot(3), "campaign.json is in the way"), CampaignBoot.Save(slots.Slot(3), campaign, savedAt: Now));
             Assert.StartsWith("SLOT 3 COULD NOT BE SAVED (CAMPAIGN.JSON IS IN THE WAY)", CampaignBoot.Save(slots.Slot(3), campaign), StringComparison.Ordinal);
             Assert.Equal(CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "campaign.json is in the way"), CampaignBoot.Save(AsAutosave(refusing), campaign));
-            Assert.Throws<ArgumentOutOfRangeException>(() => CampaignBoot.SaveTo(slots.Slot(SaveSlots.Autosave), campaign, null));
-            Assert.Throws<ArgumentOutOfRangeException>(() => CampaignBoot.SaveTo(scratch, campaign, null));
+            Assert.Equal(CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "campaign.json is in the way"), CampaignBoot.Save(AsAutosave(refusing), campaign, byHand: true));
+            Assert.Equal(CampaignBoot.NotSaved(slots.Slot(3), "campaign.json is in the way"), CampaignBoot.Save(slots.Slot(3), campaign, savedAt: Now, byHand: true));
+            Assert.Equal(("SAVED TO THE AUTOSAVE", "SAVED TO THE SCRATCH SLOT", "SAVED TO SLOT 3"),
+                (CampaignBoot.SaveAnswer(Named(SaveSlots.Autosave), failed: null, []), CampaignBoot.SaveAnswer(scratch, failed: null, []), CampaignBoot.SaveAnswer(slots.Slot(3), failed: null, [])));
             Assert.Empty(Directory.GetFileSystemEntries(folder));
         });
     }

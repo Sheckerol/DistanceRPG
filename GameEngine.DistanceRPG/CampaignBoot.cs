@@ -75,8 +75,8 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// than loaded — a dev override's scratch campaign (<see cref="BootOverride"/>)
 /// and NEW CAMPAIGN (<see cref="Abandon"/>, and <see cref="PutBack"/> when it
 /// never begins); a save that never throws and never costs a file
-/// (<see cref="Save"/>); a save by hand into another slot, at a safe point alone
-/// (<see cref="SaveTo"/>); and the save leaving play takes mid-run
+/// (<see cref="Save"/>), a save by hand among them, and what the menu answers it
+/// (<see cref="SaveAnswer"/>); and the save leaving play takes mid-run
 /// (<see cref="SaveOnQuit"/>). Engine-free, so every
 /// case is tested on a temporary folder with no window; what it has to say goes to
 /// the caller as log lines (<c>report</c>) and as notices, and the game draws and
@@ -100,22 +100,25 @@ internal sealed record SlotLoad(CampaignState? Campaign, ViewDto? View, IReadOnl
 /// ruling of 2026-09-25 on the save slots, R5: "you choose a save slot and any
 /// saving happens on that save slot"): the slot it was loaded from, or the one
 /// NEW CAMPAIGN began it in — chosen on the title, 1 to the count — takes every
-/// save of it — the game's own and the quit's — and no load sets another slot's
-/// files aside, nor does NEW CAMPAIGN, which sets aside what its own slot held
-/// alone.</item>
+/// save of it — the game's own, the quit's and SAVE GAME's — and no load sets
+/// another slot's files aside, nor does NEW CAMPAIGN, which sets aside what its
+/// own slot held alone.</item>
 /// <item><strong>A slot that takes no saves brings no campaign into
 /// play</strong>: a refusal holds for the session, and a campaign played in a
 /// slot that refuses its writes could never be saved, so its load loads nothing
 /// and touches nothing (<see cref="TakesNoSaves"/>), and NEW CAMPAIGN does not
 /// begin there — nor where its first save fails, what it set aside put back
 /// (<see cref="PutBack"/>, <see cref="NotBegunWord"/>).</item>
-/// <item><strong>A save by hand goes into a manual slot at a safe point
-/// only</strong> (<see cref="SaveTo"/>; the user's ruling of 2026-09-25 on the save
-/// model, R2(d)): never while the enemies are moving, and never into the autosave,
-/// which the game alone writes.</item>
-/// <item><strong>No write costs a file</strong> (1f): a slot can be written without
-/// being loaded, so before any write a <see cref="SaveStore.FileName"/> there
-/// that no save can be read from is set aside first, and so is such a backup the
+/// <item><strong>A save by hand goes into the campaign's own slot, asking
+/// nothing</strong> (the user's ruling of 2026-09-25 on the save slots, R5:
+/// "instead of choosing a save slot everytime you save"): through
+/// <see cref="Save"/>, the one door, at a safe point only — the game asks it
+/// (R2(d): never while the enemies are moving) — and a save of the campaign the
+/// slot holds already stamps its time, the backup kept. What the menu answers is
+/// <see cref="SaveAnswer"/>.</item>
+/// <item><strong>No write costs a file</strong> (1f): before any write, a
+/// <see cref="SaveStore.FileName"/> there that this session does not know and no
+/// save can be read from is set aside first, and so is such a backup the
 /// replace would otherwise rotate away — the codec's refusal decides, never a
 /// listing's word on the slot. And a write clears its slot's resume marker: the
 /// file it guarded is gone.</item>
@@ -721,7 +724,12 @@ internal static class CampaignBoot
     /// <paramref name="view"/> and the time, atomically. A save of the campaign the
     /// slot already holds, whatever its time, is not written again
     /// (<see cref="Holds"/>), so the backup stays the save before it and the save
-    /// keeps the time its state was first written. Never throws: a write that
+    /// keeps the time its state was first written — but for a save by hand
+    /// (<paramref name="byHand"/>), which stamps the save's time as old games' saves
+    /// stamp their file (the user's ruling of 2026-09-25 on the save slots, R5): its
+    /// time alone is rewritten, and the backup is not rotated
+    /// (<see cref="SaveStore.Restamp"/>), so one save deep holds, and the slot just
+    /// saved by hand is the one CONTINUE names. Never throws: a write that
     /// fails — a full disk, a folder with no rights, a locked file, a campaign that
     /// cannot be captured, the enemies mid-turn — is logged whole and comes back as
     /// the notice to show, and the save on the disk is what it was.
@@ -742,15 +750,16 @@ internal static class CampaignBoot
     /// it guarded is gone.
     /// </para>
     /// </summary>
-    /// <param name="slot">The slot: its store, and its name, which a failure's words name (<see cref="NotSaved"/>) — the slot the campaign came from, or a manual slot saved into by hand, where a file that would not move is said the same way, by what refuses the slot's writes; the autosave's and the scratch slot's failures name no slot.</param>
+    /// <param name="slot">The slot: its store, and its name, which a failure's words name (<see cref="NotSaved"/>) — the slot the campaign came from, where a file that would not move is said the same way, by what refuses the slot's writes; the autosave's and the scratch slot's failures name no slot.</param>
     /// <param name="campaign">The campaign, at a safe point.</param>
     /// <param name="view">What the scene shows, carried for it; null for nothing to say.</param>
     /// <param name="report">Where the log lines go.</param>
     /// <param name="savedAt">When it is saved, the edge's clock: written as the save's time. Null records none.</param>
     /// <param name="said">Where the notices of what the guard set aside go, a list the caller hands in; null to leave them to the log.</param>
+    /// <param name="byHand">A save by hand — SAVE GAME on either menu — which restamps a save that holds the campaign already, rather than write nothing; the game's own saves and the quit's never do.</param>
     /// <returns>Null when saved, or the notice a failed write shows.</returns>
     internal static string? Save(SaveSlot slot, CampaignState campaign, ViewDto? view = null, Action<string>? report = null,
-        DateTimeOffset? savedAt = null, List<string>? said = null)
+        DateTimeOffset? savedAt = null, List<string>? said = null, bool byHand = false)
     {
         ArgumentNullException.ThrowIfNull(slot);
         ArgumentNullException.ThrowIfNull(campaign);
@@ -760,7 +769,14 @@ internal static class CampaignBoot
             string text = SaveCodec.Write(SaveGame.Capture(campaign, view, savedAt));
             if (Holds(store, text))
             {
-                report?.Invoke($"[Save] {store.SavePath} already holds this campaign - nothing written, the backup kept");
+                if (!byHand)
+                {
+                    report?.Invoke($"[Save] {store.SavePath} already holds this campaign - nothing written, the backup kept");
+                    return null;
+                }
+                store.Restamp(text);
+                report?.Invoke($"[Save] {store.SavePath} already held this campaign - saved by hand, so its time alone is rewritten, and the backup kept");
+                Written(store, report);
                 return null;
             }
             if (store.WritesRefused is null && MakeWay(store, report, said) is { } stuck)
@@ -776,50 +792,6 @@ internal static class CampaignBoot
             string why = store.WritesRefused ?? SaveStore.Why(error, store.Folder, writing: true);
             return NotSaved(slot, why);
         }
-    }
-
-    /// <summary>
-    /// A save by hand into a manual <paramref name="slot"/> — the save list's
-    /// choice on the pause menu or the menu between runs (the user's ruling of
-    /// 2026-09-25 on the save model, R2(d): "a manual save can be made at ANY SAFE
-    /// POINT"). Refused off a safe point (<see cref="SaveGame.IsSafePoint"/>) —
-    /// never while the enemies are moving — with the words the menu says there,
-    /// writing nothing: the menu opens the list only on one, and this asks again
-    /// when the write comes. Otherwise written
-    /// through <see cref="Save"/>, the one door every write goes through, whose guard
-    /// sets aside a <see cref="SaveStore.FileName"/> the codec refuses — and such a
-    /// backup the replace would rotate away — <strong>whatever the list said of the
-    /// slot</strong>: the files decide, never a listing read before them. So a slot
-    /// whose save cannot be read and whose backup can has its save set aside, the
-    /// write moved into place, and the backup untouched. A slot whose store refuses
-    /// its writes this session answers with why. The campaign is not moved there:
-    /// it goes on saving into the slot it came from (R5), which the list shows and
-    /// never offers.
-    /// </summary>
-    /// <param name="slot">The manual slot (<see cref="SaveSlots.Slot"/>): its store, and its name, which the words name.</param>
-    /// <param name="campaign">The campaign in play.</param>
-    /// <param name="view">What the playing scene shows, carried for it mid-run; null between runs.</param>
-    /// <param name="report">Where the log lines go.</param>
-    /// <param name="savedAt">When it is saved, the edge's clock.</param>
-    /// <returns>Whether it was saved, and what the menu says: <c>SAVED TO SLOT 2</c> — then each file the write set aside first, where, and how to try it again — or why not.</returns>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is no manual slot: the autosave is written by the game alone, and the scratch slot by its dev override.</exception>
-    internal static (bool Saved, string Notice) SaveTo(SaveSlot slot, CampaignState campaign, ViewDto? view,
-        Action<string>? report = null, DateTimeOffset? savedAt = null)
-    {
-        ArgumentNullException.ThrowIfNull(slot);
-        ArgumentNullException.ThrowIfNull(campaign);
-        if (slot.Number is not > SaveSlots.Autosave)
-            throw new ArgumentOutOfRangeException(nameof(slot), slot.Number, "A save by hand goes into a manual slot: the autosave is written by the game alone, and the scratch slot by its dev override.");
-        if (!SaveGame.IsSafePoint(campaign))
-        {
-            report?.Invoke($"[Save] Not saving into {slot.Name}: the campaign is off a safe point ({campaign.Visit!.Turns!.Phase}) - nothing is written, and {slot.Store.SavePath} keeps what it holds");
-            return (false, PauseMenu.SaveOnYourTurn);
-        }
-
-        var said = new List<string>();
-        if (Save(slot, campaign, campaign.Visit is null ? null : view, report, savedAt, said) is { } failed)
-            return (false, failed);
-        return (true, string.Join(" - ", [SavedTo(slot), .. said]));
     }
 
     /// <summary>
@@ -1054,8 +1026,8 @@ internal static class CampaignBoot
 
     /// <summary>
     /// A write into <paramref name="slot"/> that failed, and why, in a notice:
-    /// what the slot held before is kept. A manual slot — its campaign's own save,
-    /// or one saved into by hand — is named —
+    /// what the slot held before is kept. A manual slot — the game's own save of
+    /// its campaign, the quit's, or one by hand — is named —
     /// <c>SLOT 2 COULD NOT BE SAVED (ANOTHER PROGRAM HAS IT OPEN) - WHAT IT HELD IS
     /// KEPT - SEE THE LOG</c> — and the autosave and the scratch slot are the
     /// campaign's own save: <c>THE CAMPAIGN COULD NOT BE SAVED (THE DISK IS FULL) -
@@ -1074,11 +1046,30 @@ internal static class CampaignBoot
     /// <summary>How a save by hand that went through starts (<see cref="SavedTo"/>): the menu draws it green.</summary>
     internal const string SavedPrefix = "SAVED TO ";
 
-    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
+    /// <summary>A save by hand that went through: <c>SAVED TO SLOT 2</c>, <c>SAVED TO THE AUTOSAVE</c>, <c>SAVED TO THE SCRATCH SLOT</c> — the slot by its name (<see cref="SaveSlot.Name"/>).</summary>
     internal static string SavedTo(SaveSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);
         return $"{SavedPrefix}{slot.Name}";
+    }
+
+    /// <summary>
+    /// What the menu answers a save by hand into <paramref name="slot"/> — the
+    /// campaign's own, the only one SAVE GAME saves (the user's ruling of 2026-09-25
+    /// on the save slots, R5) — drawn inside it until the next key: <see cref="SavedTo"/>
+    /// when it went through, in green, or why not (<see cref="NotSaved"/>, the words
+    /// <see cref="Save"/> handed back), in orange; then each file the write guard set
+    /// aside on the way, where, and how to try it again — true of the disk whichever
+    /// way the save went.
+    /// </summary>
+    /// <param name="slot">The campaign's slot, saved into.</param>
+    /// <param name="failed">What <see cref="Save"/> handed back: null when the save went through, and otherwise its word.</param>
+    /// <param name="setAside">The notices of what the write guard set aside first (<see cref="Save"/>'s <c>said</c>), in order.</param>
+    internal static string SaveAnswer(SaveSlot slot, string? failed, IReadOnlyList<string> setAside)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(setAside);
+        return string.Join(" - ", [failed ?? SavedTo(slot), .. setAside]);
     }
 
     /// <summary>

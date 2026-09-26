@@ -44,7 +44,7 @@ public sealed record SlotHeader(DateTimeOffset? SavedAt, int RunCounter, string?
 /// <param name="State">What it holds.</param>
 /// <param name="Header">The header of the file a load would bring back — the save's, or the backup's when the slot is <see cref="SlotState.FromBackup"/> — or null when nothing reads.</param>
 /// <param name="Unfinished">Its resume marker is there: the last load of it never finished, and the next sets the save it guarded aside as crashed.</param>
-/// <param name="Beyond">A manual slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to save into by hand.</param>
+/// <param name="Beyond">A manual slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to NEW CAMPAIGN.</param>
 /// <param name="AheadOfClock">Its time is more than a day ahead of the clock the listing was read at: shown, and counted as no time when the newest save is chosen.</param>
 public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock);
 

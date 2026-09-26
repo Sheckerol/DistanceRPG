@@ -458,8 +458,10 @@ public class GameStartupTests
         // 1f: a save is written at the end of the frame a run's end asked for it
         // in — never inside the turn system's raise that ended the run — when NEW
         // CAMPAIGN begins one, on the title or by --new-campaign at launch
-        // (BeginNewCampaign, S6), by hand into a slot (CampaignBoot.SaveTo, S7),
-        // and on leaving play, by the window's close (OnClosing) or the menus' QUIT
+        // (BeginNewCampaign, S6), by hand — SAVE GAME, into the campaign's own slot,
+        // through the frame's end's own door (the user's ruling on the save slots,
+        // R5; S7's CampaignBoot.SaveTo, into another slot, is gone) — and on
+        // leaving play, by the window's close (OnClosing) or the menus' QUIT
         // TO TITLE (S7): through the quit's own door, which settles the enemies'
         // turn first when a run is in progress and then saves (CampaignBoot.SaveOnQuit,
         // Phase 5.8) — between runs as well since the audit's pass, so a quit that
@@ -472,7 +474,7 @@ public class GameStartupTests
         const BindingFlags Any = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         MethodBase Method(Type type, string name) => type.GetMethod(name, Any)!;
 
-        Assert.Equal(["CampaignBoot.SaveOnQuit", "CampaignBoot.SaveTo", "DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.Save"],
+        Assert.Equal(["CampaignBoot.SaveOnQuit", "DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.Save"],
             Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Save))));
         Assert.Equal(["DistanceRpgGame.SaveOnQuit"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.SaveOnQuit))));
         Assert.Equal(["DistanceRpgGame.WriteRequestedSave"], Callers(Method(typeof(DistanceRpgGame), "Save")));
@@ -500,8 +502,10 @@ public class GameStartupTests
         Assert.DoesNotContain(Instructions(Body(asks)!), i => (i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt) && Resolve(asks, i.Token) is { } target
             && (target.DeclaringType == typeof(CampaignBoot) || target.DeclaringType == typeof(SaveStore)));
 
-        // The disk is touched through the store alone, and the store only by the boot and the save.
+        // The disk is touched through the store alone, and the store only by the boot and the save:
+        // a save's write, or — a save by hand of the campaign the slot holds already — its restamp.
         Assert.Equal(["CampaignBoot.Save"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Write))));
+        Assert.Equal(["CampaignBoot.Save"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Restamp))));
         Assert.Equal(["CampaignBoot.SetAside"], Callers(Method(typeof(SaveStore), nameof(SaveStore.SetAside))));
         Assert.Equal(["CampaignBoot.BootOverride"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Empty))));
         Assert.Equal(["CampaignBoot.StoreFor", "SaveSlots.Store"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
@@ -706,39 +710,65 @@ public class GameStartupTests
         // one as it is arrived on — must wait: written at once, it would clear the
         // marker, and a first screen that then crashed would leave nothing to set the
         // save aside with at the next launch. WriteRequestedSave reads _resuming
-        // before either of its writes, and clears the request only past that read,
-        // so a request that arrives while a load is resuming is kept, not dropped.
-        // And the frame's end clears a resume whose screen is up before it writes a
-        // kept request, so the request is written the frame the marker clears. Read
-        // off the IL: before this pin, only the smoke launch covered it.
+        // before it writes, and clears a request only past that read, so a request
+        // that arrives while a load is resuming is kept, not dropped — the game's
+        // own, and SAVE GAME's too (the user's ruling on the save slots, R5), which
+        // the same door writes, once, into the same slot. And the frame's end clears
+        // a resume whose screen is up before it writes a kept request, so the
+        // request is written the frame the marker clears. Read off the IL: before
+        // this pin, only the smoke launch covered it.
         var game = typeof(DistanceRpgGame);
         var write = game.GetMethod("WriteRequestedSave", Declared)!;
         var save = game.GetMethod("Save", Declared)!;
         var resuming = game.GetField("_resuming", Declared)!;
         var requested = game.GetField("_saveRequested", Declared)!;
+        var byHand = game.GetField("_handSaveRequested", Declared)!;
 
         var walked = Walk(write);
         int read = walked.FindIndex(i => i.Op == OpCodes.Ldfld && SameField(i.Field, resuming));
         int firstWrite = walked.FindIndex(i => i.Called is { } called && Same(called, save));
         Assert.True(read >= 0, "WriteRequestedSave never reads _resuming");
         Assert.True(firstWrite > read, "WriteRequestedSave writes before it reads _resuming");
-        Assert.Equal(2, Mentions(write, save));   // between runs, and mid-run with the view: both past the read
-        var cleared = walked.Select((instruction, at) => (instruction, at))
-            .Where(i => i.at > read && i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, requested))
-            .Select(i => i.at)
-            .ToList();
-        Assert.True(cleared.Count == 1 && cleared[0] < firstWrite,
-            "WriteRequestedSave does not clear the request exactly once, past its read of _resuming and before it writes");
+        Assert.Equal(1, Mentions(write, save));   // one write, whatever asked for it: past the read
+        foreach (var request in new[] { requested, byHand })
+        {
+            var cleared = walked.Select((instruction, at) => (instruction, at))
+                .Where(i => i.at > read && i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, request))
+                .Select(i => i.at)
+                .ToList();
+            Assert.True(cleared.Count == 1 && cleared[0] < firstWrite && walked[cleared[0] - 1].Op == OpCodes.Ldc_I4_0,
+                $"WriteRequestedSave does not clear {request.Name} exactly once, past its read of _resuming and before it writes");
+        }
+        Assert.DoesNotContain(walked.Take(read), i => i.Op == OpCodes.Ldfld && SameField(i.Field, byHand));   // a save by hand is taken only past the read: it waits too
 
-        // The frame's end: the resume cleared once its screen is up, then the kept request written.
+        // The frame's end: the resume cleared once its screen is up, then a kept
+        // request — either — written.
         var frame = game.GetMethod("OnUpdateFrame", Declared)!;
         var clearOnceUp = game.GetMethod("ClearResumeOnceUp", Declared)!;
-        var frameCalls = CallsIn(frame).ToList();
-        int clears = frameCalls.FindIndex(method => Same(method, clearOnceUp));
-        int writes = frameCalls.FindIndex(method => Same(method, write));
+        var frameWalked = Walk(frame);
+        int clears = frameWalked.FindIndex(i => i.Called is { } called && Same(called, clearOnceUp));
+        int writes = frameWalked.FindIndex(i => i.Called is { } called && Same(called, write));
         Assert.True(clears >= 0 && clears < writes, "OnUpdateFrame writes a kept request before it clears a resume whose screen is up");
+        foreach (var request in new[] { requested, byHand })
+        {
+            int tested = frameWalked.FindIndex(i => i.Op == OpCodes.Ldfld && SameField(i.Field, request));
+            Assert.True(clears < tested && tested < writes, $"OnUpdateFrame does not test {request.Name} before it writes");
+        }
+        Assert.Equal(1, Mentions(frame, write));
         Assert.Contains(Walk(clearOnceUp), i => i.Op == OpCodes.Stfld && SameField(i.Field, resuming));
         Assert.Equal(["DistanceRpgGame.OnUpdateFrame"], Callers(clearOnceUp));
+
+        // A campaign let go, or one that comes into play, carries no request of the
+        // one before it: DropCampaign, LoadSlot and BeginNewCampaign each store
+        // false to both.
+        foreach (string clearing in new[] { "DropCampaign", "LoadSlot", "BeginNewCampaign" })
+        {
+            var clearingWalk = Walk(game.GetMethod(clearing, Declared)!);
+            foreach (var request in new[] { requested, byHand })
+                Assert.True(clearingWalk.Select((instruction, at) => (instruction, at))
+                        .Any(i => i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, request) && clearingWalk[i.at - 1].Op == OpCodes.Ldc_I4_0),
+                    $"{clearing} does not store false to {request.Name}");
+        }
     }
 
     [Fact]

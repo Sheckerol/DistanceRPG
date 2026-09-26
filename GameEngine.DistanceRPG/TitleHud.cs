@@ -199,19 +199,16 @@ public sealed class TitleHud : IDisposable
     }
 
     /// <summary>
-    /// A slot list's rows, the title's two lists and the menus' save list alike:
-    /// each slot's rows (<see cref="SlotText.Rows"/>, in the list's mode) as one
-    /// left-aligned block centred on its widest row in a window
-    /// <paramref name="width"/> wide, from <paramref name="top"/> down — a slot a
-    /// row, its markers' row just under it in grey and indented, and the next slot
-    /// a pitch under that. The chosen slot's row is marked <c>&gt; ... &lt;</c> and
-    /// in yellow; a slot no key can take (<see cref="SlotMenu.Choosable"/>) is
-    /// dimmed — loading, an empty slot; saving, the autosave and the campaign's own
-    /// slot, which saves itself; on NEW CAMPAIGN's list, none — and every other is
-    /// white: loading, a slot beyond the count among them, which loads and plays
-    /// like any; saving, an empty slot, since it is where a save goes first; and
-    /// every slot NEW CAMPAIGN offers, empty or held, since a campaign can begin in
-    /// each.
+    /// A slot list's rows, the title's two lists alike: each slot's rows
+    /// (<see cref="SlotText.Rows"/>) as one left-aligned block centred on its
+    /// widest row in a window <paramref name="width"/> wide, from
+    /// <paramref name="top"/> down — a slot a row, its markers' row just under it
+    /// in grey and indented, and the next slot a pitch under that. The chosen slot's
+    /// row is marked <c>&gt; ... &lt;</c> and in yellow; a slot no key can take
+    /// (<see cref="SlotMenu.Choosable"/>) is dimmed — loading, an empty slot; on
+    /// NEW CAMPAIGN's list, none — and every other is white: loading, a slot beyond
+    /// the count among them, which loads and plays like any; and every slot NEW
+    /// CAMPAIGN offers, empty or held, since a campaign can begin in each.
     /// </summary>
     internal static IReadOnlyList<TitleRow> SlotRows(SlotMenu list, float width, float top, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
@@ -220,7 +217,7 @@ public sealed class TitleHud : IDisposable
         for (int i = 0; i < list.Rows.Count; i++)
         {
             var entry = list.Rows[i];
-            var texts = SlotText.Rows(entry, list.Count, dungeons, zone, list.Mode, list.Own);
+            var texts = SlotText.Rows(entry, list.Count, dungeons, zone);
             bool chosen = i == list.Cursor;
             var color = chosen ? DungeonHud.Yellow : list.Choosable(entry) ? DungeonHud.White : DungeonHud.DarkGrey;
             block.Add((chosen ? $"> {texts[0]} <" : Unmarked + texts[0], color, false));

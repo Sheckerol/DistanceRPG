@@ -1164,27 +1164,28 @@ public sealed class HudTextTests : IDisposable
     public void ThePauseMenuSavesToASlot_AndQuitsToTheTitle()
     {
         // 1f, 1i (Phase 5.8; Phase 5.5's ThePauseMenuSaysARunInProgressIsNotSavedYet
-        // until the run in progress was saved), and the user's ruling of 2026-09-25
-        // on the save model, R2(d) and R2(e): the pause menu saves the campaign by
-        // hand into a slot, and leaves play for the title — the autosave written
-        // first — where CONTINUE resumes the run where it stood. Under the options the
-        // menu still says the run saves itself at every turn's start and every
-        // arrival, whatever is saved by hand.
+        // until the run in progress was saved), and the user's rulings of 2026-09-25
+        // on the save model, R2(d) and R2(e), and on the save slots, R5: the pause
+        // menu saves the campaign by hand into its own slot, and leaves play for the
+        // title — that slot written first — where CONTINUE resumes the run where it
+        // stood. Under the options the menu says the run saves itself at every turn's
+        // start and every arrival, and into which slot: the one SAVE GAME saves too.
         Assert.Equal(["1  CLOSE", "2  SAVE GAME", "3  QUIT TO TITLE"], PauseMenu.Options(hasTitle: true));
-        Assert.Equal("PROGRESS SAVES AT EVERY TURN", DungeonHud.PauseSavesLine);
+        string savesLine = DungeonHud.PauseSavesLine("SLOT 2");
+        Assert.Equal("PROGRESS SAVES TO SLOT 2 AT EVERY TURN", savesLine);
 
         // Each option leads with the number key that takes it — 1 closes the menu,
-        // 2 saves into a slot, 3 quits to the title — and nothing on it says a quit
-        // loses the run any more, or calls it an exit that saves nothing.
+        // 2 saves the campaign's slot, 3 quits to the title — and nothing on it says
+        // a quit loses the run any more, or calls it an exit that saves nothing.
         var options = PauseMenu.Options(hasTitle: true);
         for (int i = 0; i < options.Count; i++)
             Assert.StartsWith($"{i + 1}  ", options[i], StringComparison.Ordinal);
         Assert.DoesNotContain(options, option => option.Contains("EXIT GAME", StringComparison.Ordinal));
-        Assert.DoesNotContain(options.Append(DungeonHud.PauseSavesLine), line => line.Contains("NOT SAVED", StringComparison.Ordinal));
+        Assert.DoesNotContain(options.Append(savesLine), line => line.Contains("NOT SAVED", StringComparison.Ordinal));
         Assert.Contains("SAVE", PauseMenu.SaveLine, StringComparison.Ordinal);
 
         // Every line of the menu fits the font: capitals, digits, spaces, dashes.
-        Assert.All(options.Append(DungeonHud.PauseSavesLine), line => Assert.Matches("^[A-Z0-9 -]+$", line));
+        Assert.All(options.Append(savesLine), line => Assert.Matches("^[A-Z0-9 -]+$", line));
     }
 
     [Fact]
@@ -1490,11 +1491,9 @@ public sealed class HudTextTests : IDisposable
 
         public void RequestSave() => throw new InvalidOperationException("A scene built to be read is never played, so it never asks for a save.");
 
-        public SaveListing Slots() => throw new InvalidOperationException("A scene built to be read is never played, so its menu never lists the slots.");
+        public string SavesInto => throw new InvalidOperationException("A scene built to be read is never played, so its menu never says where it saves.");
 
-        public int OwnSlot => throw new InvalidOperationException("A scene built to be read is never played, so its menu never lists the slots.");
-
-        public void SaveToSlot(int slot) => throw new InvalidOperationException("A scene built to be read is never played, so it never saves by hand.");
+        public void SaveNow() => throw new InvalidOperationException("A scene built to be read is never played, so it never saves by hand.");
 
         public void QuitToTitle() => throw new InvalidOperationException("A scene built to be read is never played, so it is never left.");
 

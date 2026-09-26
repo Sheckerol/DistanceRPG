@@ -2032,6 +2032,10 @@ superseded whole.
     a save keeps the time its state was first written. `savedAt` is raw JSON like
     every field (R3): one that is no round-trip time refuses the save whole,
     `savedAt: yesterday is no time`, set aside as any unreadable save is.
+    (Superseded by the user's ruling of the same day on the save slots, in whose
+    save keeps its time: the game's own; a save by hand of the campaign a slot
+    holds already rewrites its time alone, the backup kept — R5, SAVE GAME,
+    below.)
   - **The most recent save** — what CONTINUE is to load — is chosen by that time,
     deterministically: the latest among the slots whose save, or failing that
     whose backup, reads; a save with no time is older than any with one; a time
@@ -2077,9 +2081,10 @@ superseded whole.
     is a fact about a file. A file that will not move refuses the slot's writes,
     as a load's does, and its notice is the failure. (Superseded by the user's
     ruling of the same day on the save slots, in its example: no autosave follows a
-    manual load now — the slot loaded is the slot written — but a save by hand
-    into another slot still writes a slot unloaded, and the guard stands — R5,
-    the slot, below.)
+    manual load now — the slot loaded is the slot written — and a save by hand
+    goes into the campaign's own slot too, so no save writes a slot its campaign
+    did not come from; the guard stands, for a file put there behind the game's
+    back — R5, the slot, and R5, SAVE GAME, below.)
   - **A write clears its slot's resume marker.** The marker guards the file a
     load was resuming; once a write has replaced that file, a marker left standing
     would set the new save aside as crashed at the next load and resume the
@@ -2263,7 +2268,10 @@ superseded whole.
   player's own turn during a run, or on the between-runs screen — never while
   enemies are moving", "saving into an occupied slot asks before overwriting",
   and what becomes of the old ways out of play (R2(e)). Built on the folder and
-  the title above:
+  the title above. (Superseded by the user's ruling of the same day on the save
+  slots, in "saving into an occupied slot asks before overwriting": SAVE GAME
+  saves the campaign's own slot, which no list offers and nothing asks about —
+  R5, SAVE GAME, below.)
   - **One menu, both screens with a campaign in play**: ESC in a dungeon opens
     the pause menu, and ESC between runs now opens the same menu over the hub,
     the hub dimmed under it — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE`
@@ -2276,7 +2284,9 @@ superseded whole.
     save slots, in what saves itself: the campaign's own slot — the one it was
     loaded from or begun in — goes on saving itself, whatever is saved by hand
     into another, and the save list shows that slot's row as `SAVES ITSELF` —
-    R5, the slot, below.)
+    R5, the slot, below. Superseded again in the line under the options, which
+    names that slot — `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — the one SAVE
+    GAME saves too, with no list — R5, SAVE GAME, below.)
   - **SAVE GAME only at a safe point, the autosave's**: in a dungeon the party's
     own turn with nothing in flight — never while the enemies move or their
     turn's banner is up, never on a run's summary or during a stair's fade;
@@ -2295,7 +2305,10 @@ superseded whole.
     reads) / `ENTER: SET IT ASIDE AND SAVE HERE - ESC: NO`. **Only ENTER says
     yes**, as on the title: the slot's digit again, N, ESC and every other key say
     no and are spent. 0 answers `THE AUTOSAVE SAVES ITSELF`, and a digit above
-    the count `SLOT 5 IS BEYOND THE 3 SLOTS`.
+    the count `SLOT 5 IS BEYOND THE 3 SLOTS`. (Superseded by the user's ruling of
+    the same day on the save slots, whole: there is no save list, and SAVE GAME
+    saves the campaign's own slot, asking nothing; its ENTER-only asking lives on
+    NEW CAMPAIGN's list — R5, SAVE GAME, and R5, NEW CAMPAIGN, below.)
   - **What is set aside is the files' to decide, never the list's**: a save by
     hand goes through the one door every write does (`CampaignBoot.SaveTo`, then
     `Save`), whose guard sets aside a `campaign.json` the codec refuses — and such
@@ -2303,14 +2316,21 @@ superseded whole.
     save cannot be read has it set aside as `slot-n/campaign.unreadable-N.json`,
     never deleted, the new save moved into place and a backup that reads left
     untouched, even when a list read before the save broke called the slot
-    readable.
+    readable. (Superseded by the user's ruling of the same day on the save slots,
+    in the list: there is none, and `CampaignBoot.SaveTo` is gone; a save by hand
+    goes through the door every save of the campaign in play does, into its own
+    slot, and the guard sets aside such a file there as ever — R5, SAVE GAME,
+    below.)
   - **The answer is drawn inside the menu, never as a notice**: the list closes
     back to the menu, which says under its lines how the save went — `SAVED TO
     SLOT 2` in green, then each file the save set aside first, where, and how to
     try it again; `SLOT 2 COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE
     LOG` in orange, a slot whose store refuses its writes this session answering
     with why — until the next key or until the menu closes. A notice is not drawn
-    over a menu and ages while hidden, so it would time out unseen.
+    over a menu and ages while hidden, so it would time out unseen. (Superseded by
+    the user's ruling of the same day on the save slots, in the list closing back
+    to the menu: 2 saves at once and the menu stays up for the answer, which reads
+    as it did — R5, SAVE GAME, below.)
   - **Every key is the menu's while it is up, in both screens**: between runs 1,
     2 and 3 act and every other key does nothing — ENTER, W/S and the arrows never
     reach the dungeon list, so nothing descends behind the menu — and with the
@@ -2322,7 +2342,10 @@ superseded whole.
     **bends the plan, needs no ruling**: kept on subscriptions of their own
     beside it, the key that opens the list, or the one that saves from it and
     closes it, would be read twice. ESC answers an ask no, then goes back from the
-    list to the menu, then closes the menu.
+    list to the menu, then closes the menu. (Superseded by the user's ruling of
+    the same day on the save slots, in the list: there is none, so every key but
+    ESC is the menu's while it is up, and ESC closes it; the number keys stay on
+    the one catch-all — R5, SAVE GAME, below.)
   - **QUIT TO TITLE — this pass's decision on R2(e)**: from either menu, the host
     writes the autosave through the window close's own door — an enemies' turn in
     flight played out first on the playing scene's own step, the resume marker
@@ -2346,7 +2369,9 @@ superseded whole.
     `3  QUIT GAME` — the window's close, saving its scratch slot as ever — and its
     2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`; the host refuses a
     save by hand outright in a session with no slots, whatever asked, so no path
-    puts a scratch campaign in a player's slot.
+    puts a scratch campaign in a player's slot. (Superseded by the user's ruling of
+    the same day on the save slots, in its 2: it saves the scratch slot, the
+    campaign's own there, and nothing else — R5, SAVE GAME, below.)
   - **What replaced what (R2(e))**: N, then N → the title's NEW CAMPAIGN (R2, the
     title); ESC-save-and-quit between runs → ESC MENU, with SAVE GAME and QUIT TO
     TITLE; the pause menu's `2  SAVE AND QUIT` → `2  SAVE GAME` and `3  QUIT TO
@@ -2407,7 +2432,10 @@ superseded whole.
     (Superseded by the user's ruling of the same day on the save slots, in what
     loading that slot does: no load asks, and the slot loaded is the slot its
     campaign saves into from then on, so `SameAsAutosave` is gone and the
-    campaign continued from slot 1 saves into slot 1 — R5, the slot, below.)
+    campaign continued from slot 1 saves into slot 1 — R5, the slot, below. Then
+    whole: a save by hand goes into the campaign's own slot and stamps its time,
+    so the slot just saved by hand is the one CONTINUE names — R5, SAVE GAME,
+    below.)
 
 ### The user's ruling of 2026-09-25 on the save slots: each campaign saves in its own slot (R5)
 
@@ -2470,9 +2498,9 @@ out each alternative.
   - **A slot above the count saves into itself**, which follows from the ruling:
     loading it is choosing it. Its marker is `BEYOND THE 3 SLOTS` (`BEYOND THE 1
     SLOT`), no longer `- LOAD ONLY`, and LOAD GAME no longer dims it. The save
-    list never offers it. Whether such a slot may be played at all, rather than
-    first moved within the count, is SLOT DECISION 1, shipped as yes
-    (open-questions.md).
+    list never offers it (the list itself goes: R5, SAVE GAME, below). Whether
+    such a slot may be played at all, rather than first moved within the count,
+    is SLOT DECISION 1, shipped as yes (open-questions.md).
   - **A campaign never comes into play in a slot that takes no saves this
     session — bends S6's review, needs no ruling.** A refusal holds for the
     session, and the ruling removed the other place such a campaign could be
@@ -2522,7 +2550,8 @@ out each alternative.
     it has no other slot to offer (a count of one, the campaign in slot 1), and
     ENTER then says `SLOT 1 SAVES ITSELF` too, never the load list's `EVERY SLOT
     IS EMPTY`. Another slot chosen there takes a copy, and the campaign goes on
-    saving into its own.
+    saving into its own. (Gone: SAVE GAME saves the campaign's own slot, and the
+    list with it — R5, SAVE GAME, below.)
 - **R5, NEW CAMPAIGN — the title chooses its slot.** The ruling's "you choose a
   save slot", at a campaign's start; from here no campaign is begun in the save
   folder itself:
@@ -2570,7 +2599,65 @@ out each alternative.
     a possible later addition.
   - **The save list stays transitional**: SAVE GAME's list, keyed to the
     campaign's own slot, stands until SAVE GAME saves that slot (R5, the slot,
-    above).
+    above). (Gone — R5, SAVE GAME, below.)
+- **R5, SAVE GAME — saved where the campaign saves, asking nothing.** The
+  ruling's last clause, "instead of choosing a save slot everytime you save":
+  - **2 saves the campaign's own slot at once**: `2  SAVE GAME` on the pause
+    menu or the menu between runs, at a safe point, saves into the slot the
+    campaign was loaded from or begun in — no list, no digit to choose, no
+    question — and the menu stays up for the answer. It goes through the one door
+    every save of the campaign in play goes through but the quit's, the game's
+    own at every turn and arrival, at the frame's end (`WriteRequestedSave`),
+    which asks the safe point there: so a save by hand and an autosave asked for
+    in the same frame are one write, answered once. Off a safe point the option
+    is dimmed and 2 answers `SAVE ON YOUR OWN TURN`, as ever; a save by hand that
+    finds the campaign off one by the frame's end is answered so and dropped —
+    never kept to be written later, and never settling the enemies' turn to
+    reach one, which is the quit's alone. The answer is drawn inside the menu
+    until the next key, as it was: `SAVED TO SLOT 2` in green, then each file the
+    write guard set aside first (`CampaignBoot.SaveAnswer`); or `SLOT 2 COULD NOT
+    BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE LOG` in orange, which, like
+    every failed save, is also said over the floor and led for the next screen
+    until a save goes through. The save list and its asks — `SLOT 2 HOLDS ...` /
+    `ENTER: SAVE OVER IT - ESC: NO`, `... SET IT ASIDE AND SAVE HERE ...`, `THE
+    AUTOSAVE SAVES ITSELF`, `SLOT 2 SAVES ITSELF` — are gone, and so is
+    `CampaignBoot.SaveTo`; NEW CAMPAIGN's list keeps the ENTER-only asking they
+    had (R5, NEW CAMPAIGN, above).
+  - **A save by hand of an unchanged campaign stamps its time — bends the plan,
+    needs no ruling**, though the user is asked to confirm it. The game's own
+    saves have usually written the campaign as it stands, and a save of what a
+    slot holds already writes nothing and keeps the time (R2, the folder). Left
+    at that, a player who loads the older of two slots, presses SAVE GAME and
+    quits would find CONTINUE naming the other slot, a different campaign. So a
+    save by hand rewrites the save's time alone — a temp file flushed, then put
+    in the save's place with no backup made (`SaveStore.Restamp`) — as old games'
+    saves stamp their file, and the slot just saved by hand is the one CONTINUE
+    names. The backup is not rotated: it stays the save before, a different
+    state, so one save deep holds. "A save keeps the time its state was first
+    written" now holds for the game's own saves alone. A slot that takes no saves
+    this session restamps nothing.
+  - **The menu names the slot — bends the plan, needs no ruling**: under the
+    options, `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — `... TO THE AUTOSAVE
+    ...` for a campaign in the save folder itself, `... TO THE SCRATCH SLOT ...`
+    on a dev override — so the player always knows which slot is theirs.
+  - **A dev override's SAVE GAME saves its scratch slot — bends the plan, needs
+    no ruling**: its campaign's slot is the scratch slot, so "any saving happens
+    on that save slot" puts a save by hand there, and nowhere else: the player's
+    slots stay untouched, as ever. `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH
+    SLOT` is gone.
+  - **A slot whose writes keep failing costs what was played since its last
+    save — SLOT DECISION 3, shipped provisionally.** A full disk, a file another
+    program holds, a folder with no rights: each failed save says `SLOT 2 COULD
+    NOT BE SAVED (...)` over the floor and on the next screen, and the quit leaves
+    the unsaved marker, which the title says. Under R2 a player could save by
+    hand into another slot meanwhile; the ruling removed that, so what was played
+    since the last save that went through is lost at the quit. The alternatives,
+    in open-questions.md: the quit writes what it could not save into the same
+    slot folder as a new file, overwriting nothing; or SAVE GAME, only while the
+    slot's writes are failing, offers an empty slot to move the campaign into.
+  - **What R5 costs, again**: no COPY is built, so a campaign can no longer be
+    saved into a second slot to keep a checkpoint (the R5 paragraph, above); the
+    user is asked to confirm it.
 
 ### The numbers: `tuning.json`
 
