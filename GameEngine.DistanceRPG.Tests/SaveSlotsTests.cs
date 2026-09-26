@@ -78,8 +78,8 @@ public sealed class SaveSlotsTests : IDisposable
     /// <summary>The text <paramref name="campaign"/> saves as, at <paramref name="at"/>.</summary>
     private static string Text(CampaignState campaign, DateTimeOffset? at = null) => SaveCodec.Write(SaveGame.Capture(campaign, savedAt: at));
 
-    /// <summary>Save <paramref name="campaign"/> into <paramref name="slot"/> at <paramref name="at"/>, and it saved: a save that goes through says nothing, so the store goes in as the autosave, whichever slot's it is.</summary>
-    private static void Saved(SaveStore slot, CampaignState campaign, DateTimeOffset? at = null) => Assert.Null(CampaignBoot.Save(AsAutosave(slot), campaign, savedAt: at));
+    /// <summary>Save <paramref name="campaign"/> into <paramref name="slot"/> at <paramref name="at"/>, and it saved: a save that goes through says nothing.</summary>
+    private static void Saved(SaveSlot slot, CampaignState campaign, DateTimeOffset? at = null) => Assert.Null(CampaignBoot.Save(slot, campaign, savedAt: at));
 
     /// <summary><paramref name="text"/> as a build before the slots wrote it: no time member at all.</summary>
     private static string BeforeTheSlots(string text)
@@ -159,8 +159,8 @@ public sealed class SaveSlotsTests : IDisposable
             // Slots above the count that hold a save or a backup are beyond it: kept
             // and listed. An empty slot folder holds nothing, and is not.
             var campaign = NewCampaign();
-            Saved(slots.Store(4), campaign, T1);
-            Saved(slots.Store(9), campaign, T2);
+            Saved(slots.Slot(4), campaign, T1);
+            Saved(slots.Slot(9), campaign, T2);
             Put(slots.Store(6), SaveStore.BackupName, Text(campaign, T1));
             Directory.CreateDirectory(slots.Store(5).Folder);
             Assert.Equal([4, 6, 9], slots.Beyond());
@@ -219,9 +219,10 @@ public sealed class SaveSlotsTests : IDisposable
                 (slots.Slot(SaveSlots.Autosave).Name, slots.Slot(2).Name, slots.Slot(9).Name, scratch.Name, Named(null).Name));
 
             // Every word the saves say of a slot, built from the slot: the autosave's
-            // and a manual slot's exactly as they have always read. The scratch slot is
-            // said the autosave's way wherever the words name no slot — a load's and a
-            // failed save's — and by its own name where they do.
+            // and a manual slot's exactly as they have always read, but for SAVED TO
+            // below. The scratch slot is said the autosave's way wherever the words
+            // name no slot — a load's and a failed save's — and by its own name where
+            // they do.
             Assert.Equal("CAMPAIGN RESUMED", CampaignBoot.Resumed(Named(SaveSlots.Autosave), backup: false));
             Assert.Equal("CAMPAIGN RESUMED FROM ITS BACKUP, ONE SAVE OLDER", CampaignBoot.Resumed(Named(SaveSlots.Autosave), backup: true));
             Assert.Equal("CAMPAIGN RESUMED FROM SLOT 2", CampaignBoot.Resumed(Named(2), backup: false));
@@ -241,7 +242,12 @@ public sealed class SaveSlotsTests : IDisposable
                 CampaignBoot.NotSaved(Named(2), "another program has it open"));
             Assert.Equal(CampaignBoot.NotSaved(Named(SaveSlots.Autosave), "the disk is full"), CampaignBoot.NotSaved(scratch, "the disk is full"));
 
+            // A save by hand names the slot it went into as every word names it: THE
+            // AUTOSAVE and THE SCRATCH SLOT too, where the autosave's once read SAVED
+            // TO AUTOSAVE, the list's label. No player sees either yet: a save by hand
+            // into them is refused outright (below).
             Assert.Equal(("SAVED TO SLOT 1", "SAVED TO SLOT 9"), (CampaignBoot.SavedTo(Named(1)), CampaignBoot.SavedTo(Named(9))));
+            Assert.Equal(("SAVED TO THE AUTOSAVE", "SAVED TO THE SCRATCH SLOT"), (CampaignBoot.SavedTo(Named(SaveSlots.Autosave)), CampaignBoot.SavedTo(scratch)));
 
             // The name goes where the slot goes: one store refusing its writes, handed
             // in as slot 3 and as the autosave, fails in each one's words — and
@@ -330,9 +336,9 @@ public sealed class SaveSlotsTests : IDisposable
             foreach (int[] order in orders)
             {
                 var slots = Fresh();
-                Saved(slots.Store(0), a, times[order[0]]);
-                Saved(slots.Store(1), b, times[order[1]]);
-                Saved(slots.Store(2), c, times[order[2]]);
+                Saved(slots.Slot(0), a, times[order[0]]);
+                Saved(slots.Slot(1), b, times[order[1]]);
+                Saved(slots.Slot(2), c, times[order[2]]);
                 var listing = SaveListing.Read(slots, Now);
                 Assert.Equal(Array.IndexOf(order, 2), listing.Newest!.Number);
                 Assert.Equal(T3, listing.Newest.Header!.SavedAt);
@@ -344,31 +350,31 @@ public sealed class SaveSlotsTests : IDisposable
             {
                 var tied = Fresh();
                 foreach (int n in made)
-                    Saved(tied.Store(n), n == 0 ? a : n == 1 ? b : c, T2);
+                    Saved(tied.Slot(n), n == 0 ? a : n == 1 ? b : c, T2);
                 Assert.Equal(0, SaveListing.Read(tied, Now).Newest!.Number);
 
                 var manual = Fresh();
                 foreach (int n in made.Where(n => n != 0))
-                    Saved(manual.Store(n), n == 1 ? b : c, T2);
+                    Saved(manual.Slot(n), n == 1 ? b : c, T2);
                 Assert.Equal(1, SaveListing.Read(manual, Now).Newest!.Number);
             }
 
             // A save with no time — one from before the slots — is older than any
             // with one; with none that has one, the tie rule decides.
             var untimed = Fresh();
-            Saved(untimed.Store(1), b);
-            Saved(untimed.Store(2), c, T1);
+            Saved(untimed.Slot(1), b);
+            Saved(untimed.Slot(2), c, T1);
             Assert.Equal(2, SaveListing.Read(untimed, Now).Newest!.Number);
-            Saved(untimed.Store(2), a);   // another campaign, with no time
+            Saved(untimed.Slot(2), a);   // another campaign, with no time
             Assert.Equal(1, SaveListing.Read(untimed, Now).Newest!.Number);
 
             // A save that cannot be read beside a backup that can: the backup's time,
             // since the backup is what a load brings back. Neither reading: never chosen.
             var broken = Fresh();
-            Saved(broken.Store(1), a, T1);
-            Saved(broken.Store(1), b, T3);
+            Saved(broken.Slot(1), a, T1);
+            Saved(broken.Slot(1), b, T3);
             File.WriteAllText(broken.Store(1).SavePath, "not a save");
-            Saved(broken.Store(0), c, T2);
+            Saved(broken.Slot(0), c, T2);
             var fromBackup = SaveListing.Read(broken, Now);
             Assert.Equal((SlotState.FromBackup, (DateTimeOffset?)T1), (fromBackup.Slots[1].State, fromBackup.Slots[1].Header!.SavedAt));
             Assert.Equal(0, fromBackup.Newest!.Number);
@@ -384,8 +390,8 @@ public sealed class SaveSlotsTests : IDisposable
 
             // A slot beyond the count is chosen when it is the newest.
             var lowered = Fresh();
-            Saved(lowered.Store(0), a, T2);
-            Saved(lowered.Store(5), b, T3);
+            Saved(lowered.Slot(0), a, T2);
+            Saved(lowered.Slot(5), b, T3);
             var beyond = SaveListing.Read(lowered, Now);
             Assert.True(beyond.Slots.Single(slot => slot.Number == 5).Beyond);
             Assert.Equal(5, beyond.Newest!.Number);
@@ -394,14 +400,14 @@ public sealed class SaveSlotsTests : IDisposable
             // loses to an hour before, and is listed as ahead of the clock. An hour
             // ahead is inside the day's slack, and wins.
             var ahead = Fresh();
-            Saved(ahead.Store(0), a, Now.AddDays(365));
-            Saved(ahead.Store(1), b, Now.AddHours(-1));
+            Saved(ahead.Slot(0), a, Now.AddDays(365));
+            Saved(ahead.Slot(1), b, Now.AddHours(-1));
             var skewed = SaveListing.Read(ahead, Now);
             Assert.True(skewed.Autosave.AheadOfClock);
             Assert.Equal(Now.AddDays(365), skewed.Autosave.Header!.SavedAt);   // still listed with its time
             Assert.False(skewed.Slots[1].AheadOfClock);
             Assert.Equal(1, skewed.Newest!.Number);
-            Saved(ahead.Store(2), c, Now.AddHours(1));
+            Saved(ahead.Slot(2), c, Now.AddHours(1));
             var slack = SaveListing.Read(ahead, Now);
             Assert.False(slack.Slots[2].AheadOfClock);
             Assert.Equal(2, slack.Newest!.Number);
@@ -409,7 +415,7 @@ public sealed class SaveSlotsTests : IDisposable
 
             // A folder that is no slot never wins, however new what it holds.
             var stray = Fresh();
-            Saved(stray.Store(0), a, T1);
+            Saved(stray.Slot(0), a, T1);
             Put(new SaveStore(Path.Combine(stray.Folder, "slot-01")), SaveStore.FileName, Text(b, Now));
             var withStray = SaveListing.Read(stray, Now);
             Assert.Equal(0, withStray.Newest!.Number);
@@ -420,14 +426,14 @@ public sealed class SaveSlotsTests : IDisposable
             // load of the first needs no room made; of the second it does; of the
             // autosave, never. With the autosave empty, nothing needs room.
             var same = Fresh();
-            Saved(same.Store(0), a, T1);
-            Saved(same.Store(1), a, T2);
-            Saved(same.Store(2), b, T3);
+            Saved(same.Slot(0), a, T1);
+            Saved(same.Slot(1), a, T2);
+            Saved(same.Slot(2), b, T3);
             var sameListing = SaveListing.Read(same, Now);
             Assert.Equal([false, true, false, false], sameListing.Slots.Select(slot => slot.SameAsAutosave));
             Assert.Equal((false, false, true), (sameListing.NeedsRoom(0), sameListing.NeedsRoom(1), sameListing.NeedsRoom(2)));
             var noAutosave = Fresh();
-            Saved(noAutosave.Store(2), b, T3);
+            Saved(noAutosave.Slot(2), b, T3);
             Assert.False(SaveListing.Read(noAutosave, Now).NeedsRoom(2));
         });
     }
@@ -441,7 +447,7 @@ public sealed class SaveSlotsTests : IDisposable
             var five = new SaveSlots(folder, 5);
             CampaignState[] campaigns = [NewCampaign(), Retreated(), Cleared(), Retreated(), Cleared()];
             for (int n = 1; n <= 5; n++)
-                Saved(five.Store(n), campaigns[n - 1], T1.AddMinutes(n));
+                Saved(five.Slot(n), campaigns[n - 1], T1.AddMinutes(n));
             Assert.Empty(five.Beyond());
             var seeded = Snapshot(folder);
 
@@ -479,13 +485,13 @@ public sealed class SaveSlotsTests : IDisposable
         {
             var slots = new SaveSlots(folder, 3);
             var autosave = slots.Store(SaveSlots.Autosave);
-            Saved(autosave, Retreated(), T1);
+            Saved(slots.Slot(SaveSlots.Autosave), Retreated(), T1);
             var autosaved = Snapshot(folder, path => !path.StartsWith("slot-", StringComparison.Ordinal));
 
             // Between runs: saved to slot 2 and loaded back, the same text, time and all.
             var slot2 = slots.Store(2);
             var campaign = Cleared();
-            Saved(slot2, campaign, T2);
+            Saved(slots.Slot(2), campaign, T2);
             string between = slot2.Read()!;
             Assert.Equal(Path.Combine(folder, "slot-2", SaveStore.FileName), slot2.SavePath);
             var load = CampaignBoot.Load(slots.Slot(2), GameContent.Current);
@@ -542,9 +548,9 @@ public sealed class SaveSlotsTests : IDisposable
             // count, a newer build's save alone.
             var slots = new SaveSlots(folder, 3);
             var campaign = Cleared();
-            Saved(slots.Store(0), campaign, T1);
+            Saved(slots.Slot(0), campaign, T1);
             Put(slots.Store(1), SaveStore.FileName, "{ \"version\": 1, \"campaign\": ");
-            Saved(slots.Store(2), campaign, T2);
+            Saved(slots.Slot(2), campaign, T2);
             slots.Store(2).MarkResuming();
             Put(slots.Store(3), SaveStore.BackupName, Text(campaign, T3));
             Put(slots.Store(3), SaveStore.FileName, Newer(Text(campaign, Now)));
@@ -638,8 +644,8 @@ public sealed class SaveSlotsTests : IDisposable
             // naming the member — every row of it in the HUD's font — and the backup resumes.
             var slots = new SaveSlots(folder, 3);
             var store = slots.Store(SaveSlots.Autosave);
-            Saved(store, NewCampaign(), T1);
-            Saved(store, campaign, T2);
+            Saved(slots.Slot(SaveSlots.Autosave), NewCampaign(), T1);
+            Saved(slots.Slot(SaveSlots.Autosave), campaign, T2);
             var yesterday = JsonNode.Parse(store.Read()!)!.AsObject();
             yesterday["savedAt"] = "yesterday";
             File.WriteAllText(store.SavePath, yesterday.ToJsonString());
@@ -660,7 +666,7 @@ public sealed class SaveSlotsTests : IDisposable
 
             // The same campaign saved at a later time writes nothing: the save keeps
             // its time, and the backup stays the save before it.
-            Saved(store, campaign, T2);
+            Saved(slots.Slot(SaveSlots.Autosave), campaign, T2);
             string saved = store.Read()!, backup = store.ReadBackup()!;
             var log = new List<string>();
             Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.Autosave), campaign, report: log.Add, savedAt: T3));
@@ -799,7 +805,7 @@ public sealed class SaveSlotsTests : IDisposable
             // A slot whose last load crashed the game: its marker stands.
             var slots = new SaveSlots(folder, 3);
             var slot1 = slots.Store(1);
-            Saved(slot1, NewCampaign(), T1);
+            Saved(slots.Slot(1), NewCampaign(), T1);
             Assert.True(CampaignBoot.Load(slots.Slot(1), GameContent.Current).Loaded);
             Assert.True(slot1.WasResuming);
 
@@ -839,9 +845,9 @@ public sealed class SaveSlotsTests : IDisposable
         {
             // The save folder, seeded: the autosave and its backup, and slot 1.
             var slots = new SaveSlots(folder, 3);
-            Saved(slots.Store(SaveSlots.Autosave), NewCampaign(), T1);
-            Saved(slots.Store(SaveSlots.Autosave), Cleared(), T2);
-            Saved(slots.Store(1), Retreated(), T3);
+            Saved(slots.Slot(SaveSlots.Autosave), NewCampaign(), T1);
+            Saved(slots.Slot(SaveSlots.Autosave), Cleared(), T2);
+            Saved(slots.Slot(1), Retreated(), T3);
             static bool Campaigns(string path) => !path.StartsWith(SaveStore.OverrideSlot, StringComparison.Ordinal);
             var seeded = Snapshot(folder, Campaigns);
 

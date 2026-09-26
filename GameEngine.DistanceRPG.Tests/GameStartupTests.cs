@@ -493,6 +493,9 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.SetAside"], Callers(Method(typeof(SaveStore), nameof(SaveStore.SetAside))));
         Assert.Equal(["CampaignBoot.BootOverride"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Empty))));
         Assert.Equal(["CampaignBoot.StoreFor", "SaveSlots.Store"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
+        // A slot is made only where its store is had — the save folder's by number,
+        // the dev override's scratch — so no store goes about under another's name.
+        Assert.Equal(["SaveSlot.Scratch", "SaveSlots.Slot"], Callers(typeof(SaveSlot).GetConstructor([typeof(SaveStore), typeof(int?)])!));
         Assert.Equal(["DistanceRpgGame.LoadSlot"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Load))));
         Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.BootOverride))));
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign"], Callers(Method(typeof(CampaignBoot), nameof(CampaignBoot.Abandon))));

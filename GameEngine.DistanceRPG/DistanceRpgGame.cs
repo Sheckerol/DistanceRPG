@@ -543,8 +543,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
     /// <summary>
     /// The save by hand the save list asked for, written now that the frame is over
-    /// (<see cref="CampaignBoot.SaveTo"/>) into the slot's one store for the session
-    /// (<see cref="SaveSlots.Store"/>), with the playing scene's view mid-run; and the
+    /// (<see cref="CampaignBoot.SaveTo"/>) into the slot the session holds for it
+    /// (<see cref="SaveSlots.Slot"/>), with the playing scene's view mid-run; and the
     /// menu told how it went, inside itself (<c>SlotSaved</c>). Off a safe point it
     /// writes nothing and says so. One that arrives while a loaded campaign's first
     /// screen is not up yet waits for it, as the autosaves do.

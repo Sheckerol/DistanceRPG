@@ -55,7 +55,7 @@ public sealed class CampaignBootTests : IDisposable
     private static SlotLoad Load(SaveStore store, List<string>? log = null)
         => CampaignBoot.Load(AsAutosave(store), GameContent.Current, log is null ? null : log.Add);
 
-    /// <summary>Save <paramref name="campaign"/>, and it saved: a save that goes through says nothing, so the store goes in as the autosave, whichever slot's it is.</summary>
+    /// <summary>Save <paramref name="campaign"/> into <paramref name="store"/> — the autosave slot — and it saved: a save that goes through says nothing.</summary>
     private static void Saved(SaveStore store, CampaignState campaign) => Assert.Null(CampaignBoot.Save(AsAutosave(store), campaign));
 
     /// <summary>The text <paramref name="campaign"/> saves as.</summary>
@@ -383,7 +383,7 @@ public sealed class CampaignBootTests : IDisposable
             // A save whose resume crashed the game, with no backup to fall back on: set
             // aside as crashed, and the same again — the marker gone with it.
             var crashes = slots.Store(5);
-            Saved(crashes, NewCampaign());
+            Assert.Null(CampaignBoot.Save(slots.Slot(5), NewCampaign()));
             Assert.True(LoadSlot(5).Loaded);   // and the game goes down before the loaded screen is up: the marker stands
             Assert.Collection(Word(5, LoadSlot(5)),
                 notice => Assert.Equal("NOTHING COULD BE LOADED FROM SLOT 5", notice),
@@ -409,7 +409,7 @@ public sealed class CampaignBootTests : IDisposable
             if (!OperatingSystem.IsWindows())
                 return;
             var held = slots.Store(6);
-            Saved(held, NewCampaign());
+            Assert.Null(CampaignBoot.Save(slots.Slot(6), NewCampaign()));
             SlotLoad heldLoad;
             using (new FileStream(held.SavePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
                 heldLoad = LoadSlot(6);
@@ -446,8 +446,8 @@ public sealed class CampaignBootTests : IDisposable
             byte[] backup = File.ReadAllBytes(autosave.BackupPath);
             var inSlot1 = NewCampaign();
             CampaignRuns.ShallowRetreat(inSlot1, "tutorial");
-            Saved(slots.Store(1), inSlot1);
-            Saved(slots.Store(2), old);
+            Assert.Null(CampaignBoot.Save(slots.Slot(1), inSlot1));
+            Assert.Null(CampaignBoot.Save(slots.Slot(2), old));
             Dictionary<string, string> Manual()
                 => Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
                     .Where(path => Path.GetRelativePath(folder, path).StartsWith(SaveSlots.SlotFolderPrefix, StringComparison.Ordinal))
@@ -530,7 +530,7 @@ public sealed class CampaignBootTests : IDisposable
                 var slot1 = slots.Store(1);
                 var inSlot = NewCampaign();
                 CampaignRuns.Clear(inSlot, "tutorial", CampaignRuns.GoldenSeed);
-                Saved(slot1, inSlot);
+                Assert.Null(CampaignBoot.Save(slots.Slot(1), inSlot));
                 var autosave = slots.Store(SaveSlots.Autosave);
                 seed(autosave);
                 var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);

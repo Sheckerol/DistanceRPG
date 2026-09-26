@@ -1,10 +1,12 @@
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// The slots a test hands the save's loads, saves and words when it has no
-/// <see cref="SaveSlots"/> to ask (<see cref="SaveSlots.Slot"/> is the game's
-/// way, and a test's whenever it has one): every one of them takes a
-/// <see cref="SaveSlot"/>, its store and its name together.
+/// The slots a test hands the save's loads, saves and words when it does not
+/// ask a <see cref="SaveSlots"/> for one (<see cref="SaveSlots.Slot"/>, the
+/// game's way): every one of them takes a <see cref="SaveSlot"/>, its store and
+/// its name together. A store in a slot folder that a test saves into or loads
+/// goes in as its own slot, <see cref="SaveSlots.Slot"/>, but for the few whose
+/// tests assert the autosave's words of it (<see cref="AsAutosave"/>).
 /// </summary>
 internal static class TestSlots
 {
@@ -19,8 +21,10 @@ internal static class TestSlots
     /// <summary>
     /// <paramref name="store"/> as the autosave slot, number
     /// <see cref="SaveSlots.Autosave"/>: the save folder's own store, as most of
-    /// the save's tests make it, or a store in a slot folder whose test asserts
-    /// the words the autosave's saves say, not a manual slot's.
+    /// the save's tests make it — the slot <see cref="SaveSlots.Slot"/> gives for
+    /// it — or a store in a slot folder whose test asserts the words the
+    /// autosave's saves say, not a manual slot's. No other store in a slot folder
+    /// goes in as the autosave.
     /// </summary>
     internal static SaveSlot AsAutosave(SaveStore store) => new(store, SaveSlots.Autosave);
 }
