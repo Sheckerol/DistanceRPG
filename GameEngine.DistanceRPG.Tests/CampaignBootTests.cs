@@ -1035,6 +1035,48 @@ public sealed class CampaignBootTests : IDisposable
     }
 
     [Fact]
+    public void AQuitWithTheViewALoadBroughtBack_WritesNothing()
+    {
+        InTempFolder(folder =>
+        {
+            // T6's review: a close during a loaded run's fade in, before its screen is
+            // up, has no scene to read a view off, so the game hands the quit's save
+            // the view the load brought back (DistanceRpgGame.SaveOnQuit, pinned in
+            // GameStartupTests). With it, the campaign as loaded is the save on the
+            // disk already: nothing is written, the backup stays one save deep, and
+            // the next load comes back with the view. Handed none, as the game did
+            // before, the quit writes the campaign again without it, and the save that
+            // had it goes to the backup: the next load arrives on the floor afresh,
+            // its active member and its march lost.
+            var store = new SaveStore(folder);
+            var slot = AsSlot1(store);
+            var script = VisitScript.Enter(NewCampaign(), "spear_hall", CampaignRuns.FiveDeep);
+            var view = new ViewDto("C", MarchingThisTurn: true);
+            Assert.Null(CampaignBoot.Save(slot, script.Campaign, new ViewDto("A")));
+            Assert.Null(CampaignBoot.Save(slot, script.Campaign, view));
+            string save = File.ReadAllText(store.SavePath);
+            string backup = File.ReadAllText(store.BackupPath);
+
+            var load = Load(store);
+            Assert.Equal(view, load.View);
+            Assert.True(CampaignBoot.SaveOnQuit(slot, load.Campaign!, () => load.View, step: null));
+            Assert.Equal(save, File.ReadAllText(store.SavePath));
+            Assert.Equal(backup, File.ReadAllText(store.BackupPath));
+            store.ClearResuming();   // the game's, once the quit has saved
+            Assert.Equal(view, Load(store).View);
+            store.ClearResuming();
+
+            var viewless = Load(store);
+            Assert.True(CampaignBoot.SaveOnQuit(slot, viewless.Campaign!, () => null, step: null));
+            store.ClearResuming();
+            Assert.Null(SaveCodec.Read(store.Read()!).View);
+            Assert.Equal(save, File.ReadAllText(store.BackupPath));
+            Assert.Null(Load(store).View);
+            store.ClearResuming();
+        });
+    }
+
+    [Fact]
     public void AResumeKeepsTheTurnsSight_AStairArrivalResetsIt()
     {
         InTempFolder(folder =>

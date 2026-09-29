@@ -853,6 +853,54 @@ public class GameStartupTests
     }
 
     [Fact]
+    public void AQuitBeforeTheLoadedScreenIsUp_SavesTheViewTheLoadBroughtBack()
+    {
+        // T6's review: a close during a loaded run's fade in, before its screen is
+        // up, finds no scene playing the run — the title is still the scene up for
+        // the fade's first half — so there is no scene to read a view off, and the
+        // quit's save wrote the campaign without the view the load brought back: the
+        // slot's save rewritten less its active member and its march, the save that
+        // had them pushed to the backup. So every load keeps the view it brought back
+        // (_loadedView, stored from SlotLoad.View, by LoadSlot alone), and the quit's
+        // door alone reads it — past its read of _resuming, before its save — into
+        // what a view delegate it hands CampaignBoot.SaveOnQuit returns. Read off the
+        // IL; CampaignBootTests.AQuitWithTheViewALoadBroughtBack_WritesNothing shows
+        // what that keeps.
+        var game = typeof(DistanceRpgGame);
+        var loadedView = game.GetField("_loadedView", Declared);
+        Assert.NotNull(loadedView);
+        Assert.Equal(typeof(ViewDto), loadedView.FieldType);
+        IEnumerable<string> Touching(OpCode op) => game.GetNestedTypes(Declared).Prepend(game)
+            .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>())
+            .Where(method => Body(method) is not null && Walk(method).Any(i => i.Op == op && SameField(i.Field, loadedView)))
+            .Select(method => method.Name);
+
+        var loading = Walk(game.GetMethod(nameof(DistanceRpgGame.LoadSlot))!);
+        int kept = loading.FindIndex(i => i.Op == OpCodes.Stfld && SameField(i.Field, loadedView));
+        Assert.True(kept > 0 && loading[kept - 1].Called is { } viewRead && Same(viewRead, typeof(SlotLoad).GetProperty(nameof(SlotLoad.View))!.GetMethod!),
+            "LoadSlot does not keep the view its load brought back");
+        Assert.Equal(["LoadSlot"], Touching(OpCodes.Stfld));
+        Assert.Equal(["SaveOnQuit"], Touching(OpCodes.Ldfld));
+
+        var quitting = Walk(game.GetMethod("SaveOnQuit", Declared)!);
+        var resuming = game.GetField("_resuming", Declared)!;
+        int gate = quitting.FindIndex(i => i.Op == OpCodes.Ldfld && SameField(i.Field, resuming));
+        int read = quitting.FindIndex(i => i.Op == OpCodes.Ldfld && SameField(i.Field, loadedView));
+        int door = quitting.FindIndex(i => i.Called is { } called && Same(called, typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.SaveOnQuit), Declared)!));
+        Assert.True(gate >= 0 && gate < read && read < door, "SaveOnQuit does not read the loaded view past its read of _resuming, before its save");
+
+        // What it read is captured, and a view delegate handed to the door returns it.
+        int captured = quitting.FindIndex(read, i => i.Op == OpCodes.Stfld);
+        Assert.True(captured > read && captured < door, "SaveOnQuit does not keep the loaded view for the delegate it hands the door");
+        var keptIn = quitting[captured].Field!;
+        var handed = quitting.Take(door)
+            .Where(i => i.Op == OpCodes.Ldftn && i.Called is MethodInfo lambda && lambda.ReturnType == typeof(ViewDto))
+            .Select(i => i.Called!)
+            .ToList();
+        Assert.Contains(handed, lambda => Walk(lambda).Any(i => i.Op == OpCodes.Ldfld && SameField(i.Field, keptIn)));
+    }
+
+    [Fact]
     public void ACampaignComesIntoPlayBoundToOneSlot_AndNothingRebindsIt()
     {
         // The user's ruling of 2026-09-25 on the save slots (R5): "you choose a save

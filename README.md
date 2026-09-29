@@ -166,14 +166,20 @@ back to it, and the game quits from it.
   something it stays and is played in place, saving back there (`PROGRESS SAVES
   TO THE OLD AUTOSAVE AT EVERY TURN`). When its own files would not move —
   another program holding its save, say — or the move's own marker cannot be
-  written or cleared there, the title says `THE AUTOSAVE COULD NOT MOVE INTO A
-  SLOT (ANOTHER PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE
-  AND TAKES NO SAVES THIS SESSION - LAUNCH THE GAME AGAIN TO MOVE IT`, and it
-  loads nothing that session, since none of its saves could go through either. A
-  move neither finished nor undone says `THE AUTOSAVE IS HALF MOVED INTO SLOT 4
-  (...) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME AGAIN TO FINISH IT`, and
-  the next launch finishes it. NEW CAMPAIGN never begins a campaign in the save
-  folder, and with neither file there the old autosave is not listed at all.
+  written there, or cannot be cleared once a try is undone or once a marker a
+  crash left cannot be followed, the title says `THE AUTOSAVE COULD NOT MOVE
+  INTO A SLOT (ANOTHER PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE AND
+  TAKES NO SAVES THIS SESSION - LAUNCH THE GAME AGAIN TO MOVE IT`, and it loads
+  nothing that session, since none of its saves could go through either. When
+  the marker a crash left cannot be read, the title says the same and it loads
+  nothing too, the marker kept for a launch that can read it, since a move
+  afresh could leave the campaign in two slots. A marker that will not clear
+  after a move that went through refuses nothing: the title says the move again
+  at each launch, until one clears it. A move neither finished nor undone says
+  `THE AUTOSAVE IS HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS SESSION -
+  LAUNCH THE GAME AGAIN TO FINISH IT`, and the next launch finishes it. NEW
+  CAMPAIGN never begins a campaign in the save folder, and with neither file
+  there the old autosave is not listed at all.
   (Where it goes is the user's to rule: SLOT DECISION 4 in
   `docs/roadmap/open-questions.md`.)
 - **A save's time**: every save records when it was written — `"savedAt"`, the
@@ -297,15 +303,17 @@ back to it, and the game quits from it.
   contradicts itself or holds a number past what play can reach (below), or one
   that crashed the game as it resumed. A `campaign.resuming` marker sits beside the
   save while a resume is in flight — until the resumed screen is up, the screen
-  between runs or the resumed floor, and none of the game's own saves goes into
-  the slot before then — and a load that finds it knows the last resume never
-  finished; the slot list says `ITS LAST LOAD DID NOT FINISH`. (A save written
-  over the file a marker guarded takes the marker with it.) The save is renamed
-  `campaign.unreadable-N.json` (or `campaign.crashed-N.json`) in its own slot's
-  folder, the backup is tried — one save older, so at most a turn or a floor back
-  mid-run — and failing that the load goes back to the title, which says
-  `NOTHING COULD BE LOADED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) and each
-  file set aside, whole; nothing else is touched.
+  between runs or the resumed floor, and no save goes into the slot before then
+  but the quit's: a window close during the fade in writes the campaign as it
+  was loaded (nothing, when the slot holds it already) and clears the marker,
+  since the game quit cleanly — and a load that finds it knows the last resume
+  never finished; the slot list says `ITS LAST LOAD DID NOT FINISH`. (A save
+  written over the file a marker guarded takes the marker with it.) The save is
+  renamed `campaign.unreadable-N.json` (or `campaign.crashed-N.json`) in its own
+  slot's folder, the backup is tried — one save older, so at most a turn or a
+  floor back mid-run — and failing that the load goes back to the title, which
+  says `NOTHING COULD BE LOADED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) and
+  each file set aside, whole; nothing else is touched.
   A load that resumes says what became of the campaign under the title
   of the screen between runs, whole: `CAMPAIGN RESUMED FROM THE BACKUP OF SLOT 2,
   ONE SAVE OLDER` (`FROM THE OLD AUTOSAVE BACKUP, ...` for the old autosave),
@@ -360,15 +368,17 @@ back to it, and the game quits from it.
   (developer tooling), in the slot the list would start on: the lowest empty
   slot, or slot 1, set aside, when every slot is in use — chosen once the launch
   has moved the old autosave, so never the campaign just moved while a slot
-  within the count is free. A new campaign that
-  cannot be saved in its slot is never begun, since every save of it would fail:
-  when another program holds either file open so it cannot be moved, or that
-  first save fails, the save and its backup go back where they were, and the
-  title says `NO NEW CAMPAIGN BEGAN IN SLOT 2`, then why (`--new-campaign` then
-  opens on the title). The marker of a load that never finished stays beside
-  them, as it was, and a quit's unsaved marker that `--new-campaign` took is said
-  on that title, as it would have been. Deleting `campaign.json` by hand leaves
-  CONTINUE the backup instead, if there is one.
+  within the count is still free after the move. When the move takes the last
+  free slot within the count, every slot is then in use, and slot 1 is set aside
+  all the same — the campaign just moved, when that slot was slot 1. A new
+  campaign that cannot be saved in its slot is never begun, since every save of
+  it would fail: when another program holds either file open so it cannot be
+  moved, or that first save fails, the save and its backup go back where they
+  were, and the title says `NO NEW CAMPAIGN BEGAN IN SLOT 2`, then why
+  (`--new-campaign` then opens on the title). The marker of a load that never
+  finished stays beside them, as it was, and a quit's unsaved marker that
+  `--new-campaign` took is said on that title, as it would have been. Deleting
+  `campaign.json` by hand leaves CONTINUE the backup instead, if there is one.
 - **The dev overrides play apart**: a launch with `DISTANCERPG_DUNGEON` (a
   dungeon's id: straight into it) or `DISTANCERPG_SEED` (the first run's map
   seed) plays a fresh campaign in `saves\override\`, emptied at every such

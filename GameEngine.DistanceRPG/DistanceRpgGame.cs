@@ -209,6 +209,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     // cleared once it is.
     private bool _resuming;
 
+    // The view the load brought back with its campaign — the member who was
+    // active, whether the turn marched — set by every load, and read only while
+    // _resuming: a close during the fade in, before any scene plays the run, saves
+    // the campaign with it, as it was loaded (SaveOnQuit).
+    private ViewDto? _loadedView;
+
     // The quit's save has been written: a close is saved once, however it came.
     private bool _quitSaved;
 
@@ -374,7 +380,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
 
         // The old autosave moves into a slot of its own before anything is listed
         // or begun, so --new-campaign never sets aside the campaign just moved
-        // while a slot within the count is free.
+        // while a slot within the count is still free after the move. (A move into
+        // slot 1, the last free one, leaves none: slot 1 is set aside all the same.)
         var moved = OldAutosave.MoveIntoASlot(slots, line => Log.Info(line));
         foreach (string notice in moved)
             Log.Info($"[Save] {notice}");
@@ -444,9 +451,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// loading it is choosing it. It plays on the screen between runs or in the
     /// dungeon at the saved floor and turn (<see cref="ResumeRun"/>), its word led
     /// for that screen, its resume marker cleared once the screen is up; no write
-    /// reaches the slot before then (<see cref="WriteRequestedSave"/>). A load that
-    /// brings nothing back — a slot that takes no saves this session among them —
-    /// binds nothing and goes back to the title, which says so first and why.
+    /// reaches the slot before then (<see cref="WriteRequestedSave"/>) but the
+    /// quit's, which writes the campaign as it was loaded, the view the load brought
+    /// back with it (<see cref="SaveOnQuit"/>). A load that brings nothing back — a
+    /// slot that takes no saves this session among them — binds nothing and goes
+    /// back to the title, which says so first and why.
     /// </summary>
     public void LoadSlot(int slot)
     {
@@ -469,6 +478,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         _saveRequested = false;
         _handSaveRequested = false;
         _resuming = true;   // the loaded screen clears the slot's resume marker once it is up
+        _loadedView = load.View;   // the quit's, until then
         Log.Info($"[Save] The campaign saves into {chosen.Store.Folder} from now on");
         foreach (string notice in load.Notices)
             Log.Info($"[Save] {notice}");
@@ -1056,7 +1066,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// leaves a marker beside that slot's save instead, and the title says, when it
     /// next opens, that what the slot holds is from before this quit. A close during
     /// a loaded campaign's fade in, before its screen is up, writes the campaign as
-    /// it was loaded, or nothing when the slot holds it already, and then clears the
+    /// it was loaded — a run in progress with the view the load brought back
+    /// (<see cref="_loadedView"/>), since no scene plays it yet to read one off, so
+    /// the slot never takes it back less its active member and its march (T6's
+    /// review) — or nothing when the slot holds it already, and then clears the
     /// resume marker: the game quit cleanly, and the marker guards a screen that
     /// crashes. A quit that saves — the campaign written, or on the disk
     /// already — takes back what an earlier failed autosave said
@@ -1074,9 +1087,12 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return;   // the title, or the content never loaded: no campaign in play
 
         var scene = PlayingScene(campaign);
+        // Before a loaded campaign's screen is up no scene plays its run: the view is
+        // the one the load brought back, the one it was saved with.
+        var loaded = _resuming ? _loadedView : null;
         Log.Info(campaign.Visit is { } visit ? $"[Save] Saving the campaign on quit, mid-run in {visit.Def.Name}" : "[Save] Saving the campaign on quit");
         Action? step = scene is null ? null : scene.StepLogic;
-        CampaignBoot.SaveOnQuit(slot, campaign, scene is null ? null : () => scene.View, step, line => Log.Info(line), _clock(),
+        CampaignBoot.SaveOnQuit(slot, campaign, scene is null ? () => loaded : () => scene.View, step, line => Log.Info(line), _clock(),
             saved: TakeBackFailedSaves);
 
         if (_resuming)

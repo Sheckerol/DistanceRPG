@@ -49,21 +49,32 @@ internal static class NoticeText
     /// <summary>
     /// The most rows the notices shown whole take (<see cref="Rows"/>): the save's
     /// word on the campaign. Measured again once the user's ruling on the save slots
-    /// was whole (Phase 5.T6), in the player's own save folder under a five- and a
-    /// twenty-letter user name, each notice naming its file's full path: NEW
-    /// CAMPAIGN on the title over a slot in use, its save and backup set aside,
-    /// takes nine rows; a slot resumed from its backup under other numbers, its save
-    /// set aside with a long reason, eight and nine; the title's word on a load that
-    /// brought nothing back, the slot's crashed save and unreadable backup set
-    /// aside, with a slot's unsaved-quit word that would not clear, twelve and
-    /// fourteen. <c>--new-campaign</c> over a full save folder, both files set aside
-    /// and the old autosave's move refused or left in two halves, takes fourteen
-    /// under both: developer tooling, and the one word that fills the ceiling. A
-    /// word passes it only where several failures meet under <c>--new-campaign</c>:
-    /// no new campaign begun, its save stuck and its backup not gone back, with two
-    /// unsaved-quit words and the move's, fifteen; its first save failed and neither
-    /// file gone back, nineteen. So the ceiling stands. Past it the rows are cut
-    /// like any others, and the log has every word; with <see cref="MaxRows"/> after
+    /// was whole (Phase 5.T6, and its review, which added the title's own cases), in
+    /// the player's own save folder under a five- and a twenty-letter user name,
+    /// each notice naming its file's full path: NEW CAMPAIGN on the title over a
+    /// slot in use, its save and backup set aside, takes nine rows; NO NEW CAMPAIGN
+    /// BEGAN IN SLOT 2 on the title, its save stuck and its backup not gone back,
+    /// eight (ten with the listing's word on the save another program holds), and
+    /// with its first save failed and neither file gone back, eleven; a slot resumed
+    /// from its backup under other numbers, its save set aside with a long reason,
+    /// eight and nine; the title's word on a load that brought nothing back, the
+    /// slot's crashed save and unreadable backup set aside, with a slot's
+    /// unsaved-quit word that would not clear, twelve and fourteen — fourteen from
+    /// an eleven-letter user name up, so a word play can make fills the ceiling.
+    /// <c>--new-campaign</c> over a full save folder, both files set aside and the
+    /// old autosave's move refused or left in two halves, takes fourteen under both
+    /// names. Of the words measured, one passes the ceiling only where several
+    /// failures meet: that title word with one more two-row word on it — a second
+    /// slot's unsaved-quit word that would not clear, or the listing's word on a
+    /// slot's file another program holds — fourteen and sixteen, past it from an
+    /// eight-letter name; and under <c>--new-campaign</c>, NO NEW CAMPAIGN BEGAN IN
+    /// SLOT 1 with its own unsaved-quit word, the moved autosave's slot's and the
+    /// move's word on it, fifteen with its save stuck and its backup not gone back,
+    /// nineteen with its first save failed and neither file gone back. A title's
+    /// word grows the same way with every further failure — markers that will not
+    /// clear, files another program holds. So the ceiling stands: what passes it
+    /// needs several failures at once. Past it the rows are cut and counted like
+    /// any others, and the log has every word; with <see cref="MaxRows"/> after
     /// them and the row that counts the rest, the dungeon list still clears a
     /// 720-pixel window, and so does a resumed floor's banner, which moves down under
     /// them (<see cref="DungeonHud.BannerLine"/>). settled.md's entry on the save's
