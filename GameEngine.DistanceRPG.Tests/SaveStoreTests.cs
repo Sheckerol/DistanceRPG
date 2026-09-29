@@ -253,7 +253,7 @@ public class SaveStoreTests
             Assert.Equal((false, false), (slot.SaveVouched, slot.BackupVouched));
             Assert.True(slot.Taken(SaveStore.FileName));
             Assert.False(root.Taken(SaveStore.FileName));
-            Assert.Equal((true, false, true), (slot.Holds(SaveStore.FileName), root.Holds(SaveStore.FileName), root.Holds(SaveStore.BackupName)));
+            Assert.Equal((true, false, true), (slot.Has(SaveStore.FileName), root.Has(SaveStore.FileName), root.Has(SaveStore.BackupName)));
 
             // It moves back the same way, which undoes it; and the markers move too.
             slot.MoveInto(root, SaveStore.FileName);
@@ -270,7 +270,7 @@ public class SaveStoreTests
             Assert.Equal(("the save", "a save already there"), (root.Read(), slot.Read()));
             Directory.CreateDirectory(slot.BackupPath);
             Assert.True(slot.Taken(SaveStore.BackupName));
-            Assert.False(slot.Holds(SaveStore.BackupName));
+            Assert.False(slot.Has(SaveStore.BackupName));
             Assert.Throws<IOException>(() => root.MoveInto(slot, SaveStore.BackupName));
             Assert.Equal("the save before", root.ReadBackup());
             Assert.True(Directory.Exists(slot.BackupPath));
@@ -316,28 +316,38 @@ public class SaveStoreTests
         });
 
         // The marker reaches the disk before any file moves: written through a stream
-        // flushed to it, as a save is — never a write the system may hold back.
+        // flushed to it, as a save is — never a write the system may hold back. The
+        // flush's one argument, flushToDisk, is the literal true right before it.
         var mark = typeof(SaveStore).GetMethod(nameof(SaveStore.MarkMoving), BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var called = Instructions(Body(mark)!)
-            .Where(i => i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt || i.Op == OpCodes.Newobj)
-            .Select(i => Resolve(mark, i.Token))
-            .OfType<MethodBase>()
-            .ToList();
-        Assert.Contains(called, method => method.DeclaringType == typeof(FileStream) && method.Name == nameof(FileStream.Flush)
-            && method.GetParameters() is [{ ParameterType: var flag }] && flag == typeof(bool));
+        var marking = Instructions(Body(mark)!).ToList();
+        var called = marking.Where(i => IsCall(i.Op)).Select(i => Resolve(mark, i.Token)).OfType<MethodBase>().ToList();
+        int flushed = marking.FindIndex(i => IsCall(i.Op) && Resolve(mark, i.Token) is { } method && method.DeclaringType == typeof(FileStream)
+            && method.Name == nameof(FileStream.Flush) && method.GetParameters() is [{ ParameterType: var flag }] && flag == typeof(bool));
+        Assert.True(flushed > 0, "MarkMoving does not flush its stream");
+        Assert.Equal(OpCodes.Ldc_I4_1, marking[flushed - 1].Op);   // flushToDisk: true
         Assert.DoesNotContain(called, method => method.DeclaringType == typeof(File) && method.Name.StartsWith("Write", StringComparison.Ordinal));
 
         // A move is a rename that refuses a name taken, never a copy and never a write
-        // over one.
+        // over one: File.Move alone, and its overwrite the literal false right before
+        // it. The test of a name taken refuses one before the move is reached, so
+        // only a name taken between the two meets the flag, which no case here can
+        // time — so read off the IL.
         var moveInto = typeof(SaveStore).GetMethod(nameof(SaveStore.MoveInto), BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var moves = Instructions(Body(moveInto)!)
-            .Where(i => i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt)
-            .Select(i => Resolve(moveInto, i.Token))
-            .OfType<MethodBase>()
-            .Where(method => method.DeclaringType == typeof(File))
-            .Select(method => $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
-            .ToArray();
-        Assert.Equal(["Move(String, String, Boolean)"], moves);
+        var moving = Instructions(Body(moveInto)!).ToList();
+        var moves = moving.Select((instruction, at) => (Called: IsCall(instruction.Op) ? Resolve(moveInto, instruction.Token) : null, At: at))
+            .Where(i => i.Called?.DeclaringType == typeof(File))
+            .ToList();
+        Assert.Equal(["Move(String, String, Boolean)"], moves.Select(i => $"{i.Called!.Name}({string.Join(", ", i.Called.GetParameters().Select(p => p.ParameterType.Name))})"));
+        Assert.Equal(OpCodes.Ldc_I4_0, moving[moves[0].At - 1].Op);   // overwrite: false
+
+        // And the move reaches the disk through the stores alone: nothing of
+        // OldAutosave's own, closures and all, calls or hands on a member of a file,
+        // a folder or a stream, so all it can do there is what the stores' members
+        // above do — moves that refuse a name taken, and the one delete, of its own
+        // marker.
+        var fromTheMove = Edges(typeof(OldAutosave).Assembly).Where(edge => Root(edge.From.DeclaringType) == typeof(OldAutosave)).ToList();
+        Assert.Contains(fromTheMove, edge => edge.Target.DeclaringType == typeof(SaveStore));   // the scan reads something
+        Assert.Empty(fromTheMove.Where(edge => TouchesTheMachine(edge.Target)).Select(edge => $"{Describe(edge)} -> {edge.Target.DeclaringType!.Name}.{edge.Target.Name}"));
     }
 
     /// <summary>What reading the machine looks like from IL: a file or a folder, the environment's variables and folders, the executable's own folder.</summary>

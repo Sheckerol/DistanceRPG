@@ -420,8 +420,8 @@ internal sealed class SaveStore
         return File.Exists(path) || Directory.Exists(path);
     }
 
-    /// <summary>Whether this folder holds <paramref name="name"/> as a file: what the old autosave's move takes with it.</summary>
-    internal bool Holds(string name)
+    /// <summary>Whether this folder has <paramref name="name"/> as a file, as <see cref="HasSave"/> and <see cref="HasBackup"/> ask of theirs: what the old autosave's move takes with it.</summary>
+    internal bool Has(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return File.Exists(Path.Combine(Folder, name));

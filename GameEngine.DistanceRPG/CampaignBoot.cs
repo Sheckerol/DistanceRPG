@@ -1099,11 +1099,11 @@ internal static class CampaignBoot
     /// <summary>
     /// The launch could not move the old autosave into any slot, for
     /// <paramref name="why"/> — the save folder's own files would not move, or its
-    /// marker of the move could not be written — so it stays where it is, listed as
-    /// the old autosave, and takes no saves this session, since whatever stopped the
-    /// move stops its writes too: <c>THE AUTOSAVE COULD NOT MOVE INTO A SLOT (ANOTHER
-    /// PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS
-    /// SESSION - LAUNCH THE GAME AGAIN TO MOVE IT</c>.
+    /// marker of the move could not be written, read or cleared — so it stays where
+    /// it is, listed as the old autosave, and takes no saves this session, since
+    /// whatever stopped the move stops its writes too: <c>THE AUTOSAVE COULD NOT
+    /// MOVE INTO A SLOT (ANOTHER PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE
+    /// AND TAKES NO SAVES THIS SESSION - LAUNCH THE GAME AGAIN TO MOVE IT</c>.
     /// </summary>
     internal static string AutosaveNotMoved(string why)
     {

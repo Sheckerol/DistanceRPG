@@ -2014,11 +2014,13 @@ superseded whole.
     the autosave: nothing new is saved there, so it is the old autosave — listed,
     as `OLD AUTOSAVE`, only while it holds a save or a backup, and played in place
     — and the slots are slot 1 up — R5, the old autosave, below. Superseded again
-    in "no file moves, and there is no migration": every launch moves the save
-    folder's own campaign — the pre-rework saves among them — into a slot of its
-    own, byte for byte and all or nothing, a move of the files with no migration
-    of their text, so it is the old autosave only while a launch could not move it
-    — R5, the move, below.)
+    in "no file moves, and there is no migration", and in its being played in
+    place: every launch moves the save folder's own campaign — the pre-rework
+    saves among them — into a slot of its own, byte for byte and all or nothing, a
+    move of the files with no migration of their text, so it is the old autosave
+    only while a launch could not move it, played in place only while no slot is
+    free for it, and loading nothing in a session whose move failed — R5, the
+    move, below.)
   - **The slot count is `tuning.json`'s `SaveSlots`**: 3, clamped 1–9 with the
     usual warning. At least one, so saving by hand always has somewhere to go; at
     most nine, since a digit picks each slot, as the bag's are picked, and the
@@ -2709,7 +2711,9 @@ out each alternative.
   new is saved in the save folder itself, and the folder is no autosave slot: what
   it holds is the campaign a build before the ruling autosaved there — the **old
   autosave** — played in place, as it has been since R5, the slot, until a launch
-  moves it into a slot of its own (R5, the move, below):
+  moves it into a slot of its own (R5, the move, below; superseded there in when
+  it is played in place: only while no slot is free for it, and in a session
+  whose move failed, or left it in two halves, it loads nothing):
   - **It is named as a slot is named, and every word names it**: `OLD AUTOSAVE`
     on the lists and CONTINUE's row, `THE OLD AUTOSAVE` in the words —
     `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE`, `NOTHING COULD BE LOADED FROM THE
@@ -2810,21 +2814,30 @@ out each alternative.
     EARLIER, CAMPAIGN.JSON COULD NOT BE MOVED INTO A SLOT (...) - LAUNCH THE GAME
     AGAIN TO PLAY IN IT`, and the title says `THE AUTOSAVE COULD NOT MOVE INTO A
     SLOT (...) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS SESSION -
-    LAUNCH THE GAME AGAIN TO MOVE IT`; the next launch tries again. A try undone
-    leaves behind the slot folder it made, empty, which lists `EMPTY`: the move
-    deletes nothing but its own marker. A move a crash cut off is finished at the
-    next launch, before anything is listed or loaded, into the slot the marker
-    names; a marker naming a slot that has since taken one of the names still in
-    the save folder — a build without the move ran in between — or naming no slot
-    is dropped and logged, the log naming every slot that holds a lone save or a
-    lone backup, so a split can be joined by hand, and the move goes afresh. A
-    finish that stops is undone as a try is, and the halves the crash left stand;
-    a crash that came before any file moved left none, so that finish is a try
-    that stopped, and the move goes afresh. A move that can be neither finished
-    nor undone leaves the campaign in two halves, and neither takes saves that
-    session, so no load runs on a split and no save forks it: `THE AUTOSAVE IS
-    HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME
-    AGAIN TO FINISH IT`, the marker kept for the next launch to finish it.
+    LAUNCH THE GAME AGAIN TO MOVE IT`; the next launch tries again. A marker
+    that cannot be written, or cleared once a try is undone, or dropped, leaves
+    the save folder taking no saves that session the same way, its refusal naming
+    the marker for what it is: `... EARLIER, CAMPAIGN.MOVING, THE MARKER OF ITS
+    MOVE, COULD NOT BE WRITTEN (...) - ...`. A try undone leaves behind the slot
+    folder it made, empty, which lists `EMPTY`: the move deletes nothing but its
+    own marker. A move a crash cut off is finished at the next launch, before
+    anything is listed or loaded, into the slot the marker names; a marker naming
+    a slot that has since taken one of the names still in the save folder — a
+    build without the move ran in between — or naming no slot is dropped and
+    logged, the log naming every slot that holds a lone save or a lone backup, so
+    a split can be joined by hand, and the move goes afresh. A marker that cannot
+    be read at all is not one naming no slot, since it may name the slot a half is
+    in: it is kept, and nothing moves — moved afresh, a split would stand in two
+    slots with nothing left to join it — and the save folder, while it holds a
+    save or a backup, takes no saves that session, until a launch can read it and
+    finish the move. A finish that stops is undone as a try is, and the halves the
+    crash left stand; a crash that came before any file moved left none, so that
+    finish is a try that stopped, and the move goes afresh. A move that can be
+    neither finished nor undone leaves the campaign in two halves, and neither
+    takes saves that session, so no load runs on a split and no save forks it:
+    `THE AUTOSAVE IS HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS SESSION -
+    LAUNCH THE GAME AGAIN TO FINISH IT`, the marker kept for the next launch to
+    finish it.
   - **With no slot free, it stays — bends the plan, needs no ruling**: with
     slots 1 to 9 all holding something nothing is tried, so nothing is known to
     fail, and the old autosave is listed, marked `NOT YET MOVED INTO A SLOT`, and

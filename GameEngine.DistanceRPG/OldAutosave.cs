@@ -43,9 +43,11 @@ namespace GameEngine.DistanceRPG;
 /// marker names, before anything is listed or loaded — unless that slot has since
 /// taken one of the names still in the save folder, which makes the marker stale,
 /// or the marker names no slot: each is dropped and logged, and a slot is picked
-/// afresh. A finish that stops is undone as a move is, and the halves the crash
-/// left stand; a crash that came before any file moved left none, so that finish
-/// is a move that stopped, and goes afresh.</item>
+/// afresh. A marker that cannot be read at all is kept, since it may name the slot
+/// the other half is in, and the save folder takes no saves this session. A finish
+/// that stops is undone as a move is, and the halves the crash left stand; a crash
+/// that came before any file moved left none, so that finish is a move that
+/// stopped, and goes afresh.</item>
 /// <item><strong>With no slot free</strong> — slots 1 to 9 all hold something —
 /// nothing is tried, so nothing is known to fail: the old autosave stays, listed
 /// and played in place, and the log says why.</item>
@@ -64,7 +66,8 @@ internal static class OldAutosave
     /// <c>campaign.bak.json</c>, with its markers — into a slot of its own, or
     /// finish a move a crash cut off, and say what became of it: the title's word,
     /// led before the rest. A move that went through says
-    /// <see cref="CampaignBoot.AutosaveMoved"/>; one every slot refused,
+    /// <see cref="CampaignBoot.AutosaveMoved"/>; one every slot refused, or whose
+    /// marker could not be written, read or cleared,
     /// <see cref="CampaignBoot.AutosaveNotMoved"/>, the save folder then taking no
     /// saves this session; one left in two halves,
     /// <see cref="CampaignBoot.AutosaveSplit"/>, both halves then taking none. No
@@ -83,8 +86,7 @@ internal static class OldAutosave
 
         if (!(root.HasSave || root.HasBackup))
         {
-            if (root.WasResuming)
-                report?.Invoke($"[Save] {root.ResumingPath} stands alone, beside no save or backup - it guards nothing, and is left where it is");
+            LoneResumeLeft(root, report);
             return [];
         }
 
@@ -107,16 +109,12 @@ internal static class OldAutosave
             {
                 string why = SaveStore.Why(error, root.Folder, writing: true);
                 report?.Invoke($"[Save] {root.MovingPath} could not be written, so nothing moves - {root.Folder} takes no saves this session: {error}");
-                return [NotMoved(root, SaveStore.MovingName, why, report)];
+                return [NotMoved(root, ItsMarker("written"), why, report)];
             }
 
             var moved = new List<string>();
-            if (MoveEach(root, slot, Files.Where(root.Holds).ToList(), moved, report) is not { } stopped)
-            {
-                Unmark(root, report);
-                report?.Invoke($"[Save] The autosave moved into {slot.Folder}: its campaign saves in {SaveSlots.Label(number)} from now on");
-                return [CampaignBoot.AutosaveMoved(number)];
-            }
+            if (MoveEach(root, slot, Files.Where(root.Has).ToList(), moved, report) is not { } stopped)
+                return Moved(root, slot, number, report);
 
             if (MoveBack(root, slot, moved, report) is { } stuck)
                 return [Split(root, slot, number, stuck, report)];
@@ -128,7 +126,7 @@ internal static class OldAutosave
             {
                 string why = SaveStore.Why(error, root.Folder, writing: true);
                 report?.Invoke($"[Save] {root.MovingPath} could not be cleared after the move into {slot.Folder} was undone - the next launch moves the autosave there; {root.Folder} takes no saves this session: {error}");
-                return [NotMoved(root, SaveStore.MovingName, why, report)];
+                return [NotMoved(root, ItsMarker($"cleared after {stopped.File} would not move"), why, report)];
             }
             report?.Invoke($"[Save] The move into {slot.Folder} was undone, nothing kept there: {stopped.File} would not move ({stopped.Why}) - the next slot is tried");
             failed = stopped;
@@ -138,7 +136,7 @@ internal static class OldAutosave
         // them stops a write there too, so its campaign takes no saves this session.
         var (file, last) = failed ?? throw new InvalidOperationException("No slot was tried, though one was free.");
         report?.Invoke($"[Save] The autosave could not move into any of slots {string.Join(", ", free)} - it stays in {root.Folder} and takes no saves this session; the next launch tries again");
-        return [NotMoved(root, file, last, report)];
+        return [NotMoved(root, $"{file} could not be moved into a slot", last, report)];
     }
 
     /// <summary>A slot the old autosave may move into: none of its four names taken there, by a file or a folder, and no file where the slot's folder goes. A stray marker makes it unfit, and is left where it is.</summary>
@@ -149,7 +147,12 @@ internal static class OldAutosave
     /// slot its marker names, what is left in the save folder, in the move's order.
     /// Null to go on and move afresh — the marker named no slot, or a stale one, or
     /// one the crash had moved nothing into and the finish could not move into
-    /// either, and was dropped — and otherwise what to say.
+    /// either, and was dropped — and otherwise what to say. A marker that cannot be
+    /// read is no marker that names no slot: it may name the slot the other half of
+    /// a split is in, so it is kept for a launch that can read it, and the save
+    /// folder, while it holds a save or a backup, takes no saves this session —
+    /// were it moved afresh, a split would stand in two slots with nothing to join
+    /// it.
     /// </summary>
     private static IReadOnlyList<string>? Finish(SaveSlots slots, SaveStore root, Action<string>? report)
     {
@@ -160,8 +163,11 @@ internal static class OldAutosave
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            report?.Invoke($"[Save] {root.MovingPath} could not be read: {error}");
-            named = null;
+            report?.Invoke($"[Save] {root.MovingPath} could not be read, so a move cut off cannot be finished by it - it is kept for a launch that can read it, and nothing moves. The save folder holds {Holding(root)}; "
+                + $"a lone save or backup stands in {LoneHalves(slots)}: {error}");
+            if (!(root.HasSave || root.HasBackup))
+                return [];   // nothing left here to move, or to split: nothing to refuse, and nothing to say
+            return [NotMoved(root, ItsMarker("read"), SaveStore.Why(error, root.Folder, writing: false), report)];
         }
         if (named is not { } number)
         {
@@ -176,16 +182,15 @@ internal static class OldAutosave
             // The save and the backup moved before the crash: what is left of the
             // move is a marker at most. The quit's speaks of the slot's campaign; the
             // resume marker, with no save beside it to guard, is left (M4).
-            if (root.Holds(SaveStore.UnsavedName) && !slot.Taken(SaveStore.UnsavedName))
+            if (root.Has(SaveStore.UnsavedName) && !slot.Taken(SaveStore.UnsavedName))
                 MoveEach(root, slot, [SaveStore.UnsavedName], [], report);
-            if (root.WasResuming)
-                report?.Invoke($"[Save] {root.ResumingPath} stands alone, beside no save or backup - it guards nothing, and is left where it is");
+            LoneResumeLeft(root, report);
             Unmark(root, report);
             report?.Invoke($"[Save] The move into {slot.Folder} that a crash cut off had moved the save and its backup already: it is finished");
             return slot.HasSave || slot.HasBackup ? [CampaignBoot.AutosaveMoved(number)] : [];
         }
 
-        var left = Files.Where(root.Holds).ToList();
+        var left = Files.Where(root.Has).ToList();
         if (left.Where(slot.Taken).ToList() is [_, ..] taken)
         {
             report?.Invoke($"[Save] {root.MovingPath} names {slot.Folder}, which holds {string.Join(", ", taken)} since - the marker is stale, dropped, and a slot is picked afresh");
@@ -202,16 +207,29 @@ internal static class OldAutosave
             // stopped like any other, and it goes afresh — the next slot tried, and
             // the save folder refused its writes when every try fails.
             string? stuck = MoveBack(root, slot, moved, report);
-            if (stuck is null && !Files.Any(slot.Holds))
+            if (stuck is null && !Files.Any(slot.Has))
             {
                 report?.Invoke($"[Save] The move into {slot.Folder} that a crash cut off had moved nothing there, and stopped again: {stopped.File} would not move ({stopped.Why}) - the marker is dropped, and a slot is picked afresh");
                 return Drop(root, report);
             }
             return [Split(root, slot, number, stuck ?? stopped.Why, report)];
         }
+        return Moved(root, slot, number, report);
+    }
+
+    /// <summary>The move into slot <paramref name="number"/> went through: its marker cleared, the log told, and the title's word.</summary>
+    private static IReadOnlyList<string> Moved(SaveStore root, SaveStore slot, int number, Action<string>? report)
+    {
         Unmark(root, report);
         report?.Invoke($"[Save] The autosave moved into {slot.Folder}: its campaign saves in {SaveSlots.Label(number)} from now on");
         return [CampaignBoot.AutosaveMoved(number)];
+    }
+
+    /// <summary>A resume marker standing alone in the save folder, beside no save or backup, guards nothing: it is left where it is, and logged.</summary>
+    private static void LoneResumeLeft(SaveStore root, Action<string>? report)
+    {
+        if (root.WasResuming)
+            report?.Invoke($"[Save] {root.ResumingPath} stands alone, beside no save or backup - it guards nothing, and is left where it is");
     }
 
     /// <summary>
@@ -269,11 +287,13 @@ internal static class OldAutosave
     /// <summary>
     /// The save folder's campaign would not move: it stays, and the save folder takes
     /// no saves this session — whatever stopped the move stops its writes — so its
-    /// load, per a slot that refuses its writes, loads nothing and says why.
+    /// load, per a slot that refuses its writes, loads nothing and says why:
+    /// <paramref name="what"/> failed, a file of the campaign's that would not move or
+    /// the move's own marker (<see cref="ItsMarker"/>), for <paramref name="why"/>.
     /// </summary>
-    private static string NotMoved(SaveStore root, string file, string why, Action<string>? report)
+    private static string NotMoved(SaveStore root, string what, string why, Action<string>? report)
     {
-        root.RefuseWrites($"{file} could not be moved into a slot ({why})");
+        root.RefuseWrites($"{what} ({why})");
         report?.Invoke($"[Save] {root.Folder} takes no saves this session: {root.WritesRefused}");
         return CampaignBoot.AutosaveNotMoved(why);
     }
@@ -303,9 +323,12 @@ internal static class OldAutosave
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             report?.Invoke($"[Save] {root.MovingPath} could not be dropped, so nothing moves: {error}");
-            return [NotMoved(root, SaveStore.MovingName, SaveStore.Why(error, root.Folder, writing: true), report)];
+            return [NotMoved(root, ItsMarker("cleared"), SaveStore.Why(error, root.Folder, writing: true), report)];
         }
     }
+
+    /// <summary>What failed, when the move's own marker did, in the words of the save folder's refusal: <c>campaign.moving, the marker of its move, could not be written</c> — a file the player never made, so it says what it is.</summary>
+    private static string ItsMarker(string failed) => $"{SaveStore.MovingName}, the marker of its move, could not be {failed}";
 
     /// <summary>Clear the marker of a move that went through; one that will not go is logged, and the next launch finds nothing left to move.</summary>
     private static void Unmark(SaveStore root, Action<string>? report)
@@ -322,7 +345,7 @@ internal static class OldAutosave
 
     /// <summary>What of the campaign's four files the save folder holds, for the log.</summary>
     private static string Holding(SaveStore root)
-        => Files.Where(root.Holds).ToList() is [_, ..] held ? string.Join(", ", held) : "none of the campaign's files";
+        => Files.Where(root.Has).ToList() is [_, ..] held ? string.Join(", ", held) : "none of the campaign's files";
 
     /// <summary>Every slot that holds a save with no backup, or a backup with no save — the halves a move cut off can leave — for the log.</summary>
     private static string LoneHalves(SaveSlots slots)

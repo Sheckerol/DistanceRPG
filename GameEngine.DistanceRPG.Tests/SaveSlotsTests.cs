@@ -351,19 +351,21 @@ public sealed class SaveSlotsTests : IDisposable
             // migration: no text is read or rewritten. The old autosave is no longer
             // listed, and slot 1 is the most recent save.
             Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(slots));
-            Assert.Equal(seeded.ToDictionary(file => Path.Combine("slot-1", file.Key), file => file.Value), Snapshot(folder));
+            var inSlot1 = seeded.ToDictionary(file => Path.Combine("slot-1", file.Key), file => file.Value);
+            Assert.Equal(inSlot1, Snapshot(folder));
             var moved = SaveListing.Read(slots, Now);
             Assert.DoesNotContain(moved.Slots, slot => slot.Number == SaveSlots.OldAutosave);
             Assert.Equal((1, SlotState.Readable, new SlotHeader(null, 1, null, null, null)), (moved.Newest!.Number, moved.Newest.State, moved.Newest.Header));
 
-            // Loaded, it resumes, saying so by the slot's name.
+            // Loaded, it resumes, saying so by the slot's name, and the files moved
+            // stay as they were: the load writes nothing.
             var store = slots.Store(1);
             var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
             Assert.True(load.Loaded);
             Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1"], load.Notices);
             StateAssert.Equivalent(campaign, load.Campaign!, "campaign");
             store.ClearResuming();
-            var inSlot1 = Snapshot(folder);
+            Assert.Equal(inSlot1, Snapshot(folder));
 
             // Saved again as it stands, whatever the time now, nothing is written: the
             // save keeps the time its state was first written — none — and the backup

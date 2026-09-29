@@ -517,7 +517,7 @@ public class GameStartupTests
         // autosave that failed or was left in two halves, and by nothing else.
         string[] MentionedBy(MethodBase target)
             => Edges(Game).Where(edge => Same(edge.Target, target)).Select(edge => Root(edge.From.DeclaringType)!.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
-        foreach (var moving in new[] { nameof(SaveStore.MoveInto), nameof(SaveStore.MarkMoving), nameof(SaveStore.ReadMoving), nameof(SaveStore.ClearMoving), nameof(SaveStore.Holds),
+        foreach (var moving in new[] { nameof(SaveStore.MoveInto), nameof(SaveStore.MarkMoving), nameof(SaveStore.ReadMoving), nameof(SaveStore.ClearMoving), nameof(SaveStore.Has),
             "get_" + nameof(SaveStore.WasMoving), "get_" + nameof(SaveStore.FolderIsAFile) })
             Assert.Equal(["OldAutosave"], MentionedBy(Method(typeof(SaveStore), moving)));
         Assert.Equal(["OldAutosave", "SaveStore"], MentionedBy(Method(typeof(SaveStore), nameof(SaveStore.Taken))));
@@ -633,6 +633,21 @@ public class GameStartupTests
         Assert.True(moved < listed && moved < begun && moved < titled,
             "BootCampaign reads the slots, begins a campaign or shows the title before the old autosave has moved");
 
+        // Its word reaches the screen: what the move hands back is kept in a local,
+        // and that local, as it is, is ShowTitle's leading word, and the one word
+        // Lead is handed past the move, for the screen --new-campaign opens on — the
+        // override branch's own Lead, before it, the other of the two.
+        var lead = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Lead))!;
+        Assert.Equal(2, Mentions(boot, lead));
+        byte[] bootIl = Body(boot)!;
+        var walked = InstructionsAt(bootIl).ToList();
+        int Called(MethodBase target, int from) => walked.FindIndex(from, i => IsCall(i.Op) && Resolve(boot, i.Token) is { } called && Same(called, target));
+        int moveAt = Called(move, 0);
+        int? kept = Local(bootIl, walked[moveAt + 1], store: true);
+        Assert.True(kept is not null, "BootCampaign does not keep what the move hands back in a local");
+        Assert.Equal(kept, Local(bootIl, walked[Called(typeof(DistanceRpgGame).GetMethod("ShowTitle", Declared)!, moveAt) - 1], store: false));
+        Assert.Equal(kept, Local(bootIl, walked[Called(lead, moveAt) - 1], store: false));
+
         // Nothing else in the game reaches the move: not the title, a load, NEW
         // CAMPAIGN, a save or a quit.
         foreach (string later in new[] { "ShowTitle", "LoadSlot", "BeginNewCampaign", "WriteRequestedSave", "SaveOnQuit", "QuitToTitle", "OnUpdateFrame" })
@@ -647,6 +662,19 @@ public class GameStartupTests
     /// <summary>Every method-typed operand in <paramref name="method"/>'s body that names <paramref name="target"/> — a call, or a delegate made of it (<c>ldftn</c>).</summary>
     private static int Mentions(MethodBase method, MethodBase target)
         => Instructions(Body(method)!).Count(i => i.Token != 0 && Resolve(method, i.Token) is { } named && Same(named, target));
+
+    /// <summary>The local <paramref name="instruction"/> stores to — or, with <paramref name="store"/> false, loads — in any of the forms of <c>stloc</c> (<c>ldloc</c>); null for any other instruction.</summary>
+    private static int? Local(byte[] il, (OpCode Op, int Token, int At) instruction, bool store)
+    {
+        OpCode[] numbered = store ? [OpCodes.Stloc_0, OpCodes.Stloc_1, OpCodes.Stloc_2, OpCodes.Stloc_3] : [OpCodes.Ldloc_0, OpCodes.Ldloc_1, OpCodes.Ldloc_2, OpCodes.Ldloc_3];
+        if (Array.IndexOf(numbered, instruction.Op) is var index and >= 0)
+            return index;
+        if (instruction.Op == (store ? OpCodes.Stloc_S : OpCodes.Ldloc_S))
+            return il[instruction.At];
+        if (instruction.Op == (store ? OpCodes.Stloc : OpCodes.Ldloc))
+            return BitConverter.ToUInt16(il, instruction.At);
+        return null;
+    }
 
     [Fact]
     public void OnlyTheSceneStepDrivesTheTurnSystem()

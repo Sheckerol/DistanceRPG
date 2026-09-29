@@ -13,7 +13,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// finished into the slot its marker names, a stale or a garbage marker dropped; a
 /// try that stops undone and the next slot tried, a save folder every try fails at
 /// refused its writes for the session, and a move left in two halves loading
-/// neither; and a file renamed back into the save folder moved at the next launch.
+/// neither; a marker that cannot be written, read or cleared refusing the save
+/// folder's writes, saying so, and one that cannot be read kept; and a file renamed
+/// back into the save folder moved at the next launch.
 /// Nothing is ever deleted or written over. Every case runs on a temporary folder
 /// of its own, deleted after, under the numbers the runs were written against
 /// (<see cref="Premise"/>), so the content collection holds it. The cases that hold
@@ -124,10 +126,19 @@ public sealed class OldAutosaveTests : IDisposable
             // The launch moves the four into slot 2, the lowest free: under their own
             // names, byte for byte, the save first; the file set aside, the temp file
             // and the dev override's slot stay; nothing is written, and nothing is
-            // deleted but the marker of the move itself.
+            // deleted but the marker of the move itself — which names slot 2 on the
+            // disk before the first file moves, read as the save's move is logged.
             var log = new List<string>();
-            var said = OldAutosave.MoveIntoASlot(slots, log.Add);
+            int? marked = null;
+            void Hook(string line)
+            {
+                log.Add(line);
+                if (line == $"[Save] {root.SavePath} moved into {slots.Store(2).Folder}")
+                    marked = root.ReadMoving();
+            }
+            var said = OldAutosave.MoveIntoASlot(slots, Hook);
             Assert.Equal(["THE AUTOSAVE MOVED INTO SLOT 2 - ITS CAMPAIGN SAVES THERE FROM NOW ON"], said);
+            Assert.Equal(2, marked);
             Assert.Equal(MovedInto(before, 2), Snapshot(folder));
             var movedAt = Four.Select(name => log.FindIndex(line => line == $"[Save] {Path.Combine(root.Folder, name)} moved into {slots.Store(2).Folder}")).ToList();
             Assert.DoesNotContain(-1, movedAt);
@@ -398,7 +409,9 @@ public sealed class OldAutosaveTests : IDisposable
             // Between the test of slot 1 and the move of the backup into it, a file
             // takes the backup's name there — the log line of the save's move is the
             // hook. The try is undone — the save goes back, nothing is deleted — and
-            // the move goes into slot 2, the file in slot 1 left untouched.
+            // the move goes into slot 2, the file in slot 1 left untouched. The marker
+            // named slot 1 on the disk before the save moved there, so a crash in the
+            // try would have been finished into the slot it left a half in.
             var slots = new SaveSlots(Path.Combine(folder, "planted"), 3);
             var root = slots.Store(SaveSlots.OldAutosave);
             Autosaved(slots);
@@ -406,13 +419,18 @@ public sealed class OldAutosaveTests : IDisposable
             var before = Snapshot(slots.Folder);
             var slot1 = slots.Store(1);
             var log = new List<string>();
+            int? marked = null;
             void Hook(string line)
             {
                 log.Add(line);
                 if (line == $"[Save] {root.SavePath} moved into {slot1.Folder}")
+                {
+                    marked = root.ReadMoving();
                     Put(slot1, SaveStore.BackupName, "planted");
+                }
             }
             Assert.Equal([CampaignBoot.AutosaveMoved(2)], OldAutosave.MoveIntoASlot(slots, Hook));
+            Assert.Equal(1, marked);
             var expected = MovedInto(before, 2);
             expected[Path.Combine("slot-1", SaveStore.BackupName)] = Convert.ToBase64String("planted"u8.ToArray());
             Assert.Equal(expected, Snapshot(slots.Folder));
@@ -561,6 +579,157 @@ public sealed class OldAutosaveTests : IDisposable
             Assert.False(earlyRoot.WasMoving);
             Assert.NotNull(earlyRoot.WritesRefused);
             Assert.All(Enumerable.Range(1, SaveSlots.Most), number => Assert.Null(earlySlots.Store(number).WritesRefused));
+        });
+    }
+
+    [Fact]
+    public void AMarkerThatFailsStopsTheMove_TheSaveFolderTakingNoSaves()
+    {
+        InTempFolder(folder =>
+        {
+            // A folder named campaign.moving stands in the save folder, so the marker
+            // of the move cannot be written: nothing moves — no slot's folder is even
+            // made — and the save folder takes no saves this session, its refusal
+            // saying it was the marker that failed, and what the marker is, never
+            // that a file of the campaign's would not move. The folder is left; once
+            // it is gone, the next launch moves the autosave.
+            var slots = new SaveSlots(Path.Combine(folder, "unwritten"), 3);
+            var root = slots.Store(SaveSlots.OldAutosave);
+            Autosaved(slots);
+            Directory.CreateDirectory(root.MovingPath);
+            var before = Snapshot(slots.Folder);
+            var said = OldAutosave.MoveIntoASlot(slots);
+            const string unwritten = "campaign.moving, the marker of its move, could not be written (";
+            string refused = root.WritesRefused!;
+            Assert.StartsWith(unwritten, refused, StringComparison.Ordinal);
+            string why = refused[unwritten.Length..^1];
+            if (OperatingSystem.IsWindows())
+                Assert.Equal("no permission to write there", why);
+            Assert.Equal([CampaignBoot.AutosaveNotMoved(why)], said);
+            Assert.Equal(before, Snapshot(slots.Folder));
+            Assert.True(Directory.Exists(root.MovingPath));
+            Assert.All(Enumerable.Range(1, SaveSlots.Most), number => Assert.False(Directory.Exists(slots.Store(number).Folder)));
+            var zero = slots.Slot(SaveSlots.OldAutosave);
+            var load = CampaignBoot.Load(zero, GameContent.Current);
+            Assert.False(load.Loaded);
+            Assert.Equal(["NOTHING COULD BE LOADED FROM THE OLD AUTOSAVE",
+                $"THE OLD AUTOSAVE TAKES NO SAVES THIS SESSION: EARLIER, CAMPAIGN.MOVING, THE MARKER OF ITS MOVE, COULD NOT BE WRITTEN ({why.ToUpperInvariant()}) - LAUNCH THE GAME AGAIN TO PLAY IN IT"],
+                CampaignBoot.NothingLoadedWord(load, zero));
+            Assert.Equal(before, Snapshot(slots.Folder));
+            Directory.Delete(root.MovingPath);
+            Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(new SaveSlots(slots.Folder, 3)));
+            Assert.Equal(MovedInto(before, 1), Snapshot(slots.Folder));
+
+            // Windows only from here: a marker held by another program.
+            if (!OperatingSystem.IsWindows())
+                return;
+
+            // A crash left the move into slot 3 in two halves — the save there, the
+            // backup and the resume marker here — and another program holds the
+            // marker, sharing it for deleting alone, so it cannot be read. That is no
+            // marker naming no slot: it may name the other half, so it is kept and
+            // nothing moves — moved afresh, the backup would go into slot 1, and the
+            // campaign stand split across two slots with nothing left to join it. The
+            // save folder takes no saves this session, and the log names the lone
+            // halves. Let go, the next launch finishes the move into slot 3.
+            var split = new SaveSlots(Path.Combine(folder, "unread"), 3);
+            var splitRoot = split.Store(SaveSlots.OldAutosave);
+            Autosaved(split);
+            Put(splitRoot, SaveStore.ResumingName, "A resume is in flight.");
+            var whole = Snapshot(split.Folder);
+            Directory.CreateDirectory(split.Store(3).Folder);
+            File.Move(splitRoot.SavePath, split.Store(3).SavePath);
+            File.WriteAllText(splitRoot.MovingPath, "3");
+            var halves = Snapshot(split.Folder);
+            var log = new List<string>();
+            using (new FileStream(splitRoot.MovingPath, FileMode.Open, FileAccess.Read, FileShare.Delete))
+                Assert.Equal([CampaignBoot.AutosaveNotMoved("another program has it open")], OldAutosave.MoveIntoASlot(split, log.Add));
+            Assert.Equal(halves, Snapshot(split.Folder));
+            Assert.Equal("campaign.moving, the marker of its move, could not be read (another program has it open)", splitRoot.WritesRefused);
+            string unread = Assert.Single(log, line => line.StartsWith($"[Save] {splitRoot.MovingPath} could not be read", StringComparison.Ordinal));
+            Assert.Contains($"a lone save or backup stands in {split.Store(3).Folder}:", unread, StringComparison.Ordinal);
+            Assert.Equal(["THE OLD AUTOSAVE TAKES NO SAVES THIS SESSION: EARLIER, CAMPAIGN.MOVING, THE MARKER OF ITS MOVE, COULD NOT BE READ (ANOTHER PROGRAM HAS IT OPEN) - LAUNCH THE GAME AGAIN TO PLAY IN IT"],
+                CampaignBoot.Load(split.Slot(SaveSlots.OldAutosave), GameContent.Current).Notices);
+            Assert.Equal(halves, Snapshot(split.Folder));
+            Assert.Equal([CampaignBoot.AutosaveMoved(3)], OldAutosave.MoveIntoASlot(new SaveSlots(split.Folder, 3)));
+            Assert.Equal(MovedInto(whole, 3), Snapshot(split.Folder));
+
+            // With the save and the backup moved before the crash, a marker that
+            // cannot be read has nothing left here to split: it is kept all the same,
+            // and nothing is refused or said. Let go, the next launch finishes.
+            var late = new SaveSlots(Path.Combine(folder, "late"), 3);
+            var lateRoot = late.Store(SaveSlots.OldAutosave);
+            Autosaved(late);
+            Directory.CreateDirectory(late.Store(2).Folder);
+            File.Move(lateRoot.SavePath, late.Store(2).SavePath);
+            File.Move(lateRoot.BackupPath, late.Store(2).BackupPath);
+            File.WriteAllText(lateRoot.MovingPath, "2");
+            var lateBefore = Snapshot(late.Folder);
+            using (new FileStream(lateRoot.MovingPath, FileMode.Open, FileAccess.Read, FileShare.Delete))
+                Assert.Empty(OldAutosave.MoveIntoASlot(late));
+            Assert.Equal(lateBefore, Snapshot(late.Folder));
+            Assert.Null(lateRoot.WritesRefused);
+            Assert.Equal([CampaignBoot.AutosaveMoved(2)], OldAutosave.MoveIntoASlot(new SaveSlots(late.Folder, 3)));
+            Assert.False(lateRoot.WasMoving);
+
+            // A marker naming no slot, held by another program sharing it for reading
+            // alone: it reads, but cannot be dropped, and no fresh marker could be
+            // written over it, so nothing moves, and the save folder takes no saves
+            // this session. Let go, the next launch drops it and moves the autosave.
+            var kept = new SaveSlots(Path.Combine(folder, "undropped"), 3);
+            var keptRoot = kept.Store(SaveSlots.OldAutosave);
+            Autosaved(kept);
+            File.WriteAllText(keptRoot.MovingPath, "slot three");
+            var keptBefore = Snapshot(kept.Folder);
+            using (new FileStream(keptRoot.MovingPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                Assert.Equal([CampaignBoot.AutosaveNotMoved("another program has it open")], OldAutosave.MoveIntoASlot(kept));
+            Assert.Equal(keptBefore, Snapshot(kept.Folder));
+            Assert.Equal("campaign.moving, the marker of its move, could not be cleared (another program has it open)", keptRoot.WritesRefused);
+            keptBefore.Remove(SaveStore.MovingName);
+            Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(new SaveSlots(kept.Folder, 3)));
+            Assert.Equal(MovedInto(keptBefore, 1), Snapshot(kept.Folder));
+
+            // A try undone — a file planted in slot 1 as the save moved there, as in
+            // AFileInTheWayIsUndone_AndTheNextSlotTried — whose marker another program
+            // then holds, sharing it for reading alone, so it cannot be cleared: the
+            // save folder is whole again, and takes no saves this session, its
+            // refusal saying which file stopped the try and that the marker stayed.
+            // Let go, the next launch finds the marker stale — slot 1 has the
+            // backup's name — drops it, and moves the autosave into slot 2.
+            var stuck = new SaveSlots(Path.Combine(folder, "uncleared"), 3);
+            var stuckRoot = stuck.Store(SaveSlots.OldAutosave);
+            Autosaved(stuck);
+            var stuckBefore = Snapshot(stuck.Folder);
+            var one = stuck.Store(1);
+            var holds = new List<FileStream>();
+            void Hook(string line)
+            {
+                if (line == $"[Save] {stuckRoot.SavePath} moved into {one.Folder}")
+                    Put(one, SaveStore.BackupName, "planted");
+                else if (line.StartsWith($"[Save] {stuckRoot.BackupPath} could not be moved into {one.Folder}", StringComparison.Ordinal))
+                    holds.Add(new FileStream(stuckRoot.MovingPath, FileMode.Open, FileAccess.Read, FileShare.Read));
+            }
+            try
+            {
+                Assert.Equal([CampaignBoot.AutosaveNotMoved("another program has it open")], OldAutosave.MoveIntoASlot(stuck, Hook));
+            }
+            finally
+            {
+                holds.ForEach(held => held.Dispose());
+            }
+            Assert.Single(holds);
+            Assert.Equal("campaign.moving, the marker of its move, could not be cleared after campaign.bak.json would not move (another program has it open)", stuckRoot.WritesRefused);
+            string planted = Convert.ToBase64String("planted"u8.ToArray());
+            var undone = new Dictionary<string, string>(stuckBefore, StringComparer.Ordinal)
+            {
+                [SaveStore.MovingName] = Convert.ToBase64String("1"u8.ToArray()),
+                [Path.Combine("slot-1", SaveStore.BackupName)] = planted,
+            };
+            Assert.Equal(undone, Snapshot(stuck.Folder));
+            Assert.Equal([CampaignBoot.AutosaveMoved(2)], OldAutosave.MoveIntoASlot(new SaveSlots(stuck.Folder, 3)));
+            var moved = MovedInto(stuckBefore, 2);
+            moved[Path.Combine("slot-1", SaveStore.BackupName)] = planted;
+            Assert.Equal(moved, Snapshot(stuck.Folder));
         });
     }
 
