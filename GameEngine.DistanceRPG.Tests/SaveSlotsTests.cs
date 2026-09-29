@@ -13,8 +13,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// the save folder is slot n, each with its own backup, markers and set-aside
 /// files; <c>tuning.json</c>'s <c>SaveSlots</c> says how many, and a slot above a
 /// lowered count keeps its save. The save folder itself is only the old autosave —
-/// <c>campaign.json</c> where a build before R5 autosaved, so a save written
-/// before the slots stays there and nothing moves — listed while it holds a save
+/// <c>campaign.json</c> where a build before R5 autosaved, which the launch moves
+/// into a slot of its own (<c>OldAutosaveTests</c>) — listed while it holds a save
 /// or a backup. Every save carries the time it was written, handed in by the edge;
 /// the listing reads every slot's header and never moves a file; the most recent
 /// save is chosen by its own time, deterministically. A slot carries its own name:
@@ -318,7 +318,7 @@ public sealed class SaveSlotsTests : IDisposable
     }
 
     [Fact]
-    public void ASaveFromBeforeTheSlotsIsTheAutosave()
+    public void ASaveFromBeforeTheSlotsMovesIntoSlot1()
     {
         InTempFolder(folder =>
         {
@@ -345,28 +345,41 @@ public sealed class SaveSlotsTests : IDisposable
             Assert.Equal([SlotState.Empty, SlotState.Empty, SlotState.Empty], listing.Slots.Skip(1).Select(slot => slot.State));
             Assert.Equal(seeded, Snapshot(folder));
 
-            // Loaded, it resumes, saying so by the old autosave's name, and nothing
-            // moved: no migration.
-            var store = slots.Store(SaveSlots.OldAutosave);
-            var load = CampaignBoot.Load(slots.Slot(SaveSlots.OldAutosave), GameContent.Current);
+            // The launch moves it into slot 1, the lowest free (the user's ruling of
+            // 2026-09-25 on the save slots, R5): both files byte for byte, under the
+            // same names, and nothing left in the save folder — a move, not a
+            // migration: no text is read or rewritten. The old autosave is no longer
+            // listed, and slot 1 is the most recent save.
+            Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(slots));
+            Assert.Equal(seeded.ToDictionary(file => Path.Combine("slot-1", file.Key), file => file.Value), Snapshot(folder));
+            var moved = SaveListing.Read(slots, Now);
+            Assert.DoesNotContain(moved.Slots, slot => slot.Number == SaveSlots.OldAutosave);
+            Assert.Equal((1, SlotState.Readable, new SlotHeader(null, 1, null, null, null)), (moved.Newest!.Number, moved.Newest.State, moved.Newest.Header));
+
+            // Loaded, it resumes, saying so by the slot's name.
+            var store = slots.Store(1);
+            var load = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
             Assert.True(load.Loaded);
-            Assert.Equal(["CAMPAIGN RESUMED FROM THE OLD AUTOSAVE"], load.Notices);
+            Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1"], load.Notices);
             StateAssert.Equivalent(campaign, load.Campaign!, "campaign");
             store.ClearResuming();
-            Assert.Equal(seeded, Snapshot(folder));
+            var inSlot1 = Snapshot(folder);
 
             // Saved again as it stands, whatever the time now, nothing is written: the
             // save keeps the time its state was first written — none — and the backup
-            // stays the save before it.
-            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.OldAutosave), load.Campaign!, savedAt: Now));
-            Assert.Equal(seeded, Snapshot(folder));
+            // stays the save before it. And a launch after the move moves nothing, and
+            // says nothing.
+            Assert.Null(CampaignBoot.Save(slots.Slot(1), load.Campaign!, savedAt: Now));
+            Assert.Empty(OldAutosave.MoveIntoASlot(slots));
+            Assert.Equal(inSlot1, Snapshot(folder));
 
             // Played on, it saves as every save does from now on: with its time, the
-            // save it was the backup.
+            // save it was the backup — in slot 1, the save folder itself untouched.
             CampaignRuns.DeepRetreat(load.Campaign!, "spear_hall");
-            Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.OldAutosave), load.Campaign!, savedAt: Now));
+            Assert.Null(CampaignBoot.Save(slots.Slot(1), load.Campaign!, savedAt: Now));
             Assert.Equal((Text(load.Campaign!, Now), newer), (store.Read(), store.ReadBackup()));
-            Assert.Equal(Now, SaveListing.Read(slots, Now).Slots.Single(slot => slot.Number == SaveSlots.OldAutosave).Header!.SavedAt);
+            Assert.Equal(Now, SaveListing.Read(slots, Now).Newest!.Header!.SavedAt);
+            Assert.Empty(Files(folder));
         });
     }
 

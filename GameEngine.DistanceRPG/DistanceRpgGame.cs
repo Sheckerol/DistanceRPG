@@ -72,12 +72,13 @@ namespace GameEngine.DistanceRPG;
 /// <strong>bound to one slot</strong> (<see cref="_slot"/>): one of the save
 /// folder's slots, <c>slot-1</c> to <c>slot-N</c> (<c>DISTANCERPG_SAVE_DIR</c>
 /// moves the folder), or the save folder itself — the old autosave, where a build
-/// before R5 autosaved — while it holds a campaign. The title lists the slots
-/// (<see cref="ShowTitle"/>): CONTINUE loads the most recent save, LOAD GAME any
-/// slot, and the slot a campaign is loaded from is the slot it saves into from
-/// then on (<see cref="LoadSlot"/>) — "you choose a save slot and any saving
-/// happens on that save slot" — as NEW CAMPAIGN's is the slot chosen on its list
-/// to begin in, 1 to the count, never the save folder itself
+/// before R5 autosaved — while a launch could not move its campaign into a slot
+/// (<see cref="OldAutosave.MoveIntoASlot"/>, at every launch, before the title).
+/// The title lists the slots (<see cref="ShowTitle"/>): CONTINUE loads the most
+/// recent save, LOAD GAME any slot, and the slot a campaign is loaded from is the
+/// slot it saves into from then on (<see cref="LoadSlot"/>) — "you choose a save
+/// slot and any saving happens on that save slot" — as NEW CAMPAIGN's is the slot
+/// chosen on its list to begin in, 1 to the count, never the save folder itself
 /// (<see cref="BeginNewCampaign(int, string)"/>). Nothing rebinds a campaign: the slot
 /// is set as it comes into play (<see cref="Adopt"/>) and let go with it
 /// (<see cref="DropCampaign"/>), and a slot that takes no saves this session
@@ -326,14 +327,19 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// the session goes — the slots are never made, so nothing of the session
     /// reaches a slot or the old autosave — straight into its dungeon, or onto
     /// the screen between runs, with no title;</item>
-    /// <item><c>--new-campaign</c>: the slots made, and a new campaign begun at
-    /// once (<see cref="BeginNewCampaign(int, string)"/>) in the slot NEW CAMPAIGN's
+    /// <item>otherwise the slots made, and the old autosave — a campaign a build
+    /// before the user's ruling on the save slots (R5) saved in the save folder
+    /// itself — moved into a slot of its own, or a move a crash cut off finished,
+    /// before anything is listed or begun (<see cref="OldAutosave.MoveIntoASlot"/>;
+    /// SLOT DECISION 4), what became of it led for the first screen; then:</item>
+    /// <item><c>--new-campaign</c>: a new campaign begun at once
+    /// (<see cref="BeginNewCampaign(int, string)"/>) in the slot NEW CAMPAIGN's
     /// list would start on — the lowest empty slot within the count, else slot 1,
     /// what it holds set aside (<see cref="SaveListing.NewCampaignSlot"/>) —
     /// straight to the screen between runs: developer tooling, which asks nothing.
     /// When it cannot begin, the title opens, saying why;</item>
-    /// <item>otherwise the slots made and the title shown (<see cref="ShowTitle"/>):
-    /// the first scene, where the player chooses what to play.</item>
+    /// <item>or the title shown (<see cref="ShowTitle"/>): the first scene, where
+    /// the player chooses what to play.</item>
     /// </list>
     /// </summary>
     private void BootCampaign(GameContent content, BootRequest request)
@@ -365,38 +371,53 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var slots = new SaveSlots(saves, content.Tuning.SaveSlots);
         _slots = slots;
         Log.Info($"[Save] Saves in {slots.Folder}: {slots.Count} {(slots.Count == 1 ? "slot" : "slots")}");
+
+        // The old autosave moves into a slot of its own before anything is listed
+        // or begun, so --new-campaign never sets aside the campaign just moved
+        // while a slot within the count is free.
+        var moved = OldAutosave.MoveIntoASlot(slots, line => Log.Info(line));
+        foreach (string notice in moved)
+            Log.Info($"[Save] {notice}");
         if (request.NewCampaign)
+        {
+            _notices.Lead(moved);   // for the screen the new campaign opens on, or the title it goes back to
             BeginNewCampaign(SaveListing.Read(slots, _clock(), line => Log.Info(line)).NewCampaignSlot, Program.NewCampaignOption);
+        }
         else
-            ShowTitle();
+        {
+            ShowTitle(leading: moved);
+        }
     }
 
     /// <summary>
     /// Fade to a fresh title (R2(a)): every slot's unsaved-quit marker taken
     /// (<see cref="CampaignBoot.TakeEveryUnsaved"/>) and then the slots listed at
     /// the clock's time (<see cref="SaveListing.Read"/>) — never a file moved — and
-    /// what there is to say led, the save's word shown whole: <paramref name="word"/>
-    /// first — back from a load that brought nothing back, what it set aside
-    /// (<see cref="CampaignBoot.NothingLoadedWord"/>), or from a NEW CAMPAIGN that
-    /// did not begin, why (<see cref="CampaignBoot.NotBegunWord"/>) — then each
-    /// slot whose campaign could not be saved the last time play was left
-    /// (<see cref="CampaignBoot.QuitUnsaved"/>), then a slot's file the file system
-    /// would not let the game read; the data files' notices after them, capped, on
-    /// the first showing. No campaign is in play at the title. Asked for
-    /// mid-transition, it waits for the engine to finish.
+    /// what there is to say led, the save's word shown whole: <paramref name="leading"/>
+    /// first — at launch, what became of the old autosave
+    /// (<see cref="OldAutosave.MoveIntoASlot"/>); back from a load that brought
+    /// nothing back, what it set aside (<see cref="CampaignBoot.NothingLoadedWord"/>);
+    /// or from a NEW CAMPAIGN that did not begin, why
+    /// (<see cref="CampaignBoot.NotBegunWord"/>) — then each slot whose campaign
+    /// could not be saved the last time play was left
+    /// (<see cref="CampaignBoot.QuitUnsaved"/>), a slot the old autosave just moved
+    /// into among them, then a slot's file the file system would not let the game
+    /// read; the data files' notices after them, capped, on the first showing. No
+    /// campaign is in play at the title. Asked for mid-transition, it waits for the
+    /// engine to finish.
     /// </summary>
-    /// <param name="word">What a load that brought nothing back, or a NEW CAMPAIGN that did not begin, says, leading the rest; null for nothing.</param>
-    private void ShowTitle(IReadOnlyList<string>? word = null)
+    /// <param name="leading">What the launch's move of the old autosave, a load that brought nothing back, or a NEW CAMPAIGN that did not begin, says, leading the rest; null for nothing.</param>
+    private void ShowTitle(IReadOnlyList<string>? leading = null)
     {
         if (SceneManager.Instance.IsTransitioning)
         {
-            _pendingScene = () => ShowTitle(word);
+            _pendingScene = () => ShowTitle(leading);
             return;
         }
 
         var slots = _slots ?? throw new InvalidOperationException("No save slots: a dev-override launch has no title.");
         Action<string> report = line => Log.Info(line);
-        var said = new List<string>(word ?? []);
+        var said = new List<string>(leading ?? []);
         said.AddRange(CampaignBoot.TakeEveryUnsaved(slots, report));   // before the listing reads
         var listing = SaveListing.Read(slots, _clock(), report);
         foreach (string notice in listing.Notices)

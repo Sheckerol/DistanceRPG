@@ -23,15 +23,16 @@ namespace GameEngine.DistanceRPG;
 /// there would hide the one thing the player has to act on. A floor a saved run
 /// resumes on leads with the same word, over its banner (S8's review), and so
 /// does the title, with what a load that brought nothing back set aside, or why a
-/// NEW CAMPAIGN did not begin, and each slot whose campaign a quit could not
-/// save. Those notices are few by construction (a load sets at most its own
-/// slot's two files aside — its save, then its backup — or says only that the
-/// slot takes no saves this session, since a campaign saves into the slot it
-/// came from and no load touches another slot's files (the user's ruling of
-/// 2026-09-25 on the save slots, R5); NEW CAMPAIGN sets two aside, or says why it
-/// began nothing, what would not go back, and the quit's word on the slot it
-/// took), so the screen hands their count in (<see cref="Rows"/>'s
-/// <c>whole</c>) and they are shown in full, up to
+/// NEW CAMPAIGN did not begin, each slot whose campaign a quit could not save,
+/// and, at launch, what became of the old autosave's move into a slot (one word:
+/// moved, not moved, or half moved). Those notices are few by construction (a
+/// load sets at most its own slot's two files aside — its save, then its backup —
+/// or says only that the slot takes no saves this session, since a campaign saves
+/// into the slot it came from and no load touches another slot's files (the
+/// user's ruling of 2026-09-25 on the save slots, R5); NEW CAMPAIGN sets two
+/// aside, or says why it began nothing, what would not go back, and the quit's
+/// word on the slot it took), so the screen hands their count in
+/// (<see cref="Rows"/>'s <c>whole</c>) and they are shown in full, up to
 /// <see cref="MaxWholeRows"/>; the cap of <see cref="MaxRows"/> is for what
 /// follows them, the data files' notices, which a broken file can make as many
 /// of as it likes.

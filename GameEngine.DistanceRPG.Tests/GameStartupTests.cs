@@ -509,6 +509,20 @@ public class GameStartupTests
         Assert.Equal(["CampaignBoot.SetAside"], Callers(Method(typeof(SaveStore), nameof(SaveStore.SetAside))));
         Assert.Equal(["CampaignBoot.BootOverride"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Empty))));
         Assert.Equal(["CampaignBoot.StoreFor", "SaveSlots.Store"], Callers(typeof(SaveStore).GetConstructor([typeof(string)])!));
+        // The old autosave's move is OldAutosave's alone (the user's ruling on the
+        // save slots, R5): every file it moves, its marker, and what it reads of the
+        // folders to choose a slot — called, or handed on as a delegate, by nothing
+        // else, but for the one move refusing a name taken there. And a slot's
+        // writes are refused by what could not be set aside, or by a move of the old
+        // autosave that failed or was left in two halves, and by nothing else.
+        string[] MentionedBy(MethodBase target)
+            => Edges(Game).Where(edge => Same(edge.Target, target)).Select(edge => Root(edge.From.DeclaringType)!.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
+        foreach (var moving in new[] { nameof(SaveStore.MoveInto), nameof(SaveStore.MarkMoving), nameof(SaveStore.ReadMoving), nameof(SaveStore.ClearMoving), nameof(SaveStore.Holds),
+            "get_" + nameof(SaveStore.WasMoving), "get_" + nameof(SaveStore.FolderIsAFile) })
+            Assert.Equal(["OldAutosave"], MentionedBy(Method(typeof(SaveStore), moving)));
+        Assert.Equal(["OldAutosave", "SaveStore"], MentionedBy(Method(typeof(SaveStore), nameof(SaveStore.Taken))));
+        Assert.Equal(["SaveStore.MoveInto"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Taken))).Where(caller => !caller.StartsWith("OldAutosave.", StringComparison.Ordinal)));
+        Assert.Equal(["CampaignBoot.SetAside", "OldAutosave.NotMoved", "OldAutosave.Split"], Callers(Method(typeof(SaveStore), nameof(SaveStore.RefuseWrites))));
         // A slot is made only where its store is had — the save folder's by number,
         // the dev override's scratch — so no store goes about under another's name.
         Assert.Equal(["SaveSlot.Scratch", "SaveSlots.Slot"], Callers(typeof(SaveSlot).GetConstructor([typeof(SaveStore), typeof(int?)])!));
@@ -586,6 +600,45 @@ public class GameStartupTests
             Assert.True(op == OpCodes.Br || op == OpCodes.Br_S, $"BeginNewCampaign goes on past ShowTitle ({op}) on the way that never binds the campaign");
             int target = op == OpCodes.Br_S ? at + 1 + (sbyte)beginIl[at] : at + 4 + BitConverter.ToInt32(beginIl, at);
             next = beginAt.FindIndex(i => i.At - i.Op.Size == target);
+        }
+    }
+
+    [Fact]
+    public void TheOldAutosaveMovesAtLaunchAlone_BeforeTheTitle()
+    {
+        // The user's ruling of 2026-09-25 on the save slots, R5 (SLOT DECISION 4):
+        // the campaign a build before the ruling autosaved in the save folder itself
+        // is moved into a slot of its own by the launch alone — at every launch, never
+        // mid-session, so a campaign in play is never moved from under it — once the
+        // slots are made and before anything reads them: before --new-campaign lists
+        // them for its slot or begins a campaign, and before the title takes their
+        // markers and lists them. Its word leads the title's. Never on a dev-override
+        // launch: the call follows the override branch's own, as the slots are made
+        // only after it (SaveSlotsTests.ADevOverrideSessionNeverTouchesTheSlots). Read
+        // off the IL.
+        var move = typeof(OldAutosave).GetMethod(nameof(OldAutosave.MoveIntoASlot), Declared)!;
+        Assert.Equal(["DistanceRpgGame.BootCampaign"], Callers(move));
+        var boot = typeof(DistanceRpgGame).GetMethod("BootCampaign", Declared)!;
+        Assert.Equal(1, Mentions(boot, move));
+        var inBoot = CallsIn(boot).ToList();
+        int At(MethodBase target) => inBoot.FindIndex(called => Same(called, target));
+        int moved = At(move);
+        int slotsMade = At(typeof(SaveSlots).GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single());
+        int overridden = At(typeof(CampaignBoot).GetMethod(nameof(CampaignBoot.BootOverride), Declared)!);
+        int listed = At(typeof(SaveListing).GetMethod(nameof(SaveListing.Read), Declared)!);
+        int begun = At(typeof(DistanceRpgGame).GetMethod("BeginNewCampaign", Declared)!);
+        int titled = At(typeof(DistanceRpgGame).GetMethod("ShowTitle", Declared)!);
+        Assert.True(overridden >= 0 && overridden < slotsMade && slotsMade < moved,
+            "BootCampaign does not move the old autosave after the override branch and once the slots are made");
+        Assert.True(moved < listed && moved < begun && moved < titled,
+            "BootCampaign reads the slots, begins a campaign or shows the title before the old autosave has moved");
+
+        // Nothing else in the game reaches the move: not the title, a load, NEW
+        // CAMPAIGN, a save or a quit.
+        foreach (string later in new[] { "ShowTitle", "LoadSlot", "BeginNewCampaign", "WriteRequestedSave", "SaveOnQuit", "QuitToTitle", "OnUpdateFrame" })
+        {
+            var method = typeof(DistanceRpgGame).GetMethod(later, Declared)!;
+            Assert.DoesNotContain(Reachable(method), reached => Same(reached, move));
         }
     }
 

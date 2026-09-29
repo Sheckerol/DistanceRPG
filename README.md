@@ -123,15 +123,17 @@ There is one campaign in play at a time, and the game saves it on its own —
 slot you loaded it from, by LOAD GAME or CONTINUE, or the one you chose for it
 on NEW CAMPAIGN. Every campaign is in a **save slot**, a folder of its own in the
 save folder, in one of which every new campaign begins; a campaign an earlier
-build autosaved into the save folder itself is the **old autosave** (the user's
-rulings of 2026-09-25 on the save model and on the save slots). The game opens on
-the title screen, where CONTINUE resumes the most recent save, LOAD GAME any
-slot, and NEW CAMPAIGN starts fresh in the slot you choose; the menu's QUIT TO
-TITLE comes back to it, and the game quits from it.
+build autosaved into the save folder itself — the **old autosave** — is moved
+into a slot of its own when the game launches (the user's rulings of 2026-09-25
+on the save model and on the save slots). The game opens on the title screen,
+where CONTINUE resumes the most recent save, LOAD GAME any slot, and NEW
+CAMPAIGN starts fresh in the slot you choose; the menu's QUIT TO TITLE comes
+back to it, and the game quits from it.
 
-- **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\campaign.json` on Windows
-  (`~/.local/share/DistanceRPG/saves/` on Linux) — the player's data folder,
-  never beside the exe, which a rebuild or `dotnet clean` replaces. Set
+- **Where**: `%LOCALAPPDATA%\DistanceRPG\saves\` on Windows
+  (`~/.local/share/DistanceRPG/saves/` on Linux), each campaign in a slot folder
+  there — `saves\slot-1\campaign.json` — the player's data folder, never beside
+  the exe, which a rebuild or `dotnet clean` replaces. Set
   `DISTANCERPG_SAVE_DIR` to a folder to keep the saves there instead. The log
   names the full path of every save written or read, and says at launch where the
   saves are and how many slots there are (`[Save] Saves in ...: 3 slots`).
@@ -146,12 +148,33 @@ TITLE comes back to it, and the game quits from it.
   is never read.
 - **The old autosave**: an earlier build saved its campaign in the save folder
   itself, as the autosave — `campaign.json`, its backup and the markers and
-  set-aside files, by the same names — and there it stays: nothing moves. While
-  the save folder holds a `campaign.json` or a `campaign.bak.json`, LOAD GAME
-  lists it first as `OLD AUTOSAVE`, and 0 loads it; loaded, it saves back there
-  like any slot (`PROGRESS SAVES TO THE OLD AUTOSAVE AT EVERY TURN`). NEW
-  CAMPAIGN never begins a campaign there, and with neither file there it is not
-  listed at all.
+  set-aside files, by the same names. **Every launch moves it into a slot of its
+  own**, before the title and without asking: into the lowest empty slot, `SLOT
+  1` to `SLOT 3`, or else the lowest empty one above the count, listed `BEYOND
+  THE 3 SLOTS` and played like any; the title says `THE AUTOSAVE MOVED INTO SLOT
+  4 - ITS CAMPAIGN SAVES THERE FROM NOW ON`, and from then on it is that slot's
+  campaign. Only its save, its backup and its two markers move — the save first,
+  each under its own name, byte for byte, so a quit it could not save is said as
+  the slot's — and nothing is written over: a slot holding any of those names,
+  even a stray marker, is passed over and left as it is. Files set aside stay in
+  the save folder, and one renamed back to `campaign.json` there moves at the next
+  launch. The move is all or nothing: one that stops at a file is undone, and the
+  next slot tried; one a crash cut off is finished at the next launch, before the
+  title (`campaign.moving` in the save folder names its slot meanwhile). While a
+  launch could not move it, LOAD GAME lists it first as `OLD AUTOSAVE`, marked
+  `NOT YET MOVED INTO A SLOT`, and 0 loads it. With slots 1 to 9 all holding
+  something it stays and is played in place, saving back there (`PROGRESS SAVES
+  TO THE OLD AUTOSAVE AT EVERY TURN`). When its own files would not move —
+  another program holding its save, say — the title says `THE AUTOSAVE COULD NOT
+  MOVE INTO A SLOT (ANOTHER PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE
+  AND TAKES NO SAVES THIS SESSION - LAUNCH THE GAME AGAIN TO MOVE IT`, and it
+  loads nothing that session, since none of its saves could go through either. A
+  move neither finished nor undone says `THE AUTOSAVE IS HALF MOVED INTO SLOT 4
+  (...) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME AGAIN TO FINISH IT`, and
+  the next launch finishes it. NEW CAMPAIGN never begins a campaign in the save
+  folder, and with neither file there the old autosave is not listed at all.
+  (Where it goes is the user's to rule: SLOT DECISION 4 in
+  `docs/roadmap/open-questions.md`.)
 - **A save's time**: every save records when it was written — `"savedAt"`, the
   UTC time, the last entry of `campaign.json` (a save from an earlier build has
   none). A save of the campaign a slot already holds writes nothing, so the time
@@ -207,9 +230,10 @@ TITLE comes back to it, and the game quits from it.
   where its campaign stands (the dungeon and floor, or `BETWEEN RUNS`), the runs
   counted and when it was saved, and under it what a load of it would do that the
   row cannot say: `FROM ITS BACKUP`, `ITS LAST LOAD DID NOT FINISH`, `AHEAD OF
-  THIS CLOCK`, `NO TIME RECORDED`, `BEYOND THE 3 SLOTS`; an empty slot says
-  `EMPTY`. Between runs it is the screen between runs, with `CAMPAIGN RESUMED
-  FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title and the last run's
+  THIS CLOCK`, `NO TIME RECORDED`, `BEYOND THE 3 SLOTS`, and on the old
+  autosave `NOT YET MOVED INTO A SLOT`; an empty slot says `EMPTY`. Between runs
+  it is the screen between runs, with `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM
+  THE OLD AUTOSAVE`) under the title and the last run's
   summary above the list. Mid-run it is the dungeon: the same floor, turn and
   positions, HP, mana, statuses and movement left, the corpses lying on the very
   weapons they lay on, the weapons left on the floor, the explored fog and what

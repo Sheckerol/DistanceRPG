@@ -1083,6 +1083,58 @@ internal static class CampaignBoot
     }
 
     /// <summary>
+    /// The launch moved the old autosave into slot <paramref name="number"/>
+    /// (<see cref="OldAutosave.MoveIntoASlot"/>; SLOT DECISION 4): <c>THE AUTOSAVE
+    /// MOVED INTO SLOT 4 - ITS CAMPAIGN SAVES THERE FROM NOW ON</c>. The title says
+    /// it first, and the unsaved-quit word of the slot it moved into after it, when
+    /// the marker moved with it.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to <see cref="SaveSlots.Most"/>: the old autosave moves into a numbered slot.</exception>
+    internal static string AutosaveMoved(int number)
+    {
+        RequireSlotNumber(number);
+        return $"THE AUTOSAVE MOVED INTO {SaveSlots.Label(number)} - ITS CAMPAIGN SAVES THERE FROM NOW ON";
+    }
+
+    /// <summary>
+    /// The launch could not move the old autosave into any slot, for
+    /// <paramref name="why"/> — the save folder's own files would not move, or its
+    /// marker of the move could not be written — so it stays where it is, listed as
+    /// the old autosave, and takes no saves this session, since whatever stopped the
+    /// move stops its writes too: <c>THE AUTOSAVE COULD NOT MOVE INTO A SLOT (ANOTHER
+    /// PROGRAM HAS IT OPEN) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS
+    /// SESSION - LAUNCH THE GAME AGAIN TO MOVE IT</c>.
+    /// </summary>
+    internal static string AutosaveNotMoved(string why)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(why);
+        return $"THE AUTOSAVE COULD NOT MOVE INTO A SLOT ({why.ToUpperInvariant()}) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS SESSION - LAUNCH THE GAME AGAIN TO MOVE IT";
+    }
+
+    /// <summary>
+    /// The old autosave's campaign stands in part in the save folder and in part in
+    /// slot <paramref name="number"/>, for <paramref name="why"/>: a move that could
+    /// be neither finished nor undone. Neither half loads this session, so no load
+    /// runs on a split and no save forks it, and the next launch finishes the move:
+    /// <c>THE AUTOSAVE IS HALF MOVED INTO SLOT 4 (ANOTHER PROGRAM HAS IT OPEN) -
+    /// NEITHER LOADS THIS SESSION - LAUNCH THE GAME AGAIN TO FINISH IT</c>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to <see cref="SaveSlots.Most"/>.</exception>
+    internal static string AutosaveSplit(int number, string why)
+    {
+        RequireSlotNumber(number);
+        ArgumentException.ThrowIfNullOrWhiteSpace(why);
+        return $"THE AUTOSAVE IS HALF MOVED INTO {SaveSlots.Label(number)} ({why.ToUpperInvariant()}) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME AGAIN TO FINISH IT";
+    }
+
+    /// <summary>A slot the old autosave moves into: 1 to <see cref="SaveSlots.Most"/>, never the save folder itself.</summary>
+    private static void RequireSlotNumber(int number)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(number, SaveSlots.Most);
+    }
+
+    /// <summary>
     /// Why a save could not be resumed, in a few words: the path in the document
     /// and the first clause of the problem for a save the format refuses
     /// (<c>version: 2 is newer than this build reads (1)</c>), the file system's

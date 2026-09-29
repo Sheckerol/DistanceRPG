@@ -51,7 +51,8 @@ public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, 
 /// <summary>
 /// Every slot of the save folder and what each holds (the user's rulings of
 /// 2026-09-25 on the save model, R2, and on the save slots, R5): the old autosave
-/// while the save folder itself holds a save or a backup, the slots up to
+/// while the save folder itself holds a save or a backup — one the launch could
+/// not move into a slot (<see cref="OldAutosave.MoveIntoASlot"/>) — the slots up to
 /// <c>tuning.json</c>'s count — the empty ones included — and any above it that
 /// hold a save, in number order; and what the listing could not say in a row.
 /// <list type="bullet">
@@ -137,7 +138,9 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     /// <summary>
     /// Read every slot of <paramref name="slots"/>: the old autosave — the save
     /// folder itself, where a build before the user's ruling on the save slots
-    /// (R5) autosaved — only while it holds a save or a backup; slots 1 to the
+    /// (R5) autosaved — only while it holds a save or a backup, which the launch
+    /// could not move into a slot (<see cref="OldAutosave.MoveIntoASlot"/>, run
+    /// before any listing, a move a crash cut off finished first); slots 1 to the
     /// count; and those beyond it that hold a save (<see cref="SaveSlots.Beyond"/>).
     /// Each slot's save and backup are read and parsed for their headers, never
     /// restored; a file the file system will not let the game read is listed as

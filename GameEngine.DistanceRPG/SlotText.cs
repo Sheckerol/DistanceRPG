@@ -58,6 +58,14 @@ internal static class SlotText
     /// <summary>The marker of a save that records no time: one from before the slots, the oldest of all to CONTINUE.</summary>
     internal const string NoTimeRecorded = "NO TIME RECORDED";
 
+    /// <summary>
+    /// The old autosave's marker: the save folder's own campaign, which the launch
+    /// moves into a slot of its own (<see cref="OldAutosave.MoveIntoASlot"/>) and
+    /// could not this time — no slot was free, and it plays in place; or its files
+    /// would not move, and it takes no saves until a launch can move them.
+    /// </summary>
+    internal const string NotMovedYet = "NOT YET MOVED INTO A SLOT";
+
     /// <summary>What the load list says when ENTER finds nothing to load: every slot is empty.</summary>
     internal const string NothingToLoad = "EVERY SLOT IS EMPTY";
 
@@ -72,8 +80,9 @@ internal static class SlotText
     /// (<see cref="Row"/>), then — only when one applies — its markers' row, the
     /// markers in this order: <see cref="FromItsBackup"/>,
     /// <see cref="LastLoadDidNotFinish"/>, <see cref="AheadOfThisClock"/> or
-    /// <see cref="NoTimeRecorded"/>, and <see cref="Beyond"/>. An empty slot has
-    /// no markers: nothing of it would load.
+    /// <see cref="NoTimeRecorded"/>, and <see cref="Beyond"/> — or, for the old
+    /// autosave, which is never beyond the count, <see cref="NotMovedYet"/>. An
+    /// empty slot has no markers: nothing of it would load.
     /// </summary>
     /// <param name="entry">The slot, as the listing read it.</param>
     /// <param name="count">How many save slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
@@ -194,6 +203,8 @@ internal static class SlotText
             markers.Add(AheadOfThisClock);
         if (entry.Beyond)
             markers.Add(Beyond(count));
+        if (entry.Number == SaveSlots.OldAutosave)
+            markers.Add(NotMovedYet);
         return markers;
     }
 }

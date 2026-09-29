@@ -17,10 +17,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// its tuning hash is the hash of the tuning it was played under, read by the
 /// current reader; the game says the numbers changed exactly when the numbers
 /// it ships are not those; and a launch resumes each — the save folder itself
-/// being the old autosave, where the listing finds it the most recent save, with
-/// no time — the mid-run one in the dungeon, where its visit plays on. In the
-/// content collection, since a restore runs under the current content and the
-/// tuning cases swap it.
+/// being the old autosave, which the launch moves into slot 1, where the listing
+/// finds it the most recent save, with no time — the mid-run one in the dungeon,
+/// where its visit plays on. In the content collection, since a restore runs
+/// under the current content and the tuning cases swap it.
 /// </summary>
 [Collection(TestContent.Collection)]
 public class PreReworkSaveTests
@@ -215,34 +215,41 @@ public class PreReworkSaveTests
             {
                 // The save as the game finds it at launch: the campaign's file in the
                 // save folder itself — the old autosave, where a build before the
-                // slots saved it — and no file moves. The listing finds it there, first,
-                // with no time recorded and nothing else saved: the most recent save.
-                // Loaded, it resumes and says so, by the old autosave's name — and says
-                // the numbers have changed only while they have.
+                // slots saved it — which the launch moves, before anything is listed,
+                // into slot 1, byte for byte (the user's ruling of 2026-09-25 on the
+                // save slots, R5; OldAutosave). The listing finds it there, first, with
+                // no time recorded and nothing else saved: the most recent save.
+                // Loaded, it resumes and says so, by the slot's name — and says the
+                // numbers have changed only while they have.
                 var slots = new SaveSlots(folder.FullName, GameContent.Current.Tuning.SaveSlots);
-                var store = slots.Store(SaveSlots.OldAutosave);
-                Assert.Equal(Path.GetFullPath(folder.FullName), store.Folder);
-                File.Copy(PathOf(name), store.SavePath);
+                var root = slots.Store(SaveSlots.OldAutosave);
+                Assert.Equal(Path.GetFullPath(folder.FullName), root.Folder);
+                File.Copy(PathOf(name), root.SavePath);
+                Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(slots));
+                var store = slots.Store(1);
+                Assert.Empty(Directory.GetFiles(folder.FullName));
+                Assert.Equal([SaveStore.FileName], Directory.GetFiles(store.Folder).Select(path => Path.GetFileName(path)!));
+                Assert.Equal(File.ReadAllBytes(PathOf(name)), File.ReadAllBytes(store.SavePath));   // moved, the bytes identical
                 var saved = SaveCodec.Read(TextOf(name)).Campaign;
                 var listing = SaveListing.Read(slots, new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero));
-                var old = listing.Slots.Single(slot => slot.Number == SaveSlots.OldAutosave);
-                Assert.Same(old, listing.Slots[0]);
-                Assert.Equal(SlotState.Readable, old.State);
-                Assert.Equal(new SlotHeader(null, saved.RunCounter, saved.Visit?.DungeonId, saved.Visit?.FloorIndex + 1, saved.Visit?.Turn), old.Header);
-                Assert.Same(old, listing.Newest);
+                Assert.DoesNotContain(listing.Slots, slot => slot.Number == SaveSlots.OldAutosave);
+                var first = listing.Slots[0];
+                Assert.Equal((1, SlotState.Readable), (first.Number, first.State));
+                Assert.Equal(new SlotHeader(null, saved.RunCounter, saved.Visit?.DungeonId, saved.Visit?.FloorIndex + 1, saved.Visit?.Turn), first.Header);
+                Assert.Same(first, listing.Newest);
                 Assert.All(listing.Slots.Skip(1), slot => Assert.Equal(SlotState.Empty, slot.State));
                 Assert.Empty(listing.Notices);
 
-                var boot = CampaignBoot.Load(slots.Slot(SaveSlots.OldAutosave), GameContent.Current);
+                var boot = CampaignBoot.Load(slots.Slot(1), GameContent.Current);
                 Assert.True(boot.Loaded);
-                const string resumed = "CAMPAIGN RESUMED FROM THE OLD AUTOSAVE";
+                const string resumed = "CAMPAIGN RESUMED FROM SLOT 1";
                 string[] notices = NumbersMoved(GameContent.Current.Tuning)
                     ? [resumed, CampaignBoot.TuningChanged]
                     : [resumed];
                 Assert.Equal(notices, boot.Notices);
                 Assert.True(store.WasResuming);
                 store.ClearResuming();
-                Assert.Equal([SaveStore.FileName], Directory.GetFiles(folder.FullName).Select(path => Path.GetFileName(path)!));   // nothing moved
+                Assert.Equal([SaveStore.FileName], Directory.GetFiles(store.Folder).Select(path => Path.GetFileName(path)!));   // the load moved nothing
 
                 var campaign = boot.Campaign!;
                 Assert.Equal(saved.RunCounter, campaign.RunCounter);
@@ -281,10 +288,13 @@ public class PreReworkSaveTests
                 }
 
                 // Played on, it saves as any campaign does — under the numbers played
-                // now — and the next launch resumes that, with nothing more to say.
-                Assert.Null(CampaignBoot.Save(slots.Slot(SaveSlots.OldAutosave), campaign));
-                Assert.Equal([resumed], CampaignBoot.Load(slots.Slot(SaveSlots.OldAutosave), GameContent.Current).Notices);
+                // now, into the slot it came from — and the next launch moves nothing
+                // and resumes that, with nothing more to say.
+                Assert.Null(CampaignBoot.Save(slots.Slot(1), campaign));
+                Assert.Empty(OldAutosave.MoveIntoASlot(slots));
+                Assert.Equal([resumed], CampaignBoot.Load(slots.Slot(1), GameContent.Current).Notices);
                 store.ClearResuming();
+                Assert.Empty(Directory.GetFiles(folder.FullName));
             }
             finally
             {

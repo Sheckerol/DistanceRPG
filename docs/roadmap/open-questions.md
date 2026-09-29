@@ -365,3 +365,29 @@ and the title's unsaved word names it, with `TO PLAY IT AGAIN, MOVE IT INTO AN
 EMPTY SLOT FOLDER AS CAMPAIGN.JSON`; or (b) while the slot's writes are failing,
 and only then, SAVE GAME offers an empty slot to move the campaign into, which
 becomes its slot. settled.md's Phase 5 implementation pass records the ruling.
+
+## Where the old autosave goes (the save slots, R5) — SLOT DECISION 4
+
+The user's ruling of 2026-09-25 on the save slots (R5, settled.md) binds every
+campaign to a slot and every save of it to that slot, so there is no autosave
+slot apart from the others, and nothing new is saved in the save folder itself.
+A build before the ruling saved its campaign there, as the autosave, and a
+player's campaign may still stand there. The ruling says nothing of what becomes
+of it.
+
+**Shipped provisionally: every launch moves it, without asking, into the lowest
+empty slot** — `SLOT 1` to the count, or else the lowest empty slot above it,
+listed `BEYOND THE 3 SLOTS` and played like any (SLOT DECISION 1) — and the
+title says `THE AUTOSAVE MOVED INTO SLOT 4 - ITS CAMPAIGN SAVES THERE FROM NOW
+ON`. Its save, backup and two markers move byte for byte, all or nothing, and
+nothing is written over or deleted. With slots 1 to 9 all holding something it
+stays, listed as the `OLD AUTOSAVE`, `NOT YET MOVED INTO A SLOT`, and is played
+in place. A move that stops is undone, and when no slot's try goes through the
+old autosave takes no saves that session, until a launch can move it.
+
+**This decides whether the game moves a player's campaign without asking, so it
+is the user's to decide.** The alternatives: (a) the first title after the
+update asks which slot, on NEW CAMPAIGN's list, setting a slot in use aside as
+NEW CAMPAIGN does; or (b) it stays listed as the `OLD AUTOSAVE` until it is
+loaded, and its load then asks for a slot to move it into. settled.md's Phase 5
+implementation pass records the ruling.

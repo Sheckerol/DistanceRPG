@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace GameEngine.DistanceRPG;
@@ -26,7 +27,11 @@ namespace GameEngine.DistanceRPG;
 /// ruling on the save slots, replaced to make room for a manual slot's campaign —
 /// which nothing here ever deletes or writes over; the one move back is
 /// <see cref="PutBack"/>'s, of a file set aside for a new campaign that never
-/// began.
+/// began. In the save folder itself — the old autosave — <see cref="MovingName"/>
+/// is there while its campaign is being moved into a slot
+/// (<c>OldAutosave.MoveIntoASlot</c>), naming the slot, so a launch that finds it
+/// knows the last move never finished; the four files above move by
+/// <see cref="MoveInto"/>, one at a time, never over a name that is taken.
 /// </para>
 /// <para>
 /// <strong>A write never costs the save before it.</strong> The text goes to
@@ -35,7 +40,7 @@ namespace GameEngine.DistanceRPG;
 /// hand of the campaign the save holds already, its time alone rewritten and the
 /// backup kept (<see cref="Restamp"/>). A write that fails at
 /// any point leaves <see cref="FileName"/> exactly as it was. The one delete is
-/// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The two
+/// <see cref="Empty"/>, which refuses any folder but a dev-override slot. The
 /// markers, which are no saves, are the only other files this class removes.
 /// </para>
 /// <para>
@@ -60,6 +65,9 @@ internal sealed class SaveStore
 
     /// <summary>There when the last time play was left the campaign could not be saved in this slot: the save beside it is from before then, and the title says so and removes it.</summary>
     public const string UnsavedName = "campaign.unsaved";
+
+    /// <summary>There, in the save folder itself, while the old autosave is being moved into a slot, holding that slot's number: a launch that finds it finishes the move before anything is listed or loaded (<c>OldAutosave.MoveIntoASlot</c>).</summary>
+    internal const string MovingName = "campaign.moving";
 
     /// <summary>Set to a folder, the saves live there instead of the player's data folder, the dev-override slot inside it.</summary>
     public const string DirectoryVariable = "DISTANCERPG_SAVE_DIR";
@@ -96,6 +104,9 @@ internal sealed class SaveStore
 
     /// <summary>The temp file a write goes through, in full.</summary>
     internal string TempPath => Path.Combine(Folder, TempName);
+
+    /// <summary>The move's intent marker, in full.</summary>
+    internal string MovingPath => Path.Combine(Folder, MovingName);
 
     /// <summary>Whether there is a save to resume.</summary>
     public bool HasSave => File.Exists(SavePath);
@@ -320,10 +331,110 @@ internal sealed class SaveStore
             File.Delete(UnsavedPath);
     }
 
+    // ── The old autosave's move into a slot (OldAutosave) ─────────────────────
+
+    /// <summary>Whether the move's intent marker is there: a move of the old autosave into a slot began and never finished.</summary>
+    internal bool WasMoving => File.Exists(MovingPath);
+
+    /// <summary>
+    /// The slot the move's intent marker names (<see cref="MarkMoving"/>), or null
+    /// when there is none, or when what it holds is no slot number from 1 to
+    /// <see cref="SaveSlots.Most"/> — a marker a crash left empty, or a hand's. A
+    /// marker that is there and cannot be read throws, as the file system says why.
+    /// </summary>
+    internal int? ReadMoving()
+    {
+        if (ReadIfThere(MovingPath) is not { } text)
+            return null;
+        string digits = text.Trim();
+        return digits.Length > 0 && digits.All(char.IsAsciiDigit)
+            && int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out int number) && number >= 1 && number <= SaveSlots.Most
+            ? number
+            : null;
+    }
+
+    /// <summary>
+    /// Write the move's intent marker, naming slot <paramref name="number"/> in
+    /// ASCII digits, before the first file of the old autosave moves there. Written
+    /// through a stream flushed to the disk, as <see cref="Write"/> writes a save:
+    /// the renames after it are the file system's own journal's, and a power loss
+    /// must not keep them and lose the marker that says where they went.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to <see cref="SaveSlots.Most"/>.</exception>
+    internal void MarkMoving(int number)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(number, SaveSlots.Most);
+        Directory.CreateDirectory(Folder);
+        using var stream = new FileStream(MovingPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        stream.Write(Utf8.GetBytes(number.ToString(CultureInfo.InvariantCulture)));
+        stream.Flush(flushToDisk: true);
+    }
+
+    /// <summary>Remove the move's intent marker, if it is there: the move finished, or was undone. The one file the move ever deletes.</summary>
+    internal void ClearMoving()
+    {
+        if (File.Exists(MovingPath))
+            File.Delete(MovingPath);
+    }
+
+    /// <summary>
+    /// Move <paramref name="name"/> — the save, the backup, or one of the two
+    /// markers — out of this folder into <paramref name="target"/>'s, under the same
+    /// name: a file of the old autosave into a slot, or back, which undoes that. The
+    /// target's folder is made if need be. A move, never a copy, and it refuses a
+    /// name taken there by a file or a folder (<see cref="Taken"/>), so nothing is
+    /// deleted or written over. What either store knew of the file goes with it
+    /// (<see cref="SaveVouched"/>): the next load or write there reads it first.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is none of the four files a slot keeps of its campaign.</exception>
+    /// <exception cref="IOException">The name is taken there, or the move failed — the file held open, a folder with no rights, a file where the folder goes; the file stays where it was.</exception>
+    /// <exception cref="UnauthorizedAccessException">No permission to move it; it stays where it was.</exception>
+    internal void MoveInto(SaveStore target, string name)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (name is not (FileName or BackupName or ResumingName or UnsavedName))
+            throw new ArgumentException($"'{name}' is not one of the files a slot keeps of its campaign: only {FileName}, {BackupName}, {ResumingName} and {UnsavedName} move.", nameof(name));
+        if (target.Taken(name))
+            throw new IOException($"{name} is taken in {target.Folder}: nothing is moved over it.");
+        Directory.CreateDirectory(target.Folder);
+        File.Move(Path.Combine(Folder, name), Path.Combine(target.Folder, name), overwrite: false);
+        Unvouch(name);
+        target.Unvouch(name);
+    }
+
+    /// <summary>What this session knew of <paramref name="name"/> goes: it moved, in or out.</summary>
+    private void Unvouch(string name)
+    {
+        if (name == FileName)
+            SaveVouched = false;
+        else if (name == BackupName)
+            BackupVouched = false;
+    }
+
+    /// <summary>Whether <paramref name="name"/> is taken in this folder, by a file or by a folder: a move refuses it (<see cref="MoveInto"/>), as <see cref="SetAside"/> passes over it.</summary>
+    internal bool Taken(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        string path = Path.Combine(Folder, name);
+        return File.Exists(path) || Directory.Exists(path);
+    }
+
+    /// <summary>Whether this folder holds <paramref name="name"/> as a file: what the old autosave's move takes with it.</summary>
+    internal bool Holds(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return File.Exists(Path.Combine(Folder, name));
+    }
+
+    /// <summary>Whether a file stands where this folder would be, so nothing can be made or moved into it.</summary>
+    internal bool FolderIsAFile => File.Exists(Folder);
+
     /// <summary>
     /// Refuse every write from now on, saying why: a save that could not be read
     /// could not be moved out of the way either, so writing anything would put a
-    /// new save in its place.
+    /// new save in its place — or the old autosave could not be moved into a slot,
+    /// or was moved there only in part (<c>OldAutosave.MoveIntoASlot</c>).
     /// </summary>
     public void RefuseWrites(string why)
     {

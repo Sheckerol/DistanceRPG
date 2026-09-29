@@ -230,6 +230,116 @@ public class SaveStoreTests
         });
     }
 
+    [Fact]
+    public void MoveIntoMovesOneFile_NeverOverwriting()
+    {
+        InTempFolder(folder =>
+        {
+            // The old autosave's move into a slot (the user's ruling of 2026-09-25 on
+            // the save slots, R5): one file, under its own name, into a folder made
+            // for it, the bytes as they were — and what either store knew of it goes.
+            var root = new SaveStore(folder);
+            var slot = new SaveStore(Path.Combine(folder, "slot-1"));
+            root.Write("the save before");
+            root.Write("the save");
+            root.Vouch(backup: false);
+            Assert.Equal((true, true), (root.SaveVouched, root.BackupVouched));
+            byte[] save = File.ReadAllBytes(root.SavePath);
+            Assert.False(Directory.Exists(slot.Folder));
+            root.MoveInto(slot, SaveStore.FileName);
+            Assert.Equal(save, File.ReadAllBytes(slot.SavePath));
+            Assert.Equal([SaveStore.BackupName], Files(folder));
+            Assert.Equal((false, true), (root.SaveVouched, root.BackupVouched));
+            Assert.Equal((false, false), (slot.SaveVouched, slot.BackupVouched));
+            Assert.True(slot.Taken(SaveStore.FileName));
+            Assert.False(root.Taken(SaveStore.FileName));
+            Assert.Equal((true, false, true), (slot.Holds(SaveStore.FileName), root.Holds(SaveStore.FileName), root.Holds(SaveStore.BackupName)));
+
+            // It moves back the same way, which undoes it; and the markers move too.
+            slot.MoveInto(root, SaveStore.FileName);
+            Assert.Equal(save, File.ReadAllBytes(root.SavePath));
+            Assert.Empty(Files(slot.Folder));
+            root.MarkResuming();
+            root.MoveInto(slot, SaveStore.ResumingName);
+            Assert.Equal((false, true), (root.WasResuming, slot.WasResuming));
+
+            // A name taken there — by a file, or by a folder — is refused, and both
+            // stay as they were: nothing is written over, nothing deleted.
+            File.WriteAllText(slot.SavePath, "a save already there");
+            Assert.Throws<IOException>(() => root.MoveInto(slot, SaveStore.FileName));
+            Assert.Equal(("the save", "a save already there"), (root.Read(), slot.Read()));
+            Directory.CreateDirectory(slot.BackupPath);
+            Assert.True(slot.Taken(SaveStore.BackupName));
+            Assert.False(slot.Holds(SaveStore.BackupName));
+            Assert.Throws<IOException>(() => root.MoveInto(slot, SaveStore.BackupName));
+            Assert.Equal("the save before", root.ReadBackup());
+            Assert.True(Directory.Exists(slot.BackupPath));
+
+            // A file where the folder goes stops the move, and stays; a file that is
+            // not there has nothing to move; and only the four files of a campaign
+            // move — never a file set aside, the temp file or the marker of a move.
+            var blocked = new SaveStore(Path.Combine(folder, "slot-2"));
+            File.WriteAllText(blocked.Folder, "a file, not a folder");
+            Assert.True(blocked.FolderIsAFile);
+            Assert.False(slot.FolderIsAFile);
+            Assert.ThrowsAny<IOException>(() => root.MoveInto(blocked, SaveStore.FileName));
+            Assert.Equal(("the save", "a file, not a folder"), (root.Read(), File.ReadAllText(blocked.Folder)));
+            Assert.Throws<FileNotFoundException>(() => root.MoveInto(slot, SaveStore.UnsavedName));
+            foreach (string name in new[] { "campaign.abandoned-1.json", SaveStore.TempName, SaveStore.MovingName, "", "../campaign.json" })
+                Assert.ThrowsAny<ArgumentException>(() => root.MoveInto(slot, name));
+
+            // The marker of a move names its slot in ASCII digits, and reads back; one
+            // that names no slot from 1 to the most there can be reads as none, and so
+            // does none at all.
+            Assert.False(root.WasMoving);
+            Assert.Null(root.ReadMoving());
+            root.MarkMoving(3);
+            Assert.True(root.WasMoving);
+            Assert.Equal("3", File.ReadAllText(root.MovingPath));
+            Assert.Equal(3, root.ReadMoving());
+            root.MarkMoving(SaveSlots.Most);
+            Assert.Equal(SaveSlots.Most, root.ReadMoving());
+            foreach (string garbage in new[] { "", " ", "0", "10", "-1", "+3", "3.0", "three", "٣", "3 4" })
+            {
+                File.WriteAllText(root.MovingPath, garbage);
+                Assert.Null(root.ReadMoving());
+            }
+            File.WriteAllText(root.MovingPath, "7\n");
+            Assert.Equal(7, root.ReadMoving());
+            Assert.Throws<ArgumentOutOfRangeException>(() => root.MarkMoving(0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => root.MarkMoving(SaveSlots.Most + 1));
+            Assert.Equal(7, root.ReadMoving());
+            root.ClearMoving();
+            Assert.False(root.WasMoving);
+            root.ClearMoving();   // nothing there: nothing to do
+            Assert.Equal([SaveStore.BackupName, SaveStore.FileName, "slot-2"], Files(folder));
+        });
+
+        // The marker reaches the disk before any file moves: written through a stream
+        // flushed to it, as a save is — never a write the system may hold back.
+        var mark = typeof(SaveStore).GetMethod(nameof(SaveStore.MarkMoving), BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var called = Instructions(Body(mark)!)
+            .Where(i => i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt || i.Op == OpCodes.Newobj)
+            .Select(i => Resolve(mark, i.Token))
+            .OfType<MethodBase>()
+            .ToList();
+        Assert.Contains(called, method => method.DeclaringType == typeof(FileStream) && method.Name == nameof(FileStream.Flush)
+            && method.GetParameters() is [{ ParameterType: var flag }] && flag == typeof(bool));
+        Assert.DoesNotContain(called, method => method.DeclaringType == typeof(File) && method.Name.StartsWith("Write", StringComparison.Ordinal));
+
+        // A move is a rename that refuses a name taken, never a copy and never a write
+        // over one.
+        var moveInto = typeof(SaveStore).GetMethod(nameof(SaveStore.MoveInto), BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var moves = Instructions(Body(moveInto)!)
+            .Where(i => i.Op == OpCodes.Call || i.Op == OpCodes.Callvirt)
+            .Select(i => Resolve(moveInto, i.Token))
+            .OfType<MethodBase>()
+            .Where(method => method.DeclaringType == typeof(File))
+            .Select(method => $"{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name))})")
+            .ToArray();
+        Assert.Equal(["Move(String, String, Boolean)"], moves);
+    }
+
     /// <summary>What reading the machine looks like from IL: a file or a folder, the environment's variables and folders, the executable's own folder.</summary>
     private static bool TouchesTheMachine(MethodBase target)
     {

@@ -34,10 +34,12 @@ GameEngine.DistanceRPG/         # Game executable
                                 # TitleText; SlotMenu and SlotText, the slot list)
   SaveSlots.cs                  # The save slots, slot-1/ to slot-N/ in the save folder, each campaign
                                 # saving in its own; the folder's own campaign.json only an old autosave
-                                # (SaveStore one slot, SaveListing what each holds, CampaignBoot a slot's load
-                                # and every write)
+                                # not yet moved (SaveStore one slot, SaveListing what each holds,
+                                # CampaignBoot a slot's load and every write)
   SaveSlot.cs                   # One slot: its store and its name together, which every load, save and
                                 # word takes
+  OldAutosave.cs                # The old autosave moved into a slot of its own at every launch, before
+                                # the title: all or nothing, never over a file, a move cut off finished
   PauseMenu.cs                  # The menu ESC opens in play, both scenes': 1 CLOSE, 2 SAVE GAME (into the
                                 # campaign's own slot, at a safe point), 3 QUIT TO TITLE (IRunHost.cs'
                                 # ISaveHost is what the scenes ask of the game for it)

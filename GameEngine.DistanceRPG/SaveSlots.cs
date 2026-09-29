@@ -19,9 +19,12 @@ namespace GameEngine.DistanceRPG;
 /// the list.</item>
 /// <item><strong>The save folder itself is only the old autosave</strong>
 /// (<see cref="OldAutosave"/>): the <c>campaign.json</c> a build before R5 saved
-/// there, as the autosave. It is listed while it holds a save or a backup
-/// (<see cref="SaveListing.Read"/>), loaded, and saved into by its own campaign;
-/// NEW CAMPAIGN never begins there, so nothing new is ever saved in it.</item>
+/// there, as the autosave, which every launch moves into a slot of its own
+/// (<c>OldAutosave.MoveIntoASlot</c>). Where it could not, it is listed while it
+/// holds a save or a backup (<see cref="SaveListing.Read"/>) — loaded, and saved
+/// into by its own campaign, when no slot was free; taking no saves this session,
+/// when its files would not move. NEW CAMPAIGN never begins there, so nothing new
+/// is ever saved in it.</item>
 /// <item><strong>A count lowered below a slot that holds a save deletes
 /// nothing</strong>: the slots above the count up to <see cref="Most"/> that hold a
 /// save or a backup are <see cref="Beyond"/> it — listed, loaded, and saved into

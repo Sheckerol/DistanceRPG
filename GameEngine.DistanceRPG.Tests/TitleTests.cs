@@ -378,9 +378,14 @@ public sealed class TitleTests : IDisposable
         // The save folder itself, while it holds a campaign, is the OLD AUTOSAVE —
         // never listed empty, since it is listed only while it holds a save or a
         // backup — with the markers any slot has: here a save from before the slots,
-        // with no time, resumed from its backup.
-        Assert.Equal("OLD AUTOSAVE - BETWEEN RUNS - 1 RUN - 2026-09-25 14:32", Rows(Slot(SaveSlots.OldAutosave, header: Header(At, 1))));
-        Assert.Equal("OLD AUTOSAVE - BETWEEN RUNS - 1 RUN | FROM ITS BACKUP - NO TIME RECORDED", Rows(Slot(SaveSlots.OldAutosave, SlotState.FromBackup, Header(null, 1))));
+        // with no time, resumed from its backup. It is listed only while the launch
+        // could not move it into a slot of its own (the user's ruling on the save
+        // slots, R5; OldAutosave.MoveIntoASlot), and its row says so, last, whatever
+        // it holds — a save, a backup, or files none of which reads.
+        Assert.Equal("OLD AUTOSAVE - BETWEEN RUNS - 1 RUN - 2026-09-25 14:32 | NOT YET MOVED INTO A SLOT", Rows(Slot(SaveSlots.OldAutosave, header: Header(At, 1))));
+        Assert.Equal("OLD AUTOSAVE - BETWEEN RUNS - 1 RUN | FROM ITS BACKUP - NO TIME RECORDED - NOT YET MOVED INTO A SLOT", Rows(Slot(SaveSlots.OldAutosave, SlotState.FromBackup, Header(null, 1))));
+        Assert.Equal("OLD AUTOSAVE - CANNOT BE READ | ITS LAST LOAD DID NOT FINISH - NOT YET MOVED INTO A SLOT", Rows(Slot(SaveSlots.OldAutosave, SlotState.Unreadable, unfinished: true)));
+        Assert.Equal("NOT YET MOVED INTO A SLOT", SlotText.NotMovedYet);
 
         // Each marker, on the row under its slot's, in the order they are drawn.
         Assert.Equal("SLOT 1 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | FROM ITS BACKUP", Rows(Slot(1, SlotState.FromBackup, Header(At, 2))));
@@ -425,6 +430,8 @@ public sealed class TitleTests : IDisposable
         Assert.Equal((DungeonHud.White, true), (listed[2].Color, listed[2].Text.StartsWith("  SLOT 1 - ", StringComparison.Ordinal)));
         Assert.Equal(DungeonHud.White, listed[8].Color);   // slot 4, beyond the count: loaded like any, and played
         Assert.All(listed.Where((_, i) => i % 2 == 1), row => Assert.Equal(DungeonHud.Grey, row.Color));
+        Assert.EndsWith($" - {SlotText.NotMovedYet}", listed[1].Text, StringComparison.Ordinal);   // the old autosave's markers, and no other slot's
+        Assert.Single(listed, row => row.Text.Contains(SlotText.NotMovedYet, StringComparison.Ordinal));
         Assert.Single(listed.Select(row => row.Left).Distinct());   // one left-aligned block
         Fits(drawn);
         Assert.True(listed[^1].Bottom <= H - TitleHud.KeysFromBottom - TitleHud.BottomPitch, "the list runs into the keys");
@@ -576,11 +583,17 @@ public sealed class TitleTests : IDisposable
         Assert.True(worstRow.Length > $"> {SlotText.Row(worst, Dungeons, PlusTwo)} <".Length);
         Within(worstRow, SlotText.Scale);
 
-        // The worst markers' row: every marker that can stand together, indented.
+        // The worst markers' row: every marker that can stand together, indented —
+        // a slot's, beyond the count, and the old autosave's, never beyond it and
+        // not yet moved into a slot, which is the wider.
         var everyMarker = Slot(SaveSlots.Most, SlotState.FromBackup, Header(At, 1), unfinished: true, beyond: true, ahead: true);
         string markers = SlotText.Rows(everyMarker, 3, Dungeons, PlusTwo)[1];
         Assert.Equal(89, markers.Length);
         Within($"    {markers}", SlotText.Scale);
+        string oldMarkers = SlotText.Rows(everyMarker with { Number = SaveSlots.OldAutosave, Beyond = false }, 3, Dungeons, PlusTwo)[1];
+        Assert.Equal("FROM ITS BACKUP - ITS LAST LOAD DID NOT FINISH - AHEAD OF THIS CLOCK - NOT YET MOVED INTO A SLOT", oldMarkers);
+        Assert.Equal(96, oldMarkers.Length);
+        Within($"    {oldMarkers}", SlotText.Scale);
 
         // The ask's two rows, at the keys line's scale: NEW CAMPAIGN's, over slot 9
         // holding the worst campaign, and over one that cannot be read. (A load asks

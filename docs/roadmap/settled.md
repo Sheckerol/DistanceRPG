@@ -2013,7 +2013,12 @@ superseded whole.
     the user's ruling of the same day on the save slots, in the save folder being
     the autosave: nothing new is saved there, so it is the old autosave — listed,
     as `OLD AUTOSAVE`, only while it holds a save or a backup, and played in place
-    — and the slots are slot 1 up — R5, the old autosave, below.)
+    — and the slots are slot 1 up — R5, the old autosave, below. Superseded again
+    in "no file moves, and there is no migration": every launch moves the save
+    folder's own campaign — the pre-rework saves among them — into a slot of its
+    own, byte for byte and all or nothing, a move of the files with no migration
+    of their text, so it is the old autosave only while a launch could not move it
+    — R5, the move, below.)
   - **The slot count is `tuning.json`'s `SaveSlots`**: 3, clamped 1–9 with the
     usual warning. At least one, so saving by hand always has somewhere to go; at
     most nine, since a digit picks each slot, as the bag's are picked, and the
@@ -2109,7 +2114,10 @@ superseded whole.
   - **A dev-override session never touches a slot**: its store is its scratch
     slot, emptied as ever, and the slots are never made, so no save of the session
     — entry, turn, arrival, a run's end, quit — reaches the autosave or a manual
-    slot.
+    slot. (Superseded by the user's ruling of the same day on the save slots, in
+    the autosave: the save folder's own campaign is the old autosave, which every
+    other launch moves into a slot of its own, and a dev-override launch neither
+    saves into it nor moves it — R5, the move, below.)
 - **R2, the title — CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT.** The ruling's
   second part: "the game opens on a TITLE SCREEN offering, in this order, CONTINUE
   / NEW CAMPAIGN / LOAD GAME / QUIT". Built on the folder above, in place of the
@@ -2701,7 +2709,7 @@ out each alternative.
   new is saved in the save folder itself, and the folder is no autosave slot: what
   it holds is the campaign a build before the ruling autosaved there — the **old
   autosave** — played in place, as it has been since R5, the slot, until a launch
-  moves it into a slot of its own (R5, the move, as it lands):
+  moves it into a slot of its own (R5, the move, below):
   - **It is named as a slot is named, and every word names it**: `OLD AUTOSAVE`
     on the lists and CONTINUE's row, `THE OLD AUTOSAVE` in the words —
     `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE`, `NOTHING COULD BE LOADED FROM THE
@@ -2734,7 +2742,9 @@ out each alternative.
     `campaign.bak.json` — a marker or a file set aside alone is nothing to load —
     and otherwise starts at `SLOT 1`. Loaded, by LOAD GAME or CONTINUE, it saves
     back into the save folder, the slot it came from; NEW CAMPAIGN never begins
-    there.
+    there. (Superseded in when it is listed: only while a launch could not move
+    it into a slot, its row marked `NOT YET MOVED INTO A SLOT`; and it is played
+    in place only when no slot was free — R5, the move, below.)
   - **0 loads it, and only while it is listed**: LOAD GAME's keys line reads `W/S
     OR ARROWS CHOOSE - ENTER OR 1-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC
     BACK`, and `... 0-9 ...` while the old autosave is listed. With none listed, 0
@@ -2751,6 +2761,79 @@ out each alternative.
     so that a campaign always has a slot to begin in, where it read "so saving by
     hand always has somewhere to go", which chooses no slot now. The launch log
     says `[Save] Saves in ...: 3 slots`.
+- **R5, the move — the old autosave moved into a slot at launch, all or nothing,
+  never deleted.** The ruling leaves no autosave slot, so the campaign a build
+  before it autosaved in the save folder itself is moved into a slot of its own,
+  as every other campaign is in one (`OldAutosave.MoveIntoASlot`):
+  - **At every launch, before the title, without asking — SLOT DECISION 4,
+    shipped provisionally**: into the lowest slot free for it, 1 to the count,
+    else the lowest free one above it, listed `BEYOND THE 3 SLOTS` and played like
+    any (SLOT DECISION 1). The title says `THE AUTOSAVE MOVED INTO SLOT 4 - ITS
+    CAMPAIGN SAVES THERE FROM NOW ON` first, then the slot's unsaved-quit word
+    when that marker moved with it. It runs once the slots are made and before
+    anything reads them — before `--new-campaign` lists them for its slot, so it
+    never sets aside the campaign just moved while a slot within the count is
+    free, and before the title takes their markers — and at every launch, not
+    once: every set-aside notice in the save folder says to rename the file back
+    there, and one renamed back is the old autosave for the rest of that session
+    and moves at the next launch. Never on a dev override, and never mid-session,
+    so a campaign in play is never moved from under it. The alternatives, in
+    open-questions.md: the first title after the update asks which slot, on NEW
+    CAMPAIGN's list; or it stays the old autosave until it is loaded, and its
+    load asks.
+  - **Only the campaign's four files, the save first, never over anything —
+    bends the plan, needs no ruling**: `campaign.json`, `campaign.bak.json`,
+    `campaign.resuming` and `campaign.unsaved`, each under its own name, by a move
+    that refuses a name taken there by a file or a folder. Nothing is read,
+    rewritten or deleted, and the save document carries no slot: no version bump,
+    no migration. The save goes first, as the file another program is likeliest
+    to hold, so a held save stops the move before anything has moved. The resume
+    marker moves only with the save or backup it guards — the slot then lists
+    `ITS LAST LOAD DID NOT FINISH`, and its next load sets that save aside as
+    crashed, in the slot's own folder — and a lone one guards nothing and is
+    left, logged; the quit's marker moves so the title says it as the slot's.
+    Files set aside, `campaign.json.tmp` and `override/` stay where they are. A
+    slot is free only when none of the four names is taken there and its folder
+    is no file: a stray marker is passed over, never cleared, and files set aside
+    are no obstacle. A save folder's campaign a slot also holds — an R2 save by
+    hand of it — moves all the same: two slots, one campaign, nothing lost.
+  - **All or nothing — bends the plan, needs no ruling**: before the first file
+    moves, the save folder gets `campaign.moving`, naming the slot, flushed to
+    the disk as a save is, so a power loss cannot keep the renames and lose where
+    they went. A try that stops at a file is undone — what moved goes back, the
+    last first, by the same move — and the next free slot is tried, since the
+    failure may be the slot's. When every try fails, the failure is the save
+    folder's own — its save held by another program, or no rights there — and
+    every write there would fail too, so it takes no saves that session: listed
+    as the old autosave, its load loads nothing and says `NOTHING COULD BE LOADED
+    FROM THE OLD AUTOSAVE` / `THE OLD AUTOSAVE TAKES NO SAVES THIS SESSION:
+    EARLIER, CAMPAIGN.JSON COULD NOT BE MOVED INTO A SLOT (...) - LAUNCH THE GAME
+    AGAIN TO PLAY IN IT`, and the title says `THE AUTOSAVE COULD NOT MOVE INTO A
+    SLOT (...) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS SESSION -
+    LAUNCH THE GAME AGAIN TO MOVE IT`; the next launch tries again. A try undone
+    leaves behind the slot folder it made, empty, which lists `EMPTY`: the move
+    deletes nothing but its own marker. A move a crash cut off is finished at the
+    next launch, before anything is listed or loaded, into the slot the marker
+    names; a marker naming a slot that has since taken one of the names still in
+    the save folder — a build without the move ran in between — or naming no slot
+    is dropped and logged, the log naming every slot that holds a lone save or a
+    lone backup, so a split can be joined by hand, and the move goes afresh. A
+    finish that stops is undone as a try is, and the halves the crash left stand;
+    a crash that came before any file moved left none, so that finish is a try
+    that stopped, and the move goes afresh. A move that can be neither finished
+    nor undone leaves the campaign in two halves, and neither takes saves that
+    session, so no load runs on a split and no save forks it: `THE AUTOSAVE IS
+    HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME
+    AGAIN TO FINISH IT`, the marker kept for the next launch to finish it.
+  - **With no slot free, it stays — bends the plan, needs no ruling**: with
+    slots 1 to 9 all holding something nothing is tried, so nothing is known to
+    fail, and the old autosave is listed, marked `NOT YET MOVED INTO A SLOT`, and
+    played in place, saving back into the save folder; the log says why, and the
+    title says nothing. The move looks at every slot to 9, so raising the count
+    frees nothing it did not already see.
+  - **An older build run afterwards loses nothing**: a build before the ruling
+    finds no autosave and lists the slot the old autosave moved into as a manual
+    slot, load-only above its count.
 
 ### The numbers: `tuning.json`
 
