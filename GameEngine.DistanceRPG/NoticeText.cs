@@ -48,23 +48,26 @@ internal static class NoticeText
 
     /// <summary>
     /// The most rows the notices shown whole take (<see cref="Rows"/>): the save's
-    /// word on the campaign. Its common long case — a new campaign after the save
-    /// and its backup were both set aside, each notice naming its file's full path
-    /// — takes about seven to ten rows in the player's own save folder. The rarest
-    /// measured — a manual slot resumed from its backup under other numbers, its
-    /// save set aside with a long reason, and the autosave's crashed save and its
-    /// backup set aside to make room — took fifteen rows under a five-letter user
-    /// name, one past the ceiling, and eighteen under a twenty-letter one (Phase
-    /// 5.S7). No load makes room in another slot since the user's ruling on the
-    /// save slots, so that word has lost its last two notices; the ceiling is kept
-    /// all the same: fifteen would put a resumed floor's banner exactly on the
-    /// two-thirds line it keeps above, with no slack. Past it the rows are cut like
-    /// any others, and the log has every
-    /// word; with <see cref="MaxRows"/> after them and the row that counts the rest,
-    /// the dungeon list still clears a 720-pixel window, and so does a resumed
-    /// floor's banner, which moves down under them (<see cref="DungeonHud.BannerLine"/>).
-    /// settled.md's entry on the save's word, and R2's on saving by hand, record the
-    /// ceiling and why.
+    /// word on the campaign. Measured again once the user's ruling on the save slots
+    /// was whole (Phase 5.T6), in the player's own save folder under a five- and a
+    /// twenty-letter user name, each notice naming its file's full path: NEW
+    /// CAMPAIGN on the title over a slot in use, its save and backup set aside,
+    /// takes nine rows; a slot resumed from its backup under other numbers, its save
+    /// set aside with a long reason, eight and nine; the title's word on a load that
+    /// brought nothing back, the slot's crashed save and unreadable backup set
+    /// aside, with a slot's unsaved-quit word that would not clear, twelve and
+    /// fourteen. <c>--new-campaign</c> over a full save folder, both files set aside
+    /// and the old autosave's move refused or left in two halves, takes fourteen
+    /// under both: developer tooling, and the one word that fills the ceiling. A
+    /// word passes it only where several failures meet under <c>--new-campaign</c>:
+    /// no new campaign begun, its save stuck and its backup not gone back, with two
+    /// unsaved-quit words and the move's, fifteen; its first save failed and neither
+    /// file gone back, nineteen. So the ceiling stands. Past it the rows are cut
+    /// like any others, and the log has every word; with <see cref="MaxRows"/> after
+    /// them and the row that counts the rest, the dungeon list still clears a
+    /// 720-pixel window, and so does a resumed floor's banner, which moves down under
+    /// them (<see cref="DungeonHud.BannerLine"/>). settled.md's entry on the save's
+    /// word, R2's on saving by hand, and R5's record the ceiling and why.
     /// </summary>
     public const int MaxWholeRows = 14;
 

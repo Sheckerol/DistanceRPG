@@ -1469,10 +1469,10 @@ that bend; the dice stay the visit's own, seeded and saved; and **the save
 model**, the fourth, is the user's R2 — a title screen, one autosave slot and
 manual slots whose count is a `tuning.json` key — built in three steps and now
 whole (R2, below), its entry below superseded, and superseded in part by the
-user's ruling of the same day on the save slots (R5, below): a campaign saves
-into the slot it came from. Choices of its building ship provisionally, the
-user's to rule — USER DECISION 1, and R5's SLOT DECISIONS — and
-open-questions.md sets out their alternatives.
+user's ruling of the same day on the save slots (R5, below), built in five steps
+and now whole too: a campaign saves into the slot it came from. Choices of its
+building ship provisionally, the user's to rule — USER DECISION 1, and R5's SLOT
+DECISIONS 1 to 4 — and open-questions.md sets out their alternatives.
 
 ### The user's ruling on content (2026-09-25)
 
@@ -1617,7 +1617,12 @@ The same day as the ruling on content, the user ruled on four things more. Each
 supersedes the phase docs, the entries above and the rest of this pass wherever
 they differ: **R1**, what the d20 does across a reload; **R2**, the save model —
 a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT, one autosave
-slot, and manual slots whose count is a `tuning.json` key; **R3**, raw JSON —
+slot, and manual slots whose count is a `tuning.json` key (superseded by the
+user's ruling of the same day on the save slots, in the autosave slot and what
+the count counts: a campaign is bound to the slot NEW CAMPAIGN begins it in, or
+LOAD GAME or CONTINUE loads, and every save of it goes there, so there is no
+autosave slot apart from the others, and `SaveSlots` counts every slot — R5,
+below); **R3**, raw JSON —
 "since we are storing in raw json we should probably not trust the fields", so
 every number of a content file gets a range, and a save's fields are checked
 against each other; and **R4**, what a deposit costs. R1 and R4 change no rule
@@ -1631,7 +1636,9 @@ folder's slots, a save's time, the slot count, and what a write never costs (R2,
 the folder); the title screen, with CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT
 (R2, the title); and saving by hand, with the menus that leave play by the title
 (R2, saving by hand). The entry below that R2 supersedes — the save model — is
-superseded whole.
+superseded whole. R5, the ruling on the save slots, has an entry of its own
+after R2's, built in five steps and written there, and each passage of R2's it
+makes false is marked where it stands.
 
 - **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
   provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
@@ -1744,7 +1751,8 @@ superseded whole.
     key of its own, un-ruling the Phase 2 pass. Apart, the slots and the price
     agree at the ruled numbers and part only if tuned apart (consequence 4,
     above). It goes to open-questions.md with the save model's own choices, once
-    that is built.
+    that is built. (It went there as USER DECISION 1 when saving by hand was
+    built — R2, saving by hand, below — and stays open.)
   - **The clamps**, each the whole check a file's number gets:
     `WearCapacityPerBar` 0–1000 — 0 freezes capacity, a dial rather than an
     error, and 1000 is where the file's magnitudes clamp; `FirstSlotCapacity`
@@ -2296,7 +2304,8 @@ superseded whole.
     hand, below. Superseded by the user's ruling of the same day on the save
     slots, in the three files: no load sets another slot's files aside, so a load
     names at most its own slot's two; the fourteen-row ceiling stands — R5, the
-    slot, below.)
+    slot, below — measured again once R5 was whole, and kept: R5, the save's
+    word, below.)
 - **R2, saving by hand — SAVE GAME, and QUIT TO TITLE.** The ruling's third part:
   "a manual save can be made at ANY SAFE POINT: from the pause menu on the
   player's own turn during a run, or on the between-runs screen — never while
@@ -2434,7 +2443,8 @@ superseded whole.
     (`+1 MORE - SEE THE LOG`), and the log has every word. (Superseded by the
     user's ruling of the same day on the save slots, in the files that word names:
     no load sets the autosave's two aside any more, so that rarest word has lost
-    them; the ceiling stands — R5, the slot, below.)
+    them; the ceiling stands — R5, the slot, below — measured again once R5 was
+    whole, and kept: R5, the save's word, below.)
   - **A quit whose save goes through takes back a failed autosave's word** (S7's
     review, which licensed the change to the take-back's pin): a save that fails
     is said on the next screen until a later save goes through, which takes it
@@ -2496,12 +2506,15 @@ answered by the first half of its listed alternative — a loaded slot saves int
 itself — and leaves open-questions.md; its other half, an autosave slot kept for
 the last campaign begun or continued there, goes with R5. USER DECISION 3's
 question, what becomes of the campaign in the slot NEW CAMPAIGN begins in, is asked
-again of a slot (SLOT DECISION 2). Built in five steps, each written below as it
-lands — the binding (R5, the slot), the title's NEW CAMPAIGN (R5, NEW CAMPAIGN),
-saving by hand (R5, SAVE GAME), the save folder's name (R5, the old autosave) and
-its move (R5, the move) — and its choices ship provisionally, each labelled SLOT
-DECISION, never USER DECISION, which names Phase 5's list; open-questions.md sets
-out each alternative.
+again of a slot (SLOT DECISION 2). Built in five steps, each written below, and
+now whole — the binding (R5, the slot), the title's NEW CAMPAIGN (R5, NEW
+CAMPAIGN), saving by hand (R5, SAVE GAME), the save folder's name (R5, the old
+autosave) and its move (R5, the move), the save's word measured again once all
+five stood (R5, the save's word) — and its choices ship provisionally, each
+labelled SLOT DECISION, never USER DECISION, which names Phase 5's list;
+open-questions.md sets out each alternative: SLOT DECISIONS 1 to 4, what a slot
+above the count may do, what NEW CAMPAIGN does to a slot in use, what becomes of
+play in a slot whose writes keep failing, and where the old autosave goes.
 
 - **R5, the slot — every save of a campaign goes into the slot it came from.**
   The ruling's first half, built beneath NEW CAMPAIGN and SAVE GAME as they
@@ -2628,7 +2641,8 @@ out each alternative.
     (`RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN`, kept), would collide with it. A
     slot folder holding only files set aside lists as `EMPTY`, and moved into one
     the old campaign lists, loads and plays. The notice is 29 characters longer;
-    the notices' ceiling is measured again once the ruling is whole.
+    the notices' ceiling is measured again once the ruling is whole. (Measured,
+    and kept at fourteen rows: R5, the save's word, below.)
   - **`--new-campaign` begins in the lowest empty slot within the count, else
     slot 1 — bends the plan, needs no ruling**: developer tooling, which asks
     nothing, takes the slot NEW CAMPAIGN's list would start on, so it sets nothing
@@ -2847,6 +2861,31 @@ out each alternative.
   - **An older build run afterwards loses nothing**: a build before the ruling
     finds no autosave and lists the slot the old autosave moved into as a manual
     slot, load-only above its count.
+- **R5, the save's word — measured again once the ruling was whole, and its
+  ceiling kept at fourteen rows.** The ruling changed what the save's word holds:
+  no load sets another slot's files aside (R5, the slot), NEW CAMPAIGN's notices
+  end with the longer `TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS
+  CAMPAIGN.JSON`, the stuck notice's end speaks of its slot, and the title can say
+  why no new campaign began and what became of the old autosave's move. Measured
+  in the player's own save folder, each notice naming its file's full path, under
+  a five- and a twenty-letter user name: NEW CAMPAIGN on the title over a slot in
+  use, its save and backup set aside, takes nine rows; a slot resumed from its
+  backup under other numbers, its save set aside with a long reason — a resumed
+  floor's word — eight and nine; the title's word on a load that brought nothing
+  back, the slot's crashed save and unreadable backup set aside, with a slot's
+  unsaved-quit word that would not clear, twelve and fourteen. The move's word is
+  said at launch, before anything is loaded, so it never shares that title.
+  `--new-campaign` over a full save folder, both files set aside and the move
+  refused or left in two halves, takes fourteen under both names: the one word
+  that fills the ceiling, and developer tooling's. A word passes it only where
+  several failures meet under `--new-campaign`: no new campaign begun, its save
+  stuck and its backup not gone back, with two unsaved-quit words and the move's,
+  fifteen; its first save failed and neither file gone back, nineteen — cut and
+  counted (`+N MORE - SEE THE LOG`), the log having every word. So the ceiling
+  stands (`NoticeText.MaxWholeRows`): of the words measured, none that play from
+  the title can make passes it, and a higher one would take room the dungeon list
+  and a resumed floor's banner keep in a 720-pixel window, for words only
+  developer tooling can make.
 
 ### The numbers: `tuning.json`
 
@@ -3164,7 +3203,8 @@ out each alternative.
   was built, which kept the ceiling: R2, saving by hand, above. Superseded by the
   user's ruling of the same day on the save slots, in those three: no load sets
   another slot's files aside, so a load names at most its own slot's two, and the
-  ceiling of fourteen stands — R5, the slot, above.)
+  ceiling of fourteen stands — R5, the slot, above — measured again once R5 was
+  whole, and kept: R5, the save's word, above.)
 - **Wear, `WearCapacity` and carried consumables are not in save version 1 —
   bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
   exist until Phases 6a and 6b, and the save's version and migration steps are

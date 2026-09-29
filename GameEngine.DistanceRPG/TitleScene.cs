@@ -219,10 +219,10 @@ internal sealed class TitleMenu
 /// <c>--new-campaign</c> begins a campaign at launch. <c>DISTANCE RPG</c> across
 /// the top; under it what the game has to say — the data files' notices, each
 /// slot whose campaign could not be saved the last time play was left, a slot's
-/// file the file system would not let the game read, and, back from a load that
-/// brought nothing back or a NEW CAMPAIGN that did not begin, why — the save's
-/// word whole and the rest capped
-/// (<see cref="NoticeText.Rows"/>); then the options (<see cref="TitleMenu"/>) or
+/// file the file system would not let the game read, at launch what became of the
+/// old autosave's move into a slot, and, back from a load that brought nothing back
+/// or a NEW CAMPAIGN that did not begin, why — the save's word whole and the rest
+/// capped (<see cref="NoticeText.Rows"/>); then the options (<see cref="TitleMenu"/>) or
 /// a slot list in their place — LOAD GAME's, or NEW CAMPAIGN's; the keys, or an
 /// ask, along the bottom.
 /// <para>
