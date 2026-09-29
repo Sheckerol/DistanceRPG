@@ -370,13 +370,16 @@ public sealed class BetweenRunsHud : IDisposable
     internal static float NoticeShift(int noticeRows) => noticeRows <= 0 ? 0f : noticeRows * NoticePitch;
 
     /// <summary>
-    /// A notice row's colour: the campaign resuming in green — news, not a
-    /// warning — and every other notice in the warning's orange.
+    /// A notice row's colour: the campaign resuming, and the old autosave moved into
+    /// a slot of its own (<see cref="CampaignBoot.AutosaveMoved"/>), in green — news,
+    /// not a warning — and every other notice in the warning's orange.
     /// </summary>
     internal static Vector4 NoticeColor(string row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        return row.StartsWith(Resumed, StringComparison.Ordinal) ? DungeonHud.Green : DungeonHud.Orange;
+        return row.StartsWith(Resumed, StringComparison.Ordinal) || row.StartsWith(CampaignBoot.MovedInto, StringComparison.Ordinal)
+            ? DungeonHud.Green
+            : DungeonHud.Orange;
     }
 
     /// <summary>

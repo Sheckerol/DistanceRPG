@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
@@ -69,9 +71,20 @@ internal static class TitleText
     /// The keys NEW CAMPAIGN's list answers, along the bottom while it is up: W/S
     /// and the arrows only move, and a digit begins in its slot at once, as ENTER
     /// begins in the one chosen — each asking first over a slot that holds anything.
-    /// No 0: the old autosave is never offered.
+    /// The digits are the slots the list offers, 1 to <paramref name="count"/> —
+    /// <c>ENTER OR 1-3 BEGINS</c>, <c>ENTER OR 1 BEGINS</c> at a count of one — since
+    /// a digit above the count begins nothing. No 0: the old autosave is never
+    /// offered.
     /// </summary>
-    internal const string NewCampaignKeysLine = "W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS - ESC BACK";
+    /// <param name="count">How many save slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>): 1 to <see cref="SaveSlots.Most"/>.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is outside 1 to <see cref="SaveSlots.Most"/>.</exception>
+    internal static string NewCampaignKeysLine(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, SaveSlots.Most);
+        string digits = count == 1 ? "1" : $"1-{count.ToString(CultureInfo.InvariantCulture)}";
+        return $"W/S OR ARROWS CHOOSE - ENTER OR {digits} BEGINS - ESC BACK";
+    }
 
     /// <summary>
     /// NEW CAMPAIGN's ask, over a slot that holds a save, a backup, or files none of

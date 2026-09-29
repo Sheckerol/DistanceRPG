@@ -59,6 +59,16 @@ internal static class SlotText
     internal const string NoTimeRecorded = "NO TIME RECORDED";
 
     /// <summary>
+    /// The marker of a slot that refused its writes earlier this session
+    /// (<see cref="SlotEntry.TakesNoSaves"/>): its load loads nothing and NEW
+    /// CAMPAIGN begins nothing there, each saying why, until the game is launched
+    /// again. It stands in place of <see cref="FromItsBackup"/> and
+    /// <see cref="LastLoadDidNotFinish"/>, which say what a load would do, and none
+    /// would.
+    /// </summary>
+    internal const string TakesNoSaves = "TAKES NO SAVES THIS SESSION";
+
+    /// <summary>
     /// The old autosave's marker: the save folder's own campaign, which the launch
     /// moves into a slot of its own (<see cref="OldAutosave.MoveIntoASlot"/>) and
     /// could not this time — no slot was free, and it plays in place; or its files
@@ -78,11 +88,12 @@ internal static class SlotText
     /// <summary>
     /// The rows <paramref name="entry"/> is drawn as: its own row
     /// (<see cref="Row"/>), then — only when one applies — its markers' row, the
-    /// markers in this order: <see cref="FromItsBackup"/>,
-    /// <see cref="LastLoadDidNotFinish"/>, <see cref="AheadOfThisClock"/> or
-    /// <see cref="NoTimeRecorded"/>, and <see cref="Beyond"/> — or, for the old
-    /// autosave, which is never beyond the count, <see cref="NotMovedYet"/>. An
-    /// empty slot has no markers: nothing of it would load.
+    /// markers in this order: <see cref="FromItsBackup"/> and
+    /// <see cref="LastLoadDidNotFinish"/>, or <see cref="TakesNoSaves"/> in their
+    /// place; <see cref="AheadOfThisClock"/> or <see cref="NoTimeRecorded"/>; and
+    /// <see cref="Beyond"/> — or, for the old autosave, which is never beyond the
+    /// count, <see cref="NotMovedYet"/>. An empty slot has no markers: nothing of it
+    /// would load.
     /// </summary>
     /// <param name="entry">The slot, as the listing read it.</param>
     /// <param name="count">How many save slots there are (<c>tuning.json</c>'s <c>SaveSlots</c>), which a slot beyond it names.</param>
@@ -193,10 +204,17 @@ internal static class SlotText
         var markers = new List<string>();
         if (entry.State == SlotState.Empty)
             return markers;
-        if (entry.State == SlotState.FromBackup)
-            markers.Add(FromItsBackup);
-        if (entry.Unfinished)
-            markers.Add(LastLoadDidNotFinish);
+        if (entry.TakesNoSaves)
+        {
+            markers.Add(TakesNoSaves);   // a load of it brings nothing back, from the backup or otherwise, and sets nothing aside
+        }
+        else
+        {
+            if (entry.State == SlotState.FromBackup)
+                markers.Add(FromItsBackup);
+            if (entry.Unfinished)
+                markers.Add(LastLoadDidNotFinish);
+        }
         if (entry.Header is { SavedAt: null })
             markers.Add(NoTimeRecorded);
         else if (entry.Header is not null && entry.AheadOfClock)

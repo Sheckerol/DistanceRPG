@@ -13,7 +13,7 @@ namespace GameEngine.DistanceRPG;
 /// <param name="NewCampaign">The launch sets the campaign aside and starts fresh (<c>--new-campaign</c>).</param>
 internal sealed record BootRequest(string? DungeonId = null, long? Seed = null, bool NewCampaign = false)
 {
-    /// <summary>Whether this is a dev-override launch: a fresh campaign in a slot of its own, which never reads or writes the campaign's save.</summary>
+    /// <summary>Whether this is a dev-override launch: a fresh campaign in a slot of its own, which never reads or writes a slot, nor the old autosave.</summary>
     public bool DevOverride => DungeonId is not null || Seed is not null;
 }
 
@@ -424,11 +424,11 @@ internal static class CampaignBoot
         }
 
         if (request.NewCampaign)
-            report?.Invoke($"[Save] {Program.NewCampaignOption} does nothing on a dev-override launch: its campaign is fresh every time, and the campaign's own save is never touched");
+            report?.Invoke($"[Save] {Program.NewCampaignOption} does nothing on a dev-override launch: its campaign is fresh every time, and no slot, nor the old autosave, is touched");
         report?.Invoke($"[Save] A dev-override launch: a fresh campaign in its own slot, {store.Folder}"
             + (request.DungeonId is { } dungeon ? $", straight into {dungeon}" : "")
             + (request.Seed is { } seed ? $", its first run on seed {seed}" : "")
-            + " - the campaign's own save is not read or written");
+            + " - no slot, nor the old autosave, is read or written");
         return new BootResult(CampaignState.Start(content), Resumed: false, View: null, request.DungeonId, request.Seed, [OverrideNotice]);
     }
 
@@ -655,8 +655,13 @@ internal static class CampaignBoot
     /// (<see cref="TakeUnsaved"/>) — the save folder's, then slot 1 to
     /// <see cref="SaveSlots.Most"/>, above the count too, since a campaign saves
     /// into whichever slot it came from (R5) — and each said once, in slot order
-    /// (<see cref="QuitUnsaved"/>). The title takes them when it opens, before the
-    /// slots are listed and anything is loaded.
+    /// (<see cref="QuitUnsaved"/>), of a slot that holds a save or a backup. The
+    /// title takes them when it opens, before the slots are listed and anything is
+    /// loaded. A marker beside neither — the files it spoke of moved or deleted by
+    /// hand since — is taken and logged, and not said: its <c>WHAT IT HOLDS</c>
+    /// would name nothing, and the old autosave is not even listed then; so
+    /// <see cref="PutBack"/> says a marker only when the slot holds its campaign
+    /// again.
     /// </summary>
     /// <param name="slots">The save folder's slots.</param>
     /// <param name="report">Where the log lines go: each marker, with what its quit wrote in it.</param>
@@ -667,8 +672,12 @@ internal static class CampaignBoot
         for (int number = SaveSlots.OldAutosave; number <= SaveSlots.Most; number++)
         {
             var slot = slots.Slot(number);
-            if (TakeUnsaved(slot.Store, report))
+            if (!TakeUnsaved(slot.Store, report))
+                continue;
+            if (slot.Store.HasSave || slot.Store.HasBackup)
                 said.Add(QuitUnsaved(slot));
+            else
+                report?.Invoke($"[Save] {slot.Store.Folder} holds no save and no backup beside that marker, so there is nothing of the campaign to say it of - the title says nothing");
         }
         return said;
     }
@@ -1085,16 +1094,20 @@ internal static class CampaignBoot
     /// <summary>
     /// The launch moved the old autosave into slot <paramref name="number"/>
     /// (<see cref="OldAutosave.MoveIntoASlot"/>; SLOT DECISION 4): <c>THE AUTOSAVE
-    /// MOVED INTO SLOT 4 - ITS CAMPAIGN SAVES THERE FROM NOW ON</c>. The title says
-    /// it first, and the unsaved-quit word of the slot it moved into after it, when
-    /// the marker moved with it.
+    /// MOVED INTO SLOT 4 - IT SAVES THERE FROM NOW ON</c>. The title says it first,
+    /// and the unsaved-quit word of the slot it moved into after it, when the marker
+    /// moved with it. One notice row (<see cref="NoticeText.LineChars"/>), starting
+    /// with <see cref="MovedInto"/>, so it is news, not a warning.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to <see cref="SaveSlots.Most"/>: the old autosave moves into a numbered slot.</exception>
     internal static string AutosaveMoved(int number)
     {
         RequireSlotNumber(number);
-        return $"THE AUTOSAVE MOVED INTO {SaveSlots.Label(number)} - ITS CAMPAIGN SAVES THERE FROM NOW ON";
+        return $"{MovedInto}{SaveSlots.Label(number)} - IT SAVES THERE FROM NOW ON";
     }
+
+    /// <summary>How <see cref="AutosaveMoved"/> starts, before the slot: a notice row that starts so is drawn in green (<see cref="BetweenRunsHud.NoticeColor"/>).</summary>
+    internal const string MovedInto = "THE AUTOSAVE MOVED INTO ";
 
     /// <summary>
     /// The launch could not move the old autosave into any slot, for

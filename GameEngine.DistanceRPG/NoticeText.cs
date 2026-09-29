@@ -68,9 +68,10 @@ internal static class NoticeText
     /// slot's unsaved-quit word that would not clear, or the listing's word on a
     /// slot's file another program holds — fourteen and sixteen, past it from an
     /// eight-letter name; and under <c>--new-campaign</c>, NO NEW CAMPAIGN BEGAN IN
-    /// SLOT 1 with its own unsaved-quit word, the moved autosave's slot's and the
-    /// move's word on it, fifteen with its save stuck and its backup not gone back,
-    /// nineteen with its first save failed and neither file gone back. A title's
+    /// SLOT 1 with its first save failed and neither file gone back, its own
+    /// unsaved-quit word, the moved autosave's slot's and the move's word on it,
+    /// eighteen (with its save stuck and its backup not gone back instead, fourteen,
+    /// at the ceiling: the move's word is one row since Phase 5.T's audit). A title's
     /// word grows the same way with every further failure — markers that will not
     /// clear, files another program holds. So the ceiling stands: what passes it
     /// needs several failures at once. Past it the rows are cut and counted like

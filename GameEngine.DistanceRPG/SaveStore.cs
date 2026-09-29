@@ -430,6 +430,32 @@ internal sealed class SaveStore
     /// <summary>Whether a file stands where this folder would be, so nothing can be made or moved into it.</summary>
     internal bool FolderIsAFile => File.Exists(Folder);
 
+    /// <summary>Whether this folder is there: a try at moving the old autosave into a slot that finds it is not made it (<see cref="RemoveIfEmpty"/>).</summary>
+    internal bool FolderExists => Directory.Exists(Folder);
+
+    /// <summary>
+    /// Remove this folder if it holds nothing at all — no file and no folder: the
+    /// slot folder a try at moving the old autosave made (<see cref="MoveInto"/>
+    /// makes it) and then undid, so the try leaves the save folder as it found it.
+    /// Never recursive, so it deletes no file and no folder that holds one; a folder
+    /// that holds anything, or will not go, stays, and lists as an empty slot.
+    /// </summary>
+    /// <returns>Whether the folder was removed.</returns>
+    internal bool RemoveIfEmpty()
+    {
+        try
+        {
+            if (!Directory.Exists(Folder) || Directory.EnumerateFileSystemEntries(Folder).Any())
+                return false;
+            Directory.Delete(Folder, recursive: false);
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Refuse every write from now on, saying why: a save that could not be read
     /// could not be moved out of the way either, so writing anything would put a

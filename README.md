@@ -143,23 +143,25 @@ back to it, and the game quits from it.
   written by the game, and by SAVE GAME, for the campaign loaded from it or begun
   in it. How many there are is `tuning.json`'s `SaveSlots` (below); lowering it
   deletes nothing, and a slot above the count keeps its save, loads like any, and
-  goes on saving the campaign played from it; NEW CAMPAIGN never offers it. A
-  folder named any other way — `slot-01`, `slot-10`, `slot-x` — is no slot, and
-  is never read.
+  goes on saving the campaign played from it; NEW CAMPAIGN never offers it.
+  (Whether such a slot may be played in place is the user's to rule: SLOT
+  DECISION 1 in `docs/roadmap/open-questions.md`.) A folder named any other way
+  — `slot-01`, `slot-10`, `slot-x` — is no slot, and is never read.
 - **The old autosave**: an earlier build saved its campaign in the save folder
   itself, as the autosave — `campaign.json`, its backup and the markers and
   set-aside files, by the same names. **Every launch moves it into a slot of its
   own**, before the title and without asking: into the lowest empty slot, `SLOT
   1` to `SLOT 3`, or else the lowest empty one above the count, listed `BEYOND
   THE 3 SLOTS` and played like any; the title says `THE AUTOSAVE MOVED INTO SLOT
-  4 - ITS CAMPAIGN SAVES THERE FROM NOW ON`, and from then on it is that slot's
+  4 - IT SAVES THERE FROM NOW ON`, in green, and from then on it is that slot's
   campaign. Only its save, its backup and its two markers move — the save first,
   each under its own name, byte for byte, so a quit it could not save is said as
   the slot's — and nothing is written over: a slot holding any of those names,
   even a stray marker, is passed over and left as it is. Files set aside stay in
   the save folder, and one renamed back to `campaign.json` there moves at the next
-  launch. The move is all or nothing: one that stops at a file is undone, and the
-  next slot tried; one a crash cut off is finished at the next launch, before the
+  launch. The move is all or nothing: one that stops at a file is undone — the
+  slot folder it made taken back with it, while empty — and the next slot tried;
+  one a crash cut off is finished at the next launch, before the
   title (`campaign.moving` in the save folder names its slot meanwhile). While a
   launch could not move it, LOAD GAME lists it first as `OLD AUTOSAVE`, marked
   `NOT YET MOVED INTO A SLOT`, and 0 loads it. With slots 1 to 9 all holding
@@ -239,7 +241,9 @@ back to it, and the game quits from it.
   counted and when it was saved, and under it what a load of it would do that the
   row cannot say: `FROM ITS BACKUP`, `ITS LAST LOAD DID NOT FINISH`, `AHEAD OF
   THIS CLOCK`, `NO TIME RECORDED`, `BEYOND THE 3 SLOTS`, and on the old
-  autosave `NOT YET MOVED INTO A SLOT`; an empty slot says `EMPTY`. Between runs
+  autosave `NOT YET MOVED INTO A SLOT` — or, in place of the first two, `TAKES NO
+  SAVES THIS SESSION`, for a slot whose load brings nothing back until the game
+  is launched again (below); an empty slot says `EMPTY`. Between runs
   it is the screen between runs, with `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM
   THE OLD AUTOSAVE`) under the title and the last run's summary above the list.
   Mid-run it is the dungeon: the same floor, turn and positions, HP, mana,
@@ -271,9 +275,11 @@ back to it, and the game quits from it.
   instead. A quit that cannot save leaves `campaign.unsaved` beside the save of
   the campaign's slot, and the title says so the next time it
   opens — at once, after QUIT TO TITLE — before anything is loaded, for every
-  slot that has one: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT
-  HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` (for the old autosave,
-  `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`). **A slot whose saves keep
+  slot that has one beside a save or a backup: `SLOT 2 COULD NOT BE SAVED WHEN
+  YOU LAST LEFT PLAY - WHAT IT HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT
+  IT` (for the old autosave, `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`). One
+  beside neither — its files moved or deleted by hand since — is cleared, and
+  only the log says it. **A slot whose saves keep
   failing costs what was played since its last save that went through**: every
   save of the campaign goes into its own slot, SAVE GAME's too, so there is
   nowhere else to save it meanwhile, and a quit that cannot save loses what came
@@ -293,11 +299,14 @@ back to it, and the game quits from it.
   take its place — even once the other program lets go: the notice ends `- THIS
   SLOT TAKES NO SAVES THIS SESSION, SO IT IS NEVER WRITTEN OVER`. Since every save
   of a campaign goes into its own slot, no campaign is played in such a slot that
-  session, where it could never be saved: a later try from the title loads
-  nothing and says `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES
-  THIS SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`, and NEW
-  CAMPAIGN there begins nothing (`NO NEW CAMPAIGN BEGAN IN SLOT 2`, then
-  why). Every other slot plays as ever. Launch the game again to play in it.
+  session, where it could never be saved: LOAD GAME and NEW CAMPAIGN mark it
+  `TAKES NO SAVES THIS SESSION`, a later try from the title loads nothing and
+  says `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES THIS
+  SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`, and NEW CAMPAIGN
+  there asks nothing and begins nothing (`NO NEW CAMPAIGN BEGAN IN SLOT 2`, then
+  why). CONTINUE still names it when its save is the most recent, and its load
+  says the same. Every other slot plays as ever. Launch the game again to play
+  in it.
 - **A save that cannot be played is set aside, never deleted**: one that is not
   a save, one a newer build wrote, one naming content that is gone, one that
   contradicts itself or holds a number past what play can reach (below), or one
@@ -349,7 +358,8 @@ back to it, and the game quits from it.
   CHOOSE A SLOT` — `SLOT 1` to `SLOT 3`, never the old autosave nor a slot above
   the count — on the lowest empty slot, so Enter pressed at once sets nothing aside
   while a slot is free. An empty slot begins at once. A slot that holds a
-  campaign asks first, naming it, as old games ask before they overwrite a file —
+  campaign asks first, naming it, as old games ask before they overwrite a file
+  (one that takes no saves this session asks nothing, and begins nothing: above) —
   `SLOT 2 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS` (`SLOT 2 CANNOT BE READ` for
   files none of which reads) / `BEGIN HERE - WHAT IT HOLDS LEAVES LOAD GAME, KEPT
   AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, on Enter, sets that
@@ -359,7 +369,9 @@ back to it, and the game quits from it.
   untouched. **To play the old campaign again, move its file into an empty slot
   folder as `campaign.json`** — `saves\slot-3\campaign.json`, say — where LOAD GAME
   lists it: renamed back where it lies, it would take the new campaign's save's
-  name. The new campaign is saved into its slot at once, before it is played,
+  name. (Whether NEW CAMPAIGN sets a slot's campaign aside or saves over it is
+  the user's to rule: SLOT DECISION 2 in `docs/roadmap/open-questions.md`.)
+  The new campaign is saved into its slot at once, before it is played,
   and saves there from then on; the screen between runs says `A NEW CAMPAIGN
   BEGINS` and where the old files went: even a crash before its next save
   continues the new campaign, never the old one. `DistanceRPG --new-campaign` —

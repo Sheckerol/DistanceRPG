@@ -82,7 +82,8 @@ internal readonly record struct TitleStep(TitleAction Action, int Slot = 0);
 /// user's ruling of 2026-09-25 on the save slots, R5) — slots 1 to the count, the
 /// choice on the lowest empty one. An empty slot begins at once; one that holds
 /// anything asks first, since the new campaign sets what it holds aside
-/// (SLOT DECISION 2).</item>
+/// (SLOT DECISION 2) — but for one that takes no saves this session, where no
+/// campaign can begin, which is chosen at once and answered why.</item>
 /// <item><strong>LOAD GAME</strong> opens the load list
 /// (<see cref="SlotMenuMode.Load"/>), in the options' place.</item>
 /// <item><strong>A slot chosen loads at once</strong> — from the list, or
@@ -123,7 +124,7 @@ internal sealed class TitleMenu
     /// <summary>Whether CONTINUE is on: some slot would load something.</summary>
     public bool ContinueOn => Listing.Newest is not null;
 
-    /// <summary>Whether an ask is up — NEW CAMPAIGN's, over a slot that holds anything: the next key is its alone.</summary>
+    /// <summary>Whether an ask is up — NEW CAMPAIGN's, over a slot that holds anything and takes saves: the next key is its alone.</summary>
     public bool Asking => List?.Asking is not null;
 
     /// <summary>The slot list while it is up, in the options' place — LOAD GAME's or NEW CAMPAIGN's, by its mode; null otherwise.</summary>

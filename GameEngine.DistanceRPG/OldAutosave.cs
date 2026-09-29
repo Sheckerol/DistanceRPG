@@ -32,7 +32,8 @@ namespace GameEngine.DistanceRPG;
 /// <item><strong>All or nothing</strong>: before the first file moves, the save
 /// folder gets <see cref="SaveStore.MovingName"/>, naming the slot, flushed to the
 /// disk. A move that stops at any file is undone — what moved goes back, in
-/// reverse — and the next slot is tried, since the failure may be the slot's. When
+/// reverse, and the slot folder the try made goes too, while nothing is in it —
+/// and the next slot is tried, since the failure may be the slot's. When
 /// every slot's try fails, the failure is the save folder's own — its save held
 /// by another program, or no rights there — and every write there would fail too,
 /// so it takes no saves this session: listed as the old autosave, it loads
@@ -101,6 +102,7 @@ internal static class OldAutosave
         foreach (int number in free)
         {
             var slot = slots.Store(number);
+            bool made = !slot.FolderExists;   // the try makes it, and an undone try takes it back
             try
             {
                 root.MarkMoving(number);
@@ -118,6 +120,7 @@ internal static class OldAutosave
 
             if (MoveBack(root, slot, moved, report) is { } stuck)
                 return [Split(root, slot, number, stuck, report)];
+            Unmade(slot, made, report);
             try
             {
                 root.ClearMoving();
@@ -198,6 +201,7 @@ internal static class OldAutosave
         }
 
         report?.Invoke($"[Save] A move of the autosave into {slot.Folder} was cut off: finishing it with {string.Join(", ", left)}");
+        bool made = !slot.FolderExists;
         var moved = new List<string>();
         if (MoveEach(root, slot, left, moved, report) is { } stopped)
         {
@@ -209,6 +213,7 @@ internal static class OldAutosave
             string? stuck = MoveBack(root, slot, moved, report);
             if (stuck is null && !Files.Any(slot.Has))
             {
+                Unmade(slot, made, report);
                 report?.Invoke($"[Save] The move into {slot.Folder} that a crash cut off had moved nothing there, and stopped again: {stopped.File} would not move ({stopped.Why}) - the marker is dropped, and a slot is picked afresh");
                 return Drop(root, report);
             }
@@ -223,6 +228,21 @@ internal static class OldAutosave
         Unmark(root, report);
         report?.Invoke($"[Save] The autosave moved into {slot.Folder}: its campaign saves in {SaveSlots.Label(number)} from now on");
         return [CampaignBoot.AutosaveMoved(number)];
+    }
+
+    /// <summary>
+    /// A try undone takes back the slot folder it made (<see cref="SaveStore.MoveInto"/>
+    /// makes it before a file moves), when nothing is in it, so the try leaves the
+    /// save folder as it found it: a save folder whose own save another program
+    /// holds fails every slot's try, and would otherwise leave slot-1 to slot-9
+    /// behind, empty. A folder that was there before the try, or holds anything, is
+    /// left as it is (<see cref="SaveStore.RemoveIfEmpty"/>: never recursive, so no
+    /// file goes).
+    /// </summary>
+    private static void Unmade(SaveStore slot, bool made, Action<string>? report)
+    {
+        if (made && slot.RemoveIfEmpty())
+            report?.Invoke($"[Save] {slot.Folder}, which the try made, is empty once it is undone, and is removed");
     }
 
     /// <summary>A resume marker standing alone in the save folder, beside no save or backup, guards nothing: it is left where it is, and logged.</summary>

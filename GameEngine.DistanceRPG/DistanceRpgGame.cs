@@ -23,10 +23,10 @@ namespace GameEngine.DistanceRPG;
 /// user's ruling of 2026-09-25 on the save model, R2(a)): CONTINUE, NEW CAMPAIGN,
 /// LOAD GAME, QUIT. No campaign is in play there: one comes into play when a slot
 /// loads (<see cref="LoadSlot"/>) or a new one begins
-/// (<see cref="BeginNewCampaign(int, string)"/>), and QUIT closes the game
-/// (<see cref="Quit"/>). A dev-override launch has no title — it boots straight
-/// into its scratch campaign — and <c>--new-campaign</c> begins a campaign at
-/// launch, straight to the screen between runs.
+/// (<see cref="BeginNewCampaign(int, string, IReadOnlyList{string})"/>), and
+/// QUIT closes the game (<see cref="Quit"/>). A dev-override launch has no title —
+/// it boots straight into its scratch campaign — and <c>--new-campaign</c> begins a
+/// campaign at launch, straight to the screen between runs.
 /// </para>
 /// <para>
 /// <strong>Then two scenes take turns.</strong> The screen between runs
@@ -79,11 +79,11 @@ namespace GameEngine.DistanceRPG;
 /// slot it saves into from then on (<see cref="LoadSlot"/>) — "you choose a save
 /// slot and any saving happens on that save slot" — as NEW CAMPAIGN's is the slot
 /// chosen on its list to begin in, 1 to the count, never the save folder itself
-/// (<see cref="BeginNewCampaign(int, string)"/>). Nothing rebinds a campaign: the slot
-/// is set as it comes into play (<see cref="Adopt"/>) and let go with it
-/// (<see cref="DropCampaign"/>), and a slot that takes no saves this session
-/// brings no campaign into play. SAVE GAME on the pause menu or the menu between
-/// runs saves into that slot too, at a safe point, asking nothing
+/// (<see cref="BeginNewCampaign(int, string, IReadOnlyList{string})"/>). Nothing
+/// rebinds a campaign: the slot is set as it comes into play (<see cref="Adopt"/>)
+/// and let go with it (<see cref="DropCampaign"/>), and a slot that takes no saves
+/// this session brings no campaign into play. SAVE GAME on the pause menu or the
+/// menu between runs saves into that slot too, at a safe point, asking nothing
 /// (<see cref="SaveNow"/>): "instead of choosing a save slot everytime you save".
 /// Every save carries
 /// its time, from the clock here (<see cref="_clock"/>), never read in
@@ -339,11 +339,13 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// before anything is listed or begun (<see cref="OldAutosave.MoveIntoASlot"/>;
     /// SLOT DECISION 4), what became of it led for the first screen; then:</item>
     /// <item><c>--new-campaign</c>: a new campaign begun at once
-    /// (<see cref="BeginNewCampaign(int, string)"/>) in the slot NEW CAMPAIGN's
-    /// list would start on — the lowest empty slot within the count, else slot 1,
-    /// what it holds set aside (<see cref="SaveListing.NewCampaignSlot"/>) —
-    /// straight to the screen between runs: developer tooling, which asks nothing.
-    /// When it cannot begin, the title opens, saying why;</item>
+    /// (<see cref="BeginNewCampaign(int, string, IReadOnlyList{string})"/>) in the
+    /// slot NEW CAMPAIGN's list would start on — the lowest empty slot within the
+    /// count, else slot 1, what it holds set aside
+    /// (<see cref="SaveListing.NewCampaignSlot"/>) — straight to the screen between
+    /// runs: developer tooling, which asks nothing. When it cannot begin, the title
+    /// opens, saying why. Either screen says what became of the old autosave
+    /// first, as it came first;</item>
     /// <item>or the title shown (<see cref="ShowTitle"/>): the first scene, where
     /// the player chooses what to play.</item>
     /// </list>
@@ -386,14 +388,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         foreach (string notice in moved)
             Log.Info($"[Save] {notice}");
         if (request.NewCampaign)
-        {
-            _notices.Lead(moved);   // for the screen the new campaign opens on, or the title it goes back to
-            BeginNewCampaign(SaveListing.Read(slots, _clock(), line => Log.Info(line)).NewCampaignSlot, Program.NewCampaignOption);
-        }
+            BeginNewCampaign(SaveListing.Read(slots, _clock(), line => Log.Info(line)).NewCampaignSlot, Program.NewCampaignOption, earlier: moved);
         else
-        {
             ShowTitle(leading: moved);
-        }
     }
 
     /// <summary>
@@ -405,7 +402,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// (<see cref="OldAutosave.MoveIntoASlot"/>); back from a load that brought
     /// nothing back, what it set aside (<see cref="CampaignBoot.NothingLoadedWord"/>);
     /// or from a NEW CAMPAIGN that did not begin, why
-    /// (<see cref="CampaignBoot.NotBegunWord"/>) — then each slot whose campaign
+    /// (<see cref="CampaignBoot.NotBegunWord"/>), after <c>--new-campaign</c> the
+    /// move's word ahead of it — then each slot whose campaign
     /// could not be saved the last time play was left
     /// (<see cref="CampaignBoot.QuitUnsaved"/>), a slot the old autosave just moved
     /// into among them, then a slot's file the file system would not let the game
@@ -489,7 +487,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             ShowBetweenRuns();
     }
 
-    /// <summary>NEW CAMPAIGN, chosen on the title in slot <paramref name="slot"/> — and confirmed, over a slot that held anything: <see cref="BeginNewCampaign(int, string)"/>, the notices naming no command line.</summary>
+    /// <summary>NEW CAMPAIGN, chosen on the title in slot <paramref name="slot"/> — and confirmed, over a slot that held anything: <see cref="BeginNewCampaign(int, string, IReadOnlyList{string})"/>, the notices naming no command line.</summary>
     void ITitleHost.BeginNewCampaign(int slot) => BeginNewCampaign(slot, how: null);
 
     /// <summary>
@@ -522,8 +520,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     /// <param name="number">The slot it begins in: 1 to the count — NEW CAMPAIGN never offers the old autosave, nor a slot beyond the count.</param>
     /// <param name="how">What asked for it, which the set-aside notices name: <c>--new-campaign</c>, or null for the title's NEW CAMPAIGN.</param>
+    /// <param name="earlier">What the launch has still to say, which came before it — under <c>--new-campaign</c>, what became of the old autosave (<see cref="OldAutosave.MoveIntoASlot"/>) — said first on the screen it opens on, between runs or the title; null for nothing.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="number"/> is outside 1 to the count.</exception>
-    private void BeginNewCampaign(int number, string? how)
+    private void BeginNewCampaign(int number, string? how, IReadOnlyList<string>? earlier = null)
     {
         var slots = _slots ?? throw new InvalidOperationException("No save slots: a dev-override launch begins no new campaign.");
         ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
@@ -564,7 +563,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             var word = CampaignBoot.NotBegunWord(slot, notBegun ?? []);
             foreach (string notice in word)
                 Log.Warn($"[Save] {notice}");
-            ShowTitle(word);   // with no campaign in play
+            ShowTitle([.. earlier ?? [], .. word]);   // with no campaign in play
             return;
         }
 
@@ -575,7 +574,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         string[] begun = [.. boot.Notices, .. said];
         foreach (string notice in begun)
             Log.Info($"[Save] {notice}");
-        _notices.Lead(begun);
+        _notices.Lead([.. earlier ?? [], .. begun]);
         ShowBetweenRuns();
     }
 

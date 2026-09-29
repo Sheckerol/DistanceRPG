@@ -518,7 +518,7 @@ public class GameStartupTests
         string[] MentionedBy(MethodBase target)
             => Edges(Game).Where(edge => Same(edge.Target, target)).Select(edge => Root(edge.From.DeclaringType)!.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
         foreach (var moving in new[] { nameof(SaveStore.MoveInto), nameof(SaveStore.MarkMoving), nameof(SaveStore.ReadMoving), nameof(SaveStore.ClearMoving), nameof(SaveStore.Has),
-            "get_" + nameof(SaveStore.WasMoving), "get_" + nameof(SaveStore.FolderIsAFile) })
+            nameof(SaveStore.RemoveIfEmpty), "get_" + nameof(SaveStore.WasMoving), "get_" + nameof(SaveStore.FolderIsAFile), "get_" + nameof(SaveStore.FolderExists) })
             Assert.Equal(["OldAutosave"], MentionedBy(Method(typeof(SaveStore), moving)));
         Assert.Equal(["OldAutosave", "SaveStore"], MentionedBy(Method(typeof(SaveStore), nameof(SaveStore.Taken))));
         Assert.Equal(["SaveStore.MoveInto"], Callers(Method(typeof(SaveStore), nameof(SaveStore.Taken))).Where(caller => !caller.StartsWith("OldAutosave.", StringComparison.Ordinal)));
@@ -633,20 +633,42 @@ public class GameStartupTests
         Assert.True(moved < listed && moved < begun && moved < titled,
             "BootCampaign reads the slots, begins a campaign or shows the title before the old autosave has moved");
 
-        // Its word reaches the screen: what the move hands back is kept in a local,
-        // and that local, as it is, is ShowTitle's leading word, and the one word
-        // Lead is handed past the move, for the screen --new-campaign opens on — the
-        // override branch's own Lead, before it, the other of the two.
+        // Its word reaches the screen, and first, as the move came first: what the
+        // move hands back is kept in a local, and that local, as it is, is
+        // ShowTitle's leading word, and BeginNewCampaign's earlier word for the
+        // screen --new-campaign opens on. It is never led here: led before the new
+        // campaign's word, it stood behind it, the last notice, and the one a long
+        // save path cut (the audit of the ruling on the save slots). The one Lead
+        // here is the override branch's own, before the move.
         var lead = typeof(StartupNotices).GetMethod(nameof(StartupNotices.Lead))!;
-        Assert.Equal(2, Mentions(boot, lead));
+        var beginNew = typeof(DistanceRpgGame).GetMethod("BeginNewCampaign", Declared)!;
+        Assert.Equal(1, Mentions(boot, lead));
         byte[] bootIl = Body(boot)!;
         var walked = InstructionsAt(bootIl).ToList();
         int Called(MethodBase target, int from) => walked.FindIndex(from, i => IsCall(i.Op) && Resolve(boot, i.Token) is { } called && Same(called, target));
         int moveAt = Called(move, 0);
+        Assert.InRange(Called(lead, 0), 0, moveAt - 1);
         int? kept = Local(bootIl, walked[moveAt + 1], store: true);
         Assert.True(kept is not null, "BootCampaign does not keep what the move hands back in a local");
         Assert.Equal(kept, Local(bootIl, walked[Called(typeof(DistanceRpgGame).GetMethod("ShowTitle", Declared)!, moveAt) - 1], store: false));
-        Assert.Equal(kept, Local(bootIl, walked[Called(lead, moveAt) - 1], store: false));
+        Assert.Equal(kept, Local(bootIl, walked[Called(beginNew, moveAt) - 1], store: false));
+        Assert.Equal("earlier", beginNew.GetParameters()[^1].Name);
+
+        // And BeginNewCampaign says that earlier word on either screen it opens: its
+        // last argument is read once for the one word it leads for the screen between
+        // runs, and once for the one word it hands the title, each after the call
+        // before it — so no way out leaves it unsaid.
+        var inBegin = InstructionsAt(Body(beginNew)!).ToList();
+        Assert.Equal(3, beginNew.GetParameters().Length);   // number, how, earlier: after this, earlier is argument 3
+        var says = inBegin.Select((i, at) => (i, at))
+            .Where(call => IsCall(call.i.Op) && Resolve(beginNew, call.i.Token) is { } called
+                && (Same(called, lead) || Same(called, typeof(DistanceRpgGame).GetMethod("ShowTitle", Declared)!)))
+            .Select(call => call.at).ToList();
+        Assert.Equal(2, says.Count);
+        var readsEarlier = inBegin.Select((i, at) => (i, at)).Where(read => read.i.Op == OpCodes.Ldarg_3).Select(read => read.at).ToList();
+        Assert.Equal(2, readsEarlier.Count);
+        Assert.True(readsEarlier[0] < says[0] && says[0] < readsEarlier[1] && readsEarlier[1] < says[1],
+            "BeginNewCampaign does not read its earlier word for each screen it opens, before it says what it has to say there");
 
         // Nothing else in the game reaches the move: not the title, a load, NEW
         // CAMPAIGN, a save or a quit.
@@ -973,8 +995,8 @@ public class GameStartupTests
         var opening = Walk(door);
         Assert.Equal(1, Mentions(door, begin));
         int handedOn = opening.FindIndex(i => i.Called is { } called && Same(called, begin));
-        Assert.True(handedOn >= 2 && opening[handedOn - 2].Op == OpCodes.Ldarg_1 && opening[handedOn - 1].Op == OpCodes.Ldnull,
-            "The host's NEW CAMPAIGN does not hand BeginNewCampaign the slot it was handed, naming no command line");
+        Assert.True(handedOn >= 3 && opening[handedOn - 3].Op == OpCodes.Ldarg_1 && opening[handedOn - 2].Op == OpCodes.Ldnull && opening[handedOn - 1].Op == OpCodes.Ldnull,
+            "The host's NEW CAMPAIGN does not hand BeginNewCampaign the slot it was handed, naming no command line and no earlier word");
 
         var beginning = Walk(begin);
         Assert.Equal(1, Mentions(begin, slotOf));

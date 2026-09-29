@@ -1267,9 +1267,13 @@ public sealed class CampaignBootTests : IDisposable
             Assert.True(request.DevOverride);
             var slot = CampaignBoot.StoreFor(folder, request);
             Assert.Equal(Path.Combine(own.Folder, SaveStore.OverrideSlot), slot.Folder);
-            var boot = CampaignBoot.BootOverride(SaveSlot.Scratch(slot), GameContent.Current, request);
+            var bootLog = new List<string>();
+            var boot = CampaignBoot.BootOverride(SaveSlot.Scratch(slot), GameContent.Current, request, bootLog.Add);
             Assert.False(boot.Resumed);
             Assert.Equal("spear_hall", boot.StraightInto);
+            // The log names what it never touches as the ruling on the save slots has
+            // it: no slot, nor the old autosave — never "the campaign's own save".
+            Assert.Equal([$"[Save] A dev-override launch: a fresh campaign in its own slot, {slot.Folder}, straight into spear_hall, its first run on seed 7 - no slot, nor the old autosave, is read or written"], bootLog);
             Assert.Equal(7L, boot.FirstSeed);
             Assert.Equal([CampaignBoot.OverrideNotice], boot.Notices);
             StateAssert.Equivalent(NewCampaign(), boot.Campaign, "campaign");
@@ -1304,7 +1308,9 @@ public sealed class CampaignBootTests : IDisposable
             // either, and an override on the campaign's own folder is refused rather
             // than emptying it.
             var both = new BootRequest("spear_hall", NewCampaign: true);
-            Assert.False(CampaignBoot.BootOverride(SaveSlot.Scratch(CampaignBoot.StoreFor(folder, both)), GameContent.Current, both).Resumed);
+            var bothLog = new List<string>();
+            Assert.False(CampaignBoot.BootOverride(SaveSlot.Scratch(CampaignBoot.StoreFor(folder, both)), GameContent.Current, both, bothLog.Add).Resumed);
+            Assert.Contains($"[Save] {Program.NewCampaignOption} does nothing on a dev-override launch: its campaign is fresh every time, and no slot, nor the old autosave, is touched", bothLog);
             Assert.Throws<InvalidOperationException>(() => CampaignBoot.BootOverride(SaveSlot.Scratch(own), GameContent.Current, request));
             Assert.Equal(saved, File.ReadAllBytes(own.SavePath));
             Assert.Equal([SaveStore.FileName], Files(folder));
@@ -1725,9 +1731,18 @@ public sealed class CampaignBootTests : IDisposable
             // slot's before it lists them (CampaignBoot.TakeEveryUnsaved, which
             // DistanceRpgGame.ShowTitle calls first): the old autosave's, slot 2's, and slot
             // 5's above the count — a campaign loaded from there saves there too — each
+            // beside the campaign's save, or its backup alone, which a load resumes; each
             // said once, in slot order, by the slot's name, logged with what its quit
             // wrote, and cleared.
             var slots = new SaveSlots(folder, 3);
+            var cleared = NewCampaign();
+            CampaignRuns.Clear(cleared, "tutorial", CampaignRuns.GoldenSeed);
+            foreach (int number in new[] { SaveSlots.OldAutosave, 1, 2, 3, 5 })
+                Assert.Null(CampaignBoot.Save(slots.Slot(number), NewCampaign()));
+            Assert.Null(CampaignBoot.Save(slots.Slot(5), cleared));
+            File.Delete(slots.Store(5).SavePath);   // its backup alone
+            string Holding(SaveStore store) => string.Join(",", Directory.GetFileSystemEntries(store.Folder).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            var held = Enumerable.Range(SaveSlots.OldAutosave, SaveSlots.Most + 1).ToDictionary(number => number, number => Directory.Exists(slots.Store(number).Folder) ? Holding(slots.Store(number)) : null);
             foreach (int number in new[] { 5, SaveSlots.OldAutosave, 2 })
                 slots.Store(number).MarkUnsaved("the disk is full");
             var log = new List<string>();
@@ -1739,7 +1754,26 @@ public sealed class CampaignBootTests : IDisposable
             Assert.All(took, line => Assert.Contains("the disk is full", line, StringComparison.Ordinal));
             Assert.All(Enumerable.Range(SaveSlots.OldAutosave, SaveSlots.Most + 1), number => Assert.Null(slots.Store(number).ReadUnsaved()));
             Assert.Empty(CampaignBoot.TakeEveryUnsaved(slots));   // said once
-            Assert.Equal([SaveSlots.SlotFolderPrefix + "2", SaveSlots.SlotFolderPrefix + "5"], Directory.GetFileSystemEntries(folder).Select(Path.GetFileName).Order(StringComparer.Ordinal));   // nothing else touched
+            Assert.Equal(held, Enumerable.Range(SaveSlots.OldAutosave, SaveSlots.Most + 1).ToDictionary(number => number, number => Directory.Exists(slots.Store(number).Folder) ? Holding(slots.Store(number)) : null));   // nothing else touched
+
+            // A marker beside no save and no backup — what it spoke of moved or deleted
+            // by hand since — is taken, logged, and not said: its WHAT IT HOLDS would
+            // name nothing, and the old autosave is not even listed then (the audit of
+            // the ruling on the save slots). A slot that holds only files set aside
+            // holds no campaign either.
+            var lone = new SaveSlots(Path.Combine(folder, "lone"), 3);
+            foreach (int number in new[] { SaveSlots.OldAutosave, 2 })
+                lone.Store(number).MarkUnsaved("the disk is full");
+            Directory.CreateDirectory(lone.Store(3).Folder);
+            File.WriteAllText(Path.Combine(lone.Store(3).Folder, "campaign.abandoned-1.json"), Text(NewCampaign()));
+            lone.Store(3).MarkUnsaved("the disk is full");
+            var loneLog = new List<string>();
+            Assert.Empty(CampaignBoot.TakeEveryUnsaved(lone, loneLog.Add));
+            Assert.All(new[] { SaveSlots.OldAutosave, 2, 3 }, number => Assert.Null(lone.Store(number).ReadUnsaved()));
+            Assert.Equal([lone.Store(SaveSlots.OldAutosave).Folder, lone.Store(2).Folder, lone.Store(3).Folder],
+                loneLog.Where(line => line.EndsWith(" holds no save and no backup beside that marker, so there is nothing of the campaign to say it of - the title says nothing", StringComparison.Ordinal))
+                    .Select(line => line["[Save] ".Length..line.IndexOf(" holds no save", StringComparison.Ordinal)]));
+            Assert.DoesNotContain(SaveListing.Read(lone, DateTimeOffset.UtcNow).Slots, slot => slot.Number == SaveSlots.OldAutosave);
 
             // One that cannot be cleared — Windows only: another program holds it open
             // for reading — is said, and said again the next time; the others go.

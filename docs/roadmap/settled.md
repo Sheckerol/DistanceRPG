@@ -2005,8 +2005,13 @@ makes false is marked where it stands.
   ruling: a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT; one
   autosave slot that saves itself where the game autosaves today; and manual
   slots, "the number of saves should live on the tuning.json so that we don't need
-  to fix the code every time I change my mind". Its first part is the disk and
-  the loader under them, built beneath a launch that plays exactly as before —
+  to fix the code every time I change my mind". (Superseded by the user's ruling
+  of the same day on the save slots, in its autosave slot and manual slots: a
+  campaign is bound to the slot it is begun in or loaded from, and every save of
+  it goes there, so there is no autosave slot apart from the others, and the save
+  folder's own campaign is the old autosave, moved into a slot at launch — R5, the
+  slot, R5, the old autosave, and R5, the move, below.) Its first part is the disk
+  and the loader under them, built beneath a launch that plays exactly as before —
   it loads the autosave, and no play writes a manual slot yet:
   - **The save folder is the autosave slot**: `campaign.json`, its backup, its
     markers and its set-aside files, by the names they always had. So a save
@@ -2571,7 +2576,15 @@ play in a slot whose writes keep failing, and where the old autosave goes.
     SESSION, SO IT IS NEVER WRITTEN OVER`, where `- NOTHING IS SAVED THIS SESSION,
     ...` read as the whole game while the player is meant to go on in another slot
     — **bends the plan, needs no ruling** — and the word that leads it names the
-    slot.
+    slot. (Mended in Phase 5.T's audit, in what the lists say of such a slot: its
+    row said `FROM ITS BACKUP`, a load it would not do, and NEW CAMPAIGN asked
+    `BEGIN HERE ... ENTER: YES` over it, a yes that could begin nothing, so the
+    player learnt of the refusal only by trying each. LOAD GAME and NEW CAMPAIGN
+    now mark it `TAKES NO SAVES THIS SESSION`, in place of `FROM ITS BACKUP` and
+    `ITS LAST LOAD DID NOT FINISH`, which say what a load would do, and NEW
+    CAMPAIGN chooses it at once, asking nothing, and says the words above. CONTINUE
+    still names it while its save is the most recent, the most recent save being
+    chosen by its time alone, and its load says why.)
   - **A NEW CAMPAIGN whose first save fails is not begun — bends the plan, needs
     no ruling, for the same reason.** The new campaign's first save is written
     into the slot before the campaign is bound to it. When it fails, or when
@@ -2597,7 +2610,11 @@ play in a slot whose writes keep failing, and where the old autosave goes.
     FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` — two rows at slot 9 — and the
     autosave's in the words it has always had. (Superseded in the autosave's
     words: `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`, two rows — R5, the old
-    autosave, below.)
+    autosave, below. Mended in Phase 5.T's audit, in which markers are said: one
+    beside no save and no backup — its files moved or deleted by hand since — is
+    taken and logged, and not said, since its `WHAT IT HOLDS` would name nothing,
+    and the old autosave is not even listed then; `PutBack` says a marker only
+    when the slot holds its campaign again, the same way.)
   - **The save list, transitional — bends the plan, needs no ruling**: SAVE GAME's
     list stays in its S7 form until SAVE GAME saves the campaign's own slot, and
     is keyed to that slot meanwhile: its row ends `SAVES ITSELF` and is never
@@ -2621,7 +2638,10 @@ play in a slot whose writes keep failing, and where the old autosave goes.
     (`SaveListing.NewCampaignSlot`), so an ENTER pressed without looking sets
     nothing aside while a slot is free: the save list's rule, kept. A digit above
     the count says `SLOT 5 IS BEYOND THE 3 SLOTS` (`... THE 1 SLOT`); 0 and the
-    keypad do nothing. ESC answers an ask no, then closes the list.
+    keypad do nothing. ESC answers an ask no, then closes the list. (Mended in
+    Phase 5.T's audit, in the keys' digits: `ENTER OR 1-3 BEGINS`, the slots the
+    list offers — `ENTER OR 1 BEGINS` at a count of one — since a digit above the
+    count begins nothing, where `1-9` offered them all.)
   - **An empty slot begins at once; one in use asks** — SLOT DECISION 2, shipped
     provisionally, USER DECISION 3's question asked of a slot. The campaign in the
     slot is the ask's subject, as old games ask whether to overwrite a file:
@@ -2794,20 +2814,27 @@ play in a slot whose writes keep failing, and where the old autosave goes.
     else the lowest free one above it, listed `BEYOND THE 3 SLOTS` and played like
     any (SLOT DECISION 1). The title says `THE AUTOSAVE MOVED INTO SLOT 4 - ITS
     CAMPAIGN SAVES THERE FROM NOW ON` first, then the slot's unsaved-quit word
-    when that marker moved with it. It runs once the slots are made and before
-    anything reads them — before `--new-campaign` lists them for its slot, so it
-    never sets aside the campaign just moved while a slot within the count is
-    still free after the move (when the move takes the last free one, every slot
-    is in use and `--new-campaign` sets slot 1 aside all the same — the campaign
-    just moved, when that was slot 1: developer tooling, never deleted, noted in
-    Phase 5.T6's review), and before the title takes their markers — and at every
-    launch, not once: every set-aside notice in the save folder says to rename the
-    file back there, and one renamed back is the old autosave for the rest of that
-    session and moves at the next launch. Never on a dev override, and never
-    mid-session, so a campaign in play is never moved from under it. The
-    alternatives, in open-questions.md: the first title after the update asks
-    which slot, on NEW CAMPAIGN's list; or it stays the old autosave until it is
-    loaded, and its load asks.
+    when that marker moved with it. (Mended in Phase 5.T's audit, in its words
+    and where it stands: `THE AUTOSAVE MOVED INTO SLOT 4 - IT SAVES THERE FROM
+    NOW ON`, one notice row where the first ran to two, `NOW ON` alone on the
+    second, and drawn in green as news, where it stood in the warning's orange;
+    and under `--new-campaign` it is said first on the screen the launch opens
+    on, as the move came first, where it was said last, after `A NEW CAMPAIGN
+    BEGINS` and what was set aside, and was the notice a long save path cut.) It
+    runs once the slots are made and before anything reads them — before
+    `--new-campaign` lists them for its slot, so it never sets aside the campaign
+    just moved while a slot within the count is still free after the move (when
+    the move takes the last free one, every slot is in use and `--new-campaign`
+    sets slot 1 aside all the same — the campaign just moved, when that was slot
+    1: developer tooling, never deleted, noted in Phase 5.T6's review), and
+    before the title takes their markers — and at every launch, not once: every
+    set-aside notice in the save folder says to rename the file back there, and
+    one renamed back is the old autosave for the rest of that session and moves
+    at the next launch. Never on a dev override, and never mid-session, so a
+    campaign in play is never moved from under it. The alternatives, in
+    open-questions.md: the first title after the update asks which slot, on NEW
+    CAMPAIGN's list; or it stays the old autosave until it is loaded, and its
+    load asks.
   - **Only the campaign's four files, the save first, never over anything —
     bends the plan, needs no ruling**: `campaign.json`, `campaign.bak.json`,
     `campaign.resuming` and `campaign.unsaved`, each under its own name, by a move
@@ -2847,24 +2874,29 @@ play in a slot whose writes keep failing, and where the old autosave goes.
     tries to clear it, until one does (known and left in Phase 5.T6's review: no
     launch can tell that marker from one a crash left before the title said the
     move). A try undone leaves behind the slot folder it made, empty, which lists
-    `EMPTY`: the move deletes nothing but its own marker. A move a crash cut off
-    is finished at the next launch, before anything is listed or loaded, into the
-    slot the marker names; a marker naming a slot that has since taken one of the
-    names still in the save folder — a build without the move ran in between — or
-    naming no slot is dropped and logged, the log naming every slot that holds a
-    lone save or a lone backup, so a split can be joined by hand, and the move
-    goes afresh. A marker that cannot be read at all is not one naming no slot,
-    since it may name the slot a half is in: it is kept, and nothing moves —
-    moved afresh, a split would stand in two slots with nothing left to join it —
-    and the save folder, while it holds a save or a backup, takes no saves that
-    session, until a launch can read it and finish the move. A finish that stops
-    is undone as a try is, and the halves the crash left stand; a crash that came
-    before any file moved left none, so that finish is a try that stopped, and the
-    move goes afresh. A move that can be neither finished nor undone leaves the
-    campaign in two halves, and neither takes saves that session, so no load
-    runs on a split and no save forks it: `THE AUTOSAVE IS HALF MOVED INTO SLOT 4
-    (...) - NEITHER LOADS THIS SESSION - LAUNCH THE GAME AGAIN TO FINISH IT`, the
-    marker kept for the next launch to finish it.
+    `EMPTY`: the move deletes nothing but its own marker. (Mended in Phase 5.T's
+    audit: a try undone takes back the slot folder it made while nothing is in it
+    — never recursively, so no file goes — where a save folder whose own save
+    another program held left slot-1 to slot-9 behind, empty; a folder that was
+    there before the try, or holds anything, stays. The move deletes no file but
+    its own marker.) A move a crash cut off is finished at the next launch,
+    before anything is listed or loaded, into the slot the marker names; a marker
+    naming a slot that has since taken one of the names still in the save folder
+    — a build without the move ran in between — or naming no slot is dropped and
+    logged, the log naming every slot that holds a lone save or a lone backup, so
+    a split can be joined by hand, and the move goes afresh. A marker that cannot
+    be read at all is not one naming no slot, since it may name the slot a half
+    is in: it is kept, and nothing moves — moved afresh, a split would stand in
+    two slots with nothing left to join it — and the save folder, while it holds
+    a save or a backup, takes no saves that session, until a launch can read it
+    and finish the move. A finish that stops is undone as a try is, and the
+    halves the crash left stand; a crash that came before any file moved left
+    none, so that finish is a try that stopped, and the move goes afresh. A move
+    that can be neither finished nor undone leaves the campaign in two halves,
+    and neither takes saves that session, so no load runs on a split and no save
+    forks it: `THE AUTOSAVE IS HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS
+    SESSION - LAUNCH THE GAME AGAIN TO FINISH IT`, the marker kept for the next
+    launch to finish it.
   - **With no slot free, it stays — bends the plan, needs no ruling**: with
     slots 1 to 9 all holding something nothing is tried, so nothing is known to
     fail, and the old autosave is listed, marked `NOT YET MOVED INTO A SLOT`, and
@@ -2903,13 +2935,14 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   eight-letter user name; and, under `--new-campaign`, `NO NEW CAMPAIGN BEGAN IN
   SLOT 1` with its own unsaved-quit word, the moved autosave's slot's and the
   move's word on it, fifteen with its save stuck and its backup not gone back,
-  and nineteen with its first save failed and neither file gone back. A title's
-  word grows the same way with every further failure — markers that will not
-  clear, files another program holds — and past the ceiling each is cut and
-  counted (`+N MORE - SEE THE LOG`), the log having every word. So the ceiling
-  stands (`NoticeText.MaxWholeRows`): what passes it needs several failures at
-  once, and a higher one would take room the dungeon list and a resumed floor's
-  banner keep in a 720-pixel window.
+  and nineteen with its first save failed and neither file gone back (measured
+  again in Phase 5.T's audit, the move's word one row: fourteen, at the ceiling,
+  and eighteen). A title's word grows the same way with every further failure —
+  markers that will not clear, files another program holds — and past the ceiling
+  each is cut and counted (`+N MORE - SEE THE LOG`), the log having every word.
+  So the ceiling stands (`NoticeText.MaxWholeRows`): what passes it needs several
+  failures at once, and a higher one would take room the dungeon list and a
+  resumed floor's banner keep in a 720-pixel window.
 
 ### The numbers: `tuning.json`
 

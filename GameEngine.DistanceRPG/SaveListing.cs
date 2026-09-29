@@ -46,7 +46,8 @@ public sealed record SlotHeader(DateTimeOffset? SavedAt, int RunCounter, string?
 /// <param name="Unfinished">Its resume marker is there: the last load of it never finished, and the next sets the save it guarded aside as crashed.</param>
 /// <param name="Beyond">A slot above <c>tuning.json</c>'s <c>SaveSlots</c>: kept, listed, loaded, and saved into by the campaign played from it; never offered to NEW CAMPAIGN.</param>
 /// <param name="AheadOfClock">Its time is more than a day ahead of the clock the listing was read at: shown, and counted as no time when the newest save is chosen.</param>
-public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock);
+/// <param name="TakesNoSaves">It refused its writes earlier this session (<see cref="SaveStore.WritesRefused"/>): its load loads nothing, and NEW CAMPAIGN begins nothing in it, until the game is launched again.</param>
+public sealed record SlotEntry(int Number, SlotState State, SlotHeader? Header, bool Unfinished, bool Beyond, bool AheadOfClock, bool TakesNoSaves = false);
 
 /// <summary>
 /// Every slot of the save folder and what each holds (the user's rulings of
@@ -144,8 +145,10 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
     /// count; and those beyond it that hold a save (<see cref="SaveSlots.Beyond"/>).
     /// Each slot's save and backup are read and parsed for their headers, never
     /// restored; a file the file system will not let the game read is listed as
-    /// not reading, and said in <see cref="Notices"/>. Nothing is moved, deleted
-    /// or written.
+    /// not reading, and said in <see cref="Notices"/>; and a slot whose store
+    /// refused its writes earlier this session is marked as taking none
+    /// (<see cref="SlotEntry.TakesNoSaves"/>), since the stores are the session's
+    /// own. Nothing is moved, deleted or written.
     /// </summary>
     /// <param name="slots">The save folder's slots.</param>
     /// <param name="now">The clock's time, the edge's: a save's time more than <see cref="ClockSlack"/> past it counts as none.</param>
@@ -161,7 +164,8 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
             .Select(slot => new SlotEntry(
                 slot.Number, slot.State, slot.Header, slot.Unfinished,
                 Beyond: slot.Number > slots.Count,
-                AheadOfClock: slot.Header?.SavedAt is { } at && at.UtcDateTime > (now + ClockSlack).UtcDateTime))
+                AheadOfClock: slot.Header?.SavedAt is { } at && at.UtcDateTime > (now + ClockSlack).UtcDateTime,
+                TakesNoSaves: slots.Store(slot.Number).WritesRefused is not null))
             .ToList();
         foreach (var entry in entries.Where(entry => entry.State != SlotState.Empty))
             report?.Invoke($"[Save] {SaveSlots.Label(entry.Number)}: {Describe(entry)}");
@@ -247,6 +251,7 @@ public sealed record SaveListing(IReadOnlyList<SlotEntry> Slots, IReadOnlyList<s
                 + (header.DungeonId is { } dungeon ? $", a run in progress in {dungeon}, floor {header.Floor?.ToString(CultureInfo.InvariantCulture) ?? "?"}, turn {header.Turn?.ToString(CultureInfo.InvariantCulture) ?? "?"}" : ", between runs");
         return state + where
             + (entry.Unfinished ? " - its last load did not finish" : "")
-            + (entry.Beyond ? " - beyond the slot count, kept, and saved into by its own campaign" : "");
+            + (entry.Beyond ? " - beyond the slot count, kept, and saved into by its own campaign" : "")
+            + (entry.TakesNoSaves ? " - it takes no saves this session, so nothing loads from it and no campaign begins in it" : "");
     }
 }

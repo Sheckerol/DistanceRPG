@@ -378,9 +378,9 @@ of it.
 **Shipped provisionally: every launch moves it, without asking, into the lowest
 empty slot** — `SLOT 1` to the count, or else the lowest empty slot above it,
 listed `BEYOND THE 3 SLOTS` and played like any (SLOT DECISION 1) — and the
-title says `THE AUTOSAVE MOVED INTO SLOT 4 - ITS CAMPAIGN SAVES THERE FROM NOW
-ON`. Its save, backup and two markers move byte for byte, all or nothing, and
-nothing is written over or deleted. With slots 1 to 9 all holding something it
+title says `THE AUTOSAVE MOVED INTO SLOT 4 - IT SAVES THERE FROM NOW ON`. Its
+save, backup and two markers move byte for byte, all or nothing, and nothing is
+written over or deleted. With slots 1 to 9 all holding something it
 stays, listed as the `OLD AUTOSAVE`, `NOT YET MOVED INTO A SLOT`, and is played
 in place. A move that stops is undone, and when no slot's try goes through the
 old autosave takes no saves that session, until a launch can move it.

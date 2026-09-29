@@ -47,8 +47,8 @@ public sealed class TitleTests : IDisposable
         => new(at, runs, dungeon, floor, dungeon is null ? null : 3);
 
     private static SlotEntry Slot(int number, SlotState state = SlotState.Readable, SlotHeader? header = null, bool unfinished = false,
-        bool beyond = false, bool ahead = false)
-        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead);
+        bool beyond = false, bool ahead = false, bool refused = false)
+        => new(number, state, state is SlotState.Readable or SlotState.FromBackup ? header ?? Header(At, 0) : null, unfinished, beyond, ahead, refused);
 
     private static SlotEntry Empty(int number) => Slot(number, SlotState.Empty);
 
@@ -244,9 +244,16 @@ public sealed class TitleTests : IDisposable
         Assert.Equal(["  SLOT 1 - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32", "> SLOT 2 - EMPTY <", "  SLOT 3 - CANNOT BE READ"], slotRows.Select(row => row.Text));
         Assert.Equal([DungeonHud.White, DungeonHud.Yellow, DungeonHud.White], slotRows.Select(row => row.Color));
         Assert.Empty(Options(opened));
-        Assert.Equal(("W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS - ESC BACK", DungeonHud.Grey), (drawn[^1].Text, drawn[^1].Color));
-        Assert.Equal(TitleText.NewCampaignKeysLine, drawn[^1].Text);
+        Assert.Equal(("W/S OR ARROWS CHOOSE - ENTER OR 1-3 BEGINS - ESC BACK", DungeonHud.Grey), (drawn[^1].Text, drawn[^1].Color));
+        Assert.Equal(TitleText.NewCampaignKeysLine(3), drawn[^1].Text);
         Fits(drawn);
+
+        // The keys line's digits are the slots the list offers, 1 to the count, since
+        // a digit above it begins nothing — never 0, the old autosave.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 1 BEGINS - ESC BACK", TitleText.NewCampaignKeysLine(1));
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS - ESC BACK", TitleText.NewCampaignKeysLine(SaveSlots.Most));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TitleText.NewCampaignKeysLine(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TitleText.NewCampaignKeysLine(SaveSlots.Most + 1));
 
         // W/S and the arrows move over every slot, round the ends.
         int Walk(Keys key)
@@ -278,7 +285,7 @@ public sealed class TitleTests : IDisposable
         var askDrawn = Drawn(asked);
         Assert.Equal([("SLOT 1 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS", DungeonHud.Yellow), (Begin, DungeonHud.Yellow)],
             askDrawn.TakeLast(2).Select(row => (row.Text, row.Color)));
-        Assert.DoesNotContain(askDrawn, row => row.Text == TitleText.NewCampaignKeysLine);
+        Assert.DoesNotContain(askDrawn, row => row.Text == TitleText.NewCampaignKeysLine(3));
         Assert.Equal(H - TitleHud.KeysFromBottom, askDrawn[^1].Y);
         Fits(askDrawn);
         Assert.Equal(TitleHud.AskRows(asked, Dungeons), TitleHud.AskRows(Asked(1, Keys.W, Keys.Enter), Dungeons));
@@ -346,11 +353,30 @@ public sealed class TitleTests : IDisposable
         one.Press(Keys.Enter);
         Assert.Equal([1], one.List!.Rows.Select(row => row.Number));
         Assert.Equal(1, one.List.Rows[one.List.Cursor].Number);
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER OR 1 BEGINS - ESC BACK", Drawn(one)[^1].Text);
         Assert.Equal(default, one.Press(Keys.D2));
         Assert.Equal("SLOT 2 IS BEYOND THE 1 SLOT", one.List!.Said);
         Assert.Matches(Font, one.List.Said);
         Assert.Equal(default, one.Press(Keys.Enter));
         Assert.Equal(1, one.List!.Asking!.Number);   // slot 1 holds a campaign: it asks
+
+        // A slot that takes no saves this session asks nothing: no campaign can begin
+        // there, so a yes could set nothing aside (the audit of the ruling on the
+        // save slots). It is chosen at once — by its digit, or ENTER on it — and the
+        // game says why and begins nothing (DistanceRpgGame.BeginNewCampaign); its row
+        // says so where the list stands. A slot in use that takes saves still asks.
+        var refusing = Listing(Slot(1, header: Header(At, 3, "spear_hall", 4), refused: true), Slot(2), Slot(3, SlotState.Unreadable, refused: true));
+        TitleMenu Refusing() => After(refusing, Keys.S, Keys.Enter);
+        Assert.Equal(new TitleStep(TitleAction.NewCampaign, 1), Refusing().Press(Keys.D1));
+        Assert.Equal(new TitleStep(TitleAction.NewCampaign, 1), Refusing().Press(Keys.Enter));   // every slot in use: the list starts on slot 1
+        Assert.Equal(new TitleStep(TitleAction.NewCampaign, 3), Refusing().Press(Keys.D3));
+        var stillAsks = Refusing();
+        Assert.Equal(default, stillAsks.Press(Keys.D2));
+        Assert.Equal(2, stillAsks.List!.Asking!.Number);
+        var refusingDrawn = Drawn(Refusing());
+        Assert.Equal(["> SLOT 1 - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32 <", "    TAKES NO SAVES THIS SESSION", "  SLOT 2 - BETWEEN RUNS - 0 RUNS - 2026-09-25 14:32",
+            "  SLOT 3 - CANNOT BE READ", "    TAKES NO SAVES THIS SESSION"], refusingDrawn.Where(row => row.Scale == SlotText.Scale).Select(row => row.Text));
+        Fits(refusingDrawn);
 
         // Every slot in use: the choice starts on slot 1, which asks. Nothing
         // anywhere: slot 1, which begins at once — what the old autosave holds, or
@@ -400,6 +426,20 @@ public sealed class TitleTests : IDisposable
             Rows(Slot(9, SlotState.FromBackup, Header(At, 2), unfinished: true, beyond: true, ahead: true)));
         Assert.Equal("SLOT 4 - CANNOT BE READ | ITS LAST LOAD DID NOT FINISH - BEYOND THE 3 SLOTS",
             Rows(Slot(4, SlotState.Unreadable, unfinished: true, beyond: true)));
+
+        // A slot that refused its writes earlier this session says so, in place of
+        // what a load would do — resume its backup, set a crashed save aside — since
+        // its load brings nothing back and sets nothing aside (the audit of the
+        // ruling on the save slots); the other markers stand. The old autosave a
+        // launch could not move takes no saves that session, and says so the same
+        // way. An empty slot has no markers still: nothing of it would load.
+        Assert.Equal("SLOT 2 - BETWEEN RUNS - 2 RUNS - 2026-09-25 14:32 | TAKES NO SAVES THIS SESSION",
+            Rows(Slot(2, SlotState.FromBackup, Header(At, 2), unfinished: true, refused: true)));
+        Assert.Equal("SLOT 5 - CANNOT BE READ | TAKES NO SAVES THIS SESSION - BEYOND THE 3 SLOTS", Rows(Slot(5, SlotState.Unreadable, beyond: true, refused: true)));
+        Assert.Equal("OLD AUTOSAVE - BETWEEN RUNS - 0 RUNS | TAKES NO SAVES THIS SESSION - NO TIME RECORDED - NOT YET MOVED INTO A SLOT",
+            Rows(Slot(SaveSlots.OldAutosave, SlotState.FromBackup, Header(null, 0), refused: true)));
+        Assert.Equal("SLOT 2 - EMPTY", Rows(Empty(2) with { TakesNoSaves = true }));
+        Assert.Equal("TAKES NO SAVES THIS SESSION", SlotText.TakesNoSaves);
 
         // Nothing drawn is the file's raw text: a dungeon the content does not have is
         // named as such, and a time at the calendar's end is shown in UTC, never thrown.
@@ -594,6 +634,8 @@ public sealed class TitleTests : IDisposable
         Assert.Equal("FROM ITS BACKUP - ITS LAST LOAD DID NOT FINISH - AHEAD OF THIS CLOCK - NOT YET MOVED INTO A SLOT", oldMarkers);
         Assert.Equal(96, oldMarkers.Length);
         Within($"    {oldMarkers}", SlotText.Scale);
+        // One that takes no saves this session trades two of them for one, narrower.
+        Assert.True(SlotText.Rows(everyMarker with { Number = SaveSlots.OldAutosave, Beyond = false, TakesNoSaves = true }, 3, Dungeons, PlusTwo)[1].Length < oldMarkers.Length);
 
         // The ask's two rows, at the keys line's scale: NEW CAMPAIGN's, over slot 9
         // holding the worst campaign, and over one that cannot be read. (A load asks
@@ -612,7 +654,7 @@ public sealed class TitleTests : IDisposable
         Within(TitleText.KeysLine, TitleHud.KeysScale);
         Within(TitleText.LoadKeysLine(oldAutosave: true), TitleHud.KeysScale);
         Within(TitleText.LoadKeysLine(oldAutosave: false), TitleHud.KeysScale);
-        Within(TitleText.NewCampaignKeysLine, TitleHud.KeysScale);
+        Within(TitleText.NewCampaignKeysLine(SaveSlots.Most), TitleHud.KeysScale);
         Within(TitleText.NewCampaignHeading, TitleHud.ListHeadingScale);
         Within(SlotText.NotOffered(SaveSlots.Most, SaveSlots.Most - 1), TitleHud.KeysScale);
         Within(TitleText.Title, TitleHud.TitleScale);

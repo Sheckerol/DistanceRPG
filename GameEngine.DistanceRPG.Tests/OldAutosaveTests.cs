@@ -137,7 +137,18 @@ public sealed class OldAutosaveTests : IDisposable
                     marked = root.ReadMoving();
             }
             var said = OldAutosave.MoveIntoASlot(slots, Hook);
-            Assert.Equal(["THE AUTOSAVE MOVED INTO SLOT 2 - ITS CAMPAIGN SAVES THERE FROM NOW ON"], said);
+            Assert.Equal(["THE AUTOSAVE MOVED INTO SLOT 2 - IT SAVES THERE FROM NOW ON"], said);
+            // The word is one notice row into any slot, and news, not a warning, where
+            // the words that it did not move are warnings (the audit of the ruling on
+            // the save slots: it ran to two rows, both in orange).
+            Assert.All(Enumerable.Range(1, SaveSlots.Most), number =>
+            {
+                var rows = NoticeText.Rows([CampaignBoot.AutosaveMoved(number)]);
+                Assert.Single(rows);
+                Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(rows[0]));
+            });
+            Assert.All(NoticeText.Rows([CampaignBoot.AutosaveNotMoved("another program has it open"), CampaignBoot.AutosaveSplit(4, "another program has it open")]),
+                row => Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(row)));
             Assert.Equal(2, marked);
             Assert.Equal(MovedInto(before, 2), Snapshot(folder));
             var movedAt = Four.Select(name => log.FindIndex(line => line == $"[Save] {Path.Combine(root.Folder, name)} moved into {slots.Store(2).Folder}")).ToList();
@@ -464,10 +475,18 @@ public sealed class OldAutosaveTests : IDisposable
             }
             Assert.Equal(heldBefore, Snapshot(held.Folder));
             Assert.False(heldRoot.WasMoving);
+            // Every try made its slot's folder and took it back as it was undone: no
+            // empty slot-1 to slot-9 is left behind (the audit of the ruling on the
+            // save slots).
+            Assert.Empty(Directory.GetDirectories(held.Folder));
             var listing = SaveListing.Read(held, Now);
             Assert.Equal([0, 1, 2, 3], listing.Slots.Select(slot => slot.Number));
             Assert.All(listing.Slots.Skip(1), slot => Assert.Equal(SlotState.Empty, slot.State));
             Assert.Empty(held.Beyond());
+            // The list says it takes no saves this session, in place of what a load
+            // would do: its load brings nothing back.
+            Assert.Equal([true, false, false, false], listing.Slots.Select(slot => slot.TakesNoSaves));
+            Assert.Equal("TAKES NO SAVES THIS SESSION - NOT YET MOVED INTO A SLOT", SlotText.Rows(listing.Slots[0], 3, GameContent.Current.Dungeons, TimeZoneInfo.Utc)[1]);
             Assert.StartsWith("THE OLD AUTOSAVE COULD NOT BE SAVED (CAMPAIGN.JSON COULD NOT BE MOVED INTO A SLOT", CampaignBoot.Save(held.Slot(SaveSlots.OldAutosave), Cleared(), savedAt: Now), StringComparison.Ordinal);
             Assert.False(CampaignBoot.Load(held.Slot(SaveSlots.OldAutosave), GameContent.Current).Loaded);   // released, still refused this session
             Assert.Equal(heldBefore, Snapshot(held.Folder));
@@ -477,6 +496,38 @@ public sealed class OldAutosaveTests : IDisposable
             Assert.Equal([CampaignBoot.AutosaveMoved(1)], OldAutosave.MoveIntoASlot(relaunched));
             Assert.Equal(MovedInto(heldBefore, 1), Snapshot(held.Folder));
             Assert.Null(relaunched.Store(SaveSlots.OldAutosave).WritesRefused);
+            Assert.Equal(["slot-1"], Directory.GetDirectories(held.Folder).Select(Path.GetFileName));
+            Assert.All(SaveListing.Read(relaunched, Now).Slots, slot => Assert.False(slot.TakesNoSaves));
+
+            // A try that stops after the save has moved — another program takes hold
+            // of the backup still in the save folder as the save moves — takes the
+            // save back, and the slot folder it made with it, at every slot in turn:
+            // the save folder is left as it was found, files and folders.
+            var halfway = new SaveSlots(Path.Combine(folder, "halfway"), 3);
+            var halfwayRoot = halfway.Store(SaveSlots.OldAutosave);
+            Autosaved(halfway);
+            var halfwayBefore = Snapshot(halfway.Folder);
+            FileStream? backupHeld = null;
+            var halfwayLog = new List<string>();
+            void HoldTheBackup(string line)
+            {
+                halfwayLog.Add(line);
+                if (backupHeld is null && line == $"[Save] {halfwayRoot.SavePath} moved into {halfway.Store(1).Folder}")
+                    backupHeld = new FileStream(halfwayRoot.BackupPath, FileMode.Open, FileAccess.Read, FileShare.None);
+            }
+            try
+            {
+                Assert.Equal([CampaignBoot.AutosaveNotMoved("another program has it open")], OldAutosave.MoveIntoASlot(halfway, HoldTheBackup));
+            }
+            finally
+            {
+                backupHeld?.Dispose();
+            }
+            Assert.Equal(halfwayBefore, Snapshot(halfway.Folder));
+            Assert.Empty(Directory.GetDirectories(halfway.Folder));
+            Assert.Equal(SaveSlots.Most, halfwayLog.Count(line => line.StartsWith($"[Save] {halfwayRoot.SavePath} moved into ", StringComparison.Ordinal)));
+            Assert.Equal(SaveSlots.Most, halfwayLog.Count(line => line.EndsWith(", which the try made, is empty once it is undone, and is removed", StringComparison.Ordinal)));
+            Assert.False(halfwayRoot.WasMoving);
         });
     }
 
@@ -576,6 +627,7 @@ public sealed class OldAutosaveTests : IDisposable
             using (new FileStream(earlyRoot.SavePath, FileMode.Open, FileAccess.Read, FileShare.None))
                 Assert.Equal([CampaignBoot.AutosaveNotMoved("another program has it open")], OldAutosave.MoveIntoASlot(earlySlots));
             Assert.Equal(earlyWhole, Snapshot(early));
+            Assert.Empty(Directory.GetDirectories(early));   // the finish's slot folder, and every try's, taken back
             Assert.False(earlyRoot.WasMoving);
             Assert.NotNull(earlyRoot.WritesRefused);
             Assert.All(Enumerable.Range(1, SaveSlots.Most), number => Assert.Null(earlySlots.Store(number).WritesRefused));

@@ -8,7 +8,7 @@ internal enum SlotMenuMode
     /// <summary>Loading: every slot listed, a slot that holds something chosen to be loaded.</summary>
     Load,
 
-    /// <summary>A new campaign: slots 1 to the count, every one chosen to begin the campaign in, asking before one that holds anything.</summary>
+    /// <summary>A new campaign: slots 1 to the count, every one chosen to begin the campaign in, asking before one that holds anything and takes saves.</summary>
     NewCampaign,
 }
 
@@ -21,7 +21,7 @@ internal enum SlotStep
     /// <summary>The choice moved to another slot.</summary>
     Moved,
 
-    /// <summary>A slot that holds something was chosen on NEW CAMPAIGN's list, which asks first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
+    /// <summary>A slot that holds something, and takes saves, was chosen on NEW CAMPAIGN's list, which asks first (<see cref="SlotMenu.Asking"/>): the next key is the ask's alone.</summary>
     Asking,
 
     /// <summary>A slot was chosen (<see cref="SlotMenu.Chosen"/>): the list's owner loads it, or begins a campaign in it.</summary>
@@ -63,7 +63,11 @@ internal enum SlotStep
 /// files none of which reads — asks first (<see cref="Asking"/>) whether to begin
 /// there, setting what it holds aside, and <strong>only ENTER says yes</strong>:
 /// the slot's digit again, N, Y, the arrows, ESC and every other key say no and
-/// are spent. A digit above the count is refused, saying why; 0 does nothing.
+/// are spent. But one that takes no saves this session
+/// (<see cref="SlotEntry.TakesNoSaves"/>) is chosen at once, asking nothing: no
+/// campaign can begin there, so a yes could set nothing aside, and the list's
+/// owner says why and begins nothing. A digit above the count is refused, saying
+/// why; 0 does nothing.
 /// </para>
 /// </summary>
 internal sealed class SlotMenu
@@ -203,7 +207,7 @@ internal sealed class SlotMenu
     {
         Cursor = row;
         var entry = Rows[row];
-        if (Mode != SlotMenuMode.Load && entry.State != SlotState.Empty)
+        if (Mode != SlotMenuMode.Load && entry.State != SlotState.Empty && !entry.TakesNoSaves)
         {
             Asking = entry;   // beginning there: it holds something, and the next key answers
             return SlotStep.Asking;
