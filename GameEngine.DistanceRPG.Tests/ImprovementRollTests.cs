@@ -93,7 +93,7 @@ public sealed class ImprovementRollTests : IDisposable
     [Fact]
     public void NoWearNoRoll()
     {
-        // P6:501–503: "a fresh drop refines for nothing. No wear, no roll — nothing
+        // P6:523–525: "a fresh drop refines for nothing. No wear, no roll — nothing
         // to repair." A deposit that cashed nothing rolls nothing and comes back as
         // it went, even at odds that land every time; one wear rolls. The only such
         // deposit play makes is a refinement of an unworn weapon — an enchantment's
@@ -272,9 +272,9 @@ public sealed class ImprovementRollTests : IDisposable
     {
         // PHASE 6a DECISION 5: an outcome with nothing it may take falls through to
         // the other, and a landed roll with neither changes nothing — "a weapon with
-        // every modifier capped rolls nothing at all" (P6:592–593), read as every
+        // every modifier capped rolls nothing at all" (P6:610–611), read as every
         // modifier it may hold, since a weapon with every modifier it carries capped
-        // "can still gain breadth through grafts" (P6:598–600).
+        // "can still gain breadth through grafts" (P6:616–618).
         // Always deepening, a Tower Guard with Block and Push at their ceilings grafts.
         using (TestContent.UsePremise(tuning: Landing(0)))
         {

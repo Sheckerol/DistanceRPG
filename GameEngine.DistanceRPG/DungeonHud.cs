@@ -1588,7 +1588,7 @@ public sealed class DungeonHud
     /// the capacity, <c>WEAR 12/31</c>, and <c>WEAR 31/31 FULL</c> once it is full
     /// — a weapon that banks nothing more until the enchanter spends it, and plays
     /// on exactly as it did. Wear counts one way, the work done: the game never
-    /// says durability (P6:44–58). A capacity a tuning lowered below the wear
+    /// says durability (P6:51–65). A capacity a tuning lowered below the wear
     /// reads full too, over its old wear: nothing takes wear away.
     /// </summary>
     internal static string WearReadout(Weapon weapon)
@@ -1601,7 +1601,7 @@ public sealed class DungeonHud
     /// The colour a weapon's wear reads in on a line drawn in
     /// <paramref name="line"/>: short of full, the line's own, so it reads as
     /// part of the statline; once full, green, so the cap says so plainly on
-    /// every line a weapon is drawn on (P6:74–78) — the yellow line of the weapon
+    /// every line a weapon is drawn on (P6:81–85) — the yellow line of the weapon
     /// in hand (<see cref="WeaponLineColor"/>), the only one that banks wear and
     /// so where a weapon fills, as on a white one — and never a unique's orange
     /// or an enchantment's cyan.
@@ -1615,7 +1615,7 @@ public sealed class DungeonHud
     /// A weapon's wear said whole, for a panel with room for a sentence: how far
     /// it is from full — <c>WEAR 12 OF 31 - 19 MORE FILLS IT</c> — or, once full,
     /// what to do about it: <c>WEAR 31 OF 31 - FULL - TIME TO ROTATE IT INTO THE
-    /// SHOP</c> (P6:74–78, "a weapon at its cap should say so plainly"). Drawn in
+    /// SHOP</c> (P6:81–85, "a weapon at its cap should say so plainly"). Drawn in
     /// <see cref="WearColor"/>.
     /// </summary>
     internal static string WearLine(Weapon weapon)

@@ -957,7 +957,7 @@ public sealed class CampaignState
     /// The deposits in the shop (§6.2), in deposit order — the ordinals rising — a
     /// list, never a set, so the view a save stores and the hub lists is that
     /// order. Each weapon here is out of the party's hands: in no bag and not in
-    /// the stable. No length of its own (P6:291–292). Empty on a new campaign.
+    /// the stable. No length of its own (P6:302–303). Empty on a new campaign.
     /// </summary>
     public IReadOnlyList<Deposit> AtTheEnchanter => _enchanter.AsReadOnly();
 

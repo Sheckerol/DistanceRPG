@@ -3313,15 +3313,18 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   reads it, adds `WearPerHit` and `GraftBaseChance`, the two still to come, with
   their readers, and saves beside `wear` and `wearCapacity` the capacity's
   progress toward its next point, which carries from one deposit to the next
-  (§6.7).) (Done in Phase 6a, the wear's half, and bent once: version 2 adds
+  (§6.7).) (Done in Phase 6a, the wear's half, and bent twice. Version 2 adds
   `wear` and `wearCashed` to every weapon row, the wear the weapon has ever
   cashed, from which its capacity and that capacity's progress are replayed
-  rather than saved (PHASE 6a DECISION 2), and names at the root the version its
-  tuning hash is of (`tuningHashVersion`, DECISION 9); the one step from version
-  1 writes only those, every weapon unworn, and the campaign's stable, the
-  enchanter's queue and its count, and the last run's word on the shop are
-  appended with defaults, as the save's header rule lets a member be — the Phase
-  6a pass, below. Carried consumables wait for Phase 6b as they did.)
+  rather than saved — the first bend, PHASE 6a DECISION 2, the user's to rule.
+  It names at the root, beyond what the hand-off listed, the version its tuning
+  hash is of (`tuningHashVersion`, DECISION 9), an addition and a step as the
+  hand-off asks of each; the one step from version 1 writes only those, every
+  weapon unworn. The second bend, a reading that needs no ruling: the campaign's
+  stable, the enchanter's queue and its count, and the last run's word on the
+  shop are appended with defaults, as the save's header rule lets a member be,
+  where the hand-off had each addition a step — the Phase 6a pass, below.
+  Carried consumables wait for Phase 6b as they did.)
 
 ## Implementation pass — Phase 6a (between runs)
 
@@ -3363,8 +3366,9 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   nothing. An enemy carries no pools, so its wear feed does nothing — the roster
   says so, never a type test — and nothing arrives worn: a drop, a boss's drop,
   an enemy's weapon and the starting party's kit are new at no wear and none
-  cashed, which the save holds (check 20, below). What a staff's cast and a
-  wipe do is DECISION 1.
+  cashed; the save holds an enemy's weapon and a drop still lying so (check 20,
+  below), the kit and a drop once taken being the party's to wear. What a
+  staff's cast and a wipe do is DECISION 1.
 - **Wear accrues in one place, and a full weapon plays as a fresh one.** The
   turn system's wear feed, beside its XP feeds, is the only way into a weapon's
   pool (`Wear.Accrue`, then `Weapon.AccrueWear`, pinned off the IL). Nothing in
@@ -3549,8 +3553,9 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   gains its `stable`, the enchanter's queue (`enchanter`) and its count
   (`depositsMade`), and the last run's result its word on the shop
   (`services`), each **appended with a default** (the save's header rule: a
-  member appended with a default reads without a step) and written `null` while
-  empty, as `visit` is between runs — `null` and `[]` read alike. The one step
+  member appended with a default reads without a step) — the three lists
+  written `null` while empty, as `visit` is between runs, `null` and `[]` read
+  alike, and the count written 0 until a deposit is made. The one step
   (`SaveCodec.LiftToVersion2`) is pure — no content, no tuning — and writes only
   what version 2 requires: every weapon row, in the five places a weapon sits,
   each walked by name, unworn at 0 and 0, and the root's hash version, 1. **It
@@ -3562,7 +3567,9 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   reader refuses it where it is wrong, by its path, as at version 2. A Phase 5
   save — both the pre-rework code wrote among them — loads every weapon at 0 of
   30 with nothing in the stable or the shop, and, restored and captured again,
-  is the migrated document member by member, its hash and hash version aside.
+  is the migrated document member by member — its hash, its hash version and its
+  `savedAt` aside, and the four appended members, which a capture writes at
+  their defaults (`PreReworkSaveTests`).
 - **The tuning hash is per version** (DECISION 9): a save's hash is of the keys
   played at the version that wrote it, which it names, each key hashed from the
   version its reader came with (`TuningKey.HashedFrom`: Phase 6a's eleven from
@@ -3606,9 +3613,12 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   Enchant names an enchantment the campaign has met, a refinement names none,
   and neither holds a source; (26) a transfer names no enchantment, names its
   soul's place, and the soul lies there, on its source or, for a reorder, on the
-  weapon; (27) the last run's reports say what their deposits bought, as 25 and
-  26 ask — a transfer's names its soul, never asked among the met, its source
-  only on a transfer and the tier it landed at exactly once it came back — an
+  weapon, short of its last entry — the entry already last is not moved
+  (DECISION 11), so a reorder of it, which play never writes, would complete as
+  a move that changes nothing but the soul's tier; (27) the last run's reports
+  say what their deposits bought, as 25 and 26 ask — a transfer's names its
+  soul, never asked among the met, its source only on a transfer and the tier it
+  landed at exactly once it came back — an
   improvement comes with its modifier and only on a service that came back, a
   stalled report is short of its last run, a run that counted worked the newest
   and left no stalled report after a worked one, a run that did not count left
@@ -3653,11 +3663,13 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   what was cashed had stopped at the sanity bound, a billion hits in, which no
   play reaches. And a stable longer than play fills costs load time, never a
   wrong number.
-- **The v2 hand-off, bent once** (above): it had the save keep `wear`, a
-  `wearCapacity` and the capacity's progress, and the step write them; it keeps
-  `wear` and the wear cashed, capacity replayed (DECISION 2), and the members
-  later steps added to the campaign are appended with defaults, the step writing
-  none of them.
+- **The v2 hand-off, bent twice** (above): it had the save keep `wear`, a
+  `wearCapacity` and the capacity's progress, each an addition and a step. It
+  keeps `wear` and the wear cashed, capacity replayed — PHASE 6a DECISION 2, the
+  user's to rule; and — a reading, no ruling — the members later steps added to
+  the campaign are appended with defaults, the step writing none of them. The
+  root's `tuningHashVersion` (DECISION 9), which the hand-off never named, is an
+  addition and a step as it asks.
 
 ### The numbers
 
@@ -3764,7 +3776,8 @@ its number, and this pass records the ruling when it is made.
   runs, attaching the soul again as the last of the same count — "one
   attachment's service time" (§6.5) — at that attachment's slot and price, and
   it is allowed at five enchantments; the entry already last is not moved (`IT
-  IS LAST ALREADY`), so a reorder needs two souls and 2 runs at the least; a
+  IS LAST ALREADY`, and no save holds a reorder of it, check 26), so a reorder
+  needs two souls and 2 runs at the least; a
   weapon forged whole keeps every forged mark, and one forged in part loses the
   moved soul's, a forged entry never standing behind an acquired one — which the
   screen does not say. **Chooses between two passages above that disagree**:

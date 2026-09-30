@@ -292,7 +292,7 @@ public sealed class Weapon
     /// reaches; since <see cref="Wear"/> is no more than that, what was cashed is
     /// never less than what this call returns. The one caller is
     /// <see cref="Enchanter.Deposit"/>: the enchanter is the single place wear is
-    /// spent (P6:860–861; <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c>).
+    /// spent (P6:902–903; <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c>).
     /// </summary>
     /// <returns>The wear cashed: the deposit's.</returns>
     internal int CashWear()

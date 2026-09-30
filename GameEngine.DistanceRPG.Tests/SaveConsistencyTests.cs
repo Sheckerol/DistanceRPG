@@ -1088,7 +1088,8 @@ public sealed class SaveConsistencyTests : IDisposable
     {
         // Checks 24, 25, 26, 27 and 29's transfer half (Phase 6a.6): a transfer names
         // the soul it moves by where it lies — on its source, or on the weapon for a
-        // reorder — and no enchantment, and the soul lies there; it takes the runs of
+        // reorder — and no enchantment, and the soul lies there, a reorder's short of
+        // the weapon's last entry (Phase 6a.7's review); it takes the runs of
         // attaching it, the count plus one from another weapon and the count for a
         // reorder; only a transfer holds a source or names a soul's place; a report of
         // one names its soul, its source only if it had one, and the tier it landed at
@@ -1123,6 +1124,14 @@ public sealed class SaveConsistencyTests : IDisposable
                 "2 on a source holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
             (tree => DepositNode(tree, 1)["sourceIndex"] = 2, "campaign.enchanter[1].sourceIndex",
                 "2 on a weapon holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            // A reorder of the entry already last, which the enchanter refuses (IT IS
+            // LAST ALREADY, PHASE 6a DECISION 11) and which would complete as a move
+            // of nothing but its tier — on two souls, and on a weapon with one.
+            (tree => DepositNode(tree, 1)["sourceIndex"] = 1, "campaign.enchanter[1].sourceIndex",
+                "1 names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop"),
+            (tree => { DepositNode(tree, 1)["weapon"]!["enchantments"]!.AsArray().RemoveAt(1); DepositNode(tree, 1)["runs"] = 1; },
+                "campaign.enchanter[1].sourceIndex",
+                "0 names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop"),
             // The mapper's: a transfer pays the price of attaching its soul, 1 at the least.
             (tree => DepositNode(tree, 0)["wearAtDeposit"] = 0, "campaign.enchanter[0].wearAtDeposit",
                 "0 is below 1: a transfer pays the price of attaching its soul, FirstEnchantmentWear or more, and no tuning prices one below 1"),

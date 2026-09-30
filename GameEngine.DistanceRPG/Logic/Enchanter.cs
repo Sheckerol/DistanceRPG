@@ -180,7 +180,7 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// The enchanter (§6.2–§6.4, §6.7; Phase 6a.3a): where wear is spent, a weapon's
 /// capacity grows, and enchantments are bought — slowly, in runs that count.
 /// Engine-free and deterministic, like everything under <c>Logic/</c>, and the one
-/// place wear is spent (P6:860–861).
+/// place wear is spent (P6:902–903).
 /// <list type="bullet">
 /// <item><strong>The offer</strong> (<see cref="Offers"/>, Phase 6a.3b) is what an
 /// Enchant may buy: what the campaign has met, less the unique souls and the
@@ -1038,7 +1038,7 @@ public static class Enchanter
     /// ordinals, in deposit order — a transfer one of them, its two weapons being one
     /// deposit (PHASE 6a DECISION 13). Every other deposit in <paramref name="queue"/>
     /// is stalled until one of these comes back. The queue has no length of its own:
-    /// "dumping the whole stable achieves nothing" (P6:291–292).
+    /// "dumping the whole stable achieves nothing" (P6:302–303).
     /// </summary>
     public static IReadOnlyList<Deposit> Worked(IReadOnlyList<Deposit> queue)
     {
@@ -1192,21 +1192,21 @@ public static class Enchanter
     /// numerator</c>, on the service's odds (<see cref="Wear.ImproveOdds"/>) — the
     /// one draw refinement moves, since it "improves whether the roll lands, not
     /// what it lands on" (S:782–784). A deposit that cashed no wear draws nothing
-    /// and rolls nothing: "no wear, no roll" (P6:501–503), which only a refinement
+    /// and rolls nothing: "no wear, no roll" (P6:523–525), which only a refinement
     /// of an unworn weapon meets, since an enchantment's price is a wear at
     /// least.</item>
     /// <item><strong>Which outcome</strong>: a graft when <c>NextInt(0, 99) &lt;
     /// </c><see cref="Tuning.GraftSharePercent"/>, a deepen otherwise — "deepen stays
-    /// the common result and a graft stays the surprise" (P6:547–551).</item>
+    /// the common result and a graft stays the surprise" (P6:565–570).</item>
     /// <item><strong>Which modifier</strong>, one draw over that outcome's
     /// candidates (<see cref="DeepenCandidates"/>, weighted toward the class
     /// signature; <see cref="GraftCandidates"/>, alike), and a stack of it acquired
     /// (<see cref="Weapon.Acquire"/>, held to forged plus the acquired headroom — a
     /// graft, forged at 0, caps at the headroom). An outcome with no candidate falls
     /// through to the other, and with neither the landed roll changes nothing:
-    /// "a weapon with every modifier capped rolls nothing at all" (P6:592–593),
+    /// "a weapon with every modifier capped rolls nothing at all" (P6:610–611),
     /// read as every modifier it may hold, since a weapon whose carried modifiers
-    /// are all capped "can still gain breadth through grafts" (P6:598–600). The
+    /// are all capped "can still gain breadth through grafts" (P6:616–618). The
     /// split, the weight and the fall-through are PHASE 6a DECISION 5.</item>
     /// </list>
     /// </summary>

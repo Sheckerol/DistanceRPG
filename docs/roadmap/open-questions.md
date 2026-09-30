@@ -446,7 +446,9 @@ weapon's `WearCapacity` a start, 30 (`StartingPool`), a growth of
 and a progress that carries from one deposit to the next. The v2 hand-off
 (settled.md) words the save as holding "`wear` and `wearCapacity` … and beside
 them the capacity's progress toward its next point"; how the capacity is kept is
-the build's.
+the build's, and a pick other than those words bends the hand-off — settled.md
+marks it where the hand-off stands, the one of its two bends that is the user's
+to rule.
 
 **Shipped provisionally: the save keeps `wear` and `wearCashed`, the wear the
 weapon has ever cashed**, and its capacity and the progress toward the next
@@ -854,9 +856,10 @@ settled.md's Phase 6a implementation pass records the ruling.
 settled.md says "reordering means detaching and re-attaching, which is a
 transfer: a tier and a service", and §6.5 that a move costs "one attachment's
 service time". Two texts disagree on the weapon whose every slot is filled:
-§6.5 and settled.md describe reordering a five-enchantment weapon as "one of the
-more expensive things you can do", and settled.md elsewhere that "a weapon at five
-enchantments therefore has refinement as its only remaining service".
+§6.2 ("You choose what gets attached"), beside settled.md's words, calls
+changing the order of a five-enchantment weapon "one of the more expensive
+things you can do", and settled.md elsewhere says "a weapon at five enchantments
+therefore has refinement as its only remaining service".
 
 **Shipped provisionally** (Phase 6a.6; `Enchanter.TransferRuns`,
 `Enchanter.TransferRefusal`): a reorder is a transfer whose source is the weapon

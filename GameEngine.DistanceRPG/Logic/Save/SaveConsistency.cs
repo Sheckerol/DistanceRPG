@@ -323,10 +323,10 @@ internal static class SaveConsistency
     /// gives back; its runs are the count plus one, or a transfer's; the tick that
     /// works its last run brings it back; an Enchant buys an enchantment the
     /// campaign has met, which the weapon has room for; a Transfer (Phase 6a.6)
-    /// names a soul where it lies, on its source or on the weapon, and a weapon
-    /// that takes one from another has room for it; a run that counts works the
-    /// newest, and one that did not works nothing; and nothing is deposited before
-    /// the tutorial is beaten.
+    /// names a soul where it lies, on its source or on the weapon — a reorder's
+    /// not its last — and a weapon that takes one from another has room for it; a
+    /// run that counts works the newest, and one that did not works nothing; and
+    /// nothing is deposited before the tutorial is beaten.
     /// </summary>
     private static void Shop(CampaignDto campaign)
     {
@@ -397,6 +397,9 @@ internal static class SaveConsistency
         // 26. A transfer (Phase 6a.6) names the soul it moves by where it lies — on
         // its source, or on the weapon for a reorder — and no enchantment, which only
         // an Enchant buys; and the soul lies there: neither weapon changes in the shop.
+        // A reorder names a soul short of the weapon's last: the entry already last
+        // is not moved (IT IS LAST ALREADY, PHASE 6a DECISION 11), and a reorder of
+        // it would complete as a move of nothing but the soul's tier.
         for (int i = 0; i < queue.Count; i++)
         {
             var deposit = queue[i];
@@ -411,6 +414,9 @@ internal static class SaveConsistency
             if (index >= giver.Enchantments.Count)
                 throw new SaveFormatException($"{at}[{i}].sourceIndex",
                     $"{index} on a {(deposit.Source is null ? "weapon" : "source")} holding {giver.Enchantments.Count} enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop");
+            if (deposit.Source is null && index == giver.Enchantments.Count - 1)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex",
+                    $"{index} names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop");
         }
 
         // 27. What the last run's end said of the shop: a report for each deposit in

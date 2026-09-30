@@ -465,7 +465,8 @@ back to it, and the game quits from it.
   improvement on a service not back yet, an outcome without its modifier, a
   modifier no weapon stacks, a landed tier on a transfer not back yet), a deposit
   whose take-back would give back a weapon no load reads, a transfer whose soul is
-  not where it names, or a source on any other deposit — is refused as one that
+  not where it names, a reorder of the enchantment already last, or a source on
+  any other deposit — is refused as one that
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable

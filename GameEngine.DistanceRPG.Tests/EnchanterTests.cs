@@ -284,7 +284,7 @@ public sealed class EnchanterTests : IDisposable
     [Fact]
     public void AnUnwornRefineIsAccepted_AndComesBackAsItWent()
     {
-        // "A fresh drop refines for nothing. No wear, no roll" (P6:501–503; settled:
+        // "A fresh drop refines for nothing. No wear, no roll" (P6:523–525; settled:
         // "there is no 0% to explain"): a Refine of a weapon carrying no wear is
         // accepted, costs its count plus one runs, grows nothing, and comes back as it
         // went — never refused.
@@ -1232,7 +1232,7 @@ public sealed class EnchanterTests : IDisposable
     [Fact]
     public void WearIsSpentAndReturnedInOnePlace()
     {
-        // The enchanter is the single place wear is spent (P6:860–861), and the one
+        // The enchanter is the single place wear is spent (P6:902–903), and the one
         // door each of its moves goes through, read off the IL: the pool is cashed by
         // a deposit alone and refunded by a take-back alone; a deposit enters the
         // shop by the hub's door and a take-back leaves it by another; a finished

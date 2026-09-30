@@ -75,9 +75,9 @@ public sealed class HudTextTests : IDisposable
     public void TheWearReadoutSaysFullPlainly()
     {
         // §6.1 (Phase 6a.1): every weapon line reads its wear against its
-        // capacity — the work done, one way, never durability (P6:44–58) — in the
+        // capacity — the work done, one way, never durability (P6:51–65) — in the
         // line's own colour while it banks, and at the cap WEAR n/n FULL in green:
-        // "a weapon at its cap should say so plainly" (P6:74–78), and never in a
+        // "a weapon at its cap should say so plainly" (P6:81–85), and never in a
         // unique's orange. The sentence form a panel with room prints says what to
         // do about it.
         var fresh = TestWeapons.Get("arming_sword");
