@@ -24,19 +24,37 @@ public enum Service
 /// count of deposits as it went in (<see cref="CampaignState.DepositsMade"/>),
 /// never reused: the enchanter works the newest, the highest ordinals.
 /// <para>
-/// A record for its members, but <see cref="RunsWorked"/> moves, so a deposit is
-/// told apart from another by reference — never put in a hash container by its
-/// value.
+/// A class, not a record: <see cref="RunsWorked"/> moves, so a deposit is the one
+/// it is by reference — as the shop, the clock and the hub's rows tell them apart
+/// — and never equal to another by its values.
 /// </para>
 /// </summary>
-/// <param name="Ordinal">The deposit's place in the campaign's deposits, from 0: the higher, the newer.</param>
-/// <param name="Weapon">The weapon in the shop.</param>
-/// <param name="Service">What the deposit bought.</param>
-/// <param name="WearAtDeposit">The wear the deposit cashed: the weapon's whole pool as it went in.</param>
-/// <param name="Runs">The runs the service takes: the weapon's count plus one, as it went in.</param>
-/// <param name="EnchantmentId">The enchantment an Enchant attaches, by id; null for a refinement.</param>
-public sealed record Deposit(int Ordinal, Weapon Weapon, Service Service, int WearAtDeposit, int Runs, string? EnchantmentId = null)
+/// <param name="ordinal">The deposit's place in the campaign's deposits, from 0: the higher, the newer.</param>
+/// <param name="weapon">The weapon in the shop.</param>
+/// <param name="service">What the deposit bought.</param>
+/// <param name="wearAtDeposit">The wear the deposit cashed: the weapon's whole pool as it went in.</param>
+/// <param name="runs">The runs the service takes: the weapon's count plus one, as it went in.</param>
+/// <param name="enchantmentId">The enchantment an Enchant attaches, by id; null for a refinement.</param>
+public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wearAtDeposit, int runs, string? enchantmentId = null)
 {
+    /// <summary>The deposit's place in the campaign's deposits, from 0: the higher, the newer.</summary>
+    public int Ordinal { get; } = ordinal;
+
+    /// <summary>The weapon in the shop.</summary>
+    public Weapon Weapon { get; } = weapon;
+
+    /// <summary>What the deposit bought.</summary>
+    public Service Service { get; } = service;
+
+    /// <summary>The wear the deposit cashed: the weapon's whole pool as it went in.</summary>
+    public int WearAtDeposit { get; } = wearAtDeposit;
+
+    /// <summary>The runs the service takes: the weapon's count plus one, as it went in.</summary>
+    public int Runs { get; } = runs;
+
+    /// <summary>The enchantment an Enchant attaches, by id; null for a refinement.</summary>
+    public string? EnchantmentId { get; } = enchantmentId;
+
     /// <summary>The runs of the service the runs that counted have worked: 0 as it goes in, and below <see cref="Runs"/> while it is in the shop — the tick that works the last one brings it back.</summary>
     public int RunsWorked { get; internal set; }
 }
@@ -169,7 +187,7 @@ public static class Enchanter
         return $"THE ENCHANTER OPENS WHEN {tutorial.Name.ToUpperInvariant()} IS BEATEN";
     }
 
-    /// <summary>A weapon deposited already: <c>THE ARMING SWORD IS IN THE SHOP ALREADY</c>. The screen never offers it.</summary>
+    /// <summary>A weapon deposited already: <c>ARMING SWORD IS IN THE SHOP ALREADY</c>, named bare as the summary's <c>… IS BACK FROM THE ENCHANTER</c> names it. The screen never offers it.</summary>
     public static string InTheShop(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);

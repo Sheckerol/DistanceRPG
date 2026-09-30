@@ -49,20 +49,34 @@ public sealed class EnchanterTests : IDisposable
     /// capacity it is deposited at and the price met — and otherwise it refines;
     /// or, <paramref name="leastFirst"/>, it refines until its capacity is the last
     /// slot's less the attaches still to make, then attaches on every deposit (R4's
-    /// consequence 3: "the order that takes the least"). The pure arithmetic of
-    /// <see cref="Wear"/> alone.
+    /// consequence 3: "the order that takes the least"). The arithmetic of
+    /// <see cref="Wear"/>, and at every deposit the enchanter's own gate asked of
+    /// the weapon as it stands (<see cref="Enchanter.Refusal"/>, in
+    /// <paramref name="asked"/>'s B's bag): it takes an Enchant exactly when the
+    /// arithmetic says the slot is open and the price met, and otherwise refuses
+    /// with the gate the arithmetic names — the slot first, read at the capacity
+    /// before the cash, then the price. On a full bar under R4's numbers the two
+    /// fall together, so which one refuses is what pins the order.
     /// </summary>
-    private static (int Deposits, int Runs, IReadOnlyList<int> AttachedAt) Climb(int arriving, bool leastFirst)
+    private static (int Deposits, int Runs, IReadOnlyList<int> AttachedAt) Climb(int arriving, bool leastFirst, CampaignState asked)
     {
         int slots = GameContent.Current.Tuning.EnchantmentSlots;
         int cashed = 0, count = arriving, deposits = 0, runs = 0;
         var attachedAt = new List<int>();
+        var made = TestWeapons.Get("tower_guard");
+        var soul = GameContent.Current.Enchantments["vampiric"];
         while (count < slots)
         {
             int capacity = Wear.Capacity(cashed).Max;
             int wear = capacity;   // a full bar
             int n = count + 1;
-            bool can = Wear.SlotOpensAt(n) <= capacity && wear >= Wear.Price(n);
+            long opensAt = Wear.SlotOpensAt(n), price = Wear.Price(n);
+            string? gate = opensAt > capacity ? Enchanter.NoFreeSlot(n, opensAt, capacity) : wear < price ? Enchanter.Short(n, price, wear) : null;
+            bool can = gate is null;
+            var weapon = new Weapon(GameContent.Current.Weapons["tower_guard"], made.Forged, made.Modifiers,
+                Enumerable.Range(0, count).Select(_ => new Enchantment(soul, 1)).ToArray(), 0, wear, cashed);
+            Give(asked, "B", 2, weapon);
+            Assert.Equal(gate, Enchanter.Refusal(asked, weapon, Service.Enchant, soul.Id));   // the slot first, at the capacity before the cash; then the price
             bool attach = can && (!leastFirst || capacity >= Wear.SlotOpensAt(slots) - (slots - n));
             runs += Wear.ServiceRuns(count);
             cashed += wear;
@@ -81,8 +95,11 @@ public sealed class EnchanterTests : IDisposable
         // R4 (settled.md, S:1653–1732), the user's own numbers, pinned as the
         // ruling states them against the master (REWORK DECISION 3; ShippedDataTests
         // lists the pin): an edit to a slot, a price or a start fails here by name.
+        // Every climb asks the enchanter's own gate at each deposit, so an edit to
+        // its order or to the capacity it reads moves these numbers too.
         using (TestContent.Use())
         {
+            var asked = Opened();
             var t = GameContent.Current.Tuning;
             Assert.Equal((30, 1, 30, 5, 5, 30, 5), (t.StartingPool, t.WearCapacityPerBar, t.FirstSlotCapacity, t.SlotCapacityStep, t.EnchantmentSlots,
                 t.FirstEnchantmentWear, t.EnchantmentWearStep));
@@ -102,7 +119,7 @@ public sealed class EnchanterTests : IDisposable
             // capacity to 35, at 160 hits in all; and #2 at 195 … #3 at 385, #4 at 600
             // and #5 at 840 — twenty-one deposits from a fresh weapon, five of them
             // attaching" — and 71 runs of downtime (consequence 3).
-            var climb = Climb(arriving: 0, leastFirst: false);
+            var climb = Climb(arriving: 0, leastFirst: false, asked);
             Assert.Equal([30, 195, 385, 600, 840], climb.AttachedAt);
             Assert.Equal((21, 71), (climb.Deposits, climb.Runs));
             Assert.Equal(35, Wear.Capacity(160).Max);
@@ -113,7 +130,7 @@ public sealed class EnchanterTests : IDisposable
 
             // "Refining first and attaching all five on the last five deposits, at
             // capacities 46 to 50, takes the least there is: 31 runs."
-            var least = Climb(arriving: 0, leastFirst: true);
+            var least = Climb(arriving: 0, leastFirst: true, asked);
             Assert.Equal(31, least.Runs);
             Assert.Equal(21, least.Deposits);
 
@@ -121,7 +138,7 @@ public sealed class EnchanterTests : IDisposable
             // on the climb — an innate staff 72 and 48, a unique arriving with two souls
             // 78 and 66, one arriving with three 89 and 85, against a fresh 71 and 31.
             Assert.Equal([(72, 48), (78, 66), (89, 85)],
-                new[] { 1, 2, 3 }.Select(arriving => (Climb(arriving, leastFirst: false).Runs, Climb(arriving, leastFirst: true).Runs)));
+                new[] { 1, 2, 3 }.Select(arriving => (Climb(arriving, leastFirst: false, asked).Runs, Climb(arriving, leastFirst: true, asked).Runs)));
         }
     }
 
@@ -386,6 +403,10 @@ public sealed class EnchanterTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, new WeaponPlace("B", 1), Service.Refine));
         Assert.Throws<InvalidOperationException>(() => Enchanter.TakeBack(campaign, shop));
         Assert.Throws<InvalidOperationException>(() => campaign.Move(WeaponPlace.InTheStable(0), new WeaponPlace("A", 1)));
+        var bStaff = campaign.Party[1].Inventory[1]!;   // the hub's door itself, handed a deposit it would take between runs
+        Assert.Throws<InvalidOperationException>(() => campaign.Enqueue(new WeaponPlace("B", 1), new Deposit(campaign.DepositsMade, bStaff, Service.Refine, 0, 2)));
+        Assert.Same(bStaff, campaign.Party[1].Inventory[1]);
+        Assert.Equal((1, 1), (campaign.AtTheEnchanter.Count, campaign.DepositsMade));
         CampaignRuns.Exit(campaign);   // shallow: nothing worked
 
         Weapon? stabled = null;
@@ -597,7 +618,40 @@ public sealed class EnchanterTests : IDisposable
         Assert.Empty(campaign.Stable);
 
         // A weapon in the shop already is refused as such, before anything else.
-        Assert.Equal(Enchanter.InTheShop(guard), Enchanter.Refusal(campaign, guard, Service.Refine));
+        Assert.Equal("TOWER GUARD IS IN THE SHOP ALREADY", Enchanter.Refusal(campaign, guard, Service.Refine));
+        Assert.Equal("TOWER GUARD IS IN THE SHOP ALREADY", Enchanter.InTheShop(guard));
+    }
+
+    [Fact]
+    public void TheShopsDoorAsksItsOwnQuestions()
+    {
+        // CampaignState.Enqueue, the hub's door into the shop, holds its own gates
+        // whatever its one caller asked before it (Enchanter.Deposit asks the
+        // enchanter's first): the weapon at the place is the deposit's, the ordinal
+        // is the next, and no member is left carrying none. Refused, it moves
+        // nothing; handed a deposit whole, it takes it — that deposit, by reference.
+        // (Its mid-run gate is AFinishedEnchantAttachesLast_AtTier1_AndReturnsToTheStable's.)
+        var campaign = Opened();
+        var (bGuard, bStaff) = (campaign.Party[1].Inventory[0]!, campaign.Party[1].Inventory[1]!);
+        var at = new WeaponPlace("B", 1);
+        Deposit Of(Weapon weapon, int ordinal) => new(ordinal, weapon, Service.Refine, 0, Wear.ServiceRuns(weapon.Enchantments.Count));
+
+        Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, Of(bGuard, 0)));   // the weapon at the place is another
+        Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, Of(bStaff, 1)));   // not the next ordinal
+        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
+        var stiletto = campaign.Party[0].Inventory[0]!;
+        Assert.Throws<InvalidOperationException>(() => campaign.Enqueue(new WeaponPlace("A", 0), Of(stiletto, 0)));   // A's last weapon
+        Assert.Empty(campaign.AtTheEnchanter);
+        Assert.Equal(0, campaign.DepositsMade);
+        Assert.Same(bStaff, campaign.Party[1].Inventory[1]);
+        Assert.Same(stiletto, campaign.Party[0].Inventory[0]);
+
+        var entry = Of(bStaff, 0);
+        Assert.NotEqual(Of(bStaff, 0), entry);   // a deposit is the one it is, never equal to another by its values
+        Assert.Null(campaign.Enqueue(at, entry));
+        Assert.Same(entry, Assert.Single(campaign.AtTheEnchanter));
+        Assert.Equal(1, campaign.DepositsMade);
+        Assert.Null(campaign.Party[1].Inventory[1]);
     }
 
     [Fact]
@@ -736,6 +790,19 @@ internal static class TestShop
         campaign.Party.Single(member => member.Id == memberId).Inventory[slot] = weapon;
         return new WeaponPlace(memberId, slot);
     }
+
+    /// <summary>
+    /// The dungeons as a <c>dungeons.json</c> beside the game may have them after
+    /// deposits were made: <c>retiresOnClear</c> moved off the tutorial onto the
+    /// Spear Hall, not beaten (a retiring dungeon pins its floor) — so today's
+    /// tutorial is one the campaign has not retired, whatever it has.
+    /// </summary>
+    public static DungeonsData TutorialMoved(DungeonsData data) => new(data.Dungeons.Select(def => def.Id switch
+    {
+        "spear_hall" => def with { RetiresOnClear = true, BossFloorMin = 5, BossFloorMax = 5 },
+        "tutorial" => def with { RetiresOnClear = false },
+        _ => def,
+    }).ToArray());
 
     /// <summary>A run that counts: three floors down the Long Gallery and back out, a mercy.</summary>
     public static RunResult Counted(CampaignState campaign) => CampaignRuns.DeepRetreat(campaign, "long_gallery");

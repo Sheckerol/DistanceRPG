@@ -39,10 +39,14 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <see cref="SaveMapper"/> holds only to the sanity bound past which the next
 /// step of play would wrap (<see cref="ContentBounds.MostCount"/>). And of the
 /// enchanter's queue (Phase 6a.3a): an Enchant's deposit below today's price or
-/// above today's capacity, both today's tuning; and a queued enchantment today's
+/// above today's capacity, both today's tuning; a queued enchantment today's
 /// <c>restricted.json</c> would refuse or lists among the never-rolled — the
 /// deposit was legal when it was made, and the file beside the game is
-/// JSON-master data an edit may move since.
+/// JSON-master data an edit may move since; which dungeon is retired when
+/// something is at the enchanter — check 30 asks that one is, never that it is
+/// the one today's <c>dungeons.json</c> retires on its clear, which an edit may
+/// move; and a run's end's report against the deposits still in the shop, which
+/// a report outlives.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -307,12 +311,14 @@ internal static class SaveConsistency
     }
 
     /// <summary>
-    /// 21–25, 27–29. The enchanter (Phase 6a.3a): the shop, as the hub's deposits
+    /// 21–25, 27–30. The enchanter (Phase 6a.3a): the shop, as the hub's deposits
     /// fill it and every run's end works it, and what the last run's end said of
-    /// it. A deposit takes the next ordinal and cashes the whole pool; its runs are
-    /// the count plus one; the tick that works its last run brings it back; an
-    /// Enchant buys an enchantment the campaign has met, which the weapon has room
-    /// for; and a run that did not count works nothing.
+    /// it. A deposit takes the next ordinal and cashes the whole pool, which a
+    /// take-back gives back; its runs are the count plus one; the tick that works
+    /// its last run brings it back; an Enchant buys an enchantment the campaign has
+    /// met, which the weapon has room for; a run that counts works the newest, and
+    /// one that did not works nothing; and nothing is deposited before the
+    /// tutorial is beaten.
     /// </summary>
     private static void Shop(CampaignDto campaign)
     {
@@ -371,10 +377,14 @@ internal static class SaveConsistency
 
         // (26, a transfer's source, arrives with the transfer.)
 
-        // 27. What the last run's end said of the shop: a run that counted worked the
-        // newest few a run on and left the rest stalled, short of their last run; a
-        // run that did not count worked nothing. Nothing ties a report to a deposit
-        // still in the shop: a report outlives the entry it speaks of.
+        // 27. What the last run's end said of the shop: a report for each deposit in
+        // it as the run ended, in deposit order, each saying what its deposit bought
+        // as the deposit does (25) — so no more reports than deposits were ever made.
+        // A run that counted worked the newest few a run on — the newest always, the
+        // enchanter working on one at least — and left the older ones stalled, short
+        // of their last run; a run that did not count worked nothing. Nothing ties a
+        // report to a deposit still in the shop: a report outlives the entry it
+        // speaks of.
         if (campaign.LastResult is { Services: { } reports } last)
         {
             const string where = $"{At}.lastResult.services";
@@ -382,11 +392,26 @@ internal static class SaveConsistency
             for (int i = 0; i < reports.Count; i++)
             {
                 var report = reports[i];
+                bool enchant = report.Service == nameof(Service.Enchant);
+                if (enchant && report.Enchantment is null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", "missing on an Enchant: a report says what its deposit bought, and a deposit to enchant names its enchantment");
+                if (enchant && !seen.Contains(report.Enchantment!))
+                    throw new SaveFormatException($"{where}[{i}].enchantment",
+                        $"{report.Enchantment} is not among the seen: its deposit bought what the campaign had met, and the campaign forgets nothing it has met");
+                if (!enchant && report.Enchantment is not null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", $"{report.Enchantment} named on a {report.Service}: a refinement attaches nothing");
+
                 if (report.Stalled)
                 {
                     if (report.RunsWorked >= report.Runs)
                         throw new SaveFormatException($"{where}[{i}].runsWorked",
                             $"{report.RunsWorked} of {report.Runs} runs on a stalled report: a stalled deposit is still in the shop, short of its last run");
+                    if (last.ServiceTick && i == reports.Count - 1)
+                        throw new SaveFormatException($"{where}[{i}].stalled",
+                            "true on the newest deposit, on a run that counted: a run that counts works the newest, and one at least");
+                    if (last.ServiceTick && i > 0 && !reports[i - 1].Stalled)
+                        throw new SaveFormatException($"{where}[{i}].stalled",
+                            "true after a worked report, on a run that counted: a run that counts works the newest, and the reports are in deposit order");
                     continue;
                 }
                 if (!last.ServiceTick)
@@ -400,13 +425,30 @@ internal static class SaveConsistency
             if (worked > ContentBounds.MostWorked)
                 throw new SaveFormatException(where,
                     $"{worked} worked, more than the {ContentBounds.MostWorked} the enchanter works on at most (EnchanterWorksOn at its most)");
+            if (reports.Count > campaign.DepositsMade)
+                throw new SaveFormatException(where,
+                    $"{reports.Count} reports and {campaign.DepositsMade} deposits made: a report speaks of a deposit, and each deposit is its own");
         }
 
-        // 28. The deposit cashed the wear it holds: the weapon has cashed that much at least.
+        // 28. The deposit cashed the wear it holds: the weapon has cashed that much at
+        // least. And a take-back puts it back — in the pool, and off what was cashed
+        // (Weapon.RefundWear) — so the weapon it gives back must load: its wear within
+        // the ceiling every weapon row is held to (SaveMapper), under what it had
+        // cashed before the deposit. Play writes both, the weapon having gone in as
+        // one that loaded — short of a cash saturated at the count's ceiling, a
+        // billion hits in, which no play reaches.
         for (int i = 0; i < queue.Count; i++)
-            if (queue[i].WearAtDeposit > queue[i].Weapon.WearCashed)
+        {
+            var deposit = queue[i];
+            if (deposit.WearAtDeposit > deposit.Weapon.WearCashed)
                 throw new SaveFormatException($"{at}[{i}].wearAtDeposit",
-                    $"{queue[i].WearAtDeposit} is above what the weapon has ever cashed, {queue[i].Weapon.WearCashed}: the deposit cashed it");
+                    $"{deposit.WearAtDeposit} is above what the weapon has ever cashed, {deposit.Weapon.WearCashed}: the deposit cashed it");
+            int before = deposit.Weapon.WearCashed - deposit.WearAtDeposit;
+            long banked = ContentBounds.Bar + (long)ContentBounds.MostCapacityPerBar * before;
+            if (deposit.WearAtDeposit > banked)
+                throw new SaveFormatException($"{at}[{i}].wearAtDeposit",
+                    $"{deposit.WearAtDeposit} is above {banked}, the most a weapon that had cashed {before} banks: the deposit cashed what the weapon banked, and a take-back puts it back");
+        }
 
         // 29. What an Enchant attaches as it finishes must load: the entry is the
         // weapon's next, so the weapon has room for one more.
@@ -414,6 +456,23 @@ internal static class SaveConsistency
             if (queue[i].Service == nameof(Service.Enchant) && queue[i].Weapon.Enchantments.Count >= ContentBounds.MostEnchantments)
                 throw new SaveFormatException($"{at}[{i}].weapon.enchantments",
                     $"{queue[i].Weapon.Enchantments.Count} entries on a deposit to enchant: the one it attaches would be more than the {ContentBounds.MostEnchantments} a weapon can hold");
+
+        // 30. The enchanter opens when the tutorial is beaten (§6.3), which retires
+        // it, and retired is never undone: a shop holding anything, a run's end
+        // reporting on one, or a deposit ever made needs a dungeon retired. Asked of
+        // the retired list alone, never of which dungeon today's dungeons.json
+        // retires on its clear — a copy beside the game may move that flag onto
+        // another (as check 3's withdrawal found), and a save play wrote still loads.
+        if (campaign.Retired.Count == 0)
+        {
+            const string why = "the enchanter opens once the tutorial is beaten, which retires it, and takes nothing before";
+            if (queue.Count > 0)
+                throw new SaveFormatException(at, $"{queue.Count} in the shop and no dungeon is retired: {why}");
+            if (campaign.LastResult?.Services is { Count: > 0 } told)
+                throw new SaveFormatException($"{At}.lastResult.services", $"{told.Count} reported at the enchanter and no dungeon is retired: {why}");
+            if (campaign.DepositsMade > 0)
+                throw new SaveFormatException($"{At}.depositsMade", $"{campaign.DepositsMade} made and no dungeon is retired: {why}");
+        }
     }
 
     /// <summary>20's one question: a weapon no member has wielded has banked no wear and cashed none.</summary>

@@ -358,16 +358,11 @@ internal static class SaveMapper
         Count(campaign.DepositsMade, $"{at}.depositsMade");
 
         // Every field has been read on its own, so a refusal of one keeps its own
-        // path; now the fields against each other (R3(b)).
+        // path; now the fields against each other (R3(b)) — with no content: that
+        // nothing is at the enchanter before the tutorial is beaten is asked of the
+        // retired list alone (check 30), since dungeons.json beside the game may
+        // move which dungeon retires on its clear.
         SaveConsistency.Check(campaign);
-
-        // And the one cross-check that needs the content: the enchanter opens when
-        // the tutorial is beaten (§6.3), so a shop holding anything before then is
-        // none play filled.
-        var tutorial = content.Dungeons.Tutorial;
-        if (enchanter.Length > 0 && !retired.Contains(tutorial.Id, StringComparer.Ordinal))
-            throw new SaveFormatException($"{at}.enchanter",
-                $"{enchanter.Length} in the shop and {tutorial.Id} is not retired: the enchanter opens only once the tutorial is beaten, and takes nothing before");
 
         return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit, stable, enchanter, campaign.DepositsMade);
     }

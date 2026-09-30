@@ -1062,6 +1062,17 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal([2, 1, 0], new[] { fresh, worked, stalled }.Select(row => row.Deposit!.Ordinal));
         Assert.All(new[] { fresh, worked, stalled }, row => Assert.Equal((HubWeapons.RowKind.Shop, true, false, (WeaponPlace?)null), (row.Kind, row.Choosable, row.Target, row.Place)));
         Assert.Equal((false, true, 2), (worked.Stalled, stalled.Stalled, stalled.Ahead));
+        Assert.All(rows.Where(row => row.Kind != HubWeapons.RowKind.Shop), row => Assert.False(row.Stalled));
+
+        // A dungeons.json beside the game that moves retiresOnClear since, onto a
+        // dungeon not beaten, closes the enchanter to new deposits — and hides
+        // nothing already in the shop, which the runs that count still work.
+        using (TestContent.UsePremise(tuning: TestShop.Ruled, dungeons: TestShop.TutorialMoved))
+        {
+            Assert.False(campaign.IsRetired(GameContent.Current.Dungeons.Tutorial.Id));
+            Assert.Equal(rows.TakeLast(4).Select(row => row.Text), HubWeapons.Rows(campaign).TakeLast(4).Select(row => row.Text));
+            Assert.Equal(Enchanter.Closed(GameContent.Current.Dungeons.Tutorial), Enchanter.Refusal(campaign, campaign.Party[0].Inventory[0]!, Service.Refine));
+        }
 
         // Drawn: a worked row cyan, a stalled one yellow, a unique's name orange;
         // chosen, marked as every choice is.
@@ -1147,9 +1158,9 @@ public sealed class BetweenRunsHudTests : IDisposable
         var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
         var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
         var wide = new Deposit(999, Made(longest), Service.Enchant, 9999, ContentBounds.MostServiceRuns, soul.Id) { RunsWorked = ContentBounds.MostServiceRuns - 1 };
-        foreach (string label in new[] { HubWeapons.WorkingLabel, HubWeapons.StalledLabel })
+        foreach (var (label, waits) in new[] { (HubWeapons.WorkingLabel, false), (HubWeapons.StalledLabel, true) })
         {
-            var row = new HubWeapons.Row(HubWeapons.RowKind.Shop, label, Weapon: wide.Weapon, Deposit: wide, Ahead: 999);
+            var row = new HubWeapons.Row(HubWeapons.RowKind.Shop, label, Weapon: wide.Weapon, Deposit: wide, Ahead: 999, Stalled: waits);
             foreach (bool chosen in new[] { false, true })
                 Fits(string.Concat(HubWeapons.Runs(row, chosen).Select(run => run.Text)), BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth);
             foreach (var line in BetweenRunsHud.DetailRows(row))
@@ -1173,7 +1184,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             }
         }
         var tallest = GameContent.Current.Weapons.All
-            .Select(def => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Shop, HubWeapons.StalledLabel, Weapon: Laden(def), Deposit: wide, Ahead: 2)))
+            .Select(def => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Shop, HubWeapons.StalledLabel, Weapon: Laden(def), Deposit: wide, Ahead: 2, Stalled: true)))
             .Max(detail => detail.Sum(row => row.Pitch));
         Assert.True(layout.Top + tallest <= layout.Bottom, $"the tallest shop detail, {tallest} px, runs into the refusal row under the most notices ({layout.Bottom - layout.Top} px)");
 

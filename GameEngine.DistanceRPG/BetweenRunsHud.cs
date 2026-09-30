@@ -206,14 +206,15 @@ public sealed class BetweenRunsHud : IDisposable
     /// on, at most <paramref name="mostServiceLines"/> of them and then how many
     /// more (<see cref="MoreAtTheEnchanter"/>); then the weapons it left stalled,
     /// wrapped as the spoils are, at most <see cref="MostStalledNames"/> named. A
-    /// run that did not count worked nothing, and says so. It names no key: the
-    /// dungeon's end panel shares these lines, and the hub adds its own
-    /// (<see cref="HubSummaryLines"/>).
+    /// run that did not count worked nothing, and says so. It names no key unless
+    /// handed one: the dungeon's end panel shares these lines, and the hub hands
+    /// its own (<see cref="HubSummaryLines"/>).
     /// </para>
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
     /// <param name="mostServiceLines">How many finished and worked services to name before saying how many more: the hub's <see cref="HubServiceLines"/>, the dungeon's end panel fewer.</param>
-    internal static IReadOnlyList<Run> SummaryLines(RunResult result, int mostServiceLines = HubServiceLines)
+    /// <param name="moreTail">What the line of how many more ends with: the hub's <see cref="TabWeapons"/>, and nothing where TAB does nothing.</param>
+    internal static IReadOnlyList<Run> SummaryLines(RunResult result, int mostServiceLines = HubServiceLines, string moreTail = "")
     {
         ArgumentNullException.ThrowIfNull(result);
         var content = GameContent.Current;
@@ -275,7 +276,7 @@ public sealed class BetweenRunsHud : IDisposable
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
         // What the enchanter did on the run's end, which the count decided.
-        lines.AddRange(ServiceLines(result, mostServiceLines));
+        lines.AddRange(ServiceLines(result, mostServiceLines, moreTail));
 
         // What the clear did to the dungeon.
         if (result.Retired)
@@ -293,13 +294,14 @@ public sealed class BetweenRunsHud : IDisposable
     /// ENCHANTER - ATTACHED VAMPIRIC</c>, <c>RIPOSTE BLADE IS BACK FROM THE
     /// ENCHANTER - REFINED</c> — then each worked one — <c>THE ENCHANTER WORKED THE
     /// ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/> of those together
-    /// and then <c>AND 2 MORE AT THE ENCHANTER</c>; then the stalled weapons in
-    /// yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
-    /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
-    /// and an enchantment are named by the content's rows, and by the bare id where
-    /// a row is gone, so the summary never throws while it draws.
+    /// and then <c>AND 2 MORE AT THE ENCHANTER</c>, <paramref name="moreTail"/>
+    /// after it; then the stalled weapons in yellow, wrapped, <c>STALLED AT THE
+    /// ENCHANTER: RIPOSTE BLADE</c>. On a run that did not count, the one grey line
+    /// <see cref="WorkedNothing"/>. A weapon and an enchantment are named by the
+    /// content's rows, and by the bare id where a row is gone, so the summary never
+    /// throws while it draws.
     /// </summary>
-    private static IEnumerable<Run> ServiceLines(RunResult result, int most)
+    private static IEnumerable<Run> ServiceLines(RunResult result, int most, string moreTail)
     {
         var reports = result.Services ?? [];
         if (reports.Count == 0)
@@ -314,7 +316,7 @@ public sealed class BetweenRunsHud : IDisposable
         foreach (var report in told.Take(Math.Max(0, most)))
             yield return new Run(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report), DungeonHud.Cyan);
         if (told.Count > most)
-            yield return new Run(MoreAtTheEnchanter(told.Count - Math.Max(0, most)), DungeonHud.Cyan);
+            yield return new Run(MoreAtTheEnchanter(told.Count - Math.Max(0, most)) + moreTail, DungeonHud.Cyan);
 
         var stalled = reports.Where(report => report.Stalled).Select(report => WeaponName(report.WeaponId)).ToList();
         if (stalled.Count > 0)
@@ -352,14 +354,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// ENCHANTER - TAB WEAPONS</c>. Here, and never in the dungeon's end panel, where
     /// TAB does nothing.
     /// </summary>
-    internal static IReadOnlyList<Run> HubSummaryLines(RunResult result)
-    {
-        var lines = SummaryLines(result, HubServiceLines).ToList();
-        for (int i = 0; i < lines.Count; i++)
-            if (lines[i].Text.StartsWith("AND ", StringComparison.Ordinal) && lines[i].Text.EndsWith(" MORE AT THE ENCHANTER", StringComparison.Ordinal))
-                lines[i] = lines[i] with { Text = lines[i].Text + TabWeapons };
-        return lines;
-    }
+    internal static IReadOnlyList<Run> HubSummaryLines(RunResult result) => SummaryLines(result, HubServiceLines, TabWeapons);
 
     /// <summary>A weapon by its catalogue id, as the summary names it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
     private static string WeaponName(string id)

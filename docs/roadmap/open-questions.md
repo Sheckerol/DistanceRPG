@@ -625,7 +625,11 @@ playtester playing each step is who meets it.
 
 **Shipped provisionally: the save stays at version 2**, as every Phase 6a step
 has it, and the README's Saves section and each step's commit say not to open a
-slot a later Phase 6a build saved with an earlier one.
+slot a later Phase 6a build saved with an earlier one. This reads the standing
+instruction that new persistent state goes in "with a version bump and a
+migration so phase-5 saves still load" as met by Phase 6a.1's one bump, from
+which every Phase 5 save migrates; the 6a.3a review read it per step, and asked
+that the choice be put to the user as it stands.
 
 **This decides whether an older development build can lose a playtester's weapons,
 so it is the user's to decide.** The alternative: lift the save to version 3 with a

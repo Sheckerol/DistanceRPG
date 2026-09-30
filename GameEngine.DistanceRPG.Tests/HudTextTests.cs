@@ -1195,40 +1195,64 @@ public sealed class HudTextTests : IDisposable
         // The run's end panel has no cut: every line of the summary is drawn, the
         // enchanter's among them (Phase 6a.3a). The worst a run's end can write — a
         // wipe with the boss down, which counts and locks, losing a full haul of the
-        // longest name, clawing back three pools from every member, then the
-        // enchanter's two lines, how many more, and the stalled weapons wrapped at
-        // their cap — still ends with its key inside the shipped 1280 x 720, the
-        // panel lifted as far as the top readouts allow, and every line across the
-        // window. An ordinary summary sits where it always has, above the middle.
+        // longest name, clawing back every pool every member has at the widest
+        // numbers (a member swaps weapons mid-run, and puts one down for another, so
+        // it can gain in every class), then the enchanter's two lines — a finished
+        // Enchant of the longest enchantment first — how many more, and the stalled
+        // weapons wrapped at their cap — still ends with its key inside the shipped
+        // 1280 x 720, the panel lifted as far as the top readouts allow and its lines
+        // closed up as far as they must, never below the least step, and every line
+        // across the window. The lift alone no longer does for it, nor would a cap of
+        // one service or none: the claw-backs wrap to three lines a member.
         using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
         const float h = 720f;
         var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
+        var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
         var haul = Enumerable.Range(0, GameContent.Current.Tuning.PartyCarrySlots).Select(_ => TestWeapons.Get(longest.Id)).ToArray();
-        var clawbacks = new[] { "A", "B", "C", "D" }
-            .SelectMany(member => new[] { new XpClawback(member, nameof(WeaponClass.Throwing), 99_999, 0), new XpClawback(member, XpSnapshot.HpPool, 9999, 0), new XpClawback(member, XpSnapshot.ManaPool, 9999, 0) })
+        string[] members = ["A", "B", "C", "D"];
+        XpClawback[] Pools(string member) =>
+        [
+            .. Enum.GetNames<WeaponClass>().Select(pool => new XpClawback(member, pool, 99_999, 0)),
+            new XpClawback(member, XpSnapshot.HpPool, 9999, 0),
+            new XpClawback(member, XpSnapshot.ManaPool, 9999, 0),
+        ];
+        var reports = Enumerable.Range(0, 20).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, ContentBounds.MostServiceRuns, Stalled: true))
+            .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id))
+            .Concat(Enumerable.Range(0, ContentBounds.MostWorked - 1).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id)))
             .ToArray();
-        var reports = Enumerable.Range(0, ContentBounds.MostWorked).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: "regeneration"))
-            .Concat(Enumerable.Range(0, 20).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, ContentBounds.MostServiceRuns, Stalled: true)))
-            .ToArray();
-        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, clawbacks, reports);
+        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, members.SelectMany(Pools).ToArray(), reports);
 
         var lines = DungeonHud.RunSummaryLines(worst);
-        Assert.Equal(DungeonHud.DungeonServiceLines, lines.Count(line => line.Text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
-        Assert.Contains(lines, line => line.Text == BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines));
-        Assert.Contains(lines, line => line.Text.StartsWith(BetweenRunsHud.StalledHeading, StringComparison.Ordinal));
-        Assert.Equal(4, lines.Count(line => line.Text.StartsWith("A:", StringComparison.Ordinal) || line.Text.StartsWith("B:", StringComparison.Ordinal)
-            || line.Text.StartsWith("C:", StringComparison.Ordinal) || line.Text.StartsWith("D:", StringComparison.Ordinal)));
-        Assert.StartsWith(DungeonHud.ContinueHint, lines[^1].Text, StringComparison.Ordinal);
+        var texts = lines.Select(line => line.Text).ToArray();
+        string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()}";
+        Assert.Equal(new[] { back, $"THE ENCHANTER WORKED THE {longest.Name.ToUpperInvariant()} - 1 OF {ContentBounds.MostServiceRuns} RUNS" }.Take(DungeonHud.DungeonServiceLines),
+            texts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+        Assert.Contains(BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines), texts);
+        Assert.Contains(texts, text => text.StartsWith(BetweenRunsHud.StalledHeading, StringComparison.Ordinal));
+        int pools = Enum.GetNames<WeaponClass>().Length + 2;
+        var clawed = texts.SkipWhile(text => text != "XP CLAWED BACK:").Skip(1).TakeWhile(text => !text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(members.Length * pools, clawed.Sum(text => text.Split(" -").Length - 1));   // every pool named once
+        Assert.True(clawed.Length >= 3 * members.Length, $"the claw-backs wrap to {clawed.Length} lines");
+        Assert.StartsWith(DungeonHud.ContinueHint, texts[^1], StringComparison.Ordinal);
 
         float top = DungeonHud.RunSummaryTop(h, lines.Count);
-        float keyBottom = top + DungeonHud.RunSummaryHeight(lines.Count);
+        float step = DungeonHud.RunSummaryStep(h, lines.Count);
+        float keyBottom = top + DungeonHud.RunSummaryHeight(h, lines.Count);
         Assert.True(keyBottom <= h - DungeonHud.SummaryBottomClearance, $"the worst summary's key ends at {keyBottom} px, past the window's {h}");
         Assert.True(top >= 80f, $"the worst summary starts at {top} px, over the top readouts");
-        Assert.All(lines, line => Assert.True(line.Text.Length * 6f * 2f <= 1240f, $"'{line.Text}' runs off the window"));
+        Assert.InRange(step, 16f, 21.99f);   // closed up, and no closer than a line's glyphs and a gap
+        Assert.All(texts, text => Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window"));
 
-        // An ordinary summary is anchored where it always was.
+        // A long summary the lift alone fits keeps the full step: a member clawed
+        // back in one weapon's class, and in HP and mana, one line a member.
+        var lifted = DungeonHud.RunSummaryLines(worst with { Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray() });
+        Assert.Equal(22f, DungeonHud.RunSummaryStep(h, lifted.Count));
+        Assert.True(DungeonHud.RunSummaryTop(h, lifted.Count) < h / 2f - 170f, "the lifted summary sits above the ordinary anchor");
+
+        // An ordinary summary is anchored where it always was, at the full step.
         var ordinary = DungeonHud.RunSummaryLines(new RunResult("tutorial", RunOutcome.Retreat, false, 1, null, false, false, 0, null, false, [], [], []));
         Assert.Equal(h / 2f - 170f, DungeonHud.RunSummaryTop(h, ordinary.Count));
+        Assert.Equal(22f, DungeonHud.RunSummaryStep(h, ordinary.Count));
     }
 
     [Fact]

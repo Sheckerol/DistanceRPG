@@ -56,7 +56,8 @@ internal sealed class HubWeapons
     /// <param name="Weapon">The weapon on a weapon row or a shop row, or null.</param>
     /// <param name="Deposit">The deposit on a shop row, or null.</param>
     /// <param name="Ahead">On a shop row, how many newer deposits are in the shop: a stalled one waits on them.</param>
-    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0)
+    /// <param name="Stalled">Whether this shop row's deposit waits: the next run that counts leaves it unworked. Set with its label (<see cref="StalledLabel"/>), never read back off it.</param>
+    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0, bool Stalled = false)
     {
         /// <summary>
         /// The row's text: the label, and on a weapon row the weapon's name and its
@@ -69,9 +70,6 @@ internal sealed class HubWeapons
             ({ } weapon, null) => $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}",
             _ => Label,
         };
-
-        /// <summary>Whether this shop row's deposit waits: the next run that counts leaves it unworked.</summary>
-        public bool Stalled => Kind == RowKind.Shop && Label == StalledLabel;
 
         /// <summary>Whether W/S stops on it while browsing: a weapon, a room, or a weapon in the shop.</summary>
         public bool Choosable => Kind is RowKind.Weapon or RowKind.Room or RowKind.Shop;
@@ -176,12 +174,12 @@ internal sealed class HubWeapons
     /// the stable's heading, each weapon in the stable in its order, and the
     /// stable's room, which is always there: the stable is unbounded (PHASE 6a
     /// DECISION 7). An empty hand is a row of its own, somewhere a weapon can go.
-    /// Last the enchanter (Phase 6a.3a): before the tutorial is beaten, that it
-    /// opens then (§6.3); after, how many deposits it works on, and each weapon in
-    /// the shop, the newest first — <c>WORKING</c> for the few the next run that
-    /// counts works, <c>STALLED</c> for the rest (§6.2: "working on these two"
-    /// reads at a glance, and a stalled weapon is never silent) — or that nothing
-    /// is in it.
+    /// Last the enchanter (Phase 6a.3a): how many deposits it works on, and each
+    /// weapon in the shop, the newest first — <c>WORKING</c> for the few the next
+    /// run that counts works, <c>STALLED</c> for the rest (§6.2: "working on these
+    /// two" reads at a glance, and a stalled weapon is never silent) — or, with
+    /// nothing in it, that it opens when the tutorial is beaten (§6.3) or that
+    /// nothing is in it.
     /// </summary>
     internal static IReadOnlyList<Row> Rows(CampaignState campaign) => [.. PartyRows(campaign), .. ShopRows(campaign)];
 
@@ -228,27 +226,35 @@ internal sealed class HubWeapons
         return rows;
     }
 
-    /// <summary>The page's last rows (<see cref="Rows(CampaignState)"/>): the enchanter's heading, and each weapon in the shop, the newest first.</summary>
+    /// <summary>
+    /// The page's last rows (<see cref="Rows(CampaignState)"/>): the enchanter's
+    /// heading, and each weapon in the shop, the newest first. Whatever is in the
+    /// shop is listed, whichever dungeon today's <c>dungeons.json</c> retires on
+    /// its clear: a copy beside the game may move that flag onto a dungeon not
+    /// beaten after deposits were made, and a weapon in the shop — still worked by
+    /// the runs that count — is never hidden. Only an empty shop says it opens when
+    /// the tutorial is beaten.
+    /// </summary>
     private static List<Row> ShopRows(CampaignState campaign)
     {
         var rows = new List<Row>();
         var content = GameContent.Current;
         var shop = campaign.AtTheEnchanter;
-        if (!campaign.IsRetired(content.Dungeons.Tutorial.Id))
-            rows.Add(new Row(RowKind.Heading, Enchanter.Closed(content.Dungeons.Tutorial)));
-        else if (shop.Count == 0)
-            rows.Add(new Row(RowKind.Heading, NothingInTheShop));
-        else
+        if (shop.Count == 0)
         {
-            rows.Add(new Row(RowKind.Heading, EnchanterHeading(content.Tuning.EnchanterWorksOn)));
-            var worked = Enchanter.Worked(shop);
-            for (int i = shop.Count - 1; i >= 0; i--)   // the newest first: the worked few head it
-            {
-                var deposit = shop[i];
-                bool working = worked.Any(entry => ReferenceEquals(entry, deposit));
-                rows.Add(new Row(RowKind.Shop, working ? WorkingLabel : StalledLabel, Weapon: deposit.Weapon, Deposit: deposit,
-                    Ahead: shop.Count(entry => entry.Ordinal > deposit.Ordinal)));
-            }
+            var tutorial = content.Dungeons.Tutorial;
+            rows.Add(new Row(RowKind.Heading, campaign.IsRetired(tutorial.Id) ? NothingInTheShop : Enchanter.Closed(tutorial)));
+            return rows;
+        }
+
+        rows.Add(new Row(RowKind.Heading, EnchanterHeading(content.Tuning.EnchanterWorksOn)));
+        var worked = Enchanter.Worked(shop);
+        for (int i = shop.Count - 1; i >= 0; i--)   // the newest first: the worked few head it
+        {
+            var deposit = shop[i];
+            bool stalled = !worked.Any(entry => ReferenceEquals(entry, deposit));
+            rows.Add(new Row(RowKind.Shop, stalled ? StalledLabel : WorkingLabel, Weapon: deposit.Weapon, Deposit: deposit,
+                Ahead: shop.Count(entry => entry.Ordinal > deposit.Ordinal), Stalled: stalled));
         }
         return rows;
     }

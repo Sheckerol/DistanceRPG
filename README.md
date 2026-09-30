@@ -358,8 +358,10 @@ back to it, and the game quits from it.
   (`"depositsMade"`), with the last run's word on the shop in its result
   (`"services"`, `null` for an empty shop; Phase 6a.3a). A save whose shop
   contradicts itself — a weapon in it worn, a service past its last run, an
-  enchantment the campaign never met, a deposit before the tutorial is beaten — is
-  refused as one that cannot be read, naming where. A save an earlier build wrote —
+  enchantment the campaign never met, a deposit before the tutorial is beaten, a
+  run's report of the shop that says what no run's end says, a deposit whose
+  take-back would give back a weapon no load reads — is refused as one that
+  cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
   or the shop, and saved as version 2 from then on. It says `THE NUMBERS HAVE
@@ -722,7 +724,10 @@ everything in them is named by a stable string id.
 - **`dungeons.json`** holds the dungeons the screen between runs lists: `theme`,
   `attunement` (a damage type, or `null`), `bossFloorMin`/`bossFloorMax` (`null`
   plays `tuning.json`'s range), the `boss` (its statline and `innate` modifiers)
-  and `retiresOnClear`, the tutorial's alone. There is no drop table: what a boss
+  and `retiresOnClear`, the tutorial's alone. Moved onto another dungeon once a
+  campaign has deposits at the enchanter, it refuses no save and hides nothing in
+  the shop: the enchanter takes no new deposit until that dungeon is beaten, and
+  what is in the shop is listed and worked as ever. There is no drop table: what a boss
   drops is computed from its theme and `restricted.json`, so taking `Brace` out
   of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
   with no edit to this file.

@@ -856,11 +856,12 @@ public sealed class DungeonHud
     internal const int DungeonServiceLines = 2;
 
     // The run's summary panel: the headline's top, and the step to the first line
-    // under it; each line's step; the gap over the key; the scales; and the
-    // clearance the key keeps over the window's bottom.
+    // under it; each line's step, and the least it closes up to; the gap over the
+    // key; the scales; and the clearance the key keeps over the window's bottom.
     private const float SummaryFloor = 80f;
     private const float SummaryHeadlineStep = 56f;
     private const float SummaryLineStep = 22f;
+    private const float SummaryLeastLineStep = 16f;   // a line's glyphs at SummaryLineScale, 11.2 px, and a clear gap under them
     private const float SummaryKeyGap = 12f;
     private const float SummaryHeadlineScale = 5f;
     private const float SummaryLineScale = 1.6f;
@@ -876,22 +877,42 @@ public sealed class DungeonHud
     /// bottom. The panel has no cut, so every line it is handed is drawn.
     /// </summary>
     internal static float RunSummaryTop(float h, int lines)
-        => MathF.Max(SummaryFloor, MathF.Min(h / 2f - 170f, h - SummaryBottomClearance - RunSummaryHeight(lines)));
+        => MathF.Max(SummaryFloor, MathF.Min(h / 2f - 170f, h - SummaryBottomClearance - RunSummaryHeight(h, lines)));
 
-    /// <summary>How tall the run's summary panel is for <paramref name="lines"/> lines, from the headline's top to the key's bottom.</summary>
-    internal static float RunSummaryHeight(int lines)
-        => SummaryHeadlineStep + Math.Max(0, lines - 2) * SummaryLineStep + SummaryKeyGap + GlyphHeight * SummaryKeyScale;
+    /// <summary>
+    /// The step between the run's summary lines in a window <paramref name="h"/>
+    /// pixels tall, for <paramref name="lines"/> lines: the full step, unless the
+    /// panel lifted as far as the top readouts allow would still take the key past
+    /// the window's bottom — then as close as the lines must sit to end above it,
+    /// and never closer than <see cref="SummaryLeastLineStep"/>. Only the longest
+    /// wipes close up: every member clawed back in more pools than one line holds,
+    /// beside a full haul lost and the enchanter's lines.
+    /// </summary>
+    internal static float RunSummaryStep(float h, int lines)
+    {
+        int steps = Math.Max(0, lines - 2);
+        if (steps == 0)
+            return SummaryLineStep;
+        float room = h - SummaryBottomClearance - SummaryFloor - SummaryHeadlineStep - SummaryKeyGap - GlyphHeight * SummaryKeyScale;
+        return Math.Clamp(room / steps, SummaryLeastLineStep, SummaryLineStep);
+    }
+
+    /// <summary>How tall the run's summary panel is in a window <paramref name="h"/> pixels tall for <paramref name="lines"/> lines, from the headline's top to the key's bottom, the lines at their step (<see cref="RunSummaryStep"/>).</summary>
+    internal static float RunSummaryHeight(float h, int lines)
+        => SummaryHeadlineStep + Math.Max(0, lines - 2) * RunSummaryStep(h, lines) + SummaryKeyGap + GlyphHeight * SummaryKeyScale;
 
     /// <summary>
     /// The run's summary over the dimmed floor (<see cref="RunSummaryLines"/>):
     /// the headline large, each line under it, and the key last, a step apart.
-    /// Anchored above the middle, never over the top readouts, and lifted when a
-    /// long one would run off the bottom (<see cref="RunSummaryTop"/>).
+    /// Anchored above the middle, never over the top readouts, lifted when a long
+    /// one would run off the bottom (<see cref="RunSummaryTop"/>), and closed up
+    /// when lifting is not enough (<see cref="RunSummaryStep"/>).
     /// </summary>
     private void DrawRunSummary(int w, int h, RunResult result)
     {
         var lines = RunSummaryLines(result);
         float y = RunSummaryTop(h, lines.Count);
+        float step = RunSummaryStep(h, lines.Count);
         DrawCentered(w, y, lines[0].Text, SummaryHeadlineScale, lines[0].Color);
         y += SummaryHeadlineStep;
         for (int i = 1; i < lines.Count; i++)
@@ -899,7 +920,7 @@ public sealed class DungeonHud
             bool last = i == lines.Count - 1;
             if (last) y += SummaryKeyGap;
             DrawCentered(w, y, lines[i].Text, last ? SummaryKeyScale : SummaryLineScale, lines[i].Color);
-            y += SummaryLineStep;
+            y += step;
         }
     }
 
