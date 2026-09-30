@@ -46,6 +46,14 @@ namespace GameEngine.DistanceRPG.Tests;
 /// on, and <c>WearCapacityPerBar</c> 1, a point for every full bar cashed — the
 /// user's ruling of 2026-09-25 on what a deposit costs, R4 (settled.md L1653-1676),
 /// and its worked capacities: <see cref="WearTests.ACapacityReplaysFullBars_TheRulingsNumbers"/>.</item>
+/// <item>What a deposit costs: <c>FirstSlotCapacity</c> 30 and <c>SlotCapacityStep</c> 5
+/// (slots at 30, 35, 40, 45 and 50), <c>EnchantmentSlots</c> 5, <c>FirstEnchantmentWear</c>
+/// 30 and <c>EnchantmentWearStep</c> 5 (a deposit of 30 + 5(n − 1) for enchantment n),
+/// and <c>EnchanterWorksOn</c> 2, "the two most recently deposited" — R4 and its
+/// consequences (settled.md L1666-1732, L97-98), with its worked climb: #1 at 30, #2 at
+/// 195, #3 at 385, #4 at 600, #5 at 840 over 21 deposits, 71 runs and at the least 31,
+/// and 72/48, 78/66 and 89/85 for what a weapon arrives with:
+/// <see cref="EnchanterTests.TheRulingsClimb_WearDepositsAndRuns"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

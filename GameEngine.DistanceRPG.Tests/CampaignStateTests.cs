@@ -196,12 +196,12 @@ public class CampaignStateTests
         // And the type hands out no other view to iterate by accident: no public
         // set, no hash-ordered list, nothing but the named ordered views — the
         // stable among them, a list in the order its weapons were put there (Phase
-        // 6a.2).
+        // 6a.2), and the enchanter's queue, in deposit order (Phase 6a.3a).
         string[] orderedViews =
         [
             nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party),
             nameof(CampaignState.LockedInOrder), nameof(CampaignState.ClearedInOrder), nameof(CampaignState.RetiredInOrder),
-            nameof(CampaignState.Stable),
+            nameof(CampaignState.Stable), nameof(CampaignState.AtTheEnchanter),
         ];
         var iterable = typeof(CampaignState)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

@@ -13,7 +13,10 @@ namespace GameEngine.DistanceRPG.Logic;
 // every save an earlier build of the same version wrote still reads. A required
 // member arrives only with a version, whose migration writes it into every older
 // document (SaveCodec.Migrations): version 2's are a weapon row's wear and wear
-// cashed, and the root's tuning hash version (Phase 6a.1).
+// cashed, and the root's tuning hash version (Phase 6a.1). Version 2's appended
+// members — the stable (6a.2), the enchanter's queue and its count, and a run's
+// service reports (6a.3a) — the migration writes none of; it removes a stray one a
+// hand gave a version-1 document, which meant nothing to version 1.
 
 /// <summary>
 /// One campaign, saved (§5.1): the version of this format it was written in,
@@ -103,9 +106,31 @@ public sealed record ViewDto(string? ActiveMemberId = null, bool MarchingThisTur
 /// with its default: a document written before it — version 1, lifted, or an
 /// earlier Phase 6a step's — reads as a campaign with nothing in the stable.
 /// </param>
+/// <param name="Enchanter">
+/// The enchanter's queue (<see cref="CampaignState.AtTheEnchanter"/>, §6.2): every
+/// deposit in the shop, in deposit order, each with its weapon whole — or null for
+/// an empty shop, which is what a capture writes. Null and <c>[]</c> read alike.
+/// Appended by Phase 6a.3a, with its default: a document written before it reads
+/// as a campaign with nothing in the shop.
+/// </param>
+/// <param name="DepositsMade">How many deposits the campaign has ever made (<see cref="CampaignState.DepositsMade"/>): the next one's ordinal. Appended by Phase 6a.3a, with its default, 0.</param>
 public sealed record CampaignDto(IReadOnlyList<MemberDto> Party, IReadOnlyList<string> Seen, int RunCounter, IReadOnlyList<LockDto> Locks,
     IReadOnlyList<string> Cleared, IReadOnlyList<string> Retired, RunResultDto? LastResult, VisitDto? Visit = null,
-    IReadOnlyList<WeaponDto>? Stable = null);
+    IReadOnlyList<WeaponDto>? Stable = null, IReadOnlyList<DepositDto>? Enchanter = null, int DepositsMade = 0);
+
+/// <summary>
+/// One deposit in the shop (<see cref="Deposit"/>, §6.7): its ordinal, the service
+/// by name, the weapon whole, the wear the deposit cashed, the runs the service
+/// takes and how many are worked, and the enchantment an Enchant attaches, by id.
+/// </summary>
+/// <param name="Ordinal">The deposit's ordinal: the campaign's count of deposits as it went in.</param>
+/// <param name="Service">What it bought, by <see cref="Logic.Service"/> name.</param>
+/// <param name="Weapon">The weapon in the shop, whole.</param>
+/// <param name="WearAtDeposit">The wear the deposit cashed.</param>
+/// <param name="Runs">The runs the service takes.</param>
+/// <param name="RunsWorked">The runs of it worked.</param>
+/// <param name="Enchantment">The enchantment an Enchant attaches, by id; null for a refinement.</param>
+public sealed record DepositDto(int Ordinal, string Service, WeaponDto Weapon, int WearAtDeposit, int Runs, int RunsWorked, string? Enchantment = null);
 
 /// <summary>A cleared dungeon's lock: the run it can be entered again from (§4.5).</summary>
 public sealed record LockDto(string DungeonId, int LockedUntilRun);
@@ -188,11 +213,21 @@ public sealed record EnchantmentDto(string Id, int Tier, int Xp);
 /// <summary>
 /// How the last run ended (<see cref="RunResult"/>): the facts its summary
 /// shows between runs, the outcome by name and its spoils as weapon rows —
-/// copies, since only what they are is read, never where they went.
+/// copies, since only what they are is read, never where they went — and what
+/// the enchanter did on it: a report a deposit in the shop, or null for an empty
+/// shop, which is what a capture writes; null and <c>[]</c> read alike (appended
+/// by Phase 6a.3a, with its default).
 /// </summary>
 public sealed record RunResultDto(string DungeonId, string Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed, bool ServiceTick,
     bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired, IReadOnlyList<WeaponDto> SpoilsKept, IReadOnlyList<WeaponDto> SpoilsLost,
-    IReadOnlyList<ClawbackDto> Clawbacks);
+    IReadOnlyList<ClawbackDto> Clawbacks, IReadOnlyList<ServiceDto>? Services = null);
+
+/// <summary>
+/// What a run's end did with one deposit (<see cref="ServiceReport"/>): the weapon
+/// by catalogue id, the service by name, its runs worked and taken, whether the
+/// run left it stalled, and the enchantment an Enchant attaches, by id.
+/// </summary>
+public sealed record ServiceDto(string WeaponId, string Service, int RunsWorked, int Runs, bool Stalled = false, string? Enchantment = null);
 
 /// <summary>What a wipe took back from one pool (<see cref="XpClawback"/>): the member by id, the pool by name, what it held and what it holds.</summary>
 public sealed record ClawbackDto(string MemberId, string Pool, int Before, int After);

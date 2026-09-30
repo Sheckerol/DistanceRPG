@@ -1076,12 +1076,13 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Empty(campaign.RetiredInOrder);
 
         // And the campaign's surface holds nothing of a dungeon: its numbers, its
-        // party, what it has met, how the last run went, and the stable (Phase 6a.2).
+        // party, what it has met, how the last run went, the stable (Phase 6a.2), and
+        // the enchanter's queue and how many deposits were ever made (Phase 6a.3a).
         string[] kept =
         [
             nameof(CampaignState.Party), nameof(CampaignState.Visit), nameof(CampaignState.RunCounter), nameof(CampaignState.LastResult),
             nameof(CampaignState.SeenInOrder), nameof(CampaignState.LockedInOrder), nameof(CampaignState.ClearedInOrder), nameof(CampaignState.RetiredInOrder),
-            nameof(CampaignState.Stable),
+            nameof(CampaignState.Stable), nameof(CampaignState.AtTheEnchanter), nameof(CampaignState.DepositsMade),
         ];
         Assert.Equal(kept.Order(StringComparer.Ordinal),
             typeof(CampaignState).GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name).Order(StringComparer.Ordinal));

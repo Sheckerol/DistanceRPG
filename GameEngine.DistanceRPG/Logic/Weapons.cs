@@ -32,12 +32,12 @@ public sealed class Weapon
     /// <summary>
     /// The attached entries, in attachment order — the weapon's own copy of what
     /// it was handed, and the only thing <see cref="CreditEnchantment"/> writes
-    /// to. Private, and <see cref="Enchantments"/> hands out a read-only view of
-    /// it rather than the array itself: attachment order is gameplay (§1.7) and
-    /// fixes the order entries fire in, so it is the weapon's to change and
-    /// nobody else's.
+    /// to and the enchanter appends to (<see cref="Attach"/>). Private, and
+    /// <see cref="Enchantments"/> hands out a read-only view of it rather than the
+    /// list itself: attachment order is gameplay (§1.7) and fixes the order
+    /// entries fire in, so it is the weapon's to change and nobody else's.
     /// </summary>
-    private readonly Enchantment[] _enchantments;
+    private readonly List<Enchantment> _enchantments;
 
     /// <param name="def">The row this item is stamped from.</param>
     /// <param name="enchantments">The entries attached, in attachment order: the forged ones first, anything acquired behind them.</param>
@@ -73,10 +73,10 @@ public sealed class Weapon
     {
         Forged = Forge(def, forgedGraft);
         Modifiers = Forged;
-        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, _enchantments.Length);
-        if (forged < 0 || forged > _enchantments.Length)
+        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, _enchantments.Count);
+        if (forged < 0 || forged > _enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(forgedCount), forgedCount,
-                $"'{def.Id}' was handed {_enchantments.Length} entries; the forged ones are a prefix of them.");
+                $"'{def.Id}' was handed {_enchantments.Count} entries; the forged ones are a prefix of them.");
         ForgedEnchantmentCount = forged;
         Resolve();
     }
@@ -122,9 +122,9 @@ public sealed class Weapon
                 throw new ArgumentException(
                     $"'{def.Id}' forges {type} x{stacks} and holds {modifiers.Stacks(type)} live: the live spread is the forged one plus what was acquired, never less.",
                     nameof(modifiers));
-        if (forgedEnchantmentCount < 0 || forgedEnchantmentCount > _enchantments.Length)
+        if (forgedEnchantmentCount < 0 || forgedEnchantmentCount > _enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(forgedEnchantmentCount), forgedEnchantmentCount,
-                $"'{def.Id}' carries {_enchantments.Length} entries; the forged ones are a prefix of them.");
+                $"'{def.Id}' carries {_enchantments.Count} entries; the forged ones are a prefix of them.");
         ArgumentOutOfRangeException.ThrowIfNegative(wear);
         ArgumentOutOfRangeException.ThrowIfNegative(wearCashed);
 
@@ -152,8 +152,8 @@ public sealed class Weapon
         ManaCost = def.ManaCost;
         Forged = ModifierSet.Empty;
         Modifiers = ModifierSet.Empty;
-        _enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
-        Enchantments = Array.AsReadOnly(_enchantments);   // a live view: a credited entry shows through, a write does not get in
+        _enchantments = enchantments.ToList();   // attachment order, copied so nothing outside can reorder it
+        Enchantments = _enchantments.AsReadOnly();   // a live view: a credited entry and an attached one show through, a write does not get in
         AreaShape = def.Shape;
         Unique = def.Unique;
     }
@@ -173,7 +173,7 @@ public sealed class Weapon
     /// <summary>The live total, forged plus acquired: what every resolution site reads.</summary>
     public ModifierSet Modifiers { get; private set; }
 
-    /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped.</summary>
+    /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped. An entry the enchanter attaches comes last (<see cref="Attach"/>).</summary>
     public IReadOnlyList<Enchantment> Enchantments { get; }
 
     /// <summary>
@@ -273,6 +273,64 @@ public sealed class Weapon
     }
 
     /// <summary>
+    /// Cash the whole pool in at the enchanter (§6.1; R4): the wear banked goes
+    /// to <see cref="WearCashed"/>, the capacity growing on it as it is replayed,
+    /// and the pool empties — whatever the deposit bought, "the pool itself still
+    /// empties at every deposit". What was cashed is saturated at
+    /// <see cref="ContentBounds.MostCount"/>, a billion hits in, which play never
+    /// reaches; since <see cref="Wear"/> is no more than that, what was cashed is
+    /// never less than what this call returns. The one caller is
+    /// <see cref="Enchanter.Deposit"/>: the enchanter is the single place wear is
+    /// spent (P6:860–861; <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c>).
+    /// </summary>
+    /// <returns>The wear cashed: the deposit's.</returns>
+    internal int CashWear()
+    {
+        int cashed = Wear;
+        Wear = 0;
+        WearCashed = (int)Math.Min(ContentBounds.MostCount, (long)WearCashed + cashed);
+        return cashed;
+    }
+
+    /// <summary>
+    /// A deposit taken back (PHASE 6a DECISION 8): the exact inverse of
+    /// <see cref="CashWear"/> — <paramref name="cashed"/> goes back into the pool
+    /// and off <see cref="WearCashed"/>, so the capacity and its progress, replayed
+    /// from what was cashed, are what they were before the deposit. A deposit and
+    /// its take-back therefore leave a weapon as they found it, and a take-back is
+    /// never a way to grow capacity with no downtime. The one inexact case is a
+    /// <see cref="WearCashed"/> that saturated in the cash, which play never
+    /// reaches. The one caller is <see cref="Enchanter.TakeBack"/>.
+    /// </summary>
+    /// <param name="cashed">What the deposit cashed (<see cref="Deposit.WearAtDeposit"/>).</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="cashed"/> is negative, or more than the weapon has ever cashed.</exception>
+    internal void RefundWear(int cashed)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(cashed);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(cashed, WearCashed);
+        Wear = (int)Math.Min(ContentBounds.MostCount, (long)Wear + cashed);
+        WearCashed -= cashed;
+    }
+
+    /// <summary>
+    /// Attach <paramref name="entry"/> as the weapon's last enchantment: what a
+    /// finished Enchant service does (§6.2; <see cref="Enchanter"/>). Last and
+    /// acquired — never forged, and never sorted in: "a new enchantment always goes
+    /// last" (§3.3). The enchanter's own gate (<see cref="Enchanter.Refusal"/>) and
+    /// the save's (check 29) keep a weapon below the most a weapon can hold, and
+    /// this holds it there too, so no path builds a weapon the next load refuses.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The weapon already holds <see cref="ContentBounds.MostEnchantments"/>.</exception>
+    internal void Attach(Enchantment entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (_enchantments.Count >= ContentBounds.MostEnchantments)
+            throw new InvalidOperationException(
+                $"{Name} ({Id}) holds {_enchantments.Count} enchantments, the most a weapon can (EnchantmentSlots at its most): the enchanter never attaches past it.");
+        _enchantments.Add(entry);
+    }
+
+    /// <summary>
     /// What this item would reserve of a wielder's pool if every entry fitted:
     /// the sum of the attached entries' <see cref="Enchantment.EffectiveLock"/>
     /// (§3.3). It is the item's own figure and knows no wielder, exactly as
@@ -361,8 +419,8 @@ public sealed class Weapon
     /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, <paramref name="xp"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
     public void CreditEnchantment(int index, int xp, int stat)
     {
-        if ((uint)index >= (uint)_enchantments.Length)
-            throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Length} enchantments.");
+        if ((uint)index >= (uint)_enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Count} enchantments.");
         _enchantments[index] = _enchantments[index].WithXp(xp, stat);
     }
 

@@ -114,8 +114,7 @@ public static class TuningJson
     /// <c>true</c>/<c>false</c>, lines sorted ordinally. So a file's formatting,
     /// key order and comments never move it, and any value a rule of play reads
     /// does — a number the master copy ships, changed by a new build, included.
-    /// A key no rule of play reads (<see cref="TuningKey.Played"/> false — the
-    /// Enchanter's still declared ahead of their Phase 6a reader, and
+    /// A key no rule of play reads (<see cref="TuningKey.Played"/> false —
     /// <c>SaveSlots</c>, the launcher's) is left out: a save's hash answers "are
     /// these the numbers it was played under?", and a number nothing plays is none
     /// it was played under. So turning one never says the numbers changed, and

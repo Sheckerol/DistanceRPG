@@ -690,9 +690,9 @@ public class TuningJsonTests
     [Fact]
     public void AKeyNoRulePlaysNeverMovesTheHash()
     {
-        // A key declared ahead of its reader (Played false: what a deposit costs,
-        // the user's ruling of 2026-09-25, until Phase 6a builds the enchanter) is
-        // no number a campaign was played under. A file turning one to either end
+        // A key no rule of play reads (Played false: SaveSlots, the launcher's
+        // count; and before Phase 6a built the enchanter, what a deposit costs,
+        // declared ahead of its reader) is no number a campaign was played under. A file turning one to either end
         // of its clamp leaves the tuning's hash where it was — read alone, and as
         // the game loads it beside the shipped content — while the log's overrides
         // still name it, since the file changed it all the same.
@@ -741,12 +741,14 @@ public class TuningJsonTests
     {
         // PHASE 6a DECISION 9: a save's hash is of the keys played at the version
         // that wrote it. A key a rule began to play with version 2 — what a hit
-        // wears and the capacity a bar adds, from Phase 6a.1 — is in version 2's
+        // wears and the capacity a bar adds, from Phase 6a.1, and the slots, the
+        // price and the enchanter's worked few, from 6a.3a — is in version 2's
         // hash and not in version 1's: moving it moves the one and leaves the other
         // where it was, while a key played since version 1 moves both. The
         // current version's is the default, the one a capture writes.
         var v2Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 2).Select(k => k.Name).ToArray();
-        Assert.Equal([nameof(Tuning.WearPerHit), nameof(Tuning.WearCapacityPerBar)], v2Keys);
+        Assert.Equal([nameof(Tuning.WearPerHit), nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
+            nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep), nameof(Tuning.EnchanterWorksOn)], v2Keys);
         Assert.Equal(TuningJson.Hash(BuiltIn, SaveCodec.CurrentVersion), TuningJson.Hash(BuiltIn));
         string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2);
         Assert.NotEqual(one, two);

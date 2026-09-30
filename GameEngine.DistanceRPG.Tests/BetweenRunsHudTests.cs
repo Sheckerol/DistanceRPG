@@ -598,6 +598,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         // §6.2: WEAPONS lists every member's hand and bag, in roster order, then the
         // stable, a row a weapon with its wear; a row for the room a bag has left,
         // and the stable's room, always there — it is unbounded (PHASE 6a DECISION 7).
+        // Last the enchanter (Phase 6a.3a), shut until the tutorial is beaten
+        // (TheEnchanterSectionShowsWorkingAndStalled).
         var campaign = CampaignState.Start(GameContent.Current);
         campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
         Assert.Equal(new[]
@@ -621,6 +623,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             "THE STABLE - 1 WEAPON",
             "  STAFF OF RENEWAL - WEAR 0/30",
             "  - ROOM -",
+            "THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN",
         }, HubWeapons.Rows(campaign).Select(row => row.Text));
         Assert.Equal("THE STABLE - EMPTY", HubWeapons.StableHeading(0));
         Assert.Equal("THE STABLE - 3 WEAPONS", HubWeapons.StableHeading(3));
@@ -641,7 +644,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.DoesNotContain(rows, row => row.Place?.MemberId == "B" && row.Kind == HubWeapons.RowKind.Room);
         Assert.Equal(new WeaponPlace("A", 0), rows[2].Place);
         Assert.Equal(new WeaponPlace("A", 1), rows[4].Place);   // a weapon put in the room takes the first empty slot
-        Assert.Equal(WeaponPlace.InTheStable(1), rows[^1].Place);   // the stable's end
+        Assert.Equal(WeaponPlace.InTheStable(1), rows[^2].Place);   // the stable's end, over the enchanter's heading
 
         // Drawn: headings and members grey, a room dark grey, a weapon white — its
         // wear green once full — and a unique's name orange. The chosen row is
@@ -664,7 +667,9 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("THE BULWARK", HubWeapons.The(TestWeapons.Get("the_bulwark")));
 
         // The chosen weapon, said whole on the right: where it is, its name, the
-        // dungeon's readouts with no wielder, its wear and its capacity.
+        // dungeon's readouts with no wielder, its wear and its capacity, and its
+        // slots and what its next enchantment costs (Phase 6a.3a; their words are
+        // TheEnchanterSectionShowsWorkingAndStalled's).
         var stiletto = TestWeapons.Get("weakspot_stiletto");
         var detail = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("A", 0), stiletto));
         Assert.Equal(new[]
@@ -675,6 +680,8 @@ public sealed class BetweenRunsHudTests : IDisposable
             $"* {DungeonHud.ModifierReadout(stiletto)}",
             "WEAR 0 OF 30 - 30 MORE FILLS IT",
             "CAPACITY 30 - 0 OF 30 CASHED TOWARD 31",
+            BetweenRunsHud.SlotsLine(stiletto),
+            BetweenRunsHud.PriceLine(stiletto),
         }, detail.Select(row => row.Text));
         Assert.Equal(DungeonHud.Green, BetweenRunsHud.DetailRows(rows[3]).Single(row => row.Text.StartsWith("WEAR", StringComparison.Ordinal)).Color);
         Assert.Equal("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(full));
@@ -708,7 +715,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             var said = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("D", 1), caster));
             var why = Assert.Single(said, line => line.Text == BetweenRunsHud.CastsNothingLine);
             Assert.Equal(DungeonHud.Orange, why.Color);
-            Assert.Equal(said.Count - 3, said.ToList().IndexOf(why));   // under the enchantments, over the wear and the capacity
+            Assert.Equal(said.Count - 5, said.ToList().IndexOf(why));   // under the enchantments, over the wear, the capacity, the slots and the price
         }
         Assert.DoesNotContain(GameContent.Current.Weapons.All.Select(Made), BetweenRunsHud.CastsNothing);
         var dStaff = campaign.Party[3].EquippedWeapon!;
@@ -719,8 +726,9 @@ public sealed class BetweenRunsHudTests : IDisposable
         // A room says where it is and how a weapon gets there; a heading says nothing.
         Assert.Equal(new[] { "THE HAND OF [A] IS EMPTY", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[2]).Select(row => row.Text));
         Assert.Equal(new[] { "ROOM IN THE BAG OF [A]", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[4]).Select(row => row.Text));
-        Assert.Equal("THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS", BetweenRunsHud.DetailRows(rows[^1])[0].Text);
+        Assert.Equal("THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS", BetweenRunsHud.DetailRows(rows[^2])[0].Text);
         Assert.Empty(BetweenRunsHud.DetailRows(rows[0]));
+        Assert.Empty(BetweenRunsHud.DetailRows(rows[^1]));
 
         // A readout's entries wrap to the column, never split, the rest indented.
         Assert.Equal(new[] { "* AAAA  BBBB", "  CCCC  DD" }, BetweenRunsHud.Listed("* ", "AAAA  BBBB  CCCC  DD", 12));
@@ -785,10 +793,11 @@ public sealed class BetweenRunsHudTests : IDisposable
         // row already in view never move the window — it once pulled [B] in over B's
         // hand at the top whenever the choice left room, so W and S between two rows
         // in view moved it a row each press. A choice that is the first under a
-        // member's name or a heading brings that row in with it, where there is room.
+        // member's name or a heading brings that row in with it, where there is room,
+        // and the last row it stops on the rows under it (Phase 6a.3a).
         // The rows: the party's heading, then each member's name, hand, bag weapon
         // and room at 1-4, 5-8, 9-12 and 13-16; the stable's heading at 17, its
-        // twenty at 18-37 and its room at 38.
+        // twenty at 18-37 and its room at 38; and the enchanter's heading at 39.
         const int fit = 15;
         var (walked, _) = Hub(campaign);
         walked.OnKey(Keys.Tab);
@@ -817,7 +826,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(4, Press(Keys.W));   // A's room, out of view above: just far enough
         Assert.Equal(3, Press(Keys.W));
         Assert.Equal(0, Press(Keys.W));   // A's hand: [A] and the party's heading come in over it
-        Assert.Equal(39 - fit, Press(Keys.W));   // round the start to the stable's room, the last window
+        Assert.Equal(40 - fit, Press(Keys.W));   // round the start to the stable's room: the last window, the enchanter's heading under it in view
         while (walked.Weapons.Chosen != 18)
             Press(Keys.W);
         Assert.Equal(17, walked.Weapons.Window(fit));   // the stable's first weapon, its heading over it
@@ -1019,6 +1028,253 @@ public sealed class BetweenRunsHudTests : IDisposable
         var (handed, _) = Hub(notices: [atTheEnd, resumed, data], shownWhole: 2);
         handed.SaveWentThrough([atTheEnd, CampaignBoot.NotSaved(Named(2), "never said")]);
         Assert.Equal(NoticeText.Rows([resumed, data], 1), handed.NoticeRows);
+    }
+
+    // ── The enchanter (§6.2, §6.3; Phase 6a.3a) ─────────────────────────────
+
+    [Fact]
+    public void TheEnchanterSectionShowsWorkingAndStalled()
+    {
+        // §6.2: "the smith is working on these two" reads at a glance, and a stalled
+        // weapon is shown as stalled, never silent. WEAPONS ends with the enchanter:
+        // shut until the tutorial is beaten (§6.3, item 31), then how many deposits it
+        // works on and each weapon in the shop, the newest first — WORKING in cyan,
+        // STALLED in yellow, each with its runs — or that nothing is in it. A shop row
+        // is chosen to be read, never taken up or put down on.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        Assert.Equal("THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN", HubWeapons.Rows(CampaignState.Start(GameContent.Current))[^1].Text);
+        Assert.Equal(HubWeapons.NothingInTheShop, HubWeapons.Rows(TestShop.Opened())[^1].Text);
+        Assert.Equal("THE ENCHANTER - NOTHING IN THE SHOP", HubWeapons.NothingInTheShop);
+
+        var campaign = TestShop.Shop();
+        var rows = HubWeapons.Rows(campaign);
+        Assert.Equal(new[]
+        {
+            "  - ROOM -",
+            "THE ENCHANTER - WORKS ON THE 2 NEWEST",
+            "  WORKING  TOWER GUARD - 0 OF 1 RUN",
+            "  WORKING  STAFF OF RENEWAL - 1 OF 2 RUNS",
+            "  STALLED  STAFF OF RENEWAL - 1 OF 2 RUNS",
+        }, rows.TakeLast(5).Select(row => row.Text));
+        Assert.Equal("THE ENCHANTER - WORKS ON THE NEWEST", HubWeapons.EnchanterHeading(1));
+        Assert.Equal("THE ENCHANTER - WORKS ON THE 10 NEWEST", HubWeapons.EnchanterHeading(10));
+        var (fresh, worked, stalled) = (rows[^3], rows[^2], rows[^1]);
+        Assert.Equal([2, 1, 0], new[] { fresh, worked, stalled }.Select(row => row.Deposit!.Ordinal));
+        Assert.All(new[] { fresh, worked, stalled }, row => Assert.Equal((HubWeapons.RowKind.Shop, true, false, (WeaponPlace?)null), (row.Kind, row.Choosable, row.Target, row.Place)));
+        Assert.Equal((false, true, 2), (worked.Stalled, stalled.Stalled, stalled.Ahead));
+
+        // Drawn: a worked row cyan, a stalled one yellow, a unique's name orange;
+        // chosen, marked as every choice is.
+        Assert.All(HubWeapons.Runs(worked), run => Assert.Equal(DungeonHud.Cyan, run.Color));
+        Assert.All(HubWeapons.Runs(stalled), run => Assert.Equal(DungeonHud.Yellow, run.Color));
+        Assert.Equal("> WORKING  STAFF OF RENEWAL - 1 OF 2 RUNS <", string.Concat(HubWeapons.Runs(worked, chosen: true).Select(run => run.Text)));
+        var knife = new HubWeapons.Row(HubWeapons.RowKind.Shop, HubWeapons.WorkingLabel, Weapon: TestWeapons.Get("flensing_knife_unique"), Deposit: worked.Deposit);
+        Assert.Equal(DungeonHud.Orange, HubWeapons.Runs(knife)[1].Color);
+
+        // Said whole on the right: that it is at the enchanter, what it bought and its
+        // runs, and whether it is worked — when it comes back — or stalled, and on how
+        // many newer; then the readouts, its wear and its capacity. No slots or price:
+        // its service is changing them.
+        var staff = worked.Weapon!;
+        Assert.Equal(new[]
+        {
+            "AT THE ENCHANTER",
+            "STAFF OF RENEWAL",
+            "ENCHANT VAMPIRIC - 1 OF 2 RUNS",
+            "WORKING - BACK AFTER 1 MORE RUN THAT COUNTS",
+            DungeonHud.WeaponStats(staff),
+        }, BetweenRunsHud.DetailRows(worked).Take(5).Select(row => row.Text));
+        Assert.Equal(new[] { "REFINE - 1 OF 2 RUNS", "STALLED - 2 NEWER DEPOSITS ARE AHEAD OF IT" }, BetweenRunsHud.DetailRows(stalled).Skip(2).Take(2).Select(row => row.Text));
+        Assert.Equal((DungeonHud.Cyan, DungeonHud.Yellow), (BetweenRunsHud.DetailRows(worked)[3].Color, BetweenRunsHud.DetailRows(stalled)[3].Color));
+        Assert.Equal("REFINE - 0 OF 1 RUN", BetweenRunsHud.DetailRows(fresh)[2].Text);
+        Assert.Equal(CapacityLineOf(staff), BetweenRunsHud.DetailRows(worked)[^1].Text);
+        Assert.DoesNotContain(BetweenRunsHud.DetailRows(worked), row => row.Text.StartsWith("ENCHANTMENTS", StringComparison.Ordinal) || row.Text.StartsWith("THE NEXT", StringComparison.Ordinal));
+        Assert.Equal("WORKING - BACK AFTER 2 MORE RUNS THAT COUNT", BetweenRunsHud.WorkingLine(new Deposit(0, staff, Service.Refine, 0, 3) { RunsWorked = 1 }));
+        Assert.Equal("STALLED - 1 NEWER DEPOSIT IS AHEAD OF IT", BetweenRunsHud.StalledLine(1));
+
+        // A weapon out of the shop says its slots and its next enchantment's price
+        // (R4): what its souls fill from the first, the slot it waits on, and what a
+        // deposit for the next costs, or that every slot is filled.
+        string Slots(string id, int cashed) => BetweenRunsHud.SlotsLine(TestShop.Worn(id, 0, cashed));
+        string Price(string id, int cashed) => BetweenRunsHud.PriceLine(TestShop.Worn(id, 0, cashed));
+        Assert.Equal("ENCHANTMENTS 0 - SLOTS OPEN 1 OF 5 - SLOT 2 OPENS AT CAPACITY 35", Slots("tower_guard", 0));
+        Assert.Equal("ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5 - SLOT 2 OPENS AT CAPACITY 35", Slots("staff_of_renewal", 126));
+        Assert.Equal("ENCHANTMENTS 1 - SLOTS OPEN 2 OF 5 - SLOT 3 OPENS AT CAPACITY 40", Slots("staff_of_renewal", 160));
+        Assert.Equal("ENCHANTMENTS 3 - SLOTS OPEN 1 OF 5 - SLOT 4 OPENS AT CAPACITY 45", Slots("flensing_knife_unique", 0));
+        Assert.Equal("ENCHANTMENTS 3 - ALL 5 SLOTS OPEN", Slots("flensing_knife_unique", 790));
+        Assert.Equal("THE NEXT NEEDS A DEPOSIT OF 30 WEAR - 1 RUN IN THE SHOP", Price("tower_guard", 0));
+        Assert.Equal("THE NEXT NEEDS A DEPOSIT OF 45 WEAR - 4 RUNS IN THE SHOP", Price("flensing_knife_unique", 0));
+        using (TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { EnchantmentSlots = 3 }))
+        {
+            Assert.Equal("ALL 3 SLOTS ARE FILLED - REFINING IS LEFT", Price("flensing_knife_unique", 0));
+            Assert.Equal("ENCHANTMENTS 3 - SLOTS OPEN 1 OF 3", Slots("flensing_knife_unique", 0));
+        }
+
+        // Browsing stops on the shop's rows; carrying never does, and ENTER on one
+        // takes nothing up.
+        var (scene, _) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        ChooseRow(scene, stalled.Text);
+        Assert.Same(stalled.Deposit, scene.Weapons.ChosenRow.Deposit);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+        Assert.Null(scene.Weapons.Carried);
+        scene.OnKey(Keys.W);
+        scene.OnKey(Keys.W);
+        scene.OnKey(Keys.W);
+        Assert.Equal(HubWeapons.StableRoom, ChosenText(scene));
+        scene.OnKey(Keys.Enter);   // the stable is empty: its room holds nothing to take up
+        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        for (int step = 0; step < scene.Weapons.Rows().Count; step++)
+        {
+            scene.OnKey(Keys.S);
+            Assert.NotEqual(HubWeapons.RowKind.Shop, scene.Weapons.ChosenRow.Kind);
+        }
+        Assert.True(scene.HandleEscape());
+
+        // And the page's end is in view with the last row a choice stops on: the
+        // shop's oldest, under the most notice rows.
+        var layout = BetweenRunsHud.WeaponsPage(720f, NoticeText.MaxWholeRows + NoticeText.MaxRows + 1);
+        ChooseRow(scene, stalled.Text);
+        int top = scene.Weapons.Window(layout.Rows);
+        Assert.InRange(scene.Weapons.Rows().Count - 1, top, top + layout.Rows - 1);
+
+        // Every string of the shop fits its column in the HUD's font, at the widest
+        // numbers: two-digit runs, three-digit newer deposits, the longest shipped
+        // name and enchantment; and the tallest detail a shop row draws — the most a
+        // save may load a weapon carrying — fits the height beside the window.
+        var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
+        var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
+        var wide = new Deposit(999, Made(longest), Service.Enchant, 9999, ContentBounds.MostServiceRuns, soul.Id) { RunsWorked = ContentBounds.MostServiceRuns - 1 };
+        foreach (string label in new[] { HubWeapons.WorkingLabel, HubWeapons.StalledLabel })
+        {
+            var row = new HubWeapons.Row(HubWeapons.RowKind.Shop, label, Weapon: wide.Weapon, Deposit: wide, Ahead: 999);
+            foreach (bool chosen in new[] { false, true })
+                Fits(string.Concat(HubWeapons.Runs(row, chosen).Select(run => run.Text)), BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth);
+            foreach (var line in BetweenRunsHud.DetailRows(row))
+            {
+                Fits(line.Text, line.Scale, BetweenRunsHud.ColumnWidth);
+                Glyphs(line.Text);
+            }
+        }
+        foreach (string heading in new[] { HubWeapons.EnchanterHeading(10), HubWeapons.NothingInTheShop, Enchanter.Closed(GameContent.Current.Dungeons.Tutorial) })
+        {
+            Fits(heading, BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth);
+            Glyphs(heading);
+        }
+        using (TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { FirstSlotCapacity = 9999, SlotCapacityStep = 9999, EnchantmentSlots = 10, FirstEnchantmentWear = 9999, EnchantmentWearStep = 9999 }))
+        {
+            var nine = new Weapon(longest, Made(longest).Forged, Made(longest).Modifiers, Enumerable.Range(0, 9).Select(_ => new Enchantment(soul, 1)).ToArray(), 0, wear: 9999, wearCashed: 0);
+            foreach (string line in new[] { BetweenRunsHud.SlotsLine(nine), BetweenRunsHud.PriceLine(nine) })
+            {
+                Fits(line, BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth);
+                Glyphs(line);
+            }
+        }
+        var tallest = GameContent.Current.Weapons.All
+            .Select(def => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Shop, HubWeapons.StalledLabel, Weapon: Laden(def), Deposit: wide, Ahead: 2)))
+            .Max(detail => detail.Sum(row => row.Pitch));
+        Assert.True(layout.Top + tallest <= layout.Bottom, $"the tallest shop detail, {tallest} px, runs into the refusal row under the most notices ({layout.Bottom - layout.Top} px)");
+
+        static void Fits(string text, float scale, float width)
+            => Assert.True(text.Length * 6f * scale <= width, $"'{text}' is {text.Length * 6f * scale} px, past {width}");
+        static void Glyphs(string text) => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]*$", text.ToUpperInvariant());
+        static string CapacityLineOf(Weapon weapon) => BetweenRunsHud.CapacityLine(weapon);
+    }
+
+    [Fact]
+    public void TheSummarySaysWhatCameBack()
+    {
+        // §6.2, §6.3: a run's summary says what the enchanter did on its end, after
+        // whether it counted — a service back in the stable with what it attached,
+        // one worked a run on, the weapons left stalled — and a run that did not
+        // count says the enchanter worked nothing. The same lines on the hub and at
+        // the run's end, and after a load.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var campaign = TestShop.Shop();
+        var worked = BetweenRunsHud.SummaryLines(campaign.LastResult!);
+        int counted = Array.FindIndex(Texts(worked), line => line.StartsWith("RUN COUNTED", StringComparison.Ordinal));
+        Assert.Equal(new[] { "THE ENCHANTER WORKED THE STAFF OF RENEWAL - 1 OF 2 RUNS", "THE ENCHANTER WORKED THE STAFF OF RENEWAL - 1 OF 2 RUNS" },
+            Texts(worked).Skip(counted + 1).Take(2));
+        Assert.All(worked.Skip(counted + 1).Take(2), line => Assert.Equal(DungeonHud.Cyan, line.Color));
+        Assert.Equal(counted + 3, worked.Count);   // nothing stalled, and a retreat locks nothing
+
+        // Nothing counted: the enchanter worked nothing, in grey, and names no weapon.
+        var idle = TestShop.NotCounted(campaign);
+        var nothing = BetweenRunsHud.SummaryLines(idle);
+        int notCounted = Array.FindIndex(Texts(nothing), line => line.StartsWith("RUN NOT COUNTED", StringComparison.Ordinal));
+        Assert.Equal(new DungeonHud.Run(BetweenRunsHud.WorkedNothing, DungeonHud.Grey), nothing[notCounted + 1]);
+        Assert.Equal("THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT", BetweenRunsHud.WorkedNothing);
+        Assert.Equal(notCounted + 2, nothing.Count);
+
+        // A counted run: the Tower Guard's refinement and the staff's Vampiric back,
+        // what they came back with, and A's staff, older, stalled in yellow.
+        var back = TestShop.Counted(campaign);
+        Assert.Equal(new[]
+        {
+            "STAFF OF RENEWAL IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC",
+            "TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED",
+            "STALLED AT THE ENCHANTER: STAFF OF RENEWAL",
+        }, Texts(BetweenRunsHud.SummaryLines(back)).SkipWhile(line => !line.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1));
+        Assert.Equal(DungeonHud.Yellow, BetweenRunsHud.SummaryLines(back)[^1].Color);
+
+        // The dungeon's end panel shows the same, with its key under them; and a load
+        // of the save shows the same again.
+        var panel = DungeonHud.RunSummaryLines(back);
+        Assert.Equal(BetweenRunsHud.SummaryLines(back), panel.Take(panel.Count - 1));
+        var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign))), GameContent.Current).Campaign;
+        Assert.Equal(BetweenRunsHud.SummaryLines(back), BetweenRunsHud.SummaryLines(loaded.LastResult!));
+
+        // A report naming a weapon or an enchantment the content no longer has is
+        // named by its id, never a throw while the screen draws.
+        var gone = back with { Services = [new ServiceReport("gone_weapon", Service.Enchant, 1, 1, EnchantmentId: "gone_soul")] };
+        Assert.Contains("GONE_WEAPON IS BACK FROM THE ENCHANTER - ATTACHED GONE_SOUL", Texts(BetweenRunsHud.SummaryLines(gone)));
+    }
+
+    [Fact]
+    public void TheStalledLineWrapsAndCaps_AndOnlyTheHubNamesTab()
+    {
+        // A summary never runs away with the enchanter: it names so many finished and
+        // worked services — three on the hub, two on the run's end panel, which has no
+        // cut — then says how many more; and it names three stalled weapons at most,
+        // wrapped as the spoils are, then how many more. Only the hub points at the
+        // page that shows the rest (TAB WEAPONS): the dungeon's end panel shares the
+        // lines, and TAB does nothing there.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
+        string name = longest.Name.ToUpperInvariant();
+        var reports = Enumerable.Range(0, 5).Select(_ => new ServiceReport(longest.Id, Service.Refine, 1, 3))
+            .Concat(Enumerable.Range(0, 6).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, 2, Stalled: true)))
+            .ToArray();
+        var result = new RunResult("spear_hall", RunOutcome.Retreat, false, 3, null, true, true, 4, null, false, [], [], [], reports);
+
+        var hub = Texts(BetweenRunsHud.SummaryLines(result));
+        int counted = Array.FindIndex(hub, line => line.StartsWith("RUN COUNTED", StringComparison.Ordinal));
+        var enchanter = hub.Skip(counted + 1).ToArray();
+        Assert.Equal(Enumerable.Repeat($"THE ENCHANTER WORKED THE {name} - 1 OF 3 RUNS", BetweenRunsHud.HubServiceLines), enchanter.Take(3));
+        Assert.Equal("AND 2 MORE AT THE ENCHANTER", enchanter[3]);
+        var stalled = enchanter.Skip(4).ToArray();
+        Assert.StartsWith(BetweenRunsHud.StalledHeading, stalled[0], StringComparison.Ordinal);
+        Assert.True(stalled.Length > 1, "three of the longest names wrap");
+        Assert.Equal(BetweenRunsHud.MostStalledNames, stalled.Sum(line => line.Split(name).Length - 1));
+        Assert.EndsWith("AND 3 MORE", stalled[^1], StringComparison.Ordinal);
+        Assert.All(hub, line => Assert.True(line.Length <= 70, $"'{line}' runs off the panel"));
+
+        // The hub alone says TAB, on the line of how many more.
+        var shown = Texts(BetweenRunsHud.HubSummaryLines(result));
+        Assert.Equal("AND 2 MORE AT THE ENCHANTER - TAB WEAPONS", Assert.Single(shown, line => line.Contains("TAB", StringComparison.Ordinal)));
+        Assert.Equal(hub.Length, shown.Length);
+        Assert.DoesNotContain(hub, line => line.Contains("TAB", StringComparison.Ordinal));
+        var panel = Texts(DungeonHud.RunSummaryLines(result));
+        Assert.DoesNotContain(panel, line => line.Contains("TAB", StringComparison.Ordinal));
+        Assert.Equal(DungeonHud.DungeonServiceLines, panel.Count(line => line.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+        Assert.Contains("AND 3 MORE AT THE ENCHANTER", panel);
+
+        // Fewer than the cap: no line of how many more, and nothing for TAB to show.
+        var few = result with { Services = reports.Skip(3).ToArray() };
+        Assert.DoesNotContain(Texts(BetweenRunsHud.HubSummaryLines(few)), line => line.Contains("MORE AT THE ENCHANTER", StringComparison.Ordinal));
+        Assert.Equal(Texts(BetweenRunsHud.SummaryLines(few)), Texts(BetweenRunsHud.HubSummaryLines(few)));
     }
 
     [Fact]

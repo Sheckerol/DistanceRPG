@@ -45,8 +45,9 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
-  HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags and the stable
-                                # (CampaignState.Move, the one door), a carry the page's alone
+  HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
+                                # (CampaignState.Move, the one door) and the enchanter's shop, a carry
+                                # the page's alone
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
@@ -64,7 +65,10 @@ GameEngine.DistanceRPG/         # Game executable
     GridCollision.cs            # Axis-separated circle-vs-tile-grid collision
     TurnSystem.cs               # Turn state machine, drives combat via events
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
-                                # from the wear it has ever cashed (R4)
+                                # from the wear it has ever cashed (R4); where its slots open, what
+                                # an enchantment costs, and a service's runs
+    Enchanter.cs                # The enchanter (§6.2–§6.4): a deposit, its gates, the service clock
+                                # every run's end ticks, a take-back — the one place wear is spent
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -90,8 +94,8 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   add a C# copy of a JSON value: the load validates the code catalogues against
   the JSON instead. Nothing the golden tests pin may go in `tuning.json`.
 - A `tuning.json` key arrives with the code that reads it — except a number the
-  user has ruled and wants in the file first (the Enchanter group's, which Phase
-  6a sets played as it reads each): declare it in `TuningSchema` with
+  user has ruled and wants in the file first (the Enchanter group's were, until
+  Phase 6a played each as it read it): declare it in `TuningSchema` with
   `Played = false`, and it is read, clamped and warned like every key but left
   out of the save's tuning hash, so turning it never says the numbers changed.
   The change that gives a rule of play one to read sets it played. A key that

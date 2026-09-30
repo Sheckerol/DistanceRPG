@@ -269,6 +269,22 @@ public class SaveCodecTests
         stray["campaign"]!["stable"] = "every weapon";
         Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
 
+        // So are the enchanter's queue, its count of deposits and a run's reports at
+        // it (Phase 6a.3a): to version 1 they were nothing, an empty shop, whatever
+        // a hand wrote there — a deposit, a number, a string.
+        stray["campaign"]!["enchanter"] = new JsonArray(JsonNode.Parse("""{ "ordinal": 0, "service": "Refine" }"""));
+        stray["campaign"]!["depositsMade"] = 3;
+        stray["campaign"]!["lastResult"]!["services"] = new JsonArray(JsonNode.Parse("""{ "weaponId": "arming_sword" }"""));
+        var shop = SaveCodec.LiftToVersion2(stray.DeepClone().AsObject());
+        Assert.False(shop["campaign"]!.AsObject().ContainsKey("enchanter"));
+        Assert.False(shop["campaign"]!.AsObject().ContainsKey("depositsMade"));
+        Assert.False(shop["campaign"]!["lastResult"]!.AsObject().ContainsKey("services"));
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+        stray["campaign"]!["enchanter"] = "the whole shop";
+        stray["campaign"]!["depositsMade"] = "many";
+        stray["campaign"]!["lastResult"]!["services"] = 4;
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+
         // At version 2 the members are the document's own, read as written.
         var worn = Tree(text);
         worn["campaign"]!["party"]![0]!["inventory"]![0]!["wear"] = 12;
@@ -502,6 +518,8 @@ public class SaveCodecTests
             // Phase 5.6: the visit in progress.
             typeof(VisitDto), typeof(XpSnapshotDto), typeof(MemberXpDto), typeof(SpoilDto), typeof(CarryDto), typeof(CountDto),
             typeof(ReactionUseDto), typeof(ActorRefDto), typeof(FloorDto), typeof(EnemyDto), typeof(DropDto), typeof(LooseItemDto),
+            // Phase 6a: the enchanter.
+            typeof(DepositDto), typeof(ServiceDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

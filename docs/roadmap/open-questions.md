@@ -276,7 +276,7 @@ attaching enchantment *n* needs a free slot and a deposit of at least
 them the ruling left to the build.
 
 **Shipped provisionally: each number its own key**, in the Enchanter group and
-read by nothing until Phase 6a builds the enchanter — `WearCapacityPerBar`,
+read by the enchanter since Phase 6a — `WearCapacityPerBar`,
 `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
 `FirstEnchantmentWear` and `EnchantmentWearStep` — and a weapon's starting
 capacity `StartingPool`, the Phase 2 pass's one key for every pool's first bar,
@@ -500,10 +500,10 @@ stable, and back out again — onto a weapon it swaps, onto a hand it equips.
 Spoils carried home stay in the bags, as ever. **No move leaves a member
 carrying no weapon**: it is refused, `EACH MEMBER KEEPS A WEAPON - [A] WOULD
 CARRY NONE`, and the weapon stays taken up. A hand a move empties is armed from
-the bag as the rest before a dungeon arms it. When the enchanter's queue arrives
-(Phase 6a.3a), a finished service will return its weapon to the stable's end, and
-the deposit will be refused on the same rule — a transfer asked with both of its
-weapons gone.
+the bag as the rest before a dungeon arms it. A finished service at the enchanter
+returns its weapon to the stable's end (Phase 6a.3a), and a deposit is refused on
+the same rule — `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` —
+a transfer, when it arrives, asked with both of its weapons gone.
 
 **This decides where the party's spare weapons live and whether a member can be
 left unarmed, so it is the user's to decide.** The alternatives: (a) a capped
@@ -538,3 +538,99 @@ it is the user's to decide.** The alternative: only the run's end, SAVE GAME and
 the quit save, as the list stands, so a crash between runs loses whatever the hub
 changed since the last of them. settled.md's Phase 6a implementation pass records
 the ruling.
+
+## When a service's enchantment attaches (§6.2, §6.4) — PHASE 6a DECISION 3
+
+A deposit cashes the weapon's whole pool, and its capacity grows on the cash:
+that much is the user's ruling on what a deposit costs (R4, settled.md: "+1 per
+full bar … cashed in", "the pool itself still empties at every deposit"), so the
+wear leaves and the capacity grows as the weapon goes in. What the words leave
+open is when the service's purchase lands: the enchantment an Enchant buys, and
+the improvement roll either service may win (§6.4, Phase 6a.4).
+
+**Shipped provisionally: the chosen enchantment is attached when the service's
+last run is worked**, inside the end of the run that works it — last, at tier 1
+with no XP — and the weapon comes back to the stable then. Until then it is in the
+shop, out of the party's hands, and its enchantments are what they were. The
+improvement roll will be made at the same moment (Phase 6a.4), on a stream of the
+completing run's map seed and the deposit's ordinal, both saved, so a reload never
+rerolls it (R1).
+
+**This decides when a deposit's purchase lands, so it is the user's to decide.**
+The alternatives: (a) attach and roll at the deposit, on a seed the campaign saves
+for the purpose — the weapon then waits out its runs already enchanted; or (b)
+grow the capacity when the service finishes, the wear still leaving the pool at
+the deposit ("cashed in" read as the service's return). settled.md's Phase 6a
+implementation pass records the ruling.
+
+## The `+ 1` in a service's time (§6.2) — PHASE 6a DECISION 6
+
+§6.2 has a service cost runs, "the current enchantment count + 1", for every
+deposit, a refinement too (settled.md, "Service costs runs"). That the enchanter
+works on the two newest deposits is the doc's too ("the enchanter keeps its
+two-newest-slots rule"), and that its two is a `tuning.json` key,
+`EnchanterWorksOn`, follows the user's standing rule that a number they may
+revisit lives in the file. The `+ 1` is the one number of the rule not yet asked
+of.
+
+**Shipped provisionally: the `+ 1` stays a rule**, never a key: a service takes
+the weapon's count, what it arrived with included, plus one runs that count. So the
+tutorial's one run keeps landing on a first enchantment's one run, and attaching
+five in a row takes 1, 3, 6, 10 and 15 runs.
+
+**This decides whether the base of every service's time is a number to turn, so
+it is the user's to decide.** The alternative: a key beside the count
+(`count + ServiceBaseRuns`, 1 shipped), read with the rest of the Enchanter
+group's. settled.md's Phase 6a implementation pass records the ruling.
+
+## Taking a weapon back from the enchanter early (§6.2) — PHASE 6a DECISION 8
+
+§6.2 puts a deposited weapon in the shop until its service is done, and says
+nothing of wanting it back sooner. A deposit cashes the weapon's pool and grows
+its capacity at once (R4; DECISION 3's context).
+
+**Shipped provisionally: any queued weapon, worked or stalled, can be taken back
+between runs**, to the end of the stable. Its service is forfeit — nothing
+attached, nothing rolled — and the runs worked are lost, the ordinal never reused.
+**The deposit's cash is reversed exactly**: the wear goes back into the pool and
+off what the weapon has cashed, so its capacity and the progress toward the next
+point are as they were before it went in. The take-back is the enchanter's since
+Phase 6a.3a; the key that asks for it on the WEAPONS page arrives with the
+deposit's (Phase 6a.5).
+
+*Why not keep the cash spent:* capacity grows at the deposit. A take-back that
+kept the growth would let a player deposit to refine, take the weapon back at once,
+and bank a point of capacity a full bar with no downtime, forfeiting only a 6 to 9
+in 100 roll — every bar between two slots a free action, which R4's consequences 1
+("the bars that open a slot are refinements") and 3 (71 runs of downtime, 31 at
+the least) rule out, as does §6.2's "dumping the whole stable achieves nothing".
+
+**This decides what a deposit commits a weapon to, so it is the user's to
+decide.** The alternatives: (a) no taking back — a deposit is final until its
+service is done; (b) a take-back keeps the cash spent and the capacity grown,
+**opening the loop above**; or (c) the capacity grows when the service finishes
+(DECISION 3's (b)), which closes the loop with the take-back unchanged.
+settled.md's Phase 6a implementation pass records the ruling.
+
+## What an earlier Phase 6a build does with a later step's save (§5.2) — PHASE 6a DECISION 14
+
+Every Phase 6a step reads a version-2 save as its own, and the reader passes over
+a member it does not know (the save's header rule), so an earlier step's build
+loads a later step's save and its next save drops what it did not read. From Phase
+6a.2 that next save comes at the first weapon moved between runs. From Phase 6a.3a
+what it drops holds weapons: a 6a.1 or 6a.2 build that opens a 6a.3a save loses the
+enchanter's queue — every weapon in the shop — with no notice; a 6a.1 build loses
+the stable the same way. Only builds between released versions can do this, and a
+playtester playing each step is who meets it.
+
+**Shipped provisionally: the save stays at version 2**, as every Phase 6a step
+has it, and the README's Saves section and each step's commit say not to open a
+slot a later Phase 6a build saved with an earlier one.
+
+**This decides whether an older development build can lose a playtester's weapons,
+so it is the user's to decide.** The alternative: lift the save to version 3 with a
+step that writes nothing but the version (and removes a stray member a hand gave an
+older document), so a 6a.1 or 6a.2 build sets a 6a.3a save aside as a newer
+build's, kept and never deleted — and bump again at every later step that adds
+weapons to the save (6a.6's transfer), the tuning hash's version following or
+staying 2. settled.md's Phase 6a implementation pass records the ruling.

@@ -46,14 +46,26 @@ public class PreReworkSaveTests
     private const string SavedAtMember = "savedAt";
 
     /// <summary>
-    /// The campaign's members appended since the saves were written, with their
-    /// defaults (the header rule of <c>SaveFile.cs</c>): the migration writes none of
-    /// them, and a capture writes each empty one as null — the stable (Phase 6a.2) —
-    /// so the saves have none and the capture of one restored from them has each
-    /// null. Set aside there, and only as null: a capture that wrote one with
-    /// anything in it differs.
+    /// The members appended since the saves were written, with their defaults (the
+    /// header rule of <c>SaveFile.cs</c>), each by the object it sits in: the
+    /// migration writes none of them, and a capture writes each empty one as its
+    /// default — the stable (Phase 6a.2), and the enchanter's queue and a run's
+    /// service reports (Phase 6a.3a) null, and the count of deposits made 0 — so
+    /// the saves have none and the capture of one restored from them has each at
+    /// its default. Set aside there, and only at its default: a capture that wrote
+    /// one with anything in it differs.
     /// </summary>
-    private static readonly string[] AppendedToTheCampaign = ["stable"];
+    private static readonly (string At, string Member, int? Default)[] Appended =
+    [
+        ("$.campaign", "stable", null),
+        ("$.campaign", "enchanter", null),
+        ("$.campaign", "depositsMade", 0),
+        ("$.campaign.lastResult", "services", null),
+    ];
+
+    /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it: null, or the number.</summary>
+    private static bool IsDefault(JsonNode? value, int? expected)
+        => expected is { } number ? value is JsonValue v && v.TryGetValue(out int read) && read == number : value is null;
 
     private static readonly string[] Saves = [MidRun, BetweenRuns];
 
@@ -67,14 +79,17 @@ public class PreReworkSaveTests
     /// began to read with the save's version 2, and so none a version-1 save's hash
     /// covers: what a hit wears, and what a deposit costs, the user's ruling of
     /// 2026-09-25, declared ahead of Phase 6a's enchanter and played from version
-    /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>); and how many save
-    /// slots there are, the ruling of the same day on the save model, the launcher's.
+    /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>), and how many
+    /// deposits the enchanter works on (Phase 6a.3a), played from version 2 too; and
+    /// how many save slots there are, the ruling of the same day on the save model,
+    /// the launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [
         nameof(Tuning.WearPerHit),
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
+        nameof(Tuning.EnchanterWorksOn),
         nameof(Tuning.SaveSlots),
     ];
 
@@ -112,9 +127,9 @@ public class PreReworkSaveTests
     /// writes the current tuning's hash there, and with it its
     /// <see cref="TuningHashVersionMember"/>, the current version, where a migrated
     /// save has 1. So is its <see cref="SavedAtMember"/>, which a capture writes and
-    /// the saves, older than it, do not; and so is a member appended to the
-    /// campaign since (<see cref="AppendedToTheCampaign"/>) that the saves lack and
-    /// the capture writes null.
+    /// the saves, older than it, do not; and so is a member appended since
+    /// (<see cref="Appended"/>) that the saves lack where they have its object and
+    /// the capture writes at its default.
     /// </summary>
     private static string? FirstDifference(JsonNode? expected, JsonNode? actual, string path, bool root = false)
     {
@@ -125,7 +140,8 @@ public class PreReworkSaveTests
             case (JsonObject was, JsonObject now):
             {
                 bool Compared(string name) => !(root && name is TuningHashMember or TuningHashVersionMember or SavedAtMember)
-                    && !(path.EndsWith("$.campaign", StringComparison.Ordinal) && AppendedToTheCampaign.Contains(name) && !was.ContainsKey(name) && now[name] is null);
+                    && !Appended.Any(appended => path.EndsWith(appended.At, StringComparison.Ordinal) && appended.Member == name
+                        && !was.ContainsKey(name) && IsDefault(now[name], appended.Default));
                 var wasNames = was.Select(member => member.Key).Where(Compared).ToList();
                 var nowNames = now.Select(member => member.Key).Where(Compared).ToList();
                 foreach (string name in wasNames)
@@ -265,18 +281,30 @@ public class PreReworkSaveTests
             if (FirstDifference(migrated, JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
                 Assert.Fail($"captured again, the document is not the migrated save: {difference}");
 
-            // The members appended to the campaign since are in the capture, empty:
-            // the stable, written null (Phase 6a.2), which the migrated save reads as
-            // null too — nothing was in any stable before there was one.
-            var capturedCampaign = JsonNode.Parse(again)!["campaign"]!.AsObject();
-            Assert.All(AppendedToTheCampaign, member =>
+            // The members appended since are in the capture, at their defaults: the
+            // stable, written null (Phase 6a.2); the enchanter's queue null and its
+            // count 0, and the last run's service reports null (Phase 6a.3a) — which the
+            // migrated save reads as the same, nothing having been in any stable or
+            // shop before there was one. Where the save has no last result, its
+            // reports have nowhere to be.
+            var captured = JsonNode.Parse(again)!.AsObject();
+            JsonObject? At(JsonObject tree, string at) => at == "$.campaign" ? tree["campaign"]?.AsObject() : tree["campaign"]?["lastResult"] as JsonObject;
+            foreach (var (at, member, defaulted) in Appended)
             {
-                Assert.True(capturedCampaign.ContainsKey(member), $"{name}: the capture has no campaign.{member}");
-                Assert.Null(capturedCampaign[member]);
-                Assert.False(lifted["campaign"]!.AsObject().ContainsKey(member), $"{name}: the migration wrote campaign.{member}");
-            });
+                if (At(lifted, at) is not { } migratedAt)
+                {
+                    Assert.Null(At(captured, at));
+                    continue;
+                }
+                var capturedAt = At(captured, at)!;
+                Assert.True(capturedAt.ContainsKey(member), $"{name}: the capture has no {at}.{member}");
+                Assert.True(IsDefault(capturedAt[member], defaulted), $"{name}: the capture wrote {at}.{member} as {capturedAt[member]?.ToJsonString() ?? "null"}");
+                Assert.False(migratedAt.ContainsKey(member), $"{name}: the migration wrote {at}.{member}");
+            }
             Assert.Empty(campaign.Stable);
             Assert.Null(file.Campaign.Stable);
+            Assert.Equal((0, 0), (campaign.AtTheEnchanter.Count, campaign.DepositsMade));
+            Assert.Null(file.Campaign.Enchanter);
 
             // And as text, whitespace and number formatting included: the migrated
             // save as the codec writes it — its time null, as it never had one — with

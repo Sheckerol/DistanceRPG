@@ -185,9 +185,13 @@ public sealed class StableTests : IDisposable
         Assert.Same(visit, campaign.Visit);
 
         // Read off the IL: the stable is touched by its view, the lookup, the door
-        // and its two helpers, and the load — nothing else in CampaignState — and the
-        // door's one caller is the hub's put-down. So no run's end, no entry and no
-        // load writes a weapon into it or takes one out behind the hub's back.
+        // and its two helpers, the load, and the one path the enchanter's shop gives
+        // a weapon back by (Release, Phase 6a.3a: a take-back's and a finished
+        // service's) — nothing else in CampaignState — and the door's one caller is
+        // the hub's put-down. A deposit takes a weapon out through the door's helper
+        // (Take, from Enqueue). So no entry and no load writes a weapon into it or
+        // takes one out behind the hub's back, and a run's end only brings the shop's
+        // back (EnchanterTests.WearIsSpentAndReturnedInOnePlace).
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         var stable = typeof(CampaignState).GetField("_stable", BindingFlags.NonPublic | BindingFlags.Instance)!;
         string[] Touching(params OpCode[] ops) => typeof(CampaignState).GetNestedTypes(Declared).Prepend(typeof(CampaignState))
@@ -196,7 +200,7 @@ public sealed class StableTests : IDisposable
                 && method.Module.ResolveField(BitConverter.ToInt32(il, i.At)) is { } field
                 && field.Module == stable.Module && field.MetadataToken == stable.MetadataToken))
             .Select(method => method.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
-        Assert.Equal(["Move", "Put", "Restore", "Take", "WeaponAt", "get_Stable"], Touching(OpCodes.Ldfld, OpCodes.Ldflda));
+        Assert.Equal(["Move", "Put", "Release", "Restore", "Take", "WeaponAt", "get_Stable"], Touching(OpCodes.Ldfld, OpCodes.Ldflda));
         Assert.Equal([".ctor"], Touching(OpCodes.Stfld));
 
         static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
@@ -206,11 +210,11 @@ public sealed class StableTests : IDisposable
             .Distinct().Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(["BetweenRunsScene.PutDown"], CallersOf(typeof(CampaignState), nameof(CampaignState.Move)));
         Assert.Equal(["CampaignState.Move"], CallersOf(typeof(CampaignState), "Put"));
-        Assert.Equal(["CampaignState.Move"], CallersOf(typeof(CampaignState), "Take"));
+        Assert.Equal(["CampaignState.Enqueue", "CampaignState.Move"], CallersOf(typeof(CampaignState), "Take"));
 
-        // And a hand is armed from its bag in the two places that empty one: the rest
-        // before a dungeon, and the door.
-        Assert.Equal(["CampaignState.Move", "PartyMemberState.Rest"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.ArmFromBag)));
+        // And a hand is armed from its bag in the three places that empty one: the
+        // rest before a dungeon, the door, and a deposit (Phase 6a.3a).
+        Assert.Equal(["CampaignState.Enqueue", "CampaignState.Move", "PartyMemberState.Rest"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.ArmFromBag)));
     }
 
     [Fact]
@@ -313,6 +317,32 @@ public sealed class StableTests : IDisposable
             Assert.Empty(lifted.Stable);
             Assert.Equal(6, lifted.Party[1].Inventory.Count(carried => carried is not null));
         }
+
+        // And the enchanter's shop, the same way (Phase 6a.3a): a version-1 save a hand
+        // gave a queue — a deposit of B's Riposte Blade, a count, a run's report on it —
+        // reads as a campaign with nothing in the shop and no deposit ever made, and
+        // its last run as one with nothing at the enchanter.
+        var deposit = new JsonObject
+        {
+            ["ordinal"] = 0, ["service"] = "Refine", ["weapon"] = bRow.DeepClone(), ["wearAtDeposit"] = 0, ["runs"] = 1, ["runsWorked"] = 0,
+        };
+        foreach (var (queue, count, reports) in new (JsonNode Queue, JsonNode Count, JsonNode Reports)[]
+                 {
+                     (new JsonArray(deposit), JsonValue.Create(1), new JsonArray(JsonNode.Parse("""{ "weaponId": "riposte_blade", "service": "Refine", "runsWorked": 1, "runs": 1 }"""))),
+                     (JsonValue.Create("a shop"), JsonValue.Create("one"), JsonValue.Create(4)),
+                 })
+        {
+            var grafted = JsonNode.Parse(v1)!.AsObject();
+            grafted["campaign"]!["enchanter"] = queue;
+            grafted["campaign"]!["depositsMade"] = count;
+            grafted["campaign"]!["lastResult"]!["services"] = reports;
+            var lifted = SaveGame.Restore(SaveCodec.Read(grafted.ToJsonString()), GameContent.Current).Campaign;
+            Assert.Equal((0, 0), (lifted.AtTheEnchanter.Count, lifted.DepositsMade));
+            Assert.Null(lifted.LastResult!.Services);
+            Assert.Equal(6, lifted.Party[1].Inventory.Count(carried => carried is not null));
+        }
+        Assert.Empty(NewCampaign().AtTheEnchanter);
+        Assert.Equal(0, NewCampaign().DepositsMade);
     }
 
     [Fact]

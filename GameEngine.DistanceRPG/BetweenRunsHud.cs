@@ -10,8 +10,8 @@ namespace GameEngine.DistanceRPG;
 /// The between-runs screen's text (§4.5, §6.2, §6.7), drawn with the engine's
 /// bitmap <see cref="TextRenderer"/> as the dungeon's HUD is: on the DUNGEONS page
 /// the last run's summary, the hub's dungeon list under it, and the keys that
-/// choose from it; on the WEAPONS page (Phase 6a.2) the party's hands and bags and
-/// the stable down the left (<see cref="HubWeapons"/>), a window that scrolls with
+/// choose from it; on the WEAPONS page (Phase 6a.2) the party's hands and bags,
+/// the stable and the enchanter's shop down the left (<see cref="HubWeapons"/>), a window that scrolls with
 /// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
 /// and a refused put-down over the keys — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
@@ -37,7 +37,8 @@ namespace GameEngine.DistanceRPG;
 /// not a range, and not even the tutorial's fixed two.</item>
 /// <item><strong>The summary is the last run's own</strong>
 /// (<see cref="SummaryLines"/>): the facts its end showed over the last floor,
-/// less that panel's key, since here ENTER descends.</item>
+/// less that panel's key, since here ENTER descends — and where the enchanter's
+/// lines were cut short, the key that shows the rest (<see cref="HubSummaryLines"/>).</item>
 /// </list>
 /// Every string it draws comes from an <c>internal static</c> member and is
 /// tested (<c>BetweenRunsHudTests</c>), and so is where the rows go
@@ -171,6 +172,21 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>How many characters a summary line runs to before a list on it wraps: a little over half the shipped window at the dungeon's summary scale.</summary>
     private const int SummaryLineChars = 64;
 
+    /// <summary>How many of the enchanter's finished and worked services the hub's summary names before it says how many more (<see cref="MoreAtTheEnchanter"/>): the hub cuts a long summary short, so it can name more than the dungeon's end panel, which cannot.</summary>
+    internal const int HubServiceLines = 3;
+
+    /// <summary>How many weapons the summary's stalled line names before it says how many more.</summary>
+    internal const int MostStalledNames = 3;
+
+    /// <summary>What the summary says when a run that did not count ends with weapons in the shop (§6.3): the enchanter works only on a run that counts.</summary>
+    internal const string WorkedNothing = "THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT";
+
+    /// <summary>The head of the summary's line of stalled weapons, the names after it.</summary>
+    internal const string StalledHeading = "STALLED AT THE ENCHANTER:";
+
+    /// <summary>What the hub alone appends to <see cref="MoreAtTheEnchanter"/>: the page that shows the rest. The dungeon's end panel shares the summary, and TAB does nothing there.</summary>
+    internal const string TabWeapons = " - TAB WEAPONS";
+
     /// <summary>
     /// A run's summary (§4.4), a line a fact, the headline first. It says what
     /// the run was — <c>CLEARED</c>, <c>RETREATED</c>, <c>DEFEATED</c> — and where
@@ -183,9 +199,21 @@ public sealed class BetweenRunsHud : IDisposable
     /// them (<see cref="DungeonHud.RunSummaryLines"/>). The between-runs screen
     /// shows them again above the list, where they are the context the next
     /// choice is made in.
+    /// <para>
+    /// <strong>And the enchanter</strong> (§6.2, §6.3; Phase 6a.3a), after whether
+    /// the run counted, when anything was in the shop: each service the run
+    /// finished, back in the stable with what it attached, and each it worked a run
+    /// on, at most <paramref name="mostServiceLines"/> of them and then how many
+    /// more (<see cref="MoreAtTheEnchanter"/>); then the weapons it left stalled,
+    /// wrapped as the spoils are, at most <see cref="MostStalledNames"/> named. A
+    /// run that did not count worked nothing, and says so. It names no key: the
+    /// dungeon's end panel shares these lines, and the hub adds its own
+    /// (<see cref="HubSummaryLines"/>).
+    /// </para>
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
-    internal static IReadOnlyList<Run> SummaryLines(RunResult result)
+    /// <param name="mostServiceLines">How many finished and worked services to name before saying how many more: the hub's <see cref="HubServiceLines"/>, the dungeon's end panel fewer.</param>
+    internal static IReadOnlyList<Run> SummaryLines(RunResult result, int mostServiceLines = HubServiceLines)
     {
         ArgumentNullException.ThrowIfNull(result);
         var content = GameContent.Current;
@@ -246,6 +274,9 @@ public sealed class BetweenRunsHud : IDisposable
             : mercyReachable ? $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}" : "RUN NOT COUNTED";
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
+        // What the enchanter did on the run's end, which the count decided.
+        lines.AddRange(ServiceLines(result, mostServiceLines));
+
         // What the clear did to the dungeon.
         if (result.Retired)
             lines.Add(new Run($"{dungeon} IS CLOSED FOR GOOD", DungeonHud.Yellow));
@@ -254,6 +285,89 @@ public sealed class BetweenRunsHud : IDisposable
 
         return lines;
     }
+
+    /// <summary>
+    /// The summary's lines for the enchanter (§6.2, §6.3), off the run's reports
+    /// (<see cref="RunResult.Services"/>), none for an empty shop: on a run that
+    /// counted, each finished service (cyan) — <c>WAND OF THE CONE IS BACK FROM THE
+    /// ENCHANTER - ATTACHED VAMPIRIC</c>, <c>RIPOSTE BLADE IS BACK FROM THE
+    /// ENCHANTER - REFINED</c> — then each worked one — <c>THE ENCHANTER WORKED THE
+    /// ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/> of those together
+    /// and then <c>AND 2 MORE AT THE ENCHANTER</c>; then the stalled weapons in
+    /// yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
+    /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
+    /// and an enchantment are named by the content's rows, and by the bare id where
+    /// a row is gone, so the summary never throws while it draws.
+    /// </summary>
+    private static IEnumerable<Run> ServiceLines(RunResult result, int most)
+    {
+        var reports = result.Services ?? [];
+        if (reports.Count == 0)
+            yield break;
+        if (!result.ServiceTick)
+        {
+            yield return new Run(WorkedNothing, DungeonHud.Grey);
+            yield break;
+        }
+
+        var told = reports.Where(report => report.Finished).Concat(reports.Where(report => !report.Stalled && !report.Finished)).ToList();
+        foreach (var report in told.Take(Math.Max(0, most)))
+            yield return new Run(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report), DungeonHud.Cyan);
+        if (told.Count > most)
+            yield return new Run(MoreAtTheEnchanter(told.Count - Math.Max(0, most)), DungeonHud.Cyan);
+
+        var stalled = reports.Where(report => report.Stalled).Select(report => WeaponName(report.WeaponId)).ToList();
+        if (stalled.Count > 0)
+        {
+            var named = stalled.Take(MostStalledNames).ToList();
+            if (stalled.Count > MostStalledNames)
+                named.Add($"AND {stalled.Count - MostStalledNames} MORE");
+            foreach (var line in Wrapped(StalledHeading, named, DungeonHud.Yellow))
+                yield return line;
+        }
+    }
+
+    /// <summary>A finished service's line: <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC</c>, or <c>- REFINED</c>.</summary>
+    internal static string BackFromTheEnchanter(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        string what = report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"ATTACHED {EnchantmentName(id)}" : "REFINED";
+        return $"{WeaponName(report.WeaponId)} IS BACK FROM THE ENCHANTER - {what}";
+    }
+
+    /// <summary>A worked service's line, not finished yet: <c>THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c>.</summary>
+    internal static string WorkedThe(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return $"THE ENCHANTER WORKED {HubWeapons.The(WeaponName(report.WeaponId))} - {report.RunsWorked} OF {DungeonHud.Runs(report.Runs)}";
+    }
+
+    /// <summary>How many more finished and worked services there are than the summary named: <c>AND 2 MORE AT THE ENCHANTER</c>.</summary>
+    internal static string MoreAtTheEnchanter(int more) => $"AND {more} MORE AT THE ENCHANTER";
+
+    /// <summary>
+    /// The summary as the hub shows it over its list: <see cref="SummaryLines"/> at
+    /// <see cref="HubServiceLines"/>, and the enchanter's line of how many more it did
+    /// not name pointing at the page that shows them — <c>AND 2 MORE AT THE
+    /// ENCHANTER - TAB WEAPONS</c>. Here, and never in the dungeon's end panel, where
+    /// TAB does nothing.
+    /// </summary>
+    internal static IReadOnlyList<Run> HubSummaryLines(RunResult result)
+    {
+        var lines = SummaryLines(result, HubServiceLines).ToList();
+        for (int i = 0; i < lines.Count; i++)
+            if (lines[i].Text.StartsWith("AND ", StringComparison.Ordinal) && lines[i].Text.EndsWith(" MORE AT THE ENCHANTER", StringComparison.Ordinal))
+                lines[i] = lines[i] with { Text = lines[i].Text + TabWeapons };
+        return lines;
+    }
+
+    /// <summary>A weapon by its catalogue id, as the summary names it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
+    private static string WeaponName(string id)
+        => (GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id).ToUpperInvariant();
+
+    /// <summary>An enchantment by its id, as the summary and the shop name it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
+    internal static string EnchantmentName(string id)
+        => (GameContent.Current.Enchantments.TryGet(id, out var def) ? def.Name : id).ToUpperInvariant();
 
     /// <summary>A list under a heading, as many summary lines as it takes: the heading and the items on the first, the rest indented under it, comma-separated.</summary>
     private static IEnumerable<Run> Wrapped(string heading, IEnumerable<string> items, Vector4 color)
@@ -561,14 +675,83 @@ public sealed class BetweenRunsHud : IDisposable
     }
 
     /// <summary>
+    /// A weapon's enchantment slots said whole (R4, §6.2), for the detail panel: how
+    /// many it holds, how many slots its capacity has opened, and the slot it waits
+    /// on — the one its next enchantment needs, or the next to open when that one is
+    /// open already — <c>ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5 - SLOT 2 OPENS AT
+    /// CAPACITY 35</c>; or <c>ENCHANTMENTS 2 - ALL 5 SLOTS OPEN</c>. What a weapon
+    /// arrives with fills its slots from the first, so a unique carrying three at
+    /// capacity 30 waits on slot 4.
+    /// </summary>
+    internal static string SlotsLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int count = weapon.Enchantments.Count;
+        int slots = GameContent.Current.Tuning.EnchantmentSlots;
+        int open = Wear.SlotsOpen(weapon.WearCapacity);
+        if (open >= slots)
+            return $"ENCHANTMENTS {count} - ALL {slots} SLOTS OPEN";
+        string line = $"ENCHANTMENTS {count} - SLOTS OPEN {open} OF {slots}";
+        if (count >= slots)
+            return line;
+        int next = Math.Max(count + 1, open + 1);
+        return $"{line} - SLOT {next} OPENS AT CAPACITY {Wear.SlotOpensAt(next)}";
+    }
+
+    /// <summary>
+    /// What a weapon's next enchantment costs (R4, §6.2), for the detail panel: the
+    /// deposit it needs and the runs it spends in the shop — <c>THE NEXT NEEDS A
+    /// DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP</c> — or, with every slot filled,
+    /// <c>ALL 5 SLOTS ARE FILLED - REFINING IS LEFT</c>.
+    /// </summary>
+    internal static string PriceLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int count = weapon.Enchantments.Count;
+        int slots = GameContent.Current.Tuning.EnchantmentSlots;
+        return count >= slots
+            ? $"ALL {slots} SLOTS ARE FILLED - REFINING IS LEFT"
+            : $"THE NEXT NEEDS A DEPOSIT OF {Wear.Price(count + 1)} WEAR - {DungeonHud.Runs(Wear.ServiceRuns(count))} IN THE SHOP";
+    }
+
+    /// <summary>Over a weapon in the shop's detail, where the others say where they are.</summary>
+    internal const string AtTheEnchanterLine = "AT THE ENCHANTER";
+
+    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>.</summary>
+    internal static string ServiceLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        string what = deposit.Service == Service.Enchant && deposit.EnchantmentId is { } id ? $"ENCHANT {EnchantmentName(id)}" : "REFINE";
+        return $"{what} - {HubWeapons.ShopRuns(deposit)}";
+    }
+
+    /// <summary>A worked deposit's state: when it comes back, <c>WORKING - BACK AFTER 1 MORE RUN THAT COUNTS</c>.</summary>
+    internal static string WorkingLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        int left = deposit.Runs - deposit.RunsWorked;
+        return $"WORKING - BACK AFTER {left} MORE {(left == 1 ? "RUN THAT COUNTS" : "RUNS THAT COUNT")}";
+    }
+
+    /// <summary>A stalled deposit's state: what it waits on, <c>STALLED - 2 NEWER DEPOSITS ARE AHEAD OF IT</c>.</summary>
+    internal static string StalledLine(int ahead)
+        => $"STALLED - {ahead} NEWER {(ahead == 1 ? "DEPOSIT IS" : "DEPOSITS ARE")} AHEAD OF IT";
+
+    /// <summary>
     /// The detail panel for the row chosen, top to bottom, on the right: for a
     /// weapon, where it is, its name — a unique's in orange — and the dungeon's
     /// readouts with no wielder (<see cref="DungeonHud.WeaponStats"/>, the
     /// modifiers and the enchantments, each list wrapped to the column), under a
     /// caster that casts nothing why, in orange (<see cref="CastsNothingLine"/>),
     /// then its wear said whole (<see cref="DungeonHud.WearLine"/>, green once
-    /// full) and its capacity (<see cref="CapacityLine"/>). For a room, what it is
-    /// and what it is for. Nothing for a row that is neither.
+    /// full), its capacity (<see cref="CapacityLine"/>), its slots
+    /// (<see cref="SlotsLine"/>) and what its next enchantment costs
+    /// (<see cref="PriceLine"/>). For a weapon in the shop, that it is at the
+    /// enchanter, its name, what its deposit bought and its runs
+    /// (<see cref="ServiceLine"/>), whether it is worked or stalled and on what
+    /// (<see cref="WorkingLine"/>, <see cref="StalledLine"/>), and the readouts, wear
+    /// and capacity — no slots or price, which its service is changing. For a room,
+    /// what it is and what it is for. Nothing for a row that is none of these.
     /// </summary>
     internal static IReadOnlyList<ListRow> DetailRows(HubWeapons.Row row)
     {
@@ -580,11 +763,31 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(RoomHint, DungeonHud.Grey, DetailScale, DetailPitch));
             return rows;
         }
+        if (row is { Kind: HubWeapons.RowKind.Shop, Weapon: { } shopWeapon, Deposit: { } deposit })
+        {
+            rows.Add(new ListRow(AtTheEnchanterLine, DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
+            rows.Add(new ListRow(HubWeapons.Name(shopWeapon), shopWeapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
+            rows.Add(new ListRow(ServiceLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
+            rows.Add(row.Stalled
+                ? new ListRow(StalledLine(row.Ahead), DungeonHud.Yellow, DetailScale, DetailPitch)
+                : new ListRow(WorkingLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
+            Readouts(rows, shopWeapon);
+            return rows;
+        }
         if (row is not { Kind: HubWeapons.RowKind.Weapon, Place: { } place, Weapon: { } weapon })
             return rows;
 
         rows.Add(new ListRow(WhereLine(place), DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
         rows.Add(new ListRow(HubWeapons.Name(weapon), weapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
+        Readouts(rows, weapon);
+        rows.Add(new ListRow(SlotsLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+        rows.Add(new ListRow(PriceLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+        return rows;
+    }
+
+    /// <summary>What every weapon's detail says under its name: its statline, modifiers and enchantments with no wielder, why a caster casts nothing, its wear and its capacity.</summary>
+    private static void Readouts(List<ListRow> rows, Weapon weapon)
+    {
         rows.Add(new ListRow(DungeonHud.WeaponStats(weapon), DungeonHud.White, DetailScale, DetailPitch));
         foreach (string line in Listed("* ", DungeonHud.ModifierReadout(weapon), DetailChars))
             rows.Add(new ListRow(line, DungeonHud.White, DetailScale, DetailPitch));
@@ -594,7 +797,6 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(CastsNothingLine, DungeonHud.Orange, DetailScale, DetailPitch));
         rows.Add(new ListRow(DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
         rows.Add(new ListRow(CapacityLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
-        return rows;
     }
 
     /// <summary>
@@ -682,7 +884,7 @@ public sealed class BetweenRunsHud : IDisposable
     private void DrawDungeons(BetweenRunsScene scene, int w, int h, int noticeRows)
     {
         var rows = ListRows(scene.Listings, scene.Chosen);
-        IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
+        IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? HubSummaryLines(lastRun) : [];
         var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), noticeRows);
 
         if (summary.Count > 0)

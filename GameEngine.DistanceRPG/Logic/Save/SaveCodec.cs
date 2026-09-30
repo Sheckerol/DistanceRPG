@@ -63,6 +63,15 @@ public static class SaveCodec
     /// <summary>The campaign's stable (<see cref="CampaignDto.Stable"/>): version 2's, from Phase 6a.2.</summary>
     internal const string StableMember = "stable";
 
+    /// <summary>The campaign's enchanter's queue (<see cref="CampaignDto.Enchanter"/>): version 2's, from Phase 6a.3a.</summary>
+    internal const string EnchanterMember = "enchanter";
+
+    /// <summary>The campaign's count of deposits made (<see cref="CampaignDto.DepositsMade"/>): version 2's, from Phase 6a.3a.</summary>
+    internal const string DepositsMadeMember = "depositsMade";
+
+    /// <summary>A run's end's service reports (<see cref="RunResultDto.Services"/>), in the campaign's last result: version 2's, from Phase 6a.3a.</summary>
+    internal const string ServicesMember = "services";
+
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
 
@@ -98,13 +107,17 @@ public static class SaveCodec
     /// version 1 it meant no stable, and read at version 2 it would be weapons the
     /// campaign never owned — or a refusal of a save version 1 loaded. Where there
     /// is none the step writes none, and the reader takes the member's default,
-    /// an empty stable (Phase 6a.2's review).</item>
+    /// an empty stable (Phase 6a.2's review). So are <strong>the enchanter's queue
+    /// and its count</strong>, and <strong>the last result's service
+    /// reports</strong> (Phase 6a.3a), for the same reason: to version 1 they were
+    /// nothing, an empty shop.</item>
     /// </list>
     /// <strong>It never throws on a hand-edited document.</strong> It writes by
     /// the indexer, so a stray <c>wear</c> a version-1 row already carried (the
     /// reader ignored it) is overwritten with version 1's meaning, 0, and a stray
-    /// root <c>tuningHashVersion</c> with 1; a stray <c>stable</c> is removed,
-    /// whatever kind of thing it is. And a member that is missing, null or
+    /// root <c>tuningHashVersion</c> with 1; a stray <c>stable</c>,
+    /// <c>enchanter</c>, <c>depositsMade</c> or <c>services</c> is removed, whatever
+    /// kind of thing it is. And a member that is missing, null or
     /// the wrong kind of thing — a party that is a number, a bag that is a table,
     /// a weapon row that is a string — is passed over, so the reader then refuses
     /// the document where it is wrong, by its path
@@ -130,6 +143,8 @@ public static class SaveCodec
         if (document["campaign"] is not JsonObject campaign)
             return document;
         campaign.Remove(StableMember);   // version 1 had none: one a hand put there meant nothing to it
+        campaign.Remove(EnchanterMember);   // nor an enchanter's queue, nor its count
+        campaign.Remove(DepositsMadeMember);
 
         foreach (var member in Items(campaign["party"]))
             if (member is JsonObject row)
@@ -138,6 +153,7 @@ public static class SaveCodec
 
         if (campaign["lastResult"] is JsonObject last)
         {
+            last.Remove(ServicesMember);   // nor a run's end at the enchanter
             foreach (var spoil in Items(last["spoilsKept"]))
                 Unworn(spoil);
             foreach (var spoil in Items(last["spoilsLost"]))

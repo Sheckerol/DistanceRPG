@@ -136,8 +136,8 @@ weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on th
 dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
 hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
-`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter itself, which
-spends wear and grows a weapon's capacity, arrives in the later Phase 6a steps.
+`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter spends it
+and grows a weapon's capacity (below).
 
 **The stable** (Phase 6a.2): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The
@@ -155,6 +155,38 @@ once under the title, until a later save goes through. No move leaves a member
 carrying no weapon, and a hand a move empties takes up the first weapon in its
 bag, as it would before a dungeon (PHASE 6a DECISION 7). The log says each move: `[Hub] Moved Staff of Renewal from
 A's bag slot 2 to the stable's end`.
+
+**The enchanter** (Phase 6a.3a): the WEAPONS page ends with the enchanter's
+shop — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` until the tutorial is
+beaten, and then `THE ENCHANTER - WORKS ON THE 2 NEWEST` over each weapon in it,
+the newest first: `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan for the two the next
+run that counts works (`EnchanterWorksOn`), `STALLED  RIPOSTE BLADE - 0 OF 1 RUN`
+in yellow for the rest — or `THE ENCHANTER - NOTHING IN THE SHOP`. A weapon in the
+shop is chosen to be read, never taken up; its detail says what its deposit bought
+and its runs (`ENCHANT VAMPIRIC - 1 OF 2 RUNS`, `REFINE - 0 OF 1 RUN`), and when it
+comes back (`WORKING - BACK AFTER 1 MORE RUN THAT COUNTS`) or what it waits on
+(`STALLED - 2 NEWER DEPOSITS ARE AHEAD OF IT`). Every other weapon's detail says
+its slots and what its next enchantment costs — `ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5
+- SLOT 2 OPENS AT CAPACITY 35`, `THE NEXT NEEDS A DEPOSIT OF 35 WEAR - 2 RUNS IN THE
+SHOP` — as the user ruled (R4): slot n opens at capacity 30 + 5(n − 1), what a weapon
+arrives with filling its slots from the first, and attaching enchantment n needs a
+free slot and a deposit of 30 + 5(n − 1) wear. A deposit cashes the weapon's whole
+pool — its capacity growing on it, a point a full bar, whatever it bought — and puts
+it in the shop for its enchantment count plus one runs that count (PHASE 6a DECISION
+6); the key that deposits (D) arrives in Phase 6a.5, so until then only a
+hand-edited save fills the shop. A run that counts works the two newest a run on,
+and a service whose last run it works comes back to the end of the stable, an
+Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION 3); a run
+that does not count works nothing. The run's summary says so after whether the run
+counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC`, `THE
+ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`, `STALLED AT THE ENCHANTER: RIPOSTE
+BLADE`, or `THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT` — and past three
+services on the screen between runs (two over the floor), `AND 2 MORE AT THE
+ENCHANTER - TAB WEAPONS`. The log says it too: `[Enchanter] Run counted: worked Wand
+of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1`, then `[Enchanter] Wand of
+the Cone finished: attached vampiric`. A weapon taken back early (its key arrives
+with the deposit's) comes back with its wear and its capacity as they were before it
+went in (PHASE 6a DECISION 8).
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
@@ -320,20 +352,28 @@ back to it, and the game quits from it.
   `tuning.json` loaded now, never stored), and the save names which version's
   numbers its record of the tuning covers (`"tuningHashVersion"`). The campaign
   holds its stable (`"stable"`, each weapon whole in its order, and `null` while
-  it is empty; Phase 6a.2), each weapon in it read as every weapon in a save is.
-  A save an earlier build wrote — version 1, Phase 5's, the slots' included —
-  loads as ever: it is lifted to version 2 as it is read, every weapon unworn at
-  0 of 30 and nothing in the stable, and saved as version 2 from then on. It says
-  `THE NUMBERS HAVE CHANGED` only if a number it was played under moved: the ones Phase 6a began to play
-  (`WearPerHit`, `WearCapacityPerBar`) are none it was played under (PHASE 6a
-  DECISION 9). **Do not open a slot this build has saved with an older
-  checkout.** A Phase 5 checkout reads version 2 as a newer build's save and
-  sets it aside, kept and never deleted (renamed back to `campaign.json`, it
-  loads again here), and loads nothing in its place. An earlier Phase 6a step's
-  build does worse: every 6a step reads version 2 as its own, so it loads a save
-  a later step wrote, passes over what it does not know of (the stable, the
-  enchanter's queue), and its next save — from Phase 6a.2 on, the first weapon
-  moved between runs — drops those, and the weapons in them.
+  it is empty; Phase 6a.2), each weapon in it read as every weapon in a save is;
+  and the enchanter's shop (`"enchanter"`, each deposit with its weapon whole, in
+  deposit order, `null` while it is empty) and how many deposits it has made
+  (`"depositsMade"`), with the last run's word on the shop in its result
+  (`"services"`, `null` for an empty shop; Phase 6a.3a). A save whose shop
+  contradicts itself — a weapon in it worn, a service past its last run, an
+  enchantment the campaign never met, a deposit before the tutorial is beaten — is
+  refused as one that cannot be read, naming where. A save an earlier build wrote —
+  version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
+  version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
+  or the shop, and saved as version 2 from then on. It says `THE NUMBERS HAVE
+  CHANGED` only if a number it was played under moved: the ones Phase 6a began to
+  play (the Enchanter group's) are none it was played under (PHASE 6a DECISION 9).
+  **Do not open a slot this build has saved with an older checkout.** A Phase 5
+  checkout reads version 2 as a newer build's save and sets it aside, kept and
+  never deleted (renamed back to `campaign.json`, it loads again here), and loads
+  nothing in its place. An earlier Phase 6a step's build does worse: every 6a step
+  reads version 2 as its own, so it loads a save a later step wrote, passes over
+  what it does not know of (the stable, the enchanter's queue), and its next save —
+  from Phase 6a.2 on, the first weapon moved between runs — drops those, and the
+  weapons in them: a 6a.1 or 6a.2 build loses every weapon in a 6a.3a save's shop
+  (PHASE 6a DECISION 14).
   While Phase 6a is being built, one more thing of the steps between: a save an
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
@@ -531,29 +571,29 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   movement budget and the cast costs, and turning `MovementBudget` leaves it
   where it was — so a longer budget also banks more mana a turn. Its comment
   gives the formula to re-derive it by hand.
-- **The Enchanter's keys** are what a hit wears and what a deposit at the
+- **The Enchanter's keys** are what a hit wears, what a deposit at the
   enchanter costs, as the user ruled on 2026-09-25
-  (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2). **Two play**, since Phase
-  6a.1: `WearPerHit`, the wear a weapon banks for every hit it lands (0 wears
-  nothing, so nothing could be enchanted), and `WearCapacityPerBar`, what a full
-  bar of wear cashed adds to a weapon's capacity — worked out afresh from the
-  wear the weapon has ever cashed, so a change moves every weapon's capacity at
-  once. Turning either says `THE NUMBERS HAVE CHANGED` when a campaign saved
-  under the other number resumes — but never to a save from before Phase 6a,
-  whose record of its numbers covers only the keys played then. **The rest play
-  nothing yet**: `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
-  `FirstEnchantmentWear` and `EnchantmentWearStep` — where a weapon's
-  enchantment slots open, and the wear attaching each enchantment needs — wait
-  for the enchanter's queue, a later Phase 6a step, and until then turning one
-  changes nothing in play. Each is still checked like every key —
-  `"EnchantmentSlots": 0` is taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0
-  IS BELOW 3 - USING 3` — and the log lists it among the numbers the file
-  changed; but a save's record of the numbers it was played under leaves them
-  out, so turning one never says `THE NUMBERS HAVE CHANGED` when a campaign
-  resumes. `GraftBaseChance` is no key yet: a file naming it is told it arrives
-  with the Phase 6a code that reads it. The docs' older `WearCapacityLadder` and
-  `EnchantmentWearCost` are no keys: a file naming either is told which key took
-  its place.
+  (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2), and how many deposits the
+  enchanter works on. **All of them play.** Since Phase 6a.1: `WearPerHit`, the
+  wear a weapon banks for every hit it lands (0 wears nothing, so nothing could be
+  enchanted), and `WearCapacityPerBar`, what a full bar of wear cashed adds to a
+  weapon's capacity — worked out afresh from the wear the weapon has ever cashed,
+  so a change moves every weapon's capacity at once. Since Phase 6a.3a:
+  `FirstSlotCapacity` and `SlotCapacityStep`, where a weapon's enchantment slots
+  open (slot n at `FirstSlotCapacity + SlotCapacityStep x (n - 1)`);
+  `EnchantmentSlots`, the most enchantments a weapon holds (`"EnchantmentSlots": 0`
+  is taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0 IS BELOW 3 - USING 3`);
+  `FirstEnchantmentWear` and `EnchantmentWearStep`, the deposit attaching
+  enchantment n needs (`FirstEnchantmentWear + EnchantmentWearStep x (n - 1)`); and
+  `EnchanterWorksOn`, how many of the newest deposits a run that counts works (1 to
+  10; the doc's 2). Turning any says `THE NUMBERS HAVE CHANGED` when a campaign saved
+  under the other number resumes — but never to a save from before Phase 6a, whose
+  record of its numbers covers only the keys played then; a save the 6a.1 or 6a.2
+  build wrote says it once, though no number moved, since each step adds the
+  numbers it plays to version 2's record. `GraftBaseChance` is no key yet: a file
+  naming it is told it arrives with the Phase 6a code that reads it. The docs' older
+  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming either is
+  told which key took its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at
@@ -561,8 +601,8 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   SAVESLOTS 12 IS ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above
   the count keeps its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and
   loaded, it goes on saving the campaign played from it; NEW CAMPAIGN never
-  offers it. The launcher reads it and no rule of play does, so, like the
-  Enchanter's keys not yet played, turning it never says `THE NUMBERS HAVE CHANGED`.
+  offers it. The launcher reads it and no rule of play does, so turning it never
+  says `THE NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`

@@ -66,7 +66,9 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// — the deepest tier an entry's arithmetic stays whole at
 /// (<see cref="DeepestTier"/>), the run count a run's end could carry past the
 /// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
-/// weapon holds (<see cref="MostEnchantments"/>); and the save's sanity bounds,
+/// weapon holds (<see cref="MostEnchantments"/>), and with it the most runs a
+/// service takes (<see cref="MostServiceRuns"/>) and the most deposits a run's end
+/// works (<see cref="MostWorked"/>); and the save's sanity bounds,
 /// where a count's arithmetic stops being whole (<see cref="MostCount"/>,
 /// <see cref="MostLevels"/>, <see cref="MostHeldShots"/>). One accessor each, read once,
 /// so the content and the save never disagree about how deep a number goes.
@@ -139,6 +141,21 @@ internal static class ContentBounds
     /// largest whole number (<see cref="Weapon.TotalLock"/>).
     /// </summary>
     internal static int MostEnchantments { get; } = Int(nameof(Tuning.EnchantmentSlots)).Max;
+
+    /// <summary>
+    /// The most runs a service at the enchanter takes (§6.2, Phase 6a.3a): the
+    /// weapon's count plus one (<see cref="Wear.ServiceRuns"/>), and no weapon holds
+    /// more than <see cref="MostEnchantments"/> — so a saved deposit, or a report of
+    /// one, naming more runs is none play made, and none a tick would ever finish.
+    /// </summary>
+    internal static int MostServiceRuns { get; } = MostEnchantments + 1;
+
+    /// <summary>
+    /// The most deposits one run's end works (§6.2, Phase 6a.3a):
+    /// <c>EnchanterWorksOn</c>'s clamp ceiling, the newest that many. A saved run's
+    /// end reporting more worked is none play wrote.
+    /// </summary>
+    internal static int MostWorked { get; } = Int(nameof(Tuning.EnchanterWorksOn)).Max;
 
     /// <summary>
     /// The largest count play grows a bounded step at a time, <strong>a sanity

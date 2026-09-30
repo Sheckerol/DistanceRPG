@@ -254,7 +254,7 @@ public sealed class BetweenRunsScene : Scene
         Log.Info($"[Hub] Between runs, run counter {_campaign.RunCounter}: "
             + (_listings.Count == 0 ? "nothing left to enter" : string.Join("; ", _listings.Select(BetweenRunsHud.ListingLine)))
             + (_chosen >= 0 ? $" - {_listings[_chosen].Def.Name} chosen" : "")
-            + $" - the stable holds {_campaign.Stable.Count}");
+            + $" - the stable holds {_campaign.Stable.Count}, the enchanter {_campaign.AtTheEnchanter.Count}");
     }
 
     public override void Render(Camera camera)

@@ -5,8 +5,9 @@ namespace GameEngine.DistanceRPG;
 
 /// <summary>
 /// The WEAPONS page between runs (§6.2, §6.7; Phase 6a.2): every member's hand
-/// and bag, then the stable, a row a weapon — rebuilt from the campaign each
-/// time it is asked (<see cref="Rows(CampaignState)"/>), so a row never shows a weapon where it
+/// and bag, then the stable, then the enchanter's shop (Phase 6a.3a), a row a
+/// weapon — rebuilt from the campaign each time it is asked
+/// (<see cref="Rows(CampaignState)"/>), so a row never shows a weapon where it
 /// no longer is — and the page's own state: the row chosen, the first row the
 /// window shows, and a weapon carried.
 /// <para>
@@ -39,6 +40,9 @@ internal sealed class HubWeapons
 
         /// <summary>Somewhere a weapon can go that holds none — a member's empty hand, the room in its bag, the stable's end: chosen, and put down on.</summary>
         Room,
+
+        /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a): chosen, to be read, but neither taken up nor put down on — it is out of the party's hands.</summary>
+        Shop,
     }
 
     /// <summary>
@@ -47,16 +51,30 @@ internal sealed class HubWeapons
     /// points, and the weapon there.
     /// </summary>
     /// <param name="Kind">What the row is.</param>
-    /// <param name="Label">A heading's, a member's or a room's whole text; a weapon row's text before the weapon's name, its indent and its slot.</param>
-    /// <param name="Place">Where a weapon or a room is — what a weapon carried is put down on — or null for a heading or a member.</param>
-    /// <param name="Weapon">The weapon on a weapon row, or null.</param>
-    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null)
+    /// <param name="Label">A heading's, a member's or a room's whole text; a weapon row's text before the weapon's name, its indent and its slot, or on a shop row whether it is worked.</param>
+    /// <param name="Place">Where a weapon or a room is — what a weapon carried is put down on — or null for a heading, a member or the shop.</param>
+    /// <param name="Weapon">The weapon on a weapon row or a shop row, or null.</param>
+    /// <param name="Deposit">The deposit on a shop row, or null.</param>
+    /// <param name="Ahead">On a shop row, how many newer deposits are in the shop: a stalled one waits on them.</param>
+    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0)
     {
-        /// <summary>The row's text: the label, and on a weapon row the weapon's name and its wear (<see cref="DungeonHud.WearReadout"/>).</summary>
-        public string Text => Weapon is { } weapon ? $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}" : Label;
+        /// <summary>
+        /// The row's text: the label, and on a weapon row the weapon's name and its
+        /// wear (<see cref="DungeonHud.WearReadout"/>), on a shop row its name and its
+        /// runs (<see cref="ShopRuns"/>).
+        /// </summary>
+        public string Text => (Weapon, Deposit) switch
+        {
+            ({ } weapon, { } deposit) => $"{Label}{Name(weapon)} - {ShopRuns(deposit)}",
+            ({ } weapon, null) => $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}",
+            _ => Label,
+        };
 
-        /// <summary>Whether W/S stops on it while browsing: a weapon or a room.</summary>
-        public bool Choosable => Kind is RowKind.Weapon or RowKind.Room;
+        /// <summary>Whether this shop row's deposit waits: the next run that counts leaves it unworked.</summary>
+        public bool Stalled => Kind == RowKind.Shop && Label == StalledLabel;
+
+        /// <summary>Whether W/S stops on it while browsing: a weapon, a room, or a weapon in the shop.</summary>
+        public bool Choosable => Kind is RowKind.Weapon or RowKind.Room or RowKind.Shop;
 
         /// <summary>Whether a weapon carried can be put down on it: a weapon, which it swaps with, or a room.</summary>
         public bool Target => Kind is RowKind.Weapon or RowKind.Room;
@@ -82,6 +100,15 @@ internal sealed class HubWeapons
     /// <summary>The stable's end: where a weapon put in the stable goes.</summary>
     internal const string StableRoom = StableLabel + "- ROOM -";
 
+    /// <summary>A shop row whose deposit the next run that counts works, as the stable's and the bag's rows start: indented, and what it is said.</summary>
+    internal const string WorkingLabel = "  WORKING  ";
+
+    /// <summary>A shop row whose deposit waits on the newer ones.</summary>
+    internal const string StalledLabel = "  STALLED  ";
+
+    /// <summary>Over the shop once the tutorial is beaten and nothing is in it.</summary>
+    internal const string NothingInTheShop = "THE ENCHANTER - NOTHING IN THE SHOP";
+
     /// <summary>What the chosen row's indent becomes, and how it ends: the dungeon list's marks.</summary>
     private const string ChosenMark = "> ";
     private const string ChosenEnd = " <";
@@ -94,9 +121,12 @@ internal sealed class HubWeapons
     }
 
     /// <summary>A weapon named with its article, once: <c>THE ARMING SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
-    internal static string The(Weapon weapon)
+    internal static string The(Weapon weapon) => The(Name(weapon));
+
+    /// <summary>A weapon's name, as the page says it, with its article once: <c>THE ROTWOOD</c>, and <c>THE BULWARK</c> as it is.</summary>
+    internal static string The(string name)
     {
-        string name = Name(weapon);
+        ArgumentNullException.ThrowIfNull(name);
         return name.StartsWith("THE ", StringComparison.Ordinal) ? name : $"THE {name}";
     }
 
@@ -116,6 +146,22 @@ internal sealed class HubWeapons
         };
 
     /// <summary>
+    /// Over the shop while something is in it (§6.2): how many deposits the
+    /// enchanter works on at once, the newest, <c>THE ENCHANTER - WORKS ON THE 2
+    /// NEWEST</c> (<see cref="Tuning.EnchanterWorksOn"/>) — so a stalled row under it
+    /// reads as waiting, never as lost.
+    /// </summary>
+    internal static string EnchanterHeading(int worksOn)
+        => worksOn == 1 ? "THE ENCHANTER - WORKS ON THE NEWEST" : $"THE ENCHANTER - WORKS ON THE {worksOn} NEWEST";
+
+    /// <summary>A deposit's runs as a shop row reads them, the runs worked of the runs it takes: <c>1 OF 2 RUNS</c>, <c>0 OF 1 RUN</c>.</summary>
+    internal static string ShopRuns(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        return $"{deposit.RunsWorked} OF {DungeonHud.Runs(deposit.Runs)}";
+    }
+
+    /// <summary>
     /// Why a weapon cannot be put down where it was carried to (PHASE 6a DECISION
     /// 7): the member it would leave carrying none, <c>EACH MEMBER KEEPS A WEAPON -
     /// [A] WOULD CARRY NONE</c>. Said in the refusal row, over the keys, until the
@@ -130,8 +176,24 @@ internal sealed class HubWeapons
     /// the stable's heading, each weapon in the stable in its order, and the
     /// stable's room, which is always there: the stable is unbounded (PHASE 6a
     /// DECISION 7). An empty hand is a row of its own, somewhere a weapon can go.
+    /// Last the enchanter (Phase 6a.3a): before the tutorial is beaten, that it
+    /// opens then (§6.3); after, how many deposits it works on, and each weapon in
+    /// the shop, the newest first — <c>WORKING</c> for the few the next run that
+    /// counts works, <c>STALLED</c> for the rest (§6.2: "working on these two"
+    /// reads at a glance, and a stalled weapon is never silent) — or that nothing
+    /// is in it.
     /// </summary>
-    internal static IReadOnlyList<Row> Rows(CampaignState campaign)
+    internal static IReadOnlyList<Row> Rows(CampaignState campaign) => [.. PartyRows(campaign), .. ShopRows(campaign)];
+
+    /// <summary>
+    /// The page's rows down to the stable's room (<see cref="Rows(CampaignState)"/>):
+    /// the party and the stable, every place a weapon can be taken up from or put
+    /// down on — the page's first rows, so a row's index is the same here as on the
+    /// whole page. Read off the party and the stable alone, nothing of the content,
+    /// so a carry put back finds its weapon's row with nothing but the campaign
+    /// (<see cref="PutBack"/>, which ESC reaches).
+    /// </summary>
+    private static List<Row> PartyRows(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         var rows = new List<Row> { new(RowKind.Heading, PartyHeading) };
@@ -166,13 +228,40 @@ internal sealed class HubWeapons
         return rows;
     }
 
+    /// <summary>The page's last rows (<see cref="Rows(CampaignState)"/>): the enchanter's heading, and each weapon in the shop, the newest first.</summary>
+    private static List<Row> ShopRows(CampaignState campaign)
+    {
+        var rows = new List<Row>();
+        var content = GameContent.Current;
+        var shop = campaign.AtTheEnchanter;
+        if (!campaign.IsRetired(content.Dungeons.Tutorial.Id))
+            rows.Add(new Row(RowKind.Heading, Enchanter.Closed(content.Dungeons.Tutorial)));
+        else if (shop.Count == 0)
+            rows.Add(new Row(RowKind.Heading, NothingInTheShop));
+        else
+        {
+            rows.Add(new Row(RowKind.Heading, EnchanterHeading(content.Tuning.EnchanterWorksOn)));
+            var worked = Enchanter.Worked(shop);
+            for (int i = shop.Count - 1; i >= 0; i--)   // the newest first: the worked few head it
+            {
+                var deposit = shop[i];
+                bool working = worked.Any(entry => ReferenceEquals(entry, deposit));
+                rows.Add(new Row(RowKind.Shop, working ? WorkingLabel : StalledLabel, Weapon: deposit.Weapon, Deposit: deposit,
+                    Ahead: shop.Count(entry => entry.Ordinal > deposit.Ordinal)));
+            }
+        }
+        return rows;
+    }
+
     /// <summary>
     /// A row as the page draws it, in its colours: a heading and a member in grey,
     /// a room in dark grey, a weapon in white — its name in a unique's orange, its
     /// wear green once full (<see cref="DungeonHud.WearColor"/>), as on every
-    /// weapon line — and a weapon taken up, where it still lies, in cyan. The row
-    /// chosen is yellow, its indent marked <c>&gt;</c> and its end <c>&lt;</c>, as
-    /// the dungeon list marks its choice.
+    /// weapon line — and a weapon taken up, where it still lies, in cyan. A weapon
+    /// in the shop reads cyan while it is worked, as the enchantments do, and yellow
+    /// while it is stalled, a unique's name orange. The row chosen is yellow, its
+    /// indent marked <c>&gt;</c> and its end <c>&lt;</c>, as the dungeon list marks
+    /// its choice.
     /// </summary>
     /// <param name="row">The row.</param>
     /// <param name="chosen">Whether it is the row chosen.</param>
@@ -188,6 +277,21 @@ internal sealed class HubWeapons
 
             case RowKind.Room:
                 return [chosen ? new Run(Marked(row.Label) + ChosenEnd, DungeonHud.Yellow) : new Run(row.Label, DungeonHud.DarkGrey)];
+
+            case RowKind.Shop:
+            {
+                var weapon = row.Weapon!;
+                var line = chosen || row.Stalled ? DungeonHud.Yellow : DungeonHud.Cyan;
+                var runs = new List<Run>
+                {
+                    new(chosen ? Marked(row.Label) : row.Label, line),
+                    new(Name(weapon), weapon.Unique ? DungeonHud.Orange : line),
+                    new($" - {ShopRuns(row.Deposit!)}", line),
+                };
+                if (chosen)
+                    runs.Add(new Run(ChosenEnd, line));
+                return runs;
+            }
 
             default:
             {
@@ -271,16 +375,21 @@ internal sealed class HubWeapons
     /// The first row a window of <paramref name="fit"/> rows shows, with the choice
     /// in it (<see cref="ScrollTop"/>): kept from one frame to the next, so the
     /// window moves only as far as the choice asks, and W/S onto a row already in
-    /// view never move it. A choice that is the first row under a member's name or
-    /// a heading — the first weapon of a member or of the stable, or the room where
-    /// there is none — asks for the rows over it that no choice stops on too, where
-    /// the window has room, so it is never read without whose it is.
+    /// view never move it. A choice that is the last row any choice stops on asks
+    /// for the rows under it that none stops on — the enchanter's heading under the
+    /// stable's room, with nothing in the shop — where the window has room, so the
+    /// page's end is read. And a choice that is the first row under a member's name
+    /// or a heading — the first weapon of a member, of the stable or of the shop, or
+    /// the room where there is none — asks for the rows over it that no choice stops
+    /// on too, where the window has room, so it is never read without whose it is.
     /// </summary>
     public int Window(int fit)
     {
         var rows = Rows();
         int chosen = Math.Clamp(_chosen, 0, rows.Count - 1);
         int top = ScrollTop(_top, chosen, rows.Count, fit);
+        if (fit > 0 && rows.Skip(chosen + 1).All(row => !row.Choosable))
+            top = Math.Max(top, Math.Min(chosen, rows.Count - fit));   // the rows under the last choice: the page's end in view
         int over = chosen;   // the first of the rows no choice stops on just over the choice, or the choice itself when there are none
         while (over > 0 && !rows[over - 1].Choosable)
             over--;
@@ -335,10 +444,15 @@ internal sealed class HubWeapons
         ChooseRowOf(moved);
     }
 
-    /// <summary>The choice onto <paramref name="weapon"/>'s row, wherever it is now; or, gone from the page, onto the first row it can stop on.</summary>
+    /// <summary>
+    /// The choice onto <paramref name="weapon"/>'s row, wherever it is now; or, gone
+    /// from the page, onto the first row it can stop on. A weapon carried is in the
+    /// party or the stable, never the shop, and so are those rows, which the page
+    /// opens with (<see cref="PartyRows"/>).
+    /// </summary>
     private void ChooseRowOf(Weapon weapon)
     {
-        var rows = Rows();
+        var rows = PartyRows(_campaign);
         int at = -1;
         for (int i = 0; i < rows.Count && at < 0; i++)
             if (ReferenceEquals(rows[i].Weapon, weapon))

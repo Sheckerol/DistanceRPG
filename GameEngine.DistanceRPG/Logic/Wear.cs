@@ -1,9 +1,11 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The §6.1 arithmetic of wear, under the user's ruling of 2026-09-25 on what a
-/// deposit costs (R4, settled.md): what a hit banks, and what a weapon's wear
-/// capacity is. Engine-free and deterministic — it rolls nothing — and it reads
+/// The §6.1 and §6.2 arithmetic of wear, under the user's ruling of 2026-09-25 on
+/// what a deposit costs (R4, settled.md): what a hit banks, what a weapon's wear
+/// capacity is, where its enchantment slots open, what attaching each enchantment
+/// costs, and how many runs a service takes (Phase 6a.3a). Engine-free and
+/// deterministic — it rolls nothing — and it reads
 /// the current tuning the way <see cref="Progression"/> does, so every number is
 /// a <c>tuning.json</c> key and none is a copy of one.
 /// <para>
@@ -58,6 +60,68 @@ public static class Wear
             throw new ArgumentOutOfRangeException(nameof(Tuning.StartingPool), tuning.StartingPool, "StartingPool is the bar a capacity opens on; below 1 there is no bar to fill.");
         int bar = tuning.StartingPool;
         return new PoolProgress(cashed / bar, bar, cashed % bar, bar);
+    }
+
+    /// <summary>
+    /// The capacity enchantment slot <paramref name="n"/> opens at (R4,
+    /// S:1666–1667): <c>FirstSlotCapacity + SlotCapacityStep × (n − 1)</c> — 30,
+    /// 35, 40, 45 and 50. What a weapon arrives with fills its slots from the first
+    /// ("a free slot is read literally", S:1713–1720), so the slot a weapon's next
+    /// enchantment needs is its count plus one. In a <c>long</c>: no tuning in
+    /// range wraps it.
+    /// </summary>
+    /// <param name="n">The slot, from 1.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is below 1.</exception>
+    public static long SlotOpensAt(int n)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(n, 1);
+        var tuning = GameContent.Current.Tuning;
+        return tuning.FirstSlotCapacity + (long)tuning.SlotCapacityStep * (n - 1);
+    }
+
+    /// <summary>
+    /// How many enchantment slots are open at <paramref name="capacity"/>: the
+    /// largest n no more than <see cref="Tuning.EnchantmentSlots"/> whose slot has
+    /// opened (<see cref="SlotOpensAt"/>), or 0 below the first.
+    /// </summary>
+    public static int SlotsOpen(int capacity)
+    {
+        int slots = GameContent.Current.Tuning.EnchantmentSlots;
+        int open = 0;
+        while (open < slots && SlotOpensAt(open + 1) <= capacity)
+            open++;
+        return open;
+    }
+
+    /// <summary>
+    /// The least wear a deposit must cash to attach enchantment <paramref name="n"/>
+    /// (R4, S:1668–1671): <c>FirstEnchantmentWear + EnchantmentWearStep × (n − 1)</c>
+    /// — 30, 35, 40, 45 and 50. A deposit spends the whole pool whatever the
+    /// price, and capacity above it is breathing room. It depends on n alone, so
+    /// refining never raises it. In a <c>long</c>, as the slots are.
+    /// </summary>
+    /// <param name="n">The enchantment being attached, from 1: the weapon's count plus one.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is below 1.</exception>
+    public static long Price(int n)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(n, 1);
+        var tuning = GameContent.Current.Tuning;
+        return tuning.FirstEnchantmentWear + (long)tuning.EnchantmentWearStep * (n - 1);
+    }
+
+    /// <summary>
+    /// The runs a service at the enchanter takes (§6.2, S:357–358): the weapon's
+    /// enchantment count, what it arrived with included, plus one — for every
+    /// deposit, a refinement too. So the tutorial's one run lands on a first
+    /// enchantment's one run, and the cumulative 1, 3, 6, 10, 15 of attaching five
+    /// in a row. The <c>+ 1</c> is a rule, not a key (PHASE 6a DECISION 6).
+    /// </summary>
+    /// <param name="count">The weapon's enchantments as it is deposited.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is negative.</exception>
+    public static int ServiceRuns(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        return count + 1;
     }
 
     /// <summary>

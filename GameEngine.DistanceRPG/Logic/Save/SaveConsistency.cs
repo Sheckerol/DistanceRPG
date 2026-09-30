@@ -37,7 +37,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <see cref="SaveMapper"/>); a soul's tier, which its pin plays at 1; and
 /// the counts no clamp or rule gives an honest ceiling, which
 /// <see cref="SaveMapper"/> holds only to the sanity bound past which the next
-/// step of play would wrap (<see cref="ContentBounds.MostCount"/>).
+/// step of play would wrap (<see cref="ContentBounds.MostCount"/>). And of the
+/// enchanter's queue (Phase 6a.3a): an Enchant's deposit below today's price or
+/// above today's capacity, both today's tuning; and a queued enchantment today's
+/// <c>restricted.json</c> would refuse or lists among the never-rolled — the
+/// deposit was legal when it was made, and the file beside the game is
+/// JSON-master data an edit may move since.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -91,6 +96,8 @@ internal static class SaveConsistency
 
         if (campaign.Visit is { } visit)
             Visit(campaign, visit, retired, locks);
+
+        Shop(campaign);
     }
 
     /// <summary>4. No run has ended: only a run's end moves the counter or clears a dungeon, and it always writes the summary.</summary>
@@ -297,6 +304,116 @@ internal static class SaveConsistency
                     Unworn(lying.Weapon, $"{where}.groundItem.weapon", "a drop is made when it is rolled, and nothing has wielded it since");
             }
         }
+    }
+
+    /// <summary>
+    /// 21–25, 27–29. The enchanter (Phase 6a.3a): the shop, as the hub's deposits
+    /// fill it and every run's end works it, and what the last run's end said of
+    /// it. A deposit takes the next ordinal and cashes the whole pool; its runs are
+    /// the count plus one; the tick that works its last run brings it back; an
+    /// Enchant buys an enchantment the campaign has met, which the weapon has room
+    /// for; and a run that did not count works nothing.
+    /// </summary>
+    private static void Shop(CampaignDto campaign)
+    {
+        const string at = $"{At}.enchanter";
+        var queue = campaign.Enchanter ?? [];
+        var seen = new HashSet<string>(campaign.Seen, StringComparer.Ordinal);
+
+        // 21. A deposit takes the next ordinal, and the count moves past it: the shop
+        // is in deposit order, each ordinal its own, each below the count.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            int ordinal = queue[i].Ordinal;
+            if (i > 0 && ordinal <= queue[i - 1].Ordinal)
+                throw new SaveFormatException($"{at}[{i}].ordinal",
+                    $"{ordinal} follows {queue[i - 1].Ordinal}: the shop is in deposit order, and each deposit takes the next ordinal, never one reused");
+            if (ordinal >= campaign.DepositsMade)
+                throw new SaveFormatException($"{at}[{i}].ordinal",
+                    $"{ordinal} is not below the deposits made, {campaign.DepositsMade}: a deposit takes the next ordinal, and the count moves past it");
+        }
+
+        // 22. A deposit cashes the whole pool, and nothing wears a weapon in the shop.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].Weapon.Wear != 0)
+                throw new SaveFormatException($"{at}[{i}].weapon.wear",
+                    $"{queue[i].Weapon.Wear} worn in the shop: the deposit cashed it all, and nothing wears a weapon there");
+
+        // 23. The tick that works a service's last run brings its weapon back.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].RunsWorked >= queue[i].Runs)
+                throw new SaveFormatException($"{at}[{i}].runsWorked",
+                    $"{queue[i].RunsWorked} of {queue[i].Runs} runs worked in the shop: the tick that works the last run brings the weapon back");
+
+        // 24. A service takes the count plus one runs, fixed as it went in, and the
+        // count cannot move while the weapon is in the shop.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            int count = queue[i].Weapon.Enchantments.Count;
+            if (queue[i].Runs != count + 1)
+                throw new SaveFormatException($"{at}[{i}].runs",
+                    $"{queue[i].Runs} for a weapon holding {count} enchantments: a service takes the count plus one runs, and the count does not move in the shop");
+        }
+
+        // 25. An Enchant buys an enchantment the campaign has met; a refinement names none.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            var deposit = queue[i];
+            bool enchant = deposit.Service == nameof(Service.Enchant);
+            if (enchant && deposit.Enchantment is null)
+                throw new SaveFormatException($"{at}[{i}].enchantment", "missing on an Enchant: a deposit to enchant names the enchantment it buys");
+            if (enchant && !seen.Contains(deposit.Enchantment!))
+                throw new SaveFormatException($"{at}[{i}].enchantment",
+                    $"{deposit.Enchantment} is not among the seen: the enchanter offers only what the campaign has met");
+            if (!enchant && deposit.Enchantment is not null)
+                throw new SaveFormatException($"{at}[{i}].enchantment", $"{deposit.Enchantment} named on a {deposit.Service}: a refinement attaches nothing");
+        }
+
+        // (26, a transfer's source, arrives with the transfer.)
+
+        // 27. What the last run's end said of the shop: a run that counted worked the
+        // newest few a run on and left the rest stalled, short of their last run; a
+        // run that did not count worked nothing. Nothing ties a report to a deposit
+        // still in the shop: a report outlives the entry it speaks of.
+        if (campaign.LastResult is { Services: { } reports } last)
+        {
+            const string where = $"{At}.lastResult.services";
+            int worked = 0;
+            for (int i = 0; i < reports.Count; i++)
+            {
+                var report = reports[i];
+                if (report.Stalled)
+                {
+                    if (report.RunsWorked >= report.Runs)
+                        throw new SaveFormatException($"{where}[{i}].runsWorked",
+                            $"{report.RunsWorked} of {report.Runs} runs on a stalled report: a stalled deposit is still in the shop, short of its last run");
+                    continue;
+                }
+                if (!last.ServiceTick)
+                    throw new SaveFormatException($"{where}[{i}].stalled",
+                        "false on a run that did not count: a run that did not count works nothing, and reports every deposit stalled");
+                if (report.RunsWorked < 1)
+                    throw new SaveFormatException($"{where}[{i}].runsWorked",
+                        $"{report.RunsWorked} of {report.Runs} runs on a worked report: the run worked it a run at least");
+                worked++;
+            }
+            if (worked > ContentBounds.MostWorked)
+                throw new SaveFormatException(where,
+                    $"{worked} worked, more than the {ContentBounds.MostWorked} the enchanter works on at most (EnchanterWorksOn at its most)");
+        }
+
+        // 28. The deposit cashed the wear it holds: the weapon has cashed that much at least.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].WearAtDeposit > queue[i].Weapon.WearCashed)
+                throw new SaveFormatException($"{at}[{i}].wearAtDeposit",
+                    $"{queue[i].WearAtDeposit} is above what the weapon has ever cashed, {queue[i].Weapon.WearCashed}: the deposit cashed it");
+
+        // 29. What an Enchant attaches as it finishes must load: the entry is the
+        // weapon's next, so the weapon has room for one more.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].Service == nameof(Service.Enchant) && queue[i].Weapon.Enchantments.Count >= ContentBounds.MostEnchantments)
+                throw new SaveFormatException($"{at}[{i}].weapon.enchantments",
+                    $"{queue[i].Weapon.Enchantments.Count} entries on a deposit to enchant: the one it attaches would be more than the {ContentBounds.MostEnchantments} a weapon can hold");
     }
 
     /// <summary>20's one question: a weapon no member has wielded has banked no wear and cashed none.</summary>

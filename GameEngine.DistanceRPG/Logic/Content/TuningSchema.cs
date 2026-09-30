@@ -7,9 +7,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// the readers Phase 6b builds (<see cref="TuningSchema.Deferred"/>).
 /// <see cref="Enchanter"/> holds what a hit wears and what a deposit costs, the
 /// user's ruling of 2026-09-25, whose keys were declared ahead of Phase 6a's
-/// enchanter and are set played as its rules read them
-/// (<see cref="TuningKey.Played"/>); its last key arrives with its Phase 6a
-/// reader. <see cref="Saves"/> holds how many save slots there are, the user's
+/// enchanter and are played since its rules read them
+/// (<see cref="TuningKey.Played"/>), and how many deposits the enchanter works on;
+/// its last key arrives with its Phase 6a reader, the improvement roll. <see cref="Saves"/> holds how many save slots there are, the user's
 /// ruling of the same day on the save model: the launcher's number, never a rule
 /// of play's. The file's heading for each group names the keys still to come,
 /// so §5.3's one screen stays whole.
@@ -45,8 +45,8 @@ public abstract record TuningKey(string Name, TuningGroup Group)
     /// <summary>
     /// Whether a rule of play reads this key. True for every key but two kinds: one
     /// declared ahead of its reader — a number the user has ruled and wants in the
-    /// file before the code that plays it exists: what a deposit costs, until Phase
-    /// 6a's enchanter reads each — and one that no rule of play reads at all:
+    /// file before the code that plays it exists: what a deposit costs was, until
+    /// Phase 6a's enchanter read each — and one that no rule of play reads at all:
     /// <c>SaveSlots</c>, how many save slots the launcher offers. Such a key
     /// is read exactly as every key — the built-in copy must name it with a whole
     /// number, a copy beside the game merges it, clamps it and warns — and the log
@@ -127,12 +127,12 @@ public static class TuningSchema
     /// reader is a dial wired to nothing (bend (e)) — by group, each with the
     /// phase and the keys it will bring. The file's headings name them. What a
     /// deposit costs is the one exception: the user ruled its numbers on
-    /// 2026-09-25 and keeps a number they may revisit in the file, so its six are
-    /// <see cref="TuningGroup.Enchanter"/> keys already, declared ahead of their
-    /// reader (<see cref="TuningKey.Played"/> false until a Phase 6a rule reads
-    /// each). <c>WearPerHit</c> arrived with its reader in Phase 6a;
-    /// <c>GraftBaseChance</c> is not the ruling's number either, and waits here
-    /// with the improvement roll that reads it.
+    /// 2026-09-25 and keeps a number they may revisit in the file, so its six were
+    /// <see cref="TuningGroup.Enchanter"/> keys before their reader, and each has
+    /// played since a Phase 6a rule reads it (<see cref="TuningKey.Played"/>).
+    /// <c>WearPerHit</c> and <c>EnchanterWorksOn</c> arrived with their readers in
+    /// Phase 6a; <c>GraftBaseChance</c> is not the ruling's number either, and
+    /// waits here with the improvement roll that reads it.
     /// </summary>
     public static IReadOnlyDictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)> Deferred { get; } =
         new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>
@@ -301,25 +301,29 @@ public static class TuningSchema
         Int(nameof(Tuning.DeathXpLossPercent), TuningGroup.Dungeon, 0, 100, t => t.DeathXpLossPercent, (t, v) => t with { DeathXpLossPercent = v }),
         Int(nameof(Tuning.StairGatherTiles), TuningGroup.Dungeon, 1, 50, t => t.StairGatherTiles, (t, v) => t with { StairGatherTiles = v }),
 
-        // Enchanter (§6.1, §6.2) — what a hit wears, and what a deposit costs, the
-        // user's ruling of 2026-09-25: the ruling's keys were declared ahead of their
-        // reader, Phase 6a's enchanter, and each is set played, hashed from the save's
-        // version 2, as a rule of it reads it — the wear a hit banks and the capacity
-        // a bar adds from Phase 6a.1, the rest still unplayed. A hit wears at most
-        // what a magnitude clamps at, and 0 wears nothing (a dial: nothing can then be
-        // enchanted). A capacity's range is StartingPool's, the bar it opens on; a
-        // step may be 0 (every slot open at once, every enchantment priced as the
-        // first); a bar adds at most what a magnitude clamps at. A weapon holds no
-        // fewer slots than it arrives filling, and at most twice the docs' five until
-        // Phase 6a sees a weapon carry more.
+        // Enchanter (§6.1, §6.2) — what a hit wears, what a deposit costs, the
+        // user's ruling of 2026-09-25, and how many deposits the enchanter works on:
+        // the ruling's keys were declared ahead of their reader, Phase 6a's
+        // enchanter, and each is played, hashed from the save's version 2, since a
+        // rule of it reads it — the wear a hit banks and the capacity a bar adds from
+        // Phase 6a.1, the slots, the price and the queue's worked few from 6a.3a. A
+        // hit wears at most what a magnitude clamps at, and 0 wears nothing (a dial:
+        // nothing can then be enchanted). A capacity's range is StartingPool's, the
+        // bar it opens on; a step may be 0 (every slot open at once, every
+        // enchantment priced as the first); a bar adds at most what a magnitude
+        // clamps at. A weapon holds no fewer slots than it arrives filling, and at
+        // most twice the docs' five. The enchanter works on one deposit at least — 0
+        // would freeze every service — and on no more than the most enchantments a
+        // weapon holds.
         PlayedFrom2(Int(nameof(Tuning.WearPerHit), TuningGroup.Enchanter, 0, 1000, t => t.WearPerHit, (t, v) => t with { WearPerHit = v })),
         PlayedFrom2(Int(nameof(Tuning.WearCapacityPerBar), TuningGroup.Enchanter, 0, 1000, t => t.WearCapacityPerBar, (t, v) => t with { WearCapacityPerBar = v })),
-        Unplayed(Int(nameof(Tuning.FirstSlotCapacity), TuningGroup.Enchanter, 1, 10000, t => t.FirstSlotCapacity, (t, v) => t with { FirstSlotCapacity = v })),
-        Unplayed(Int(nameof(Tuning.SlotCapacityStep), TuningGroup.Enchanter, 0, 10000, t => t.SlotCapacityStep, (t, v) => t with { SlotCapacityStep = v })),
-        Unplayed(Int(nameof(Tuning.EnchantmentSlots), TuningGroup.Enchanter, ContentValidator.MostArrivingEnchantments, 10,
+        PlayedFrom2(Int(nameof(Tuning.FirstSlotCapacity), TuningGroup.Enchanter, 1, 10000, t => t.FirstSlotCapacity, (t, v) => t with { FirstSlotCapacity = v })),
+        PlayedFrom2(Int(nameof(Tuning.SlotCapacityStep), TuningGroup.Enchanter, 0, 10000, t => t.SlotCapacityStep, (t, v) => t with { SlotCapacityStep = v })),
+        PlayedFrom2(Int(nameof(Tuning.EnchantmentSlots), TuningGroup.Enchanter, ContentValidator.MostArrivingEnchantments, 10,
             t => t.EnchantmentSlots, (t, v) => t with { EnchantmentSlots = v })),
-        Unplayed(Int(nameof(Tuning.FirstEnchantmentWear), TuningGroup.Enchanter, 1, 10000, t => t.FirstEnchantmentWear, (t, v) => t with { FirstEnchantmentWear = v })),
-        Unplayed(Int(nameof(Tuning.EnchantmentWearStep), TuningGroup.Enchanter, 0, 10000, t => t.EnchantmentWearStep, (t, v) => t with { EnchantmentWearStep = v })),
+        PlayedFrom2(Int(nameof(Tuning.FirstEnchantmentWear), TuningGroup.Enchanter, 1, 10000, t => t.FirstEnchantmentWear, (t, v) => t with { FirstEnchantmentWear = v })),
+        PlayedFrom2(Int(nameof(Tuning.EnchantmentWearStep), TuningGroup.Enchanter, 0, 10000, t => t.EnchantmentWearStep, (t, v) => t with { EnchantmentWearStep = v })),
+        PlayedFrom2(Int(nameof(Tuning.EnchanterWorksOn), TuningGroup.Enchanter, 1, 10, t => t.EnchanterWorksOn, (t, v) => t with { EnchanterWorksOn = v })),
 
         // Inventory (§4.4)
         Int(nameof(Tuning.PartyCarrySlots), TuningGroup.Inventory, GameConstants.PartySize, GameConstants.PartySize * GameConstants.MaxInventorySlots,

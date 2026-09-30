@@ -839,34 +839,67 @@ public sealed class DungeonHud
     /// last the key the panel answers, <c>ENTER TO CONTINUE</c>, never ESC. The
     /// key names <paramref name="next"/>, the next run's dungeon, when a caller
     /// knows it. The dungeon scene names none: ENTER goes on to the between-runs
-    /// screen, and the next dungeon is chosen there.
+    /// screen, and the next dungeon is chosen there. The enchanter's services are
+    /// named here at most <see cref="DungeonServiceLines"/> — the panel has no cut,
+    /// and the hub, which has, names more — and the rest counted.
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
     /// <param name="next">The next run's dungeon, by name; null names none.</param>
     internal static IReadOnlyList<Run> RunSummaryLines(RunResult result, string? next = null)
     {
-        var lines = new List<Run>(BetweenRunsHud.SummaryLines(result));
+        var lines = new List<Run>(BetweenRunsHud.SummaryLines(result, DungeonServiceLines));
         lines.Add(new Run(next is null ? ContinueHint : $"{ContinueHint} - NEXT: {next.ToUpperInvariant()}", White));
         return lines;
     }
 
+    /// <summary>How many of the enchanter's finished and worked services the run's end panel names before it says how many more (Phase 6a.3a): the panel shows every line it is handed, so it names fewer than the hub.</summary>
+    internal const int DungeonServiceLines = 2;
+
+    // The run's summary panel: the headline's top, and the step to the first line
+    // under it; each line's step; the gap over the key; the scales; and the
+    // clearance the key keeps over the window's bottom.
+    private const float SummaryFloor = 80f;
+    private const float SummaryHeadlineStep = 56f;
+    private const float SummaryLineStep = 22f;
+    private const float SummaryKeyGap = 12f;
+    private const float SummaryHeadlineScale = 5f;
+    private const float SummaryLineScale = 1.6f;
+    private const float SummaryKeyScale = 2f;
+    internal const float SummaryBottomClearance = 16f;
+
+    /// <summary>
+    /// Where the run's summary panel starts in a window <paramref name="h"/> pixels
+    /// tall, for <paramref name="lines"/> lines, the headline and the key among them:
+    /// above the middle, and never over the top readouts — and lifted from there, as
+    /// far as the top readouts allow, when a long summary (a wipe's lost haul and
+    /// claw-backs, and the enchanter's lines) would take the key past the window's
+    /// bottom. The panel has no cut, so every line it is handed is drawn.
+    /// </summary>
+    internal static float RunSummaryTop(float h, int lines)
+        => MathF.Max(SummaryFloor, MathF.Min(h / 2f - 170f, h - SummaryBottomClearance - RunSummaryHeight(lines)));
+
+    /// <summary>How tall the run's summary panel is for <paramref name="lines"/> lines, from the headline's top to the key's bottom.</summary>
+    internal static float RunSummaryHeight(int lines)
+        => SummaryHeadlineStep + Math.Max(0, lines - 2) * SummaryLineStep + SummaryKeyGap + GlyphHeight * SummaryKeyScale;
+
     /// <summary>
     /// The run's summary over the dimmed floor (<see cref="RunSummaryLines"/>):
     /// the headline large, each line under it, and the key last, a step apart.
-    /// Anchored above the middle, never over the top readouts.
+    /// Anchored above the middle, never over the top readouts, and lifted when a
+    /// long one would run off the bottom (<see cref="RunSummaryTop"/>).
     /// </summary>
     private void DrawRunSummary(int w, int h, RunResult result)
     {
         var lines = RunSummaryLines(result);
-        float y = MathF.Max(80f, h / 2f - 170f);
-        DrawCentered(w, y, lines[0].Text, 5f, lines[0].Color);
-        y += 56f;
+        float y = RunSummaryTop(h, lines.Count);
+        DrawCentered(w, y, lines[0].Text, SummaryHeadlineScale, lines[0].Color);
+        y += SummaryHeadlineStep;
         for (int i = 1; i < lines.Count; i++)
         {
             bool last = i == lines.Count - 1;
-            if (last) y += 12f;
-            DrawCentered(w, y, lines[i].Text, last ? 2f : 1.6f, lines[i].Color);
-            y += 22f;
+            if (last) y += SummaryKeyGap;
+            DrawCentered(w, y, lines[i].Text, last ? SummaryKeyScale : SummaryLineScale, lines[i].Color);
+            y += SummaryLineStep;
         }
     }
 

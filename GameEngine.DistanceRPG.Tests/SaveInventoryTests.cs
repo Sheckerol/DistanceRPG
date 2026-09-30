@@ -43,6 +43,8 @@ public class SaveInventoryTests
             new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a save and a load"),
             new("Visit", Kept.Saved, "campaign.visit: the Run group and every visited floor, or null between runs"),
             new("_stable", Kept.Saved, "campaign.stable[], each weapon whole, in the order they were put there — null for an empty stable (Phase 6a.2)"),
+            new("_enchanter", Kept.Saved, "campaign.enchanter[], each deposit whole, in deposit order — null for an empty shop (Phase 6a.3a)"),
+            new("DepositsMade", Kept.Saved, "campaign.depositsMade: the next deposit's ordinal (Phase 6a.3a)"),
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],
@@ -99,6 +101,25 @@ public class SaveInventoryTests
             new("Def", Kept.Saved, "id: the content's own entry by id — the tuned def, so a unique's pin holds"),
             new("_tier", Kept.Saved, "tier"),
             new("Xp", Kept.Saved, "xp: the remainder into the tier"),
+        ],
+        [typeof(Deposit)] =
+        [
+            new("Ordinal", Kept.Saved, "enchanter[].ordinal"),
+            new("Weapon", Kept.Saved, "enchanter[].weapon, whole"),
+            new("Service", Kept.Saved, "enchanter[].service, by name"),
+            new("WearAtDeposit", Kept.Saved, "enchanter[].wearAtDeposit: what the deposit cashed, which a take-back returns"),
+            new("Runs", Kept.Saved, "enchanter[].runs: fixed as it went in"),
+            new("EnchantmentId", Kept.Saved, "enchanter[].enchantment, by id"),
+            new("RunsWorked", Kept.Saved, "enchanter[].runsWorked"),
+        ],
+        [typeof(ServiceReport)] =
+        [
+            new("WeaponId", Kept.Saved, "lastResult.services[].weaponId"),
+            new("Service", Kept.Saved, "lastResult.services[].service, by name"),
+            new("RunsWorked", Kept.Saved, "lastResult.services[].runsWorked: 0 on a stalled report play wrote"),
+            new("Runs", Kept.Saved, "lastResult.services[].runs"),
+            new("Stalled", Kept.Saved, "lastResult.services[].stalled"),
+            new("EnchantmentId", Kept.Saved, "lastResult.services[].enchantment, by id"),
         ],
         [typeof(WeaponXpBook)] =
         [

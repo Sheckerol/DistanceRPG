@@ -668,7 +668,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private void DropCampaign()
     {
         if (_campaign is { } dropped)
+        {
             dropped.RunEnded -= SaveAtTheRunsEnd;
+            dropped.RunEnded -= LogTheEnchanter;
+        }
         _campaign = null;
         _slot = null;
         _saveRequested = false;
@@ -681,17 +684,22 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Play <paramref name="campaign"/> from now on, bound to
     /// <paramref name="slot"/> (the user's ruling of 2026-09-25 on the save slots,
     /// R5): every save of it goes there, and nothing rebinds it — this is the one
-    /// place a campaign's slot is set. Its run's end is a save request, and the
-    /// campaign it replaces keeps no wire to the game.
+    /// place a campaign's slot is set. Its run's end is a save request, and what
+    /// the enchanter did on it a few lines of the log; the campaign it replaces
+    /// keeps no wire to the game.
     /// </summary>
     private void Adopt(CampaignState campaign, SaveSlot slot)
     {
         if (_campaign is { } replaced)
+        {
             replaced.RunEnded -= SaveAtTheRunsEnd;
+            replaced.RunEnded -= LogTheEnchanter;
+        }
         _campaign = campaign;
         _slot = slot;
         _runsEndAsked = false;
         campaign.RunEnded += SaveAtTheRunsEnd;
+        campaign.RunEnded += LogTheEnchanter;
     }
 
     /// <summary>
@@ -704,6 +712,49 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     {
         _saveRequested = true;
         _runsEndAsked = true;
+    }
+
+    /// <summary>
+    /// A run has ended: what the enchanter did on it, in the log (§6.3; Phase
+    /// 6a.3a) — Logic never logs, so the run's end hands its reports over in the
+    /// result, and they are written here (<see cref="EnchanterLines"/>). Nothing
+    /// when the shop was empty.
+    /// </summary>
+    private void LogTheEnchanter(RunResult result)
+    {
+        foreach (string line in EnchanterLines(result))
+            Log.Info(line);
+    }
+
+    /// <summary>
+    /// The log's lines for what a run's end did at the enchanter, off its reports
+    /// (<see cref="RunResult.Services"/>): whether the run counted, what it worked
+    /// with each one's runs and what it left stalled — <c>[Enchanter] Run counted:
+    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1</c>, or
+    /// <c>[Enchanter] Run not counted: nothing worked; stalled …</c> — then a line
+    /// for each service it finished: <c>[Enchanter] Wand of the Cone finished:
+    /// attached vampiric</c>, or <c>… finished: refined</c>. None for an empty shop.
+    /// A weapon by its content row's name, and its id where the content has none.
+    /// </summary>
+    internal static IReadOnlyList<string> EnchanterLines(RunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var reports = result.Services ?? [];
+        if (reports.Count == 0)
+            return [];
+        static string Named(string id) => GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id;
+        static string Runs(ServiceReport report) => $"{Named(report.WeaponId)} {report.RunsWorked}/{report.Runs}";
+
+        var worked = reports.Where(report => !report.Stalled).Select(Runs).ToList();
+        var stalled = reports.Where(report => report.Stalled).Select(Runs).ToList();
+        string head = result.ServiceTick
+            ? $"[Enchanter] Run counted: worked {(worked.Count > 0 ? string.Join(", ", worked) : "nothing")}"
+            : "[Enchanter] Run not counted: nothing worked";
+        var lines = new List<string> { stalled.Count > 0 ? $"{head}; stalled {string.Join(", ", stalled)}" : head };
+        foreach (var report in reports.Where(report => report.Finished))
+            lines.Add($"[Enchanter] {Named(report.WeaponId)} finished: "
+                + (report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"attached {id}" : "refined"));
+        return lines;
     }
 
     /// <summary>

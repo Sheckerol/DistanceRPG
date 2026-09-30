@@ -254,14 +254,14 @@
   "StairGatherTiles": 3,
 
   /* ---- Enchanter - Phase 6a: GraftBaseChance ---- */
-  /* What a hit wears, and what a deposit costs at the enchanter, as the user ruled on 2026-09-25:
-     a weapon's wear capacity opens on StartingPool and grows as full bars of wear are cashed, its
-     enchantment slots open along that capacity, and attaching each enchantment needs a deposit of
-     its own size. The user keeps a number they may revisit in this file, so the ruling's six keys
-     were here before the Phase 6a enchanter that reads them. WearPerHit and WearCapacityPerBar
-     play now, and turning either says the numbers have changed; the ruling's other five are read,
-     clamped and warned like every other key, but nothing plays them until the enchanter takes
-     deposits, so turning one of them says nothing yet. GraftBaseChance is not a key yet: it
+  /* What a hit wears, what a deposit costs at the enchanter, as the user ruled on 2026-09-25, and
+     how many deposits the enchanter works on: a weapon's wear capacity opens on StartingPool and
+     grows as full bars of wear are cashed, its enchantment slots open along that capacity, and
+     attaching each enchantment needs a deposit of its own size. The user keeps a number they may
+     revisit in this file, so the ruling's six keys were here before the Phase 6a enchanter that
+     reads them. Every key here plays now, and turning one says the numbers have changed when a
+     campaign saved under the other number resumes - never to a save from before Phase 6a, whose
+     record of its numbers covers only the keys played then. GraftBaseChance is not a key yet: it
      arrives with the Phase 6a code that reads it. */
 
   /* The wear a weapon banks for every hit it lands - each body a swing, a cleave, a shot or a
@@ -300,6 +300,11 @@
   /* How much more wear each later enchantment needs than the one before, above. 0 prices every one
      as the first. */
   "EnchantmentWearStep": 5,
+
+  /* How many deposited weapons the enchanter works on at once: the newest. A run that counts works
+     each of them a run on; a deposit past them stalls the oldest until one of the newest comes
+     back. At least 1, and at most 10, the most enchantments a weapon holds. */
+  "EnchanterWorksOn": 2,
 
   /* ---- Inventory ---- */
 

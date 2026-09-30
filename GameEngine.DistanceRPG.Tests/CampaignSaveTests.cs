@@ -328,6 +328,72 @@ public sealed class CampaignSaveTests : IDisposable
     }
 
     [Fact]
+    public void TheQueueRoundTrips_OrdinalsAndRunsWorked()
+    {
+        // §6.7 (Phase 6a.3a): the enchanter's queue is saved with the campaign, in
+        // deposit order, each deposit whole — its ordinal, its service by name, its
+        // weapon, what it cashed, its runs taken and worked, its enchantment by id —
+        // with how many deposits were ever made, and the last run's reports at the
+        // enchanter with its result; and each comes back field for field, captured
+        // again the same text. A take-back leaves a gap in the ordinals, which comes
+        // back as it was.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var campaign = TestShop.Shop();
+        Enchanter.TakeBack(campaign, campaign.AtTheEnchanter[0]);
+        var restored = RoundTrip(campaign);
+        Assert.Equal([(1, 1, 2, "vampiric"), (2, 0, 1, null)],
+            restored.AtTheEnchanter.Select(deposit => (deposit.Ordinal, deposit.RunsWorked, deposit.Runs, deposit.EnchantmentId)));
+        Assert.Equal(3, restored.DepositsMade);
+        Assert.Equal(campaign.AtTheEnchanter.Select(deposit => deposit.Weapon.Id), restored.AtTheEnchanter.Select(deposit => deposit.Weapon.Id));
+        Assert.Equal((35, 0, 195), (restored.AtTheEnchanter[0].WearAtDeposit, restored.AtTheEnchanter[0].Weapon.Wear, restored.AtTheEnchanter[0].Weapon.WearCashed));
+
+        var tree = JsonNode.Parse(Save(campaign))!.AsObject();
+        var queue = tree["campaign"]!["enchanter"]!.AsArray();
+        Assert.Equal(["ordinal", "service", "weapon", "wearAtDeposit", "runs", "runsWorked", "enchantment"], queue[0]!.AsObject().Select(member => member.Key));
+        Assert.Equal(("Enchant", "vampiric"), (queue[0]!["service"]!.GetValue<string>(), queue[0]!["enchantment"]!.GetValue<string>()));
+        Assert.Equal(3, tree["campaign"]!["depositsMade"]!.GetValue<int>());
+        var reports = tree["campaign"]!["lastResult"]!["services"]!.AsArray();
+        Assert.Equal(2, reports.Count);
+        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment"], reports[1]!.AsObject().Select(member => member.Key));
+
+        // The restored shop works on as the one saved: the next run that counts
+        // brings both back.
+        TestShop.Counted(restored);
+        Assert.Empty(restored.AtTheEnchanter);
+        Assert.Equal(["regeneration", "vampiric"], restored.Stable.Single(weapon => weapon.Enchantments.Count == 2).Enchantments.Select(entry => entry.Id));
+
+        // An empty shop and a run's end with nothing in it write null, as the stable
+        // does — the count stays — and null and [] read alike, as empty.
+        var empty = TestShop.Opened();
+        Assert.Null(empty.LastResult!.Services);
+        string text = Save(empty);
+        var emptyTree = JsonNode.Parse(text)!.AsObject();
+        Assert.True(emptyTree["campaign"]!.AsObject().ContainsKey("enchanter"));
+        Assert.Null(emptyTree["campaign"]!["enchanter"]);
+        Assert.Equal(0, emptyTree["campaign"]!["depositsMade"]!.GetValue<int>());
+        Assert.True(emptyTree["campaign"]!["lastResult"]!.AsObject().ContainsKey("services"));
+        Assert.Null(emptyTree["campaign"]!["lastResult"]!["services"]);
+        emptyTree["campaign"]!["enchanter"] = new JsonArray();
+        emptyTree["campaign"]!["lastResult"]!["services"] = new JsonArray();
+        var bracketed = Load(emptyTree.ToJsonString()).Campaign;
+        Assert.Empty(bracketed.AtTheEnchanter);
+        Assert.Null(bracketed.LastResult!.Services);
+        Assert.Equal(text, Save(bracketed));
+        Assert.Equal(3, RoundTrip(restored).DepositsMade);
+
+        // And the door a load comes back through refuses what no shop holds: a
+        // deposit out of order, one at or past the count, a weapon in two places.
+        var party = NewCampaign().Party;
+        var guard = TestWeapons.Get("tower_guard");
+        Deposit Of(int ordinal, Weapon weapon) => new(ordinal, weapon, Service.Refine, 0, 1);
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [Of(1, guard), Of(0, TestWeapons.Get("tower_guard"))], 2));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [Of(2, guard)], 2));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [guard], [Of(0, guard)], 1));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [null!], 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [], -1));
+    }
+
+    [Fact]
     public void WearAndWhatWasCashedRoundTrip()
     {
         // §6.1, §6.7 (Phase 6a.1): a weapon's wear and the wear it has ever cashed

@@ -1190,6 +1190,48 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void TheRunSummaryFitsA720Window_ServicesIncluded()
+    {
+        // The run's end panel has no cut: every line of the summary is drawn, the
+        // enchanter's among them (Phase 6a.3a). The worst a run's end can write — a
+        // wipe with the boss down, which counts and locks, losing a full haul of the
+        // longest name, clawing back three pools from every member, then the
+        // enchanter's two lines, how many more, and the stalled weapons wrapped at
+        // their cap — still ends with its key inside the shipped 1280 x 720, the
+        // panel lifted as far as the top readouts allow, and every line across the
+        // window. An ordinary summary sits where it always has, above the middle.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        const float h = 720f;
+        var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
+        var haul = Enumerable.Range(0, GameContent.Current.Tuning.PartyCarrySlots).Select(_ => TestWeapons.Get(longest.Id)).ToArray();
+        var clawbacks = new[] { "A", "B", "C", "D" }
+            .SelectMany(member => new[] { new XpClawback(member, nameof(WeaponClass.Throwing), 99_999, 0), new XpClawback(member, XpSnapshot.HpPool, 9999, 0), new XpClawback(member, XpSnapshot.ManaPool, 9999, 0) })
+            .ToArray();
+        var reports = Enumerable.Range(0, ContentBounds.MostWorked).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: "regeneration"))
+            .Concat(Enumerable.Range(0, 20).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, ContentBounds.MostServiceRuns, Stalled: true)))
+            .ToArray();
+        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, clawbacks, reports);
+
+        var lines = DungeonHud.RunSummaryLines(worst);
+        Assert.Equal(DungeonHud.DungeonServiceLines, lines.Count(line => line.Text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+        Assert.Contains(lines, line => line.Text == BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines));
+        Assert.Contains(lines, line => line.Text.StartsWith(BetweenRunsHud.StalledHeading, StringComparison.Ordinal));
+        Assert.Equal(4, lines.Count(line => line.Text.StartsWith("A:", StringComparison.Ordinal) || line.Text.StartsWith("B:", StringComparison.Ordinal)
+            || line.Text.StartsWith("C:", StringComparison.Ordinal) || line.Text.StartsWith("D:", StringComparison.Ordinal)));
+        Assert.StartsWith(DungeonHud.ContinueHint, lines[^1].Text, StringComparison.Ordinal);
+
+        float top = DungeonHud.RunSummaryTop(h, lines.Count);
+        float keyBottom = top + DungeonHud.RunSummaryHeight(lines.Count);
+        Assert.True(keyBottom <= h - DungeonHud.SummaryBottomClearance, $"the worst summary's key ends at {keyBottom} px, past the window's {h}");
+        Assert.True(top >= 80f, $"the worst summary starts at {top} px, over the top readouts");
+        Assert.All(lines, line => Assert.True(line.Text.Length * 6f * 2f <= 1240f, $"'{line.Text}' runs off the window"));
+
+        // An ordinary summary is anchored where it always was.
+        var ordinary = DungeonHud.RunSummaryLines(new RunResult("tutorial", RunOutcome.Retreat, false, 1, null, false, false, 0, null, false, [], [], []));
+        Assert.Equal(h / 2f - 170f, DungeonHud.RunSummaryTop(h, ordinary.Count));
+    }
+
+    [Fact]
     public void AnOverrideLaunchShowsTheStartupNotices()
     {
         // A dev override boots straight into a dungeon, past the screen between
