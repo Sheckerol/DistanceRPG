@@ -45,6 +45,8 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
+  HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags and the stable
+                                # (CampaignState.Move, the one door), a carry the page's alone
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)

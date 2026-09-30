@@ -334,11 +334,12 @@ public sealed class BetweenRunsHudTests : IDisposable
     public void TheKeysChooseAndDescend()
     {
         // 1f, and the user's ruling of 2026-09-25 on the save model, R2(e): the
-        // screen between runs names the keys that choose and descend, and ESC, which
-        // opens the menu — where the campaign is saved by hand and play is left for
-        // the title. NEW CAMPAIGN is the title's now, so no key here begins one, and
-        // the line names none.
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU", BetweenRunsHud.KeysLine);
+        // screen between runs names the keys that choose and descend, TAB, which
+        // turns to the WEAPONS page (Phase 6a.2), and ESC, which opens the menu —
+        // where the campaign is saved by hand and play is left for the title. NEW
+        // CAMPAIGN is the title's now, so no key here begins one, and the line names
+        // none.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU", BetweenRunsHud.KeysLine);
         Assert.DoesNotContain("NEW CAMPAIGN", BetweenRunsHud.KeysLine, StringComparison.Ordinal);
 
         // The keys stand along the bottom in their grey.
@@ -369,8 +370,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT TO TITLE - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: true));
         Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT GAME - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: false));
         Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine());
-        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: true), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true));
-        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: false), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true, hasTitle: false));
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: true), DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Menu));
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: false), DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Menu, hasTitle: false));
         foreach (string line in new[] { BetweenRunsHud.MenuKeysLine(hasTitle: true), BetweenRunsHud.MenuKeysLine(hasTitle: false) })
         {
             Assert.Matches("^[A-Z0-9 /-]+$", line);
@@ -380,13 +381,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         // Where a key goes, walked key by key: with the menu up, ENTER, W, S and the
         // arrows are the menu's — which does nothing with them, so nothing descends
         // behind it — as every other key is; ESC is always the game's, which asks
-        // HandleEscape.
+        // HandleEscape. (The other modes' keys: EveryModeRoutesEveryKey_EscThroughHandleEscape.)
         foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.N, Keys.Space })
-            Assert.Equal(BetweenRunsScene.KeyRoute.Menu, BetweenRunsScene.Route(menu: true, key));
+            Assert.Equal(BetweenRunsScene.KeyRoute.Menu, BetweenRunsScene.Route(BetweenRunsScene.HubMode.Menu, key));
         foreach (var key in new[] { Keys.Enter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D2, Keys.N })
-            Assert.Equal(BetweenRunsScene.KeyRoute.List, BetweenRunsScene.Route(menu: false, key));
-        foreach (bool menu in new[] { false, true })
-            Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(menu, Keys.Escape));
+            Assert.Equal(BetweenRunsScene.KeyRoute.List, BetweenRunsScene.Route(BetweenRunsScene.HubMode.Dungeons, key));
+        foreach (var mode in new[] { BetweenRunsScene.HubMode.Dungeons, BetweenRunsScene.HubMode.Menu })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(mode, Keys.Escape));
 
         // Walked through the screen itself, built with no window over a new campaign,
         // the tutorial chosen, its campaign in slot 2: its host records what it is
@@ -436,5 +437,543 @@ public sealed class BetweenRunsHudTests : IDisposable
         quitting.OnKey(Keys.Enter);
         Assert.Equal((0, 0), (leaving.HandSaves, leaving.Descended.Count));
         Assert.True(quitting.HandleEscape());
+    }
+
+    // ── The WEAPONS page (§6.2, Phase 6a.2) ─────────────────────────────────
+
+    /// <summary>A screen between runs walked with no window, over <paramref name="campaign"/> — the game's own starting party when none is handed in — and its recording host.</summary>
+    private static (BetweenRunsScene Scene, RecordingHost Host) Hub(CampaignState? campaign = null, IReadOnlyList<string>? notices = null, int shownWhole = 0)
+    {
+        var host = new RecordingHost();
+        return (new BetweenRunsScene(game: null!, campaign ?? CampaignState.Start(GameContent.Current), host, shownWhole, notices), host);
+    }
+
+    /// <summary>A weapon of every row the content ships, as a drop makes one: a wand that names no element of its own on one it is handed.</summary>
+    private static Weapon Made(WeaponDef def)
+        => GameContent.Current.Weapons.Instantiate(def.Id,
+            def.Class == WeaponClass.Wand && !def.Enchantments.Any(entry => GameContent.Current.Enchantments[entry.Id].Effect == EffectKind.ElementalDamage)
+                ? DamageType.Shocking
+                : null);
+
+    /// <summary>Every member's slots, as they stand: what a carry must leave alone.</summary>
+    private static Weapon?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
+
+    /// <summary>The chosen row's text on the page.</summary>
+    private static string ChosenText(BetweenRunsScene scene) => scene.Weapons.ChosenRow.Text;
+
+    /// <summary>Step the page's choice down until its row reads <paramref name="text"/>, failing if a lap never meets it.</summary>
+    private static void ChooseRow(BetweenRunsScene scene, string text)
+    {
+        for (int step = 0; step <= scene.Weapons.Rows().Count; step++)
+        {
+            if (ChosenText(scene) == text)
+                return;
+            scene.OnKey(Keys.S);
+        }
+        Assert.Fail($"No row the choice stops on reads '{text}'");
+    }
+
+    [Fact]
+    public void TabSwitchesPages_AndTheMenuTakesEveryKey()
+    {
+        // §6.2, Phase 6a.2: the screen between runs has two pages, and TAB goes from
+        // one to the other — DUNGEONS, where every showing opens, and WEAPONS. The
+        // title, the notices and the menu are the same on both; the keys line is the
+        // page's.
+        var (scene, host) = Hub();
+        Assert.Equal((BetweenRunsScene.HubMode.Dungeons, false), (scene.Mode, scene.OnWeapons));
+        Assert.Equal(BetweenRunsHud.KeysLine, BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, true), (scene.Mode, scene.OnWeapons));
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - TAB DUNGEONS - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
+        scene.OnKey(Keys.Tab);
+
+        // ESC opens the menu over WEAPONS, and while it is up every key is its: TAB
+        // turns no page, ENTER takes nothing up, W/S move nothing.
+        string chosen = ChosenText(scene);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Menu, true), (scene.Mode, scene.OnWeapons));
+        Assert.Equal(BetweenRunsHud.MenuKeysLine(hasTitle: true), BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        foreach (var key in new[] { Keys.Tab, Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D, Keys.T })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Menu, true, chosen), (scene.Mode, scene.OnWeapons, ChosenText(scene)));
+        Assert.Null(scene.Weapons.Carried);
+
+        // Closed, the page it was opened over is back, as it was; and the menu's 2
+        // saves by hand there as on DUNGEONS.
+        scene.OnKey(Keys.D2);
+        Assert.Equal(1, host.HandSaves);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, chosen), (scene.Mode, ChosenText(scene)));
+        Assert.Equal((0, 0), (host.Descended.Count, host.HubSavesAsked));
+    }
+
+    [Fact]
+    public void EveryModeRoutesEveryKey_EscThroughHandleEscape()
+    {
+        // The hub's modes by its keys (the plan's §1g table, the modes Phase 6a.2
+        // has): where Route sends each key — ESC always to the game, which asks
+        // HandleEscape — and then what the screen does with it, walked.
+        var modes = Enum.GetValues<BetweenRunsScene.HubMode>();
+        Keys[] keys = [Keys.Tab, Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.D, Keys.T, Keys.N, Keys.Space];
+        foreach (var mode in modes)
+        {
+            Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(mode, Keys.Escape));
+            foreach (var key in keys)
+            {
+                var expected = mode switch
+                {
+                    BetweenRunsScene.HubMode.Menu => BetweenRunsScene.KeyRoute.Menu,
+                    BetweenRunsScene.HubMode.Dungeons => key == Keys.Tab ? BetweenRunsScene.KeyRoute.Page : BetweenRunsScene.KeyRoute.List,
+                    BetweenRunsScene.HubMode.Weapons => key == Keys.Tab ? BetweenRunsScene.KeyRoute.Page : BetweenRunsScene.KeyRoute.Weapons,
+                    _ => BetweenRunsScene.KeyRoute.Carrying,   // TAB is the carry's, and does nothing
+                };
+                Assert.True(expected == BetweenRunsScene.Route(mode, key), $"{mode}, {key}: routed to {BetweenRunsScene.Route(mode, key)}, not {expected}");
+            }
+        }
+
+        // DUNGEONS: W/S choose, ENTER descends, TAB turns the page, and every other
+        // key is inert — D and T are WEAPONS' keys to come (Phase 6a.5), and here
+        // they say nothing.
+        var (scene, host) = Hub();
+        foreach (var key in new[] { Keys.D, Keys.T, Keys.D1, Keys.N, Keys.Space })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Dungeons, 0, (string?)null), (scene.Mode, scene.Chosen, scene.Refusal));
+
+        // WEAPONS, browsing: W/S choose, ENTER takes up, and the rest is inert.
+        scene.OnKey(Keys.Tab);
+        string first = ChosenText(scene);
+        foreach (var key in new[] { Keys.D, Keys.T, Keys.D1, Keys.D2, Keys.N, Keys.Space })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, first), (scene.Mode, ChosenText(scene)));
+        scene.OnKey(Keys.S);
+        Assert.NotEqual(first, ChosenText(scene));
+        scene.OnKey(Keys.W);
+        Assert.Equal(first, ChosenText(scene));
+
+        // Carrying: TAB, D, T and the digits are inert — the page stays WEAPONS, the
+        // weapon stays taken up; W/S choose where; ESC, through HandleEscape, puts it
+        // back and opens no menu.
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        foreach (var key in new[] { Keys.Tab, Keys.D, Keys.T, Keys.D1, Keys.D2, Keys.D3, Keys.N, Keys.Space })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Carrying, true, first), (scene.Mode, scene.OnWeapons, ChosenText(scene)));
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, false), (scene.Mode, scene.MenuOpen));
+
+        // ESC from each other mode: on a page it opens the menu, on the menu it
+        // closes it — the page under it unchanged.
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(BetweenRunsScene.HubMode.Menu, scene.Mode);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+        scene.OnKey(Keys.Tab);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Menu, false), (scene.Mode, scene.OnWeapons));
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
+        Assert.Equal((0, 0, 0), (host.Descended.Count, host.HubSavesAsked, host.HandSaves));
+    }
+
+    [Fact]
+    public void TheWeaponsPageListsEveryMemberAndTheStable()
+    {
+        // §6.2: WEAPONS lists every member's hand and bag, in roster order, then the
+        // stable, a row a weapon with its wear; a row for the room a bag has left,
+        // and the stable's room, always there — it is unbounded (PHASE 6a DECISION 7).
+        var campaign = CampaignState.Start(GameContent.Current);
+        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
+        Assert.Equal(new[]
+        {
+            "THE PARTY AND THE STABLE",
+            "[A]",
+            "  HAND  WEAKSPOT STILETTO - WEAR 0/30",
+            "  BAG   - ROOM FOR 5 MORE -",
+            "[B]",
+            "  HAND  TOWER GUARD - WEAR 0/30",
+            "  BAG   STAFF OF RENEWAL - WEAR 0/30",
+            "  BAG   - ROOM FOR 4 MORE -",
+            "[C]",
+            "  HAND  GREAT AXE - WEAR 0/30",
+            "  BAG   STAFF OF RENEWAL - WEAR 0/30",
+            "  BAG   - ROOM FOR 4 MORE -",
+            "[D]",
+            "  HAND  STAFF OF RENEWAL - WEAR 0/30",
+            "  BAG   STAFF OF MIRE - WEAR 0/30",
+            "  BAG   - ROOM FOR 4 MORE -",
+            "THE STABLE - 1 WEAPON",
+            "  STAFF OF RENEWAL - WEAR 0/30",
+            "  - ROOM -",
+        }, HubWeapons.Rows(campaign).Select(row => row.Text));
+        Assert.Equal("THE STABLE - EMPTY", HubWeapons.StableHeading(0));
+        Assert.Equal("THE STABLE - 3 WEAPONS", HubWeapons.StableHeading(3));
+
+        // A full bag has no room row; an empty hand is a row of its own, somewhere a
+        // weapon can go; a full weapon reads FULL.
+        var b = campaign.Party[1];
+        for (int slot = 2; slot < b.Inventory.Length; slot++)
+            b.Inventory[slot] = TestWeapons.Get("darts");
+        var a = campaign.Party[0];
+        var def = GameContent.Current.Weapons["weakspot_stiletto"];
+        var full = new Weapon(def, a.Inventory[0]!.Forged, a.Inventory[0]!.Modifiers, [], 0, wear: 30);
+        a.Inventory[0] = null;
+        a.Inventory[2] = full;
+        var rows = HubWeapons.Rows(campaign);
+        Assert.Equal(new[] { "[A]", "  HAND  - EMPTY -", "  BAG   WEAKSPOT STILETTO - WEAR 30/30 FULL", "  BAG   - ROOM FOR 4 MORE -" },
+            rows.Skip(1).Take(4).Select(row => row.Text));
+        Assert.DoesNotContain(rows, row => row.Place?.MemberId == "B" && row.Kind == HubWeapons.RowKind.Room);
+        Assert.Equal(new WeaponPlace("A", 0), rows[2].Place);
+        Assert.Equal(new WeaponPlace("A", 1), rows[4].Place);   // a weapon put in the room takes the first empty slot
+        Assert.Equal(WeaponPlace.InTheStable(1), rows[^1].Place);   // the stable's end
+
+        // Drawn: headings and members grey, a room dark grey, a weapon white — its
+        // wear green once full — and a unique's name orange. The chosen row is
+        // yellow, its indent marked and its end closed, as the dungeon list's choice
+        // is; a weapon taken up reads cyan where it lies.
+        Assert.Equal(DungeonHud.Grey, Assert.Single(HubWeapons.Runs(rows[0])).Color);
+        Assert.Equal(DungeonHud.DarkGrey, Assert.Single(HubWeapons.Runs(rows[2])).Color);
+        var fullRuns = HubWeapons.Runs(rows[3]);
+        Assert.Equal(("  BAG   ", DungeonHud.White), (fullRuns[0].Text, fullRuns[0].Color));
+        Assert.Equal(("WEAR 30/30 FULL", DungeonHud.Green), (fullRuns[^1].Text, fullRuns[^1].Color));
+        var chosen = HubWeapons.Runs(rows[3], chosen: true);
+        Assert.Equal("> BAG   WEAKSPOT STILETTO - WEAR 30/30 FULL <", string.Concat(chosen.Select(run => run.Text)));
+        Assert.Equal((DungeonHud.Yellow, DungeonHud.Green), (chosen[0].Color, chosen[3].Color));
+        Assert.Equal("> HAND  - EMPTY - <", Assert.Single(HubWeapons.Runs(rows[2], chosen: true)).Text);
+        Assert.Equal(DungeonHud.Cyan, HubWeapons.Runs(rows[3], carried: true)[0].Color);
+        var knife = new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.StableLabel, WeaponPlace.InTheStable(0), TestWeapons.Get("flensing_knife_unique"));
+        Assert.True(knife.Weapon!.Unique);
+        Assert.Equal(DungeonHud.Orange, HubWeapons.Runs(knife)[1].Color);
+        Assert.Equal("THE NAMELESS KNIFE", HubWeapons.The(knife.Weapon));
+        Assert.Equal("THE BULWARK", HubWeapons.The(TestWeapons.Get("the_bulwark")));
+
+        // The chosen weapon, said whole on the right: where it is, its name, the
+        // dungeon's readouts with no wielder, its wear and its capacity.
+        var stiletto = TestWeapons.Get("weakspot_stiletto");
+        var detail = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("A", 0), stiletto));
+        Assert.Equal(new[]
+        {
+            "IN THE HAND OF [A]",
+            "WEAKSPOT STILETTO",
+            DungeonHud.WeaponStats(stiletto),
+            $"* {DungeonHud.ModifierReadout(stiletto)}",
+            "WEAR 0 OF 30 - 30 MORE FILLS IT",
+            "CAPACITY 30 - 0 OF 30 CASHED TOWARD 31",
+        }, detail.Select(row => row.Text));
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.DetailRows(rows[3]).Single(row => row.Text.StartsWith("WEAR", StringComparison.Ordinal)).Color);
+        Assert.Equal("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(full));
+        Assert.Equal("IN THE STABLE", BetweenRunsHud.WhereLine(WeaponPlace.InTheStable(3)));
+        Assert.Equal("IN THE BAG OF [D]", BetweenRunsHud.WhereLine(new WeaponPlace("D", 2)));
+        var serviced = new Weapon(GameContent.Current.Weapons["arming_sword"], stiletto.Forged, stiletto.Modifiers, [], 0, wear: 12, wearCashed: 42);
+        Assert.Equal("CAPACITY 31 - 12 OF 31 CASHED TOWARD 32", BetweenRunsHud.CapacityLine(serviced));
+        using (TestContent.UsePremise(tuning: t => t with { WearCapacityPerBar = 0 }))
+            Assert.Equal("CAPACITY 30 - IT DOES NOT GROW", BetweenRunsHud.CapacityLine(serviced));
+
+        // A room says where it is and how a weapon gets there; a heading says nothing.
+        Assert.Equal(new[] { "THE HAND OF [A] IS EMPTY", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[2]).Select(row => row.Text));
+        Assert.Equal(new[] { "ROOM IN THE BAG OF [A]", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[4]).Select(row => row.Text));
+        Assert.Equal("THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS", BetweenRunsHud.DetailRows(rows[^1])[0].Text);
+        Assert.Empty(BetweenRunsHud.DetailRows(rows[0]));
+
+        // A readout's entries wrap to the column, never split, the rest indented.
+        Assert.Equal(new[] { "* AAAA  BBBB", "  CCCC  DD" }, BetweenRunsHud.Listed("* ", "AAAA  BBBB  CCCC  DD", 12));
+        Assert.Empty(BetweenRunsHud.Listed("* ", "", 12));
+    }
+
+    [Fact]
+    public void ChoosingSkipsHeadings_AndTheWindowScrolls()
+    {
+        // The page is a window over the rows, the choice kept in view. W/S stop on
+        // the weapons and the rooms alone — never a heading or a member — round the
+        // ends, and a stable of 20 scrolls the window, which fits between the most
+        // notice rows the screen can be handed and the refusal row over the keys.
+        var start = CampaignState.Start(GameContent.Current);
+        var stable = Enumerable.Range(0, 20).Select(_ => TestWeapons.Get("hunting_bow")).ToArray();
+        var campaign = CampaignState.Restore(start.Party, start.SeenInOrder, 0, [], [], [], lastResult: null, visit: null, stable);
+        const float h = 720f;
+        int most = NoticeText.MaxWholeRows + NoticeText.MaxRows + 1;
+        var layout = BetweenRunsHud.WeaponsPage(h, most);
+
+        // The window under the notices, and over the refusal row, which is over the keys.
+        Assert.True(layout.Top >= BetweenRunsHud.NoticeTop + most * BetweenRunsHud.NoticePitch, "the page's rows run into the notices");
+        Assert.InRange(layout.Rows, 5, 40);
+        Assert.True(layout.Top + (layout.Rows - 1) * BetweenRunsHud.WeaponRowPitch + 7f * BetweenRunsHud.WeaponRowScale <= layout.Bottom);
+        Assert.True(layout.Bottom <= h - BetweenRunsHud.RefusalFromBottom, "the page's rows run into the refusal row");
+        Assert.True(h - BetweenRunsHud.RefusalFromBottom + 7f * BetweenRunsHud.KeysLineScale <= h - BetweenRunsHud.KeysLineFromBottom, "the refusal row runs into the keys");
+        Assert.True(BetweenRunsHud.WeaponsPage(h).Rows > layout.Rows);   // fewer notices, more rows
+
+        var saysWhole = Enumerable.Range(1, NoticeText.MaxWholeRows).Select(i => $"the save's word, row {i}");
+        var data = Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1");
+        var (scene, _) = Hub(campaign, notices: [.. saysWhole, .. data], shownWhole: NoticeText.MaxWholeRows);
+        Assert.Equal(most, scene.NoticeRows.Count);
+        scene.OnKey(Keys.Tab);
+        var rows = scene.Weapons.Rows();
+        int choosable = rows.Count(row => row.Choosable);
+        Assert.Equal(20 + 1 + 4 * 3, choosable);   // the stable's 20 and its room, and each member's hand, bag weapon and room
+        var met = new HashSet<int>();
+        for (int step = 0; step < choosable; step++)
+        {
+            int at = scene.Weapons.Chosen;
+            Assert.True(rows[at].Choosable, $"the choice stopped on '{rows[at].Text}'");
+            met.Add(at);
+            int top = scene.Weapons.Window(layout.Rows);
+            Assert.InRange(at, top, top + layout.Rows - 1);
+            scene.OnKey(Keys.S);
+        }
+        Assert.Equal(choosable, met.Count);
+        Assert.Equal(met.Min(), scene.Weapons.Chosen);   // round the end, to the first again
+        scene.OnKey(Keys.W);
+        Assert.Equal("  - ROOM -", ChosenText(scene));   // and up round the start, to the stable's room at the bottom
+        Assert.Equal(rows.Count - layout.Rows, scene.Weapons.Window(layout.Rows));
+
+        // The window moves only as far as the choice asks.
+        Assert.Equal(0, HubWeapons.ScrollTop(0, 3, 30, 10));
+        Assert.Equal(1, HubWeapons.ScrollTop(0, 10, 30, 10));
+        Assert.Equal(5, HubWeapons.ScrollTop(5, 14, 30, 10));
+        Assert.Equal(4, HubWeapons.ScrollTop(5, 4, 30, 10));
+        Assert.Equal(20, HubWeapons.ScrollTop(25, 29, 30, 10));
+        Assert.Equal(0, HubWeapons.ScrollTop(7, 8, 9, 10));   // every row fits: no scroll
+
+        // And the tallest detail the page draws — the weapon with the most lines of
+        // readouts — fits in the same height beside the window.
+        float tallest = GameContent.Current.Weapons.All
+            .Select(def => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("A", 1), Made(def))))
+            .Max(detail => detail.Sum(row => row.Pitch));
+        Assert.True(layout.Top + tallest <= layout.Bottom, "the tallest detail runs into the refusal row under the most notices");
+    }
+
+    [Fact]
+    public void CarryingTargetsSlotsRoomsAndTheStableOnly_EscPutsItBack_NothingMovesUntilPutDown()
+    {
+        // ENTER on a weapon takes it up: nothing moves — the campaign, and a save of
+        // it, are as they were — and the keys line names it. W/S then stop on the
+        // places it can be put down alone. ESC puts it back; ENTER on a place puts it
+        // down there, the one moment the campaign changes.
+        var campaign = CampaignState.Start(GameContent.Current);
+        var (scene, host) = Hub(campaign);
+        var bags = Bags(campaign);
+        string saved = SaveCodec.Write(SaveGame.Capture(campaign));
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.S);
+        Assert.Equal("  BAG   STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
+        var staff = campaign.Party[0].Inventory[1]!;
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        Assert.Equal((new WeaponPlace("A", 1), staff), scene.Weapons.Carried);
+        Assert.Equal("CARRYING THE STAFF OF RENEWAL - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK",
+            BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon).Text);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Empty(campaign.Stable);
+        Assert.Equal(saved, SaveCodec.Write(SaveGame.Capture(campaign)));
+
+        // Every stop is a target: a slot, a room, the stable's weapons and its room.
+        var rows = scene.Weapons.Rows();
+        for (int step = 0; step < rows.Count; step++)
+        {
+            Assert.True(rows[scene.Weapons.Chosen].Target, $"carrying, the choice stopped on '{ChosenText(scene)}'");
+            scene.OnKey(Keys.S);
+        }
+
+        // ESC puts it back: nothing moved, nothing asked of the host, the choice on it.
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, false), (scene.Mode, scene.MenuOpen));
+        Assert.Equal("  BAG   STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(0, host.HubSavesAsked);
+
+        // ENTER on its own place puts it back too, and asks nothing.
+        scene.OnKey(Keys.Enter);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(0, host.HubSavesAsked);
+
+        // Put down at the stable's end: it is there, its old slot empty, the choice
+        // on it where it went, and the host asked for a save.
+        scene.OnKey(Keys.Enter);
+        ChooseRow(scene, HubWeapons.StableRoom);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+        Assert.Equal([staff], campaign.Stable);
+        Assert.Null(campaign.Party[0].Inventory[1]);
+        Assert.Equal("  STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
+        Assert.Equal(1, host.HubSavesAsked);
+
+        // Taken up from the stable and put down onto C's hand: a swap — equipping —
+        // the axe going to the stable where the staff was.
+        var axe = campaign.Party[2].EquippedWeapon!;
+        scene.OnKey(Keys.Enter);
+        ChooseRow(scene, "  HAND  GREAT AXE - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        Assert.Same(staff, campaign.Party[2].EquippedWeapon);
+        Assert.Equal([axe], campaign.Stable);
+        Assert.Equal(2, host.HubSavesAsked);
+    }
+
+    [Fact]
+    public void AMoveAsksTheHostForASave()
+    {
+        // PHASE 6a DECISION 10: every change the hub makes to the campaign asks the
+        // host for a save (IBetweenRunsHost.RequestSave), written at the frame's end
+        // into the campaign's own slot. A move asks once; a weapon put back, and a
+        // put-down refused, change nothing and ask nothing.
+        var campaign = CampaignState.Start(GameContent.Current);
+        var (scene, host) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+
+        // A's staff to the stable: asked once.
+        ChooseRow(scene, "  BAG   STAFF OF RENEWAL - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        ChooseRow(scene, HubWeapons.StableRoom);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(1, host.HubSavesAsked);
+
+        // A's stiletto, its last weapon, to the stable: refused, said in the refusal
+        // row — PHASE 6a DECISION 7 — and still taken up; nothing moved, nothing asked.
+        var bags = Bags(campaign);
+        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        ChooseRow(scene, HubWeapons.StableRoom);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal("EACH MEMBER KEEPS A WEAPON - [A] WOULD CARRY NONE", scene.Refusal);
+        Assert.Equal(HubWeapons.KeepsAWeapon("A"), scene.Refusal);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Single(campaign.Stable);
+        Assert.Equal(1, host.HubSavesAsked);
+
+        // Into B's bag room: refused the same way — it leaves A with none.
+        ChooseRow(scene, "  BAG   - ROOM FOR 4 MORE -");
+        Assert.Null(scene.Refusal);   // until the next key
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(HubWeapons.KeepsAWeapon("A"), scene.Refusal);
+
+        // Onto the stable's staff instead: a swap, which leaves A armed — asked again.
+        ChooseRow(scene, "  STAFF OF RENEWAL - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        Assert.Null(scene.Refusal);
+        Assert.Equal("staff_of_renewal", campaign.Party[0].EquippedWeapon!.Id);
+        Assert.Equal("weakspot_stiletto", Assert.Single(campaign.Stable).Id);
+        Assert.Equal(2, host.HubSavesAsked);
+
+        // ESC clears a refusal too, and puts the weapon back.
+        ChooseRow(scene, "  HAND  STAFF OF RENEWAL - WEAR 0/30");
+        scene.OnKey(Keys.Enter);
+        ChooseRow(scene, HubWeapons.StableRoom);
+        scene.OnKey(Keys.Enter);
+        Assert.NotNull(scene.Refusal);
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, (string?)null), (scene.Mode, scene.Refusal));
+        Assert.Equal(2, host.HubSavesAsked);
+
+        // The game's log line for the hub's save says who asked, where every other
+        // automatic save between runs is the run's end's.
+        var when = typeof(DistanceRpgGame).GetMethod("When", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        string When(bool byHand, bool runsEnd) => (string)when.Invoke(null, [campaign, byHand, runsEnd])!;
+        Assert.Equal("between runs, after a change on the hub", When(byHand: false, runsEnd: false));
+        Assert.Equal("at the run's end", When(byHand: false, runsEnd: true));
+        Assert.Equal("by hand, between runs", When(byHand: true, runsEnd: false));
+    }
+
+    [Fact]
+    public void AHubSaveThatFailsIsSaidAtOnce()
+    {
+        // PHASE 6a DECISION 10, the plan's 1h: a save of the hub's changes that could
+        // not be written is said at once under the title, in the warning's orange,
+        // shown whole ahead of what was there — the save's word among it — so a move
+        // whose save failed is never taken for saved. Said twice, it is said once.
+        string resumed = CampaignBoot.Resumed(Named(2), backup: false);
+        var (scene, _) = Hub(notices: [resumed, "tuning.json: Key1 0 is below 1 - using 1"], shownWhole: 1);
+        var before = scene.NoticeRows.ToList();
+        string failed = CampaignBoot.NotSaved(Named(2), "The disk is full.");
+        scene.SaveFailed(failed);
+        var rows = scene.NoticeRows;
+        var failedRows = NoticeText.Wrap(failed);
+        Assert.Equal([.. failedRows, .. before], rows);
+        Assert.All(failedRows, row => Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(row)));
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(rows[failedRows.Count]));
+        scene.SaveFailed(failed);
+        Assert.Equal(rows, scene.NoticeRows);
+
+        // A second failure, of another kind, leads in its turn; both pages still
+        // leave their list and their window on the shipped window.
+        string aside = CampaignBoot.SetAsideNotice("CAMPAIGN.JSON", "COULD NOT BE READ", @"C:\saves\slot-2\campaign.unreadable-1.json");
+        scene.SaveFailed(aside);
+        Assert.Equal(NoticeText.Wrap(aside), scene.NoticeRows.Take(NoticeText.Wrap(aside).Count));
+        Assert.True(BetweenRunsHud.WeaponsPage(720f, scene.NoticeRows.Count).Rows >= 5);
+    }
+
+    [Fact]
+    public void EveryWeaponsPageStringFitsItsColumn_InTheHudsFont()
+    {
+        // Every string the WEAPONS page draws fits its own column at its own scale:
+        // the rows the left, the detail the right — each 580 px, side by side on the
+        // shipped 1280 — and the lines across the window, the keys and the refusal,
+        // 1240. The worst case is the longest shipped name, marked as chosen, with
+        // four-digit wear and capacity; every weapon the content ships is drawn, and
+        // one carrying ten of the longest enchantment at its deepest tier.
+        using var numbers = TestContent.UsePremise(tuning: t => t with { StartingPool = 9999 });
+        var weapons = GameContent.Current.Weapons;
+        var longest = weapons.All.MaxBy(def => def.Name.Length)!;
+        var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
+        var plain = Made(longest);
+        var worn = new Weapon(longest, plain.Forged, plain.Modifiers, Enumerable.Range(0, ContentBounds.MostEnchantments).Select(_ => new Enchantment(soul, 99)).ToArray(), 0,
+            wear: 9999, wearCashed: 9998);
+        Assert.Equal((9999, true), (worn.WearCapacity, worn.WornFull));
+
+        static void Fits(string text, float scale, float width, string what)
+            => Assert.True(text.Length * 6f * scale <= width, $"{what}: '{text}' is {text.Length * 6f * scale} px, past {width}");
+        static void Glyphs(string text) => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]*$", text.ToUpperInvariant());
+
+        var drawn = weapons.All.Select(Made).Append(worn).ToList();
+        foreach (var weapon in drawn)
+        {
+            foreach (var place in new[] { new WeaponPlace("A", 0), new WeaponPlace("A", 3), WeaponPlace.InTheStable(9998) })
+            {
+                string label = place.IsStable ? HubWeapons.StableLabel : place.Index == 0 ? HubWeapons.HandLabel : HubWeapons.BagLabel;
+                var row = new HubWeapons.Row(HubWeapons.RowKind.Weapon, label, place, weapon);
+                foreach (bool chosen in new[] { false, true })
+                    Fits(string.Concat(HubWeapons.Runs(row, chosen).Select(run => run.Text)), BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth, "a row");
+                foreach (var line in BetweenRunsHud.DetailRows(row))
+                    Fits(line.Text, line.Scale, BetweenRunsHud.ColumnWidth, "the detail");
+            }
+            Fits(BetweenRunsHud.CarryingKeysLine(weapon), BetweenRunsHud.KeysLineScale, BetweenRunsHud.FullWidth, "the keys line");
+        }
+
+        foreach (string room in new[] { HubWeapons.EmptyHand, HubWeapons.BagRoom(GameConstants.MaxInventorySlots - 1), HubWeapons.StableRoom })
+        {
+            var row = new HubWeapons.Row(HubWeapons.RowKind.Room, room, WeaponPlace.InTheStable(0));
+            Fits(Assert.Single(HubWeapons.Runs(row, chosen: true)).Text, BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth, "a row");
+            Glyphs(room);
+        }
+        foreach (string heading in new[] { HubWeapons.PartyHeading, HubWeapons.StableHeading(99_999), HubWeapons.MemberLine("A") })
+        {
+            Fits(heading, BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth, "a heading");
+            Glyphs(heading);
+        }
+        foreach (var place in new[] { new WeaponPlace("A", 0), new WeaponPlace("A", 5), WeaponPlace.InTheStable(99_999) })
+        {
+            foreach (string text in new[] { BetweenRunsHud.WhereLine(place), BetweenRunsHud.RoomLine(place), BetweenRunsHud.RoomHint })
+            {
+                Fits(text, BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth, "the detail");
+                Glyphs(text);
+            }
+        }
+        foreach (string text in new[] { DungeonHud.WearLine(worn), BetweenRunsHud.CapacityLine(worn), DungeonHud.WearReadout(worn) })
+            Glyphs(text);
+
+        foreach (string line in new[] { BetweenRunsHud.KeysLine, BetweenRunsHud.WeaponsKeysLine, HubWeapons.KeepsAWeapon("A"), BetweenRunsHud.MenuKeysLine(hasTitle: true) })
+        {
+            Fits(line, BetweenRunsHud.KeysLineScale, BetweenRunsHud.FullWidth, "a line across the window");
+            Glyphs(line);
+        }
+        Glyphs(BetweenRunsHud.CarryingKeysLine(TestWeapons.Get("arming_sword")));
+
+        // The columns stand side by side inside the shipped window, apart.
+        Assert.True(640f + BetweenRunsHud.LeftColumn >= 20f);
+        Assert.True(640f + BetweenRunsHud.LeftColumn + BetweenRunsHud.ColumnWidth <= 640f + BetweenRunsHud.RightColumn);
+        Assert.True(640f + BetweenRunsHud.RightColumn + BetweenRunsHud.ColumnWidth <= 1280f - 20f);
     }
 }

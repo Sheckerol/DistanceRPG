@@ -95,8 +95,17 @@ public sealed record ViewDto(string? ActiveMemberId = null, bool MarchingThisTur
 /// Appended by Phase 5.6, so it carries its default and a document written
 /// before it reads as a campaign between runs.
 /// </param>
+/// <param name="Stable">
+/// The stable (<see cref="CampaignState.Stable"/>, §6.2): every weapon the party
+/// owns and is not carrying, whole, in the order they were put there — or null
+/// for an empty one, which is what a capture writes, as it writes no visit
+/// between runs. Null and <c>[]</c> read alike, as empty. Appended by Phase 6a.2,
+/// with its default: a document written before it — version 1, lifted, or an
+/// earlier Phase 6a step's — reads as a campaign with nothing in the stable.
+/// </param>
 public sealed record CampaignDto(IReadOnlyList<MemberDto> Party, IReadOnlyList<string> Seen, int RunCounter, IReadOnlyList<LockDto> Locks,
-    IReadOnlyList<string> Cleared, IReadOnlyList<string> Retired, RunResultDto? LastResult, VisitDto? Visit = null);
+    IReadOnlyList<string> Cleared, IReadOnlyList<string> Retired, RunResultDto? LastResult, VisitDto? Visit = null,
+    IReadOnlyList<WeaponDto>? Stable = null);
 
 /// <summary>A cleared dungeon's lock: the run it can be entered again from (§4.5).</summary>
 public sealed record LockDto(string DungeonId, int LockedUntilRun);

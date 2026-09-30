@@ -53,7 +53,12 @@ internal static class SaveMapper
 {
     // ── Capture ──────────────────────────────────────────────────────────────
 
-    /// <summary>The campaign, as the document's <c>campaign</c>: between runs, or with the visit in progress inside it.</summary>
+    /// <summary>
+    /// The campaign, as the document's <c>campaign</c>: between runs, or with the
+    /// visit in progress inside it. The stable is written in its order, and as
+    /// null when it is empty, as no visit is between runs — so a document from
+    /// before it, restored and captured again, is the same document.
+    /// </summary>
     internal static CampaignDto Capture(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
@@ -65,7 +70,8 @@ internal static class SaveMapper
             campaign.ClearedInOrder,
             campaign.RetiredInOrder,
             campaign.LastResult is { } result ? Result(result) : null,
-            campaign.Visit is { } visit ? Visit(visit, campaign.Party) : null);
+            campaign.Visit is { } visit ? Visit(visit, campaign.Party) : null,
+            campaign.Stable.Count > 0 ? campaign.Stable.Select(Weapon).ToArray() : null);
     }
 
     /// <summary>
@@ -337,12 +343,28 @@ internal static class SaveMapper
         var retired = Ids(campaign.Retired, $"{at}.retired", "dungeon", id => content.Dungeons.TryGet(id, out _));
         var lastResult = campaign.LastResult is { } result ? Result(result, content, party, $"{at}.lastResult") : null;
         var visit = campaign.Visit is { } saved ? Visit(saved, content, party, $"{at}.visit") : null;
+        Weapon[] stable = campaign.Stable is { } kept ? Stable(kept, content, $"{at}.stable") : [];   // null and [] alike: empty
 
         // Every field has been read on its own, so a refusal of one keeps its own
         // path; now the fields against each other (R3(b)).
         SaveConsistency.Check(campaign);
 
-        return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit);
+        return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit, stable);
+    }
+
+    /// <summary>
+    /// The stable, in its order: every row a weapon, read as every weapon is
+    /// (<see cref="Weapon(WeaponDto, GameContent, string)"/>), and none of them null. Its
+    /// length has no ceiling: the stable is unbounded (PHASE 6a DECISION 7), and
+    /// nothing reads its count but an index.
+    /// </summary>
+    private static Weapon[] Stable(IReadOnlyList<WeaponDto> dtos, GameContent content, string at)
+    {
+        var rows = Rows(dtos, at, "weapon");
+        var stable = new Weapon[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+            stable[i] = Weapon(rows[i], content, $"{at}[{i}]");
+        return stable;
     }
 
     /// <summary>The party, in the document's order: exactly a party's size, each id once.</summary>

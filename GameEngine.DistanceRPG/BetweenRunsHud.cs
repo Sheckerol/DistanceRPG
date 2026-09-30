@@ -7,14 +7,19 @@ using Run = GameEngine.DistanceRPG.DungeonHud.Run;
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
-/// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it — and, under
+/// The between-runs screen's text (§4.5, §6.2, §6.7), drawn with the engine's
+/// bitmap <see cref="TextRenderer"/> as the dungeon's HUD is: on the DUNGEONS page
+/// the last run's summary, the hub's dungeon list under it, and the keys that
+/// choose from it; on the WEAPONS page (Phase 6a.2) the party's hands and bags and
+/// the stable down the left (<see cref="HubWeapons"/>), a window that scrolls with
+/// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
+/// and a refused put-down over the keys — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
 /// aside and where), and then anything else, capped; on a later one, a save that
-/// could not be written. While the menu ESC opens is up, the hub dims under it and
+/// could not be written, and one of the hub's own that could not, at once. While
+/// the menu ESC opens is up, the hub dims under it and
 /// the menu is drawn over it as the dungeon's pause menu is
 /// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, the slot the campaign
 /// saves into, and what a save by hand came to — and the keys line along the
@@ -53,13 +58,24 @@ public sealed class BetweenRunsHud : IDisposable
     internal const string ChooseHeading = "CHOOSE A DUNGEON";
 
     /// <summary>
-    /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, ESC opens the menu — the dungeon's pause menu,
-    /// over the hub, where the campaign is saved by hand and play is left for the
-    /// title (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)). NEW
-    /// CAMPAIGN is the title's (R2(e)), so no key here begins one.
+    /// The keys the DUNGEONS page answers, along the bottom: W/S or the arrows move
+    /// the choice, ENTER descends into it, TAB turns to the WEAPONS page, ESC opens
+    /// the menu — the dungeon's pause menu, over the hub, where the campaign is
+    /// saved by hand and play is left for the title (the user's ruling of
+    /// 2026-09-25 on the save model, R2(d), R2(e)). NEW CAMPAIGN is the title's
+    /// (R2(e)), so no key here begins one.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU";
+
+    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, TAB turns back to DUNGEONS, ESC opens the menu.</summary>
+    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - TAB DUNGEONS - ESC MENU";
+
+    /// <summary>
+    /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
+    /// ARMING SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
+    /// TAB is not named: it does nothing while a weapon is carried.
+    /// </summary>
+    internal static string CarryingKeysLine(Weapon carried) => $"CARRYING {HubWeapons.The(carried)} - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK";
 
     /// <summary>How the menu's keys line ends, after its options: ESC closes the menu.</summary>
     private const string EscCloses = "ESC CLOSES";
@@ -384,13 +400,22 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The line along the bottom, and its colour, in grey: the keys the screen
-    /// answers (<see cref="KeysLine"/>), and while the menu is up, the menu's
-    /// (<see cref="MenuKeysLine"/>) in their place.
+    /// answers in what it is doing — the DUNGEONS page's (<see cref="KeysLine"/>),
+    /// the WEAPONS page's (<see cref="WeaponsKeysLine"/>), a carry's, naming the
+    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu is up, the
+    /// menu's (<see cref="MenuKeysLine"/>) in their place.
     /// </summary>
-    /// <param name="menu">Whether the menu is up.</param>
+    /// <param name="mode">What the screen is doing.</param>
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
-    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool hasTitle = true)
-        => (menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
+    /// <param name="carried">The weapon taken up, while carrying.</param>
+    internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null)
+        => (mode switch
+        {
+            BetweenRunsScene.HubMode.Menu => MenuKeysLine(hasTitle),
+            BetweenRunsScene.HubMode.Weapons => WeaponsKeysLine,
+            BetweenRunsScene.HubMode.Carrying => carried is null ? WeaponsKeysLine : CarryingKeysLine(carried),
+            _ => KeysLine,
+        }, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -427,6 +452,156 @@ public sealed class BetweenRunsHud : IDisposable
         return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines), shift);
     }
 
+    // ── The WEAPONS page (§6.2, Phase 6a.2) ─────────────────────────────────
+
+    /// <summary>Where the WEAPONS page's two columns start, from the window's centre: the rows on the left, the chosen weapon's detail on the right — 40 and 660 across the shipped 1280.</summary>
+    internal const float LeftColumn = -600f;
+    internal const float RightColumn = 20f;
+
+    /// <summary>How wide each column is: nothing drawn in one runs into the other, or off a 1280-wide window.</summary>
+    internal const float ColumnWidth = 580f;
+
+    /// <summary>How wide a line across the window may run — the keys, the refusal — with 20 px either side of the shipped 1280.</summary>
+    internal const float FullWidth = 1240f;
+
+    /// <summary>A row of the page: its scale and the height it takes before the next.</summary>
+    internal const float WeaponRowScale = 1.5f;
+    internal const float WeaponRowPitch = 19f;
+
+    /// <summary>The detail panel's lines: where the weapon is, its name, then the rest.</summary>
+    internal const float DetailWhereScale = 1.3f;
+    private const float DetailWherePitch = 20f;
+    internal const float DetailNameScale = 2f;
+    private const float DetailNamePitch = 26f;
+    internal const float DetailScale = 1.4f;
+    private const float DetailPitch = 18f;
+
+    /// <summary>
+    /// The refusal row's distance up from the bottom: one row over the keys line,
+    /// in the warning's orange — what a put-down was refused with, until the next
+    /// key — and the clearance the page's rows keep above it.
+    /// </summary>
+    internal const float RefusalFromBottom = 50f;
+    private const float RefusalClearance = 6f;
+
+    /// <summary>The top of the WEAPONS page under the notices, the lowest a row's glyphs may reach over the refusal row, and how many rows fit between.</summary>
+    internal readonly record struct WeaponsLayout(float Top, float Bottom, int Rows);
+
+    /// <summary>
+    /// Where the WEAPONS page goes in a window <paramref name="windowHeight"/>
+    /// pixels tall: from where the last run's heading sits on DUNGEONS, pushed down
+    /// by <paramref name="noticeRows"/> rows of notices (<see cref="NoticeShift"/>),
+    /// to the refusal row's clearance over the keys line; the rows between are the
+    /// window the choice scrolls (<see cref="HubWeapons.ScrollTop"/>). At least one,
+    /// so the choice is always in view.
+    /// </summary>
+    internal static WeaponsLayout WeaponsPage(float windowHeight, int noticeRows = 0)
+    {
+        float top = LastRunHeadingY + NoticeShift(noticeRows);
+        float bottom = windowHeight - RefusalFromBottom - RefusalClearance;
+        int rows = (int)MathF.Floor((bottom - top - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
+        return new WeaponsLayout(top, bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>How many characters a detail line runs to before a list on it wraps: the right column's width at <see cref="DetailScale"/>.</summary>
+    internal static int DetailChars => (int)(ColumnWidth / (GlyphAdvance * DetailScale));
+
+    /// <summary>
+    /// A weapon's capacity said whole (R4, §6.1), for the detail panel: the
+    /// capacity, and how far the wear cashed has come toward the next point of it —
+    /// <c>CAPACITY 31 - 12 OF 31 CASHED TOWARD 32</c>. Under a tuning that freezes
+    /// it (<see cref="Tuning.WearCapacityPerBar"/> 0), <c>CAPACITY 30 - IT DOES NOT
+    /// GROW</c>.
+    /// </summary>
+    internal static string CapacityLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var pool = weapon.WearPool;
+        int perBar = GameContent.Current.Tuning.WearCapacityPerBar;
+        return perBar > 0
+            ? $"CAPACITY {pool.Max} - {pool.XpIntoNext} OF {pool.XpToNext} CASHED TOWARD {pool.Max + perBar}"
+            : $"CAPACITY {pool.Max} - IT DOES NOT GROW";
+    }
+
+    /// <summary>Where a weapon row's weapon is, over its detail: <c>IN THE HAND OF [A]</c>, <c>IN THE BAG OF [A]</c>, <c>IN THE STABLE</c>.</summary>
+    internal static string WhereLine(WeaponPlace place)
+        => place.IsStable ? "IN THE STABLE"
+            : place.Index == 0 ? $"IN THE HAND OF {HubWeapons.MemberLine(place.MemberId!)}"
+            : $"IN THE BAG OF {HubWeapons.MemberLine(place.MemberId!)}";
+
+    /// <summary>What a room says, over the detail panel: where it is.</summary>
+    internal static string RoomLine(WeaponPlace place)
+        => place.IsStable ? "THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS"
+            : place.Index == 0 ? $"THE HAND OF {HubWeapons.MemberLine(place.MemberId!)} IS EMPTY"
+            : $"ROOM IN THE BAG OF {HubWeapons.MemberLine(place.MemberId!)}";
+
+    /// <summary>Under a room's line: how a weapon comes to be there.</summary>
+    internal const string RoomHint = "TAKE A WEAPON UP - THEN PUT IT DOWN HERE";
+
+    /// <summary>
+    /// The detail panel for the row chosen, top to bottom, on the right: for a
+    /// weapon, where it is, its name — a unique's in orange — and the dungeon's
+    /// readouts with no wielder (<see cref="DungeonHud.WeaponStats"/>, the
+    /// modifiers and the enchantments, each list wrapped to the column), then its
+    /// wear said whole (<see cref="DungeonHud.WearLine"/>, green once full) and its
+    /// capacity (<see cref="CapacityLine"/>). For a room, what it is and what it is
+    /// for. Nothing for a row that is neither.
+    /// </summary>
+    internal static IReadOnlyList<ListRow> DetailRows(HubWeapons.Row row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        var rows = new List<ListRow>();
+        if (row is { Kind: HubWeapons.RowKind.Room, Place: { } room })
+        {
+            rows.Add(new ListRow(RoomLine(room), DungeonHud.White, DetailScale, DetailPitch));
+            rows.Add(new ListRow(RoomHint, DungeonHud.Grey, DetailScale, DetailPitch));
+            return rows;
+        }
+        if (row is not { Kind: HubWeapons.RowKind.Weapon, Place: { } place, Weapon: { } weapon })
+            return rows;
+
+        rows.Add(new ListRow(WhereLine(place), DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
+        rows.Add(new ListRow(HubWeapons.Name(weapon), weapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
+        rows.Add(new ListRow(DungeonHud.WeaponStats(weapon), DungeonHud.White, DetailScale, DetailPitch));
+        foreach (string line in Listed("* ", DungeonHud.ModifierReadout(weapon), DetailChars))
+            rows.Add(new ListRow(line, DungeonHud.White, DetailScale, DetailPitch));
+        foreach (string line in Listed("* ", DungeonHud.EnchantmentReadout(weapon), DetailChars))
+            rows.Add(new ListRow(line, DungeonHud.Cyan, DetailScale, DetailPitch));
+        rows.Add(new ListRow(DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
+        rows.Add(new ListRow(CapacityLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+        return rows;
+    }
+
+    /// <summary>
+    /// A readout's entries — separated by two spaces, as the dungeon's readouts
+    /// separate them — as lines of at most <paramref name="chars"/> characters: the
+    /// first led by <paramref name="lead"/>, the rest indented under it, an entry
+    /// never split. None for an empty readout.
+    /// </summary>
+    internal static IEnumerable<string> Listed(string lead, string readout, int chars)
+    {
+        ArgumentNullException.ThrowIfNull(lead);
+        ArgumentNullException.ThrowIfNull(readout);
+        var entries = readout.Split("  ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (entries.Length == 0)
+            yield break;
+        string indent = new(' ', lead.Length);
+        var line = new System.Text.StringBuilder(lead).Append(entries[0]);
+        foreach (string entry in entries.Skip(1))
+        {
+            if (line.Length + 2 + entry.Length > chars)
+            {
+                yield return line.ToString();
+                line.Clear().Append(indent).Append(entry);
+            }
+            else
+            {
+                line.Append("  ").Append(entry);
+            }
+        }
+        yield return line.ToString();
+    }
+
     // ── Drawing ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -453,9 +628,37 @@ public sealed class BetweenRunsHud : IDisposable
         for (int i = 0; i < notices.Count; i++)
             DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
 
+        if (scene.OnWeapons)
+            DrawWeapons(scene, w, h, notices.Count);
+        else
+            DrawDungeons(scene, w, h, notices.Count);
+
+        if (scene.MenuOpen)
+        {
+            // The hub dims under the menu, as the floor does under the pause menu,
+            // and the menu is drawn over it.
+            _text.Flush(_game.ShaderManager);
+            _fade.Draw(_game.ShaderManager, MenuDim);
+            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
+                         scene.MenuAnswer))
+                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+        }
+        else if (scene.Refusal is { } refusal)
+        {
+            DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
+        }
+
+        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon);
+        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
+        _text.Flush(_game.ShaderManager);
+    }
+
+    /// <summary>The DUNGEONS page: the last run above (when there has been one), and the list under it with the choice marked.</summary>
+    private void DrawDungeons(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
         var rows = ListRows(scene.Listings, scene.Chosen);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
-        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), notices.Count);
+        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), noticeRows);
 
         if (summary.Count > 0)
         {
@@ -478,21 +681,46 @@ public sealed class BetweenRunsHud : IDisposable
             DrawCentered(w, rowY, row.Text, row.Scale, row.Color);
             rowY += row.Pitch;
         }
+    }
 
-        if (scene.MenuOpen)
+    /// <summary>
+    /// The WEAPONS page (§6.2): the rows down the left, as many as the window
+    /// holds, scrolled to keep the choice in view — the choice marked, a weapon
+    /// taken up in cyan where it still lies — and the chosen row said whole on the
+    /// right (<see cref="DetailRows"/>).
+    /// </summary>
+    private void DrawWeapons(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
+        var page = scene.Weapons;
+        var rows = page.Rows();
+        var layout = WeaponsPage(h, noticeRows);
+        int top = page.Window(layout.Rows);
+        var carried = page.Carried?.Weapon;
+        float left = w / 2f + LeftColumn;
+        for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
         {
-            // The hub dims under the menu, as the floor does under the pause menu,
-            // and the menu is drawn over it.
-            _text.Flush(_game.ShaderManager);
-            _fade.Draw(_game.ShaderManager, MenuDim);
-            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
-                         scene.MenuAnswer))
-                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+            var row = rows[i];
+            bool isCarried = carried is not null && ReferenceEquals(row.Weapon, carried);
+            DrawRuns(left, layout.Top + (i - top) * WeaponRowPitch, WeaponRowScale, HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried));
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.HasTitle);
-        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
-        _text.Flush(_game.ShaderManager);
+        float right = w / 2f + RightColumn;
+        float y = layout.Top;
+        foreach (var line in DetailRows(page.ChosenRow))
+        {
+            _text.DrawText(line.Text, right, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+    }
+
+    /// <summary>Runs side by side from <paramref name="x"/>, each where the last ended: a row read as one line, in its colours.</summary>
+    private void DrawRuns(float x, float y, float scale, IReadOnlyList<Run> runs)
+    {
+        foreach (var run in runs)
+        {
+            _text.DrawText(run.Text, x, y, scale, run.Color);
+            x += run.Text.Length * GlyphAdvance * scale;
+        }
     }
 
     /// <summary>The keys line's scale.</summary>

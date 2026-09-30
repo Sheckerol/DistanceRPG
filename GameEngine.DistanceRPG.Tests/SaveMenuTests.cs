@@ -968,7 +968,10 @@ public sealed class SaveMenuTests : IDisposable
 /// <summary>
 /// The host of a screen built with no window and walked key by key: what it is
 /// asked for is recorded, it names the slot the campaign saves into as it was
-/// handed it, and it saves, quits and descends nothing itself.
+/// handed it, and it saves, quits and descends nothing itself. Its two
+/// <c>RequestSave</c>s are its two hosts' apart (Phase 6a.2): the hub's autosave
+/// is counted, and a dungeon's, which a screen walked with no window never asks
+/// for, is refused.
 /// </summary>
 internal sealed class RecordingHost : IRunHost, IBetweenRunsHost
 {
@@ -992,6 +995,9 @@ internal sealed class RecordingHost : IRunHost, IBetweenRunsHost
     /// <summary>Every dungeon descended into, in order.</summary>
     public List<string> Descended { get; } = [];
 
+    /// <summary>How many saves the hub asked for after a change it made (<see cref="IBetweenRunsHost.RequestSave"/>, PHASE 6a DECISION 10).</summary>
+    public int HubSavesAsked { get; private set; }
+
     public void SaveNow() => HandSaves++;
 
     public void QuitToTitle() => QuitsToTitle++;
@@ -1000,5 +1006,7 @@ internal sealed class RecordingHost : IRunHost, IBetweenRunsHost
 
     public void RunOver() => throw new InvalidOperationException("A screen walked with no window is never played to a run's end.");
 
-    public void RequestSave() => throw new InvalidOperationException("A screen walked with no window never opens a floor, so it never asks for an autosave.");
+    void IRunHost.RequestSave() => throw new InvalidOperationException("A screen walked with no window never opens a floor, so it never asks for an autosave.");
+
+    void IBetweenRunsHost.RequestSave() => HubSavesAsked++;
 }

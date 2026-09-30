@@ -42,6 +42,7 @@ public class SaveInventoryTests
             new("_retired", Kept.Saved, "campaign.retired[] = RetiredInOrder"),
             new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a save and a load"),
             new("Visit", Kept.Saved, "campaign.visit: the Run group and every visited floor, or null between runs"),
+            new("_stable", Kept.Saved, "campaign.stable[], each weapon whole, in the order they were put there — null for an empty stable (Phase 6a.2)"),
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],
@@ -343,6 +344,18 @@ public class SaveInventoryTests
             new("_menu", Kept.NotSaved, "a menu: the one ESC opens over the hub, closed on every showing"),
             new("_answer", Kept.NotSaved, "a menu: what the menu answers under its lines, until the next key or until the menu closes"),
             new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a load has its own to say"),
+            new("_notices", Kept.NotSaved, "this showing's notices, a failed save of the hub's laid ahead of them: the log keeps them"),
+            new("_shownWhole", Kept.NotSaved, "how many of this showing's notices are shown whole"),
+            new("_weapons", Kept.NotSaved, "the WEAPONS page: its rows are the campaign's, read afresh; its choice, its window and a carry are presentation (HubWeapons, below)"),
+            new("_onWeapons", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
+            new("_refusal", Kept.NotSaved, "what a put-down was refused with, until the next key"),
+        ],
+        [typeof(HubWeapons)] =
+        [
+            new("_campaign", Kept.Derived, "the campaign the save restores — the page's rows are read off it afresh each time"),
+            new("_chosen", Kept.NotSaved, "the page's choice: every showing opens on the first row it can choose"),
+            new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
+            new("_carried", Kept.NotSaved, "a carry is the page's alone and moves nothing: the campaign changes only as it is put down (CampaignState.Move), so a save never sees one, and a quit mid-carry loses nothing"),
         ],
     };
 
@@ -380,9 +393,10 @@ public class SaveInventoryTests
     public void EverySceneFieldIsViewDerivedOrNamedAsNot()
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
-        // scenes is in the document's view, derived from what the save restores, or
-        // not saved for the reason given — so a scene field added later fails here
-        // until someone decides whether a resume needs it.
+        // scenes — and of the WEAPONS page the screen between runs holds (Phase 6a.2)
+        // — is in the document's view, derived from what the save restores, or not
+        // saved for the reason given — so a scene field added later fails here until
+        // someone decides whether a resume needs it.
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         foreach (var (type, rows) in SceneInventory)
         {

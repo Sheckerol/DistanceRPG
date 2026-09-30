@@ -91,9 +91,10 @@ namespace GameEngine.DistanceRPG;
 /// (<see cref="SaveGame.IsSafePoint"/>) and only once the frame a save was asked
 /// for in is over, so no write runs inside a turn system's raise: when a run is
 /// entered, at every player turn's start and after every floor arrival (the
-/// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, when NEW
-/// CAMPAIGN begins one — on the title, or <c>--new-campaign</c> at launch — by
-/// hand, and on leaving play — the menus' QUIT TO TITLE
+/// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, after every
+/// change the hub makes between runs (<see cref="IBetweenRunsHost.RequestSave"/>,
+/// PHASE 6a DECISION 10), when NEW CAMPAIGN begins one — on the title, or
+/// <c>--new-campaign</c> at launch — by hand, and on leaving play — the menus' QUIT TO TITLE
 /// (<see cref="QuitToTitle"/>) or the window's close button (<see cref="OnClosing"/>),
 /// both through the quit's own door (<see cref="SaveOnQuit"/>). A quit during the
 /// enemies' turn plays it out to the next player turn first, on the playing
@@ -195,9 +196,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private Action? _pendingScene;
 
     // A save was asked for since the last one — a run entered or ended, a player
-    // turn begun, a floor arrived on: written at the end of the frame, once no
-    // raise is running, and not before the campaign stands at a safe point.
+    // turn begun, a floor arrived on, a change on the hub: written at the end of
+    // the frame, once no raise is running, and not before the campaign stands at a
+    // safe point.
     private bool _saveRequested;
+
+    // Who asked for it between runs, for its log line alone (When): the run's end
+    // (SaveAtTheRunsEnd), or, when it did not, the hub, after a change it made
+    // (IBetweenRunsHost.RequestSave). Cleared with the request it goes with.
+    private bool _runsEndAsked;
 
     // A save by hand was asked for — SAVE GAME, into the campaign's own slot:
     // written at the end of the frame, through the same door as the requests
@@ -666,6 +673,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         _slot = null;
         _saveRequested = false;
         _handSaveRequested = false;
+        _runsEndAsked = false;
         _failedSaves.Clear();
     }
 
@@ -682,15 +690,21 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             replaced.RunEnded -= SaveAtTheRunsEnd;
         _campaign = campaign;
         _slot = slot;
+        _runsEndAsked = false;
         campaign.RunEnded += SaveAtTheRunsEnd;
     }
 
     /// <summary>
     /// A run has ended, by the way out or by a wipe — which ends it inside the turn
     /// system's raise — so the save is only asked for here, and written once the
-    /// frame is over (<see cref="WriteRequestedSave"/>).
+    /// frame is over (<see cref="WriteRequestedSave"/>), its log line saying it is
+    /// the run's end's (<see cref="When"/>).
     /// </summary>
-    private void SaveAtTheRunsEnd(RunResult result) => _saveRequested = true;
+    private void SaveAtTheRunsEnd(RunResult result)
+    {
+        _saveRequested = true;
+        _runsEndAsked = true;
+    }
 
     /// <summary>
     /// The first run's map seed: <paramref name="requested"/> — the
@@ -744,11 +758,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     public void RunOver() => ShowBetweenRuns();
 
     /// <summary>
-    /// The playing scene asks for a save (1f): a player turn has started, or the
-    /// party has arrived on a floor. Only asked for here — it arrives inside the
-    /// turn system's raise that began the turn — and written at the end of the
-    /// frame (<see cref="WriteRequestedSave"/>), once the campaign stands at a
-    /// safe point.
+    /// A scene asks for a save: the playing scene's (1f,
+    /// <see cref="IRunHost.RequestSave"/>) — a player turn has started, or the
+    /// party has arrived on a floor — or the screen between runs'
+    /// (<see cref="IBetweenRunsHost.RequestSave"/>, PHASE 6a DECISION 10), after a
+    /// change the hub made to the campaign. Only asked for here — the dungeon's
+    /// arrives inside the turn system's raise that began the turn — and written at
+    /// the end of the frame (<see cref="WriteRequestedSave"/>), once the campaign
+    /// stands at a safe point, which between runs it always does; a failure between
+    /// runs is said on the hub at once (<see cref="BetweenRunsScene.SaveFailed"/>).
     /// </summary>
     public void RequestSave() => _saveRequested = true;
 
@@ -942,17 +960,26 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return;   // an automatic request waits for the next safe point
         }
         _saveRequested = false;   // cleared once, past the _resuming read, before the write
-        var (failed, setAside) = Save(campaign, slot, When(campaign, byHand), campaign.Visit is null ? null : PlayingScene(campaign)?.View, byHand);
+        string when = When(campaign, byHand, _runsEndAsked);
+        _runsEndAsked = false;
+        var (failed, setAside) = Save(campaign, slot, when, campaign.Visit is null ? null : PlayingScene(campaign)?.View, byHand);
         if (byHand)
             AnswerHandSave(CampaignBoot.SaveAnswer(slot, failed, setAside));
     }
 
-    /// <summary>What a save's log line says of it: where the campaign stands — mid-run, the dungeon, floor and turn; between runs, the run's end the game's own save follows — and whether it is saved by hand.</summary>
-    private static string When(CampaignState campaign, bool byHand)
+    /// <summary>
+    /// What a save's log line says of it: where the campaign stands — mid-run, the
+    /// dungeon, floor and turn; between runs, who asked for the game's own save,
+    /// the run's end (<paramref name="runsEnd"/>) or a change on the hub — and
+    /// whether it is saved by hand.
+    /// </summary>
+    private static string When(CampaignState campaign, bool byHand, bool runsEnd)
     {
         string where = campaign.Visit is { } visit
             ? $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
-            : byHand ? "between runs" : "at the run's end";
+            : byHand ? "between runs"
+            : runsEnd ? "at the run's end"
+            : "between runs, after a change on the hub";
         return byHand ? $"by hand, {where}" : where;
     }
 
@@ -960,7 +987,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws,
     /// stamped with the clock's time: every line to the log. A write that fails is
     /// said at once over the floor being played, when a run is
-    /// (<see cref="DungeonScene.SaveFailed"/>), and on the next screen the game
+    /// (<see cref="DungeonScene.SaveFailed"/>), or under the hub's title between
+    /// runs (<see cref="BetweenRunsScene.SaveFailed"/>), and on the next screen the game
     /// shows — there once, however many times it failed, and only until a later
     /// save goes through, which takes it back (<see cref="TakeBackFailedSaves"/>) —
     /// this door's, or the quit's (<see cref="SaveOnQuit"/>). A file of the slot the
@@ -994,11 +1022,16 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return (failed, setAside);
 
         // Led for the next screen, and shown at once over the floor being played,
-        // each whole ahead of what is up — so the first said is laid last, on top.
+        // or on the hub between runs, each whole ahead of what is up — so the first
+        // said is laid last, on top.
         _notices.Lead(said);
         var scene = PlayingScene(campaign);
+        var hub = HubScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
+        {
             scene?.SaveFailed(said[i]);
+            hub?.SaveFailed(said[i]);
+        }
         return (failed, setAside);
     }
 
@@ -1028,6 +1061,14 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         => SceneManager.Instance.CurrentScene is DungeonScene scene && campaign.Visit is { } visit && ReferenceEquals(scene.Visit, visit)
             ? scene
             : null;
+
+    /// <summary>
+    /// The screen between runs, when it is the scene up now and the campaign is
+    /// between runs — where a save of the hub's changes that failed is said at once
+    /// (PHASE 6a DECISION 10) — or null: mid-run, or on any other screen.
+    /// </summary>
+    private static BetweenRunsScene? HubScene(CampaignState campaign)
+        => SceneManager.Instance.CurrentScene is BetweenRunsScene hub && campaign.Visit is null ? hub : null;
 
     /// <summary>
     /// The window is closing — the close button from anywhere, the title's QUIT or
@@ -1105,7 +1146,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Escape goes to the scene being played. In a dungeon it closes a menu or
     /// opens the pause menu, whose QUIT TO TITLE is how play is left, and it does
     /// nothing on a run's summary, where ENTER is the one way on. On the screen
-    /// between runs it opens and closes the same menu, always consumed. On the
+    /// between runs it puts a weapon taken up back, or opens and closes the same
+    /// menu, always consumed. On the
     /// title it says no to an ask or closes the load list, and on the options it is
     /// not consumed, so the game closes, as QUIT does, with nothing to save — as it
     /// quits from the screen a broken content file stops the game on, which has no

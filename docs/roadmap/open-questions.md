@@ -482,3 +482,58 @@ to decide.** The alternative: accept one `THE NUMBERS HAVE CHANGED SINCE THIS
 CAMPAIGN WAS SAVED` on the first resume of every phase-5 save, as a new key costs
 (the entry on the gameplay numbers still compiled), with no new member at the
 save's root. settled.md's Phase 6a implementation pass records the ruling.
+
+## The stable (§6.2) — PHASE 6a DECISION 7
+
+§6.2 puts a deposited weapon in the shop, out of the party's hands, and says the
+campaign keeps "the stable": the weapons the party owns and is not carrying
+(phase-6-between-runs.md §6.2, §6.7; ROADMAP's "Needs `CampaignState` and the
+stable"). No ruling gives the stable a size, says where a weapon goes when its
+service is done, or says whether a member may be left with nothing in hand; and
+the bags are six slots a member (settled.md, "Carry limit is unified with the
+loadout").
+
+**Shipped provisionally: the stable is the campaign's, unbounded, in the order
+weapons were put there**, and it is the screen between runs' WEAPONS page (TAB):
+a weapon is taken up and put down in another member's hand or bag, or in the
+stable, and back out again — onto a weapon it swaps, onto a hand it equips.
+Spoils carried home stay in the bags, as ever. **No move leaves a member
+carrying no weapon**: it is refused, `EACH MEMBER KEEPS A WEAPON - [A] WOULD
+CARRY NONE`, and the weapon stays taken up. A hand a move empties is armed from
+the bag as the rest before a dungeon arms it. When the enchanter's queue arrives
+(Phase 6a.3a), a finished service will return its weapon to the stable's end, and
+the deposit will be refused on the same rule — a transfer asked with both of its
+weapons gone.
+
+**This decides where the party's spare weapons live and whether a member can be
+left unarmed, so it is the user's to decide.** The alternatives: (a) a capped
+stable; (b) a finished weapon returns to the bag it came from, or to the stable
+when that bag is full; or (c) a member may be left unarmed, as a wipe that takes
+every spoil it held already can leave one. settled.md's Phase 6a implementation
+pass records the ruling.
+
+## Autosaving between runs (§5.1's safe points) — PHASE 6a DECISION 10
+
+A save is taken only at a safe point, and between runs is always one (settled.md,
+the save's safe points); SAVE GAME saves there by hand. The list of when the game
+saves on its own — a run's entry, every player turn's start, every floor arrival,
+a run's end, NEW CAMPAIGN and every quit — names nothing between runs, since
+nothing changed the campaign there before Phase 6a: the screen between runs only
+chose a dungeon. From Phase 6a it moves weapons between the bags and the stable,
+and the enchanter's deposits and take-backs follow.
+
+**Shipped provisionally: every change the hub makes to the campaign is saved**,
+into the campaign's own slot, at the end of the frame it was made in — a move
+(Phase 6a.2), and a deposit and a take-back when they arrive. The screen asks
+through its host (`IBetweenRunsHost.RequestSave`), which the game answers with
+the same request the dungeon's autosaves make, written through the one door
+every save of the campaign goes through; the log says `Saving the campaign
+between runs, after a change on the hub`. A save that fails is said at once under
+the hub's title, in orange, as one over a floor is, and on the next screen until
+a later save goes through.
+
+**This decides whether a crash between runs can cost the changes made there, so
+it is the user's to decide.** The alternative: only the run's end, SAVE GAME and
+the quit save, as the list stands, so a crash between runs loses whatever the hub
+changed since the last of them. settled.md's Phase 6a implementation pass records
+the ruling.

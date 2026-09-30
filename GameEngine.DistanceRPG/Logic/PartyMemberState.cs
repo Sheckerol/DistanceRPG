@@ -317,12 +317,11 @@ public sealed class PartyMemberState : ActorState
     /// carried, the XP earned, the innate spread — because a rest is between
     /// runs and never a reset of the campaign.
     /// <para>
-    /// <strong>And armed, if there is anything to arm it with.</strong> A wipe
-    /// takes the run's spoils out of the bags (§4.4), and a spoil the member had
-    /// taken up in hand leaves the hand empty; so an empty hand takes the first
-    /// weapon carried in the bag, moved rather than copied, before the member
-    /// walks into the next dungeon. A hand already holding something is left as
-    /// it is, and a member carrying nothing stays unarmed.
+    /// <strong>And armed, if there is anything to arm it with</strong>
+    /// (<see cref="ArmFromBag"/>). A wipe takes the run's spoils out of the bags
+    /// (§4.4), and a spoil the member had taken up in hand leaves the hand empty;
+    /// so an empty hand takes the first weapon carried in the bag before the
+    /// member walks into the next dungeon.
     /// </para>
     /// <para>
     /// Taken at the next entry, not when a run ends, so the run's end still
@@ -331,16 +330,7 @@ public sealed class PartyMemberState : ActorState
     /// </summary>
     public void Rest()
     {
-        if (Inventory[0] is null)
-        {
-            for (int slot = 1; slot < Inventory.Length; slot++)
-            {
-                if (Inventory[slot] is not { } carried) continue;
-                Inventory[0] = carried;
-                Inventory[slot] = null;
-                break;
-            }
-        }
+        ArmFromBag();
 
         Alive = true;
         StatusEffects.Clear();
@@ -351,6 +341,28 @@ public sealed class PartyMemberState : ActorState
         BudgetBeforeMire = Budget;
         EffectiveMax = Budget;
         DistLeft = Budget;
+    }
+
+    /// <summary>
+    /// An empty hand takes the first weapon carried in the bag, moved rather than
+    /// copied: what the rest before a dungeon does (<see cref="Rest"/>), and what a
+    /// move between runs does to the hand it empties (PHASE 6a DECISION 7,
+    /// <see cref="CampaignState.Move"/>). A hand already holding something is left
+    /// as it is, and a member carrying nothing stays unarmed.
+    /// </summary>
+    /// <returns>The weapon taken into the hand, or null when none was.</returns>
+    internal Weapon? ArmFromBag()
+    {
+        if (Inventory[0] is not null)
+            return null;
+        for (int slot = 1; slot < Inventory.Length; slot++)
+        {
+            if (Inventory[slot] is not { } carried) continue;
+            Inventory[0] = carried;
+            Inventory[slot] = null;
+            return carried;
+        }
+        return null;
     }
 
     /// <summary>

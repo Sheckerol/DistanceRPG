@@ -20,6 +20,25 @@ namespace GameEngine.DistanceRPG.Logic;
 public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUntilAvailable, bool Early);
 
 /// <summary>
+/// Where a weapon the party owns is, between runs (§6.2, Phase 6a.2): a member's
+/// slot — <see cref="MemberId"/> and the slot, 0 the hand and the rest the bag —
+/// or the stable, <see cref="MemberId"/> null and <see cref="Index"/> its place in
+/// <see cref="CampaignState.Stable"/>, where <c>Stable.Count</c> is the stable's
+/// end: where a weapon put there goes. What the hub's moves name
+/// (<see cref="CampaignState.Move"/>).
+/// </summary>
+/// <param name="MemberId">The member whose slot it is, by roster id, or null for the stable.</param>
+/// <param name="Index">The slot, or the place in the stable.</param>
+public readonly record struct WeaponPlace(string? MemberId, int Index)
+{
+    /// <summary>A place in the stable: <c>Stable.Count</c> is its end.</summary>
+    public static WeaponPlace InTheStable(int index) => new(null, index);
+
+    /// <summary>Whether it is the stable's, rather than a member's slot.</summary>
+    public bool IsStable => MemberId is null;
+}
+
+/// <summary>
 /// The campaign (§6.7): what lives <em>outside</em> any one dungeon and outlasts
 /// every visit — the party, the permanent half of the game — and the visit in
 /// progress, the renewable half, which is null between runs. §6.7's "a save with
@@ -75,6 +94,15 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// party kept. The dungeon itself is discarded whole. Between runs, the hub's
 /// dungeon list is read off those numbers (<see cref="Listings"/>).
 /// </para>
+/// <para>
+/// <strong>And the stable</strong> (§6.2, Phase 6a.2; PHASE 6a DECISION 7): the
+/// weapons the party owns and is not carrying, in the order they were put there
+/// (<see cref="Stable"/>), and unbounded. It changes by hand only between runs,
+/// through the hub's one door (<see cref="Move"/>), which never leaves a member
+/// carrying no weapon and arms a hand it empties from the bag; a load brings it
+/// back through <see cref="Restore"/>. A new campaign's is empty, and so is a
+/// save's from before it.
+/// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>: it
 /// rolls nothing — a visit's seed is handed to <see cref="Enter"/> by whoever
 /// enters.
@@ -94,6 +122,11 @@ public sealed class CampaignState
     private readonly Dictionary<string, int> _lockedUntilRun = new(StringComparer.Ordinal);
     private readonly HashSet<string> _cleared = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);
+
+    // The stable (§6.2): the weapons owned and not carried, in the order they
+    // were put there. Written by the hub's moves between runs
+    // (Move) and by a load (Restore) alone.
+    private readonly List<Weapon> _stable = new();
 
     // The subscription Enter (or a load, through Restore) made on the visit in
     // progress's Wiped, taken off again at the run's end, so a discarded visit
@@ -163,7 +196,9 @@ public sealed class CampaignState
     /// A campaign as a save describes it (§5.1, §6.7): the party as the load
     /// rebuilt it, what it has met, the run counter, every lock a clear wrote — an
     /// early offer's rewrite as it stands — the dungeons cleared and retired, how
-    /// the last run ended, and the visit in progress, or none between runs. The
+    /// the last run ended, the visit in progress, or none between runs, and the
+    /// stable, in its order — filled before the visit is held, so a mid-run save
+    /// with a stable comes back through no door the hub's guard shuts. The
     /// one door the run's-end records come back through: internal, so there is
     /// still no public setter on the counter and no public <c>Retire</c> (a run's
     /// end is the only other writer). Nothing is re-derived and nothing is met: a
@@ -179,22 +214,28 @@ public sealed class CampaignState
     /// The ids are the load's to have checked against the content
     /// (<see cref="SaveGame.Restore"/>): this takes them as they are, and refuses
     /// only what no campaign can hold — a negative counter or lock, a dungeon
-    /// locked twice, and a visit with nobody to make it.
+    /// locked twice, a visit with nobody to make it, and a stable that holds a
+    /// null or one weapon twice.
     /// </para>
     /// </summary>
-    /// <exception cref="ArgumentException">The party names a null member, an id is null, a dungeon is locked twice, or a visit is handed in with no party.</exception>
+    /// <exception cref="ArgumentException">The party names a null member, an id is null, a dungeon is locked twice, a visit is handed in with no party, or the stable holds a null or a weapon twice.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The counter or a lock is negative.</exception>
     internal static CampaignState Restore(IReadOnlyList<PartyMemberState> party, IReadOnlyList<string> seen, int runCounter,
         IReadOnlyList<(string DungeonId, int LockedUntilRun)> locks, IReadOnlyList<string> cleared, IReadOnlyList<string> retired,
-        RunResult? lastResult, DungeonState? visit)
+        RunResult? lastResult, DungeonState? visit, IReadOnlyList<Weapon> stable)
     {
         ArgumentNullException.ThrowIfNull(seen);
         ArgumentNullException.ThrowIfNull(locks);
         ArgumentNullException.ThrowIfNull(cleared);
         ArgumentNullException.ThrowIfNull(retired);
+        ArgumentNullException.ThrowIfNull(stable);
         ArgumentOutOfRangeException.ThrowIfNegative(runCounter);
         if (seen.Concat(cleared).Concat(retired).Any(id => id is null))
             throw new ArgumentException("A campaign's records name their entries by id, and one is null.");
+        if (stable.Any(weapon => weapon is null))
+            throw new ArgumentException("The stable holds weapons, and one is null.", nameof(stable));
+        if (stable.Distinct(ReferenceEqualityComparer.Instance).Count() != stable.Count)
+            throw new ArgumentException("The stable holds a weapon twice: a weapon is in one place.", nameof(stable));
 
         var campaign = new CampaignState(party)
         {
@@ -211,6 +252,7 @@ public sealed class CampaignState
         }
         campaign._cleared.UnionWith(cleared);
         campaign._retired.UnionWith(retired);
+        campaign._stable.AddRange(stable);   // before the visit is held: the hub's door is shut once it is
         if (visit is not null)
         {
             if (campaign._party.Count == 0)
@@ -724,5 +766,136 @@ public sealed class CampaignState
         foreach (var weapon in member.Inventory)
             if (weapon is not null)
                 See(weapon);
+    }
+
+    // ── The stable (§6.2, Phase 6a.2) ────────────────────────────────────────
+
+    /// <summary>
+    /// The stable (§6.2): every weapon the party owns and is not carrying, in the
+    /// order they were put there — a list, never a set, so the view a save stores
+    /// and the hub lists is that order. Unbounded (PHASE 6a DECISION 7). Empty on
+    /// a new campaign.
+    /// </summary>
+    public IReadOnlyList<Weapon> Stable => _stable.AsReadOnly();
+
+    /// <summary>
+    /// The weapon at <paramref name="place"/>: a member's slot's, which may be
+    /// empty (null), or the stable's — its end holding nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The slot is not one the member has, or the place is past the stable's end.</exception>
+    public Weapon? WeaponAt(WeaponPlace place)
+    {
+        if (place.IsStable)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(place.Index, nameof(place));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(place.Index, _stable.Count, nameof(place));
+            return place.Index < _stable.Count ? _stable[place.Index] : null;
+        }
+        var bag = MemberOf(place).Inventory;
+        ArgumentOutOfRangeException.ThrowIfNegative(place.Index, nameof(place));
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(place.Index, bag.Length, nameof(place));
+        return bag[place.Index];
+    }
+
+    /// <summary>
+    /// The member a move of the weapon at <paramref name="from"/> to
+    /// <paramref name="to"/> would leave carrying no weapon (PHASE 6a DECISION 7),
+    /// or null when it leaves every member armed. Only the member it is taken
+    /// from can be left with none, and only when nothing comes back in its place
+    /// — the weapon put down where nothing lies, in another member's bag or at
+    /// the stable's end — and it was the one weapon that member carried. A swap
+    /// always hands one back, and a weapon put down in its own member's bag stays
+    /// carried.
+    /// </summary>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    public PartyMemberState? WouldDisarm(WeaponPlace from, WeaponPlace to)
+    {
+        if (from.IsStable || WeaponAt(from) is null || WeaponAt(to) is not null)
+            return null;
+        if (!to.IsStable && to.MemberId == from.MemberId)
+            return null;
+        var member = MemberOf(from);
+        return member.Inventory.Count(carried => carried is not null) == 1 ? member : null;
+    }
+
+    /// <summary>
+    /// Move a weapon the party owns, by hand between runs (§6.2; PHASE 6a
+    /// DECISION 7): the hub's one door onto the stable and the bags. The weapon at
+    /// <paramref name="from"/> goes to <paramref name="to"/>, and whatever lay
+    /// there comes back to <paramref name="from"/> in its place — a swap: into a
+    /// member's hand is how a weapon is equipped, from the stable or another bag.
+    /// Put down where nothing lies — a member's empty slot, or the stable's end —
+    /// it leaves its old place empty: a bag slot is left empty, and the stable
+    /// closes up, so a weapon put at the stable's end from the stable moves there.
+    /// A hand the move empties is armed from its bag, as the rest before a
+    /// dungeon arms it (<see cref="PartyMemberState.ArmFromBag"/>). A move onto its
+    /// own place moves nothing.
+    /// <para>
+    /// Refused, and nothing moves: during a visit — the stable and the bags are
+    /// changed by hand only between runs — and a move that would leave a member
+    /// carrying no weapon (<see cref="WouldDisarm"/>), which the hub asks first and
+    /// says why. Nothing is met: every weapon moved was the party's already.
+    /// </para>
+    /// </summary>
+    /// <returns>The weapon moved; the weapon it was swapped with, or null; and the weapon a hand the move emptied took up from the bag, or null.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress, <paramref name="from"/> holds no weapon, or the move would leave a member carrying none.</exception>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    internal (Weapon Moved, Weapon? Swapped, Weapon? Armed) Move(WeaponPlace from, WeaponPlace to)
+    {
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the stable and the bags are changed by hand only between runs.");
+        var moved = WeaponAt(from) ?? throw new InvalidOperationException($"Nothing lies at {from} to move.");
+        var swapped = WeaponAt(to);
+        if (WouldDisarm(from, to) is { } unarmed)
+            throw new InvalidOperationException($"The move would leave {unarmed.Id} carrying no weapon (PHASE 6a DECISION 7).");
+        if (from == to)
+            return (moved, null, null);
+
+        if (swapped is not null)
+        {
+            Put(to, moved);
+            Put(from, swapped);
+        }
+        else if (to.IsStable)
+        {
+            Take(from);
+            _stable.Add(moved);   // the stable's end, after the stable has closed up behind it
+        }
+        else
+        {
+            Take(from);
+            Put(to, moved);
+        }
+
+        var armed = !from.IsStable && from.Index == 0 ? MemberOf(from).ArmFromBag() : null;   // null for a hand the move filled again
+        return (moved, swapped, armed);
+    }
+
+    /// <summary>The member a place in the party names.</summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    private PartyMemberState MemberOf(WeaponPlace place)
+        => _party.FirstOrDefault(member => member.Id == place.MemberId)
+            ?? throw new ArgumentException($"'{place.MemberId}' is no member of the party.", nameof(place));
+
+    /// <summary>Lay <paramref name="weapon"/> at <paramref name="place"/>, over what is there: a slot, or a place in the stable.</summary>
+    private void Put(WeaponPlace place, Weapon weapon)
+    {
+        if (place.IsStable)
+            _stable[place.Index] = weapon;
+        else
+            MemberOf(place).Inventory[place.Index] = weapon;
+    }
+
+    /// <summary>Take what is at <paramref name="place"/> away: a slot is left empty, and the stable closes up behind it.</summary>
+    private void Take(WeaponPlace place)
+    {
+        if (place.IsStable)
+            _stable.RemoveAt(place.Index);
+        else
+            MemberOf(place).Inventory[place.Index] = null;
     }
 }

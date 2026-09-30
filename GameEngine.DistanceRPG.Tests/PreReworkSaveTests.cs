@@ -45,6 +45,16 @@ public class PreReworkSaveTests
     /// <summary>The document's member holding when it was saved: appended since the saves were written, so a capture writes it (null, with no time handed in) and the saves have none.</summary>
     private const string SavedAtMember = "savedAt";
 
+    /// <summary>
+    /// The campaign's members appended since the saves were written, with their
+    /// defaults (the header rule of <c>SaveFile.cs</c>): the migration writes none of
+    /// them, and a capture writes each empty one as null — the stable (Phase 6a.2) —
+    /// so the saves have none and the capture of one restored from them has each
+    /// null. Set aside there, and only as null: a capture that wrote one with
+    /// anything in it differs.
+    /// </summary>
+    private static readonly string[] AppendedToTheCampaign = ["stable"];
+
     private static readonly string[] Saves = [MidRun, BetweenRuns];
 
     private static string PathOf(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name);
@@ -102,7 +112,9 @@ public class PreReworkSaveTests
     /// writes the current tuning's hash there, and with it its
     /// <see cref="TuningHashVersionMember"/>, the current version, where a migrated
     /// save has 1. So is its <see cref="SavedAtMember"/>, which a capture writes and
-    /// the saves, older than it, do not.
+    /// the saves, older than it, do not; and so is a member appended to the
+    /// campaign since (<see cref="AppendedToTheCampaign"/>) that the saves lack and
+    /// the capture writes null.
     /// </summary>
     private static string? FirstDifference(JsonNode? expected, JsonNode? actual, string path, bool root = false)
     {
@@ -112,7 +124,8 @@ public class PreReworkSaveTests
                 return null;
             case (JsonObject was, JsonObject now):
             {
-                bool Compared(string name) => !(root && name is TuningHashMember or TuningHashVersionMember or SavedAtMember);
+                bool Compared(string name) => !(root && name is TuningHashMember or TuningHashVersionMember or SavedAtMember)
+                    && !(path.EndsWith("$.campaign", StringComparison.Ordinal) && AppendedToTheCampaign.Contains(name) && !was.ContainsKey(name) && now[name] is null);
                 var wasNames = was.Select(member => member.Key).Where(Compared).ToList();
                 var nowNames = now.Select(member => member.Key).Where(Compared).ToList();
                 foreach (string name in wasNames)
@@ -251,6 +264,19 @@ public class PreReworkSaveTests
             migrated["version"] = SaveCodec.CurrentVersion;
             if (FirstDifference(migrated, JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
                 Assert.Fail($"captured again, the document is not the migrated save: {difference}");
+
+            // The members appended to the campaign since are in the capture, empty:
+            // the stable, written null (Phase 6a.2), which the migrated save reads as
+            // null too — nothing was in any stable before there was one.
+            var capturedCampaign = JsonNode.Parse(again)!["campaign"]!.AsObject();
+            Assert.All(AppendedToTheCampaign, member =>
+            {
+                Assert.True(capturedCampaign.ContainsKey(member), $"{name}: the capture has no campaign.{member}");
+                Assert.Null(capturedCampaign[member]);
+                Assert.False(lifted["campaign"]!.AsObject().ContainsKey(member), $"{name}: the migration wrote campaign.{member}");
+            });
+            Assert.Empty(campaign.Stable);
+            Assert.Null(file.Campaign.Stable);
 
             // And as text, whitespace and number formatting included: the migrated
             // save as the codec writes it — its time null, as it never had one — with

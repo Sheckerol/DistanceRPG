@@ -325,10 +325,11 @@ public class SaveCodecTests
         // A member a later build of the same version adds never breaks this
         // reader, wherever it sits; a member this reader needs and does not find
         // is an error, never a default; and a null where none belongs is one too.
+        // (The campaign's graft is named for no version: "stable" is Phase 6a.2's.)
         string text = SaveCodec.Write(Sample());
         var grown = Tree(text);
         grown["futureMember"] = JsonNode.Parse("""{ "deep": [1, 2, { "x": null }] }""");
-        Campaign(grown)["stable"] = JsonNode.Parse("[]");
+        Campaign(grown)["notAMemberOfAnyVersion"] = JsonNode.Parse("[]");
         FirstMember(grown)["wear"] = 12;
         FirstMember(grown)["inventory"]![0]!["wearCapacity"] = 30;
         Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(grown.ToJsonString())));

@@ -312,6 +312,13 @@ public class GameStartupTests
         var takeBack = typeof(DistanceRpgGame).GetMethod("TakeBackFailedSaves", Declared)!;
         Assert.Equal(["DistanceRpgGame.Save"], Callers(saveFailed));
         Assert.Equal(["DungeonScene.SaveFailed"], Callers(typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowSaveFailed))!));
+
+        // Between runs the screen between runs says it at once instead, when it is
+        // up (PHASE 6a DECISION 10): the same one Save, through HubScene.
+        var hubFailed = typeof(BetweenRunsScene).GetMethod(nameof(BetweenRunsScene.SaveFailed), Declared)!;
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(hubFailed));
+        Assert.Equal(1, Mentions(save, hubFailed));
+        Assert.Equal(1, Mentions(save, typeof(DistanceRpgGame).GetMethod("HubScene", Declared)!));
         Assert.Equal(["DistanceRpgGame.TakeBackFailedSaves"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
         Assert.Equal(["DistanceRpgGame.Save"], Callers(takeBack));
         Assert.Equal(1, Mentions(save, takeBack));
@@ -780,6 +787,16 @@ public class GameStartupTests
         var game = typeof(DistanceRpgGame);
         var request = game.GetMethod(nameof(DistanceRpgGame.RequestSave))!;
         Assert.Equal(["DistanceRpgGame.BeginRun"], Callers(request));
+
+        // Between runs (PHASE 6a DECISION 10): the hub asks through its own host,
+        // IBetweenRunsHost.RequestSave — the game's same RequestSave — after every
+        // change it makes to the campaign, and those are its put-downs alone
+        // (Phase 6a.2). Only asked for, as the dungeon's are.
+        var hubAsks = typeof(IBetweenRunsHost).GetMethod(nameof(IBetweenRunsHost.RequestSave))!;
+        Assert.Equal(["BetweenRunsScene.PutDown"], Callers(hubAsks));
+        Assert.Contains(typeof(IBetweenRunsHost), game.GetInterfaces());
+        Assert.Equal(request, game.GetInterfaceMap(typeof(IBetweenRunsHost)).TargetMethods
+            .Single(method => method.Name.EndsWith(nameof(IBetweenRunsHost.RequestSave), StringComparison.Ordinal)));
         foreach (var asking in new[] { request, game.GetMethod("BeginRun", Declared)! })
             Assert.DoesNotContain(Instructions(Body(asking)!), i => i.Token != 0 && Resolve(asking, i.Token) is { } target
                 && (target.DeclaringType == typeof(CampaignBoot) || target.DeclaringType == typeof(SaveStore) || target.Name == "Save"));

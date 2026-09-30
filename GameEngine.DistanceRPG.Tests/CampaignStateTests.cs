@@ -194,11 +194,14 @@ public class CampaignStateTests
         Assert.Equal(fresh.RetiredInOrder, fresh.RetiredInOrder);
 
         // And the type hands out no other view to iterate by accident: no public
-        // set, no hash-ordered list, nothing but the named ordered views.
+        // set, no hash-ordered list, nothing but the named ordered views — the
+        // stable among them, a list in the order its weapons were put there (Phase
+        // 6a.2).
         string[] orderedViews =
         [
             nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party),
             nameof(CampaignState.LockedInOrder), nameof(CampaignState.ClearedInOrder), nameof(CampaignState.RetiredInOrder),
+            nameof(CampaignState.Stable),
         ];
         var iterable = typeof(CampaignState)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

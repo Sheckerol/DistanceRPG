@@ -41,9 +41,11 @@ recent save and resumes it where it was left: on the screen between runs, with
 `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title, or
 back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 [Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
-is passed over. The screen between runs is the dungeon list, with the last run's
-summary above it once a run has ended; until the tutorial's golem is beaten it
-lists the tutorial alone. In play — in a dungeon or between runs — Esc opens the
+is passed over. The screen between runs is two pages, Tab going from one to the
+other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
+has ended — until the tutorial's golem is beaten it lists the tutorial alone —
+and WEAPONS, every member's hand and bag and the stable, where weapons are moved
+between them (below). In play — in a dungeon or between runs — Esc opens the
 menu, where the campaign is saved by hand into its own slot, the one it saves
 into all the time, and play is left for the title.
 
@@ -68,11 +70,26 @@ into all the time, and play is left for the title.
 | Enter | Begin in the chosen slot, the same way |
 | Esc | Back to the options (on a question, no) |
 
-| Between runs | Action |
+| Between runs: DUNGEONS | Action |
 | --- | --- |
 | W/S / arrows | Choose a dungeon (a locked one shows its countdown and is skipped) |
 | Enter | Descend into the chosen dungeon |
+| Tab | The WEAPONS page |
 | Esc | Open the menu, over the hub (below) |
+
+| Between runs: WEAPONS | Action |
+| --- | --- |
+| W/S / arrows | Choose a weapon, or a room: a member's empty hand, the room left in its bag, the stable's end (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
+| Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
+| Tab | The DUNGEONS page |
+| Esc | Open the menu, over the hub |
+
+| Between runs: WEAPONS, carrying a weapon | Action |
+| --- | --- |
+| W/S / arrows | Choose where it goes: a weapon, a room, or the stable's end |
+| Enter | Put it down there: onto a weapon it swaps with it — onto a hand, that is equipping it — and into a room where none lies, the stable closing up behind a weapon taken from it; the campaign is saved at once. On its own place, it is put back. A member's last weapon cannot be put away: `EACH MEMBER KEEPS A WEAPON - [A] WOULD CARRY NONE`, over the keys, and it stays taken up |
+| Tab | Nothing |
+| Esc | Put it back: nothing has moved |
 
 | The menu (Esc, in a dungeon or between runs) | Action |
 | --- | --- |
@@ -121,6 +138,21 @@ hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
 `[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter itself, which
 spends wear and grows a weapon's capacity, arrives in the later Phase 6a steps.
+
+**The stable** (Phase 6a.2): the weapons the party owns and is not carrying,
+kept with the campaign in the order they were put there, as many as you like. The
+WEAPONS page between runs lists every member — `[A]`, its `HAND` and each weapon
+in its `BAG`, with `- ROOM FOR 4 MORE -` while its bag has room — then `THE
+STABLE - 3 WEAPONS` and its `- ROOM -`, each weapon with its wear (`WEAR 12/30`,
+green once `FULL`). Take a weapon up with Enter and put it down elsewhere with
+Enter: into another member's hand (equipping it) or bag, into the stable, or back
+out of it. Taking up moves nothing — Esc puts it back — and only the put-down
+changes the campaign, which is saved at once, into its own slot (PHASE 6a
+DECISION 10 in `docs/roadmap/open-questions.md`); a save that fails says so at
+once under the title. No move leaves a member carrying no weapon, and a hand a
+move empties takes up the first weapon in its bag, as it would before a dungeon
+(PHASE 6a DECISION 7). The log says each move: `[Hub] Moved Staff of Renewal from
+A's bag slot 2 to the stable's end`.
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
@@ -218,8 +250,9 @@ back to it, and the game quits from it.
   Mid-run the game saves when a run is entered, at the start of every one of your
   turns, and every time the party arrives on a floor; it saves at a run's end
   (the summary with it), when NEW CAMPAIGN on the title or `--new-campaign` begins
-  one, and whenever play is left — the menu's `3  QUIT TO TITLE`, or the window's
-  close button. A save is never taken while the enemies are moving: a quit during
+  one, after every change made on the screen between runs — a weapon moved
+  between the bags and the stable (PHASE 6a DECISION 10) — and whenever play is
+  left — the menu's `3  QUIT TO TITLE`, or the window's close button. A save is never taken while the enemies are moving: a quit during
   their turn (the menu can be opened then, and the close button pressed any time)
   plays their turn out to your next one first — at the game's fixed logic step,
   so exactly as it would have played — and saves that. If the enemies wipe the
@@ -283,11 +316,13 @@ back to it, and the game quits from it.
   wear (`"wear"`) and the wear it has ever cashed at the enchanter
   (`"wearCashed"` — its capacity is worked out afresh from that under the
   `tuning.json` loaded now, never stored), and the save names which version's
-  numbers its record of the tuning covers (`"tuningHashVersion"`). A save an
-  earlier build wrote — version 1, Phase 5's, the slots' included — loads as
-  ever: it is lifted to version 2 as it is read, every weapon unworn at 0 of 30,
-  and saved as version 2 from then on. It says `THE NUMBERS HAVE CHANGED` only if
-  a number it was played under moved: the ones Phase 6a began to play
+  numbers its record of the tuning covers (`"tuningHashVersion"`). The campaign
+  holds its stable (`"stable"`, each weapon whole in its order, and `null` while
+  it is empty; Phase 6a.2), each weapon in it read as every weapon in a save is.
+  A save an earlier build wrote — version 1, Phase 5's, the slots' included —
+  loads as ever: it is lifted to version 2 as it is read, every weapon unworn at
+  0 of 30 and nothing in the stable, and saved as version 2 from then on. It says
+  `THE NUMBERS HAVE CHANGED` only if a number it was played under moved: the ones Phase 6a began to play
   (`WearPerHit`, `WearCapacityPerBar`) are none it was played under (PHASE 6a
   DECISION 9). **Do not open a slot this build has saved with an older
   checkout.** A Phase 5 checkout reads version 2 as a newer build's save and
@@ -305,8 +340,8 @@ back to it, and the game quits from it.
   the backup, so a write that fails — a full disk, a locked file, a folder with
   no rights — costs nothing: the save on the disk is the last good one, the log
   says why, and the game says `SLOT 2 COULD NOT BE SAVED` (or `THE OLD AUTOSAVE
-  COULD NOT BE SAVED`) at once, over the floor you are playing, and again on the
-  next screen — the screen between runs, or the title after QUIT TO TITLE —
+  COULD NOT BE SAVED`) at once, over the floor you are playing or under the
+  title between runs, and again on the next screen — the screen between runs, or the title after QUIT TO TITLE —
   once, however many saves failed, and not at all if a later save has gone
   through by then, the quit's own included. It never saves into another slot
   instead. A quit that cannot save leaves `campaign.unsaved` beside the save of
