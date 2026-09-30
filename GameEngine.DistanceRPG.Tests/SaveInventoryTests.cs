@@ -389,7 +389,7 @@ public class SaveInventoryTests
         [typeof(DepositPanel)] =
         [
             new("Weapon", Kept.Derived, "the weapon the panel is about: the campaign's, where the save keeps it — in a bag, the stable or the shop"),
-            new("From", Kept.Derived, "where the weapon lies, as the campaign has it"),
+            new("From", Kept.Derived, "where the weapon lay as the panel opened, as the campaign has it — none on a take-back's ask — and asked again at the ENTER (DepositPanel.RefusalNow)"),
             new("TakingBack", Kept.Derived, "the deposit a take-back asks about: the campaign's shop, saved"),
             new("_services", Kept.Derived, "the services as the enchanter answers them (Enchanter.ServiceRefusal), asked of the campaign as the panel opens"),
             new("_offers", Kept.Derived, "the offer as the enchanter answers it (Enchanter.Offers), asked of the campaign as the panel opens"),
@@ -434,11 +434,11 @@ public class SaveInventoryTests
     public void EverySceneFieldIsViewDerivedOrNamedAsNot()
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
-        // scenes — and of the WEAPONS page the screen between runs holds (Phase 6a.2),
-        // and of its deposit panel (Phase 6a.5) — is in the document's view, derived
-        // from what the save restores, or not
-        // saved for the reason given — so a scene field added later fails here until
-        // someone decides whether a resume needs it.
+        // scenes — and of the WEAPONS page the screen between runs holds (Phase
+        // 6a.2), and of its deposit panel (Phase 6a.5) — is in the document's view,
+        // derived from what the save restores, or not saved for the reason given — so
+        // a scene field added later fails here until someone decides whether a resume
+        // needs it.
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         foreach (var (type, rows) in SceneInventory)
         {

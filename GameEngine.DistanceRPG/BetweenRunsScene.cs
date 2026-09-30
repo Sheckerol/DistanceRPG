@@ -28,10 +28,10 @@ public interface IBetweenRunsHost : ISaveHost
     /// <summary>
     /// Save the campaign once the frame is over: the hub has just changed it — a
     /// weapon moved between the bags and the stable, deposited at the enchanter, or
-    /// taken back out of the shop (PHASE 6a DECISION 10). Asked
-    /// after every change, so a crash between runs loses none of them; asking twice
-    /// in a frame is one save, into the campaign's own slot, and between runs is
-    /// always a safe point. It is only asked for, as the dungeon's autosaves are
+    /// taken back out of the shop (PHASE 6a DECISION 10). Asked after every change,
+    /// so a crash between runs loses none of them; asking twice in a frame is one
+    /// save, into the campaign's own slot, and between runs is always a safe point.
+    /// It is only asked for, as the dungeon's autosaves are
     /// (<see cref="IRunHost.RequestSave"/>), and one that fails is said on the hub
     /// at once (<see cref="BetweenRunsScene.SaveFailed"/>).
     /// </summary>
@@ -85,7 +85,9 @@ public interface IBetweenRunsHost : ISaveHost
 /// out of the panel from its services, and answers no to the ask. TAB, D and T do
 /// nothing while either is up, and nothing changes the campaign but the ENTER that
 /// deposits or takes back — each logged and followed by a save asked for (PHASE 6a
-/// DECISION 10), the choice following the weapon into the shop and back out.
+/// DECISION 10), the choice following the weapon into the shop and back out. That
+/// ENTER asks the campaign again as it stands (<see cref="DepositPanel.RefusalNow"/>),
+/// and refused, closes the panel and says why over the keys, doing nothing.
 /// </para>
 /// <para>
 /// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
@@ -106,8 +108,8 @@ public interface IBetweenRunsHost : ISaveHost
 /// Like every gameplay scene it is single-use: the host registers a fresh one
 /// each time the screen is shown. What it reads is the campaign's, and it writes
 /// to it only between runs, through the campaign's own moves and the enchanter,
-/// and asks for a save after each (PHASE 6a DECISION 10). The dungeon list is read once, when the
-/// screen is made: nothing the hub does moves a lock.
+/// and asks for a save after each (PHASE 6a DECISION 10). The dungeon list is
+/// read once, when the screen is made: nothing the hub does moves a lock.
 /// </para>
 /// <para>
 /// A screen is handed what the game has to say under its title — on the first one
@@ -272,7 +274,7 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>The WEAPONS page: its rows, its choice, its window and a weapon carried.</summary>
     internal HubWeapons Weapons => _weapons;
 
-    /// <summary>What the last key was refused with — a put-down that would leave a member unarmed (<see cref="HubWeapons.KeepsAWeapon"/>), D while the enchanter is shut (<see cref="Enchanter.Closed"/>), a dimmed service's number key — said over the keys until the next key; null for nothing.</summary>
+    /// <summary>What the last key was refused with — a put-down that would leave a member unarmed (<see cref="HubWeapons.KeepsAWeapon"/>), D while the enchanter is shut (<see cref="Enchanter.Closed"/>), a dimmed service's number key, an ENTER on a panel the campaign has changed under (<see cref="DepositPanel.RefusalNow"/>) — said over the keys until the next key; null for nothing.</summary>
     internal string? Refusal => _refusal;
 
     /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>) — until the next key or until the menu closes; null for nothing.</summary>
@@ -553,15 +555,18 @@ public sealed class BetweenRunsScene : Scene
     /// ENTER on the confirm: the weapon deposited (<see cref="Enchanter.Deposit"/>) —
     /// its whole pool cashed, its capacity grown on it, into the shop — the panel
     /// closed, the choice on the weapon's row in the shop, the deposit logged, and a
-    /// save asked for (PHASE 6a DECISION 10).
+    /// save asked for (PHASE 6a DECISION 10). Asked again first
+    /// (<see cref="Refused"/>): refused now, nothing is deposited.
     /// </summary>
     private void MakeDeposit(DepositPanel panel)
     {
-        string from = Where(panel.From);   // named as it stood before the deposit closed the stable up
-        var made = Enchanter.Deposit(_campaign, panel.From, panel.Service, panel.EnchantmentId);
+        if (Refused(panel) || panel.From is not { } from)
+            return;
+        string where = Where(from);   // named as it stood before the deposit closed the stable up
+        var made = Enchanter.Deposit(_campaign, from, panel.Service, panel.EnchantmentId);
         _panel = null;
         _weapons.Follow(made.Entry.Weapon);
-        Log.Info(DepositedLine(made, panel.From, from));
+        Log.Info(DepositedLine(made, from, where));
         _host.RequestSave();
     }
 
@@ -569,17 +574,36 @@ public sealed class BetweenRunsScene : Scene
     /// ENTER on the ask: the weapon taken back (<see cref="Enchanter.TakeBack"/>) to
     /// the stable's end, its service forfeit and its deposit's cash reversed (PHASE
     /// 6a DECISION 8), the ask closed, the choice on the weapon, the take-back
-    /// logged, and a save asked for (PHASE 6a DECISION 10).
+    /// logged, and a save asked for (PHASE 6a DECISION 10). Asked again first
+    /// (<see cref="Refused"/>): refused now, nothing is taken back.
     /// </summary>
     private void TakeBack(DepositPanel ask)
     {
-        var deposit = ask.TakingBack!;
-        var before = deposit.Weapon.WearPool;
-        Enchanter.TakeBack(_campaign, deposit);
+        if (Refused(ask))
+            return;
+        var taken = Enchanter.TakeBack(_campaign, ask.TakingBack!);
         _panel = null;
-        _weapons.Follow(deposit.Weapon);
-        Log.Info(TookBackLine(deposit, before, deposit.Weapon.WearPool));
+        _weapons.Follow(taken.Entry.Weapon);
+        Log.Info(TookBackLine(taken));
         _host.RequestSave();
+    }
+
+    /// <summary>
+    /// The confirm's or the ask's ENTER asked again of the campaign as it stands
+    /// (<see cref="DepositPanel.RefusalNow"/>), since the panel read it as it opened:
+    /// refused, the panel closes, the reason is said over the keys until the next
+    /// key, and nothing is done or saved. Nothing changes the campaign while a panel
+    /// is up yet, so in play this lets every ENTER through.
+    /// </summary>
+    /// <returns>True when the ENTER is refused.</returns>
+    private bool Refused(DepositPanel panel)
+    {
+        if (panel.RefusalNow(_campaign) is not { } refused)
+            return false;
+        _panel = null;
+        _refusal = refused;
+        Log.Info($"[Hub] Refused: {refused}");
+        return true;
     }
 
     /// <summary>
@@ -605,19 +629,20 @@ public sealed class BetweenRunsScene : Scene
     }
 
     /// <summary>
-    /// A take-back, as the log says it (the plan's 1h): <c>[Enchanter] Took back
-    /// Tower Guard (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of
-    /// 1 run worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c>.
+    /// A take-back, as the log says it (the plan's 1h), from what the enchanter
+    /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Tower Guard
+    /// (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run
+    /// worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c> — the
+    /// capacity after as it was before the deposit.
     /// </summary>
-    /// <param name="deposit">The deposit taken back.</param>
-    /// <param name="before">The weapon's capacity before the take-back.</param>
-    /// <param name="after">Its capacity after: as it was before the deposit.</param>
-    internal static string TookBackLine(Deposit deposit, PoolProgress before, PoolProgress after)
+    /// <param name="taken">What the take-back did.</param>
+    internal static string TookBackLine(TakenBack taken)
     {
-        ArgumentNullException.ThrowIfNull(deposit);
+        ArgumentNullException.ThrowIfNull(taken);
+        var deposit = taken.Entry;
         return $"[Enchanter] Took back {deposit.Weapon.Name} ({deposit.Weapon.Id}) to the stable's end: {Bought(deposit)} forfeited,"
             + $" {deposit.RunsWorked} of {RunsSaid(deposit.Runs)} worked lost, {deposit.WearAtDeposit} wear returned"
-            + $" (capacity {before.Max} -> {after.Max}), deposit #{deposit.Ordinal}";
+            + $" (capacity {taken.Before.Max} -> {taken.After.Max}), deposit #{deposit.Ordinal}";
     }
 
     /// <summary>What a deposit bought, as the log names it: <c>Enchant vampiric</c>, <c>Refine</c>.</summary>

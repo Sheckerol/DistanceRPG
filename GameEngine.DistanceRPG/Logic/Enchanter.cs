@@ -108,6 +108,15 @@ public sealed record ImproveRoll(long Draw, long Denominator, long Numerator)
 public sealed record DepositMade(Deposit Entry, PoolProgress Before, PoolProgress After, Weapon? Armed);
 
 /// <summary>
+/// What <see cref="Enchanter.TakeBack"/> did, for the screen that asked it to log
+/// it (Logic never logs), as <see cref="DepositMade"/> is a deposit's: the deposit
+/// taken back, and the weapon's capacity before and after its cash was reversed —
+/// taken here, on either side of the reversal, so no caller can take them in the
+/// wrong order.
+/// </summary>
+public sealed record TakenBack(Deposit Entry, PoolProgress Before, PoolProgress After);
+
+/// <summary>
 /// One enchantment the enchanter offers a weapon (§6.2, "you pick the
 /// enchantment"; <see cref="Enchanter.Offers"/>): an id the campaign has met, why
 /// the enchanter would refuse to attach it to that weapon — or null when it would
@@ -584,13 +593,16 @@ public static class Enchanter
     /// is the runs lost, never a way to grow a capacity with no downtime. The
     /// ordinal is not reused.
     /// </summary>
+    /// <returns>The deposit taken back, and the capacity before and after its cash was reversed, for the screen's log.</returns>
     /// <exception cref="InvalidOperationException">A visit is in progress, or <paramref name="deposit"/> is not in the shop.</exception>
-    public static void TakeBack(CampaignState campaign, Deposit deposit)
+    public static TakenBack TakeBack(CampaignState campaign, Deposit deposit)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         ArgumentNullException.ThrowIfNull(deposit);
         campaign.TakeOut(deposit);   // the hub's door: between runs, and only a deposit in the shop
+        var before = deposit.Weapon.WearPool;
         deposit.Weapon.RefundWear(deposit.WearAtDeposit);
+        return new TakenBack(deposit, before, deposit.Weapon.WearPool);
     }
 
     // ── The clock ─────────────────────────────────────────────────────────────

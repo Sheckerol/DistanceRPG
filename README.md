@@ -43,11 +43,12 @@ back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 [Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
 is passed over. The screen between runs is two pages, Tab going from one to the
 other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
-has ended — until the tutorial's golem is beaten it lists the tutorial alone —
-and WEAPONS, every member's hand and bag, the stable and the enchanter's shop,
-where weapons are moved between them and deposited at the enchanter (below). In play — in a dungeon or between runs — Esc opens the
-menu, where the campaign is saved by hand into its own slot, the one it saves
-into all the time, and play is left for the title.
+has ended — until the tutorial's golem is beaten it lists the tutorial alone — and
+WEAPONS, every member's hand and bag, the stable and the enchanter's shop, where
+weapons are moved between them and deposited at the enchanter (below). In play —
+in a dungeon or between runs — Esc opens the menu, where the campaign is saved by
+hand into its own slot, the one it saves into all the time, and play is left for
+the title.
 
 | Title | Action |
 | --- | --- |
@@ -195,17 +196,18 @@ enchantments, the slots its capacity has opened and its runs in the shop — `WE
 OF 36 - ENCHANTMENTS 1 OF 5 - SLOTS OPEN 2 - 2 RUNS IN THE SHOP` — and offers ENCHANT
 and REFINE, each with the odds its return improves the weapon anyway (below), a
 refused one dimmed with the enchanter's reason, and an unworn weapon's refinement
-noted as coming back as it went; then the confirm, which names the wear it spends. What an Enchant may buy (Phase 6a.3b) is any
-enchantment the campaign has met, less what `restricted.json` never copies (the
-unique souls) and what does nothing yet (`echoing`): one the relations refuse on the
-weapon (`COLD - CANNOT SIT WITH FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF IT`), a
-status onto a wand (`REGENERATION - A WAND CASTS NO STATUS`) or a status a staff
-would cast on the wrong side (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`) is
-refused, and one that never fires on the weapon attaches all the same, noted `NEVER
-FIRES ON A SWORD` — on a staff, anything that rides a strike or a kill, since a staff
-never strikes (PHASE 6a DECISION 12); with nothing left to choose the Enchant says
-`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. ENCHANT
-lists the offer, a refused one dimmed with its reason and never hidden. A run that counts works the two
+noted as coming back as it went; then the confirm, which names the wear it spends.
+What an Enchant may buy (Phase 6a.3b) is any enchantment the campaign has met, less
+what `restricted.json` never copies (the unique souls) and what does nothing yet
+(`echoing`): one the relations refuse on the weapon (`COLD - CANNOT SIT WITH
+FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF IT`), a status onto a wand
+(`REGENERATION - A WAND CASTS NO STATUS`) or a status a staff would cast on the
+wrong side (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`) is refused, and one that
+never fires on the weapon attaches all the same, noted `NEVER FIRES ON A SWORD` — on
+a staff, anything that rides a strike or a kill, since a staff never strikes (PHASE
+6a DECISION 12); with nothing left to choose the Enchant says `NOTHING TO OFFER - NO
+ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. ENCHANT lists the offer, a
+refused one dimmed with its reason and never hidden. A run that counts works the two
 newest a run on, and a service whose last run it works comes back to the end of the
 stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
 3); a run that does not count works nothing. A service coming back may improve the

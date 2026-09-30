@@ -443,7 +443,7 @@ internal sealed class HubWeapons
         if (_carried is not { } carried)
             return null;
         _carried = null;
-        ChooseRowOf(carried.Weapon);
+        ChooseRowOf(PartyRows(_campaign), carried.Weapon);
         return carried.Weapon;
     }
 
@@ -452,35 +452,33 @@ internal sealed class HubWeapons
     {
         ArgumentNullException.ThrowIfNull(moved);
         _carried = null;
-        ChooseRowOf(moved);
+        ChooseRowOf(PartyRows(_campaign), moved);
     }
 
     /// <summary>
     /// A weapon has gone into the shop or come back out of it (Phase 6a.5): the
     /// choice follows it to its row wherever it now is — a deposit's to its shop row,
     /// a take-back's to the stable's end — or, gone from the page, onto the first
-    /// row it can stop on.
+    /// row it can stop on. It reads the whole page, the shop's rows and so the
+    /// content with it; a carry, which ESC puts back, reads the party's and the
+    /// stable's alone (<see cref="PutBack"/>).
     /// </summary>
     public void Follow(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        var rows = Rows();
-        int at = -1;
-        for (int i = 0; i < rows.Count && at < 0; i++)
-            if (rows[i].Choosable && ReferenceEquals(rows[i].Weapon, weapon))
-                at = i;
-        _chosen = at >= 0 ? at : Next(rows, -1, +1, row => row.Choosable);
+        ChooseRowOf(Rows(), weapon);
     }
 
     /// <summary>
-    /// The choice onto <paramref name="weapon"/>'s row, wherever it is now; or, gone
-    /// from the page, onto the first row it can stop on. A weapon carried is in the
-    /// party or the stable, never the shop, and so are those rows, which the page
-    /// opens with (<see cref="PartyRows"/>).
+    /// The choice onto <paramref name="weapon"/>'s row among <paramref name="rows"/>,
+    /// the page's own or the first of them; or, gone from them, onto the first row
+    /// it can stop on. Every row that holds a weapon is one the choice stops on: a
+    /// weapon's, or a deposit's in the shop. A weapon carried is in the party or the
+    /// stable, never the shop, and so are the rows the page opens with
+    /// (<see cref="PartyRows"/>), which read nothing of the content.
     /// </summary>
-    private void ChooseRowOf(Weapon weapon)
+    private void ChooseRowOf(IReadOnlyList<Row> rows, Weapon weapon)
     {
-        var rows = PartyRows(_campaign);
         int at = -1;
         for (int i = 0; i < rows.Count && at < 0; i++)
             if (ReferenceEquals(rows[i].Weapon, weapon))

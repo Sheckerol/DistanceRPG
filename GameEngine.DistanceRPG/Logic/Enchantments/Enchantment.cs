@@ -172,7 +172,19 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// squaring the tier.
     /// </para>
     /// </summary>
-    public int EffectiveLock => Def.Lock * Tier;
+    public int EffectiveLock => LockAt(Def, Tier);
+
+    /// <summary>
+    /// The mana <paramref name="def"/> reserves at <paramref name="tier"/>: the one
+    /// formula behind <see cref="EffectiveLock"/>, for a screen that names the lock
+    /// of an entry not yet attached — the enchanter's offer, at the tier it attaches
+    /// at — so the lock it says is the lock the entry has once on.
+    /// </summary>
+    public static int LockAt(EnchantmentDef def, int tier)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        return def.Lock * tier;
+    }
 
     /// <summary>
     /// What leaving this tier costs (§3.3): <c>xpToNextTier = currentTierCost /

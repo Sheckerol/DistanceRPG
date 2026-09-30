@@ -620,10 +620,9 @@ public sealed class ImprovementRollTests : IDisposable
         // was made (the run's entry; the deposit's line, deposit #n, Phase 6a.5) and
         // held by a save made during the run, a load of which replays it. The save
         // keeps what the roll did, never the roll: a report a load brings back has
-        // none, and the document names no
-        // roll. TestShop's shop, worked home on a run entered on FiveDeep:
-        // B's staff enchanted Vampiric (deposit 1, 35 cashed) and C's Tower Guard
-        // refined (deposit 2, 30 cashed).
+        // none, and the document names no roll. TestShop's shop, worked home on a
+        // run entered on FiveDeep: B's staff enchanted Vampiric (deposit 1, 35
+        // cashed) and C's Tower Guard refined (deposit 2, 30 cashed).
         var campaign = TestShop.Shop();
         var back = TestShop.Counted(campaign);
         var (enchant, refine) = (back.Services![1], back.Services[2]);

@@ -36,7 +36,9 @@ namespace GameEngine.DistanceRPG;
 /// ESC goes back a step at a time (<see cref="Back"/>), and from the services, or
 /// on the ask, closes the panel with nothing done. The panel reads the campaign
 /// once, as it opens: nothing changes it while the panel is up, since only its own
-/// ENTER does.
+/// ENTER does — and that ENTER asks again before it acts (<see cref="RefusalNow"/>),
+/// so a panel left up over a change, should a later hub action make one, says why
+/// and does nothing.
 /// </summary>
 internal sealed class DepositPanel
 {
@@ -92,6 +94,22 @@ internal sealed class DepositPanel
     /// costs its runs, grows nothing and rolls nothing.
     /// </summary>
     internal const string NothingToRepair = "NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT";
+
+    /// <summary>
+    /// A deposit's weapon gone from where the panel found it, as the confirm's ENTER
+    /// finds it (<see cref="RefusalNow"/>): <c>THE TOWER GUARD HAS MOVED - NOTHING
+    /// DEPOSITED</c>. Nothing moves a weapon while a panel is up yet, so it is not
+    /// seen in play.
+    /// </summary>
+    internal static string Moved(Weapon weapon) => $"{HubWeapons.The(weapon)} HAS MOVED - NOTHING DEPOSITED";
+
+    /// <summary>
+    /// A take-back's deposit gone from the shop, as the ask's ENTER finds it
+    /// (<see cref="RefusalNow"/>): <c>THE TOWER GUARD IS NOT IN THE SHOP - NOTHING
+    /// TAKEN BACK</c>. Nothing empties the shop while the ask is up yet, so it is not
+    /// seen in play.
+    /// </summary>
+    internal static string NotInTheShop(Weapon weapon) => $"{HubWeapons.The(weapon)} IS NOT IN THE SHOP - NOTHING TAKEN BACK";
 
     /// <summary>The keys while the services are up: a number picks one, ESC closes the panel.</summary>
     internal const string ServicesKeys = "1 OR 2 CHOOSES - ESC BACK";
@@ -176,7 +194,7 @@ internal sealed class DepositPanel
     {
         ArgumentNullException.ThrowIfNull(offer);
         string head = offer.Refusal
-            ?? $"{BetweenRunsHud.EnchantmentName(offer.Id)} - LOCK {GameContent.Current.Enchantments[offer.Id].Lock * Enchanter.AttachedTier}";
+            ?? $"{BetweenRunsHud.EnchantmentName(offer.Id)} - LOCK {Enchantment.LockAt(GameContent.Current.Enchantments[offer.Id], Enchanter.AttachedTier)}";
         return offer.Note is { } note ? $"{head} - {note}" : head;
     }
 
@@ -221,7 +239,7 @@ internal sealed class DepositPanel
     private int _chosen;
     private int _top;
 
-    private DepositPanel(Weapon weapon, WeaponPlace from, Deposit? deposit, Option[] services, Offer[] offers, Step step)
+    private DepositPanel(Weapon weapon, WeaponPlace? from, Deposit? deposit, Option[] services, Offer[] offers, Step step)
     {
         Weapon = weapon;
         From = from;
@@ -256,14 +274,14 @@ internal sealed class DepositPanel
     public static DepositPanel Asking(Deposit deposit)
     {
         ArgumentNullException.ThrowIfNull(deposit);
-        return new DepositPanel(deposit.Weapon, default, deposit, [], [], Step.Ask);
+        return new DepositPanel(deposit.Weapon, null, deposit, [], [], Step.Ask);
     }
 
     /// <summary>The weapon the panel is about: the one to deposit, or the one in the shop to take back.</summary>
     public Weapon Weapon { get; }
 
-    /// <summary>Where the weapon to deposit lies; nothing, on a take-back's ask.</summary>
-    public WeaponPlace From { get; }
+    /// <summary>Where the weapon to deposit lay as the panel opened; null on a take-back's ask, which deposits nothing.</summary>
+    public WeaponPlace? From { get; }
 
     /// <summary>The deposit a take-back's ask is about, or null for a deposit.</summary>
     public Deposit? TakingBack { get; }
@@ -274,7 +292,7 @@ internal sealed class DepositPanel
     /// <summary>The services, on their number keys.</summary>
     public IReadOnlyList<Option> Services => _services;
 
-    /// <summary>What an ENCHANT chooses from, in the campaign's order, refused ones among them.</summary>
+    /// <summary>What an ENCHANT chooses from, refused ones among them: sorted by id, as <see cref="CampaignState.SeenInOrder"/> hands them out (the same on every machine), not in the order the campaign met them.</summary>
     public IReadOnlyList<Offer> Offers => _offers;
 
     /// <summary>The index of the offer chosen, or -1 when none can be.</summary>
@@ -364,6 +382,44 @@ internal sealed class DepositPanel
             default:
                 return true;
         }
+    }
+
+    /// <summary>
+    /// Why the ENTER that answers the confirm or the ask cannot be done now, or null
+    /// when it can — asked of the campaign as it stands at the ENTER, not as the
+    /// panel read it when it opened: for a deposit, the weapon still where it lay
+    /// (<see cref="Moved"/>) and the enchanter still taking it for the service and
+    /// the enchantment chosen (<see cref="Enchanter.Refusal"/>, the gates
+    /// <see cref="Enchanter.Deposit"/> asks and throws on); for a take-back, the
+    /// deposit still in the shop (<see cref="NotInTheShop"/>). Nothing changes the
+    /// campaign while a panel is up yet, so in play it answers null: it is there so
+    /// a panel left up over a change says why and does nothing, rather than
+    /// throwing through the enchanter's doors.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Neither the confirm nor the ask is up: no ENTER answers the panel yet.</exception>
+    public string? RefusalNow(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        switch (_step)
+        {
+            case Step.Ask:
+                return campaign.AtTheEnchanter.Any(queued => ReferenceEquals(queued, TakingBack)) ? null : NotInTheShop(Weapon);
+            case Step.Confirm:
+                if (From is not { } from || !Lies(campaign, from, Weapon))
+                    return Moved(Weapon);
+                return Enchanter.Refusal(campaign, Weapon, _service, EnchantmentId);
+            default:
+                throw new InvalidOperationException($"The panel is on its {_step}: only the confirm and the ask are answered with an ENTER.");
+        }
+    }
+
+    /// <summary>Whether <paramref name="weapon"/> lies at <paramref name="place"/> now — asked without the throws of <see cref="CampaignState.WeaponAt"/>, since a place the panel read may no longer be one the campaign has.</summary>
+    private static bool Lies(CampaignState campaign, WeaponPlace place, Weapon weapon)
+    {
+        if (place.IsStable)
+            return place.Index >= 0 && place.Index < campaign.Stable.Count && ReferenceEquals(campaign.Stable[place.Index], weapon);
+        var member = campaign.Party.FirstOrDefault(member => member.Id == place.MemberId);
+        return member is not null && place.Index >= 0 && place.Index < member.Inventory.Length && ReferenceEquals(member.Inventory[place.Index], weapon);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Reflection;
+using GameEngine.Core.Diagnostics;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using static GameEngine.DistanceRPG.Tests.TestIl;
@@ -193,6 +194,25 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal(Enchanter.AllFilled(5), filled.Pick(1));
         Assert.Equal(DepositPanel.Step.Services, filled.Current);
 
+        // Nothing to choose (R-none): a Flaming sword, open to a second enchantment,
+        // in a campaign that has met Cold alone — which cannot sit with Flaming, so
+        // every offer is refused — and in one that has met nothing. ENCHANT is dimmed
+        // with the reason, its key says it, and the offer list never opens; refining
+        // is left.
+        var start = CampaignState.Start(GameContent.Current);
+        foreach (string[] seen in new[] { new[] { "cold" }, [] })
+        {
+            var met = CampaignState.Restore(start.Party, seen, 0, [], [], [GameContent.Current.Dungeons.Tutorial.Id], lastResult: null, visit: null, stable: []);
+            var none = DepositPanel.Open(met, TestShop.Give(met, "B", 2, Sword(wear: 36, cashed: 195, "flaming")));
+            Assert.Equal(seen.Length, none.Offers.Count(offer => offer.Refusal is not null));
+            Assert.Equal(none.Offers.Count, none.Offers.Count(offer => offer.Refusal is not null));
+            Assert.Equal("1  ENCHANT - NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT", none.Services[0].Text);
+            Assert.Equal(DungeonHud.DarkGrey, BetweenRunsHud.PanelRows(none, 10)[2].Color);
+            Assert.Equal(Enchanter.NothingToOffer, none.Pick(1));
+            Assert.Equal((DepositPanel.Step.Services, -1), (none.Current, none.Chosen));
+            Assert.False(none.Services[1].Dimmed);
+        }
+
         Assert.Equal(0, host.HubSavesAsked);
         Assert.Empty(campaign.AtTheEnchanter);
     }
@@ -201,13 +221,14 @@ public sealed class DepositPanelTests : IDisposable
     public void TheOfferListsTheSeen_RefusedOnesDimmedWithTheirReason()
     {
         // §6.2: "you pick the enchantment, from everything your campaign has seen" —
-        // the enchanter's offer (Enchanter.Offers), in the campaign's own order of
-        // what it has met (SeenInOrder): what restricted.json never copies and what
-        // does nothing yet are not offered at all; a refused offer is listed, dimmed,
-        // its reason naming it (PHASE 6a DECISION 12); one that never fires on the
-        // weapon is noted, and may be chosen. Each unrefused one says the mana it
-        // locks, at the tier it is attached at. W/S stop only on what can be chosen,
-        // round the ends. The choice starts on the first that can be.
+        // the enchanter's offer (Enchanter.Offers), sorted by id as SeenInOrder hands
+        // them out (the same on every machine), not in the order they were met: what
+        // restricted.json never copies and what does nothing yet are not offered at
+        // all; a refused offer is listed, dimmed, its reason naming it (PHASE 6a
+        // DECISION 12); one that never fires on the weapon is noted, and may be
+        // chosen. Each unrefused one says the mana it locks, at the tier it is
+        // attached at. W/S stop only on what can be chosen, round the ends. The
+        // choice starts on the first that can be.
         var campaign = TestShop.Opened();   // met: the party's Regeneration and Mire, and Vampiric, Flaming, Cold
         campaign.See(TestWeapons.Enchanted("Met", 40, 10, 30, "serrated", "echoing"));
         var sword = Sword(wear: 36, cashed: 195, "flaming");
@@ -257,7 +278,7 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal("DEPOSIT THE ARMING SWORD TO REFINE - 2 RUNS - ITS 36 WEAR IS SPENT", DepositPanel.DepositAsk(sword, Service.Refine, null));
 
         // Deposited as asked: the offer chosen is what the shop holds.
-        var made = Enchanter.Deposit(campaign, panel.From, panel.Service, panel.EnchantmentId);
+        var made = Enchanter.Deposit(campaign, panel.From!.Value, panel.Service, panel.EnchantmentId);
         Assert.Equal((Service.Enchant, "flaming", 36), (made.Entry.Service, made.Entry.EnchantmentId, made.Entry.WearAtDeposit));
     }
 
@@ -432,6 +453,67 @@ public sealed class DepositPanelTests : IDisposable
     }
 
     [Fact]
+    public void AnEnterOnAPanelTheCampaignChangedUnder_SaysWhyAndDoesNothing()
+    {
+        // The panel reads the campaign as it opens, and the ENTER that answers it
+        // asks again before it acts (DepositPanel.RefusalNow; 6a.5's review).
+        // Nothing changes the campaign while a panel is up yet, but should a later
+        // hub action, a confirm or an ask left up over the change says why over the
+        // keys and closes — nothing deposited, nothing taken back, no save asked for,
+        // and nothing thrown through the enchanter's doors, which refuse by throwing.
+        var campaign = TestShop.Opened();
+        var guard = TestShop.Worn("tower_guard", wear: 30);
+        TestShop.Give(campaign, "B", 2, guard);
+        var (scene, host) = Weapons(campaign);
+
+        // The weapon gone from where the panel found it.
+        ChooseRow(scene, "  BAG   TOWER GUARD - WEAR 30/30 FULL");
+        foreach (var key in new[] { Keys.D, Keys.D1, Keys.Enter })
+            scene.OnKey(key);
+        Assert.Equal(DepositPanel.Step.Confirm, scene.Panel!.Current);
+        campaign.Move(new WeaponPlace("B", 2), WeaponPlace.InTheStable(0));
+        scene.OnKey(Keys.Enter);
+        Assert.Equal("THE TOWER GUARD HAS MOVED - NOTHING DEPOSITED", scene.Refusal);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
+        Assert.Empty(campaign.AtTheEnchanter);
+        Assert.Equal((30, 30), (guard.Wear, guard.WearCapacity));
+
+        // Where it lay still, but a gate shut since: B's bag emptied into the stable,
+        // the Tower Guard in B's hand is B's last weapon, and the enchanter's own
+        // reason is said.
+        ChooseRow(scene, "  HAND  TOWER GUARD - WEAR 0/30");
+        foreach (var key in new[] { Keys.D, Keys.D2 })
+            scene.OnKey(key);
+        Assert.Equal(DepositPanel.Step.Confirm, scene.Panel!.Current);
+        campaign.Move(new WeaponPlace("B", 1), WeaponPlace.InTheStable(campaign.Stable.Count));
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(Enchanter.WouldCarryNone("B"), scene.Refusal);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
+        Assert.Empty(campaign.AtTheEnchanter);
+
+        // The deposit an ask is about gone from the shop.
+        var deposit = Enchanter.Deposit(campaign, WeaponPlace.InTheStable(0), Service.Refine).Entry;
+        ChooseRow(scene, "  WORKING  TOWER GUARD - 0 OF 1 RUN");
+        scene.OnKey(Keys.T);
+        Assert.Equal(BetweenRunsScene.HubMode.Ask, scene.Mode);
+        Enchanter.TakeBack(campaign, deposit);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal("THE TOWER GUARD IS NOT IN THE SHOP - NOTHING TAKEN BACK", scene.Refusal);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
+        Assert.Empty(campaign.AtTheEnchanter);
+        Assert.Single(campaign.Stable, weapon => ReferenceEquals(weapon, guard));
+        Assert.Equal((30, 30), (guard.Wear, guard.WearCapacity));
+        Assert.Equal(0, host.HubSavesAsked);
+
+        // Asked of the campaign as it stands, a panel nothing changed under lets its
+        // ENTER through; and it is asked only where an ENTER answers the panel.
+        var open = DepositPanel.Open(campaign, WeaponPlace.InTheStable(0));
+        Assert.Throws<InvalidOperationException>(() => open.RefusalNow(campaign));
+        open.Pick(2);
+        Assert.Null(open.RefusalNow(campaign));
+    }
+
+    [Fact]
     public void ADepositAndATakeBackEachAskForASave()
     {
         // PHASE 6a DECISION 10: every change the hub makes to the campaign asks the
@@ -468,7 +550,8 @@ public sealed class DepositPanelTests : IDisposable
         // hands back — a deposit with the wear it cashed, the capacity before and
         // after, its runs and its ordinal (so a finished service's improvement roll,
         // logged at the run's end, can be keyed again), and a hand it emptied; a
-        // take-back with what it forfeited and what came back. Written by the two
+        // take-back with what it forfeited and what came back, the capacity on either
+        // side of it as the enchanter hands them back (TakenBack). Written by the two
         // hub doors that make them, read off the IL.
         var campaign = TestShop.Opened();
         var guard = TestShop.Worn("tower_guard", wear: 30);
@@ -476,10 +559,10 @@ public sealed class DepositPanelTests : IDisposable
         var made = Enchanter.Deposit(campaign, hand, Service.Enchant, "vampiric");
         Assert.Equal("[Enchanter] Deposited Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed (capacity 30 -> 31), 1 run, deposit #0;"
             + " B's hand, emptied, took up Staff of Renewal from the bag", BetweenRunsScene.DepositedLine(made, hand, "B's hand"));
-        var before = guard.WearPool;
-        Enchanter.TakeBack(campaign, made.Entry);
+        var taken = Enchanter.TakeBack(campaign, made.Entry);
+        Assert.Equal((made.Entry, 31, 30), (taken.Entry, taken.Before.Max, taken.After.Max));
         Assert.Equal("[Enchanter] Took back Tower Guard (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked lost, 30 wear returned (capacity 31 -> 30), deposit #0",
-            BetweenRunsScene.TookBackLine(made.Entry, before, guard.WearPool));
+            BetweenRunsScene.TookBackLine(taken));
 
         // A refinement from the stable, worked a run of two before it is taken back.
         var staff = TestShop.Worn("staff_of_renewal", wear: 35, cashed: 160);
@@ -490,16 +573,33 @@ public sealed class DepositPanelTests : IDisposable
         TestShop.Counted(campaign);
         var worked = Assert.Single(campaign.AtTheEnchanter);
         Assert.Equal(1, worked.RunsWorked);
-        var grown = staff.WearPool;
-        Enchanter.TakeBack(campaign, worked);
         Assert.Equal("[Enchanter] Took back Staff of Renewal (staff_of_renewal) to the stable's end: Refine forfeited, 1 of 2 runs worked lost, 35 wear returned (capacity 36 -> 35), deposit #1",
-            BetweenRunsScene.TookBackLine(worked, grown, staff.WearPool));
+            BetweenRunsScene.TookBackLine(Enchanter.TakeBack(campaign, worked)));
 
         const BindingFlags Declared = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         static bool Calls(string method, string target)
             => CallsIn(typeof(BetweenRunsScene).GetMethod(method, Declared)!).Any(called => called.Name == target && called.DeclaringType == typeof(BetweenRunsScene));
         Assert.True(Calls("MakeDeposit", nameof(BetweenRunsScene.DepositedLine)));
         Assert.True(Calls("TakeBack", nameof(BetweenRunsScene.TookBackLine)));
+
+        // Walked through the screen, the lines are what it logs: a deposit from the
+        // stable's middle names the place as it stood before the deposit closed the
+        // stable up — 2 of 3, never 2 of 2 — and its take-back the capacity on either
+        // side, 31 to 30.
+        var walked = TestShop.Opened();
+        walked.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
+        walked.Move(TestShop.Give(walked, "C", 2, TestShop.Worn("tower_guard", wear: 30)), WeaponPlace.InTheStable(1));
+        walked.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(2));
+        var (scene, _) = Weapons(walked);
+        ChooseRow(scene, "  TOWER GUARD - WEAR 30/30 FULL");
+        foreach (var key in new[] { Keys.D, Keys.D2, Keys.Enter })
+            scene.OnKey(key);
+        Assert.Contains("[Enchanter] Deposited Tower Guard (tower_guard) from the stable (2 of 3): Refine, 30 wear cashed (capacity 30 -> 31), 1 run, deposit #0", Logged());
+        foreach (var key in new[] { Keys.T, Keys.Enter })
+            scene.OnKey(key);
+        Assert.Contains("[Enchanter] Took back Tower Guard (tower_guard) to the stable's end: Refine forfeited, 0 of 1 run worked lost, 30 wear returned (capacity 31 -> 30), deposit #0", Logged());
+
+        static IEnumerable<string> Logged() => Log.RecentEntries.Select(entry => entry.Message);
     }
 
     [Fact]
@@ -574,6 +674,8 @@ public sealed class DepositPanelTests : IDisposable
         Line(HubWeapons.Name(nine), BetweenRunsHud.PanelHeadingScale);
         foreach (string keys in new[] { DepositPanel.ServicesKeys, DepositPanel.OfferKeys, DepositPanel.ConfirmKeys, DepositPanel.AskKeys, BetweenRunsHud.WeaponsKeysLine })
             Line(keys, BetweenRunsHud.KeysLineScale);
+        foreach (string refused in new[] { DepositPanel.Moved(nine), DepositPanel.NotInTheShop(nine) })   // the refusal row's, over the keys
+            Line(refused, BetweenRunsHud.KeysLineScale);
 
         foreach (var (text, scale) in lines)
         {
