@@ -312,7 +312,8 @@ internal static class SaveMapper
         result.SpoilsLost.Select(Weapon).ToArray(),
         result.Clawbacks.Select(c => new ClawbackDto(c.MemberId, c.Pool, c.Before, c.After)).ToArray(),
         result.Services is { Count: > 0 } services   // null for an empty shop, as the queue is
-            ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId)).ToArray()
+            ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId,
+                r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null)).ToArray()   // the roll as drawn is the log's
             : null);
 
     /// <summary>An enum-keyed count table by member name, in the enum's order — the order its entries come in.</summary>
@@ -410,8 +411,11 @@ internal static class SaveMapper
     /// kind that does something, as its deposit's is (<see cref="BoughtEnchantmentId"/>),
     /// a service by name, the runs it takes one to
     /// <see cref="ContentBounds.MostServiceRuns"/>, and the runs worked 0 to those:
-    /// play writes a stalled report at 0, a deposit the run left unworked. Which of
-    /// those a report may be is check 27's.
+    /// play writes a stalled report at 0, a deposit the run left unworked. What a
+    /// finished one's improvement roll did (Phase 6a.4) is an outcome by name and a
+    /// modifier by name, one some weapon can stack (<see cref="ImprovedModifier"/>).
+    /// Which of those a report may be, and that the two come together, are check
+    /// 27's.
     /// </summary>
     private static ServiceReport[] Services(IReadOnlyList<ServiceDto> dtos, GameContent content, string at)
     {
@@ -428,9 +432,29 @@ internal static class SaveMapper
             int runsWorked = AtMost(NotNegative(row.RunsWorked, $"{where}.runsWorked"), runs, $"{where}.runsWorked",
                 "a service works no more runs than it takes (runs)");
             string? enchantment = row.Enchantment is { } id ? BoughtEnchantmentId(id, content, $"{where}.enchantment") : null;
-            reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment);
+            ImprovementKind? kind = row.Improved is { } how ? EnumOf<ImprovementKind>(how, $"{where}.improved", "improvement") : null;
+            ModifierType? modifier = row.Modifier is { } which ? ImprovedModifier(which, $"{where}.modifier") : null;
+            var improved = kind is { } k && modifier is { } m ? new Improvement(k, m) : null;   // one without the other is check 27's
+            reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment, improved);
         }
         return reports;
+    }
+
+    /// <summary>
+    /// The modifier a run's report says a service's improvement roll gave a stack
+    /// of (Phase 6a.4): a modifier by name, and not one no weapon ever stacks
+    /// (<see cref="ModifierRules.NeverStacked"/>) — which members have behaviour to
+    /// stack is the code's, which no file beside the game edits, so no roll play made
+    /// could land on one. What the relations say of it now is not asked: a report
+    /// outlives its weapon's shape, and <c>restricted.json</c> beside the game may
+    /// have moved since.
+    /// </summary>
+    private static ModifierType ImprovedModifier(string name, string at)
+    {
+        var modifier = EnumOf<ModifierType>(name, at, "modifier");
+        if (ModifierRules.NeverStacked.Contains(modifier))
+            throw new SaveFormatException(at, $"{name} is a modifier no weapon stacks, so no improvement lands on it");
+        return modifier;
     }
 
     /// <summary>The runs a service takes: one at least, and no more than a weapon holding the most enchantments takes (<see cref="ContentBounds.MostServiceRuns"/>).</summary>

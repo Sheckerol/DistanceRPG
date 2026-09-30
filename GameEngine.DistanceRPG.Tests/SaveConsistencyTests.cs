@@ -1171,6 +1171,59 @@ public sealed class SaveConsistencyTests : IDisposable
     }
 
     [Fact]
+    public void AnImprovementComesWithAFinishedServiceOnly()
+    {
+        // Phase 6a.4: a run's report of a service it brought back says what the
+        // improvement roll did — an outcome by name and the modifier it gave a stack
+        // of, together (check 27) — and only a finished service's does, since the
+        // roll is made as a service comes back. The modifier is one some weapon can
+        // stack: which members have behaviour is the code's, so no roll lands on
+        // Momentum or OnHitPoison. What play writes loads: TestShop's shop worked
+        // home at odds that land every time, both finished reports improved.
+        string back, shop;
+        using (TestContent.UsePremise(tuning: TestShop.Landing))
+        {
+            var campaign = TestShop.Shop();
+            shop = Save(campaign);
+            TestShop.Counted(campaign);
+            back = Save(campaign);
+            Loads(campaign, "a shop worked home, each service improving its weapon");
+        }
+        var report = ReportNode(JsonNode.Parse(back)!.AsObject(), 2);
+        Assert.Equal(("Refine", 1, 1), (report["service"]!.GetValue<string>(), report["runsWorked"]!.GetValue<int>(), report["runs"]!.GetValue<int>()));
+        string improved = report["improved"]!.GetValue<string>(), modifier = report["modifier"]!.GetValue<string>();
+
+        string Reporting(int index, Action<JsonObject> edit, string text) => Edited(text, tree => edit(ReportNode(tree, index)));
+        const string Together = "an improvement is an outcome and the modifier it gave a stack of, together";
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            RefusedAt(Reporting(2, row => row["modifier"] = null, back), "campaign.lastResult.services[2].modifier",
+                $"missing beside the outcome {improved}: {Together}");
+            RefusedAt(Reporting(2, row => row["improved"] = null, back), "campaign.lastResult.services[2].improved",
+                $"missing beside the modifier {modifier}: {Together}");
+
+            // A stalled report, and one worked short of its last run, never carry one.
+            const string AsItComesBack = "the improvement roll is made as a service comes back, its last run worked";
+            RefusedAt(Reporting(0, row => { row["improved"] = "Deepen"; row["modifier"] = "Resonant"; }, back), "campaign.lastResult.services[0].improved",
+                $"Deepen on a service stalled: {AsItComesBack}");
+            RefusedAt(Reporting(1, row => { row["improved"] = "Graft"; row["modifier"] = "Block"; }, shop), "campaign.lastResult.services[1].improved",
+                $"Graft on a service at 1 of 2 runs: {AsItComesBack}");
+
+            // Each is read on its own first: a name its enum has, and a modifier some
+            // weapon stacks.
+            Assert.Equal("campaign.lastResult.services[2].improved", Refused(Reporting(2, row => row["improved"] = "Sideways", back)).Where);
+            Assert.Equal("campaign.lastResult.services[2].modifier", Refused(Reporting(2, row => row["modifier"] = "Blok", back)).Where);
+            RefusedAt(Reporting(2, row => row["modifier"] = "Momentum", back), "campaign.lastResult.services[2].modifier",
+                "Momentum is a modifier no weapon stacks, so no improvement lands on it");
+
+            // A report from before the roll — a Phase 6a.3a save's, naming neither —
+            // loads, and says the weapon came back as it went.
+            var before = Restores(Reporting(2, row => { row.Remove("improved"); row.Remove("modifier"); }, back), "a finished report naming no improvement");
+            Assert.Null(before.Campaign.LastResult!.Services![2].Improved);
+        }
+    }
+
+    [Fact]
     public void AnEnemyOrADropCarryingWearIsRefused()
     {
         // Check 20 (Phase 6a.1): no enemy's weapon ever wears — its wear feed does

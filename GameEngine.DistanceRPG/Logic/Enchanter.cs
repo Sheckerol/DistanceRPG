@@ -60,6 +60,42 @@ public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wea
 }
 
 /// <summary>
+/// What a service's improvement roll did when it landed (§6.4's two outcomes, "nothing"
+/// being the roll that did not land): deepened a modifier the weapon carried by a
+/// stack, or grafted a first stack of one it never carried.
+/// </summary>
+public enum ImprovementKind
+{
+    /// <summary>+1 stack on a modifier the weapon already carries — the common outcome, biased toward the class signature.</summary>
+    Deepen,
+
+    /// <summary>+1 stack of a modifier the weapon has never carried — the rare one, and the surprise: acquired, so it caps at the acquired headroom.</summary>
+    Graft,
+}
+
+/// <summary>What a landed improvement roll did to the weapon (§6.4): the outcome, and the modifier it gave a stack of.</summary>
+/// <param name="Kind">Deepened, or grafted.</param>
+/// <param name="Modifier">The modifier that gained the stack.</param>
+public sealed record Improvement(ImprovementKind Kind, ModifierType Modifier);
+
+/// <summary>
+/// A service's improvement roll as it was drawn, for the log alone (Logic never
+/// logs): the first draw off the roll's stream, 0 to <see cref="Denominator"/> − 1,
+/// against the odds' numerator — it landed exactly when the draw is below it
+/// (<see cref="Wear.ImproveOdds"/>). With the run's map seed the log already names
+/// and the deposit's ordinal, it makes any roll reproducible from the log. Never
+/// saved: a report a load brings back has none.
+/// </summary>
+/// <param name="Draw">The draw, 0 to <paramref name="Denominator"/> − 1.</param>
+/// <param name="Denominator">The odds' denominator: 100 × StartingPool.</param>
+/// <param name="Numerator">The odds' numerator: the roll lands when the draw is below it.</param>
+public sealed record ImproveRoll(long Draw, long Denominator, long Numerator)
+{
+    /// <summary>Whether the roll landed: the draw below the numerator.</summary>
+    public bool Landed => Draw < Numerator;
+}
+
+/// <summary>
 /// What <see cref="Enchanter.Deposit"/> did, for the screen that asked it to log
 /// it (Logic never logs): the entry now in the shop, the weapon's capacity before
 /// and after the deposit's cash, and the weapon a hand the deposit emptied took up
@@ -101,9 +137,16 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// tick: every run's end asks it, the visit already gone. A run that counts works
 /// the newest <see cref="Tuning.EnchanterWorksOn"/> deposits a run on — every
 /// other deposit stalls — and a service whose last run is worked finishes: an
-/// Enchant attaches its enchantment last, at tier 1 with no XP, and the weapon
-/// goes to the end of the stable (PHASE 6a DECISION 7). A run that does not count
-/// works nothing.</item>
+/// Enchant attaches its enchantment last, at tier 1 with no XP, the improvement
+/// roll is made (<see cref="Improve"/>, Phase 6a.4), and the weapon goes to the
+/// end of the stable (PHASE 6a DECISION 7). A run that does not count works
+/// nothing.</item>
+/// <item><strong>The improvement roll</strong> (<see cref="Improve"/>) is §6.4's
+/// gamble: on its own stream, keyed by the finishing run's map seed and the
+/// deposit's ordinal, it lands on the service's odds (<see cref="Wear.ImproveOdds"/>)
+/// — never when the deposit cashed no wear — and a landed roll deepens a modifier
+/// the weapon carries or, more rarely, grafts one it never carried (PHASE 6a
+/// DECISION 5).</item>
 /// <item><strong>A take-back</strong> (<see cref="TakeBack"/>), between runs,
 /// returns a queued weapon to the stable with its service forfeit, and reverses
 /// the deposit's cash exactly — the wear back in the pool, the capacity as before
@@ -491,7 +534,7 @@ public static class Enchanter
     /// empties armed from the bag, as a move's is.</item>
     /// </list>
     /// Nothing is attached and nothing is rolled here: a service does that as it
-    /// finishes (PHASE 6a DECISION 3).
+    /// finishes (PHASE 6a DECISION 3; <see cref="Tick"/>, <see cref="Improve"/>).
     /// </summary>
     /// <returns>The deposit made, and the capacity before and after its cash, for the screen's log.</returns>
     /// <exception cref="InvalidOperationException">A visit is in progress, nothing lies at <paramref name="from"/>, or the enchanter refuses the deposit — the reason in the message.</exception>
@@ -561,19 +604,22 @@ public static class Enchanter
     /// <see cref="Worked"/> names a run on, in deposit order, and finishes each
     /// whose last run that was: an Enchant attaches its enchantment last, at
     /// <see cref="AttachedTier"/> with no XP — the deposit asked the offer and the
-    /// ceiling, and the weapon has been in the shop since — a refinement nothing,
-    /// and the weapon goes to the end of the stable
+    /// ceiling, and the weapon has been in the shop since — a refinement nothing;
+    /// then the improvement roll is made on the weapon as it now stands
+    /// (<see cref="Improve"/>, on <paramref name="mapSeed"/> and the deposit's
+    /// ordinal), and the weapon goes to the end of the stable
     /// (<see cref="CampaignState.Return"/>). Every other deposit is reported
     /// stalled.</item>
-    /// <item><strong>A run that did not count</strong> moves nothing, and reports
-    /// every deposit stalled with its runs as they were — a fresh one's at 0 — so
-    /// the summary can say the enchanter worked nothing.</item>
+    /// <item><strong>A run that did not count</strong> moves nothing and rolls
+    /// nothing, and reports every deposit stalled with its runs as they were — a
+    /// fresh one's at 0 — so the summary can say the enchanter worked nothing.</item>
     /// </list>
     /// </summary>
     /// <param name="campaign">The campaign whose run has just ended.</param>
+    /// <param name="mapSeed">The map seed the run was entered on, which its save holds: what a finishing service's improvement roll is keyed by, with the deposit's ordinal, so a reload that replays the run's end replays the roll (R1).</param>
     /// <param name="counted">Whether the run counted (<see cref="RunResult.ServiceTick"/>).</param>
     /// <returns>A report for every deposit in the shop as the run ended, in deposit order; empty for an empty shop.</returns>
-    internal static IReadOnlyList<ServiceReport> Tick(CampaignState campaign, bool counted)
+    internal static IReadOnlyList<ServiceReport> Tick(CampaignState campaign, long mapSeed, bool counted)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         var queue = campaign.AtTheEnchanter.ToArray();   // a copy: a finished service leaves the shop as the tick goes
@@ -596,6 +642,8 @@ public static class Enchanter
             if (entry.RunsWorked >= entry.Runs)
             {
                 Complete(entry);
+                var (improved, roll) = Improve(entry.Weapon, entry.Service, entry.WearAtDeposit, mapSeed, entry.Ordinal);
+                reports[i] = reports[i] with { Improved = improved, Roll = roll };
                 campaign.Return(entry);
             }
         }
@@ -625,5 +673,158 @@ public static class Enchanter
             default:
                 throw new ArgumentOutOfRangeException(nameof(entry), entry.Service, "Not a Service.");
         }
+    }
+
+    // ── The improvement roll ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// The improvement roll's splitter (§6.4; ROADMAP: new randomness gets "its own
+    /// stream derived from the map seed … never a continuation"): odd, 32-bit —
+    /// murmur3's first mixing constant — and distinct from every other salt and mix
+    /// in <c>Logic/</c>. A compiled constant like every salt: it decides what a seed
+    /// rolls, so it is parity's and never a tuning key.
+    /// </summary>
+    public const long ServiceSalt = 0xCC9E2D51;
+
+    /// <summary>
+    /// The per-deposit term of <see cref="ImproveStream"/>, multiplied by the
+    /// deposit's ordinal: odd — murmur3's second mixing constant — so no two of the
+    /// first 2³² deposits share a composed seed, and each deposit's roll is its own
+    /// seeded stream rather than a position in a running one.
+    /// </summary>
+    internal const long ServiceMix = 0x1B873593;
+
+    /// <summary>
+    /// The stream the deposit <paramref name="ordinal"/> finishing on a run entered
+    /// on <paramref name="mapSeed"/> rolls its improvement on:
+    /// <c>SplitMix32(mapSeed ^ ServiceSalt ^ ordinal × ServiceMix)</c>, finalized as
+    /// every counter-keyed stream here is (<see cref="FarmLadder.SplitMix32"/>),
+    /// since the roll's first draw — whether it lands — is the load-bearing one.
+    /// Both keys are saved — the run's seed with its visit, the ordinal with its
+    /// deposit — so a reload that replays the same run's end replays the same roll,
+    /// and a bad roll is never reloaded away (R1).
+    /// </summary>
+    /// <param name="mapSeed">The seed the finishing run was entered on.</param>
+    /// <param name="ordinal">The deposit's ordinal: the campaign's count of deposits as it went in.</param>
+    internal static Mulberry32 ImproveStream(long mapSeed, int ordinal)
+        => new(FarmLadder.SplitMix32(mapSeed ^ ServiceSalt ^ (ordinal * ServiceMix)));
+
+    /// <summary>Percentages are integers out of this.</summary>
+    private const int Percent = 100;
+
+    /// <summary>
+    /// A finished service's improvement roll (§6.4), made on
+    /// <paramref name="weapon"/> as it now stands — its enchantment attached, for an
+    /// Enchant — and drawn in this order off <see cref="ImproveStream"/>:
+    /// <list type="number">
+    /// <item><strong>Whether it lands</strong>: <c>NextInt(0, denominator − 1) &lt;
+    /// numerator</c>, on the service's odds (<see cref="Wear.ImproveOdds"/>) — the
+    /// one draw refinement moves, since it "improves whether the roll lands, not
+    /// what it lands on" (S:782–784). A deposit that cashed no wear draws nothing
+    /// and rolls nothing: "no wear, no roll" (P6:501–503), which only a refinement
+    /// of an unworn weapon meets, since an enchantment's price is a wear at
+    /// least.</item>
+    /// <item><strong>Which outcome</strong>: a graft when <c>NextInt(0, 99) &lt;
+    /// </c><see cref="Tuning.GraftSharePercent"/>, a deepen otherwise — "deepen stays
+    /// the common result and a graft stays the surprise" (P6:547–551).</item>
+    /// <item><strong>Which modifier</strong>, one draw over that outcome's
+    /// candidates (<see cref="DeepenCandidates"/>, weighted toward the class
+    /// signature; <see cref="GraftCandidates"/>, alike), and a stack of it acquired
+    /// (<see cref="Weapon.Acquire"/>, held to forged plus the acquired headroom — a
+    /// graft, forged at 0, caps at the headroom). An outcome with no candidate falls
+    /// through to the other, and with neither the landed roll changes nothing:
+    /// "a weapon with every modifier capped rolls nothing at all" (P6:588–593).
+    /// The split, the weight and the fall-through are PHASE 6a DECISION 5.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="weapon">The weapon coming back.</param>
+    /// <param name="service">What its deposit bought.</param>
+    /// <param name="wearAtDeposit">The wear its deposit cashed.</param>
+    /// <param name="mapSeed">The seed the finishing run was entered on.</param>
+    /// <param name="ordinal">The deposit's ordinal.</param>
+    /// <returns>What the roll did, or null when it did not land or found nothing to improve; and the roll as drawn, for the log, or null when nothing was rolled.</returns>
+    internal static (Improvement? Improved, ImproveRoll? Roll) Improve(Weapon weapon, Service service, int wearAtDeposit, long mapSeed, int ordinal)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        ArgumentOutOfRangeException.ThrowIfNegative(wearAtDeposit);
+        if (wearAtDeposit == 0)
+            return (null, null);   // no wear, no roll: nothing to repair
+
+        var stream = ImproveStream(mapSeed, ordinal);
+        var (numerator, denominator) = Wear.ImproveOdds(service, wearAtDeposit);
+        var roll = new ImproveRoll(stream.NextInt(0, checked((int)denominator) - 1), denominator, numerator);
+        if (!roll.Landed)
+            return (null, roll);
+
+        bool graft = stream.NextInt(0, Percent - 1) < GameContent.Current.Tuning.GraftSharePercent;
+        var deepens = DeepenCandidates(weapon);
+        var grafts = GraftCandidates(weapon);
+        bool None() => graft ? grafts.Count == 0 : deepens.Count == 0;
+        if (None())
+            graft = !graft;   // nothing that outcome may take: the other's
+        if (None())
+            return (null, roll);   // nothing to deepen and nothing to graft
+
+        var modifier = graft
+            ? grafts[stream.NextInt(0, grafts.Count - 1)]
+            : Weighted(deepens, stream.NextInt(0, deepens.Sum(candidate => candidate.Weight) - 1));
+        weapon.Acquire(modifier, 1);
+        return (new Improvement(graft ? ImprovementKind.Graft : ImprovementKind.Deepen, modifier), roll);
+    }
+
+    /// <summary>The candidate <paramref name="pick"/> lands on, walking <paramref name="candidates"/> in their order, each as wide as its weight.</summary>
+    private static ModifierType Weighted(IReadOnlyList<(ModifierType Modifier, int Weight)> candidates, int pick)
+    {
+        foreach (var (modifier, weight) in candidates)
+        {
+            if (pick < weight)
+                return modifier;
+            pick -= weight;
+        }
+        throw new ArgumentOutOfRangeException(nameof(pick), pick, "The pick is past the candidates' whole weight.");
+    }
+
+    /// <summary>
+    /// What a deepen may land on (§6.4): every modifier <paramref name="weapon"/>
+    /// carries, forged or acquired, still below its ceiling — forged plus the
+    /// acquired headroom (<see cref="ModifierRules.Cap"/>), the one budget farming
+    /// spends too — and one the relations still allow beside what it carries
+    /// (<see cref="ModifierRules.Allowed"/>), in <see cref="ModifierType"/> order.
+    /// Each weighs 1, and the class's signature
+    /// (<see cref="WeaponClassDef.Signature"/>; a caster has none)
+    /// <see cref="Tuning.DeepenSignatureWeight"/>: "biased toward the class
+    /// signature".
+    /// </summary>
+    internal static IReadOnlyList<(ModifierType Modifier, int Weight)> DeepenCandidates(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var content = GameContent.Current;
+        var rules = content.Modifiers;
+        var signature = content.Weapons.Class(weapon.Class).Signature;
+        var candidates = new List<(ModifierType, int)>();
+        foreach (var (modifier, stacks) in weapon.Modifiers.Entries)
+            if (stacks < rules.Cap(modifier, weapon.Forged.Stacks(modifier)) && rules.Allowed(modifier, weapon.Kind, weapon.Modifiers))
+                candidates.Add((modifier, modifier == signature ? content.Tuning.DeepenSignatureWeight : 1));
+        return candidates;
+    }
+
+    /// <summary>
+    /// What a graft may land on (§6.4): every modifier <paramref name="weapon"/> has
+    /// never carried that the relations let it take as an acquired first stack
+    /// (<see cref="ModifierRules.CanGraft"/>, asked as the enchanter's graft: the
+    /// kind, the exclusions, the prerequisites — so a Block grafted first makes a
+    /// Riposte possible later — and never a forged-only one, so <c>Charges</c>, the
+    /// one negative graft, is never grafted), less those no weapon stacks
+    /// (<see cref="ModifierRules.NeverStacked"/>), in <see cref="ModifierType"/>
+    /// order, each alike.
+    /// </summary>
+    internal static IReadOnlyList<ModifierType> GraftCandidates(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var rules = GameContent.Current.Modifiers;
+        return Enum.GetValues<ModifierType>()
+            .Where(modifier => weapon.Stacks(modifier) == 0 && !ModifierRules.NeverStacked.Contains(modifier)
+                && rules.CanGraft(modifier, weapon.Kind, weapon.Modifiers, weapon.Forged, asForged: false))
+            .ToArray();
     }
 }

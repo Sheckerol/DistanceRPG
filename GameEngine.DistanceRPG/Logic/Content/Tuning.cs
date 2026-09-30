@@ -394,12 +394,13 @@ public sealed record Tuning
     // ---- Enchanter (Phase 6a; the user's ruling of 2026-09-25) ----
     // What a hit wears (§6.1), what a deposit costs (§6.1, §6.2) — how a weapon's
     // wear capacity grows, where its enchantment slots open, and how much wear
-    // attaching each enchantment needs — and how many deposits the enchanter works
-    // on at once (§6.2). The user ruled the deposit's numbers and keeps each in
-    // tuning.json, so they were declared ahead of their reader; Phase 6a plays each
-    // as a rule of it reads it (TuningKey.Played), and a save's hash covers each
-    // from version 2 (TuningKey.HashedFrom). A weapon's capacity opens on
-    // StartingPool, the one bar every pool opens on, which stays one key.
+    // attaching each enchantment needs — how many deposits the enchanter works on at
+    // once (§6.2), and the improvement roll a finished service makes (§6.4, Phase
+    // 6a.4). The user ruled the deposit's numbers and keeps each in tuning.json, so
+    // they were declared ahead of their reader; Phase 6a plays each as a rule of it
+    // reads it (TuningKey.Played), and a save's hash covers each from version 2
+    // (TuningKey.HashedFrom). A weapon's capacity opens on StartingPool, the one bar
+    // every pool opens on, which stays one key.
 
     /// <summary>
     /// The wear a weapon banks for every hit it lands (§6.1): each body a swing,
@@ -472,6 +473,34 @@ public sealed record Tuning
     /// may revisit lives in the file.
     /// </summary>
     public int EnchanterWorksOn { get; init; }
+
+    /// <summary>
+    /// The chance, as a percentage, that a finished service improves the weapon
+    /// anyway (§6.4, S:1149–1154): flat when it enchants, and times
+    /// <c>1 + wear cashed ÷ StartingPool</c> when it refines — 6 on a fresh full bar,
+    /// 7 at capacity 40, 9 at capacity 60 (R4's consequence 2). A deposit that
+    /// cashed no wear rolls nothing. §5.3's name, in whole percent as
+    /// <see cref="DefeatStackChance"/> keeps its own. Read by
+    /// <see cref="Wear.ImproveOdds"/>, whose odds the enchanter rolls on as a
+    /// service finishes.
+    /// </summary>
+    public int GraftBaseChance { get; init; }
+
+    /// <summary>
+    /// Of the services whose improvement roll lands, the percentage that graft a
+    /// modifier the weapon has never carried; the rest deepen one it carries (§6.4:
+    /// deepen "uncommon", a graft "rare"). A branch with nothing it may take falls
+    /// through to the other. Provisional: §6.4 gives no number (PHASE 6a DECISION 5).
+    /// </summary>
+    public int GraftSharePercent { get; init; }
+
+    /// <summary>
+    /// How many times likelier a deepen lands on the class's signature than on any
+    /// other modifier the weapon carries (§6.4: "biased toward the class
+    /// signature"); 1 is no bias. A caster has no signature, so it has no bias
+    /// either. Provisional: §6.4 gives no number (PHASE 6a DECISION 5).
+    /// </summary>
+    public int DeepenSignatureWeight { get; init; }
 
     // ---- Inventory (§4.4) ----
 

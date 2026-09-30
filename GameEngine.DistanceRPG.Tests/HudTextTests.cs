@@ -1198,16 +1198,20 @@ public sealed class HudTextTests : IDisposable
         // longest name, clawing back every pool every member has at the widest
         // numbers (a member swaps weapons mid-run, and puts one down for another, so
         // it can gain in every class), then the enchanter's two lines — a finished
-        // Enchant of the longest enchantment first — how many more, and the stalled
-        // weapons wrapped at their cap — still ends with its key inside the shipped
-        // 1280 x 720, the panel lifted as far as the top readouts allow and its lines
-        // closed up as far as they must, never below the least step, and every line
-        // across the window. The lift alone no longer does for it, nor would a cap of
-        // one service or none: the claw-backs wrap to three lines a member.
+        // Enchant of the longest enchantment first, its improvement roll deepening the
+        // longest-named modifier any weapon stacks (Phase 6a.4) — how many more, and
+        // the stalled weapons wrapped at their cap — still ends with its key inside
+        // the shipped 1280 x 720, the panel lifted as far as the top readouts allow
+        // and its lines closed up as far as they must, never below the least step,
+        // and every line across the window. The lift alone no longer does for it,
+        // nor would a cap of one service or none: the claw-backs wrap to three lines
+        // a member.
         using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
         const float h = 720f;
         var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
         var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
+        var deepest = Enum.GetValues<ModifierType>().Where(t => !ModifierRules.NeverStacked.Contains(t)).MaxBy(t => DungeonHud.ModifierName(t).Length);
+        var improved = new Improvement(ImprovementKind.Deepen, deepest);   // DEEPENED is the longer outcome
         var haul = Enumerable.Range(0, GameContent.Current.Tuning.PartyCarrySlots).Select(_ => TestWeapons.Get(longest.Id)).ToArray();
         string[] members = ["A", "B", "C", "D"];
         XpClawback[] Pools(string member) =>
@@ -1217,14 +1221,14 @@ public sealed class HudTextTests : IDisposable
             new XpClawback(member, XpSnapshot.ManaPool, 9999, 0),
         ];
         var reports = Enumerable.Range(0, 20).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, ContentBounds.MostServiceRuns, Stalled: true))
-            .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id))
+            .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id, Improved: improved))
             .Concat(Enumerable.Range(0, ContentBounds.MostWorked - 1).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id)))
             .ToArray();
         var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, members.SelectMany(Pools).ToArray(), reports);
 
         var lines = DungeonHud.RunSummaryLines(worst);
         var texts = lines.Select(line => line.Text).ToArray();
-        string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()}";
+        string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()} - DEEPENED {DungeonHud.ModifierName(deepest)}";
         Assert.Equal(new[] { back, $"THE ENCHANTER WORKED THE {longest.Name.ToUpperInvariant()} - 1 OF {ContentBounds.MostServiceRuns} RUNS" }.Take(DungeonHud.DungeonServiceLines),
             texts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
         Assert.Contains(BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines), texts);

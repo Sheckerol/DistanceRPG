@@ -66,9 +66,10 @@ GameEngine.DistanceRPG/         # Game executable
     TurnSystem.cs               # Turn state machine, drives combat via events
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
                                 # from the wear it has ever cashed (R4); where its slots open, what
-                                # an enchantment costs, and a service's runs
+                                # an enchantment costs, a service's runs, and its improvement odds
     Enchanter.cs                # The enchanter (§6.2–§6.4): a deposit, its gates, the service clock
-                                # every run's end ticks, a take-back — the one place wear is spent
+                                # every run's end ticks, the improvement roll (its own stream),
+                                # a take-back — the one place wear is spent
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is

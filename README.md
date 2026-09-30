@@ -187,16 +187,29 @@ never strikes (PHASE 6a DECISION 12); with nothing left to choose the Enchant sa
 list that shows it arrives with the deposit's key. A run that counts works the two
 newest a run on, and a service whose last run it works comes back to the end of the
 stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
-3); a run that does not count works nothing. The run's summary says so after whether
-the run counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC`,
-`THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`, `STALLED AT THE ENCHANTER: RIPOSTE
-BLADE`, or `THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT` — and past three
-services on the screen between runs (two over the floor), `AND 2 MORE AT THE
-ENCHANTER - TAB WEAPONS`. The log says it too: `[Enchanter] Run counted: worked Wand
-of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1`, then `[Enchanter] Wand of
-the Cone finished: attached vampiric`. A weapon taken back early (its key arrives
-with the deposit's) comes back with its wear and its capacity as they were before it
-went in (PHASE 6a DECISION 8).
+3); a run that does not count works nothing. A service coming back may improve the
+weapon anyway (Phase 6a.4): enchanting at `GraftBaseChance` in 100 (3), flat, and
+refining at that times 1 + the wear cashed ÷ `StartingPool` — 6 in 100 on a fresh
+full bar, 7 at capacity 40, 9 at capacity 60 — and a deposit that cashed no wear
+rolls nothing. A roll that lands deepens a modifier the weapon carries by a stack,
+three times likelier on its class's signature, or, a quarter of the time, grafts
+one it never carried, which caps at 5; each falls through to the other when it has
+nothing to take, and the relations bind both, so `Charges` is never grafted (PHASE
+6a DECISION 5). The roll is keyed to the run's map seed and the deposit's ordinal,
+both saved, so a reload never rerolls it. The run's summary says so after whether
+the run counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC -
+NO CHANGE`, `TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - DEEPENED BLOCK`,
+`… - GRAFTED RIPOSTE` on a green line, `THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`,
+`STALLED AT THE ENCHANTER: RIPOSTE BLADE`, or `THE ENCHANTER WORKED NOTHING - THE
+RUN DID NOT COUNT` — and past three services on the screen between runs (two over
+the floor), `AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. The log says it too:
+`[Enchanter] Run counted: worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte
+Blade 0/1`, then `[Enchanter] Wand of the Cone finished: attached vampiric;
+improvement roll 1073 of 3000 against 90: no change` — the draw, out of 100 ×
+`StartingPool`, against the odds (`… : grafted Block`, `… : deepened Push`, or `;
+no wear, no roll`). A weapon taken back early (its key arrives with the deposit's)
+comes back with its wear and its capacity as they were before it went in (PHASE 6a
+DECISION 8).
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
@@ -366,11 +379,15 @@ back to it, and the game quits from it.
   and the enchanter's shop (`"enchanter"`, each deposit with its weapon whole, in
   deposit order, `null` while it is empty) and how many deposits it has made
   (`"depositsMade"`), with the last run's word on the shop in its result
-  (`"services"`, `null` for an empty shop; Phase 6a.3a). A save whose shop
+  (`"services"`, `null` for an empty shop; Phase 6a.3a), a service it brought back
+  saying what its improvement roll did (`"improved"` and `"modifier"`, by name; Phase
+  6a.4 — the roll as it was drawn is the log's, never the save's). A save whose shop
   contradicts itself — a weapon in it worn, a service past its last run, an
   enchantment the campaign never met or one that does nothing yet (Phase 6a.3b,
   in a deposit or in a run's report of one), a deposit before the tutorial is
-  beaten, a run's report of the shop that says what no run's end says, a deposit
+  beaten, a run's report of the shop that says what no run's end says (an
+  improvement on a service not back yet, an outcome without its modifier, a
+  modifier no weapon stacks), a deposit
   whose take-back would give back a weapon no load reads — is refused as one that
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
@@ -599,14 +616,18 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `FirstEnchantmentWear` and `EnchantmentWearStep`, the deposit attaching
   enchantment n needs (`FirstEnchantmentWear + EnchantmentWearStep x (n - 1)`); and
   `EnchanterWorksOn`, how many of the newest deposits a run that counts works (1 to
-  10; the doc's 2). Turning any says `THE NUMBERS HAVE CHANGED` when a campaign saved
-  under the other number resumes — but never to a save from before Phase 6a, whose
-  record of its numbers covers only the keys played then; a save the 6a.1 or 6a.2
-  build wrote says it once, though no number moved, since each step adds the
-  numbers it plays to version 2's record. `GraftBaseChance` is no key yet: a file
-  naming it is told it arrives with the Phase 6a code that reads it. The docs' older
-  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming either is
-  told which key took its place.
+  10; the doc's 2). Since Phase 6a.4, the improvement roll's: `GraftBaseChance`, the
+  chance in 100 a service improves the weapon anyway (0 to 100; flat when it
+  enchants, times 1 + wear ÷ `StartingPool` when it refines), and two provisional
+  numbers, `GraftSharePercent`, how many of the rolls that land graft (0 to 100; 25),
+  and `DeepenSignatureWeight`, how many times likelier a deepen lands on the class's
+  signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. Turning any says `THE
+  NUMBERS HAVE CHANGED` when a campaign saved under the other number resumes — but
+  never to a save from before Phase 6a, whose record of its numbers covers only the
+  keys played then; a save an earlier 6a step's build wrote says it once, though no
+  number moved, since each step adds the numbers it plays to version 2's record. The
+  docs' older `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file
+  naming either is told which key took its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at

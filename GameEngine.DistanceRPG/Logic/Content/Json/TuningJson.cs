@@ -352,7 +352,7 @@ public static class TuningJson
         /// <summary>
         /// A name no key has: ignored, with a warning that points at the key the
         /// reader meant (1g) — the phase that brings one of §5.3's keys still to
-        /// come (<c>GraftBaseChance</c> and the Consumables'),
+        /// come (the Consumables'),
         /// the code's name for a doc's spelling and why (a placeholder the user's
         /// ruling of 2026-09-25 replaced among them: <c>WearCapacityLadder</c> is
         /// <c>WearCapacityPerBar</c>), or the key a typo is nearest — and never

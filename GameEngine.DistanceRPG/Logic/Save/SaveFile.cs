@@ -225,9 +225,14 @@ public sealed record RunResultDto(string DungeonId, string Outcome, bool BossDef
 /// <summary>
 /// What a run's end did with one deposit (<see cref="ServiceReport"/>): the weapon
 /// by catalogue id, the service by name, its runs worked and taken, whether the
-/// run left it stalled, and the enchantment an Enchant attaches, by id.
+/// run left it stalled, and the enchantment an Enchant attaches, by id — and, on a
+/// finished service whose improvement roll improved the weapon, how and which
+/// modifier, each by name (appended by Phase 6a.4, with their defaults: absent,
+/// the report says the weapon came back as it went). The roll as it was drawn is
+/// the log's, never the save's.
 /// </summary>
-public sealed record ServiceDto(string WeaponId, string Service, int RunsWorked, int Runs, bool Stalled = false, string? Enchantment = null);
+public sealed record ServiceDto(string WeaponId, string Service, int RunsWorked, int Runs, bool Stalled = false, string? Enchantment = null,
+    string? Improved = null, string? Modifier = null);
 
 /// <summary>What a wipe took back from one pool (<see cref="XpClawback"/>): the member by id, the pool by name, what it held and what it holds.</summary>
 public sealed record ClawbackDto(string MemberId, string Pool, int Before, int After);

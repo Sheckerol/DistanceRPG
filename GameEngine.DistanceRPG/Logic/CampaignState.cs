@@ -444,8 +444,9 @@ public sealed class CampaignState
     /// <para>
     /// <strong>The enchanter's clock</strong> (§6.3): once the visit is gone, the
     /// run's end works the shop (<see cref="Enchanter.Tick"/>) — a run that counted
-    /// works the newest deposits a run on and brings back what they finish, one
-    /// that did not works nothing — and the result carries what it did
+    /// works the newest deposits a run on and brings back what they finish, each
+    /// with its improvement roll made on the run's map seed, one that did not works
+    /// nothing — and the result carries what it did
     /// (<see cref="RunResult.Services"/>).
     /// </para>
     /// <para>
@@ -516,16 +517,19 @@ public sealed class CampaignState
             ? visit.EntrySnapshot.ClawBack(_party, tuning.DeathXpLossPercent)
             : [];
 
-        // The visit goes, and nothing of the campaign stays wired to it.
+        // The visit goes, and nothing of the campaign stays wired to it — but its
+        // map seed, which a finishing service's improvement roll is keyed by.
+        long mapSeed = visit.MapSeed;
         visit.Wiped -= _onWiped;
         _onWiped = null;
         Visit = null;
 
         // The enchanter's clock (§6.3), on every run's end with the visit gone, so
         // a finished service's weapon goes back to the stable through the campaign's
-        // own path: a run that counted works the newest deposits a run on; one that
-        // did not works nothing, and says so.
-        var services = Enchanter.Tick(this, counted: tick);
+        // own path: a run that counted works the newest deposits a run on, and a
+        // service it finishes rolls its improvement on the run's seed; one that did
+        // not works nothing, and says so.
+        var services = Enchanter.Tick(this, mapSeed, counted: tick);
 
         var result = new RunResult(def.Id,
             ending == RunEnding.Wiped ? RunOutcome.Death : bossDown ? RunOutcome.BossKill : RunOutcome.Retreat,

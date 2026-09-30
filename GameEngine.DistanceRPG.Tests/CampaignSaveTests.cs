@@ -125,13 +125,20 @@ public sealed class CampaignSaveTests : IDisposable
 
     private static LoadedCampaign Load(string text) => SaveGame.Restore(SaveCodec.Read(text), GameContent.Current);
 
-    /// <summary>Capture, write, read, restore — and the restored campaign is the same state and writes the same text.</summary>
+    /// <summary>
+    /// Capture, write, read, restore — and the restored campaign is the same state
+    /// and writes the same text. A run's report's improvement roll as it was drawn
+    /// (<see cref="ServiceReport.Roll"/>) is left out: the save declares it does not
+    /// keep it — it is the log's, written at the run's end (Phase 6a.4) — while what
+    /// the roll did is kept and compared.
+    /// </summary>
     private static CampaignState RoundTrip(CampaignState campaign)
     {
         string text = Save(campaign);
         var loaded = Load(text);
         Assert.False(loaded.TuningChanged);
-        StateAssert.Equivalent(campaign, loaded.Campaign, "campaign");
+        StateAssert.Equivalent(campaign, loaded.Campaign, "campaign",
+            ignore: path => path.StartsWith("campaign.LastResult.Services[", StringComparison.Ordinal) && path.EndsWith("].Roll", StringComparison.Ordinal));
         Assert.Equal(text, Save(loaded.Campaign));
         return loaded.Campaign;
     }
@@ -354,7 +361,8 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Equal(3, tree["campaign"]!["depositsMade"]!.GetValue<int>());
         var reports = tree["campaign"]!["lastResult"]!["services"]!.AsArray();
         Assert.Equal(2, reports.Count);
-        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment"], reports[1]!.AsObject().Select(member => member.Key));
+        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier"],   // the roll's outcome, Phase 6a.4
+            reports[1]!.AsObject().Select(member => member.Key));
 
         // The restored shop works on as the one saved: the next run that counts
         // brings both back.

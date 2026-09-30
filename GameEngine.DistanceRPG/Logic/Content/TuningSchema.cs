@@ -8,8 +8,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <see cref="Enchanter"/> holds what a hit wears and what a deposit costs, the
 /// user's ruling of 2026-09-25, whose keys were declared ahead of Phase 6a's
 /// enchanter and are played since its rules read them
-/// (<see cref="TuningKey.Played"/>), and how many deposits the enchanter works on;
-/// its last key arrives with its Phase 6a reader, the improvement roll. <see cref="Saves"/> holds how many save slots there are, the user's
+/// (<see cref="TuningKey.Played"/>), how many deposits the enchanter works on, and
+/// the improvement roll's odds and split (Phase 6a.4). <see cref="Saves"/> holds how many save slots there are, the user's
 /// ruling of the same day on the save model: the launcher's number, never a rule
 /// of play's. The file's heading for each group names the keys still to come,
 /// so §5.3's one screen stays whole.
@@ -130,14 +130,13 @@ public static class TuningSchema
     /// 2026-09-25 and keeps a number they may revisit in the file, so its six were
     /// <see cref="TuningGroup.Enchanter"/> keys before their reader, and each has
     /// played since a Phase 6a rule reads it (<see cref="TuningKey.Played"/>).
-    /// <c>WearPerHit</c> and <c>EnchanterWorksOn</c> arrived with their readers in
-    /// Phase 6a; <c>GraftBaseChance</c> is not the ruling's number either, and
-    /// waits here with the improvement roll that reads it.
+    /// <c>WearPerHit</c>, <c>EnchanterWorksOn</c> and the improvement roll's
+    /// <c>GraftBaseChance</c> — which waited here until Phase 6a.4 — arrived with
+    /// their readers, so only the Consumables' wait now.
     /// </summary>
     public static IReadOnlyDictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)> Deferred { get; } =
         new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>
         {
-            [TuningGroup.Enchanter] = ("Phase 6a", ["GraftBaseChance"]),
             [TuningGroup.Consumables] = ("Phase 6b", ["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"]),
         };
 
@@ -301,20 +300,23 @@ public static class TuningSchema
         Int(nameof(Tuning.DeathXpLossPercent), TuningGroup.Dungeon, 0, 100, t => t.DeathXpLossPercent, (t, v) => t with { DeathXpLossPercent = v }),
         Int(nameof(Tuning.StairGatherTiles), TuningGroup.Dungeon, 1, 50, t => t.StairGatherTiles, (t, v) => t with { StairGatherTiles = v }),
 
-        // Enchanter (§6.1, §6.2) — what a hit wears, what a deposit costs, the
-        // user's ruling of 2026-09-25, and how many deposits the enchanter works on:
-        // the ruling's keys were declared ahead of their reader, Phase 6a's
-        // enchanter, and each is played, hashed from the save's version 2, since a
-        // rule of it reads it — the wear a hit banks and the capacity a bar adds from
-        // Phase 6a.1, the slots, the price and the queue's worked few from 6a.3a. A
-        // hit wears at most what a magnitude clamps at, and 0 wears nothing (a dial:
+        // Enchanter (§6.1, §6.2, §6.4) — what a hit wears, what a deposit costs, the
+        // user's ruling of 2026-09-25, how many deposits the enchanter works on, and
+        // the improvement roll a finished service makes: the ruling's keys were
+        // declared ahead of their reader, Phase 6a's enchanter, and each is played,
+        // hashed from the save's version 2, since a rule of it reads it — the wear a
+        // hit banks and the capacity a bar adds from Phase 6a.1, the slots, the price
+        // and the queue's worked few from 6a.3a, the roll's three from 6a.4. A hit
+        // wears at most what a magnitude clamps at, and 0 wears nothing (a dial:
         // nothing can then be enchanted). A capacity's range is StartingPool's, the
         // bar it opens on; a step may be 0 (every slot open at once, every
         // enchantment priced as the first); a bar adds at most what a magnitude
         // clamps at. A weapon holds no fewer slots than it arrives filling, and at
         // most twice the docs' five. The enchanter works on one deposit at least — 0
         // would freeze every service — and on no more than the most enchantments a
-        // weapon holds.
+        // weapon holds. The roll's chance and its graft share are percentages, 0 to
+        // 100 (0 never improves, or never grafts); the signature's weight is 1 at
+        // least — no bias — and at most what a magnitude clamps at.
         PlayedFrom2(Int(nameof(Tuning.WearPerHit), TuningGroup.Enchanter, 0, 1000, t => t.WearPerHit, (t, v) => t with { WearPerHit = v })),
         PlayedFrom2(Int(nameof(Tuning.WearCapacityPerBar), TuningGroup.Enchanter, 0, 1000, t => t.WearCapacityPerBar, (t, v) => t with { WearCapacityPerBar = v })),
         PlayedFrom2(Int(nameof(Tuning.FirstSlotCapacity), TuningGroup.Enchanter, 1, 10000, t => t.FirstSlotCapacity, (t, v) => t with { FirstSlotCapacity = v })),
@@ -324,6 +326,9 @@ public static class TuningSchema
         PlayedFrom2(Int(nameof(Tuning.FirstEnchantmentWear), TuningGroup.Enchanter, 1, 10000, t => t.FirstEnchantmentWear, (t, v) => t with { FirstEnchantmentWear = v })),
         PlayedFrom2(Int(nameof(Tuning.EnchantmentWearStep), TuningGroup.Enchanter, 0, 10000, t => t.EnchantmentWearStep, (t, v) => t with { EnchantmentWearStep = v })),
         PlayedFrom2(Int(nameof(Tuning.EnchanterWorksOn), TuningGroup.Enchanter, 1, 10, t => t.EnchanterWorksOn, (t, v) => t with { EnchanterWorksOn = v })),
+        PlayedFrom2(Int(nameof(Tuning.GraftBaseChance), TuningGroup.Enchanter, 0, 100, t => t.GraftBaseChance, (t, v) => t with { GraftBaseChance = v })),
+        PlayedFrom2(Int(nameof(Tuning.GraftSharePercent), TuningGroup.Enchanter, 0, 100, t => t.GraftSharePercent, (t, v) => t with { GraftSharePercent = v })),
+        PlayedFrom2(Int(nameof(Tuning.DeepenSignatureWeight), TuningGroup.Enchanter, 1, 1000, t => t.DeepenSignatureWeight, (t, v) => t with { DeepenSignatureWeight = v })),
 
         // Inventory (§4.4)
         Int(nameof(Tuning.PartyCarrySlots), TuningGroup.Inventory, GameConstants.PartySize, GameConstants.PartySize * GameConstants.MaxInventorySlots,

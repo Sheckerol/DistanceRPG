@@ -1220,12 +1220,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(notCounted + 2, nothing.Count);
 
         // A counted run: the Tower Guard's refinement and the staff's Vampiric back,
-        // what they came back with, and A's staff, older, stalled in yellow.
+        // what they came back with and what their improvement rolls did — nothing,
+        // on these draws (Phase 6a.4) — and A's staff, older, stalled in yellow.
         var back = TestShop.Counted(campaign);
         Assert.Equal(new[]
         {
-            "STAFF OF RENEWAL IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC",
-            "TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED",
+            "STAFF OF RENEWAL IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO CHANGE",
+            "TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE",
             "STALLED AT THE ENCHANTER: STAFF OF RENEWAL",
         }, Texts(BetweenRunsHud.SummaryLines(back)).SkipWhile(line => !line.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1));
         Assert.Equal(DungeonHud.Yellow, BetweenRunsHud.SummaryLines(back)[^1].Color);
@@ -1240,7 +1241,40 @@ public sealed class BetweenRunsHudTests : IDisposable
         // A report naming a weapon or an enchantment the content no longer has is
         // named by its id, never a throw while the screen draws.
         var gone = back with { Services = [new ServiceReport("gone_weapon", Service.Enchant, 1, 1, EnchantmentId: "gone_soul")] };
-        Assert.Contains("GONE_WEAPON IS BACK FROM THE ENCHANTER - ATTACHED GONE_SOUL", Texts(BetweenRunsHud.SummaryLines(gone)));
+        Assert.Contains("GONE_WEAPON IS BACK FROM THE ENCHANTER - ATTACHED GONE_SOUL - NO CHANGE", Texts(BetweenRunsHud.SummaryLines(gone)));
+    }
+
+    [Fact]
+    public void AGraftTurnsItsLineGreen()
+    {
+        // §6.4, Phase 6a.4: a finished service's line ends with what its improvement
+        // roll did — DEEPENED and GRAFTED name the modifier as the dungeon names it,
+        // NO CHANGE when the weapon came back as it went (a roll that missed, one
+        // that found nothing, or none made) — and a graft, the story §6.4 says the
+        // game tells, turns its line green, while every other finished line stays
+        // cyan, as a worked one does. The dungeon's end panel shows the same, as far
+        // as its cap of two.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var back = TestShop.Counted(TestShop.Shop()) with
+        {
+            Services =
+            [
+                new ServiceReport("tower_guard", Service.Refine, 1, 1, Improved: new Improvement(ImprovementKind.Graft, ModifierType.Riposte), Roll: new ImproveRoll(3, 3000, 180)),
+                new ServiceReport("great_axe", Service.Enchant, 2, 2, EnchantmentId: "vampiric", Improved: new Improvement(ImprovementKind.Deepen, ModifierType.CritWindow)),
+                new ServiceReport("weakspot_stiletto", Service.Refine, 1, 1, Roll: new ImproveRoll(2999, 3000, 180)),
+            ],
+        };
+        var lines = BetweenRunsHud.SummaryLines(back).SkipWhile(line => !line.Text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1).ToArray();
+        var grafted = new DungeonHud.Run("TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - GRAFTED RIPOSTE", DungeonHud.Green);
+        var deepened = new DungeonHud.Run("GREAT AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - DEEPENED CRIT WINDOW", DungeonHud.Cyan);
+        Assert.Equal([grafted, deepened, new("WEAKSPOT STILETTO IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE", DungeonHud.Cyan)], lines);
+        Assert.Equal(("GRAFTED BLOCK", "DEEPENED CRIT WINDOW", "NO CHANGE"),
+            (BetweenRunsHud.Outcome(new Improvement(ImprovementKind.Graft, ModifierType.Block)),
+                BetweenRunsHud.Outcome(new Improvement(ImprovementKind.Deepen, ModifierType.CritWindow)), BetweenRunsHud.Outcome(null)));
+
+        var panel = DungeonHud.RunSummaryLines(back);
+        Assert.Equal([grafted, deepened, new(BetweenRunsHud.MoreAtTheEnchanter(1), DungeonHud.Cyan)],
+            panel.SkipWhile(line => !line.Text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1).Take(3));
     }
 
     [Fact]

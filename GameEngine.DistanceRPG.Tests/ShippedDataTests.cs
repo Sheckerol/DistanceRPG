@@ -54,6 +54,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// 195, #3 at 385, #4 at 600, #5 at 840 over 21 deposits, 71 runs and at the least 31,
 /// and 72/48, 78/66 and 89/85 for what a weapon arrives with:
 /// <see cref="EnchanterTests.TheRulingsClimb_WearDepositsAndRuns"/>.</item>
+/// <item>The improvement roll's odds: <c>GraftBaseChance</c> 3, a service's chance in 100
+/// of improving the weapon anyway — flat when it enchants, and times 1 + wear ÷
+/// <c>StartingPool</c> when it refines: 6 in 100 on a fresh full bar, 7 at capacity 40 and
+/// 9 at capacity 60 — phase-6-between-runs.md §6.4 and settled.md L1149-1154 and R4's
+/// consequence 2, L1699-1703: <see cref="ImprovementRollTests.TheOddsAreTheRulings"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

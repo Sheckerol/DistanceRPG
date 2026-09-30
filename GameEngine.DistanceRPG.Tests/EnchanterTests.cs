@@ -1178,9 +1178,12 @@ public sealed class EnchanterTests : IDisposable
         // Logic never logs (LogicPurityTests), so what the enchanter did on a run's
         // end is handed over in the result (RunResult.Services) and written by the
         // game: whether the run counted, what it worked and left stalled with each
-        // one's runs, and each service it finished — nothing for an empty shop. A
-        // handler on the campaign's RunEnded beside the run's end's save request,
-        // wired where that one is and let go where it is, read off the IL.
+        // one's runs, and each service it finished with its improvement roll as it
+        // was drawn (Phase 6a.4: the draw of the denominator against the numerator —
+        // 90 is enchanting's 3 in 100, 180 refining's 6 on a full bar of 30 — or no
+        // roll where nothing was cashed) — nothing for an empty shop. A handler on
+        // the campaign's RunEnded beside the run's end's save request, wired where
+        // that one is and let go where it is, read off the IL.
         var campaign = TestShop.Shop();
         var idle = TestShop.NotCounted(campaign);
         Assert.Equal(["[Enchanter] Run not counted: nothing worked; stalled Staff of Renewal 1/2, Staff of Renewal 1/2, Tower Guard 0/1"],
@@ -1189,10 +1192,29 @@ public sealed class EnchanterTests : IDisposable
         Assert.Equal(new[]
         {
             "[Enchanter] Run counted: worked Staff of Renewal 2/2, Tower Guard 1/1; stalled Staff of Renewal 1/2",
-            "[Enchanter] Staff of Renewal finished: attached vampiric",
-            "[Enchanter] Tower Guard finished: refined",
+            "[Enchanter] Staff of Renewal finished: attached vampiric; improvement roll 1073 of 3000 against 90: no change",
+            "[Enchanter] Tower Guard finished: refined; improvement roll 2815 of 3000 against 180: no change",
         }, DistanceRpgGame.EnchanterLines(back));
+        Assert.Equal(new[]
+        {
+            "[Enchanter] Run counted: worked Staff of Renewal 2/2",
+            "[Enchanter] Staff of Renewal finished: refined; no wear, no roll",   // A's, deposited unworn
+        }, DistanceRpgGame.EnchanterLines(Counted(campaign)));
         Assert.Empty(DistanceRpgGame.EnchanterLines(Counted(TestShop.Opened())));
+
+        // A roll that landed says what it did, and one that landed on a weapon with
+        // nothing to deepen or graft says that.
+        var landed = new ImproveRoll(12, 3000, 180);
+        string Finished(Improvement? improved, ImproveRoll? roll) => DistanceRpgGame.EnchanterLines(back with
+        {
+            Services = [new ServiceReport("tower_guard", Service.Refine, 1, 1, Improved: improved, Roll: roll)],
+        })[^1];
+        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: grafted Riposte",
+            Finished(new Improvement(ImprovementKind.Graft, ModifierType.Riposte), landed));
+        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: deepened Block",
+            Finished(new Improvement(ImprovementKind.Deepen, ModifierType.Block), landed));
+        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: landed, nothing to deepen or graft",
+            Finished(null, landed));
 
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
@@ -1261,12 +1283,16 @@ public sealed class EnchanterTests : IDisposable
 /// </summary>
 internal static class TestShop
 {
-    /// <summary>The ruling's numbers, stated as the tests' own: 30 to start and a point a full bar, slots every 5 from 30, the price 30 + 5(n − 1), five slots, and the two newest worked.</summary>
+    /// <summary>The ruling's numbers, stated as the tests' own: 30 to start and a point a full bar, slots every 5 from 30, the price 30 + 5(n − 1), five slots, and the two newest worked; and the improvement roll's (Phase 6a.4): 3 in 100, a quarter of what lands grafting, the signature three times as likely to deepen.</summary>
     public static Tuning Ruled(Tuning t) => t with
     {
         StartingPool = 30, WearPerHit = 1, WearCapacityPerBar = 1, FirstSlotCapacity = 30, SlotCapacityStep = 5, EnchantmentSlots = 5,
         FirstEnchantmentWear = 30, EnchantmentWearStep = 5, EnchanterWorksOn = 2,
+        GraftBaseChance = 3, GraftSharePercent = 25, DeepenSignatureWeight = 3,
     };
+
+    /// <summary><see cref="Ruled"/>, with the improvement roll landing every time: <c>GraftBaseChance</c> at its most, 100 in 100 when enchanting and past it when refining.</summary>
+    public static Tuning Landing(Tuning t) => Ruled(t) with { GraftBaseChance = 100 };
 
     /// <summary>The game's own party — A a Weakspot Stiletto and a Staff of Renewal, B a Tower Guard and one, C a Great Axe and one, D a Staff of Renewal and a Staff of Mire — with the tutorial beaten, so the enchanter is open, and Vampiric, Flaming and Cold met.</summary>
     public static CampaignState Opened()

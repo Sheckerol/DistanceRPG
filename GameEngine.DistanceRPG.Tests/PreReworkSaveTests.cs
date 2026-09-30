@@ -80,16 +80,16 @@ public class PreReworkSaveTests
     /// covers: what a hit wears, and what a deposit costs, the user's ruling of
     /// 2026-09-25, declared ahead of Phase 6a's enchanter and played from version
     /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>), and how many
-    /// deposits the enchanter works on (Phase 6a.3a), played from version 2 too; and
-    /// how many save slots there are, the ruling of the same day on the save model,
-    /// the launcher's.
+    /// deposits the enchanter works on (Phase 6a.3a) and the improvement roll's
+    /// odds and split (6a.4), played from version 2 too; and how many save slots
+    /// there are, the ruling of the same day on the save model, the launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [
         nameof(Tuning.WearPerHit),
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
-        nameof(Tuning.EnchanterWorksOn),
+        nameof(Tuning.EnchanterWorksOn), nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
         nameof(Tuning.SaveSlots),
     ];
 

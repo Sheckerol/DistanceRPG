@@ -1,11 +1,12 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The §6.1 and §6.2 arithmetic of wear, under the user's ruling of 2026-09-25 on
-/// what a deposit costs (R4, settled.md): what a hit banks, what a weapon's wear
-/// capacity is, where its enchantment slots open, what attaching each enchantment
-/// costs, and how many runs a service takes (Phase 6a.3a). Engine-free and
-/// deterministic — it rolls nothing — and it reads
+/// The §6.1, §6.2 and §6.4 arithmetic of wear, under the user's ruling of
+/// 2026-09-25 on what a deposit costs (R4, settled.md): what a hit banks, what a
+/// weapon's wear capacity is, where its enchantment slots open, what attaching each
+/// enchantment costs, how many runs a service takes (Phase 6a.3a), and the odds a
+/// service improves the weapon anyway (Phase 6a.4). Engine-free and deterministic —
+/// it rolls nothing: the enchanter rolls on its odds — and it reads
 /// the current tuning the way <see cref="Progression"/> does, so every number is
 /// a <c>tuning.json</c> key and none is a copy of one.
 /// <para>
@@ -122,6 +123,39 @@ public static class Wear
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         return count + 1;
+    }
+
+    /// <summary>Percentages are integers out of this.</summary>
+    private const int Percent = 100;
+
+    /// <summary>
+    /// The odds a service improves the weapon anyway (§6.4, S:1149–1154; R4's
+    /// consequence 2), as a whole-number fraction — <c>Numerator</c> in
+    /// <c>Denominator</c>. Enchanting's are <see cref="Tuning.GraftBaseChance"/> in
+    /// 100, flat, whatever the wear; refining's are those times <c>1 + wear ÷
+    /// StartingPool</c>, on the whole deposit: 6 in 100 cashing a fresh full bar of
+    /// 30, 7 cashing 40 at capacity 40, 9 cashing 60 at capacity 60, and no top —
+    /// "refinement improves whether the roll lands, not what it lands on"
+    /// (S:782–784). One expression with one branch (P6:873–875), in integers:
+    /// <c>GraftBaseChance × (StartingPool + wear)</c> out of <c>100 × StartingPool</c>,
+    /// the wear counted for a refinement alone, so nothing is rounded, and a
+    /// numerator at or past its denominator lands every time. In <c>long</c>s: no
+    /// tuning in range and no wear a save holds wraps them.
+    /// <para>
+    /// These are the odds, never the roll: a deposit that cashed nothing rolls
+    /// nothing whatever its odds say — "no wear, no roll" (P6:501–503) — which is
+    /// the roll's own guard (<see cref="Enchanter"/>).
+    /// </para>
+    /// </summary>
+    /// <param name="service">What the deposit bought.</param>
+    /// <param name="wearAtDeposit">The wear the deposit cashed: the weapon's whole pool as it went in.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="wearAtDeposit"/> is negative.</exception>
+    public static (long Numerator, long Denominator) ImproveOdds(Service service, int wearAtDeposit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(wearAtDeposit);
+        var tuning = GameContent.Current.Tuning;
+        long pool = tuning.StartingPool;
+        return ((long)tuning.GraftBaseChance * (pool + (service == Service.Refine ? wearAtDeposit : 0)), Percent * pool);
     }
 
     /// <summary>

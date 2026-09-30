@@ -190,9 +190,11 @@ public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDe
 /// service finished when they meet, its weapon back in the stable — and left the
 /// rest <see cref="Stalled"/>; a run that did not count worked nothing, and
 /// reports every entry stalled with its runs as they were, a fresh deposit's at 0.
-/// So a stalled report has <c>0 ≤ RunsWorked ≤ Runs − 1</c>. The summary reads
-/// these, after a load too, since the save keeps them with the result. Nothing
-/// ties a report to a deposit in the shop: it outlives the entry it speaks of.
+/// So a stalled report has <c>0 ≤ RunsWorked ≤ Runs − 1</c>. A finished one says
+/// what its improvement roll did (Phase 6a.4). The summary reads these, after a
+/// load too, since the save keeps them with the result — all but the roll as it
+/// was drawn, which is the log's. Nothing ties a report to a deposit in the shop:
+/// it outlives the entry it speaks of.
 /// </summary>
 /// <param name="WeaponId">The weapon serviced, by its catalogue id: what the summary names it by.</param>
 /// <param name="Service">What the deposit bought.</param>
@@ -200,7 +202,19 @@ public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDe
 /// <param name="Runs">The runs its service takes, fixed at deposit.</param>
 /// <param name="Stalled">Whether this run left it unworked: an older deposit behind the newest, or any deposit on a run that did not count.</param>
 /// <param name="EnchantmentId">The enchantment an Enchant attaches (on finishing, attached), or null for a refinement.</param>
-public sealed record ServiceReport(string WeaponId, Service Service, int RunsWorked, int Runs, bool Stalled = false, string? EnchantmentId = null)
+/// <param name="Improved">
+/// On a finished service, what its improvement roll did to the weapon — a modifier
+/// deepened or grafted (<see cref="Enchanter.Improve"/>) — or null: the roll did
+/// not land, found nothing to improve, or was never made (no wear cashed). Null on
+/// every service not finished.
+/// </param>
+/// <param name="Roll">
+/// On a finished service, its improvement roll as it was drawn, for the log that
+/// the run's end writes (Logic never logs), or null when nothing was rolled. Never
+/// saved: a report a load brings back has none.
+/// </param>
+public sealed record ServiceReport(string WeaponId, Service Service, int RunsWorked, int Runs, bool Stalled = false, string? EnchantmentId = null,
+    Improvement? Improved = null, ImproveRoll? Roll = null)
 {
     /// <summary>Whether this run finished the service: worked, its last run done, its weapon back in the stable.</summary>
     public bool Finished => !Stalled && RunsWorked == Runs;

@@ -564,7 +564,7 @@ the improvement roll either service may win (§6.4, Phase 6a.4).
 last run is worked**, inside the end of the run that works it — last, at tier 1
 with no XP — and the weapon comes back to the stable then. Until then it is in the
 shop, out of the party's hands, and its enchantments are what they were. The
-improvement roll will be made at the same moment (Phase 6a.4), on a stream of the
+improvement roll is made at the same moment (since Phase 6a.4), on a stream of the
 completing run's map seed and the deposit's ordinal, both saved, so a reload never
 rerolls it (R1).
 
@@ -737,4 +737,50 @@ a staff's cast skip an entry for the other side — a change to how a cast plays
 and note it `NEVER FIRES ON A STAFF`; or (h) give `weapons.json` the rule too, so
 a unique staff cannot ship what the enchanter refuses, as the wand's rule is
 shared. And for an element on a staff: (i) note it as never firing, or refuse it.
+settled.md's Phase 6a implementation pass records the ruling.
+
+## How a landed improvement chooses (§6.4) — PHASE 6a DECISION 5
+
+§6.4 gives a service coming back from the enchanter a chance to improve the
+weapon anyway, and settles the chance: `GraftBaseChance`, 3 in 100, flat when it
+enchants, and times `1 + wear ÷ StartingPool` when it refines (settled.md;
+R4's consequence 2). What a roll that lands does, its table gives in words alone:
+**deepen**, +1 stack on a modifier the weapon already carries, "uncommon, biased
+toward the class signature"; **graft**, +1 stack of a modifier it has never
+carried, "rare" — "deepen stays the common result and a graft stays the surprise",
+and refinement moves whether the roll lands, "not what it lands on". It gives no
+number for either, and does not say what a roll does when the outcome it drew has
+nothing to take: every modifier the weapon carries at its forged-plus-five
+ceiling, or nothing left it may graft.
+
+**Shipped provisionally** (Phase 6a.4, `Enchanter.Improve`):
+- of the rolls that land, `GraftSharePercent` (25) in 100 graft, and the rest
+  deepen — the second draw off the roll's stream, which neither service moves;
+- a deepen weighs the class's signature `DeepenSignatureWeight` (3) against 1 for
+  every other modifier the weapon carries below its ceiling, so on a Tower Guard
+  (Block x2, Push x1) Block deepens three times in four; a staff or a wand has no
+  signature, so it has no bias;
+- a graft is drawn evenly among the modifiers the weapon has never carried that
+  the relations let it take (the kind, the exclusions, the prerequisites, and
+  never a forged-only one, so never `Charges`). So it may land on one the weapon
+  never reads — `CRIT MULTIPLIER` on a staff, whose cast crits at a fixed x2 —
+  which settled.md already accepts: "every other modifier is at worst inert on the
+  wrong weapon" (the relations entry), `Charges`, the negative one, alone kept
+  out;
+- an outcome with nothing to take falls through to the other — a weapon with its
+  every modifier capped still grafts, "a finished weapon is not inert" — and with
+  neither, the roll that landed changes nothing, which the summary says as it says
+  a roll that missed: `NO CHANGE` (the log tells the two apart: `landed, nothing
+  to deepen or graft`).
+
+Both numbers are `tuning.json` keys, each comment starting `Provisional:` (the
+file's marker), by the user's standing rule that a number they may revisit lives
+in the file; `GraftBaseChance`, the doc's own 3, is a key beside them and not
+provisional.
+
+**This decides what a landed roll gives, and how often each, so it is the user's
+to decide.** The alternatives: (a) no fall-through: an outcome drawn with nothing
+to take gives nothing, so a capped weapon's deepens are lost rolls; (b) other
+numbers — the share and the weight are guesses, §6.4 saying only "uncommon" and
+"rare"; or (c) the split as a rule of the code rather than two keys.
 settled.md's Phase 6a implementation pass records the ruling.

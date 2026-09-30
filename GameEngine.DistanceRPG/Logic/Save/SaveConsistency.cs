@@ -379,12 +379,13 @@ internal static class SaveConsistency
 
         // 27. What the last run's end said of the shop: a report for each deposit in
         // it as the run ended, in deposit order, each saying what its deposit bought
-        // as the deposit does (25) — so no more reports than deposits were ever made.
-        // A run that counted worked the newest few a run on — the newest always, the
-        // enchanter working on one at least — and left the older ones stalled, short
-        // of their last run; a run that did not count worked nothing. Nothing ties a
-        // report to a deposit still in the shop: a report outlives the entry it
-        // speaks of.
+        // as the deposit does (25) — so no more reports than deposits were ever made
+        // — and, on a service it brought back, what the improvement roll did to the
+        // weapon, if anything (Phase 6a.4). A run that counted worked the newest few
+        // a run on — the newest always, the enchanter working on one at least — and
+        // left the older ones stalled, short of their last run; a run that did not
+        // count worked nothing. Nothing ties a report to a deposit still in the shop:
+        // a report outlives the entry it speaks of.
         if (campaign.LastResult is { Services: { } reports } last)
         {
             const string where = $"{At}.lastResult.services";
@@ -400,6 +401,16 @@ internal static class SaveConsistency
                         $"{report.Enchantment} is not among the seen: its deposit bought what the campaign had met, and the campaign forgets nothing it has met");
                 if (!enchant && report.Enchantment is not null)
                     throw new SaveFormatException($"{where}[{i}].enchantment", $"{report.Enchantment} named on a {report.Service}: a refinement attaches nothing");
+
+                // What the improvement roll did (Phase 6a.4): an outcome and the
+                // modifier it gave a stack of, together, and only as the service
+                // came back — the roll is made as its last run is worked.
+                if ((report.Improved is null) != (report.Modifier is null))
+                    throw new SaveFormatException($"{where}[{i}].{(report.Improved is null ? "improved" : "modifier")}",
+                        $"missing beside {(report.Improved is null ? $"the modifier {report.Modifier}" : $"the outcome {report.Improved}")}: an improvement is an outcome and the modifier it gave a stack of, together");
+                if (report.Improved is not null && (report.Stalled || report.RunsWorked != report.Runs))
+                    throw new SaveFormatException($"{where}[{i}].improved",
+                        $"{report.Improved} on a service {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: the improvement roll is made as a service comes back, its last run worked");
 
                 if (report.Stalled)
                 {

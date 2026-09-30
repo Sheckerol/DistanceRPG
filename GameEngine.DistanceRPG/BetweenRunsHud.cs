@@ -290,9 +290,10 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>
     /// The summary's lines for the enchanter (§6.2, §6.3), off the run's reports
     /// (<see cref="RunResult.Services"/>), none for an empty shop: on a run that
-    /// counted, each finished service (cyan) — <c>WAND OF THE CONE IS BACK FROM THE
-    /// ENCHANTER - ATTACHED VAMPIRIC</c>, <c>RIPOSTE BLADE IS BACK FROM THE
-    /// ENCHANTER - REFINED</c> — then each worked one — <c>THE ENCHANTER WORKED THE
+    /// counted, each finished service (cyan, and green when its improvement roll
+    /// grafted) — <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC
+    /// - NO CHANGE</c>, <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - REFINED -
+    /// GRAFTED BLOCK</c> — then each worked one — <c>THE ENCHANTER WORKED THE
     /// ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/> of those together
     /// and then <c>AND 2 MORE AT THE ENCHANTER</c>, <paramref name="moreTail"/>
     /// after it; then the stalled weapons in yellow, wrapped, <c>STALLED AT THE
@@ -314,7 +315,8 @@ public sealed class BetweenRunsHud : IDisposable
 
         var told = reports.Where(report => report.Finished).Concat(reports.Where(report => !report.Stalled && !report.Finished)).ToList();
         foreach (var report in told.Take(Math.Max(0, most)))
-            yield return new Run(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report), DungeonHud.Cyan);
+            yield return new Run(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report),
+                report.Improved?.Kind == ImprovementKind.Graft ? DungeonHud.Green : DungeonHud.Cyan);   // a graft is the story (§6.4)
         if (told.Count > most)
             yield return new Run(MoreAtTheEnchanter(told.Count - Math.Max(0, most)) + moreTail, DungeonHud.Cyan);
 
@@ -329,13 +331,28 @@ public sealed class BetweenRunsHud : IDisposable
         }
     }
 
-    /// <summary>A finished service's line: <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC</c>, or <c>- REFINED</c>.</summary>
+    /// <summary>
+    /// A finished service's line, what it bought and then what its improvement roll
+    /// did (§6.4, Phase 6a.4): <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER -
+    /// ATTACHED VAMPIRIC - NO CHANGE</c>, <c>… - REFINED - DEEPENED CRIT WINDOW</c>, or
+    /// <c>… - GRAFTED BLOCK</c>, which the summary draws green. A weapon that came
+    /// back as it went — a roll that missed, or found nothing to improve, or none
+    /// made — says <c>NO CHANGE</c>.
+    /// </summary>
     internal static string BackFromTheEnchanter(ServiceReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
         string what = report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"ATTACHED {EnchantmentName(id)}" : "REFINED";
-        return $"{WeaponName(report.WeaponId)} IS BACK FROM THE ENCHANTER - {what}";
+        return $"{WeaponName(report.WeaponId)} IS BACK FROM THE ENCHANTER - {what} - {Outcome(report.Improved)}";
     }
+
+    /// <summary>What an improvement roll did, as a finished service's line ends: <c>DEEPENED CRIT WINDOW</c>, <c>GRAFTED BLOCK</c>, or <c>NO CHANGE</c>.</summary>
+    internal static string Outcome(Improvement? improved) => improved switch
+    {
+        null => "NO CHANGE",
+        { Kind: ImprovementKind.Graft } => $"GRAFTED {DungeonHud.ModifierName(improved.Modifier)}",
+        _ => $"DEEPENED {DungeonHud.ModifierName(improved.Modifier)}",
+    };
 
     /// <summary>A worked service's line, not finished yet: <c>THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c>.</summary>
     internal static string WorkedThe(ServiceReport report)

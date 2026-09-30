@@ -732,9 +732,16 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// with each one's runs and what it left stalled — <c>[Enchanter] Run counted:
     /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1</c>, or
     /// <c>[Enchanter] Run not counted: nothing worked; stalled …</c> — then a line
-    /// for each service it finished: <c>[Enchanter] Wand of the Cone finished:
-    /// attached vampiric</c>, or <c>… finished: refined</c>. None for an empty shop.
-    /// A weapon by its content row's name, and its id where the content has none.
+    /// for each service it finished, with its improvement roll as it was drawn
+    /// (Phase 6a.4): <c>[Enchanter] Wand of the Cone finished: attached vampiric;
+    /// improvement roll 2417 of 3000 against 90: no change</c>, <c>… finished:
+    /// refined; improvement roll 12 of 3000 against 180: grafted Block</c> (or
+    /// <c>deepened …</c>, or <c>landed, nothing to deepen or graft</c>), or <c>…
+    /// finished: refined; no wear, no roll</c>. With the run's map seed, which the
+    /// log names as the run begins, and the deposit's ordinal, which the save holds,
+    /// the numbers make any roll reproducible from the log. None for an
+    /// empty shop. A weapon by its content row's name, and its id where the content
+    /// has none.
     /// </summary>
     internal static IReadOnlyList<string> EnchanterLines(RunResult result)
     {
@@ -753,8 +760,24 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var lines = new List<string> { stalled.Count > 0 ? $"{head}; stalled {string.Join(", ", stalled)}" : head };
         foreach (var report in reports.Where(report => report.Finished))
             lines.Add($"[Enchanter] {Named(report.WeaponId)} finished: "
-                + (report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"attached {id}" : "refined"));
+                + (report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"attached {id}" : "refined")
+                + RollSaid(report));
         return lines;
+    }
+
+    /// <summary>What a finished service's improvement roll was and did, as its log line ends: the draw against its odds, and what it did — or that nothing was rolled.</summary>
+    private static string RollSaid(ServiceReport report)
+    {
+        if (report.Roll is not { } roll)
+            return "; no wear, no roll";
+        string did = report.Improved switch
+        {
+            { Kind: ImprovementKind.Graft } graft => $"grafted {graft.Modifier}",
+            { } deepen => $"deepened {deepen.Modifier}",
+            null when roll.Landed => "landed, nothing to deepen or graft",
+            null => "no change",
+        };
+        return $"; improvement roll {roll.Draw} of {roll.Denominator} against {roll.Numerator}: {did}";
     }
 
     /// <summary>

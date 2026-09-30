@@ -144,8 +144,8 @@ public class TuningJsonTests
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");
 
-        // One of §5.3's keys still to come says which phase brings it.
-        Ignored("""{ "GraftBaseChance": 3 }""", "GraftBaseChance is not a key yet", "Phase 6a");
+        // One of §5.3's keys still to come says which phase brings it (the
+        // Consumables': GraftBaseChance, the Enchanter's last, is a key since 6a.4).
         Ignored("""{ "HealthPotionPercent": 20 }""", "HealthPotionPercent is not a key yet", "Phase 6b");
     }
 
@@ -529,7 +529,7 @@ public class TuningJsonTests
         Assert.Equal(
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
-        Assert.Contains("/* ---- Enchanter - Phase 6a: GraftBaseChance ---- */", headings);
+        Assert.Contains("/* ---- Enchanter ---- */", headings);   // its last key to come plays since Phase 6a.4
         Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
@@ -559,10 +559,15 @@ public class TuningJsonTests
         Assert.Contains("forged + AcquiredHeadroom", comments[nameof(Tuning.AcquiredHeadroom)]);
         Assert.Contains("Searing burns for its level, then loses one", comments[nameof(Tuning.EffectPerLevel)]);
 
-        // A provisional figure says so, and only a provisional one: the four keys,
-        // and serrated's percentage, whose note sits above its member.
+        // A provisional figure says so, and only a provisional one: the six keys —
+        // the improvement roll's graft share and signature weight among them, PHASE
+        // 6a DECISION 5's (Phase 6a.4) — and serrated's percentage, whose note sits
+        // above its member.
         string[] provisional =
-            [nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency)];
+        [
+            nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency),
+            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+        ];
         Assert.Equal(provisional.Order(StringComparer.Ordinal),
             comments.Where(c => c.Value.StartsWith("Provisional:", StringComparison.Ordinal)).Select(c => c.Key).Order(StringComparer.Ordinal));
         int serrated = text.IndexOf("\n    \"serrated\":", StringComparison.Ordinal) + 1;
@@ -741,14 +746,16 @@ public class TuningJsonTests
     {
         // PHASE 6a DECISION 9: a save's hash is of the keys played at the version
         // that wrote it. A key a rule began to play with version 2 — what a hit
-        // wears and the capacity a bar adds, from Phase 6a.1, and the slots, the
-        // price and the enchanter's worked few, from 6a.3a — is in version 2's
-        // hash and not in version 1's: moving it moves the one and leaves the other
-        // where it was, while a key played since version 1 moves both. The
-        // current version's is the default, the one a capture writes.
+        // wears and the capacity a bar adds, from Phase 6a.1, the slots, the price
+        // and the enchanter's worked few, from 6a.3a, and the improvement roll's
+        // three, from 6a.4 — is in version 2's hash and not in version 1's: moving
+        // it moves the one and leaves the other where it was, while a key played
+        // since version 1 moves both. The current version's is the default, the one
+        // a capture writes.
         var v2Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 2).Select(k => k.Name).ToArray();
         Assert.Equal([nameof(Tuning.WearPerHit), nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
-            nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep), nameof(Tuning.EnchanterWorksOn)], v2Keys);
+            nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep), nameof(Tuning.EnchanterWorksOn),
+            nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight)], v2Keys);
         Assert.Equal(TuningJson.Hash(BuiltIn, SaveCodec.CurrentVersion), TuningJson.Hash(BuiltIn));
         string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2);
         Assert.NotEqual(one, two);

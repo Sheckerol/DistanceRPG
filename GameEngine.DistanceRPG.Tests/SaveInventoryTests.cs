@@ -120,6 +120,13 @@ public class SaveInventoryTests
             new("Runs", Kept.Saved, "lastResult.services[].runs"),
             new("Stalled", Kept.Saved, "lastResult.services[].stalled"),
             new("EnchantmentId", Kept.Saved, "lastResult.services[].enchantment, by id"),
+            new("Improved", Kept.Saved, "lastResult.services[].improved and .modifier, each by name: what the improvement roll did (Phase 6a.4)"),
+            new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which the save's map seed and ordinal replay"),
+        ],
+        [typeof(Improvement)] =
+        [
+            new("Kind", Kept.Saved, "lastResult.services[].improved, by name"),
+            new("Modifier", Kept.Saved, "lastResult.services[].modifier, by name"),
         ],
         [typeof(WeaponXpBook)] =
         [
