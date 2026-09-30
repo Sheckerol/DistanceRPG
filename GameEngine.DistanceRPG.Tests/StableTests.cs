@@ -130,10 +130,31 @@ public sealed class StableTests : IDisposable
 
         // A hand a move empties is armed from the bag, as the rest before a dungeon
         // arms it: the first weapon carried in the bag, moved into the hand. Put
-        // down in its own bag, the only weapon comes straight back to the hand.
+        // down in its own bag, the only weapon comes straight back to the hand — a
+        // move that changes nothing, which the hub asks first (ComesStraightBack)
+        // and refuses, saying why, so no move, log line or save is made of it (the
+        // audit of Phase 6a).
+        Assert.True(campaign.ComesStraightBack(Slot("A", 0), Slot("A", 4)));
+        Assert.True(campaign.ComesStraightBack(Slot("A", 0), Slot("A", 1)));
         Assert.Equal((stiletto, (Weapon?)null, (Weapon?)stiletto), campaign.Move(Slot("A", 0), Slot("A", 4)));
         Assert.Same(stiletto, a.EquippedWeapon);
         Assert.All(a.Inventory.Skip(1), Assert.Null);
+
+        // B carries two: its hand put down past the staff in its bag is a real
+        // move — the hand takes the staff up — and so is one onto the staff, a swap;
+        // put down ahead of it, it would come straight back. Nothing but a hand's
+        // weapon put where nothing lies in its own bag is asked.
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 2)));
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 1)));
+        campaign.Move(Slot("B", 1), Slot("B", 3));
+        Assert.True(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 1)));
+        Assert.True(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 2)));
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 4)));
+        campaign.Move(Slot("B", 3), Slot("B", 1));
+        Assert.False(campaign.ComesStraightBack(Slot("B", 1), Slot("B", 2)));
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("C", 2)));
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Stable(1)));
+        Assert.False(campaign.ComesStraightBack(Stable(0), Slot("B", 2)));
 
         // B carries two: its hand to the stable's end is allowed, and its staff is
         // taken up into the emptied hand.

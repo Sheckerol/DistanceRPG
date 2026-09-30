@@ -1052,6 +1052,18 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Enter);
         Assert.Equal(HubWeapons.KeepsAWeapon("A"), scene.Refusal);
 
+        // Into A's own bag room: A's emptied hand would take it straight back — a
+        // move that moves nothing, once logged and saved as one (the audit of Phase
+        // 6a). Refused, said why, still taken up; nothing moved, nothing asked.
+        ChooseRow(scene, "  BAG   - ROOM FOR 5 MORE -");
+        scene.OnKey(Keys.Enter);
+        Assert.Equal("AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A] WOULD TAKE IT STRAIGHT BACK", scene.Refusal);
+        Assert.Equal(HubWeapons.StraightBack("A"), scene.Refusal);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(1, host.HubSavesAsked);
+        Assert.DoesNotContain(GameEngine.Core.Diagnostics.Log.RecentEntries, entry => entry.Message.StartsWith("[Hub] Moved Weakspot Stiletto", StringComparison.Ordinal));
+
         // Onto the stable's staff instead: a swap, which leaves A armed — asked again.
         ChooseRow(scene, "  STAFF OF RENEWAL - WEAR 0/30");
         scene.OnKey(Keys.Enter);
@@ -1181,6 +1193,14 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.All(HubWeapons.Runs(worked), run => Assert.Equal(DungeonHud.Cyan, run.Color));
         Assert.All(HubWeapons.Runs(stalled), run => Assert.Equal(DungeonHud.Yellow, run.Color));
         Assert.Equal("> WORKING  STAFF OF RENEWAL - 1 OF 2 RUNS <", string.Concat(HubWeapons.Runs(worked, chosen: true).Select(run => run.Text)));
+
+        // Chosen, a shop row keeps its state's colour, and its marks alone say it is
+        // the choice: yellow is STALLED's, and a chosen WORKING row drawn in it read
+        // as stalled (the audit of Phase 6a). Every other row chosen is yellow.
+        Assert.All(HubWeapons.Runs(worked, chosen: true), run => Assert.Equal(DungeonHud.Cyan, run.Color));
+        Assert.All(HubWeapons.Runs(stalled, chosen: true), run => Assert.Equal(DungeonHud.Yellow, run.Color));
+        Assert.Equal("> STALLED  STAFF OF RENEWAL - 1 OF 2 RUNS <", string.Concat(HubWeapons.Runs(stalled, chosen: true).Select(run => run.Text)));
+        Assert.Equal(DungeonHud.Yellow, HubWeapons.Runs(rows.First(row => row.Kind == HubWeapons.RowKind.Weapon), chosen: true)[0].Color);
         var knife = new HubWeapons.Row(HubWeapons.RowKind.Shop, HubWeapons.WorkingLabel, Weapon: TestWeapons.Get("flensing_knife_unique"), Deposit: worked.Deposit);
         Assert.Equal(DungeonHud.Orange, HubWeapons.Runs(knife)[1].Color);
 
@@ -1515,10 +1535,12 @@ public sealed class BetweenRunsHudTests : IDisposable
         }
         foreach (string text in new[] { DungeonHud.WearLine(worn), BetweenRunsHud.CapacityLine(worn), DungeonHud.WearReadout(worn) })
             Glyphs(text);
+        Fits(BetweenRunsHud.HeldWearLine(worn), BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth, "the detail");
+        Glyphs(BetweenRunsHud.HeldWearLine(worn));
         Fits(BetweenRunsHud.CastsNothingLine, BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth, "the detail");
         Glyphs(BetweenRunsHud.CastsNothingLine);
 
-        foreach (string line in new[] { BetweenRunsHud.KeysLine, BetweenRunsHud.WeaponsKeysLine, HubWeapons.KeepsAWeapon("A"), BetweenRunsHud.MenuKeysLine(hasTitle: true) })
+        foreach (string line in new[] { BetweenRunsHud.KeysLine, BetweenRunsHud.WeaponsKeysLine, HubWeapons.KeepsAWeapon("A"), HubWeapons.StraightBack("A"), BetweenRunsHud.MenuKeysLine(hasTitle: true) })
         {
             Fits(line, BetweenRunsHud.KeysLineScale, BetweenRunsHud.FullWidth, "a line across the window");
             Glyphs(line);

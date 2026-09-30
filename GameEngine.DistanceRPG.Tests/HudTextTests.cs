@@ -315,7 +315,7 @@ public sealed class HudTextTests : IDisposable
         // itself, as a hit meets it: weapon plus innate.
         var tutorial = GameContent.Current.Dungeons.Tutorial;
         var golem = DungeonState.BossRow(tutorial, TestWeapons.Get("hatchet"));
-        Assert.Equal("STONE GOLEM [Hatchet]", DungeonHud.EnemyTitle(golem));
+        Assert.Equal("STONE GOLEM [HATCHET]", DungeonHud.EnemyTitle(golem));
         Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(golem));
         Assert.Equal("BLOCK 9", DungeonHud.InnateReadout(golem));
 
@@ -330,19 +330,19 @@ public sealed class HudTextTests : IDisposable
         // the Knife Mother's CritWindow x3 on a Weakspot Stiletto's x1 is 16+.
         var warrens = GameContent.Current.Dungeons["knife_warrens"];
         var mother = DungeonState.BossRow(warrens, TestWeapons.Get("weakspot_stiletto"));
-        Assert.Equal("KNIFE MOTHER [Weakspot Stiletto]", DungeonHud.EnemyTitle(mother));
+        Assert.Equal("KNIFE MOTHER [WEAKSPOT STILETTO]", DungeonHud.EnemyTitle(mother));
         Assert.Equal("CRIT 16+ x3", DungeonHud.InnateReadout(mother));
 
         // The golem the shipped seed's tutorial generates.
         var bottom = Floor.Generate(2762136374, 1, bottom: true, tutorial);
-        Assert.Equal("STONE GOLEM [Pinning Lance]", DungeonHud.EnemyTitle(bottom.Boss!));
+        Assert.Equal("STONE GOLEM [PINNING LANCE]", DungeonHud.EnemyTitle(bottom.Boss!));
         Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(bottom.Boss!));
 
         // Rank and file are named by what they hold, as they always were, and
         // carry nothing on themselves to print.
-        Assert.Equal("DUMMY [Arming Sword]", DungeonHud.EnemyTitle(new EnemyState()));
-        Assert.Equal("HEALER [Staff of Renewal]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_renewal") }));
-        Assert.Equal("CASTER [Staff of Mire]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_mire") }));
+        Assert.Equal("DUMMY [ARMING SWORD]", DungeonHud.EnemyTitle(new EnemyState()));
+        Assert.Equal("HEALER [STAFF OF RENEWAL]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_renewal") }));
+        Assert.Equal("CASTER [STAFF OF MIRE]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_mire") }));
         Assert.Equal("", DungeonHud.InnateReadout(new EnemyState()));
     }
 
@@ -556,8 +556,8 @@ public sealed class HudTextTests : IDisposable
 
         // On the floor, the boss's drop is a weapon like any other: its name - a
         // unique's in gold - and no count, since nobody farmed it.
-        Assert.Equal(new[] { "Hunting Bow" }, Item(bow));
-        Assert.Equal(new[] { "The Bulwark" }, Item(bulwark));
+        Assert.Equal(new[] { "HUNTING BOW" }, Item(bow));
+        Assert.Equal(new[] { "THE BULWARK" }, Item(bulwark));
     }
 
     [Fact]
@@ -570,15 +570,15 @@ public sealed class HudTextTests : IDisposable
         // extracted it, so it is one higher than the last plate the player read
         // over the living dummy; a dead one draws no plate to disagree with.
         var plain = new Drop(TestWeapons.Get("arming_sword"), DefeatCount: 0, WasUniqueRoll: false);
-        Assert.Equal(new[] { "Arming Sword" }, Item(plain));   // nothing farmed it: no quality to print
+        Assert.Equal(new[] { "ARMING SWORD" }, Item(plain));   // nothing farmed it: no quality to print
 
         var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
-        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));
+        Assert.Equal(new[] { "TOWER GUARD", "x7" }, Item(farmed));
 
         // A unique is named in the gold every other readout gives it, rather than
         // by a word the label would have to find room for.
         var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
-        Assert.Equal(new[] { "Widowmaker", "x22" }, Item(won));
+        Assert.Equal(new[] { "WIDOWMAKER", "x22" }, Item(won));
         Assert.NotEqual(DungeonHud.GroundItemRuns(farmed)[0].Color, DungeonHud.GroundItemRuns(won)[0].Color);
     }
 
@@ -593,12 +593,12 @@ public sealed class HudTextTests : IDisposable
         static string[] Loose(LooseItem item) => DungeonHud.LooseItemRuns(item).Select(r => r.Text).ToArray();
 
         var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
-        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
-        Assert.Equal(new[] { "Tower Guard" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
+        Assert.Equal(new[] { "TOWER GUARD", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
+        Assert.Equal(new[] { "TOWER GUARD" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
 
         var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
         var unique = DungeonHud.LooseItemRuns(new LooseItem(won.Weapon, (5, 5)));
-        Assert.Equal(new[] { "Widowmaker" }, unique.Select(r => r.Text));
+        Assert.Equal(new[] { "WIDOWMAKER" }, unique.Select(r => r.Text));
         Assert.Equal(DungeonHud.GroundItemRuns(won)[0].Color, unique[0].Color);
         Assert.NotEqual(DungeonHud.LooseItemRuns(new LooseItem(farmed.Weapon, (5, 5)))[0].Color, unique[0].Color);
 
@@ -612,7 +612,7 @@ public sealed class HudTextTests : IDisposable
         var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
         visit.OpenTurns(party, () => 10);
         var left = visit.Current.Leave(party[0], 1);
-        Assert.Equal(new[] { "Tower Guard" }, Loose(left));
+        Assert.Equal(new[] { "TOWER GUARD" }, Loose(left));
         Assert.DoesNotContain(Loose(left), text => text.StartsWith('x'));
     }
 
@@ -818,6 +818,122 @@ public sealed class HudTextTests : IDisposable
                 Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
                 Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
             }
+    }
+
+    [Fact]
+    public void AWeaponIsNamedOnScreenWithNoApostrophe()
+    {
+        // The HUD's font has no apostrophe: drawn, Skirmisher's Pike read SKIRMISHER
+        // S PIKE on every line that names it — the weapon line and the bag, a plate
+        // and what lies on the floor, the WEAPONS page, the deposit panel and its
+        // reasons, the run's summary (the audit of Phase 6a). Every name takes one
+        // door onto the screen (Weapon.Shown): capitals, the apostrophe dropped. The
+        // log keeps the name as the content spells it.
+        var pike = TestWeapons.Get("skirmishers_pike");
+        Assert.Equal("Skirmisher's Pike", pike.Name);
+        Assert.Equal("SKIRMISHERS PIKE", pike.ShownName);
+        Assert.Equal(["SKIRMISHERS PIKE", "WARDENS SHIELD", "HOPLITES WALL", "ASSASSINS FANG"],
+            new[] { "skirmishers_pike", "wardens_shield", "hoplites_wall", "assassins_fang" }.Select(id => Weapon.Shown(GameContent.Current.Weapons[id].Name)));
+        Assert.All(GameContent.Current.Weapons.All, def => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", Weapon.Shown(def.Name)));
+
+        Assert.Equal("[A] SKIRMISHERS PIKE", DungeonHud.WeaponRuns("[A] ", pike, null, 0, DungeonHud.Yellow)[0].Text);
+        Assert.Equal("DUMMY [SKIRMISHERS PIKE]", DungeonHud.EnemyTitle(new EnemyState { Weapon = pike }));
+        Assert.Equal("LEFT SKIRMISHERS PIKE HERE", DungeonHud.LeftBeat(pike));
+        Assert.Equal("SKIRMISHERS PIKE", DungeonHud.LooseItemRuns(new LooseItem(pike, (5, 5)))[0].Text);
+        Assert.Equal(("SKIRMISHERS PIKE", "THE SKIRMISHERS PIKE"), (HubWeapons.Name(pike), HubWeapons.The(pike)));
+        Assert.Equal("SKIRMISHERS PIKE IS IN THE SHOP ALREADY", Enchanter.InTheShop(pike));
+        Assert.StartsWith("SKIRMISHERS PIKE IS BACK FROM THE ENCHANTER - ", BetweenRunsHud.BackFromTheEnchanter(new ServiceReport(pike.Id, Service.Refine, 1, 1)), StringComparison.Ordinal);
+        Assert.Equal("DEPOSIT THE SKIRMISHERS PIKE", DepositPanel.Heading(pike));
+    }
+
+    [Fact]
+    public void TheWeaponLineAndTheBagWrapInA1280Window_AtTheirWidest()
+    {
+        // Phase 6a's audit: the weapon line along the top was one line centred on
+        // the window, and a weapon carrying the enchantments R4 lets it hold ran off
+        // both ends — its name gone at three, and at five even its WEAR — while the
+        // bag's statline ran off the right from two. Both now wrap between entries,
+        // never through one (DungeonHud.Wrap). The widest play can reach, for every
+        // weapon the content ships: every modifier the enchanter's roll could graft
+        // onto it and deepen, to exhaustion (Enchanter's own candidates), the five
+        // longest-named enchantments at T99 with their bars all but full, every one
+        // asleep in a member's hands, the member's tag before the name, and
+        // four-digit wear at its full capacity. In the shipped 1280 x 720 window
+        // every line fits, the top line ends above the party selector down the
+        // left, nothing is dropped, and a bag of six such weapons still ends above
+        // the help line with every slot drawn.
+        using var numbers = TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { WearCapacityPerBar = 1000 });
+        var content = GameContent.Current;
+        var souls = content.Enchantments.All.Where(def => !def.Unique).OrderByDescending(def => def.Name.Length).Take(5).ToArray();
+        float top = DungeonHud.WeaponLineWidth(1280f), bag = DungeonHud.InventoryDetailWidth(1280f);
+        static float Width(IReadOnlyList<DungeonHud.Run> line, float scale) => (line.Sum(run => run.Text.Length) + 2 * (line.Count - 1)) * 6f * scale;
+
+        Weapon Widest(WeaponDef def)
+        {
+            bool fixedElement = def.Enchantments.Any(row => content.Enchantments[row.Id].Effect == EffectKind.ElementalDamage);
+            var made = content.Weapons.Instantiate(def.Id, def.Class == WeaponClass.Wand && !fixedElement ? DamageType.Shocking : null);
+            while (Enchanter.GraftCandidates(made) is [var graft, ..])
+                made.Acquire(graft, 1);
+            while (Enchanter.DeepenCandidates(made) is [var (deepen, _), ..])
+                made.Acquire(deepen, 1);
+            var enchantments = souls.Select(soul => new Enchantment(soul, 99) { Xp = new Enchantment(soul, 99).TierCost(InnateStats.Low) - 1 }).ToArray();
+            const int cashed = 36_270;   // nine bars, 30 to 8030: a capacity of 9030
+            return new Weapon(def, made.Forged, made.Modifiers, enchantments, 0, wear: 9030, wearCashed: cashed);
+        }
+
+        int mostLines = 0;
+        foreach (var def in content.Weapons.All)
+        {
+            var member = TestPools.Holding("A", Widest(def));
+            var weapon = member.EquippedWeapon!;
+            Assert.Equal("WEAR 9030/9030 FULL", DungeonHud.WearReadout(weapon));
+            Assert.Equal(souls.Length, DungeonHud.EnchantmentEntries(weapon, member).Count(entry => entry.EndsWith(" (ASLEEP)", StringComparison.Ordinal)));
+
+            // The top line: as one line it runs past the window — the case — and
+            // wrapped, every line fits, every run is on one, the name first, and the
+            // last ends above the party selector.
+            var runs = DungeonHud.WeaponRuns("[A] ", weapon, member, 0, DungeonHud.WeaponLineColor(0));
+            Assert.True(Width(runs, DungeonHud.WeaponLineScale) > top, $"{def.Id}: {Width(runs, DungeonHud.WeaponLineScale)} px fits one line");
+            var lines = DungeonHud.TopWeaponLines(member, 0, 1280f);
+            Assert.All(lines, line => Assert.True(Width(line, DungeonHud.WeaponLineScale) <= top, $"{def.Id}: '{string.Join("  ", line.Select(run => run.Text))}' runs off the window"));
+            Assert.Equal(runs.Select(run => run.Text), lines.SelectMany(line => line).Select(run => run.Text));
+            Assert.Equal($"[A] {weapon.ShownName}", lines[0][0].Text);
+            Assert.InRange(lines.Count, 2, DungeonHud.WeaponLineMost);
+            Assert.Equal(lines.Count, DungeonHud.WeaponLinesShown(lines.Count, roomy: true));
+            Assert.True(DungeonHud.WeaponLineTop + (lines.Count - 1) * DungeonHud.WeaponLinePitch + 7f * DungeonHud.WeaponLineScale < 130f,
+                $"{def.Id}: {lines.Count} lines run into the party selector");
+            mostLines = Math.Max(mostLines, lines.Count);
+
+            // Under a menu or the notices, its first line alone, cut short as it says.
+            Assert.Equal(1, DungeonHud.WeaponLinesShown(lines.Count, roomy: false));
+            var cut = DungeonHud.CutShort(lines[0], DungeonHud.WeaponLineScale, top);
+            Assert.Equal("...", cut[^1].Text);
+            Assert.True(Width(cut, DungeonHud.WeaponLineScale) <= top);
+
+            // The bag: six of it, the hand's with its locks and bars, every line
+            // inside the window's right, every run drawn, and the panel — grown by the
+            // lines the slots wrap to — clear of the top readouts and the help line.
+            for (int slot = 1; slot < member.Inventory.Length; slot++)
+                member.Inventory[slot] = Widest(def);
+            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines(carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
+            for (int slot = 0; slot < slots.Length; slot++)
+            {
+                Assert.All(slots[slot], line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= bag, $"{def.Id}: bag slot {slot + 1} runs off the window"));
+                Assert.Equal(DungeonHud.WeaponRuns("", member.Inventory[slot]!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
+                    slots[slot].SelectMany(line => line).Select(run => run.Text));
+            }
+            Assert.Contains(slots[0].SelectMany(line => line), run => run.Text.Contains(" LOCK ", StringComparison.Ordinal));
+            var layout = DungeonHud.LayoutInventory(720f, slots.Length, 2 + 8, slots.Sum(lines => lines.Count - 1));
+            Assert.True(layout.Top >= 56f, $"{def.Id}: the bag is over the top readouts");
+            Assert.True(layout.Bottom <= 720f - 24f, $"{def.Id}: the bag runs past the help line");
+        }
+        Assert.InRange(mostLines, 3, DungeonHud.WeaponLineMost);
+        Assert.Equal(5, DungeonHud.WeaponLineMost);
+
+        // Wrapping breaks between runs alone, and a line that fits stays one line.
+        var fits = DungeonHud.TopWeaponLines(TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")), 0, 1280f);
+        Assert.Single(fits);
+        Assert.Equal(DungeonHud.WeaponRuns("[A] ", TestWeapons.Get("weakspot_stiletto"), null, 0, DungeonHud.White).Count, fits[0].Count);
     }
 
     [Fact]
@@ -1341,6 +1457,37 @@ public sealed class HudTextTests : IDisposable
 
         // Every line of the menu fits the font: capitals, digits, spaces, dashes.
         Assert.All(options.Append(savesLine), line => Assert.Matches("^[A-Z0-9 -]+$", line));
+    }
+
+    [Fact]
+    public void AMemberFallenBeforeAMidRunSave_IsBuiltFallen()
+    {
+        // A mid-run save brings a fallen member back fallen, and the scene built its
+        // stand-in in the member's live colour all the same: after CONTINUE a corpse
+        // stood in A's red beside a party list that read A dead (the audit of Phase
+        // 6a, of a Phase 5 resume). A member is built in its place's colour while it
+        // stands and in the corpse's grey fallen (DungeonScene.MemberColor) — as a
+        // death turns it, and as a fallen enemy is built — and the scene builds its
+        // party through that alone.
+        var campaign = CampaignState.Start(GameContent.Current);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        visit.OpenTurns(campaign.Party, () => 10);
+        (campaign.Party[0].Hp, campaign.Party[0].Alive) = (0, false);
+        var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign, new ViewDto("B", MarchingThisTurn: true)))), GameContent.Current);
+        var party = loaded.Campaign.Party;
+        Assert.Equal([false, true, true, true], party.Select(member => member.Alive));
+        Assert.Equal(DungeonScene.DeadColor, DungeonScene.MemberColor(party[0], 0));
+        var scene = new DungeonScene(camera: null!, game: null!, loaded.Campaign, new NoRunHost(), new ResumeView(loaded.View, 0, []));
+        for (int i = 1; i < party.Count; i++)
+            Assert.Equal(scene.PartyColor(i), DungeonScene.MemberColor(party[i], i));
+        Assert.All(Enumerable.Range(0, party.Count), i => Assert.NotEqual(DungeonScene.DeadColor, scene.PartyColor(i)));
+
+        var built = TestIl.Calls(typeof(DungeonScene).Assembly)
+            .Where(call => call.From.DeclaringType == typeof(DungeonScene) && call.From.Name == "SpawnParty")
+            .Select(call => call.Target.Name)
+            .ToArray();
+        Assert.Contains(nameof(DungeonScene.MemberColor), built);
+        Assert.DoesNotContain(nameof(DungeonScene.PartyColor), built);
     }
 
     [Fact]

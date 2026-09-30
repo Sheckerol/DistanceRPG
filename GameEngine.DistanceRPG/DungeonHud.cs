@@ -124,8 +124,9 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The highest a notice row is drawn: under the two readouts along the top —
-    /// the MOVE line, and the weapon line at 42 under it — so a notice is never
-    /// drawn over them or off the window. When the rows reach it, the banner
+    /// the MOVE line, and the weapon line at 42 under it, drawn to its first line
+    /// alone while a notice is up (<see cref="WeaponLinesShown"/>) — so a notice is
+    /// never drawn over them or off the window. When the rows reach it, the banner
     /// moves down to make room (<see cref="BannerLine"/>).
     /// </summary>
     internal const float NoticeTopMargin = 62f;
@@ -439,7 +440,7 @@ public sealed class DungeonHud
         else if (scene.AnyMenuOpen)
             _fade.Draw(_game.ShaderManager, 0.65f);
 
-        DrawTopReadouts(w, active, turns);
+        DrawTopReadouts(w, active, turns, roomy: !scene.AnyMenuOpen && _noticeRows.Count == 0);
         DrawFloorLine(scene.Visit);
         DrawPartySelector(scene);
         if (ended is null)
@@ -508,7 +509,14 @@ public sealed class DungeonHud
 
     // ── Sections ─────────────────────────────────────────────────────────────
 
-    private void DrawTopReadouts(int w, PartyMemberState active, TurnSystem turns)
+    /// <summary>
+    /// The two readouts along the top: the MOVE line, and the weapon line under it
+    /// (<see cref="TopWeaponLines"/>), as many of its lines as <see cref="WeaponLinesShown"/>
+    /// gives — every one while nothing is over the floor (<paramref name="roomy"/>),
+    /// and its first alone under a menu or the notices, which the band under it is
+    /// kept for.
+    /// </summary>
+    private void DrawTopReadouts(int w, PartyMemberState active, TurnSystem turns, bool roomy)
     {
         // Mire deep enough to take the whole budget is paralysis, called out beside the budget it emptied.
         var budget = new List<Run> { new($"[{active.Id}] MOVE: {MathF.Ceiling(active.DistLeft)} / {active.EffectiveMax:0}", White) };
@@ -517,11 +525,104 @@ public sealed class DungeonHud
         budget.Add(new Run($"  {ManaReadout(active)}", White));
         DrawRunsCenteredAt(w / 2f, 14f, 2f, budget);
 
-        var weapon = active.EquippedWeapon;
-        if (weapon == null)
-            DrawCentered(w, 42f, $"[{active.Id}] (NO WEAPON)", 1.5f, Yellow);
-        else
-            DrawRunsCenteredAt(w / 2f, 42f, 1.5f, WeaponRuns($"[{active.Id}] ", weapon, active, turns.AttacksThisTurn(active), WeaponLineColor(0)));
+        if (active.EquippedWeapon == null)
+        {
+            DrawCentered(w, WeaponLineTop, $"[{active.Id}] (NO WEAPON)", WeaponLineScale, Yellow);
+            return;
+        }
+        var lines = TopWeaponLines(active, turns.AttacksThisTurn(active), w);
+        int shown = WeaponLinesShown(lines.Count, roomy);
+        for (int i = 0; i < shown; i++)
+        {
+            var line = i == shown - 1 && shown < lines.Count ? CutShort(lines[i], WeaponLineScale, WeaponLineWidth(w)) : lines[i];
+            DrawRunsCenteredAt(w / 2f, WeaponLineTop + i * WeaponLinePitch, WeaponLineScale, line);
+        }
+    }
+
+    // The weapon line along the top: where its first line sits, under the MOVE
+    // line; its scale; the pitch its wrapped lines keep, a line's glyphs and a gap;
+    // the margin it keeps from either side of the window, the floor line's; and the
+    // clearance its last line keeps over the party selector.
+    internal const float WeaponLineTop = 42f;
+    internal const float WeaponLineScale = 1.5f;
+    internal const float WeaponLinePitch = 16f;
+    private const float WeaponLineMargin = 14f;
+    private const float WeaponLineClearance = 6f;
+
+    /// <summary>How wide a line of the weapon line may run in a window <paramref name="windowWidth"/> pixels wide: the window, less the margin either side.</summary>
+    internal static float WeaponLineWidth(float windowWidth) => windowWidth - 2f * WeaponLineMargin;
+
+    /// <summary>
+    /// The most lines the weapon line wraps to on screen: as many as fit between its
+    /// first and the party selector down the left, which the wrapped lines, centred
+    /// and as wide as the window, would otherwise run through — five.
+    /// </summary>
+    internal static int WeaponLineMost
+        => (int)MathF.Floor((SelectorTop - WeaponLineClearance - WeaponLineTop - GlyphHeight * WeaponLineScale) / WeaponLinePitch) + 1;
+
+    /// <summary>
+    /// How many of the weapon line's <paramref name="lines"/> are drawn: all of them,
+    /// up to <see cref="WeaponLineMost"/>, while the floor is <paramref name="roomy"/>
+    /// — no menu over it and no notice up — and otherwise the first alone. A menu
+    /// or a notice keeps the band under the top readouts for itself
+    /// (<see cref="InventoryTopMargin"/>, <see cref="SummaryFloor"/>,
+    /// <see cref="NoticeTopMargin"/>), and the bag, the one menu that speaks of the
+    /// weapon, says it whole. A line cut short ends <c>...</c> (<see cref="CutShort"/>).
+    /// </summary>
+    internal static int WeaponLinesShown(int lines, bool roomy)
+        => Math.Min(lines, roomy ? WeaponLineMost : 1);
+
+    /// <summary>
+    /// The weapon in <paramref name="active"/>'s hand as the top line reads it
+    /// (<see cref="WeaponRuns"/>, led by the member's tag), wrapped to the window
+    /// (<see cref="Wrap"/>): its name, statline, wear and modifiers first, and then
+    /// its enchantments, each whole on a line — so a weapon carrying the most there
+    /// are, each with its lock and bar and asleep, is read to its last entry, where
+    /// one line centred on the window lost both its ends. Empty for an empty hand.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<Run>> TopWeaponLines(PartyMemberState active, int attacksThisTurn, float windowWidth)
+    {
+        ArgumentNullException.ThrowIfNull(active);
+        return active.EquippedWeapon is { } weapon
+            ? Wrap(WeaponRuns($"[{active.Id}] ", weapon, active, attacksThisTurn, WeaponLineColor(0)), WeaponLineScale, WeaponLineWidth(windowWidth))
+            : [];
+    }
+
+    /// <summary>
+    /// <paramref name="runs"/> as lines no wider than <paramref name="width"/> at
+    /// <paramref name="scale"/>, drawn <see cref="RunGap"/> apart: each run on the
+    /// line it starts on while it fits there, and otherwise first on the next — a
+    /// run is never split. A run wider than a line alone has one to itself.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<Run>> Wrap(IReadOnlyList<Run> runs, float scale, float width)
+    {
+        ArgumentNullException.ThrowIfNull(runs);
+        var lines = new List<IReadOnlyList<Run>>();
+        var line = new List<Run>();
+        foreach (var run in runs)
+        {
+            if (line.Count > 0 && RunsWidth([.. line, run], scale) > width)
+            {
+                lines.Add(line);
+                line = [];
+            }
+            line.Add(run);
+        }
+        if (line.Count > 0)
+            lines.Add(line);
+        return lines;
+    }
+
+    /// <summary>A line with more after it than is drawn: ended <c>...</c> in grey, as many of its last runs dropped as the mark needs to fit <paramref name="width"/>.</summary>
+    internal static IReadOnlyList<Run> CutShort(IReadOnlyList<Run> line, float scale, float width)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        var more = new Run("...", Grey);
+        var cut = line.ToList();
+        while (cut.Count > 1 && RunsWidth([.. cut, more], scale) > width)
+            cut.RemoveAt(cut.Count - 1);
+        cut.Add(more);
+        return cut;
     }
 
     /// <summary>
@@ -638,7 +739,7 @@ public sealed class DungeonHud
     internal static string BossDropLine(Drop drop, ModifierType? theme)
     {
         ArgumentNullException.ThrowIfNull(drop);
-        string name = drop.Weapon.Name.ToUpperInvariant();
+        string name = drop.Weapon.ShownName;
         if (drop.Weapon.Unique) return $"DROPPED: {name} - UNIQUE";
         return theme is { } t ? $"DROPPED: {name} - FORGED WITH {ModifierName(t)}" : $"DROPPED: {name}";
     }
@@ -653,7 +754,7 @@ public sealed class DungeonHud
     internal static string? UniqueBeat(Drop drop)
     {
         ArgumentNullException.ThrowIfNull(drop);
-        return drop.Weapon.Unique ? $"UNIQUE: {drop.Weapon.Name.ToUpperInvariant()}!" : null;
+        return drop.Weapon.Unique ? $"UNIQUE: {drop.Weapon.ShownName}!" : null;
     }
 
     /// <summary>A modifier by name in the HUD's capitals, its words apart: <c>BLOCK</c>, <c>CRIT WINDOW</c>, <c>LONGSHOT</c>.</summary>
@@ -1086,7 +1187,7 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(enemy);
         string name = enemy.Title?.ToUpperInvariant()
             ?? (enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY");
-        return $"{name} [{enemy.Weapon.Name}]";
+        return $"{name} [{enemy.Weapon.ShownName}]";
     }
 
     /// <summary>How far apart the labels of two items on one tile stack: a label's height and a hair.</summary>
@@ -1140,7 +1241,7 @@ public sealed class DungeonHud
     internal static IReadOnlyList<Run> LooseItemRuns(LooseItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        return [new Run(item.Weapon.Name, item.Weapon.Unique ? Orange : White)];
+        return [new Run(item.Weapon.ShownName, item.Weapon.Unique ? Orange : White)];
     }
 
     /// <summary>
@@ -1165,7 +1266,7 @@ public sealed class DungeonHud
     internal static IReadOnlyList<Run> GroundItemRuns(Drop drop)
     {
         ArgumentNullException.ThrowIfNull(drop);
-        var runs = new List<Run> { new(drop.Weapon.Name, drop.Weapon.Unique ? Orange : White) };
+        var runs = new List<Run> { new(drop.Weapon.ShownName, drop.Weapon.Unique ? Orange : White) };
         if (drop.DefeatCount > 0)
             runs.Add(new Run($"x{drop.DefeatCount}", Orange));
         return runs;
@@ -1210,6 +1311,16 @@ public sealed class DungeonHud
     /// <summary>A slot: its name, and the statline under it.</summary>
     private const float InventorySlotPitch = 46f;
 
+    /// <summary>
+    /// A slot's statline: how far under the name it starts, how far in — past the
+    /// slot's number — its scale, and the pitch of each line it wraps to past its
+    /// first, which a slot grows by (<see cref="SlotDetailLines"/>).
+    /// </summary>
+    private const float InventoryDetailDrop = 18f;
+    private const float InventoryDetailIndent = 3 * GlyphAdvance * 2f;
+    internal const float InventoryDetailScale = 1.3f;
+    private const float InventoryDetailPitch = 12f;
+
     /// <summary>The PROGRESSION label over the rows.</summary>
     private const float InventoryLabelHeight = 16f;
 
@@ -1229,7 +1340,7 @@ public sealed class DungeonHud
     /// <summary>Clearance kept under the panel for the help line at <c>h - 24</c>.</summary>
     private const float InventoryBottomMargin = 32f;
 
-    /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under.</summary>
+    /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under: the weapon line is its first line alone while a menu is open (<see cref="WeaponLinesShown"/>).</summary>
     private const float InventoryTopMargin = 56f;
 
     /// <summary>How far either side of the middle the panel's column runs: its slots start this far left, and the header row's right-hand hint ends this far right.</summary>
@@ -1252,11 +1363,14 @@ public sealed class DungeonHud
     /// six with every row printed. Below that even a row-less panel is taller
     /// than the room under the readouts, and the panel is then anchored as high
     /// as it goes and clipped: that is a window smaller than the rest of the
-    /// HUD is laid out for either.
+    /// HUD is laid out for either. A slot whose statline wraps
+    /// (<see cref="SlotDetailLines"/>) grows the panel by
+    /// <paramref name="wrappedLines"/> — every slot's lines past its first —
+    /// as a class row does: slid up first, then rows dropped.
     /// </summary>
-    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount)
+    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0)
     {
-        float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + InventoryLabelHeight
+        float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + wrappedLines * InventoryDetailPitch + InventoryLabelHeight
             + InventorySwapGap + InventoryHintGap + InventoryLineHeight;
         float floorLine = windowHeight - InventoryBottomMargin;
         float top = MathF.Min(windowHeight / 2f - InventoryCentredOffset,
@@ -1264,6 +1378,26 @@ public sealed class DungeonHud
         top = MathF.Max(InventoryTopMargin, top);
         int rows = Math.Clamp((int)MathF.Floor((floorLine - top - fixedHeight) / InventoryRowPitch), 0, rowCount);
         return new InventoryLayout(top, rows, top + fixedHeight + rows * InventoryRowPitch);
+    }
+
+    /// <summary>How wide a slot's statline may run in a window <paramref name="windowWidth"/> pixels wide: from where it starts, right of the slot's number, to the weapon line's margin from the window's right.</summary>
+    internal static float InventoryDetailWidth(float windowWidth)
+        => windowWidth - WeaponLineMargin - (windowWidth / 2f - InventoryHalfWidth + InventoryDetailIndent);
+
+    /// <summary>
+    /// A bag slot's statline as the bag panel draws it under the weapon's name: the
+    /// weapon's runs as they read in <paramref name="member"/>'s hands
+    /// (<see cref="WeaponRuns"/>) less the name, which is the line above, wrapped to
+    /// <paramref name="width"/> (<see cref="Wrap"/>) — so the weapon in hand's
+    /// enchantments, each with its lock and bar, run to their last rather than off
+    /// the window's right.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<Run>> SlotDetailLines(Weapon weapon, PartyMemberState member, int attacksThisTurn, Vector4 color, float width)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var runs = WeaponRuns("", weapon, member, attacksThisTurn, color);
+        runs.RemoveAt(0);   // the name is the line above
+        return Wrap(runs, InventoryDetailScale, width);
     }
 
     /// <summary>
@@ -1287,7 +1421,15 @@ public sealed class DungeonHud
         foreach (string row in ProficiencyRows(active))
             rows.Add(new Run(row, Cyan));
 
-        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count);
+        // Each weapon's statline as it reads in this member's hands, wrapped to the
+        // room right of its slot's number: a slot grows by the lines it wraps to.
+        int attacks = turns.AttacksThisTurn(active);
+        var details = active.Inventory
+            .Select((weapon, slot) => weapon is null ? [] : SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)))
+            .ToArray();
+        int wrapped = details.Sum(lines => Math.Max(0, lines.Count - 1));
+
+        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped);
         float top = layout.Top;
         float left = cx - InventoryHalfWidth;
 
@@ -1300,25 +1442,25 @@ public sealed class DungeonHud
             _text.DrawText(LeaveKeyHint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
         }
 
+        float y = top + InventorySlotsTop;
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
-            float y = top + InventorySlotsTop + slot * InventorySlotPitch;
             var weapon = active.Inventory[slot];
             if (weapon == null)
             {
                 _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
+                y += InventorySlotPitch;
                 continue;
             }
 
             // The name, then the statline and modifiers under it as they read in this member's hands.
-            var color = WeaponLineColor(slot);
-            _text.DrawText($"{slot + 1}  {weapon.Name}", left, y, 2f, weapon.Unique ? Orange : color);
-            var detail = WeaponRuns("", weapon, active, turns.AttacksThisTurn(active), color);
-            detail.RemoveAt(0); // the name is the line above
-            DrawRuns(left + 3 * GlyphAdvance * 2f, y + 18f, 1.3f, detail);
+            _text.DrawText($"{slot + 1}  {weapon.ShownName}", left, y, 2f, weapon.Unique ? Orange : WeaponLineColor(slot));
+            for (int line = 0; line < details[slot].Count; line++)
+                DrawRuns(left + InventoryDetailIndent, y + InventoryDetailDrop + line * InventoryDetailPitch, InventoryDetailScale, details[slot][line]);
+            y += InventorySlotPitch + Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch;
         }
 
-        float rowY = top + InventorySlotsTop + active.Inventory.Length * InventorySlotPitch;
+        float rowY = y;
         _text.DrawText("PROGRESSION", left, rowY, 1.2f, Grey);
         rowY += InventoryLabelHeight;
         for (int i = 0; i < layout.Rows; i++)
@@ -1413,7 +1555,7 @@ public sealed class DungeonHud
     internal static string LeftBeat(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        return $"LEFT {weapon.Name.ToUpperInvariant()} HERE";
+        return $"LEFT {weapon.ShownName} HERE";
     }
 
     // ── The menu: the pause menu, and the same menu between runs ─────────────
@@ -1546,26 +1688,26 @@ public sealed class DungeonHud
     // ── Weapon readouts ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// A weapon as one line of runs: its name (a unique's in gold) and resolved
-    /// statline, its wear against its capacity (<see cref="WearReadout"/>: in the
-    /// line's colour, and green once full, <see cref="WearColor"/>), its
-    /// modifiers, then its enchantments in attachment order — a caster's innate,
-    /// a unique's souls.
+    /// A weapon as runs, read as one line where it fits: its name (a unique's in
+    /// gold) and resolved statline, its wear against its capacity
+    /// (<see cref="WearReadout"/>: in the line's colour, and green once full,
+    /// <see cref="WearColor"/>), its modifiers, then its enchantments in attachment
+    /// order — a caster's innate, a unique's souls. Each modifier and each
+    /// enchantment is a run of its own, the first of each led <c>* </c>, so a line
+    /// too wide for the window wraps between entries (<see cref="Wrap"/>) and never
+    /// through one; side by side, <see cref="RunGap"/> apart, they read as the
+    /// readouts join them.
     /// </summary>
-    private static List<Run> WeaponRuns(string prefix, Weapon weapon, ActorState? wielder, int attacksThisTurn, Vector4 color)
+    internal static List<Run> WeaponRuns(string prefix, Weapon weapon, ActorState? wielder, int attacksThisTurn, Vector4 color)
     {
         var runs = new List<Run>
         {
-            new($"{prefix}{weapon.Name}", weapon.Unique ? Orange : color),
+            new($"{prefix}{weapon.ShownName}", weapon.Unique ? Orange : color),
             new(WeaponStats(weapon), color),
             new(WearReadout(weapon), WearColor(weapon, color)),
         };
-        string modifiers = ModifierReadout(weapon, wielder, attacksThisTurn);
-        if (modifiers.Length > 0)
-            runs.Add(new Run($"* {modifiers}", White));
-        string enchantments = EnchantmentReadout(weapon, wielder);
-        if (enchantments.Length > 0)
-            runs.Add(new Run($"* {enchantments}", Cyan));
+        runs.AddRange(ModifierEntries(weapon, wielder, attacksThisTurn).Select((entry, i) => new Run(i == 0 ? $"* {entry}" : entry, White)));
+        runs.AddRange(EnchantmentEntries(weapon, wielder).Select((entry, i) => new Run(i == 0 ? $"* {entry}" : entry, Cyan)));
         return runs;
     }
 
@@ -1670,6 +1812,10 @@ public sealed class DungeonHud
     /// shows its caps. Empty for a weapon with no stacks.
     /// </summary>
     internal static string ModifierReadout(Weapon weapon, ActorState? wielder = null, int attacksThisTurn = 0)
+        => string.Join("  ", ModifierEntries(weapon, wielder, attacksThisTurn));
+
+    /// <summary>The entries <see cref="ModifierReadout"/> joins, each on its own: <c>BLOCK 6</c>, <c>CRIT 19+ x3</c>.</summary>
+    internal static IReadOnlyList<string> ModifierEntries(Weapon weapon, ActorState? wielder = null, int attacksThisTurn = 0)
     {
         var context = new ReadoutContext(weapon, wielder,
             Equipped: wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon), attacksThisTurn);
@@ -1683,7 +1829,7 @@ public sealed class DungeonHud
             if (!parts.Contains(text)) // the crit pair reads as one entry
                 parts.Add(text);
         }
-        return string.Join("  ", parts);
+        return parts;
     }
 
     /// <summary>
@@ -1816,6 +1962,10 @@ public sealed class DungeonHud
     /// </para>
     /// </summary>
     internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
+        => string.Join("  ", EnchantmentEntries(weapon, wielder));
+
+    /// <summary>The entries <see cref="EnchantmentReadout"/> joins, each on its own: <c>VAMPIRIC T3 LOCK 60 XP 0/60</c>.</summary>
+    internal static IReadOnlyList<string> EnchantmentEntries(Weapon weapon, ActorState? wielder = null)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
@@ -1837,7 +1987,7 @@ public sealed class DungeonHud
             }
             parts.Add(text);
         }
-        return string.Join("  ", parts);
+        return parts;
     }
 
     private static string ShapeName(AreaShape shape) => shape.Kind.ToString().ToUpperInvariant();

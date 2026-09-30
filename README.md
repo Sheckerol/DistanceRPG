@@ -92,8 +92,8 @@ the title.
 | 1 | `1  ENCHANT - A CHOSEN ENCHANTMENT - 3 IN 100 TO IMPROVE`: the offer list. Dimmed with its reason — `NO FREE SLOT - SLOT 2 OPENS AT CAPACITY 35 - IT IS 31`, `ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0`, `ALL 5 SLOTS ARE FILLED`, `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` — the key says the reason over the keys, and picks nothing |
 | 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
 | 3 | `3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE`: the source list, every soul on the party's other weapons and then the weapon's own. Dimmed with its reason as ENCHANT is, or `NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT` |
-| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul and where it comes from: `VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2 RUNS`, or on a sword carrying Flaming and Vampiric `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING`) and skipped. Each list scrolls with the choice |
-| Enter | On either list, choose it: the confirm. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
+| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul, the weapon it is on and whose hand or bag that is, or the stable: `VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T2 - 2 RUNS`, or on a sword carrying Flaming and Vampiric `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS`; a soul that does nothing yet moves all the same, noted `DOES NOTHING YET`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD IN THE STABLE - THE ROTWOOD WOULD CAST NOTHING`), and chosen a line at a time like the rest, so every line of a long list comes into view. Each list opens on the first that can be chosen and scrolls with the choice |
+| Enter | On either list, choose it: the confirm — or, on a refused one, say why over the keys and choose nothing. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
 | Esc | Back a step: from the confirm to the list it came from (or the services), from either list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
 | Tab, D, T | Nothing |
 
@@ -147,7 +147,10 @@ bag.
 strikes, each counter and each brace, and each landed cast of a staff, a heal or
 a curse alike — up to its capacity, 30 on every new weapon (`StartingPool`). The
 weapon line at the top of the screen, and each weapon in the bag, reads its wear
-over its capacity after the statline, `WEAR 12/30`, in the line's own colour; a
+over its capacity after the statline, `WEAR 12/30`, in the line's own colour —
+each wrapping between its entries onto lines under it where it would run off the
+window, as a weapon carrying several enchantments does, the top line to its first
+alone while a menu or a notice is up; a
 full weapon reads `WEAR 30/30 FULL` in green — on the yellow line of the weapon
 in hand as on a white one — banks nothing more, and plays exactly as it did —
 wear is a resource the enchanter spends between runs, never damage, and a full
@@ -172,15 +175,20 @@ campaign, which is saved at once, into its own slot (PHASE 6a DECISION 10 in
 `docs/roadmap/open-questions.md`); a save that fails says so at once under the
 title, until a later save goes through. No move leaves a member carrying no
 weapon, and a hand a move empties takes up the first weapon in its bag, as it
-would before a dungeon (PHASE 6a DECISION 7). The log says each move: `[Hub]
-Moved Staff of Renewal from A's bag slot 2 to the stable's end`.
+would before a dungeon (PHASE 6a DECISION 7) — so a hand's weapon put down in its
+own bag ahead of every weapon there would come straight back, and is refused as
+changing nothing: `AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A] WOULD TAKE
+IT STRAIGHT BACK`. The log says each move: `[Hub] Moved Staff of Renewal from A's
+bag slot 2 to the stable's end`. On screen a name is drawn without its apostrophe,
+which the font lacks: `SKIRMISHERS PIKE`.
 
 **The enchanter** (Phase 6a): the WEAPONS page ends with the enchanter's
 shop — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` until the tutorial is
 beaten, and then `THE ENCHANTER - WORKS ON THE 2 NEWEST` over each weapon in it,
 the newest first: `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan for the two the next
 run that counts works (`EnchanterWorksOn`), `STALLED  RIPOSTE BLADE - 0 OF 1 RUN`
-in yellow for the rest — or `THE ENCHANTER - NOTHING IN THE SHOP`. A weapon in the
+in yellow for the rest — or `THE ENCHANTER - NOTHING IN THE SHOP`; chosen, a row
+keeps its colour, marked `> <`. A weapon in the
 shop is chosen to be read, never taken up; its detail says what its deposit bought
 and its runs (`ENCHANT VAMPIRIC - 1 OF 2 RUNS`, `REFINE - 0 OF 1 RUN`), and when it
 comes back (`WORKING - BACK AFTER 1 MORE RUN THAT COUNTS`) or what it waits on
@@ -256,7 +264,8 @@ lands last, acquired: the forged mark stays with the weapon forged with it. Both
 weapons wait in the shop as one deposit, one of the two the enchanter works on, the
 source's wear left in its pool: the WEAPONS page lists the source `HELD     NAMELESS
 KNIFE` under `WORKING  RIPOSTE BLADE - 0 OF 1 RUN`, its detail `HELD - GIVING
-VAMPIRIC TO THE RIPOSTE BLADE`, and T on either takes both back. The summary says
+VAMPIRIC TO THE RIPOSTE BLADE` (a full one's wear `WEAR 40 OF 40 - FULL - THE MOVE
+LEAVES IT UNSPENT`), and T on either takes both back. The summary says
 `RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
 under it, `NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF`. Moving a
 weapon's own soul to its end is a reorder: it takes the weapon's count in runs

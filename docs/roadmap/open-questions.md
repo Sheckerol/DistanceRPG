@@ -515,9 +515,10 @@ Spoils carried home stay in the bags, as ever. **No move leaves a member
 carrying no weapon**: it is refused, `EACH MEMBER KEEPS A WEAPON - [A] WOULD
 CARRY NONE`, and the weapon stays taken up. A hand a move empties is armed from
 the bag as the rest before a dungeon arms it. A finished service at the enchanter
-returns its weapon to the stable's end (Phase 6a.3a), and a deposit is refused on
-the same rule — `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` —
-a transfer, when it arrives, asked with both of its weapons gone.
+returns its weapons to the stable's end (Phase 6a.3a), and a deposit is refused
+on the same rule — `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE
+FIRST` — and a transfer (Phase 6a.6) is asked with both of its weapons gone, its
+reason shown on the source's row.
 
 **This decides where the party's spare weapons live and whether a member can be
 left unarmed, so it is the user's to decide.** The alternatives: (a) a capped
@@ -730,10 +731,14 @@ dimmed with its reason):
   never strikes). An element on a staff is offered with no note: it fires on the
   cast, paying its trigger, and types a cast that lands no damage, so it spends
   mana for nothing;
-- a refused choice is listed with its reason, never hidden. An Enchant with nothing
-  left to choose — every offer refused, or none left (nothing met, or only what
-  the enchanter never offers) — is refused as such (`NOTHING TO OFFER - NO
-  ENCHANTMENT MET YET CAN GO ON IT`), and refining is left;
+- a refused choice is listed with its reason, never hidden — and, since Phase 6a's
+  audit, chosen like the rest: W/S stop on it, dimmed and marked, and Enter on it
+  says why and chooses nothing, since a list that passed over its refused lines
+  never showed a run of them longer than its window past either end of what could
+  be chosen. An Enchant with nothing left to choose — every offer refused, or
+  none left (nothing met, or only what the enchanter never offers) — is refused
+  as such (`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`), and
+  refining is left;
 - a transfer (Phase 6a.6; `Enchanter.TransferRefusal`) asks the moved soul the
   same relations, the wand's rule and the staff's side on the weapon it lands on
   — its own entries, less the soul for a reorder — and refuses one that would
@@ -780,7 +785,13 @@ a staff's cast skip an entry for the other side — a change to how a cast plays
 and note it `NEVER FIRES ON A STAFF`; or (h) give `weapons.json` the rule too, so
 a unique staff cannot ship what the enchanter refuses, as the wand's rule is
 shared. And for an element on a staff: (i) note it as never firing, or refuse it.
-settled.md's Phase 6a implementation pass records the ruling.
+And for how a list's refused lines are walked (Phase 6a's audit): (j) W/S pass
+over a refused line, as the game's other lists pass over what cannot be chosen,
+the window pulling in the refused lines past either end of what can be as far as
+it has room — quicker to walk, but a run of them longer than the window at either
+end stays out of view: a crossbow with every slot filled, whose reorders are all a
+MOVE may choose, listed 37 refused souls over them in a window of 25. settled.md's
+Phase 6a implementation pass records the ruling.
 
 ## How a landed improvement chooses (§6.4) — PHASE 6a DECISION 5
 
@@ -919,7 +930,9 @@ leaves while the move is made, what the queue counts it as, and what it rolls.
   in 100); a reorder's are DECISION 11's;
 - the soul may come from any weapon the party owns out of the shop — a member's or
   the stable's — whatever it is: a forged innate, a unique's soul, one of a kind
-  that does nothing yet. The enchanter moves what it never offers to copy;
+  that does nothing yet, the source list noting that one `DOES NOTHING YET` as it
+  notes one that never fires (Phase 6a's audit). The enchanter moves what it never
+  offers to copy;
 - **the source's wear is left in its pool**, uncashed, and comes back with it;
 - **both weapons stay in the shop until it is done, as one deposit**, which holds
   one of the `EnchanterWorksOn` newest places, not two; the WEAPONS page lists the

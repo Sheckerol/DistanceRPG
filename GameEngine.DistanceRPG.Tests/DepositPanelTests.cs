@@ -232,8 +232,10 @@ public sealed class DepositPanelTests : IDisposable
         // all; a refused offer is listed, dimmed, its reason naming it (PHASE 6a
         // DECISION 12); one that never fires on the weapon is noted, and may be
         // chosen. Each unrefused one says the mana it locks, at the tier it is
-        // attached at. W/S stop only on what can be chosen, round the ends. The
-        // choice starts on the first that can be.
+        // attached at. The choice starts on the first that can be chosen; W/S go a
+        // line at a time round the ends, a refused one included, whose ENTER says why
+        // and chooses nothing (the audit of Phase 6a: passed over, a refused line
+        // beyond the window at either end of a long list was never shown).
         var campaign = TestShop.Opened();   // met: the party's Regeneration and Mire, and Vampiric, Flaming, Cold
         campaign.See(TestWeapons.Enchanted("Met", 40, 10, 30, "serrated", "echoing"));
         var sword = Sword(wear: 36, cashed: 195, "flaming");
@@ -257,24 +259,33 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal("MIRE - THIS STAFF WOULD CAST IT ON AN ALLY - NEVER FIRES ON A STAFF",
             DepositPanel.OfferLine(new Offer("mire", Enchanter.StaffCastsItOn(GameContent.Current.Enchantments["mire"], TargetSide.Ally), Enchanter.NeverFiresOn(WeaponClass.Staff))));
 
-        // The choice goes round what can be chosen, over the refused.
+        // The choice goes round every line, a line at a time, the refused one too.
         var chosen = new List<string>();
-        for (int step = 0; step < 4; step++)
+        for (int step = 0; step < 5; step++)
         {
             panel.Move(+1);
             chosen.Add(panel.Offers[panel.Chosen].Id);
         }
-        Assert.Equal(["mire", "regeneration", "vampiric", "flaming"], chosen);
+        Assert.Equal(["mire", "regeneration", "vampiric", "cold", "flaming"], chosen);
         panel.Move(-1);
         panel.Move(-1);
-        Assert.Equal("regeneration", panel.Offers[panel.Chosen].Id);
+        Assert.Equal("vampiric", panel.Offers[panel.Chosen].Id);
+
+        // Chosen, a refused line is marked and stays dimmed, a shade lighter; ENTER
+        // on it hands back its reason as it names it, for the refusal row, and
+        // chooses nothing.
         panel.Move(+1);
+        Assert.Equal("cold", panel.Offers[panel.Chosen].Id);
+        var onCold = BetweenRunsHud.PanelRows(panel, 10);
+        Assert.Equal(("> COLD - CANNOT SIT WITH FLAMING <", DungeonHud.Grey), (onCold[1].Text, onCold[1].Color));
+        Assert.Equal("COLD - CANNOT SIT WITH FLAMING", panel.ChooseOffer());
+        Assert.Equal((DepositPanel.Step.Offer, (string?)null), (panel.Current, panel.Ask));
         panel.Move(+1);
         Assert.Equal("flaming", panel.Offers[panel.Chosen].Id);
 
         // ENTER chooses, and the confirm asks on the panel's last line: the plan's
         // own ask, the same enchantment again allowed (S:352–354).
-        panel.ChooseOffer();
+        Assert.Null(panel.ChooseOffer());
         Assert.Equal((DepositPanel.Step.Confirm, Service.Enchant, "flaming"), (panel.Current, panel.Service, panel.EnchantmentId));
         Assert.Equal("DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT", panel.Ask);
         var confirm = BetweenRunsHud.PanelRows(panel, 10);
@@ -293,9 +304,10 @@ public sealed class DepositPanelTests : IDisposable
         // What a campaign has met only grows, so the offer list is a window that
         // scrolls with the choice, as the WEAPONS page's rows do: with every entry
         // of the catalogue met, and the most notice rows the screen can lead over
-        // it, the list runs past its window on a 720-pixel window, and every choice
-        // W/S make is in view — and the panel, the confirm's ask included, ends
-        // clear of the refusal row.
+        // it, the list runs past its window on a 720-pixel window, and every line —
+        // each a choice W/S make in turn, a refused one too — is in view as it is
+        // chosen; and the panel, the confirm's ask included, ends clear of the
+        // refusal row.
         var campaign = TestShop.Opened();
         foreach (var chunk in GameContent.Current.Enchantments.All.Select(def => def.Id).Chunk(5))
             campaign.See(TestWeapons.Enchanted("Met", 40, 10, 30, chunk));
@@ -306,9 +318,9 @@ public sealed class DepositPanelTests : IDisposable
             panel.Offers.Count);
 
         Assert.Null(panel.Pick(1));
-        int choosable = panel.Offers.Count(offer => offer.Refusal is null);
+        int listed = panel.Offers.Count;
         var seen = new HashSet<int>();
-        for (int step = 0; step < 2 * choosable + 1; step++)
+        for (int step = 0; step < 2 * listed + 1; step++)
         {
             var rows = BetweenRunsHud.PanelRows(panel, place.OfferRows);
             int top = panel.Window(place.OfferRows);
@@ -317,11 +329,13 @@ public sealed class DepositPanelTests : IDisposable
             Assert.Equal(1 + Math.Min(place.OfferRows, panel.Offers.Count), rows.Count);
             Ends(rows);
             seen.Add(panel.Chosen);
-            panel.Move(step < choosable ? +1 : -1);
+            panel.Move(step < listed ? +1 : -1);
         }
-        Assert.Equal(choosable, seen.Count);
+        Assert.Equal(listed, seen.Count);
 
-        panel.ChooseOffer();
+        while (panel.Offers[panel.Chosen].Refusal is not null)
+            panel.Move(+1);
+        Assert.Null(panel.ChooseOffer());
         var confirm = BetweenRunsHud.PanelRows(panel, place.OfferRows);
         Assert.Equal(panel.Ask, confirm[^1].Text);
         Ends(confirm);
@@ -617,8 +631,10 @@ public sealed class DepositPanelTests : IDisposable
         // reason, never hidden (PHASE 6a DECISION 12): a staff's or a wand's only soul
         // (it would cast nothing), a Flaming that would strand the Burning behind it,
         // a Cold that cannot sit with the Flaming the sword carries, and the sword's
-        // own Flaming, last already. W/S stop only on what can be chosen; ENTER
-        // chooses, and ENTER again deposits both weapons as one, logged and saved.
+        // own Flaming, last already. Where it lies names whose hand or bag, or the
+        // stable, so the party's three Staffs of Renewal are told apart (the audit of
+        // Phase 6a). W/S go a line at a time, a refused one included; ENTER chooses,
+        // and ENTER again deposits both weapons as one, logged and saved.
         var campaign = TestShop.Opened();
         var sword = Sword(wear: 36, cashed: 195, "flaming");   // capacity 36: a second enchantment's slot and price met
         TestShop.Give(campaign, "B", 2, sword);
@@ -635,18 +651,18 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal(new[]
         {
             "MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH WEAPONS STAY IN THE SHOP",
-            "REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "> SERRATED ON THE NAMELESS KNIFE - ARRIVES AT T1 - 2 RUNS <",
-            "VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2 RUNS",
-            "OVERHEAL ON THE NAMELESS KNIFE - ARRIVES AT T1 - 2 RUNS",
-            "FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT",
-            "BURNING ON THE NAMELESS NOVA - ARRIVES AT T1 - 2 RUNS",
-            "REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "MIRE ON THE STAFF OF MIRE - THE STAFF OF MIRE WOULD CAST NOTHING",
-            "POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING",
-            "COLD ON THE WAND OF THE CONE - CANNOT SIT WITH FLAMING",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [A] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [B] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [C] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            "> SERRATED ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS <",
+            "VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T2 - 2 RUNS",
+            "OVERHEAL ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS",
+            "FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT",
+            "BURNING ON THE NAMELESS NOVA IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE HAND OF [D] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            "MIRE ON THE STAFF OF MIRE IN THE BAG OF [D] - THE STAFF OF MIRE WOULD CAST NOTHING",
+            "POISON T3 ON THE ROTWOOD IN THE BAG OF [D] - THE ROTWOOD WOULD CAST NOTHING",
+            "COLD ON THE WAND OF THE CONE IN THE BAG OF [D] - CANNOT SIT WITH FLAMING",
             "FLAMING - ITS OWN - IT IS LAST ALREADY",
         }, Texts(rows));
         Assert.Equal(DungeonHud.Yellow, rows[4].Color);
@@ -655,7 +671,7 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal(DungeonHud.White, rows[5].Color);
 
         // A soul that would never fire on the weapon is chosen all the same, noted.
-        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
+        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [A] - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
             DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("A", 1), campaign.Party[0].Inventory[1], 0, campaign.Party[0].Inventory[1]!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
         // A reorder moves one of two souls at the least (the last is last already), so
         // it takes 2 runs at the least (PHASE 6a DECISION 11).
@@ -664,17 +680,59 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal("FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS",
             DepositPanel.MoveLine(Enchanter.TransferOffers(own, own.WeaponAt(two)!).Single(move => move.Source is null && move.Index == 0)));
 
-        // The choice goes round what can be chosen, over the refused; ENTER chooses,
-        // and the confirm asks, the list's heading over it saying both stay.
+        // The heading's tail is the choice's (the audit of Phase 6a): both weapons
+        // stay in the shop while the soul chosen is on another weapon, and a reorder,
+        // which puts the weapon in the shop alone, is headed with the weapon alone —
+        // over the list and over its confirm.
+        var reorder = DepositPanel.Open(own, two);
+        Assert.Null(reorder.Pick(3));
+        Assert.Equal((null, "flaming"), (reorder.ChosenMove!.Source, reorder.ChosenMove.Soul.Id));   // the party's staffs cast nothing without theirs
+        Assert.Equal("MOVE AN ENCHANTMENT ONTO THE ARMING SWORD", BetweenRunsHud.PanelRows(reorder, 20)[0].Text);
+        reorder.Move(-1);
+        Assert.NotNull(reorder.ChosenMove!.Source);
+        Assert.Equal("MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH WEAPONS STAY IN THE SHOP", BetweenRunsHud.PanelRows(reorder, 20)[0].Text);
+        reorder.Move(+1);
+        Assert.Null(reorder.ChooseOffer());
+        var reordering = BetweenRunsHud.PanelRows(reorder, 20);
+        Assert.Equal(("MOVE AN ENCHANTMENT ONTO THE ARMING SWORD", "DEPOSIT THE ARMING SWORD TO MOVE FLAMING TO THE END - 2 RUNS - ITS 35 WEAR IS SPENT"),
+            (reordering[0].Text, reordering[^1].Text));
+        Assert.Equal("MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH WEAPONS STAY IN THE SHOP", DepositPanel.SourcesHeading(sword, null));
+
+        // A soul of a kind that does nothing yet moves all the same — the enchanter
+        // moves what it never offers to copy (PHASE 6a DECISION 13) — and says so, as
+        // one that would never fire on the weapon says that: a deposit and its runs
+        // would buy a lock that does nothing (the audit of Phase 6a).
+        var inert = TestShop.Opened();
+        var target = TestShop.Give(inert, "B", 2, Sword(wear: 36, cashed: 195, "flaming"));
+        inert.Move(TestShop.Give(inert, "C", 2, TestWeapons.Get("feathered_death")), WeaponPlace.InTheStable(0));
+        inert.Move(TestShop.Give(inert, "C", 2, TestWeapons.Get("shieldbreaker")), WeaponPlace.InTheStable(1));
+        var souls = Enchanter.TransferOffers(inert, inert.WeaponAt(target)!).Where(move => LootTable.IsInert(move.Soul.Def)).ToArray();
+        Assert.Equal(["weightless", "momentum"], souls.Select(move => move.Soul.Id));
+        Assert.All(souls, move => Assert.Equal((null, Enchanter.DoesNothingYetNote), (move.Refusal, move.Note)));
+        Assert.Equal(["WEIGHTLESS ON THE FEATHERED DEATH IN THE STABLE - ARRIVES AT T1 - 2 RUNS - DOES NOTHING YET",
+                "MOMENTUM ON THE SHIELDBREAKER IN THE STABLE - ARRIVES AT T1 - 2 RUNS - DOES NOTHING YET"],
+            souls.Select(DepositPanel.MoveLine));
+        Assert.DoesNotContain(Enchanter.TransferOffers(inert, inert.WeaponAt(target)!), move => !LootTable.IsInert(move.Soul.Def) && move.Note == Enchanter.DoesNothingYetNote);
+
+        // The choice goes round a line at a time, a refused one included: ENTER on it
+        // says why, where the soul lies first, and chooses nothing. ENTER on one that
+        // can be chosen chooses, and the confirm asks, the list's heading over it
+        // saying both stay.
         var chosen = new List<string>();
         for (int step = 0; step < 4; step++)
         {
             panel.Move(+1);
             chosen.Add(panel.Moves[panel.Chosen].Soul.Id);
         }
-        Assert.Equal(["vampiric", "overheal", "burning", "serrated"], chosen);
-        panel.Move(+1);
-        panel.ChooseOffer();
+        Assert.Equal(["vampiric", "overheal", "flaming", "burning"], chosen);
+        panel.Move(-1);
+        Assert.Equal(("> FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT <", DungeonHud.Grey),
+            (BetweenRunsHud.PanelRows(panel, 20)[7].Text, BetweenRunsHud.PanelRows(panel, 20)[7].Color));
+        Assert.Equal("FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT", panel.ChooseOffer());
+        Assert.Equal(DepositPanel.Step.Sources, panel.Current);
+        panel.Move(-1);
+        panel.Move(-1);
+        Assert.Null(panel.ChooseOffer());
         Assert.Equal((DepositPanel.Step.Confirm, "vampiric", knife), (panel.Current, panel.ChosenMove!.Soul.Id, panel.ChosenMove.Source));
         Assert.Equal("DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT", panel.Ask);
         var confirm = BetweenRunsHud.PanelRows(panel, 20);
@@ -728,7 +786,7 @@ public sealed class DepositPanelTests : IDisposable
         campaign.Move(new WeaponPlace("C", 3), WeaponPlace.InTheStable(campaign.Stable.Count));   // C left carrying the knife alone
         Assert.Equal(1, campaign.Party[2].Inventory.Count(carried => carried is not null));
         scene.OnKey(Keys.Enter);
-        Assert.Equal("VAMPIRIC T3 ON THE NAMELESS KNIFE - [C] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", scene.Refusal);
+        Assert.Equal("VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE HAND OF [C] - [C] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", scene.Refusal);
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
         Assert.Empty(campaign.AtTheEnchanter);
         Assert.Equal(1, host.HubSavesAsked);   // the deposit's alone: nothing refused was saved
@@ -740,9 +798,9 @@ public sealed class DepositPanelTests : IDisposable
         // A late stable holds many souls, so the source list is a window that
         // scrolls with the choice, as the offer list does: with twenty weapons of
         // three souls each in the stable, and the most notice rows the screen can lead
-        // over it, the list runs past its window on a 720-pixel window, every choice
-        // W/S make is in view, and the panel, the confirm's ask included, ends clear of
-        // the refusal row.
+        // over it, the list runs past its window on a 720-pixel window, every line —
+        // each chosen in turn, a refused one too — is in view as it is chosen, and the
+        // panel, the confirm's ask included, ends clear of the refusal row.
         var start = CampaignState.Start(GameContent.Current);
         var stable = Enumerable.Range(0, 20).Select(_ => TestWeapons.Get("flensing_knife_unique")).ToArray();
         var campaign = CampaignState.Restore(start.Party, start.SeenInOrder, 0, [], [], [GameContent.Current.Dungeons.Tutorial.Id], lastResult: null, visit: null, stable: stable);
@@ -751,10 +809,10 @@ public sealed class DepositPanelTests : IDisposable
         Assert.True(panel.Moves.Count > place.OfferRows, $"{panel.Moves.Count} souls fit the window of {place.OfferRows}: nothing scrolls");
 
         Assert.Null(panel.Pick(3));
-        int choosable = panel.Moves.Count(move => move.Refusal is null);
-        Assert.Equal(60, choosable);
+        Assert.Equal(60, panel.Moves.Count(move => move.Refusal is null));
+        int listed = panel.Moves.Count;
         var seen = new HashSet<int>();
-        for (int step = 0; step < 2 * choosable + 1; step++)
+        for (int step = 0; step < 2 * listed + 1; step++)
         {
             var rows = BetweenRunsHud.PanelRows(panel, place.OfferRows);
             int top = panel.Window(place.OfferRows);
@@ -763,11 +821,13 @@ public sealed class DepositPanelTests : IDisposable
             Assert.Equal(1 + Math.Min(place.OfferRows, panel.Moves.Count), rows.Count);
             Ends(rows);
             seen.Add(panel.Chosen);
-            panel.Move(step < choosable ? +1 : -1);
+            panel.Move(step < listed ? +1 : -1);
         }
-        Assert.Equal(choosable, seen.Count);
+        Assert.Equal(listed, seen.Count);
 
-        panel.ChooseOffer();
+        while (panel.Moves[panel.Chosen].Refusal is not null)
+            panel.Move(+1);
+        Assert.Null(panel.ChooseOffer());
         var confirm = BetweenRunsHud.PanelRows(panel, place.OfferRows);
         Assert.Equal(panel.Ask, confirm[^1].Text);
         Ends(confirm);
@@ -777,6 +837,111 @@ public sealed class DepositPanelTests : IDisposable
             float y = place.Top + rows.Take(rows.Count - 1).Sum(row => row.Pitch);
             Assert.True(y + 7f * rows[^1].Scale <= place.Bottom, $"the panel's last line ends at {y + 7f * rows[^1].Scale}, past {place.Bottom}");
         }
+    }
+
+    [Fact]
+    public void EveryLineOfALongListIsChosenAndSeen_RefusedRunsAtBothEndsIncluded()
+    {
+        // PHASE 6a DECISION 12: a refused line is listed with its reason, never
+        // hidden. The audit of Phase 6a found the window, which follows the choice,
+        // never reached the refused lines past the ends of what could be chosen, W/S
+        // passing over them: on a weapon with every slot filled, whose reorders are
+        // all a MOVE may choose, the souls of a late stable ran on over them further
+        // than the window reaches, and the last reorder's own IT IS LAST ALREADY hid
+        // under it. W/S now go a line at a time, a refused one included — its ENTER
+        // saying why and choosing nothing — so every line is chosen in turn, and
+        // shown as it is.
+        var start = CampaignState.Start(GameContent.Current);
+        var stable = Enumerable.Range(0, 10).Select(_ => TestWeapons.Get("flensing_knife_unique")).ToArray();
+        var campaign = CampaignState.Restore(start.Party, start.SeenInOrder, 0, [], [], [GameContent.Current.Dungeons.Tutorial.Id], lastResult: null, visit: null, stable: stable);
+        var full = Sword(wear: 50, cashed: 790, "flaming", "vampiric", "arcane", "shattering", "vampiric");   // capacity 50: slot 5 open, its reorder's price met
+        Assert.Equal((50, 5), (full.WearCapacity, full.Enchantments.Count));
+        var panel = DepositPanel.Open(campaign, TestShop.Give(campaign, "B", 2, full));
+        Assert.Null(panel.Pick(3));
+        var place = BetweenRunsHud.PanelPlace(720f);
+        var moves = panel.Moves;
+        Assert.True(moves.Count >= 30, $"{moves.Count} lines");
+        int first = panel.Chosen;
+        Assert.Equal((null, 0), (moves[first].Source, moves[first].Index));   // the first reorder: every soul on another weapon is refused
+        Assert.All(moves.Take(first), move => Assert.NotNull(move.Refusal));
+        Assert.True(first >= place.OfferRows, $"the {first} refused lines over the reorders fit the window of {place.OfferRows}");
+        Assert.Equal("VAMPIRIC - ITS OWN - IT IS LAST ALREADY", DepositPanel.MoveLine(moves[^1]));
+
+        // W from the first reorder, a line at a time, round the list and back: every
+        // line is chosen, and every one is in the window as it is.
+        var chosen = new HashSet<int>();
+        var shown = new HashSet<int>();
+        for (int step = 0; step < moves.Count; step++)
+        {
+            var rows = BetweenRunsHud.PanelRows(panel, place.OfferRows);
+            int top = panel.Window(place.OfferRows);
+            Assert.InRange(panel.Chosen, top, top + place.OfferRows - 1);
+            Assert.Contains($"> {DepositPanel.MoveLine(moves[panel.Chosen])} <", Texts(rows));
+            chosen.Add(panel.Chosen);
+            for (int i = top; i < Math.Min(moves.Count, top + place.OfferRows); i++)
+                shown.Add(i);
+            panel.Move(-1);
+        }
+        Assert.Equal(moves.Count, chosen.Count);
+        Assert.Equal(moves.Count, shown.Count);
+        Assert.Equal(first, panel.Chosen);
+
+        // Walked: D, 3 opens on the first reorder; W onto the refused line over it
+        // and ENTER says why over the keys, where the soul lies first, as the log
+        // does; the list stays up, nothing is deposited and nothing is saved. S back
+        // and ENTER chooses the reorder.
+        var (scene, host) = Weapons(campaign);
+        ChooseRow(scene, "  BAG   ARMING SWORD - WEAR 50/50 FULL");
+        foreach (var key in new[] { Keys.D, Keys.D3, Keys.W, Keys.Enter })
+            scene.OnKey(key);
+        string said = $"{DepositPanel.SoulPlace(moves[first - 1])} - {moves[first - 1].Refusal}";
+        Assert.Equal(said, scene.Refusal);
+        Assert.StartsWith("OVERHEAL ON THE NAMELESS KNIFE IN THE STABLE - ", said, StringComparison.Ordinal);
+        Assert.Contains($"[Hub] Refused: {said}", Log.RecentEntries.Select(entry => entry.Message));
+        Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Sources), (scene.Mode, scene.Panel!.Current));
+        Assert.Empty(campaign.AtTheEnchanter);
+        Assert.Equal(0, host.HubSavesAsked);
+        foreach (var key in new[] { Keys.S, Keys.Enter })
+            scene.OnKey(key);
+        Assert.Equal(("DEPOSIT THE ARMING SWORD TO MOVE FLAMING TO THE END - 5 RUNS - ITS 50 WEAR IS SPENT", (string?)null), (scene.Panel!.Ask, scene.Refusal));
+    }
+
+    [Fact]
+    public void ThePanelIsDrawnOnASolidBacking()
+    {
+        // The panel's lines were drawn straight over the WEAPONS page, on the detail
+        // column's own lines: a refused service's grey on the page's dimmed grey read
+        // as neither (the audit of Phase 6a). A solid backing goes under them first
+        // (BetweenRunsHud.PanelBacking): on every question the panel asks, every
+        // line's glyphs lie inside it with room all round, and it lies inside the
+        // window.
+        var campaign = TestShop.Opened();
+        var panel = DepositPanel.Open(campaign, TestShop.Give(campaign, "B", 2, Sword(wear: 36, cashed: 195, "flaming")));
+        var place = BetweenRunsHud.PanelPlace(720f, 2);
+        void Backed()
+        {
+            var rows = BetweenRunsHud.PanelRows(panel, place.OfferRows);
+            var (x, y, width, height) = BetweenRunsHud.PanelBacking(rows, place.Top, 1280f);
+            Assert.True(x >= 0f && x + width <= 1280f && y >= 0f && y + height <= 720f, $"{panel.Current}: the backing runs off the window");
+            float top = place.Top;
+            foreach (var row in rows)
+            {
+                float glyphs = row.Text.Length * 6f * row.Scale;
+                Assert.True(640f - glyphs / 2f >= x + BetweenRunsHud.PanelBackingPad - 0.01f && 640f + glyphs / 2f <= x + width - BetweenRunsHud.PanelBackingPad + 0.01f, $"'{row.Text}' runs past its backing's sides");
+                Assert.True(top >= y + BetweenRunsHud.PanelBackingPad - 0.01f && top + 7f * row.Scale <= y + height - BetweenRunsHud.PanelBackingPad + 0.01f, $"'{row.Text}' runs past its backing's top or bottom");
+                top += row.Pitch;
+            }
+        }
+
+        Backed();                          // the services
+        Assert.Null(panel.Pick(1));
+        Backed();                          // the offer list
+        Assert.Null(panel.ChooseOffer());
+        Backed();                          // its confirm
+        var made = Enchanter.Deposit(campaign, panel.From!.Value, panel.Service, panel.EnchantmentId);
+        panel = DepositPanel.Asking(made.Entry);
+        Backed();                          // the take-back's ask
+        Assert.Equal((1280f / 2f, 100f, 0f, 0f), BetweenRunsHud.PanelBacking([], 100f, 1280f));
     }
 
     [Fact]
@@ -862,7 +1027,7 @@ public sealed class DepositPanelTests : IDisposable
         foreach (string reason in (string[])[.. reasons, Enchanter.NothingToMove])
             Line(new DepositPanel.Option(3, Service.Transfer, DepositPanel.TransferDoes, reason, null, null).Text, BetweenRunsHud.PanelOptionScale);
         Line($"> {new DepositPanel.Option(3, Service.Transfer, DepositPanel.TransferDoes, null, "99.9 IN 100 TO IMPROVE", null).Text} <", BetweenRunsHud.PanelOptionScale);
-        Line(DepositPanel.SourcesHeading(nine), BetweenRunsHud.PanelOfferHeadingScale);
+        Line(DepositPanel.SourcesHeading(nine, null), BetweenRunsHud.PanelOfferHeadingScale);
         var deepSoul = new Enchantment(soul, 99);
         string[] moveReasons =
         [
@@ -873,19 +1038,23 @@ public sealed class DepositPanelTests : IDisposable
         ];
         foreach (var source in new[] { nine, null })
         {
-            foreach (string? note in Enum.GetValues<WeaponClass>().Select(Enchanter.NeverFiresOn).Prepend(null))
-                Line($"> {DepositPanel.MoveLine(new TransferOffer(null, source, 0, deepSoul, 98, ContentBounds.MostServiceRuns, null, note))} <", BetweenRunsHud.PanelOfferScale);
+            // Where a source lies, at its longest: in a member's hand (the audit of Phase 6a).
+            WeaponPlace? at = source is null ? null : new WeaponPlace("A", 0);
+            foreach (string? note in Enum.GetValues<WeaponClass>().Select(Enchanter.NeverFiresOn).Prepend(Enchanter.DoesNothingYetNote).Prepend(null))
+                Line($"> {DepositPanel.MoveLine(new TransferOffer(at, source, 0, deepSoul, 98, ContentBounds.MostServiceRuns, null, note))} <", BetweenRunsHud.PanelOfferScale);
             foreach (string reason in moveReasons)
-                Line($"> {DepositPanel.MoveLine(new TransferOffer(null, source, 0, deepSoul, 98, ContentBounds.MostServiceRuns, reason, Enchanter.NeverFiresOn(WeaponClass.Throwing)))} <", BetweenRunsHud.PanelOfferScale);
+                Line($"> {DepositPanel.MoveLine(new TransferOffer(at, source, 0, deepSoul, 98, ContentBounds.MostServiceRuns, reason, Enchanter.NeverFiresOn(WeaponClass.Throwing)))} <", BetweenRunsHud.PanelOfferScale);
             Line(DepositPanel.DepositAsk(nine, Service.Transfer, null, new TransferOffer(null, source, 0, deepSoul, 98, ContentBounds.MostServiceRuns, null, null)), BetweenRunsHud.PanelAskScale);
             var moving = new Deposit(999, nine, Service.Transfer, 9999, ContentBounds.MostServiceRuns, null, source, 0) { RunsWorked = ContentBounds.MostServiceRuns - 1 };
             Line(DepositPanel.TakeBackAsk(moving), BetweenRunsHud.PanelAskScale);
             Line(BetweenRunsHud.ServiceLine(moving), BetweenRunsHud.PanelStateScale);
-            Line(DepositPanel.SoulMoved(new TransferOffer(null, source, 0, deepSoul, 98, 1, null, null)), BetweenRunsHud.KeysLineScale);
-            Line($"{DepositPanel.SoulPlace(new TransferOffer(null, source, 0, deepSoul, 98, 1, null, null))} - {Enchanter.WouldCarryNone("A")}", BetweenRunsHud.KeysLineScale);   // a refusal the confirm's ENTER says
+            Line(DepositPanel.SoulMoved(new TransferOffer(at, source, 0, deepSoul, 98, 1, null, null)), BetweenRunsHud.KeysLineScale);
+            foreach (string reason in moveReasons)   // a refusal the confirm's ENTER says, or a refused line's own
+                Line($"{DepositPanel.SoulPlace(new TransferOffer(at, source, 0, deepSoul, 98, 1, null, null))} - {reason}", BetweenRunsHud.KeysLineScale);
         }
         Assert.Contains(lines, line => line.Text.Contains(" T99 ON THE ", StringComparison.Ordinal)
-            && line.Text.Contains($"ARRIVES AT T98 - {ContentBounds.MostServiceRuns} RUNS - NEVER FIRES ON A THROWING WEAPON", StringComparison.Ordinal));
+            && line.Text.Contains($"IN THE HAND OF [A] - ARRIVES AT T98 - {ContentBounds.MostServiceRuns} RUNS - NEVER FIRES ON A THROWING WEAPON", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Text.Contains("IN THE HAND OF [A] - [A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", StringComparison.Ordinal));
         var held = new Deposit(999, nine, Service.Transfer, 9999, ContentBounds.MostServiceRuns, null, nine, 0);
         Assert.True(BetweenRunsHud.HeldLine(held).Length * 6f * BetweenRunsHud.DetailScale <= BetweenRunsHud.ColumnWidth, BetweenRunsHud.HeldLine(held));
         Assert.True(BetweenRunsHud.ServiceLine(held).Length * 6f * BetweenRunsHud.DetailScale <= BetweenRunsHud.ColumnWidth, BetweenRunsHud.ServiceLine(held));

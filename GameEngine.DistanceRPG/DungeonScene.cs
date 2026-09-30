@@ -186,7 +186,7 @@ public class DungeonScene : Scene
     private static readonly Vector4 WallColor = Rgb(0x3d405b);
     private static readonly Vector4 FloorColor = Rgb(0x0f3460);
     private static readonly Vector4 EnemyColor = Rgb(0xf5a623);
-    private static readonly Vector4 DeadColor = Rgb(0x555555);
+    internal static readonly Vector4 DeadColor = Rgb(0x555555);
     private static readonly Vector4 HealColor = Rgb(0x44dd77);
     private static readonly Vector4 TickColor = Rgb(0xb06ee0);   // a status tick's damage: neither a hit's red nor a heal's green
     private static readonly Vector4 CritColor = Rgb(0xffde00);     // a crit, a hit's or a cast's
@@ -1064,8 +1064,9 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// A stand-in for every member of the campaign's party, in roster order
-    /// (§2.1, §5.9) — one colour each by position. The members are the
-    /// campaign's: built once for the whole campaign
+    /// (§2.1, §5.9) — one colour each by position, and a fallen one's grey
+    /// (<see cref="MemberColor"/>). The members are the campaign's: built once for
+    /// the whole campaign
     /// (<see cref="CampaignState.Start"/>), their loadout already met, and stood
     /// where the visit put them. The scene supplies only what is the scene's —
     /// the box and its colour. Built once per scene and kept across every swap:
@@ -1076,12 +1077,25 @@ public class DungeonScene : Scene
         var members = _campaign.Party;
         for (int i = 0; i < members.Count; i++)
         {
-            var character = new CharacterObject(members[i], PartyColors[i]);
+            var character = new CharacterObject(members[i], MemberColor(members[i], i));
             _party.Add(character);
             AddGameObject(character);
         }
 
         _activeIdx = 0;
+    }
+
+    /// <summary>
+    /// The colour a member's stand-in is built in: its place's in the roster, or,
+    /// fallen, the corpse's grey — as a death turns it (<c>CharacterDied</c>) and as
+    /// an enemy row that is down is built (<see cref="SpawnEnemies"/>). A mid-run
+    /// save brings a fallen member back fallen, and its stand-in was built in its
+    /// live colour, a corpse that looked like a member standing (Phase 6a's audit).
+    /// </summary>
+    internal static Vector4 MemberColor(PartyMemberState member, int index)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        return member.Alive ? PartyColors[index] : DeadColor;
     }
 
     /// <summary>
@@ -2720,7 +2734,7 @@ public class DungeonScene : Scene
 
         Log.Info($"[Loot] {member.Id} picks up {item.Weapon.Name} into slot {slot + 1}{(item.Loose is null ? "" : ", back off the floor")}");
         // G's answer, like its BAG FULL: it replaces the LEFT ... HERE of a trade made a moment before.
-        _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, $"TOOK {item.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
+        _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, $"TOOK {item.Weapon.ShownName}", LootColor, -52f);
     }
 
     /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>

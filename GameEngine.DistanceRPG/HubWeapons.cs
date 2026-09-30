@@ -127,7 +127,7 @@ internal sealed class HubWeapons
     internal static string Name(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        return weapon.Name.ToUpperInvariant();
+        return weapon.ShownName;
     }
 
     /// <summary>A weapon named with its article, once: <c>THE ARMING SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
@@ -178,6 +178,15 @@ internal sealed class HubWeapons
     /// next key; the weapon stays taken up.
     /// </summary>
     internal static string KeepsAWeapon(string memberId) => $"EACH MEMBER KEEPS A WEAPON - {MemberLine(memberId)} WOULD CARRY NONE";
+
+    /// <summary>
+    /// Why a weapon in a hand is not put down in its own member's bag where the hand
+    /// would take it straight back (<see cref="CampaignState.ComesStraightBack"/>): the
+    /// rule, and what it would do — <c>AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG
+    /// - [A] WOULD TAKE IT STRAIGHT BACK</c>. Said in the refusal row, over the keys,
+    /// until the next key; the weapon stays taken up.
+    /// </summary>
+    internal static string StraightBack(string memberId) => $"AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - {MemberLine(memberId)} WOULD TAKE IT STRAIGHT BACK";
 
     /// <summary>
     /// The page's rows, top to bottom (§6.2): the party's heading, then each member
@@ -285,7 +294,9 @@ internal sealed class HubWeapons
     /// while it is stalled, a unique's name orange; a transfer's source held there
     /// reads grey, the row over it saying how its deposit stands. The row chosen
     /// is yellow, its indent marked <c>&gt;</c> and its end <c>&lt;</c>, as the
-    /// dungeon list marks its choice.
+    /// dungeon list marks its choice — bar a row in the shop, which keeps its state's
+    /// colour chosen and is marked alone: yellow is <c>STALLED</c>'s, and a chosen
+    /// <c>WORKING</c> row drawn in it read as stalled (Phase 6a's audit).
     /// </summary>
     /// <param name="row">The row.</param>
     /// <param name="chosen">Whether it is the row chosen.</param>
@@ -305,7 +316,7 @@ internal sealed class HubWeapons
             case RowKind.Shop:
             {
                 var weapon = row.Weapon!;
-                var line = chosen ? DungeonHud.Yellow : row.Held ? DungeonHud.Grey : row.Stalled ? DungeonHud.Yellow : DungeonHud.Cyan;
+                var line = row.Held ? DungeonHud.Grey : row.Stalled ? DungeonHud.Yellow : DungeonHud.Cyan;   // chosen or not: the marks say which
                 var runs = new List<Run>
                 {
                     new(chosen ? Marked(row.Label) : row.Label, line),

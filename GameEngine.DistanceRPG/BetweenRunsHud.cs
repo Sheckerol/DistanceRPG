@@ -1,6 +1,7 @@
 using GameEngine.Core;
 using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using Run = GameEngine.DistanceRPG.DungeonHud.Run;
 
@@ -248,9 +249,9 @@ public sealed class BetweenRunsHud : IDisposable
 
         // What was carried home, or lost with the party.
         if (result.SpoilsKept.Count > 0)
-            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.Name.ToUpperInvariant()), DungeonHud.Orange));
+            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.ShownName), DungeonHud.Orange));
         if (result.SpoilsLost.Count > 0)
-            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.Name.ToUpperInvariant()), DungeonHud.Red));
+            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.ShownName), DungeonHud.Red));
         if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
             lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", DungeonHud.Grey));
 
@@ -415,7 +416,7 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>A weapon by its catalogue id, as the summary names it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
     private static string WeaponName(string id)
-        => (GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id).ToUpperInvariant();
+        => Weapon.Shown(GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id);
 
     /// <summary>An enchantment by its id, as the summary and the shop name it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
     internal static string EnchantmentName(string id)
@@ -860,7 +861,7 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(row.Stalled
                 ? new ListRow(StalledLine(row.Ahead), DungeonHud.Yellow, DetailScale, DetailPitch)
                 : new ListRow(WorkingLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
-            Readouts(rows, shopWeapon);
+            Readouts(rows, shopWeapon, row.Held);
             return rows;
         }
         if (row is not { Kind: HubWeapons.RowKind.Weapon, Place: { } place, Weapon: { } weapon })
@@ -874,8 +875,8 @@ public sealed class BetweenRunsHud : IDisposable
         return rows;
     }
 
-    /// <summary>What every weapon's detail says under its name: its statline, modifiers and enchantments with no wielder, why a caster casts nothing, its wear and its capacity.</summary>
-    private static void Readouts(List<ListRow> rows, Weapon weapon)
+    /// <summary>What every weapon's detail says under its name: its statline, modifiers and enchantments with no wielder, why a caster casts nothing, its wear — a transfer's <paramref name="held"/> source's as the move leaves it (<see cref="HeldWearLine"/>) — and its capacity.</summary>
+    private static void Readouts(List<ListRow> rows, Weapon weapon, bool held = false)
     {
         rows.Add(new ListRow(DungeonHud.WeaponStats(weapon), DungeonHud.White, DetailScale, DetailPitch));
         foreach (string line in Listed("* ", DungeonHud.ModifierReadout(weapon), DetailChars))
@@ -884,8 +885,21 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(line, DungeonHud.Cyan, DetailScale, DetailPitch));
         if (CastsNothing(weapon))
             rows.Add(new ListRow(CastsNothingLine, DungeonHud.Orange, DetailScale, DetailPitch));
-        rows.Add(new ListRow(DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
+        rows.Add(new ListRow(held ? HeldWearLine(weapon) : DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
         rows.Add(new ListRow(CapacityLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+    }
+
+    /// <summary>
+    /// A transfer's source's wear, held in the shop beside the weapon its soul goes to
+    /// with its wear left uncashed (PHASE 6a DECISION 13): short of full as every
+    /// weapon's says it (<see cref="DungeonHud.WearLine"/>), and full, what the move
+    /// does with it — <c>WEAR 40 OF 40 - FULL - THE MOVE LEAVES IT UNSPENT</c> — never
+    /// the full line's <c>TIME TO ROTATE IT INTO THE SHOP</c>, since it is there.
+    /// </summary>
+    internal static string HeldWearLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return weapon.WornFull ? $"WEAR {weapon.Wear} OF {weapon.WearCapacity} - FULL - THE MOVE LEAVES IT UNSPENT" : DungeonHud.WearLine(weapon);
     }
 
     /// <summary>
@@ -994,8 +1008,7 @@ public sealed class BetweenRunsHud : IDisposable
                     var offer = panel.Offers[i];
                     string line = DepositPanel.OfferLine(offer);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line,
-                        chosen ? DungeonHud.Yellow : offer.Refusal is null ? DungeonHud.White : DungeonHud.DarkGrey, PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch));
                 }
                 break;
             }
@@ -1003,15 +1016,14 @@ public sealed class BetweenRunsHud : IDisposable
             case DepositPanel.Step.Sources:
             case DepositPanel.Step.Confirm when panel.Service == Service.Transfer:
             {
-                rows.Add(new ListRow(DepositPanel.SourcesHeading(weapon), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
+                rows.Add(new ListRow(DepositPanel.SourcesHeading(weapon, panel.ChosenMove), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
                 int top = panel.Window(offerRows);
                 for (int i = top; i < Math.Min(panel.Moves.Count, top + offerRows); i++)
                 {
                     var move = panel.Moves[i];
                     string line = DepositPanel.MoveLine(move);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line,
-                        chosen ? DungeonHud.Yellow : move.Refusal is null ? DungeonHud.White : DungeonHud.DarkGrey, PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch));
                 }
                 break;
             }
@@ -1035,6 +1047,37 @@ public sealed class BetweenRunsHud : IDisposable
         }
         return rows;
     }
+
+    /// <summary>How far the deposit panel's backing reaches past its lines' glyphs, on every side.</summary>
+    internal const float PanelBackingPad = 10f;
+
+    /// <summary>
+    /// The solid backing under the deposit panel's <paramref name="rows"/> — the
+    /// services, a list and its confirm, or the take-back ask — drawn from
+    /// <paramref name="top"/> in a window <paramref name="windowWidth"/> pixels wide:
+    /// as wide as its widest line, centred as the lines are, from the first line's
+    /// top to the last line's glyphs, <see cref="PanelBackingPad"/> past them all
+    /// round. Over the page's detail column the panel's lines were drawn on the
+    /// page's own, a refused one's grey on dimmed grey (Phase 6a's audit).
+    /// </summary>
+    internal static (float X, float Y, float Width, float Height) PanelBacking(IReadOnlyList<ListRow> rows, float top, float windowWidth)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        if (rows.Count == 0)
+            return (windowWidth / 2f, top, 0f, 0f);
+        float widest = rows.Max(row => row.Text.Length * GlyphAdvance * row.Scale);
+        float height = rows.Take(rows.Count - 1).Sum(row => row.Pitch) + GlyphHeight * rows[^1].Scale;
+        float width = MathF.Min(windowWidth, widest + 2f * PanelBackingPad);
+        return (windowWidth / 2f - width / 2f, top - PanelBackingPad, width, height + 2f * PanelBackingPad);
+    }
+
+    /// <summary>
+    /// The colour of a line on the offer list or the source list: the choice yellow,
+    /// and a refused line dimmed — chosen, a shade lighter, its marks saying it is the
+    /// choice while its colour says ENTER will not take it (PHASE 6a DECISION 12).
+    /// </summary>
+    internal static Vector4 ListColor(bool chosen, bool refused)
+        => refused ? chosen ? DungeonHud.Grey : DungeonHud.DarkGrey : chosen ? DungeonHud.Yellow : DungeonHud.White;
 
     // ── Drawing ──────────────────────────────────────────────────────────────
 
@@ -1084,12 +1127,16 @@ public sealed class BetweenRunsHud : IDisposable
             if (scene.Panel is { } panel)
             {
                 // The page dims under the deposit panel, as the hub does under the
-                // menu, and the panel is drawn over it.
+                // menu, and the panel is drawn over it — on a solid backing, since
+                // its lines sit on the page's own, and a dimmed refusal over dimmed
+                // page text read as neither.
                 _text.Flush(_game.ShaderManager);
                 _fade.Draw(_game.ShaderManager, MenuDim);
                 var place = PanelPlace(h, notices.Count);
+                var panelRows = PanelRows(panel, place.OfferRows);
+                FillBlack(PanelBacking(panelRows, place.Top, w), w, h);
                 float y = place.Top;
-                foreach (var row in PanelRows(panel, place.OfferRows))
+                foreach (var row in panelRows)
                 {
                     DrawCentered(w, y, row.Text, row.Scale, row.Color);
                     y += row.Pitch;
@@ -1162,6 +1209,26 @@ public sealed class BetweenRunsHud : IDisposable
             _text.DrawText(line.Text, right, y, line.Scale, line.Color);
             y += line.Pitch;
         }
+    }
+
+    /// <summary>
+    /// A rectangle of the window, in the HUD's pixels (the top left the origin),
+    /// filled black: the fade drawn whole through a scissor, which GL counts from
+    /// the viewport's bottom left in its own pixels, so the rectangle is scaled from
+    /// the window's size to the viewport's.
+    /// </summary>
+    private void FillBlack((float X, float Y, float Width, float Height) box, int w, int h)
+    {
+        if (box.Width <= 0f || box.Height <= 0f || w <= 0 || h <= 0)
+            return;
+        var viewport = new int[4];
+        GL.GetInteger(GetPName.Viewport, viewport);
+        float sx = viewport[2] / (float)w, sy = viewport[3] / (float)h;
+        GL.Enable(EnableCap.ScissorTest);
+        GL.Scissor(viewport[0] + (int)MathF.Floor(box.X * sx), viewport[1] + (int)MathF.Floor((h - box.Y - box.Height) * sy),
+            (int)MathF.Ceiling(box.Width * sx), (int)MathF.Ceiling(box.Height * sy));
+        _fade.Draw(_game.ShaderManager, 1f);
+        GL.Disable(EnableCap.ScissorTest);
     }
 
     /// <summary>Runs side by side from <paramref name="x"/>, each where the last ended: a row read as one line, in its colours.</summary>

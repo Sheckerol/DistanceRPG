@@ -3381,7 +3381,13 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   line, no unique's name and no enchantment is drawn in — and never says
   durability. The crossing is logged once, at the edge, since Logic never logs
   (`TurnSystem.WeaponWornFull`; `[Wear] A's Weakspot Stiletto is full: wear 30
-  of 30`).
+  of 30`). (Mended in Phase 6a's audit, in where the readout fits: the weapon
+  line along the top was one line centred on the window and the bag's statline
+  one line from its slot, and a weapon carrying the enchantments R4 opens slots
+  for ran off them — at three the top line lost its name, at five its `WEAR`.
+  Both now wrap between entries, never through one, the top line to five lines
+  over the party list — its first alone while a menu or a notice has the band
+  under it — and a slot growing the bag by the lines it wraps to.)
 - **R4 as built.** Capacity opens on `StartingPool` (30) and rises
   `WearCapacityPerBar` (1) for every full bar cashed, the bar the capacity at the
   time and the progress carrying: `Progression`'s own replay at a flat 1, the
@@ -3525,8 +3531,9 @@ nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
   ENCHANTER - WORKS ON THE 2 NEWEST`, then each deposit, the newest first —
   `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan, `STALLED  RIPOSTE BLADE - 0 OF 1
   RUN` in yellow, a transfer's source `HELD` under its weapon in grey — each
-  detail saying what the deposit bought and when it comes back, or what it waits
-  on. D on a weapon opens the deposit panel: ENCHANT, REFINE and MOVE, each with
+  keeping its colour chosen, marked alone, since yellow is `STALLED`'s (mended
+  in Phase 6a's audit) — each detail saying what the deposit bought and when it
+  comes back, or what it waits on. D on a weapon opens the deposit panel: ENCHANT, REFINE and MOVE, each with
   its odds of improving the weapon (an unworn refinement its note), a refused one
   dimmed with its reason and its key saying why, then the offer or the souls,
   then the confirm, which names the wear it spends; only Enter deposits, and the
@@ -3745,7 +3752,11 @@ its number, and this pass records the ruling when it is made.
   leaves a member carrying no weapon — `EACH MEMBER KEEPS A WEAPON - [A] WOULD
   CARRY NONE`, a transfer asked with both its weapons gone — and a hand a move
   or a deposit empties takes up the first weapon in its bag, as the rest before
-  a dungeon arms it.
+  a dungeon arms it. (Mended in Phase 6a's audit, in a move that changes
+  nothing: a hand's weapon put down in its own bag ahead of every weapon there
+  came straight back to the hand, and was logged as a move and saved; it is
+  refused, saying why — `AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A]
+  WOULD TAKE IT STRAIGHT BACK` — and stays taken up.)
 - **PHASE 6a DECISION 8 — taking a weapon back early (§6.2).** Any deposit,
   worked or stalled, can be taken back between runs, to the stable's end, a
   transfer's two weapons together: its service is forfeit, nothing attached and
@@ -3808,7 +3819,13 @@ its number, and this pass records the ruling when it is made.
   its effect away only once it has grown to capacity 35 and been given a second
   status to cast. Everything else attaches — an entry again, one whose lock
   sleeps, one that never fires on the weapon, noted — and a refused choice is
-  listed dimmed with its reason, never hidden.
+  listed dimmed with its reason, never hidden. (Mended in Phase 6a's audit, in
+  how a list is walked: W/S passed over a refused line, so the window, which
+  follows the choice, never reached a run of them past either end of what could
+  be chosen that was longer than it — a weapon with every slot filled, whose
+  reorders are all a MOVE may choose, under a late stable's souls. W/S now stop
+  on a refused line too, dimmed and marked, and its Enter says why and chooses
+  nothing. The panel is drawn on a solid backing, off the page's own lines.)
 - **PHASE 6a DECISION 13 — how a transfer works (§6.5, §6.7).** It is the
   Enchant service with the soul brought from a weapon the party owns out of the
   shop, whatever the soul — a forged innate, a unique's: the weapon it lands on
@@ -3821,7 +3838,14 @@ its number, and this pass records the ruling when it is made.
   with the weapon forged with it. **Extends §6.7's record**, which named one
   weapon and no enchantment: a deposit also holds its ordinal, its runs and runs
   worked, an Enchant's enchantment, and a transfer's source and the soul's place
-  there, and `Service` gains `Transfer`.
+  there, and `Service` gains `Transfer`. (Mended in Phase 6a's audit, in what
+  the screen says of it: a soul of a kind that does nothing yet is noted `DOES
+  NOTHING YET`, as one that never fires on the weapon is; a source's line says
+  whose hand or bag it lies in, or the stable — `VAMPIRIC T3 ON THE NAMELESS
+  KNIFE IN THE BAG OF [C]` — so a party's copies of a weapon are told apart; the
+  list's heading says both weapons stay in the shop only while the soul chosen
+  is another weapon's; and a held source's full wear reads `… - FULL - THE MOVE
+  LEAVES IT UNSPENT`, not the advice to rotate into the shop a weapon in it.)
 - **PHASE 6a DECISION 14 — what an earlier Phase 6a build does with a later
   step's save (§5.2).** The save stayed at version 2 through every step, the
   standing instruction's "version bump and a migration so phase-5 saves still

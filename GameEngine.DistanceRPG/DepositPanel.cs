@@ -24,13 +24,16 @@ namespace GameEngine.DistanceRPG;
 /// met that the enchanter offers (<see cref="Enchanter.Offers"/>), a refused one
 /// dimmed with its reason and never hidden, one that would never fire on the
 /// weapon noted — in a window that scrolls with the choice, since what a campaign
-/// has met only grows. W/S choose among those not refused, ENTER chooses.</item>
+/// has met only grows. The choice opens on the first not refused; W/S go a line at
+/// a time, a refused one included, and ENTER chooses — or, on a refused one, says
+/// why (PHASE 6a DECISION 12).</item>
 /// <item><strong>Sources</strong>: MOVE's list (Phase 6a.6), every soul on every
 /// other weapon the party owns out of the shop and then the weapon's own
 /// (<see cref="Enchanter.TransferOffers"/>), each saying where it lies, the tier it
-/// arrives at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 -
-/// 2 RUNS</c> — a refused one dimmed with its reason and never hidden, in a window
-/// that scrolls with the choice, since a late stable holds many souls.</item>
+/// arrives at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] -
+/// ARRIVES AT T2 - 2 RUNS</c> — a refused one dimmed with its reason and never
+/// hidden, in a window that scrolls with the choice the same way, since a late
+/// stable holds many souls.</item>
 /// <item><strong>Confirm</strong>: the panel's last line becomes the ask —
 /// <c>DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS
 /// SPENT</c> — and only ENTER deposits.</item>
@@ -270,35 +273,47 @@ internal sealed class DepositPanel
 
     /// <summary>
     /// The source list's heading, over the list and over the confirm's ask: the
-    /// weapon, and that a MOVE holds the weapon it takes from in the shop beside it
-    /// (PHASE 6a DECISION 13) — <c>MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH
-    /// WEAPONS STAY IN THE SHOP</c>.
+    /// weapon, and — while the soul <paramref name="chosen"/> is on another weapon —
+    /// that a MOVE holds the weapon it takes from in the shop beside it (PHASE 6a
+    /// DECISION 13): <c>MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH WEAPONS STAY
+    /// IN THE SHOP</c>. A reorder, the weapon's own soul, puts the weapon alone in the
+    /// shop, and the heading says no more than <c>MOVE AN ENCHANTMENT ONTO THE ARMING
+    /// SWORD</c>.
     /// </summary>
-    internal static string SourcesHeading(Weapon weapon) => $"MOVE AN ENCHANTMENT ONTO {HubWeapons.The(weapon)} - BOTH WEAPONS STAY IN THE SHOP";
+    internal static string SourcesHeading(Weapon weapon, TransferOffer? chosen)
+        => chosen is { Source: null }
+            ? $"MOVE AN ENCHANTMENT ONTO {HubWeapons.The(weapon)}"
+            : $"MOVE AN ENCHANTMENT ONTO {HubWeapons.The(weapon)} - BOTH WEAPONS STAY IN THE SHOP";
 
     /// <summary>
-    /// A soul as the source list names it, and where it lies: <c>VAMPIRIC T3 ON THE
-    /// NAMELESS KNIFE</c> — its tier said past the first, as the readouts say it —
-    /// or, on the weapon itself, <c>FLAMING - ITS OWN</c>.
+    /// A soul as the source list names it, and where it lies — the weapon, and whose
+    /// hand or bag it is in, or the stable, as the WEAPONS page's detail says it
+    /// (<see cref="BetweenRunsHud.WhereLine"/>): <c>VAMPIRIC T3 ON THE NAMELESS KNIFE
+    /// IN THE BAG OF [C]</c>, its tier said past the first, as the readouts say it —
+    /// or, on the weapon itself, <c>FLAMING - ITS OWN</c>. So two copies of a weapon,
+    /// four Staffs of Renewal in a new party's bags, are told apart, and the member
+    /// whose weapon a move takes is named before it is chosen.
     /// </summary>
     internal static string SoulPlace(TransferOffer move)
     {
         ArgumentNullException.ThrowIfNull(move);
         string soul = BetweenRunsHud.EnchantmentName(move.Soul.Id) + (move.Soul.Tier > 1 ? $" T{move.Soul.Tier}" : "");
-        return move.Source is { } source ? $"{soul} ON {HubWeapons.The(source)}" : $"{soul} - ITS OWN";
+        if (move.Source is not { } source)
+            return $"{soul} - ITS OWN";
+        return move.From is { } at ? $"{soul} ON {HubWeapons.The(source)} {BetweenRunsHud.WhereLine(at)}" : $"{soul} ON {HubWeapons.The(source)}";
     }
 
     /// <summary>
     /// One soul's line on the source list: where it lies, then the tier it arrives
-    /// at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2
-    /// RUNS</c>, or on an Arming Sword carrying Flaming and Vampiric <c>FLAMING - ITS
-    /// OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS</c> (a reorder moves one of two
-    /// souls at the least, so it takes 2 runs at the least: PHASE 6a DECISION 11) —
-    /// or, refused, its reason in their place (<c>FLAMING ON THE NAMELESS NOVA -
-    /// BURNING NEEDS FLAMING AHEAD OF IT</c>) — and then, on one that can be chosen,
-    /// its note (<c>… - NEVER FIRES ON A SWORD</c>). A refused one says its reason
-    /// alone: it cannot be chosen, and at the widest names the line has no room for
-    /// both, as an offer's has.
+    /// at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] -
+    /// ARRIVES AT T2 - 2 RUNS</c>, or on an Arming Sword carrying Flaming and Vampiric
+    /// <c>FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS</c> (a reorder
+    /// moves one of two souls at the least, so it takes 2 runs at the least: PHASE 6a
+    /// DECISION 11) — or, refused, its reason in their place (<c>FLAMING ON THE
+    /// NAMELESS NOVA IN THE STABLE - BURNING NEEDS FLAMING AHEAD OF IT</c>) — and
+    /// then, on one that can be chosen, its note (<c>… - NEVER FIRES ON A SWORD</c>,
+    /// <c>… - DOES NOTHING YET</c>). A refused one says its reason alone: at the
+    /// widest names the line has no room for both, as an offer's has.
     /// </summary>
     internal static string MoveLine(TransferOffer move)
     {
@@ -441,18 +456,41 @@ internal sealed class DepositPanel
         return null;
     }
 
-    /// <summary>W/S on the offer list or the source list: the choice to the next one up (<paramref name="step"/> −1) or down (+1) not refused, round the ends. Anywhere else, nothing.</summary>
+    /// <summary>
+    /// W/S on the offer list or the source list: the choice to the next line up
+    /// (<paramref name="step"/> −1) or down (+1), round the ends — a refused one
+    /// too, which stays dimmed and whose ENTER says why (<see cref="ChooseOffer"/>),
+    /// so the window, which follows the choice, reaches every line: a run of refused
+    /// lines longer than the window, as a weapon with every slot filled lists over
+    /// its reorders, was never shown while the choice passed over them (PHASE 6a
+    /// DECISION 12). Anywhere else, nothing.
+    /// </summary>
     public void Move(int step)
     {
-        if (_step is Step.Offer or Step.Sources)
-            _chosen = Next(_chosen, step);
+        int count = Listed;
+        if (_step is Step.Offer or Step.Sources && count > 0 && step != 0)
+            _chosen = ((Math.Max(0, _chosen) + Math.Sign(step)) % count + count) % count;
     }
 
-    /// <summary>ENTER on the offer list or the source list: the one chosen is the one, and the confirm asks. Anywhere else, nothing.</summary>
-    public void ChooseOffer()
+    /// <summary>
+    /// ENTER on the offer list or the source list: the one chosen is the one, and the
+    /// confirm asks — or, refused, nothing is chosen and its reason is handed back for
+    /// the screen to say, as a dimmed service's number is (<see cref="Pick"/>): an
+    /// offer's as it names it (<c>COLD - CANNOT SIT WITH FLAMING</c>), a soul's after
+    /// where it lies, as the confirm's ENTER says it (<see cref="RefusalNow"/>).
+    /// Anywhere else, nothing.
+    /// </summary>
+    /// <returns>Why the line chosen is refused, or null.</returns>
+    public string? ChooseOffer()
     {
-        if (_step is Step.Offer or Step.Sources && _chosen >= 0)
+        if (_step is not (Step.Offer or Step.Sources) || _chosen < 0)
+            return null;
+        string? refused = _service == Service.Transfer
+            ? _moves[_chosen].Refusal is { } why ? $"{SoulPlace(_moves[_chosen])} - {why}" : null
+            : _offers[_chosen].Refusal;
+        if (refused is null)
             _step = Step.Confirm;
+        return refused;
     }
 
     /// <summary>
@@ -549,7 +587,7 @@ internal sealed class DepositPanel
     /// <summary>Whether the <paramref name="index"/>th of that list is refused.</summary>
     private bool RefusedAt(int index) => (_service == Service.Transfer ? _moves[index].Refusal : _offers[index].Refusal) is not null;
 
-    /// <summary>The next of that list from <paramref name="from"/>, a step at a time round the ends, that is not refused; <paramref name="from"/> itself when no other is, and -1 when none is.</summary>
+    /// <summary>The next of that list from <paramref name="from"/>, a step at a time round the ends, that is not refused — where a list opens its choice (<see cref="Pick"/>); <paramref name="from"/> itself when no other is, and -1 when none is.</summary>
     private int Next(int from, int step)
     {
         int count = Listed;

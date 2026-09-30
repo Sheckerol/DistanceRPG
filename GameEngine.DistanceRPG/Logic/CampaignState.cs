@@ -873,6 +873,30 @@ public sealed class CampaignState
     }
 
     /// <summary>
+    /// Whether a move of the weapon at <paramref name="from"/> to <paramref name="to"/>
+    /// would come straight back, and leave everything as it was: a weapon in a hand
+    /// put down where nothing lies in its own member's bag, ahead of every weapon
+    /// that bag carries, which the emptied hand takes up again at once — it takes the
+    /// first weapon in the bag (<see cref="PartyMemberState.ArmFromBag"/>, the rule
+    /// <see cref="Move"/> keeps). A member's only weapon put in its own bag always
+    /// does. The hub asks first and says why, as it asks <see cref="WouldDisarm"/>,
+    /// so no move, log line or save is made of a change that changes nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    public bool ComesStraightBack(WeaponPlace from, WeaponPlace to)
+    {
+        if (from.IsStable || from.Index != 0 || to.IsStable || to.MemberId != from.MemberId || to.Index == 0
+            || WeaponAt(from) is null || WeaponAt(to) is not null)
+            return false;
+        var bag = MemberOf(from).Inventory;
+        for (int slot = 1; slot < to.Index; slot++)
+            if (bag[slot] is not null)
+                return false;   // the hand would take up this one instead
+        return true;
+    }
+
+    /// <summary>
     /// Move a weapon the party owns, by hand between runs (§6.2; PHASE 6a
     /// DECISION 7): the hub's one door onto the stable and the bags. The weapon at
     /// <paramref name="from"/> goes to <paramref name="to"/>, and whatever lay

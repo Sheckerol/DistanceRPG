@@ -306,9 +306,23 @@ public sealed class TransferTests : IDisposable
         Assert.All(shop, row => Assert.Same(deposit, row.Deposit));
         Assert.Equal((false, true), (shop[0].Held, shop[1].Held));
         Assert.Equal([DungeonHud.Grey, DungeonHud.Orange], HubWeapons.Runs(shop[1]).Select(run => run.Color));   // held, grey; a unique's name orange
+        Assert.Equal([DungeonHud.Grey, DungeonHud.Orange, DungeonHud.Grey], HubWeapons.Runs(shop[1], chosen: true).Select(run => run.Color));   // chosen, marked alone
         Assert.Equal("TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 1 RUN", BetweenRunsHud.DetailRows(shop[0])[2].Text);
         Assert.Equal("HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE", BetweenRunsHud.DetailRows(shop[1])[2].Text);
         Assert.Equal("WORKING - BACK AFTER 1 MORE RUN THAT COUNTS", BetweenRunsHud.DetailRows(shop[1])[3].Text);
+
+        // The source's wear is left in its pool (PHASE 6a DECISION 13): short of full
+        // its detail says so as every weapon's does, and full, what the move does with
+        // it — never the full line's advice to rotate it into the shop, which it is in
+        // (the audit of Phase 6a). Out of the shop, a full weapon still says that.
+        Assert.Contains("WEAR 12 OF 30 - 18 MORE FILLS IT", BetweenRunsHud.DetailRows(shop[1]).Select(row => row.Text));
+        var worn = Worn("flensing_knife_unique", wear: 30);
+        var heldFull = BetweenRunsHud.DetailRows(shop[1] with { Weapon = worn });
+        Assert.Contains(("WEAR 30 OF 30 - FULL - THE MOVE LEAVES IT UNSPENT", DungeonHud.Green), heldFull.Select(row => (row.Text, row.Color)));
+        Assert.DoesNotContain(heldFull, row => row.Text.Contains("ROTATE", StringComparison.Ordinal));
+        Assert.Equal("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(worn));
+        Assert.Contains("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP",
+            BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, "  BAG   NAMELESS KNIFE", Place: new WeaponPlace("C", 2), Weapon: worn)).Select(row => row.Text));
         Assert.Equal("TAKE BACK THE RIPOSTE BLADE AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 30 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
 
         // Walked: T on the HELD row, ENTER.
@@ -363,7 +377,7 @@ public sealed class TransferTests : IDisposable
         Assert.Same(knife, d.EquippedWeapon);   // its hand armed from the bag
         var row = Enchanter.TransferOffers(campaign, blade).First(move => ReferenceEquals(move.Source, knife));
         Assert.Equal(Enchanter.WouldCarryNone("D"), row.Refusal);
-        Assert.Equal("SERRATED ON THE NAMELESS KNIFE - [D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", DepositPanel.MoveLine(row));
+        Assert.Equal("SERRATED ON THE NAMELESS KNIFE IN THE HAND OF [D] - [D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", DepositPanel.MoveLine(row));
 
         // D given another weapon to carry: the move is taken, and D's hand is armed.
         campaign.Move(TestShop.InTheStable(campaign, guard), new WeaponPlace("D", 1));
@@ -399,7 +413,7 @@ public sealed class TransferTests : IDisposable
         Assert.Contains(stranded, ex.Message, StringComparison.Ordinal);
 
         var move = Enchanter.TransferOffers(campaign, sword).Single(offer => ReferenceEquals(offer.Source, nova) && offer.Index == 0);
-        Assert.Equal("FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT", DepositPanel.MoveLine(move));
+        Assert.Equal("FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT", DepositPanel.MoveLine(move));
 
         // Only this move's doing is refused: a source whose entry lacked its
         // prerequisite already (a hand-edited save) still gives away another soul.
@@ -431,7 +445,7 @@ public sealed class TransferTests : IDisposable
         Give(campaign, "C", 4, rotwood);
         Assert.Equal("THE ROTWOOD WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, dagger, rotwood, 0));
         var move = Enchanter.TransferOffers(campaign, dagger).Single(offer => ReferenceEquals(offer.Source, rotwood));
-        Assert.Equal("POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING", DepositPanel.MoveLine(move));
+        Assert.Equal("POISON T3 ON THE ROTWOOD IN THE BAG OF [C] - THE ROTWOOD WOULD CAST NOTHING", DepositPanel.MoveLine(move));
         var cone = Souled("wand_of_the_cone", 0, 0, ("cold", 1));
         Give(campaign, "D", 2, cone);
         Assert.Equal("THE WAND OF THE CONE WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, dagger, cone, 0));
@@ -498,7 +512,7 @@ public sealed class TransferTests : IDisposable
         var pair = Souled("staff_of_renewal", 0, 0, ("regeneration", 1), ("serrated", 1));
         Give(campaign, "D", 2, pair);
         Assert.Equal("THE STAFF OF RENEWAL WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, dagger, pair, 0));
-        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [D] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
             DepositPanel.MoveLine(Enchanter.TransferOffers(campaign, dagger).Single(move => ReferenceEquals(move.Source, pair) && move.Index == 0)));
 
         // A staff given its first entry — a soulless one, as only a hand-edited save

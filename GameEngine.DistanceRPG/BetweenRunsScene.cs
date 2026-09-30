@@ -448,7 +448,9 @@ public sealed class BetweenRunsScene : Scene
     /// (<see cref="CampaignState.Move"/>), and a save asked for (PHASE 6a DECISION
     /// 10). Put down where it was taken from, it is put back, and nothing moves. A
     /// move that would leave a member carrying no weapon is refused, said over the
-    /// keys, and the weapon stays taken up (PHASE 6a DECISION 7).
+    /// keys, and the weapon stays taken up (PHASE 6a DECISION 7) — and so is one the
+    /// emptied hand would take straight back, which would change nothing
+    /// (<see cref="CampaignState.ComesStraightBack"/>).
     /// </summary>
     private void PutDown()
     {
@@ -463,6 +465,12 @@ public sealed class BetweenRunsScene : Scene
         if (_campaign.WouldDisarm(carried.From, to) is { } unarmed)
         {
             _refusal = HubWeapons.KeepsAWeapon(unarmed.Id);
+            Log.Info($"[Hub] Refused: {_refusal}");
+            return;
+        }
+        if (_campaign.ComesStraightBack(carried.From, to))
+        {
+            _refusal = HubWeapons.StraightBack(carried.From.MemberId!);
             Log.Info($"[Hub] Refused: {_refusal}");
             return;
         }
@@ -516,12 +524,14 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// The deposit panel's keys (<see cref="DepositPanel"/>): a number picks a
     /// service — a dimmed one's says why, over the keys — W/S or the arrows choose
-    /// on the offer list or the source list, ENTER chooses there and deposits on the
-    /// confirm. Every other key does nothing.
+    /// on the offer list or the source list, ENTER chooses there — a refused line's
+    /// says why, the same way — and deposits on the confirm. Every other key does
+    /// nothing.
     /// </summary>
     private void PanelKey(Keys key)
     {
         var panel = _panel!;
+        string? refused = null;
         switch (key)
         {
             case Keys.W or Keys.Up:
@@ -532,17 +542,19 @@ public sealed class BetweenRunsScene : Scene
                 break;
             case Keys.Enter or Keys.KeyPadEnter:
                 if (panel.Current is DepositPanel.Step.Offer or DepositPanel.Step.Sources)
-                    panel.ChooseOffer();
+                    refused = panel.ChooseOffer();
                 else if (panel.Current == DepositPanel.Step.Confirm)
                     MakeDeposit(panel);
                 break;
             default:
-                if (SlotMenu.Digit(key) is { } digit && panel.Pick(digit) is { } refused)
-                {
-                    _refusal = refused;
-                    Log.Info($"[Hub] Refused: {refused}");
-                }
+                if (SlotMenu.Digit(key) is { } digit)
+                    refused = panel.Pick(digit);
                 break;
+        }
+        if (refused is not null)
+        {
+            _refusal = refused;
+            Log.Info($"[Hub] Refused: {refused}");
         }
     }
 

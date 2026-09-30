@@ -315,8 +315,10 @@ public static class TuningSchema
         // most twice the docs' five. The enchanter works on one deposit at least — 0
         // would freeze every service — and on no more than the most enchantments a
         // weapon holds. The roll's chance and its graft share are percentages, 0 to
-        // 100 (0 never improves, or never grafts); the signature's weight is 1 at
-        // least — no bias — and at most what a magnitude clamps at.
+        // 100 (a chance of 0 never improves; a share of 0 grafts only when there is
+        // nothing to deepen, the fall-through of PHASE 6a DECISION 5); the
+        // signature's weight is 1 at least — no bias — and at most what a magnitude
+        // clamps at.
         PlayedFrom2(Int(nameof(Tuning.WearPerHit), TuningGroup.Enchanter, 0, 1000, t => t.WearPerHit, (t, v) => t with { WearPerHit = v })),
         PlayedFrom2(Int(nameof(Tuning.WearCapacityPerBar), TuningGroup.Enchanter, 0, 1000, t => t.WearCapacityPerBar, (t, v) => t with { WearCapacityPerBar = v })),
         PlayedFrom2(Int(nameof(Tuning.FirstSlotCapacity), TuningGroup.Enchanter, 1, 10000, t => t.FirstSlotCapacity, (t, v) => t with { FirstSlotCapacity = v })),

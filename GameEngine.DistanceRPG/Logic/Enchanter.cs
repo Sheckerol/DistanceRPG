@@ -160,7 +160,7 @@ public sealed record TakenBack(Deposit Entry, PoolProgress Before, PoolProgress 
 /// <param name="ArrivesAt">The tier it lands at (<see cref="Enchantment.Transferred"/>).</param>
 /// <param name="Runs">The runs the move takes (<see cref="Enchanter.TransferRuns"/>).</param>
 /// <param name="Refusal">Why the enchanter would refuse it, not naming the soul — <c>BURNING NEEDS FLAMING AHEAD OF IT</c> — or null (<see cref="Enchanter.TransferRefusal"/>).</param>
-/// <param name="Note">What the screen says beside it whether or not it is refused — <c>NEVER FIRES ON A SWORD</c> — or null.</param>
+/// <param name="Note">What the screen says beside it whether or not it is refused — <c>NEVER FIRES ON A SWORD</c>, <c>DOES NOTHING YET</c> — or null.</param>
 public sealed record TransferOffer(WeaponPlace? From, Weapon? Source, int Index, Enchantment Soul, int ArrivesAt, int Runs, string? Refusal, string? Note);
 
 /// <summary>
@@ -654,9 +654,10 @@ public static class Enchanter
     /// roster order and slot order, then the stable's in its order — then the
     /// weapon's own, a reorder. Each with the tier it arrives at, the runs the move
     /// takes, why the enchanter would refuse it (<see cref="TransferRefusal"/>) or
-    /// nothing, and the note an offer carries when it would never fire on the weapon
-    /// (<see cref="NeverFiresOn"/>). A refused one is listed with its reason, never
-    /// hidden (PHASE 6a DECISION 12).
+    /// nothing, and its note (<see cref="MoveNote"/>): the one an offer carries when
+    /// it would never fire on the weapon (<see cref="NeverFiresOn"/>), or that it does
+    /// nothing yet (<see cref="DoesNothingYetNote"/>). A refused one is listed with its
+    /// reason, never hidden (PHASE 6a DECISION 12).
     /// </summary>
     /// <param name="campaign">The campaign between its runs.</param>
     /// <param name="weapon">The weapon the soul would land on, last.</param>
@@ -672,7 +673,7 @@ public static class Enchanter
             {
                 var soul = giver.Enchantments[index];
                 offers.Add(new TransferOffer(from, source, index, soul, soul.Transferred().Tier, TransferRuns(weapon, reorder: source is null),
-                    TransferRefusal(campaign, weapon, source, index), FiresOn(weapon, soul.Def) ? null : NeverFiresOn(weapon.Class)));
+                    TransferRefusal(campaign, weapon, source, index), MoveNote(weapon, soul.Def)));
             }
         }
 
@@ -686,6 +687,23 @@ public static class Enchanter
         Each(null, null);
         return offers;
     }
+
+    /// <summary>
+    /// The note on a soul the source list offers to move onto <paramref name="weapon"/>,
+    /// or null: one of a kind that does nothing yet, which the enchanter moves though
+    /// it never offers to copy (PHASE 6a DECISION 13), <see cref="DoesNothingYetNote"/>
+    /// — its behaviour registers a handler that does nothing, so it "fires" on every
+    /// weapon, and the move would spend a deposit and its runs on a lock that buys
+    /// nothing, unsaid; and otherwise, one that would never fire on the weapon,
+    /// <see cref="NeverFiresOn"/>, as an offer is noted.
+    /// </summary>
+    private static string? MoveNote(Weapon weapon, EnchantmentDef def)
+        => LootTable.IsInert(def) ? DoesNothingYetNote
+            : FiresOn(weapon, def) ? null
+            : NeverFiresOn(weapon.Class);
+
+    /// <summary>The note on a soul of a kind declared and inert (<see cref="LootTable.IsInert"/>) on the source list, which moves it all the same: <c>WEIGHTLESS ON THE FEATHERED DEATH IN THE STABLE - ARRIVES AT T1 - 2 RUNS - DOES NOTHING YET</c>.</summary>
+    public const string DoesNothingYetNote = "DOES NOTHING YET";
 
     /// <summary>
     /// Why the enchanter would refuse to move the soul at <paramref name="index"/> on
@@ -886,7 +904,7 @@ public static class Enchanter
     /// <summary>A caster as a refusal names it: <c>THE ROTWOOD</c>, <c>THE STAFF OF RENEWAL</c>, a name already starting <c>THE</c> kept as it is.</summary>
     private static string TheCaster(Weapon caster)
     {
-        string name = caster.Name.ToUpperInvariant();
+        string name = caster.ShownName;
         return name.StartsWith("THE ", StringComparison.Ordinal) ? name : $"THE {name}";
     }
 
@@ -912,7 +930,7 @@ public static class Enchanter
     public static string InTheShop(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        return $"{weapon.Name.ToUpperInvariant()} IS IN THE SHOP ALREADY";
+        return $"{weapon.ShownName} IS IN THE SHOP ALREADY";
     }
 
     /// <summary>A member's last weapon (PHASE 6a DECISION 7): <c>[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST</c>.</summary>
