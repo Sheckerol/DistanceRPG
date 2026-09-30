@@ -749,9 +749,16 @@ R4's consequence 2). What a roll that lands does, its table gives in words alone
 toward the class signature"; **graft**, +1 stack of a modifier it has never
 carried, "rare" — "deepen stays the common result and a graft stays the surprise",
 and refinement moves whether the roll lands, "not what it lands on". It gives no
-number for either, and does not say what a roll does when the outcome it drew has
-nothing to take: every modifier the weapon carries at its forged-plus-five
-ceiling, or nothing left it may graft.
+number for either. What a roll does when the outcome it drew has nothing to take
+— every modifier the weapon carries at its forged-plus-five ceiling, or nothing
+left it may graft — it speaks to twice, and the two sentences pull apart: "A
+modifier at its ceiling cannot be deepened, and a weapon with every modifier
+capped rolls nothing at all" (§6.4's rules), and "A finished weapon is not inert.
+Even with its signature capped, a weapon can still gain *breadth* through grafts
+at 5 apiece — which is what keeps a max-farmed drop worth depositing at all" (the
+next rule). A max-farmed drop has every modifier it carries capped, so read
+literally — every modifier it carries — the first says that drop's landed roll is
+nothing, and the second says it grafts.
 
 **Shipped provisionally** (Phase 6a.4, `Enchanter.Improve`):
 - of the rolls that land, `GraftSharePercent` (25) in 100 graft, and the rest
@@ -762,16 +769,25 @@ ceiling, or nothing left it may graft.
   signature, so it has no bias;
 - a graft is drawn evenly among the modifiers the weapon has never carried that
   the relations let it take (the kind, the exclusions, the prerequisites, and
-  never a forged-only one, so never `Charges`). So it may land on one the weapon
-  never reads — `CRIT MULTIPLIER` on a staff, whose cast crits at a fixed x2 —
-  which settled.md already accepts: "every other modifier is at worst inert on the
-  wrong weapon" (the relations entry), `Charges`, the negative one, alone kept
-  out;
-- an outcome with nothing to take falls through to the other — a weapon with its
-  every modifier capped still grafts, "a finished weapon is not inert" — and with
-  neither, the roll that landed changes nothing, which the summary says as it says
-  a roll that missed: `NO CHANGE` (the log tells the two apart: `landed, nothing
-  to deepen or graft`).
+  never a forged-only one, so never `Charges`) — the relations and nothing else.
+  So it may land on one the weapon never reads, such as `CRIT MULTIPLIER` on a
+  staff, whose cast crits at a fixed x2 (a wand's area cast does read it), and
+  the summary's green line names it as the story. The record pulls both ways on
+  that. For it: "every other modifier is at worst inert on the wrong weapon"
+  (settled.md's relations entry, `Charges`, the negative one, alone kept out),
+  and "restriction is reserved for grafts that would be negative, not merely
+  off-class" (§6.4). Against it: the same relations entry sharpens §1.1's rule to
+  "no stack may be dead"; the caster crit ruling is made "without reopening
+  `CritMultiplier`, which stays a martial-only stat" (settled.md); and "a dead
+  stack is a farm cycle or a service roll that bought nothing" (settled.md's
+  "nothing is capped at the ceiling" entry);
+- an outcome with nothing to take falls through to the other. §6.4's "every
+  modifier capped" is read as every modifier the weapon may hold, so the roll
+  that changes nothing is the one with nothing to deepen and nothing to graft,
+  and a weapon whose carried modifiers are all capped still grafts, "a finished
+  weapon is not inert". With neither, the roll that landed changes nothing, which
+  the summary says as it says a roll that missed: `NO CHANGE` (the log tells the
+  two apart: `landed, nothing to deepen or graft`).
 
 Both numbers are `tuning.json` keys, each comment starting `Provisional:` (the
 file's marker), by the user's standing rule that a number they may revisit lives
@@ -780,7 +796,14 @@ provisional.
 
 **This decides what a landed roll gives, and how often each, so it is the user's
 to decide.** The alternatives: (a) no fall-through: an outcome drawn with nothing
-to take gives nothing, so a capped weapon's deepens are lost rolls; (b) other
-numbers — the share and the weight are guesses, §6.4 saying only "uncommon" and
-"rare"; or (c) the split as a rule of the code rather than two keys.
+to take gives nothing, so a capped weapon's deepens are lost rolls — which is
+§6.4's "rolls nothing at all" read literally, for the deepens; read so for the
+grafts too, a weapon whose every carried modifier is capped rolls nothing at all;
+(b) other numbers — the share and the weight are guesses, §6.4 saying only
+"uncommon" and "rare"; (c) the split as a rule of the code rather than two keys;
+or (d) a graft only of what the weapon reads: the candidates narrowed to the
+modifiers its attack or its cast reads, so a staff is never grafted `CRIT
+MULTIPLIER` — a rule of the code beside the modifiers no weapon stacks, keyed on
+a staff's cast, or a `kind` row in `restricted.json`, though a row for casters
+would keep it off a wand too, whose cast reads it.
 settled.md's Phase 6a implementation pass records the ruling.

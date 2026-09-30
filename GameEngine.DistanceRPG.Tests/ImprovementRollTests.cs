@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text.Json.Nodes;
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
@@ -271,8 +272,9 @@ public sealed class ImprovementRollTests : IDisposable
     {
         // PHASE 6a DECISION 5: an outcome with nothing it may take falls through to
         // the other, and a landed roll with neither changes nothing — "a weapon with
-        // every modifier capped rolls nothing at all" (P6:588–593), and a capped
-        // weapon "can still gain breadth through grafts".
+        // every modifier capped rolls nothing at all" (P6:592–593), read as every
+        // modifier it may hold, since a weapon with every modifier it carries capped
+        // "can still gain breadth through grafts" (P6:598–600).
         // Always deepening, a Tower Guard with Block and Push at their ceilings grafts.
         using (TestContent.UsePremise(tuning: Landing(0)))
         {
@@ -313,25 +315,124 @@ public sealed class ImprovementRollTests : IDisposable
     {
         // S:387–390: "Charges is the only negative graft … Still worth a test
         // asserting every modifier's first stack is a non-decrease, so a future
-        // modifier cannot reintroduce the shape unnoticed." Every modifier the
-        // enchanter can graft onto any weapon of the catalogue is worth at least as
-        // much at one stack as at none. Charges alone is not — a cap where there was
-        // none — and forgedOnly is what keeps it out: let out of it, a bow would be
-        // offered it.
+        // modifier cannot reintroduce the shape unnoticed." The measure is what the
+        // rules read of a modifier on the weapon it is grafted to, at one stack
+        // against none. Logic reads a modifier one of two ways:
+        // - by its value (ActorState.Value): Offset + PerStack × stacks, more being
+        //   better, as S:387's sweep found of every row. A stack never lowers it —
+        //   every PerStack is clamped 0 up — so that read is a non-decrease under
+        //   any tuning that loads, Charges' 1 to 2 included, and guards nothing: it
+        //   is checked below as the premise, not as the guard;
+        // - by its presence: a Stacks call naming the modifier, a rule its first
+        //   stack switches on. That is where the shape lives — "a cap where there
+        //   was none" — and no comparison of the table's numbers can see it. Every
+        //   presence read in Logic's IL is found and pinned, and each is measured by
+        //   the reader that makes it, at none and at one: today
+        //   TurnSystem.AttacksPerTurn's of Charges alone, no limit at none and 2
+        //   throws at one.
+        // A first stack that tightens a read is the negative shape, and a modifier
+        // whose first stack does must be forged-only, so no weapon is grafted it. A
+        // new presence read fails the pin by name until its reader is measured here.
+        Assert.Equal([("TurnSystem.AttacksPerTurn", Charges)], PresenceReads());
+        var readers = new Dictionary<ModifierType, Func<PartyMemberState, int?>>
+        {
+            [Charges] = holder => new TurnSystem(new int[20, 20], [holder], [], () => 10).AttacksPerTurn(holder),   // null: no limit
+        };
+        Assert.Equal(PresenceReads().Select(read => read.Modifier).Distinct().Order(), readers.Keys.Order());
+
+        // What t's first stack, acquired on a fresh weapon of id, does to the read
+        // that asks for t by name: a limit where there was none, or a lower one, is
+        // a decrease.
+        string? Decrease(string id, ModifierType t)
+        {
+            if (!readers.TryGetValue(t, out var read))
+                return null;   // read by its value alone
+            var with = Fresh(id);
+            with.Acquire(t, 1);
+            int? none = read(TestPools.Holding("A", Fresh(id)));
+            int? one = read(TestPools.Holding("A", with));
+            return one is int limit && (none is not int free || limit < free)
+                ? $"{t} grafted onto {with.Name}: {(none is int was ? was.ToString() : "no limit")} -> {limit}"
+                : null;
+        }
+
+        // Every modifier the enchanter can graft onto any weapon of the catalogue.
         var rules = GameContent.Current.Modifiers;
         var grafted = new HashSet<ModifierType>();
         foreach (var def in GameContent.Current.Weapons.All)
             foreach (var t in Enchanter.GraftCandidates(Fresh(def.Id)))
             {
                 grafted.Add(t);
-                Assert.True(rules.Resolve(t, 1) >= rules.Resolve(t, 0), $"{t}'s first stack, grafted onto {def.Name}, is worth less than none");
+                Assert.Null(Decrease(def.Id, t));
+                Assert.True(rules.Resolve(t, 1) >= rules.Resolve(t, 0), $"{t}'s value falls with its first stack");   // the premise: PerStack ≥ 0
             }
         Assert.DoesNotContain(Charges, grafted);
         Assert.Equal(Enum.GetValues<ModifierType>().Except([Charges, .. ModifierRules.NeverStacked]).Order(), grafted.Order());   // every other one somewhere
 
+        // The guard fires on the shape, and on nothing else: let out of forgedOnly,
+        // Charges is offered to every weapon forged without it, and the measure
+        // finds it a decrease on each — a bow held to 2 throws where only its
+        // movement bound it — and no other graft one. Each it finds is in the
+        // shipped forgedOnly.
+        var forgedOnly = rules.ForgedOnly;
         using (TestContent.UsePremise(tuning: TestShop.Ruled, restricted: ShippedContent.Restricted with { ForgedOnly = [] }))
-            Assert.Contains(Charges, Enchanter.GraftCandidates(Fresh("hunting_bow")));
+        {
+            var offered = GameContent.Current.Weapons.All
+                .SelectMany(def => Enchanter.GraftCandidates(Fresh(def.Id)).Select(t => (def.Id, Modifier: t)))
+                .ToArray();
+            var decreases = offered.Where(graft => Decrease(graft.Id, graft.Modifier) is not null).ToArray();
+            Assert.Equal(offered.Where(graft => graft.Modifier == Charges), decreases);
+            Assert.Equal(GameContent.Current.Weapons.All.Count(def => def.Forged.GetValueOrDefault(Charges) == 0), decreases.Length);
+            Assert.Equal("Charges grafted onto Hunting Bow: no limit -> 2", Decrease("hunting_bow", Charges));
+            Assert.All(decreases, decrease => Assert.Contains(decrease.Modifier, forgedOnly));
+        }
     }
+
+    /// <summary>
+    /// Every presence read in <c>Logic/</c> — a call to a <c>Stacks(ModifierType)</c>,
+    /// an actor's, a weapon's or a spread's, on a modifier the code names, the
+    /// constant loaded just before the call — as the method that makes it and the
+    /// modifier it asks for. A Stacks call on a modifier held in a variable asks the
+    /// same of every modifier (the relations, the caps) and is not one.
+    /// </summary>
+    private static (string Reader, ModifierType Modifier)[] PresenceReads()
+    {
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        string logic = typeof(Floor).Namespace!;
+        var reads = new List<(string, ModifierType)>();
+        foreach (var type in Types(typeof(Floor).Assembly).Where(t => t.Namespace is { } ns && (ns == logic || ns.StartsWith(logic + ".", StringComparison.Ordinal))))
+            foreach (var method in type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+            {
+                if (Body(method) is not { } il)
+                    continue;
+                int? loaded = null;
+                foreach (var (op, token, at) in InstructionsAt(il))
+                {
+                    if (loaded is int value && IsCall(op) && Resolve(method, token) is { Name: "Stacks" } target
+                        && target.GetParameters() is [{ ParameterType: var parameter }] && parameter == typeof(ModifierType))
+                        reads.Add(($"{Root(method.DeclaringType)!.Name}.{method.Name}", (ModifierType)value));
+                    loaded = Loaded(op, il, at);
+                }
+            }
+        return reads.Distinct().Order().ToArray();
+    }
+
+    /// <summary>The int <paramref name="op"/> loads as a constant, its operand at <paramref name="at"/> in <paramref name="il"/>, or null when it loads none.</summary>
+    private static int? Loaded(OpCode op, byte[] il, int at)
+    {
+        if (op == OpCodes.Ldc_I4_S)
+            return (sbyte)il[at];
+        if (op == OpCodes.Ldc_I4)
+            return BitConverter.ToInt32(il, at);
+        if (op == OpCodes.Ldc_I4_M1)
+            return -1;
+        int shortForm = Array.IndexOf(ShortConstants, op);
+        return shortForm >= 0 ? shortForm : null;
+    }
+
+    /// <summary><c>ldc.i4.0</c> to <c>ldc.i4.8</c>, each at the index of the int it loads.</summary>
+    private static readonly OpCode[] ShortConstants =
+        [OpCodes.Ldc_I4_0, OpCodes.Ldc_I4_1, OpCodes.Ldc_I4_2, OpCodes.Ldc_I4_3, OpCodes.Ldc_I4_4, OpCodes.Ldc_I4_5, OpCodes.Ldc_I4_6, OpCodes.Ldc_I4_7, OpCodes.Ldc_I4_8];
 
     [Fact]
     public void TheRollIsTheRunsAndTheDepositsOwn_AReloadNeverRerolls()
@@ -386,6 +487,60 @@ public sealed class ImprovementRollTests : IDisposable
             .Distinct().Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(["Enchanter.Tick"], CallersOf(nameof(Enchanter.Improve)));
         Assert.Equal(["Enchanter.Improve"], CallersOf(nameof(Enchanter.ImproveStream)));
+    }
+
+    [Fact]
+    public void TheRollIsKeyedByTheOrdinal_NeverThePlaceInTheShop()
+    {
+        // §1d: the roll's second key is the deposit's ordinal — the campaign's count
+        // of deposits as it went in, never reused — not where the deposit stands in
+        // the shop as the run ends. Every other pinned roll comes off a deposit whose
+        // ordinal is its place. TestShop's shop with deposit 0 taken back: the
+        // staff's Vampiric (ordinal 1) and the Tower Guard's refinement (ordinal 2)
+        // now stand first and second, and each rolls on its own ordinal's stream —
+        // the draws 1073 and 2815 TheReportCarriesTheDrawForTheLog pins — and lands
+        // on what that stream draws next. A tick keyed by the place would draw 232,
+        // ordinal 0's.
+        using var landing = TestContent.UsePremise(tuning: Landing(25));
+        var campaign = TestShop.Shop();
+        Enchanter.TakeBack(campaign, campaign.AtTheEnchanter[0]);
+        Assert.Equal([1, 2], campaign.AtTheEnchanter.Select(deposit => deposit.Ordinal));
+        Assert.Equal(232, Enchanter.ImproveStream(CampaignRuns.FiveDeep, 0).NextInt(0, 2999));
+
+        var back = TestShop.Counted(campaign).Services!;
+        Assert.Equal(["staff_of_renewal", "tower_guard"], back.Select(report => report.WeaponId));
+        Assert.All(back, report => Assert.True(report.Finished));
+        Assert.Equal(new ImproveRoll(1073, 3000, 3000), back[0].Roll);   // enchanting: 100 in 100
+        Assert.Equal(new ImproveRoll(2815, 3000, 6000), back[1].Roll);   // refining 30 cashed: twice that
+        Assert.Equal(new Improvement(ImprovementKind.Deepen, Resonant), back[0].Improved);   // a staff's one deepen
+        Assert.Equal(new Improvement(ImprovementKind.Deepen, Block), back[1].Improved);
+    }
+
+    [Fact]
+    public void WhatALandedRollLandsOnIsPinned()
+    {
+        // §1d's draws, always in this order: whether it lands, then which outcome,
+        // then which modifier — a deepen walking its candidates in ModifierType
+        // order, each as wide as its weight, a graft indexing its list alike. The
+        // ratio tests would pass a reorder of the second and third draws, a walk
+        // from the other end or another index, and each moves what a seed and an
+        // ordinal land on — a mid-run save resumed on a later build included — so
+        // the outcomes are pinned: a Tower Guard (Block x2, the signature, weighing
+        // 3; Push x1) refined on a full bar of 30 at odds that always land, a
+        // quarter grafting, over the shipped seed's first twelve ordinals. The
+        // shop's, through the tick, are TheRollIsKeyedByTheOrdinal_NeverThePlaceInTheShop's.
+        using var landing = TestContent.UsePremise(tuning: Landing(25));
+        Improvement Deepen(ModifierType t) => new(ImprovementKind.Deepen, t);
+        Improvement Graft(ModifierType t) => new(ImprovementKind.Graft, t);
+        Improvement[] expected =
+        [
+            Graft(Softening), Graft(Light), Deepen(Block), Deepen(Block), Deepen(Block), Deepen(Push),
+            Deepen(Block), Deepen(Push), Graft(Brace), Deepen(Block), Deepen(Block), Deepen(Block),
+        ];
+        var landed = Enumerable.Range(0, expected.Length)
+            .Select(ordinal => Enchanter.Improve(Fresh("tower_guard"), Service.Refine, 30, GoldenSeed, ordinal).Improved)
+            .ToArray();
+        Assert.Equal(expected, landed);
     }
 
     [Fact]
@@ -460,10 +615,11 @@ public sealed class ImprovementRollTests : IDisposable
     {
         // Logic never logs: a finished service's report carries its roll as it was
         // drawn — the first draw off its stream, out of 100 × StartingPool, against
-        // the odds' numerator — for the run's end's log line, which with the run's
-        // map seed makes any roll reproducible. The save keeps what the roll did,
-        // never the roll: a report a load brings back has none, and the document
-        // names no roll. TestShop's shop, worked home on a run entered on FiveDeep:
+        // the odds' numerator — for the run's end's log line, which shows the roll;
+        // its keys, the map seed and the ordinal, are held by a save made during the
+        // run, a load of which replays it. The save keeps what the roll did, never
+        // the roll: a report a load brings back has none, and the document names no
+        // roll. TestShop's shop, worked home on a run entered on FiveDeep:
         // B's staff enchanted Vampiric (deposit 1, 35 cashed) and C's Tower Guard
         // refined (deposit 2, 30 cashed).
         var campaign = TestShop.Shop();

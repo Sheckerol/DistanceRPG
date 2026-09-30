@@ -737,11 +737,11 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// improvement roll 2417 of 3000 against 90: no change</c>, <c>… finished:
     /// refined; improvement roll 12 of 3000 against 180: grafted Block</c> (or
     /// <c>deepened …</c>, or <c>landed, nothing to deepen or graft</c>), or <c>…
-    /// finished: refined; no wear, no roll</c>. With the run's map seed, which the
-    /// log names as the run begins, and the deposit's ordinal, which the save holds,
-    /// the numbers make any roll reproducible from the log. None for an
-    /// empty shop. A weapon by its content row's name, and its id where the content
-    /// has none.
+    /// finished: refined; no wear, no roll</c>. The line shows the roll without its
+    /// keys: the run's map seed is in the log, as the run begins, but the deposit's
+    /// ordinal is not, and a finished deposit's is in no save. A save made during the
+    /// run holds both, and a load of it replays the roll. None for an empty shop. A
+    /// weapon by its content row's name, and its id where the content has none.
     /// </summary>
     internal static IReadOnlyList<string> EnchanterLines(RunResult result)
     {

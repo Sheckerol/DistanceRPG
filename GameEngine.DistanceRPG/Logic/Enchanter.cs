@@ -82,9 +82,11 @@ public sealed record Improvement(ImprovementKind Kind, ModifierType Modifier);
 /// A service's improvement roll as it was drawn, for the log alone (Logic never
 /// logs): the first draw off the roll's stream, 0 to <see cref="Denominator"/> − 1,
 /// against the odds' numerator — it landed exactly when the draw is below it
-/// (<see cref="Wear.ImproveOdds"/>). With the run's map seed the log already names
-/// and the deposit's ordinal, it makes any roll reproducible from the log. Never
-/// saved: a report a load brings back has none.
+/// (<see cref="Wear.ImproveOdds"/>). Its two keys are not both in the log: the
+/// run's map seed is, as the run begins, but no log line names the deposit's
+/// ordinal, and once the service has finished no save holds it either. A save made
+/// during the run holds both — the visit's seed and the queued deposit — and a load
+/// of it replays the roll. Never saved: a report a load brings back has none.
 /// </summary>
 /// <param name="Draw">The draw, 0 to <paramref name="Denominator"/> − 1.</param>
 /// <param name="Denominator">The odds' denominator: 100 × StartingPool.</param>
@@ -700,8 +702,9 @@ public static class Enchanter
     /// <c>SplitMix32(mapSeed ^ ServiceSalt ^ ordinal × ServiceMix)</c>, finalized as
     /// every counter-keyed stream here is (<see cref="FarmLadder.SplitMix32"/>),
     /// since the roll's first draw — whether it lands — is the load-bearing one.
-    /// Both keys are saved — the run's seed with its visit, the ordinal with its
-    /// deposit — so a reload that replays the same run's end replays the same roll,
+    /// Both keys are saved while the run is under way — the run's seed with its
+    /// visit, the ordinal with its queued deposit — so a reload that replays the same
+    /// run's end replays the same roll,
     /// and a bad roll is never reloaded away (R1).
     /// </summary>
     /// <param name="mapSeed">The seed the finishing run was entered on.</param>
@@ -733,8 +736,10 @@ public static class Enchanter
     /// (<see cref="Weapon.Acquire"/>, held to forged plus the acquired headroom — a
     /// graft, forged at 0, caps at the headroom). An outcome with no candidate falls
     /// through to the other, and with neither the landed roll changes nothing:
-    /// "a weapon with every modifier capped rolls nothing at all" (P6:588–593).
-    /// The split, the weight and the fall-through are PHASE 6a DECISION 5.</item>
+    /// "a weapon with every modifier capped rolls nothing at all" (P6:592–593),
+    /// read as every modifier it may hold, since a weapon whose carried modifiers
+    /// are all capped "can still gain breadth through grafts" (P6:598–600). The
+    /// split, the weight and the fall-through are PHASE 6a DECISION 5.</item>
     /// </list>
     /// </summary>
     /// <param name="weapon">The weapon coming back.</param>
