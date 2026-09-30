@@ -80,7 +80,7 @@ public class SaveInventoryTests
             new("Forged", Kept.Saved, "forged, by modifier name: the identity spread a ceiling is read off"),
             new("Modifiers", Kept.Saved, "modifiers, by modifier name: the live total"),
             new("_enchantments", Kept.Saved, "enchantments[] in attachment order, (id, tier, xp) — never sorted"),
-            new("ForgedEnchantmentCount", Kept.Saved, "forgedEnchantments"),
+            new("ForgedEnchantmentCount", Kept.Saved, "forgedEnchantments: fixed as the weapon was made, and moved only by a transfer taking a forged entry off (Phase 6a.6), which a save of the weapon after it holds"),
             new("Wear", Kept.Saved, "wear: the wear banked since its last service (version 2)"),
             new("WearCashed", Kept.Saved, "wearCashed: the wear ever cashed, which the capacity and its progress are replayed from under the tuning loaded now (version 2)"),
             new("Enchantments", Kept.Derived, "the read-only view of _enchantments"),
@@ -110,6 +110,8 @@ public class SaveInventoryTests
             new("WearAtDeposit", Kept.Saved, "enchanter[].wearAtDeposit: what the deposit cashed, which a take-back returns"),
             new("Runs", Kept.Saved, "enchanter[].runs: fixed as it went in"),
             new("EnchantmentId", Kept.Saved, "enchanter[].enchantment, by id"),
+            new("Source", Kept.Saved, "enchanter[].source, whole: a transfer's source, held in the shop as the same deposit (Phase 6a.6)"),
+            new("SourceIndex", Kept.Saved, "enchanter[].sourceIndex: a transfer's soul by its place on the source, or on the weapon for a reorder (Phase 6a.6)"),
             new("RunsWorked", Kept.Saved, "enchanter[].runsWorked"),
         ],
         [typeof(ServiceReport)] =
@@ -121,6 +123,8 @@ public class SaveInventoryTests
             new("Stalled", Kept.Saved, "lastResult.services[].stalled"),
             new("EnchantmentId", Kept.Saved, "lastResult.services[].enchantment, by id"),
             new("Improved", Kept.Saved, "lastResult.services[].improved and .modifier, each by name: what the improvement roll did (Phase 6a.4)"),
+            new("Tier", Kept.Saved, "lastResult.services[].tier: the tier a finished transfer's soul landed at (Phase 6a.6)"),
+            new("SourceId", Kept.Saved, "lastResult.services[].sourceId: a transfer's source, by catalogue id (Phase 6a.6)"),
             new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which a save made during the run replays: it holds the visit's map seed and the queued deposit's ordinal, each named in the log where it was made (deposit #n, Phase 6a.5)"),
         ],
         [typeof(Improvement)] =
@@ -393,10 +397,11 @@ public class SaveInventoryTests
             new("TakingBack", Kept.Derived, "the deposit a take-back asks about: the campaign's shop, saved"),
             new("_services", Kept.Derived, "the services as the enchanter answers them (Enchanter.ServiceRefusal), asked of the campaign as the panel opens"),
             new("_offers", Kept.Derived, "the offer as the enchanter answers it (Enchanter.Offers), asked of the campaign as the panel opens"),
+            new("_moves", Kept.Derived, "the souls a MOVE could take as the enchanter answers them (Enchanter.TransferOffers), asked of the campaign as the panel opens, and asked again at the ENTER (Phase 6a.6)"),
             new("_step", Kept.NotSaved, "which question is up: a panel is the screen's alone, and nothing is deposited until the confirm's ENTER"),
             new("_service", Kept.NotSaved, "the service chosen: nothing is deposited until the confirm's ENTER"),
-            new("_chosen", Kept.NotSaved, "the offer chosen: nothing is deposited until the confirm's ENTER"),
-            new("_top", Kept.NotSaved, "the offer list's window: presentation, kept to the choice"),
+            new("_chosen", Kept.NotSaved, "the offer or the soul chosen: nothing is deposited until the confirm's ENTER"),
+            new("_top", Kept.NotSaved, "the offer list's or the source list's window: presentation, kept to the choice"),
         ],
     };
 

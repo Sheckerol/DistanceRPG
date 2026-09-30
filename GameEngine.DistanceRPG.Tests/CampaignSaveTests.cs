@@ -356,12 +356,13 @@ public sealed class CampaignSaveTests : IDisposable
 
         var tree = JsonNode.Parse(Save(campaign))!.AsObject();
         var queue = tree["campaign"]!["enchanter"]!.AsArray();
-        Assert.Equal(["ordinal", "service", "weapon", "wearAtDeposit", "runs", "runsWorked", "enchantment"], queue[0]!.AsObject().Select(member => member.Key));
+        Assert.Equal(["ordinal", "service", "weapon", "wearAtDeposit", "runs", "runsWorked", "enchantment", "source", "sourceIndex"],   // a transfer's source, Phase 6a.6
+            queue[0]!.AsObject().Select(member => member.Key));
         Assert.Equal(("Enchant", "vampiric"), (queue[0]!["service"]!.GetValue<string>(), queue[0]!["enchantment"]!.GetValue<string>()));
         Assert.Equal(3, tree["campaign"]!["depositsMade"]!.GetValue<int>());
         var reports = tree["campaign"]!["lastResult"]!["services"]!.AsArray();
         Assert.Equal(2, reports.Count);
-        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier"],   // the roll's outcome, Phase 6a.4
+        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier", "tier", "sourceId"],   // the roll's outcome, Phase 6a.4; a transfer's, Phase 6a.6
             reports[1]!.AsObject().Select(member => member.Key));
 
         // The restored shop works on as the one saved: the next run that counts

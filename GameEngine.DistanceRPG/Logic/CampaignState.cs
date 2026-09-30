@@ -112,7 +112,8 @@ public readonly record struct WeaponPlace(string? MemberId, int Index)
 /// through the hub's doors (<see cref="Enqueue"/>, <see cref="TakeOut"/>), which
 /// the enchanter calls (<see cref="Enchanter"/>); every run's end works it, the
 /// visit gone, and brings a finished service's weapon back to the end of the stable
-/// (<see cref="Return"/>); a load brings it back through <see cref="Restore"/>.
+/// (<see cref="Return"/>) — a transfer's two, its source after it (Phase 6a.6); a
+/// load brings it back through <see cref="Restore"/>.
 /// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>: it
 /// rolls nothing — a visit's seed is handed to <see cref="Enter"/> by whoever
@@ -262,7 +263,8 @@ public sealed class CampaignState
         ArgumentOutOfRangeException.ThrowIfNegative(depositsMade);
         if (enchanter.Any(deposit => deposit?.Weapon is null))
             throw new ArgumentException("The queue holds deposits of weapons, and one is null.", nameof(enchanter));
-        if (stable.Concat(enchanter.Select(deposit => deposit.Weapon)).Distinct(ReferenceEqualityComparer.Instance).Count() != stable.Count + enchanter.Count)
+        var queued = enchanter.SelectMany(deposit => deposit.Source is { } source ? new[] { deposit.Weapon, source } : [deposit.Weapon]).ToArray();
+        if (stable.Concat(queued).Distinct(ReferenceEqualityComparer.Instance).Count() != stable.Count + queued.Length)
             throw new ArgumentException("The stable and the queue hold a weapon twice between them: a weapon is in one place.", nameof(enchanter));
         for (int i = 0; i < enchanter.Count; i++)
             if (enchanter[i].Ordinal < (i == 0 ? 0 : enchanter[i - 1].Ordinal + 1) || enchanter[i].Ordinal >= depositsMade)
@@ -967,15 +969,19 @@ public sealed class CampaignState
     /// <paramref name="from"/>, by hand between runs: the hub's door into the shop,
     /// which the enchanter calls once it has cashed the weapon's wear
     /// (<see cref="Enchanter.Deposit"/>, its one caller). The weapon leaves its
-    /// place — a bag slot is left empty, and the stable closes up behind it — a hand
-    /// it empties is armed from the bag as a move's is
-    /// (<see cref="PartyMemberState.ArmFromBag"/>), and the count of deposits made
-    /// moves past its ordinal.
+    /// place — a bag slot is left empty, and the stable closes up behind it — and so
+    /// does a transfer's source, from <paramref name="source"/>: both wait in the
+    /// shop as the one deposit (PHASE 6a DECISION 13). A hand either empties is armed
+    /// from the bag as a move's is (<see cref="PartyMemberState.ArmFromBag"/>), once
+    /// both are gone, and the count of deposits made moves past its ordinal.
     /// </summary>
-    /// <returns>The weapon a hand the deposit emptied took up from the bag, or null.</returns>
-    /// <exception cref="InvalidOperationException">A visit is in progress, or the deposit would leave a member carrying no weapon (PHASE 6a DECISION 7).</exception>
-    /// <exception cref="ArgumentException"><paramref name="entry"/> is not the deposit of the weapon at <paramref name="from"/>, or its ordinal is not the next.</exception>
-    internal Weapon? Enqueue(WeaponPlace from, Deposit entry)
+    /// <param name="from">Where the deposit's weapon lies.</param>
+    /// <param name="entry">The deposit.</param>
+    /// <param name="source">Where a transfer's source lies, when it is another weapon; null for every other deposit, and for a reorder.</param>
+    /// <returns>The weapon a hand the weapon left took up from the bag, and the one a hand the source left took up; each null when no hand was emptied.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress, or the deposit would leave a member carrying no weapon (PHASE 6a DECISION 7) — a transfer's asked with both its weapons gone.</exception>
+    /// <exception cref="ArgumentException"><paramref name="entry"/> is not the deposit of the weapon at <paramref name="from"/>, or of the source at <paramref name="source"/>; or its ordinal is not the next.</exception>
+    internal (Weapon? Armed, Weapon? SourceArmed) Enqueue(WeaponPlace from, Deposit entry, WeaponPlace? source = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (Visit is { } visit)
@@ -983,21 +989,29 @@ public sealed class CampaignState
                 $"A visit to '{visit.Def.Id}' is in progress: the shop is changed by hand only between runs.");
         if (!ReferenceEquals(WeaponAt(from), entry.Weapon))
             throw new ArgumentException($"Deposit {entry.Ordinal} is of {entry.Weapon.Name}, and {from} holds another: a deposit takes the weapon where it lies.", nameof(entry));
+        if ((source is null) != (entry.Source is null) || (source is { } at && !ReferenceEquals(WeaponAt(at), entry.Source)))
+            throw new ArgumentException($"Deposit {entry.Ordinal}'s source is {entry.Source?.Name ?? "none"}, and {source?.ToString() ?? "no place"} is named for it: a transfer takes its source where it lies.", nameof(source));
         if (entry.Ordinal != DepositsMade)
             throw new ArgumentException($"Deposit {entry.Ordinal} is not the next: {DepositsMade} deposits have been made.", nameof(entry));
-        if (!from.IsStable && MemberOf(from).Inventory.Count(carried => carried is not null) == 1)
-            throw new InvalidOperationException($"The deposit would leave {from.MemberId} carrying no weapon (PHASE 6a DECISION 7).");
+        WeaponPlace[] places = source is { } given ? [from, given] : [from];
+        foreach (var member in places.Where(place => !place.IsStable).Select(MemberOf).Distinct())
+            if (member.Inventory.Count(carried => carried is not null) == places.Count(place => place.MemberId == member.Id))
+                throw new InvalidOperationException($"The deposit would leave {member.Id} carrying no weapon (PHASE 6a DECISION 7).");
 
-        Take(from);
+        foreach (var place in places.OrderByDescending(place => place.IsStable ? place.Index : -1))
+            Take(place);   // the stable's later place first, so the earlier one has not moved
         _enchanter.Add(entry);
         DepositsMade++;
-        return !from.IsStable && from.Index == 0 ? MemberOf(from).ArmFromBag() : null;
+        var armed = !from.IsStable && from.Index == 0 ? MemberOf(from).ArmFromBag() : null;
+        var sourceArmed = source is { IsStable: false, Index: 0 } emptied ? MemberOf(emptied).ArmFromBag() : null;
+        return (armed, sourceArmed);
     }
 
     /// <summary>
     /// Take <paramref name="deposit"/> out of the shop by hand, between runs: the
     /// hub's door for a take-back (<see cref="Enchanter.TakeBack"/>, its one
-    /// caller), its weapon to the end of the stable.
+    /// caller), its weapon to the end of the stable, and a transfer's source after
+    /// it.
     /// </summary>
     /// <exception cref="InvalidOperationException">A visit is in progress, or <paramref name="deposit"/> is not in the shop.</exception>
     internal void TakeOut(Deposit deposit)
@@ -1011,7 +1025,8 @@ public sealed class CampaignState
 
     /// <summary>
     /// A service finished at the run's end (§6.2): <paramref name="finished"/> leaves
-    /// the shop and its weapon goes to the end of the stable (PHASE 6a DECISION 7).
+    /// the shop and its weapon goes to the end of the stable, a transfer's source
+    /// after it (PHASE 6a DECISIONS 7 and 13).
     /// The run's end's own path — the visit already gone — never the hub's doors,
     /// and asked by the enchanter's clock alone (<see cref="Enchanter.Tick"/>,
     /// which <see cref="EndRun"/> alone asks).
@@ -1023,7 +1038,7 @@ public sealed class CampaignState
         Release(finished);
     }
 
-    /// <summary>A deposit out of the shop, by reference, and its weapon to the end of the stable: what a take-back and a finished service share.</summary>
+    /// <summary>A deposit out of the shop, by reference, and its weapon to the end of the stable, a transfer's source after it: what a take-back and a finished service share.</summary>
     private void Release(Deposit deposit)
     {
         int at = _enchanter.FindIndex(queued => ReferenceEquals(queued, deposit));
@@ -1031,5 +1046,7 @@ public sealed class CampaignState
             throw new InvalidOperationException($"Deposit {deposit.Ordinal}, of {deposit.Weapon.Name}, is not in the shop.");
         _enchanter.RemoveAt(at);
         _stable.Add(deposit.Weapon);
+        if (deposit.Source is { } source)
+            _stable.Add(source);
     }
 }

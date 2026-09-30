@@ -83,7 +83,7 @@ the title.
 | W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
 | Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
 | D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
-| T | On a weapon in the shop (`WORKING` or `STALLED`): ask whether to take it back (below) |
+| T | On a weapon in the shop (`WORKING` or `STALLED`), or a transfer's source held there (`HELD`): ask whether to take it back (below) — a transfer's two weapons together |
 | Tab | The DUNGEONS page |
 | Esc | Open the menu, over the hub |
 
@@ -91,14 +91,15 @@ the title.
 | --- | --- |
 | 1 | `1  ENCHANT - A CHOSEN ENCHANTMENT - 3 IN 100 TO IMPROVE`: the offer list. Dimmed with its reason — `NO FREE SLOT - SLOT 2 OPENS AT CAPACITY 35 - IT IS 31`, `ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0`, `ALL 5 SLOTS ARE FILLED`, `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` — the key says the reason over the keys, and picks nothing |
 | 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
-| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`) and skipped. The list scrolls with the choice |
-| Enter | On the offer list, choose it: the confirm. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a hand it empties takes up the first weapon in its bag, and the campaign is saved at once |
-| Esc | Back a step: from the confirm to the offer list (or the services), from the offer list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
+| 3 | `3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE` (Phase 6a.6): the source list, every soul on the party's other weapons and then the weapon's own. Dimmed with its reason as ENCHANT is, or `NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT` |
+| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul and where it comes from: `VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2 RUNS`, `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 1 RUN`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING`) and skipped. Each list scrolls with the choice |
+| Enter | On either list, choose it: the confirm. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
+| Esc | Back a step: from the confirm to the list it came from (or the services), from either list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
 | Tab, D, T | Nothing |
 
 | Between runs: the take-back ask (T) | Action |
 | --- | --- |
-| Enter | `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once |
+| Enter | `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once. A transfer's — `TAKE BACK THE ARMING SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36 WEAR COMES BACK` — returns both, the source's souls and wear as they went in |
 | Esc | No: it stays in the shop |
 | Tab, D, T | Nothing |
 
@@ -240,6 +241,39 @@ from the bag` — the deposit's number, with the run's map seed, is what a finis
 service's improvement roll is keyed by — and `[Enchanter] Took back Tower Guard
 (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked
 lost, 30 wear returned (capacity 31 -> 30), deposit #0`.
+
+**Moving an enchantment** (Phase 6a.6): 3 on the deposit panel lists every soul on
+the party's other weapons out of the shop — each member's, then the stable's — and
+last the weapon's own, each with where it lies, the tier it arrives at and its runs.
+A move is the Enchant service with the soul brought from a weapon the party owns
+rather than from the offer: the weapon needs the free slot and the deposit of
+attaching it as its next, its whole pool is cashed, it takes that attachment's runs
+and it has enchanting's odds of improving (PHASE 6a DECISION 13). Any soul may move —
+a staff's forged effect, a unique's soul — and it comes back a tier down, the new
+tier from no XP; one at tier 1, and every unique soul, moves intact with its XP. It
+lands last, acquired: the forged mark stays with the weapon forged with it. Both
+weapons wait in the shop as one deposit, one of the two the enchanter works on, the
+source's wear left in its pool: the WEAPONS page lists the source `HELD     NAMELESS
+KNIFE` under `WORKING  RIPOSTE BLADE - 0 OF 1 RUN`, its detail `HELD - GIVING
+VAMPIRIC TO THE RIPOSTE BLADE`, and T on either takes both back. The summary says
+`RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
+under it, `NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF`. Moving a
+weapon's own soul to its end is a reorder: it takes the weapon's count in runs rather
+than the count plus one, and it is allowed with every slot filled — `ALL 5 SLOTS ARE
+FILLED - REFINING OR REORDERING IS LEFT` — but not for the entry already last (PHASE
+6a DECISION 11). The enchanter refuses a move that would leave a member carrying no
+weapon, asked with both weapons gone (`[B] WOULD CARRY NO WEAPON - …`); one the
+relations refuse on the weapon, as ENCHANT's offer does; one that would strand an
+entry behind it on the weapon it leaves (`BURNING NEEDS FLAMING AHEAD OF IT`); and
+one that would leave a staff or a wand casting nothing (`THE ROTWOOD WOULD CAST
+NOTHING`: a staff's first enchantment is its cast and must apply a status, a wand's
+must be an element — so a staff gives its effect away once it has a second status
+to cast; PHASE 6a DECISION 12). A lock the new wielder cannot pay is no refusal: the
+soul sleeps there. The log names both: `[Enchanter] Deposited Riposte Blade
+(riposte_blade) from B's bag slot 3: Transfer vampiric (T3) from Nameless Knife
+(flensing_knife_unique) in B's bag slot 4, 30 wear cashed (capacity 30 -> 31), 1
+run, deposit #0`, and `[Enchanter] Riposte Blade finished: vampiric moved on at T2
+from Nameless Knife; improvement roll …`.
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
@@ -411,14 +445,18 @@ back to it, and the game quits from it.
   (`"depositsMade"`), with the last run's word on the shop in its result
   (`"services"`, `null` for an empty shop; Phase 6a.3a), a service it brought back
   saying what its improvement roll did (`"improved"` and `"modifier"`, by name; Phase
-  6a.4 — the roll as it was drawn is the log's, never the save's). A save whose shop
+  6a.4 — the roll as it was drawn is the log's, never the save's). A transfer in the
+  shop holds its source whole (`"source"`, `null` for a reorder) and its soul's place
+  there (`"sourceIndex"`), and a run's report of one its source (`"sourceId"`) and,
+  once it came back, the tier its soul landed at (`"tier"`; Phase 6a.6). A save whose shop
   contradicts itself — a weapon in it worn, a service past its last run, an
   enchantment the campaign never met or one that does nothing yet (Phase 6a.3b,
   in a deposit or in a run's report of one), a deposit before the tutorial is
   beaten, a run's report of the shop that says what no run's end says (an
   improvement on a service not back yet, an outcome without its modifier, a
-  modifier no weapon stacks), a deposit
-  whose take-back would give back a weapon no load reads — is refused as one that
+  modifier no weapon stacks, a landed tier on a transfer not back yet), a deposit
+  whose take-back would give back a weapon no load reads, a transfer whose soul is
+  not where it names, or a source on any other deposit — is refused as one that
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
@@ -433,7 +471,9 @@ back to it, and the game quits from it.
   what it does not know of (the stable, the enchanter's queue), and its next save —
   from Phase 6a.2 on, the first weapon moved between runs — drops those, and the
   weapons in them: a 6a.1 or 6a.2 build loses every weapon in a 6a.3a save's shop
-  (PHASE 6a DECISION 14).
+  (PHASE 6a DECISION 14). A 6a.5 or earlier build refuses a save with a transfer in
+  its shop or its last run's report (`Transfer` is no service it knows) and sets it
+  aside, kept and never deleted, as it does any it cannot read.
   While Phase 6a is being built, one more thing of the steps between: a save an
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
@@ -719,8 +759,10 @@ everything in them is named by a stable string id.
   it may be copied: the enchanter offers it once the campaign has met it (no drop
   carries a soul either way). The enchanter asks `excludes` and `requires` too: it
   attaches nothing a group pairs with an entry the weapon carries, nor anything
-  whose requirement is not on the weapon ahead of it. A deposit already in the
-  shop when the file changes is served as it was bought.
+  whose requirement is not on the weapon ahead of it — and a move (Phase 6a.6) is
+  asked the same of the weapon it lands on, and `requires` of the weapon it leaves:
+  it strands nothing behind it. A deposit already in the shop when the file
+  changes is served as it was bought.
   A relation is an edit here, never a rebuild: take the crit riders' group
   (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
 - **The enchantment catalogue and the unique souls are code**

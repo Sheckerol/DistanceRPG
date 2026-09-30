@@ -737,7 +737,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// improvement roll 2417 of 3000 against 90: no change</c>, <c>… finished:
     /// refined; improvement roll 12 of 3000 against 180: grafted Block</c> (or
     /// <c>deepened …</c>, or <c>landed, nothing to deepen or graft</c>), or <c>…
-    /// finished: refined; no wear, no roll</c>. The line shows the roll without its
+    /// finished: refined; no wear, no roll</c>; a transfer's says where its soul
+    /// went (Phase 6a.6), <c>… finished: vampiric moved on at T2 from Nameless
+    /// Knife; …</c>, or a reorder's <c>… flaming moved to the end at T1; …</c>. The
+    /// line shows the roll without its
     /// keys, which the log names where each was made: the run's map seed as the run
     /// begins, and the deposit's ordinal where the deposit was made (<c>deposit
     /// #3</c>, Phase 6a.5; <see cref="BetweenRunsScene.DepositedLine"/>), in the
@@ -762,7 +765,14 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var lines = new List<string> { stalled.Count > 0 ? $"{head}; stalled {string.Join(", ", stalled)}" : head };
         foreach (var report in reports.Where(report => report.Finished))
             lines.Add($"[Enchanter] {Named(report.WeaponId)} finished: "
-                + (report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"attached {id}" : "refined")
+                + (report.Service, report.EnchantmentId) switch
+                {
+                    (Service.Enchant, { } id) => $"attached {id}",
+                    (Service.Transfer, { } soul) => report.SourceId is { } source
+                        ? $"{soul} moved on at T{report.Tier} from {Named(source)}"
+                        : $"{soul} moved to the end at T{report.Tier}",
+                    _ => "refined",
+                }
                 + RollSaid(report));
         return lines;
     }

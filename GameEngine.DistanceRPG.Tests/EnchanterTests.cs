@@ -721,11 +721,12 @@ public sealed class EnchanterTests : IDisposable
         // beside the requires rows, so the two can never part. Read off the IL, both
         // ask it and the validator walks no requires row of its own; asked of the same
         // lists, they agree — a burn with no Flaming ahead is refused by both, naming
-        // Flaming, and a burn behind it is allowed by both.
+        // Flaming, and a burn behind it is allowed by both. A transfer asks it of the
+        // weapon a soul leaves too (Enchanter.Stranded, Phase 6a.6).
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
         var question = typeof(EnchantmentCatalogue).GetMethod(nameof(EnchantmentCatalogue.LacksPrerequisiteAhead), Declared)!;
-        Assert.Equal(["ContentValidator.ValidateWeapons", "Enchanter.OfferRefusal"],
+        Assert.Equal(["ContentValidator.ValidateWeapons", "Enchanter.OfferRefusal", "Enchanter.Stranded"],
             Calls(typeof(Enchanter).Assembly).Where(call => Same(call.Target, question))
                 .Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct().Order(StringComparer.Ordinal));
         var validate = typeof(ContentValidator).GetMethod(nameof(ContentValidator.ValidateWeapons), Declared)!;
@@ -1148,7 +1149,7 @@ public sealed class EnchanterTests : IDisposable
 
         var entry = Of(bStaff, 0);
         Assert.NotEqual(Of(bStaff, 0), entry);   // a deposit is the one it is, never equal to another by its values
-        Assert.Null(campaign.Enqueue(at, entry));
+        Assert.Equal(((Weapon?)null, (Weapon?)null), campaign.Enqueue(at, entry));   // no hand emptied: neither the weapon's nor, with no source, a source's
         Assert.Same(entry, Assert.Single(campaign.AtTheEnchanter));
         Assert.Equal(1, campaign.DepositsMade);
         Assert.Null(campaign.Party[1].Inventory[1]);
@@ -1310,6 +1311,30 @@ internal static class TestShop
         return new Weapon(GameContent.Current.Weapons[id], made.Forged, made.Modifiers, made.Enchantments, made.ForgedEnchantmentCount, wear, cashed);
     }
 
+    /// <summary>
+    /// <paramref name="id"/>'s row brought back as a save brings it, carrying
+    /// <paramref name="souls"/> — each at its tier, acquired, in that order, a wand's
+    /// statline its cold one's — with <paramref name="wear"/> banked and
+    /// <paramref name="cashed"/> ever cashed: a weapon the enchanter has worked on.
+    /// </summary>
+    public static Weapon Souled(string id, int wear, int cashed, params (string Id, int Tier)[] souls)
+    {
+        var made = TestWeapons.Get(id, GameContent.Current.Weapons[id].Class == WeaponClass.Wand ? DamageType.Cold : null);
+        return new Weapon(GameContent.Current.Weapons[id], made.Forged, made.Modifiers,
+            souls.Select(soul => new Enchantment(GameContent.Current.Enchantments[soul.Id], soul.Tier)).ToArray(), 0, wear, cashed);
+    }
+
+    /// <summary>Where <paramref name="weapon"/> lies in <paramref name="campaign"/>'s stable.</summary>
+    public static WeaponPlace InTheStable(CampaignState campaign, Weapon weapon)
+    {
+        int at = -1;
+        for (int i = 0; i < campaign.Stable.Count && at < 0; i++)
+            if (ReferenceEquals(campaign.Stable[i], weapon))
+                at = i;
+        Assert.True(at >= 0, $"{weapon.Name} is not in the stable");
+        return WeaponPlace.InTheStable(at);
+    }
+
     /// <summary>Lay <paramref name="weapon"/> in <paramref name="memberId"/>'s bag slot <paramref name="slot"/>, over what was there, and say where.</summary>
     public static WeaponPlace Give(CampaignState campaign, string memberId, int slot, Weapon weapon)
     {
@@ -1352,6 +1377,30 @@ internal static class TestShop
         Counted(campaign);
         Enchanter.Deposit(campaign, Give(campaign, "C", 2, Worn("tower_guard", wear: 30)), Service.Refine);
         Assert.Equal([(0, 1, 2), (1, 1, 2), (2, 0, 1)], campaign.AtTheEnchanter.Select(deposit => (deposit.Ordinal, deposit.RunsWorked, deposit.Runs)));
+        return campaign;
+    }
+
+    /// <summary>
+    /// <see cref="Opened"/>, with transfers made as play makes them (Phase 6a.6): B's
+    /// Riposte Blade, worn full, takes Vampiric T3 off C's Nameless Knife (0: one
+    /// run), and a counted run brings both back to the stable — the blade carrying it
+    /// at T2, the knife without it — the last result reporting it; then D's Tower
+    /// Guard, worn full, takes the knife's Serrated from the stable (1: one run,
+    /// fresh), the knife held beside it; and A's Arming Sword, carrying Flaming and
+    /// Vampiric at capacity 35 and full, moves its Flaming to its end (2: a reorder,
+    /// two runs, fresh).
+    /// </summary>
+    public static CampaignState Transfers()
+    {
+        var campaign = Opened();
+        var knife = TestWeapons.Get("flensing_knife_unique");
+        var blade = Worn("riposte_blade", wear: 30);
+        Enchanter.Deposit(campaign, Give(campaign, "B", 2, blade), Service.Transfer, source: Give(campaign, "C", 2, knife), sourceIndex: 1);
+        Counted(campaign);
+        Enchanter.Deposit(campaign, Give(campaign, "D", 2, Worn("tower_guard", wear: 30)), Service.Transfer, source: InTheStable(campaign, knife), sourceIndex: 0);
+        Enchanter.Deposit(campaign, Give(campaign, "A", 2, Souled("arming_sword", 35, 160, ("flaming", 1), ("vampiric", 1))), Service.Transfer, sourceIndex: 0);
+        Assert.Equal([(1, Service.Transfer, 1, true), (2, Service.Transfer, 2, false)],
+            campaign.AtTheEnchanter.Select(deposit => (deposit.Ordinal, deposit.Service, deposit.Runs, deposit.Source is not null)));
         return campaign;
     }
 }

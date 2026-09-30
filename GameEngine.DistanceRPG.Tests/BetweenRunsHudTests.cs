@@ -667,7 +667,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Shown();
         panel.ChooseOffer();
         Shown();
-        Assert.Equal(["1 OR 2 CHOOSES - ESC BACK", "W/S CHOOSE - ENTER CHOOSES - ESC BACK", "ENTER: DEPOSIT - ESC: BACK"], shown);
+        Assert.Equal(["1, 2 OR 3 CHOOSES - ESC BACK", "W/S CHOOSE - ENTER CHOOSES - ESC BACK", "ENTER: DEPOSIT - ESC: BACK"], shown);   // 3, MOVE, since Phase 6a.6
         Enchanter.Deposit(campaign, new WeaponPlace("B", 2), Service.Refine);
         var ask = DepositPanel.Asking(Assert.Single(campaign.AtTheEnchanter));
         Assert.Equal(("ENTER: TAKE IT BACK - ESC: NO", DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Ask, panel: ask));
@@ -1219,7 +1219,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("THE NEXT NEEDS A DEPOSIT OF 45 WEAR - 4 RUNS IN THE SHOP", Price("flensing_knife_unique", 0));
         using (TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { EnchantmentSlots = 3 }))
         {
-            Assert.Equal("ALL 3 SLOTS ARE FILLED - REFINING IS LEFT", Price("flensing_knife_unique", 0));
+            Assert.Equal("ALL 3 SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT", Price("flensing_knife_unique", 0));   // a reorder at the count (PHASE 6a DECISION 11)
             Assert.Equal("ENCHANTMENTS 3 - SLOTS OPEN 1 OF 3", Slots("flensing_knife_unique", 0));
         }
 

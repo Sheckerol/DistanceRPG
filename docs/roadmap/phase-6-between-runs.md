@@ -634,6 +634,17 @@ you wanted Flaming is not a dead weapon — it is a body with the
 wrong soul in it, and the enchanter moves souls. The roll sets what you start
 with, never what you end with.
 
+(Built in Phase 6a.6: a move is the Enchant service with the soul brought from
+a weapon the party owns — the weapon needs the free slot and the deposit of
+attaching it, both weapons wait in the shop as one deposit, the source's wear
+left in its pool, and the soul lands last, acquired. How a transfer works is
+PHASE 6a DECISION 13 in open-questions.md, and a reorder's runs, and a reorder
+at five enchantments, are PHASE 6a DECISION 11, both provisional and the user's
+to rule. What the enchanter refuses is DECISION 12's: its caster clause — no
+move leaves a staff or a wand casting nothing — narrows "can be transferred onto
+a dagger" in settled.md, and a wand's Cold becomes Flaming through a third
+element, since the two cannot sit together.)
+
 ## 6.6 The farm — where potions come from
 
 **Every first-time clear adds someone to the hub**, and the hub makes potions
@@ -873,6 +884,14 @@ they share everything except what the wear buys:
 record Deposit(Weapon Weapon, Service Service, int WearAtDeposit);
 enum Service { Enchant, Refine }
 ```
+
+(Built in Phase 6a, extended — PHASE 6a DECISION 13 in open-questions.md: the
+queue entry also holds its ordinal, the runs it takes and has worked, the
+enchantment an Enchant attaches, and a transfer's source and the soul's place on
+it; `Service` gains `Transfer`, §6.5's move. A weapon keeps `Wear` and the wear
+it has ever cashed, its capacity and that capacity's progress replayed from the
+latter under the tuning loaded — PHASE 6a DECISION 2. settled.md's Phase 6a
+implementation pass, written at Phase 6a.7, records both.)
 
 The graft roll is `GraftBaseChance` for `Enchant` and
 `GraftBaseChance * (1 + wear / StartingWearCapacity)` for `Refine` (§6.4) — one

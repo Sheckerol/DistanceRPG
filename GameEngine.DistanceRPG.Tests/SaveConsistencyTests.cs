@@ -357,6 +357,21 @@ public sealed class SaveConsistencyTests : IDisposable
             TestShop.Counted(moved);
             Loads(moved, "a shop worked after retiresOnClear moved");
         }
+
+        // Transfers (Phase 6a.6): a move and a reorder in the shop, the source held
+        // there with its wear, and a finished move reported — and the same after a
+        // run that did not count, and after one that finished them.
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            var moves = TestShop.Transfers();
+            Loads(moves, "a transfer and a reorder in the shop, a finished transfer reported");
+            Restores(Edited(Save(moves), tree => DepositNode(tree, 0)["source"]!["wear"] = 12), "a transfer's source holding its wear in the shop");
+            TestShop.NotCounted(moves);
+            Loads(moves, "a run that did not count, with transfers in the shop");
+            TestShop.Counted(moves);
+            TestShop.Counted(moves);
+            Loads(moves, "a transfer and a reorder finished and reported");
+        }
     }
 
     [Fact]
@@ -915,6 +930,26 @@ public sealed class SaveConsistencyTests : IDisposable
             RefusedAt(Edited(shop, past), where, problem);
         }
 
+        // A transfer's (Phase 6a.6): the tier a report's soul landed at, 1 to the
+        // deepest a tier stays whole at, as a weapon row's entry; and a soul's place,
+        // never below 0.
+        string moves = Save(TestShop.Transfers());
+        int deepestTier = ContentBounds.DeepestTier;
+        (string What, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] moveCeilings =
+        [
+            ("a report's tier", tree => ReportNode(tree, 0)["tier"] = deepestTier, tree => ReportNode(tree, 0)["tier"] = deepestTier + 1,
+                "campaign.lastResult.services[0].tier",
+                $"{deepestTier + 1} is above {deepestTier}: tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number"),
+            ("a report's least tier", tree => ReportNode(tree, 0)["tier"] = 1, tree => ReportNode(tree, 0)["tier"] = 0,
+                "campaign.lastResult.services[0].tier", "0 is no tier: a soul lands at tier 1 or deeper"),
+            ("a negative soul's place", tree => { }, tree => DepositNode(tree, 0)["sourceIndex"] = -1, "campaign.enchanter[0].sourceIndex", "-1 is below 0"),
+        ];
+        foreach (var (what, atCeiling, past, where, problem) in moveCeilings)
+        {
+            Restores(Edited(moves, atCeiling), $"{what} at its ceiling");
+            RefusedAt(Edited(moves, past), where, problem);
+        }
+
         // What a deposit cashed at the most check 28 lets it, taken back: the weapon
         // it gives back holds that as its wear, under what it had cashed before, and
         // loads. One more, and it would not: refused at the deposit.
@@ -1046,6 +1081,84 @@ public sealed class SaveConsistencyTests : IDisposable
         RefusedAt(Edited(shop, tree => Full(tree, 1)), "campaign.enchanter[1].weapon.enchantments",
             $"{most} entries on a deposit to enchant: the one it attaches would be more than the {most} a weapon can hold");
         Restores(Edited(shop, tree => Full(tree, 2)), "a refinement of a weapon holding the most");
+    }
+
+    [Fact]
+    public void ATransferThatContradictsItselfIsRefused()
+    {
+        // Checks 24, 25, 26, 27 and 29's transfer half (Phase 6a.6): a transfer names
+        // the soul it moves by where it lies — on its source, or on the weapon for a
+        // reorder — and no enchantment, and the soul lies there; it takes the runs of
+        // attaching it, the count plus one from another weapon and the count for a
+        // reorder; only a transfer holds a source or names a soul's place; a report of
+        // one names its soul, its source only if it had one, and the tier it landed at
+        // exactly as it came back; and a weapon that takes a soul from another has room
+        // for it. The shop: B's Riposte Blade took Vampiric off the Nameless Knife and
+        // came back (reported); D's Tower Guard takes the knife's Serrated (0, the
+        // knife held with it), and an Arming Sword moves its Flaming to its end (1).
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string moves = Save(TestShop.Transfers());
+        Restores(moves, "the transfers");
+
+        (Action<JsonObject> Edit, string Where, string Problem)[] contradictions =
+        [
+            // 24. The runs of attaching the soul: the count plus one, or the count for a reorder.
+            (tree => DepositNode(tree, 0)["runs"] = 2, "campaign.enchanter[0].runs",
+                "2 for a weapon holding 0 enchantments: a service takes the count plus one runs, and the count does not move in the shop"),
+            (tree => DepositNode(tree, 1)["runs"] = 3, "campaign.enchanter[1].runs",
+                "3 for a reorder on a weapon holding 2 enchantments: a reorder takes the count, and the count does not move in the shop"),
+            // 25. Only a transfer holds a source, or names a soul's place.
+            (tree => DepositNode(tree, 0)["service"] = "Refine", "campaign.enchanter[0].source",
+                "a source held on a Refine: only a transfer takes a second weapon into the shop"),
+            (tree => { DepositNode(tree, 0)["service"] = "Refine"; DepositNode(tree, 0)["source"] = null; }, "campaign.enchanter[0].sourceIndex",
+                "0 named on a Refine: only a transfer moves a soul"),
+            (tree => { DepositNode(tree, 0)["service"] = "Enchant"; DepositNode(tree, 0)["enchantment"] = "cold"; DepositNode(tree, 0)["source"] = null; },
+                "campaign.enchanter[0].sourceIndex", "0 named on an Enchant: only a transfer moves a soul"),
+            // 26. A transfer names its soul by where it lies, and buys no enchantment.
+            (tree => DepositNode(tree, 0)["enchantment"] = "vampiric", "campaign.enchanter[0].enchantment",
+                "vampiric named on a Transfer: a transfer moves a soul the party owns, named by where it lies, and buys none"),
+            (tree => DepositNode(tree, 0)["sourceIndex"] = null, "campaign.enchanter[0].sourceIndex",
+                "missing on a Transfer: a transfer names the soul it moves by its place"),
+            (tree => DepositNode(tree, 0)["sourceIndex"] = 2, "campaign.enchanter[0].sourceIndex",
+                "2 on a source holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            (tree => DepositNode(tree, 1)["sourceIndex"] = 2, "campaign.enchanter[1].sourceIndex",
+                "2 on a weapon holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            // 27. A report of a transfer: its soul, its source, and the tier it landed at as it came back.
+            (tree => ReportNode(tree, 0)["enchantment"] = null, "campaign.lastResult.services[0].enchantment",
+                "missing on a Transfer: a report of a transfer names the soul it moves"),
+            (tree => ReportNode(tree, 0)["tier"] = null, "campaign.lastResult.services[0].tier",
+                "missing on a Transfer that came back: its soul landed at a tier, which its report says"),
+            (tree => { ReportNode(tree, 0)["stalled"] = true; ReportNode(tree, 0)["runsWorked"] = 0; }, "campaign.lastResult.services[0].tier",
+                "2 on a transfer stalled: a soul lands as its service comes back, its last run worked"),
+            (tree => { ReportNode(tree, 0)["service"] = "Enchant"; ReportNode(tree, 0)["tier"] = null; }, "campaign.lastResult.services[0].sourceId",
+                "flensing_knife_unique named on an Enchant: only a transfer takes a soul from another weapon"),
+            (tree => { ReportNode(tree, 0)["service"] = "Refine"; ReportNode(tree, 0)["enchantment"] = null; ReportNode(tree, 0)["sourceId"] = null; },
+                "campaign.lastResult.services[0].tier", "2 on a Refine: only a transfer lands a soul at a tier"),
+        ];
+        foreach (var (edit, where, problem) in contradictions)
+            RefusedAt(Edited(moves, edit), where, problem);
+
+        // 29's transfer half: a weapon taking a soul from another has room for it; a
+        // reorder's count does not move, so a weapon holding the most reorders.
+        int most = ContentBounds.MostEnchantments;
+        var ids = new[] { "vampiric", "cold", "flaming" };
+        JsonArray Entries() => new(Enumerable.Range(0, most).Select(i => (JsonNode?)JsonNode.Parse($$"""{ "id": "{{ids[i % ids.Length]}}", "tier": 1, "xp": 0 }""")).ToArray());
+        void Full(JsonObject tree, int index, int runs)
+        {
+            DepositNode(tree, index)["weapon"]!["enchantments"] = Entries();
+            DepositNode(tree, index)["weapon"]!["forgedEnchantments"] = 0;
+            DepositNode(tree, index)["runs"] = runs;
+        }
+        RefusedAt(Edited(moves, tree => Full(tree, 0, most + 1)), "campaign.enchanter[0].weapon.enchantments",
+            $"{most} entries on a deposit to take a soul: the one it attaches would be more than the {most} a weapon can hold");
+        Restores(Edited(moves, tree => Full(tree, 1, most)), "a reorder on a weapon holding the most");
+
+        // A report's soul a unique carries, of a kind that does nothing yet, and not
+        // among the seen: the party's own weapon's, and it loads (the mapper asks only
+        // that the content has it). A report's source the content has not: refused.
+        Restores(Edited(moves, tree => ReportNode(tree, 0)["enchantment"] = "momentum"), "a transfer's report of a soul that does nothing yet");
+        Assert.Equal("campaign.lastResult.services[0].sourceId", Refused(Edited(moves, tree => ReportNode(tree, 0)["sourceId"] = "no_such_weapon")).Where);   // as its weaponId is (AReportNamingNoWeaponIsRefused)
+        Assert.Equal("campaign.enchanter[0].source.id", Refused(Edited(moves, tree => DepositNode(tree, 0)["source"]!["id"] = "no_such_weapon")).Where);
     }
 
     [Fact]

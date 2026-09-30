@@ -46,7 +46,7 @@ internal sealed class HubWeapons
         /// <summary>Somewhere a weapon can go that holds none — a member's empty hand, the room in its bag, the stable's end: chosen, and put down on.</summary>
         Room,
 
-        /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a): chosen, to be read and taken back (T, Phase 6a.5), but neither taken up nor put down on — it is out of the party's hands.</summary>
+        /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a) — or held there as a transfer's source (Phase 6a.6): chosen, to be read and taken back (T, Phase 6a.5), but neither taken up nor put down on — it is out of the party's hands.</summary>
         Shop,
     }
 
@@ -62,15 +62,19 @@ internal sealed class HubWeapons
     /// <param name="Deposit">The deposit on a shop row, or null.</param>
     /// <param name="Ahead">On a shop row, how many newer deposits are in the shop: a stalled one waits on them.</param>
     /// <param name="Stalled">Whether this shop row's deposit waits: the next run that counts leaves it unworked. Set with its label (<see cref="StalledLabel"/>), never read back off it.</param>
-    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0, bool Stalled = false)
+    /// <param name="Held">Whether this shop row's weapon is a transfer's source, held in the shop beside the weapon its soul goes to, as the same deposit (Phase 6a.6): <see cref="HeldLabel"/>.</param>
+    internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0, bool Stalled = false,
+        bool Held = false)
     {
         /// <summary>
         /// The row's text: the label, and on a weapon row the weapon's name and its
         /// wear (<see cref="DungeonHud.WearReadout"/>), on a shop row its name and its
-        /// runs (<see cref="ShopRuns"/>).
+        /// runs (<see cref="ShopRuns"/>) — a transfer's source its name alone, its
+        /// runs the row over it's.
         /// </summary>
         public string Text => (Weapon, Deposit) switch
         {
+            ({ } weapon, not null) when Held => $"{Label}{Name(weapon)}",
             ({ } weapon, { } deposit) => $"{Label}{Name(weapon)} - {ShopRuns(deposit)}",
             ({ } weapon, null) => $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}",
             _ => Label,
@@ -108,6 +112,9 @@ internal sealed class HubWeapons
 
     /// <summary>A shop row whose deposit waits on the newer ones.</summary>
     internal const string StalledLabel = "  STALLED  ";
+
+    /// <summary>A transfer's source, held in the shop under the weapon its soul goes to (Phase 6a.6), its name lined up with theirs.</summary>
+    internal const string HeldLabel = "  HELD     ";
 
     /// <summary>Over the shop once the tutorial is beaten and nothing is in it.</summary>
     internal const string NothingInTheShop = "THE ENCHANTER - NOTHING IN THE SHOP";
@@ -182,7 +189,8 @@ internal sealed class HubWeapons
     /// Last the enchanter (Phase 6a.3a): how many deposits it works on, and each
     /// weapon in the shop, the newest first — <c>WORKING</c> for the few the next
     /// run that counts works, <c>STALLED</c> for the rest (§6.2: "working on these
-    /// two" reads at a glance, and a stalled weapon is never silent) — or, with
+    /// two" reads at a glance, and a stalled weapon is never silent), a transfer's
+    /// source <c>HELD</c> under the weapon its soul goes to (Phase 6a.6) — or, with
     /// nothing in it, that it opens when the tutorial is beaten (§6.3) or that
     /// nothing is in it.
     /// </summary>
@@ -233,7 +241,9 @@ internal sealed class HubWeapons
 
     /// <summary>
     /// The page's last rows (<see cref="Rows(CampaignState)"/>): the enchanter's
-    /// heading, and each weapon in the shop, the newest first. Whatever is in the
+    /// heading, and each weapon in the shop, the newest first, a transfer's source
+    /// held under the weapon its soul goes to — one deposit, one place among those
+    /// the enchanter works, and T on either takes both back. Whatever is in the
     /// shop is listed, whichever dungeon today's <c>dungeons.json</c> retires on
     /// its clear: a copy beside the game may move that flag onto a dungeon not
     /// beaten after deposits were made, and a weapon in the shop — still worked by
@@ -258,8 +268,10 @@ internal sealed class HubWeapons
         {
             var deposit = shop[i];
             bool stalled = !worked.Any(entry => ReferenceEquals(entry, deposit));
-            rows.Add(new Row(RowKind.Shop, stalled ? StalledLabel : WorkingLabel, Weapon: deposit.Weapon, Deposit: deposit,
-                Ahead: shop.Count(entry => entry.Ordinal > deposit.Ordinal), Stalled: stalled));
+            int ahead = shop.Count(entry => entry.Ordinal > deposit.Ordinal);
+            rows.Add(new Row(RowKind.Shop, stalled ? StalledLabel : WorkingLabel, Weapon: deposit.Weapon, Deposit: deposit, Ahead: ahead, Stalled: stalled));
+            if (deposit.Source is { } source)
+                rows.Add(new Row(RowKind.Shop, HeldLabel, Weapon: source, Deposit: deposit, Ahead: ahead, Stalled: stalled, Held: true));
         }
         return rows;
     }
@@ -270,9 +282,10 @@ internal sealed class HubWeapons
     /// wear green once full (<see cref="DungeonHud.WearColor"/>), as on every
     /// weapon line — and a weapon taken up, where it still lies, in cyan. A weapon
     /// in the shop reads cyan while it is worked, as the enchantments do, and yellow
-    /// while it is stalled, a unique's name orange. The row chosen is yellow, its
-    /// indent marked <c>&gt;</c> and its end <c>&lt;</c>, as the dungeon list marks
-    /// its choice.
+    /// while it is stalled, a unique's name orange; a transfer's source held there
+    /// reads grey, the row over it saying how its deposit stands. The row chosen
+    /// is yellow, its indent marked <c>&gt;</c> and its end <c>&lt;</c>, as the
+    /// dungeon list marks its choice.
     /// </summary>
     /// <param name="row">The row.</param>
     /// <param name="chosen">Whether it is the row chosen.</param>
@@ -292,13 +305,14 @@ internal sealed class HubWeapons
             case RowKind.Shop:
             {
                 var weapon = row.Weapon!;
-                var line = chosen || row.Stalled ? DungeonHud.Yellow : DungeonHud.Cyan;
+                var line = chosen ? DungeonHud.Yellow : row.Held ? DungeonHud.Grey : row.Stalled ? DungeonHud.Yellow : DungeonHud.Cyan;
                 var runs = new List<Run>
                 {
                     new(chosen ? Marked(row.Label) : row.Label, line),
                     new(Name(weapon), weapon.Unique ? DungeonHud.Orange : line),
-                    new($" - {ShopRuns(row.Deposit!)}", line),
                 };
+                if (!row.Held)
+                    runs.Add(new Run($" - {ShopRuns(row.Deposit!)}", line));
                 if (chosen)
                     runs.Add(new Run(ChosenEnd, line));
                 return runs;

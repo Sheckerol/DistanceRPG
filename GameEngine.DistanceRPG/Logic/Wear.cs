@@ -132,7 +132,8 @@ public static class Wear
     /// The odds a service improves the weapon anyway (§6.4, S:1149–1154; R4's
     /// consequence 2), as a whole-number fraction — <c>Numerator</c> in
     /// <c>Denominator</c>. Enchanting's are <see cref="Tuning.GraftBaseChance"/> in
-    /// 100, flat, whatever the wear; refining's are those times <c>1 + wear ÷
+    /// 100, flat, whatever the wear, and a transfer's are enchanting's (PHASE 6a
+    /// DECISION 13); refining's are those times <c>1 + wear ÷
     /// StartingPool</c>, on the whole deposit: 6 in 100 cashing a fresh full bar of
     /// 30, 7 cashing 40 at capacity 40, 9 cashing 60 at capacity 60, and no top —
     /// "refinement improves whether the roll lands, not what it lands on"

@@ -121,7 +121,9 @@ public sealed record CampaignDto(IReadOnlyList<MemberDto> Party, IReadOnlyList<s
 /// <summary>
 /// One deposit in the shop (<see cref="Deposit"/>, §6.7): its ordinal, the service
 /// by name, the weapon whole, the wear the deposit cashed, the runs the service
-/// takes and how many are worked, and the enchantment an Enchant attaches, by id.
+/// takes and how many are worked, and the enchantment an Enchant attaches, by id —
+/// or a transfer's source, whole, and its soul's place (appended by Phase 6a.6, with
+/// their defaults: a deposit written before names neither).
 /// </summary>
 /// <param name="Ordinal">The deposit's ordinal: the campaign's count of deposits as it went in.</param>
 /// <param name="Service">What it bought, by <see cref="Logic.Service"/> name.</param>
@@ -129,8 +131,11 @@ public sealed record CampaignDto(IReadOnlyList<MemberDto> Party, IReadOnlyList<s
 /// <param name="WearAtDeposit">The wear the deposit cashed.</param>
 /// <param name="Runs">The runs the service takes.</param>
 /// <param name="RunsWorked">The runs of it worked.</param>
-/// <param name="Enchantment">The enchantment an Enchant attaches, by id; null for a refinement.</param>
-public sealed record DepositDto(int Ordinal, string Service, WeaponDto Weapon, int WearAtDeposit, int Runs, int RunsWorked, string? Enchantment = null);
+/// <param name="Enchantment">The enchantment an Enchant attaches, by id; null for any other service.</param>
+/// <param name="Source">A transfer's source, whole — in the shop with the weapon, as the same deposit — or null for a reorder and for any other service.</param>
+/// <param name="SourceIndex">A transfer's soul, by its place on the source, or on the weapon for a reorder; null for any other service.</param>
+public sealed record DepositDto(int Ordinal, string Service, WeaponDto Weapon, int WearAtDeposit, int Runs, int RunsWorked, string? Enchantment = null,
+    WeaponDto? Source = null, int? SourceIndex = null);
 
 /// <summary>A cleared dungeon's lock: the run it can be entered again from (§4.5).</summary>
 public sealed record LockDto(string DungeonId, int LockedUntilRun);
@@ -228,11 +233,13 @@ public sealed record RunResultDto(string DungeonId, string Outcome, bool BossDef
 /// run left it stalled, and the enchantment an Enchant attaches, by id — and, on a
 /// finished service whose improvement roll improved the weapon, how and which
 /// modifier, each by name (appended by Phase 6a.4, with their defaults: absent,
-/// the report says the weapon came back as it went). The roll as it was drawn is
-/// the log's, never the save's.
+/// the report says the weapon came back as it went) — and on a transfer the soul
+/// it moves (<c>enchantment</c>), its source by catalogue id, and on a finished one
+/// the tier the soul landed at (appended by Phase 6a.6, with their defaults). The
+/// roll as it was drawn is the log's, never the save's.
 /// </summary>
 public sealed record ServiceDto(string WeaponId, string Service, int RunsWorked, int Runs, bool Stalled = false, string? Enchantment = null,
-    string? Improved = null, string? Modifier = null);
+    string? Improved = null, string? Modifier = null, int? Tier = null, string? SourceId = null);
 
 /// <summary>What a wipe took back from one pool (<see cref="XpClawback"/>): the member by id, the pool by name, what it held and what it holds.</summary>
 public sealed record ClawbackDto(string MemberId, string Pool, int Before, int After);

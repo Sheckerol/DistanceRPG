@@ -203,9 +203,10 @@ public sealed class BetweenRunsHud : IDisposable
     /// <para>
     /// <strong>And the enchanter</strong> (§6.2, §6.3; Phase 6a.3a), after whether
     /// the run counted, when anything was in the shop: each service the run
-    /// finished, back in the stable with what it attached, and each it worked a run
-    /// on, at most <paramref name="mostServiceLines"/> of them and then how many
-    /// more (<see cref="MoreAtTheEnchanter"/>); then the weapons it left stalled,
+    /// finished, back in the stable with what it attached — a transfer's two
+    /// weapons a line each — and each it worked a run on, at most
+    /// <paramref name="mostServiceLines"/> lines of them and then how many more
+    /// (<see cref="MoreAtTheEnchanter"/>); then the weapons it left stalled,
     /// wrapped as the spoils are, at most <see cref="MostStalledNames"/> named. A
     /// run that did not count worked nothing, and says so. It names no key unless
     /// handed one: the dungeon's end panel shares these lines, and the hub hands
@@ -213,7 +214,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// </para>
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
-    /// <param name="mostServiceLines">How many finished and worked services to name before saying how many more: the hub's <see cref="HubServiceLines"/>, the dungeon's end panel fewer.</param>
+    /// <param name="mostServiceLines">How many lines of finished and worked services to say before saying how many more — a service told whole, a transfer's two lines together: the hub's <see cref="HubServiceLines"/>, the dungeon's end panel fewer.</param>
     /// <param name="moreTail">What the line of how many more ends with: the hub's <see cref="TabWeapons"/>, and nothing where TAB does nothing.</param>
     internal static IReadOnlyList<Run> SummaryLines(RunResult result, int mostServiceLines = HubServiceLines, string moreTail = "")
     {
@@ -294,14 +295,15 @@ public sealed class BetweenRunsHud : IDisposable
     /// counted, each finished service (cyan, and green when its improvement roll
     /// grafted) — <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC
     /// - NO CHANGE</c>, <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - REFINED -
-    /// GRAFTED BLOCK</c> — then each worked one — <c>THE ENCHANTER WORKED THE
-    /// ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/> of those together
-    /// and then <c>AND 2 MORE AT THE ENCHANTER</c>, <paramref name="moreTail"/>
-    /// after it; then the stalled weapons in yellow, wrapped, <c>STALLED AT THE
-    /// ENCHANTER: RIPOSTE BLADE</c>. On a run that did not count, the one grey line
-    /// <see cref="WorkedNothing"/>. A weapon and an enchantment are named by the
-    /// content's rows, and by the bare id where a row is gone, so the summary never
-    /// throws while it draws.
+    /// GRAFTED BLOCK</c>, a transfer's source on a line of its own under the weapon
+    /// its soul went to (<see cref="SourceBack"/>) — then each worked one — <c>THE
+    /// ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/>
+    /// lines of those together, a service never split, and then <c>AND 2 MORE AT THE
+    /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then the stalled weapons
+    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
+    /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
+    /// and an enchantment are named by the content's rows, and by the bare id where
+    /// a row is gone, so the summary never throws while it draws.
     /// </summary>
     private static IEnumerable<Run> ServiceLines(RunResult result, int most, string moreTail)
     {
@@ -315,11 +317,25 @@ public sealed class BetweenRunsHud : IDisposable
         }
 
         var told = reports.Where(report => report.Finished).Concat(reports.Where(report => !report.Stalled && !report.Finished)).ToList();
-        foreach (var report in told.Take(Math.Max(0, most)))
-            yield return new Run(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report),
-                report.Improved?.Kind == ImprovementKind.Graft ? DungeonHud.Green : DungeonHud.Cyan);   // a graft is the story (§6.4)
-        if (told.Count > most)
-            yield return new Run(MoreAtTheEnchanter(told.Count - Math.Max(0, most)) + moreTail, DungeonHud.Cyan);
+        int said = 0, lines = 0;
+        foreach (var report in told)
+        {
+            var saying = new List<Run>
+            {
+                new(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report),
+                    report.Improved?.Kind == ImprovementKind.Graft ? DungeonHud.Green : DungeonHud.Cyan),   // a graft is the story (§6.4)
+            };
+            if (report.Finished && SourceBack(report) is { } source)
+                saying.Add(new Run(source, DungeonHud.Cyan));
+            if (lines + saying.Count > most)
+                break;   // told whole or not at all, and in order
+            foreach (var line in saying)
+                yield return line;
+            lines += saying.Count;
+            said++;
+        }
+        if (said < told.Count)
+            yield return new Run(MoreAtTheEnchanter(told.Count - said) + moreTail, DungeonHud.Cyan);
 
         var stalled = reports.Where(report => report.Stalled).Select(report => WeaponName(report.WeaponId)).ToList();
         if (stalled.Count > 0)
@@ -338,13 +354,36 @@ public sealed class BetweenRunsHud : IDisposable
     /// ATTACHED VAMPIRIC - NO CHANGE</c>, <c>… - REFINED - DEEPENED CRIT WINDOW</c>, or
     /// <c>… - GRAFTED BLOCK</c>, which the summary draws green. A weapon that came
     /// back as it went — a roll that missed, or found nothing to improve, or none
-    /// made — says <c>NO CHANGE</c>.
+    /// made — says <c>NO CHANGE</c>. A transfer's weapon says where its soul landed
+    /// (Phase 6a.6): <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
+    /// T2 - NO CHANGE</c>, or a reorder's <c>… - FLAMING NOW LAST AT T1 - …</c>, short
+    /// enough that the widest names and a two-digit tier still fit the dungeon's end
+    /// panel at its scale.
     /// </summary>
     internal static string BackFromTheEnchanter(ServiceReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        string what = report.Service == Service.Enchant && report.EnchantmentId is { } id ? $"ATTACHED {EnchantmentName(id)}" : "REFINED";
+        string what = (report.Service, report.EnchantmentId) switch
+        {
+            (Service.Enchant, { } id) => $"ATTACHED {EnchantmentName(id)}",
+            (Service.Transfer, { } soul) => $"{EnchantmentName(soul)} {(report.SourceId is null ? "NOW LAST" : "MOVED ON")}{(report.Tier is { } tier ? $" AT T{tier}" : "")}",
+            _ => "REFINED",
+        };
         return $"{WeaponName(report.WeaponId)} IS BACK FROM THE ENCHANTER - {what} - {Outcome(report.Improved)}";
+    }
+
+    /// <summary>
+    /// A finished transfer's source, back in the stable beside the weapon its soul
+    /// went to, the soul gone from it (Phase 6a.6): <c>NAMELESS KNIFE IS BACK FROM THE
+    /// ENCHANTER - VAMPIRIC MOVED OFF</c>. Null for any other report, and for a
+    /// reorder, whose weapon was its own source.
+    /// </summary>
+    internal static string? SourceBack(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return report is { Service: Service.Transfer, SourceId: { } source }
+            ? $"{WeaponName(source)} IS BACK FROM THE ENCHANTER - {(report.EnchantmentId is { } soul ? EnchantmentName(soul) : "ITS ENCHANTMENT")} MOVED OFF"
+            : null;
     }
 
     /// <summary>What an improvement roll did, as a finished service's line ends: <c>DEEPENED CRIT WINDOW</c>, <c>GRAFTED BLOCK</c>, or <c>NO CHANGE</c>.</summary>
@@ -680,16 +719,15 @@ public sealed class BetweenRunsHud : IDisposable
     /// staff's cast (<c>TurnSystem.CanCastOn</c>) and the wand's
     /// (<see cref="TurnSystem.CanCastArea"/>), so such a weapon never casts, and
     /// cannot strike: a caster casts. No weapon the content ships is made so, and
-    /// the enchanter is to leave none so (the plan's caster rule, Phase 6a.6); only
-    /// a hand-edited save can put one on the WEAPONS page, whose detail then says why.
+    /// the enchanter leaves none so (<see cref="Enchanter.TransferRefusal"/> asks the
+    /// same question, <see cref="Weapon.CastsWith"/>, of what a transfer would leave;
+    /// Phase 6a.6); only a hand-edited save can put one on the WEAPONS page, whose
+    /// detail then says why.
     /// </summary>
     internal static bool CastsNothing(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
-        return weapon.IsCaster
-            && (weapon.AreaShape is null
-                ? weapon.Innate?.Def.Applies is null
-                : weapon.Innate?.Def.DamageType is null or DamageType.None);
+        return !weapon.CastsWith(weapon.Innate?.Def);
     }
 
     /// <summary>
@@ -720,7 +758,8 @@ public sealed class BetweenRunsHud : IDisposable
     /// What a weapon's next enchantment costs (R4, §6.2), for the detail panel: the
     /// deposit it needs and the runs it spends in the shop — <c>THE NEXT NEEDS A
     /// DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP</c> — or, with every slot filled,
-    /// <c>ALL 5 SLOTS ARE FILLED - REFINING IS LEFT</c>.
+    /// <c>ALL 5 SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT</c>: a reorder
+    /// attaches its soul again as the last of the same count (PHASE 6a DECISION 11).
     /// </summary>
     internal static string PriceLine(Weapon weapon)
     {
@@ -728,20 +767,41 @@ public sealed class BetweenRunsHud : IDisposable
         int count = weapon.Enchantments.Count;
         int slots = GameContent.Current.Tuning.EnchantmentSlots;
         return count >= slots
-            ? $"ALL {slots} SLOTS ARE FILLED - REFINING IS LEFT"
+            ? $"ALL {slots} SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT"
             : $"THE NEXT NEEDS A DEPOSIT OF {Wear.Price(count + 1)} WEAR - {DungeonHud.Runs(Wear.ServiceRuns(count))} IN THE SHOP";
     }
 
     /// <summary>Over a weapon in the shop's detail, where the others say where they are.</summary>
     internal const string AtTheEnchanterLine = "AT THE ENCHANTER";
 
-    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>.</summary>
+    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>, a transfer's <c>TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 2 RUNS</c> or a reorder's <c>MOVE FLAMING TO THE END - 0 OF 1 RUN</c>.</summary>
     internal static string ServiceLine(Deposit deposit)
     {
         ArgumentNullException.ThrowIfNull(deposit);
-        string what = deposit.Service == Service.Enchant && deposit.EnchantmentId is { } id ? $"ENCHANT {EnchantmentName(id)}" : "REFINE";
+        string what = deposit.Service switch
+        {
+            Service.Enchant when deposit.EnchantmentId is { } id => $"ENCHANT {EnchantmentName(id)}",
+            Service.Transfer => deposit.Source is { } source
+                ? $"TAKE {SoulName(deposit)} FROM {HubWeapons.The(source)}"
+                : $"MOVE {SoulName(deposit)} TO THE END",
+            _ => "REFINE",
+        };
         return $"{what} - {HubWeapons.ShopRuns(deposit)}";
     }
+
+    /// <summary>
+    /// A transfer's source held in the shop, over its detail (Phase 6a.6): what it
+    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE</c>. The soul is
+    /// still on it until the service is done.
+    /// </summary>
+    internal static string HeldLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        return $"HELD - GIVING {SoulName(deposit)} TO {HubWeapons.The(deposit.Weapon)}";
+    }
+
+    /// <summary>A transfer's soul by name, as the shop's lines say it, or <c>AN ENCHANTMENT</c> where nothing lies at its place (a hand-edited save the checks would have refused).</summary>
+    private static string SoulName(Deposit deposit) => deposit.Soul is { } soul ? EnchantmentName(soul.Id) : "AN ENCHANTMENT";
 
     /// <summary>A worked deposit's state: when it comes back, <c>WORKING - BACK AFTER 1 MORE RUN THAT COUNTS</c>.</summary>
     internal static string WorkingLine(Deposit deposit)
@@ -768,7 +828,9 @@ public sealed class BetweenRunsHud : IDisposable
     /// enchanter, its name, what its deposit bought and its runs
     /// (<see cref="ServiceLine"/>), whether it is worked or stalled and on what
     /// (<see cref="WorkingLine"/>, <see cref="StalledLine"/>), and the readouts, wear
-    /// and capacity — no slots or price, which its service is changing. For a room,
+    /// and capacity — no slots or price, which its service is changing. For a
+    /// transfer's source held there, what it is held for (<see cref="HeldLine"/>),
+    /// how its deposit stands, and its own readouts, wear and capacity. For a room,
     /// what it is and what it is for. Nothing for a row that is none of these.
     /// </summary>
     internal static IReadOnlyList<ListRow> DetailRows(HubWeapons.Row row)
@@ -785,7 +847,9 @@ public sealed class BetweenRunsHud : IDisposable
         {
             rows.Add(new ListRow(AtTheEnchanterLine, DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
             rows.Add(new ListRow(HubWeapons.Name(shopWeapon), shopWeapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
-            rows.Add(new ListRow(ServiceLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
+            rows.Add(row.Held
+                ? new ListRow(HeldLine(deposit), DungeonHud.Grey, DetailScale, DetailPitch)
+                : new ListRow(ServiceLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
             rows.Add(row.Stalled
                 ? new ListRow(StalledLine(row.Ahead), DungeonHud.Yellow, DetailScale, DetailPitch)
                 : new ListRow(WorkingLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
@@ -894,6 +958,8 @@ public sealed class BetweenRunsHud : IDisposable
     /// a window of <paramref name="offerRows"/> of its lines that scrolls with the
     /// choice (<see cref="DepositPanel.Window"/>): the choice yellow and marked, a
     /// refused offer dimmed, the rest white;</item>
+    /// <item>on the source list — and the confirm of a MOVE — its heading and a
+    /// window of its lines the same way (Phase 6a.6);</item>
     /// <item>on the take-back ask, the weapon's name — a unique's orange — and what
     /// its deposit bought and its runs, in cyan (<see cref="ServiceLine"/>);</item>
     /// </list>
@@ -923,6 +989,22 @@ public sealed class BetweenRunsHud : IDisposable
                     bool chosen = i == panel.Chosen;
                     rows.Add(new ListRow(chosen ? $"> {line} <" : line,
                         chosen ? DungeonHud.Yellow : offer.Refusal is null ? DungeonHud.White : DungeonHud.DarkGrey, PanelOfferScale, PanelOfferPitch));
+                }
+                break;
+            }
+
+            case DepositPanel.Step.Sources:
+            case DepositPanel.Step.Confirm when panel.Service == Service.Transfer:
+            {
+                rows.Add(new ListRow(DepositPanel.SourcesHeading(weapon), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
+                int top = panel.Window(offerRows);
+                for (int i = top; i < Math.Min(panel.Moves.Count, top + offerRows); i++)
+                {
+                    var move = panel.Moves[i];
+                    string line = DepositPanel.MoveLine(move);
+                    bool chosen = i == panel.Chosen;
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line,
+                        chosen ? DungeonHud.Yellow : move.Refusal is null ? DungeonHud.White : DungeonHud.DarkGrey, PanelOfferScale, PanelOfferPitch));
                 }
                 break;
             }

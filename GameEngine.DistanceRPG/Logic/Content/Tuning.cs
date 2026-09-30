@@ -467,7 +467,8 @@ public sealed record Tuning
     /// How many deposited weapons the enchanter works on at once (§6.2): the
     /// newest, "the two most recently deposited" (S:97–98). A run that counts
     /// works each of them a run on (<see cref="Enchanter.Tick"/>); a deposit past
-    /// them stalls the oldest until one of the newest comes back. The queue has no
+    /// them stalls the oldest until one of the newest comes back — a transfer one
+    /// deposit, its two weapons together (Phase 6a.6). The queue has no
     /// length of its own: dumping the whole stable achieves nothing. Its figure is
     /// the doc's, and it is a key by the user's standing rule that a number they
     /// may revisit lives in the file.
@@ -476,7 +477,8 @@ public sealed record Tuning
 
     /// <summary>
     /// The chance, as a percentage, that a finished service improves the weapon
-    /// anyway (§6.4, S:1149–1154): flat when it enchants, and times
+    /// anyway (§6.4, S:1149–1154): flat when it enchants or moves an enchantment
+    /// onto the weapon (PHASE 6a DECISION 13), and times
     /// <c>1 + wear cashed ÷ StartingPool</c> when it refines — 6 on a fresh full bar,
     /// 7 at capacity 40, 9 at capacity 60 (R4's consequence 2). A deposit that
     /// cashed no wear rolls nothing. §5.3's name, in whole percent as

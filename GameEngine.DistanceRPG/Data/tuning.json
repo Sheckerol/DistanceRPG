@@ -303,12 +303,14 @@
 
   /* How many deposited weapons the enchanter works on at once: the newest. A run that counts works
      each of them a run on; a deposit past them stalls the oldest until one of the newest comes
-     back. At least 1, and at most 10, the most enchantments a weapon holds. */
+     back. A transfer is one deposit, its two weapons together. At least 1, and at most 10, the
+     most enchantments a weapon holds. */
   "EnchanterWorksOn": 2,
 
   /* The chance, as a percentage, that a service improves the weapon anyway as it comes back: flat
-     when it enchants, and times 1 + the wear cashed / StartingPool when it refines - 6 on a fresh
-     full bar, 7 at capacity 40, 9 at capacity 60. A deposit that cashes no wear rolls nothing. */
+     when it enchants or moves an enchantment onto it, and times 1 + the wear cashed / StartingPool
+     when it refines - 6 on a fresh full bar, 7 at capacity 40, 9 at capacity 60. A deposit that
+     cashes no wear rolls nothing. */
   "GraftBaseChance": 3,
 
   /* Provisional: of the services that improve, the percentage that graft a modifier the weapon

@@ -46,7 +46,13 @@ namespace GameEngine.DistanceRPG.Logic;
 /// something is at the enchanter — check 30 asks that one is, never that it is
 /// the one today's <c>dungeons.json</c> retires on its clear, which an edit may
 /// move; and a run's end's report against the deposits still in the shop, which
-/// a report outlives.
+/// a report outlives. And of a transfer (Phase 6a.6): a soul today's relations
+/// would refuse on its weapon, one whose leaving would strand an entry on its
+/// source, and one that would leave a staff or a wand casting nothing — each the
+/// content's to say, <c>restricted.json</c>'s or <c>weapons.json</c>'s, which an
+/// edit beside the game may move since the deposit was made; and a transfer's
+/// report whose soul is not among the seen: the soul was the party's own weapon's,
+/// and nothing asks that every entry a weapon carries was met.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -311,14 +317,16 @@ internal static class SaveConsistency
     }
 
     /// <summary>
-    /// 21–25, 27–30. The enchanter (Phase 6a.3a): the shop, as the hub's deposits
-    /// fill it and every run's end works it, and what the last run's end said of
-    /// it. A deposit takes the next ordinal and cashes the whole pool, which a
-    /// take-back gives back; its runs are the count plus one; the tick that works
-    /// its last run brings it back; an Enchant buys an enchantment the campaign has
-    /// met, which the weapon has room for; a run that counts works the newest, and
-    /// one that did not works nothing; and nothing is deposited before the
-    /// tutorial is beaten.
+    /// 21–30. The enchanter (Phase 6a.3a): the shop, as the hub's deposits fill it
+    /// and every run's end works it, and what the last run's end said of it. A
+    /// deposit takes the next ordinal and cashes the whole pool, which a take-back
+    /// gives back; its runs are the count plus one, or a transfer's; the tick that
+    /// works its last run brings it back; an Enchant buys an enchantment the
+    /// campaign has met, which the weapon has room for; a Transfer (Phase 6a.6)
+    /// names a soul where it lies, on its source or on the weapon, and a weapon
+    /// that takes one from another has room for it; a run that counts works the
+    /// newest, and one that did not works nothing; and nothing is deposited before
+    /// the tutorial is beaten.
     /// </summary>
     private static void Shop(CampaignDto campaign)
     {
@@ -352,19 +360,26 @@ internal static class SaveConsistency
                     $"{queue[i].RunsWorked} of {queue[i].Runs} runs worked in the shop: the tick that works the last run brings the weapon back");
 
         // 24. A service takes the count plus one runs, fixed as it went in, and the
-        // count cannot move while the weapon is in the shop.
+        // count cannot move while the weapon is in the shop — a transfer the runs of
+        // attaching its soul: the count plus one from another weapon, and the count
+        // for a reorder, which attaches it again as the last of the same count.
         for (int i = 0; i < queue.Count; i++)
         {
             int count = queue[i].Weapon.Enchantments.Count;
-            if (queue[i].Runs != count + 1)
-                throw new SaveFormatException($"{at}[{i}].runs",
-                    $"{queue[i].Runs} for a weapon holding {count} enchantments: a service takes the count plus one runs, and the count does not move in the shop");
+            bool reorder = queue[i].Service == nameof(Service.Transfer) && queue[i].Source is null;
+            if (queue[i].Runs != (reorder ? count : count + 1))
+                throw new SaveFormatException($"{at}[{i}].runs", reorder
+                    ? $"{queue[i].Runs} for a reorder on a weapon holding {count} enchantments: a reorder takes the count, and the count does not move in the shop"
+                    : $"{queue[i].Runs} for a weapon holding {count} enchantments: a service takes the count plus one runs, and the count does not move in the shop");
         }
 
-        // 25. An Enchant buys an enchantment the campaign has met; a refinement names none.
+        // 25. An Enchant buys an enchantment the campaign has met; a refinement names
+        // none; and neither names a source, which only a transfer has.
         for (int i = 0; i < queue.Count; i++)
         {
             var deposit = queue[i];
+            if (deposit.Service == nameof(Service.Transfer))
+                continue;   // 26's
             bool enchant = deposit.Service == nameof(Service.Enchant);
             if (enchant && deposit.Enchantment is null)
                 throw new SaveFormatException($"{at}[{i}].enchantment", "missing on an Enchant: a deposit to enchant names the enchantment it buys");
@@ -373,9 +388,30 @@ internal static class SaveConsistency
                     $"{deposit.Enchantment} is not among the seen: the enchanter offers only what the campaign has met");
             if (!enchant && deposit.Enchantment is not null)
                 throw new SaveFormatException($"{at}[{i}].enchantment", $"{deposit.Enchantment} named on a {deposit.Service}: a refinement attaches nothing");
+            if (deposit.Source is not null)
+                throw new SaveFormatException($"{at}[{i}].source", $"a source held on {A(deposit.Service)}: only a transfer takes a second weapon into the shop");
+            if (deposit.SourceIndex is not null)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex", $"{deposit.SourceIndex} named on {A(deposit.Service)}: only a transfer moves a soul");
         }
 
-        // (26, a transfer's source, arrives with the transfer.)
+        // 26. A transfer (Phase 6a.6) names the soul it moves by where it lies — on
+        // its source, or on the weapon for a reorder — and no enchantment, which only
+        // an Enchant buys; and the soul lies there: neither weapon changes in the shop.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            var deposit = queue[i];
+            if (deposit.Service != nameof(Service.Transfer))
+                continue;
+            if (deposit.Enchantment is not null)
+                throw new SaveFormatException($"{at}[{i}].enchantment",
+                    $"{deposit.Enchantment} named on a Transfer: a transfer moves a soul the party owns, named by where it lies, and buys none");
+            if (deposit.SourceIndex is not { } index)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex", "missing on a Transfer: a transfer names the soul it moves by its place");
+            var giver = deposit.Source ?? deposit.Weapon;
+            if (index >= giver.Enchantments.Count)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex",
+                    $"{index} on a {(deposit.Source is null ? "weapon" : "source")} holding {giver.Enchantments.Count} enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop");
+        }
 
         // 27. What the last run's end said of the shop: a report for each deposit in
         // it as the run ended, in deposit order, each saying what its deposit bought
@@ -394,13 +430,28 @@ internal static class SaveConsistency
             {
                 var report = reports[i];
                 bool enchant = report.Service == nameof(Service.Enchant);
+                bool transfer = report.Service == nameof(Service.Transfer);
                 if (enchant && report.Enchantment is null)
                     throw new SaveFormatException($"{where}[{i}].enchantment", "missing on an Enchant: a report says what its deposit bought, and a deposit to enchant names its enchantment");
                 if (enchant && !seen.Contains(report.Enchantment!))
                     throw new SaveFormatException($"{where}[{i}].enchantment",
                         $"{report.Enchantment} is not among the seen: its deposit bought what the campaign had met, and the campaign forgets nothing it has met");
-                if (!enchant && report.Enchantment is not null)
+                if (transfer && report.Enchantment is null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", "missing on a Transfer: a report of a transfer names the soul it moves");
+                if (!enchant && !transfer && report.Enchantment is not null)
                     throw new SaveFormatException($"{where}[{i}].enchantment", $"{report.Enchantment} named on a {report.Service}: a refinement attaches nothing");
+
+                // A transfer's (Phase 6a.6): its source, which only a transfer has, and
+                // the tier its soul landed at, said as it comes back and not before.
+                if (!transfer && report.SourceId is not null)
+                    throw new SaveFormatException($"{where}[{i}].sourceId", $"{report.SourceId} named on {A(report.Service)}: only a transfer takes a soul from another weapon");
+                bool landed = transfer && !report.Stalled && report.RunsWorked == report.Runs;
+                if (landed && report.Tier is null)
+                    throw new SaveFormatException($"{where}[{i}].tier", "missing on a Transfer that came back: its soul landed at a tier, which its report says");
+                if (!landed && report.Tier is not null)
+                    throw new SaveFormatException($"{where}[{i}].tier", transfer
+                        ? $"{report.Tier} on a transfer {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: a soul lands as its service comes back, its last run worked"
+                        : $"{report.Tier} on {A(report.Service)}: only a transfer lands a soul at a tier");
 
                 // What the improvement roll did (Phase 6a.4): an outcome and the
                 // modifier it gave a stack of, together, and only as the service
@@ -462,11 +513,16 @@ internal static class SaveConsistency
         }
 
         // 29. What an Enchant attaches as it finishes must load: the entry is the
-        // weapon's next, so the weapon has room for one more.
+        // weapon's next, so the weapon has room for one more — and so has a weapon a
+        // transfer moves a soul onto from another (Phase 6a.6); a reorder's count
+        // does not move.
         for (int i = 0; i < queue.Count; i++)
-            if (queue[i].Service == nameof(Service.Enchant) && queue[i].Weapon.Enchantments.Count >= ContentBounds.MostEnchantments)
+        {
+            bool adds = queue[i].Service == nameof(Service.Enchant) || (queue[i].Service == nameof(Service.Transfer) && queue[i].Source is not null);
+            if (adds && queue[i].Weapon.Enchantments.Count >= ContentBounds.MostEnchantments)
                 throw new SaveFormatException($"{at}[{i}].weapon.enchantments",
-                    $"{queue[i].Weapon.Enchantments.Count} entries on a deposit to enchant: the one it attaches would be more than the {ContentBounds.MostEnchantments} a weapon can hold");
+                    $"{queue[i].Weapon.Enchantments.Count} entries on a deposit to {(queue[i].Service == nameof(Service.Enchant) ? "enchant" : "take a soul")}: the one it attaches would be more than the {ContentBounds.MostEnchantments} a weapon can hold");
+        }
 
         // 30. The enchanter opens when the tutorial is beaten (§6.3), which retires
         // it, and retired is never undone: a shop holding anything, a run's end
@@ -485,6 +541,9 @@ internal static class SaveConsistency
                 throw new SaveFormatException($"{At}.depositsMade", $"{campaign.DepositsMade} made and no dungeon is retired: {why}");
         }
     }
+
+    /// <summary>A service by the name the save gives it, with its article: <c>an Enchant</c>, <c>a Refine</c>.</summary>
+    private static string A(string service) => service == nameof(Service.Enchant) ? $"an {service}" : $"a {service}";
 
     /// <summary>20's one question: a weapon no member has wielded has banked no wear and cashed none.</summary>
     private static void Unworn(WeaponDto weapon, string at, string why)

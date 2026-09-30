@@ -32,7 +32,8 @@ public sealed class Weapon
     /// <summary>
     /// The attached entries, in attachment order — the weapon's own copy of what
     /// it was handed, and the only thing <see cref="CreditEnchantment"/> writes
-    /// to and the enchanter appends to (<see cref="Attach"/>). Private, and
+    /// to, the enchanter appends to (<see cref="Attach"/>) and a transfer takes
+    /// an entry off (<see cref="Detach"/>). Private, and
     /// <see cref="Enchantments"/> hands out a read-only view of it rather than the
     /// list itself: attachment order is gameplay (§1.7) and fixes the order
     /// entries fire in, so it is the weapon's to change and nobody else's.
@@ -173,14 +174,16 @@ public sealed class Weapon
     /// <summary>The live total, forged plus acquired: what every resolution site reads.</summary>
     public ModifierSet Modifiers { get; private set; }
 
-    /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped. An entry the enchanter attaches comes last (<see cref="Attach"/>).</summary>
+    /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped. An entry the enchanter attaches comes last (<see cref="Attach"/>), and one a transfer takes off leaves the rest in their order (<see cref="Detach"/>).</summary>
     public IReadOnlyList<Enchantment> Enchantments { get; }
 
     /// <summary>
     /// How many of <see cref="Enchantments"/>, from the front, are forged: part
     /// of what the weapon <em>is</em>, rather than what was attached to it later
     /// (§3.1). The same line <see cref="Forged"/> draws through the modifiers,
-    /// drawn through the entries — fixed at construction, never written again.
+    /// drawn through the entries — fixed at construction, and moved only by a
+    /// transfer taking a forged entry off (<see cref="Detach"/>, Phase 6a.6), which
+    /// closes the list up behind it, so the forged ones stay a prefix.
     /// <para>
     /// The distinction is not weapon-versus-magic: a staff's effect and a wand's
     /// element are forged, and they are the whole of what those weapons do — a
@@ -189,8 +192,12 @@ public sealed class Weapon
     /// and not a convention at the credit site: a wizard's Arcane dagger levels
     /// daggers on the knife alone.
     /// </para>
+    /// <para>
+    /// A forged entry a transfer moves arrives on its new weapon acquired, last:
+    /// the mark stays with the weapon that was forged with it (PHASE 6a DECISION 13).
+    /// </para>
     /// </summary>
-    public int ForgedEnchantmentCount { get; }
+    public int ForgedEnchantmentCount { get; private set; }
 
     /// <summary>Whether the entry at <paramref name="index"/> of <see cref="Enchantments"/> is forged (<see cref="ForgedEnchantmentCount"/>).</summary>
     /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>.</exception>
@@ -314,10 +321,11 @@ public sealed class Weapon
 
     /// <summary>
     /// Attach <paramref name="entry"/> as the weapon's last enchantment: what a
-    /// finished Enchant service does (§6.2; <see cref="Enchanter"/>). Last and
-    /// acquired — never forged, and never sorted in: "a new enchantment always goes
-    /// last" (§3.3). The enchanter's own gate (<see cref="Enchanter.Refusal"/>) and
-    /// the save's (check 29) keep a weapon below the most a weapon can hold, and
+    /// finished Enchant service does (§6.2; <see cref="Enchanter"/>), and a finished
+    /// transfer with the soul it moved (§6.5). Last and acquired — never forged, and
+    /// never sorted in: "a new enchantment always goes last" (§3.3). The enchanter's
+    /// own gates (<see cref="Enchanter.Refusal"/>, <see cref="Enchanter.TransferRefusal"/>)
+    /// and the save's (check 29) keep a weapon below the most a weapon can hold, and
     /// this holds it there too, so no path builds a weapon the next load refuses.
     /// </summary>
     /// <exception cref="InvalidOperationException">The weapon already holds <see cref="ContentBounds.MostEnchantments"/>.</exception>
@@ -329,6 +337,45 @@ public sealed class Weapon
                 $"{Name} ({Id}) holds {_enchantments.Count} enchantments, the most a weapon can (EnchantmentSlots at its most): the enchanter never attaches past it.");
         _enchantments.Add(entry);
     }
+
+    /// <summary>
+    /// Take the entry at <paramref name="index"/> off the weapon: what a finished
+    /// transfer does to the weapon it moves a soul from — another, or its own, for
+    /// a reorder (§6.5; <see cref="Enchanter"/>). The entries behind it close up in
+    /// their order, which is gameplay and never re-sorted, and a forged entry taken
+    /// off takes a forged place with it (<see cref="ForgedEnchantmentCount"/>), so
+    /// the forged ones stay a prefix. The one door an entry leaves a weapon by; its
+    /// one caller is the enchanter's clock, finishing a transfer
+    /// (<c>TransferTests.AForgedInnateArrivesAcquired_ItsForgedMarkLeavesWithIt</c>).
+    /// </summary>
+    /// <returns>The entry taken off, as it was: its tier and its XP.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>.</exception>
+    internal Enchantment Detach(int index)
+    {
+        if ((uint)index >= (uint)_enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Count} enchantments.");
+        var entry = _enchantments[index];
+        _enchantments.RemoveAt(index);
+        if (index < ForgedEnchantmentCount)
+            ForgedEnchantmentCount--;
+        return entry;
+    }
+
+    /// <summary>
+    /// Whether this weapon, were <paramref name="first"/> its first enchantment,
+    /// would cast: a staff one that applies a status — whom its cast lands on — and a
+    /// wand one that is an element, which its area cast carries. The dungeon's own
+    /// gates ask the same of a weapon's first entry, the staff's cast
+    /// (<c>TurnSystem.CanCastOn</c>) and the wand's (<see cref="TurnSystem.CanCastArea"/>);
+    /// a caster that casts nothing can neither cast nor strike, so it never earns
+    /// wear again. True for every weapon that is no caster: it casts nothing, and
+    /// needs nothing to. What the enchanter asks of what a transfer would leave
+    /// (<see cref="Enchanter.TransferRefusal"/>), and what the WEAPONS page asks of a
+    /// hand-edited caster.
+    /// </summary>
+    /// <param name="first">The entry that would be first, or null for none.</param>
+    public bool CastsWith(EnchantmentDef? first)
+        => !IsCaster || (AreaShape is null ? first?.Applies is not null : first?.DamageType is not (null or DamageType.None));
 
     /// <summary>
     /// What this item would reserve of a wielder's pool if every entry fitted:

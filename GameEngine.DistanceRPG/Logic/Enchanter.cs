@@ -1,10 +1,11 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// What a deposit at the enchanter buys (§6.2, §6.4, §6.7): one of two services,
-/// chosen as the weapon goes in. Whichever it is, the deposit cashes the weapon's
-/// whole pool and grows its capacity alike (R4), and it takes the weapon's count
-/// plus one runs (<see cref="Wear.ServiceRuns"/>).
+/// What a deposit at the enchanter buys (§6.2, §6.4, §6.5, §6.7): one of its
+/// services, chosen as the weapon goes in. Whichever it is, the deposit cashes the
+/// weapon's whole pool and grows its capacity alike (R4). An Enchant and a Refine
+/// take the weapon's count plus one runs (<see cref="Wear.ServiceRuns"/>); a
+/// Transfer the runs of attaching the soul it moves (<see cref="Enchanter.TransferRuns"/>).
 /// </summary>
 public enum Service
 {
@@ -13,6 +14,16 @@ public enum Service
 
     /// <summary>Nothing attached: the deposit is the wear it cashes, which grows the capacity as any deposit's does, and opens the slots along it. Declining an enchantment is always this (§6.2).</summary>
     Refine,
+
+    /// <summary>
+    /// An enchantment the party owns moved onto the weapon (§6.5; Phase 6a.6): taken
+    /// off another weapon — its source, which waits in the shop beside it as the one
+    /// deposit — or off the weapon itself, a reorder, and attached last a tier down,
+    /// tier 1 the floor. An Enchant whose soul comes from a weapon rather than the
+    /// catalogue: the weapon needs the free slot and the deposit of attaching it
+    /// (PHASE 6a DECISIONS 11 and 13).
+    /// </summary>
+    Transfer,
 }
 
 /// <summary>
@@ -22,7 +33,10 @@ public enum Service
 /// it went in — the count cannot change while the weapon is in the shop — and how
 /// many of them the runs that counted have worked. The ordinal is the campaign's
 /// count of deposits as it went in (<see cref="CampaignState.DepositsMade"/>),
-/// never reused: the enchanter works the newest, the highest ordinals.
+/// never reused: the enchanter works the newest, the highest ordinals. A transfer
+/// (Phase 6a.6) names the soul it moves by where it lies: its source — another
+/// weapon, in the shop beside this one as the same deposit, or none for a reorder
+/// of the weapon's own — and the soul's place on it.
 /// <para>
 /// A class, not a record: <see cref="RunsWorked"/> moves, so a deposit is the one
 /// it is by reference — as the shop, the clock and the hub's rows tell them apart
@@ -33,9 +47,12 @@ public enum Service
 /// <param name="weapon">The weapon in the shop.</param>
 /// <param name="service">What the deposit bought.</param>
 /// <param name="wearAtDeposit">The wear the deposit cashed: the weapon's whole pool as it went in.</param>
-/// <param name="runs">The runs the service takes: the weapon's count plus one, as it went in.</param>
-/// <param name="enchantmentId">The enchantment an Enchant attaches, by id; null for a refinement.</param>
-public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wearAtDeposit, int runs, string? enchantmentId = null)
+/// <param name="runs">The runs the service takes, as it went in: the weapon's count plus one, or a transfer's (<see cref="Enchanter.TransferRuns"/>).</param>
+/// <param name="enchantmentId">The enchantment an Enchant attaches, by id; null for any other service.</param>
+/// <param name="source">A transfer's source, the weapon its soul comes off, in the shop with this one; null for a reorder and for any other service.</param>
+/// <param name="sourceIndex">A transfer's soul, by its place on its source — or on the weapon, for a reorder; null for any other service.</param>
+public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wearAtDeposit, int runs, string? enchantmentId = null,
+    Weapon? source = null, int? sourceIndex = null)
 {
     /// <summary>The deposit's place in the campaign's deposits, from 0: the higher, the newer.</summary>
     public int Ordinal { get; } = ordinal;
@@ -49,11 +66,22 @@ public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wea
     /// <summary>The wear the deposit cashed: the weapon's whole pool as it went in.</summary>
     public int WearAtDeposit { get; } = wearAtDeposit;
 
-    /// <summary>The runs the service takes: the weapon's count plus one, as it went in.</summary>
+    /// <summary>The runs the service takes, as it went in: the weapon's count plus one, or a transfer's (<see cref="Enchanter.TransferRuns"/>).</summary>
     public int Runs { get; } = runs;
 
-    /// <summary>The enchantment an Enchant attaches, by id; null for a refinement.</summary>
+    /// <summary>The enchantment an Enchant attaches, by id; null for any other service.</summary>
     public string? EnchantmentId { get; } = enchantmentId;
+
+    /// <summary>A transfer's source (§6.5): the weapon its soul comes off, held in the shop beside this one until the service is done or taken back, as the same deposit. Null for a reorder — the soul is the weapon's own — and for any other service.</summary>
+    public Weapon? Source { get; } = source;
+
+    /// <summary>A transfer's soul, by its place on <see cref="Source"/> — on <see cref="Weapon"/> for a reorder — as it went in: neither weapon changes in the shop. Null for any other service.</summary>
+    public int? SourceIndex { get; } = sourceIndex;
+
+    /// <summary>The enchantment a transfer moves, where it lies while the deposit is in the shop: <see cref="SourceIndex"/> on its source, or on the weapon for a reorder. Null for any other service, and for an index nothing lies at.</summary>
+    public Enchantment? Soul => Service == Service.Transfer && SourceIndex is { } index && index >= 0 && index < (Source ?? Weapon).Enchantments.Count
+        ? (Source ?? Weapon).Enchantments[index]
+        : null;
 
     /// <summary>The runs of the service the runs that counted have worked: 0 as it goes in, and below <see cref="Runs"/> while it is in the shop — the tick that works the last one brings it back.</summary>
     public int RunsWorked { get; internal set; }
@@ -103,18 +131,37 @@ public sealed record ImproveRoll(long Draw, long Denominator, long Numerator)
 /// What <see cref="Enchanter.Deposit"/> did, for the screen that asked it to log
 /// it (Logic never logs): the entry now in the shop, the weapon's capacity before
 /// and after the deposit's cash, and the weapon a hand the deposit emptied took up
-/// from the bag, or null.
+/// from the bag, or null — the weapon's hand, and a transfer's source's.
 /// </summary>
-public sealed record DepositMade(Deposit Entry, PoolProgress Before, PoolProgress After, Weapon? Armed);
+public sealed record DepositMade(Deposit Entry, PoolProgress Before, PoolProgress After, Weapon? Armed, Weapon? SourceArmed = null);
 
 /// <summary>
 /// What <see cref="Enchanter.TakeBack"/> did, for the screen that asked it to log
 /// it (Logic never logs), as <see cref="DepositMade"/> is a deposit's: the deposit
-/// taken back, and the weapon's capacity before and after its cash was reversed —
-/// taken here, on either side of the reversal, so no caller can take them in the
-/// wrong order.
+/// taken back — a transfer's source with it, its <see cref="Deposit.Source"/>, whose
+/// wear was never cashed — and the weapon's capacity before and after its cash was
+/// reversed, taken here, on either side of the reversal, so no caller can take them
+/// in the wrong order.
 /// </summary>
 public sealed record TakenBack(Deposit Entry, PoolProgress Before, PoolProgress After);
+
+/// <summary>
+/// One soul the enchanter could move onto a weapon (§6.5, "MOVE AN ENCHANTMENT
+/// ONTO IT"; <see cref="Enchanter.TransferOffers"/>): where it lies — on another
+/// weapon the party owns, or on the weapon itself, a reorder — the tier it arrives
+/// at and the runs the move takes, why the enchanter would refuse it — or null when
+/// it would take it — and what the screen says beside it, or null. A refused one is
+/// listed with its reason and never hidden (PHASE 6a DECISION 12).
+/// </summary>
+/// <param name="From">Where the source lies, a member's slot or the stable's; null for the weapon's own entry.</param>
+/// <param name="Source">The weapon the soul is on; null for the weapon's own entry.</param>
+/// <param name="Index">The soul's place on its source, or on the weapon.</param>
+/// <param name="Soul">The soul as it lies, its tier and its XP.</param>
+/// <param name="ArrivesAt">The tier it lands at (<see cref="Enchantment.Transferred"/>).</param>
+/// <param name="Runs">The runs the move takes (<see cref="Enchanter.TransferRuns"/>).</param>
+/// <param name="Refusal">Why the enchanter would refuse it, not naming the soul — <c>BURNING NEEDS FLAMING AHEAD OF IT</c> — or null (<see cref="Enchanter.TransferRefusal"/>).</param>
+/// <param name="Note">What the screen says beside it whether or not it is refused — <c>NEVER FIRES ON A SWORD</c> — or null.</param>
+public sealed record TransferOffer(WeaponPlace? From, Weapon? Source, int Index, Enchantment Soul, int ArrivesAt, int Runs, string? Refusal, string? Note);
 
 /// <summary>
 /// One enchantment the enchanter offers a weapon (§6.2, "you pick the
@@ -146,14 +193,23 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// service (R4) — and queues it for its count plus one runs. The gates are asked
 /// first (<see cref="Refusal"/>), and nothing is attached or rolled yet (PHASE 6a
 /// DECISION 3).</item>
+/// <item><strong>A transfer</strong> (Phase 6a.6; <see cref="TransferOffers"/>,
+/// <see cref="TransferRefusal"/>) is a deposit whose soul comes off a weapon the
+/// party owns rather than from the offer: the weapon needs the free slot and the
+/// deposit of attaching it, and both weapons wait in the shop as one deposit, the
+/// source's wear left in its pool. It is refused where it would leave a member
+/// unarmed, where the relations refuse the soul on the weapon, where taking it off
+/// would strand an entry behind it, and where a staff or a wand would be left
+/// casting nothing (PHASE 6a DECISIONS 11–13).</item>
 /// <item><strong>The clock</strong> (<see cref="Tick"/>) is the run counter's
 /// tick: every run's end asks it, the visit already gone. A run that counts works
 /// the newest <see cref="Tuning.EnchanterWorksOn"/> deposits a run on — every
-/// other deposit stalls — and a service whose last run is worked finishes: an
-/// Enchant attaches its enchantment last, at tier 1 with no XP, the improvement
-/// roll is made (<see cref="Improve"/>, Phase 6a.4), and the weapon goes to the
-/// end of the stable (PHASE 6a DECISION 7). A run that does not count works
-/// nothing.</item>
+/// other deposit stalls, a transfer counting as one — and a service whose last run
+/// is worked finishes: an Enchant attaches its enchantment last, at tier 1 with no
+/// XP, a Transfer moves its soul last a tier down, the improvement roll is made
+/// (<see cref="Improve"/>, Phase 6a.4), and the weapon goes to the end of the
+/// stable, a transfer's source after it (PHASE 6a DECISION 7). A run that does not
+/// count works nothing.</item>
 /// <item><strong>The improvement roll</strong> (<see cref="Improve"/>) is §6.4's
 /// gamble: on its own stream, keyed by the finishing run's map seed and the
 /// deposit's ordinal, it lands on the service's odds (<see cref="Wear.ImproveOdds"/>)
@@ -253,26 +309,35 @@ public static class Enchanter
 
     /// <summary>The offer of <paramref name="def"/> to <paramref name="weapon"/>: why the enchanter would refuse to attach it there, last, and whether it would never fire there (<see cref="Offers"/>) — each asked on its own.</summary>
     private static Offer OfferOf(Weapon weapon, EnchantmentDef def)
-        => new(def.Id, OfferRefusal(weapon, def), FiresOn(weapon, def) ? null : NeverFiresOn(weapon.Class));
+        => new(def.Id, OfferRefusal(weapon, weapon.Enchantments, def) is { } why ? Named(def, why) : null, FiresOn(weapon, def) ? null : NeverFiresOn(weapon.Class));
 
-    /// <summary>The relations, the wand and the staff's side, asked of <paramref name="def"/> attached last to <paramref name="weapon"/>, in <see cref="Offers"/>' order; null when none refuses it.</summary>
-    private static string? OfferRefusal(Weapon weapon, EnchantmentDef def)
+    /// <summary>
+    /// The relations, the wand and the staff's side, asked of <paramref name="def"/>
+    /// attached last to <paramref name="weapon"/> behind <paramref name="ahead"/> —
+    /// its entries, or, for a reorder, its entries less the one moving — in
+    /// <see cref="Offers"/>' order; the reason without the entry's name, which the
+    /// caller puts to it (<c>CANNOT SIT WITH FLAMING</c>), or null when none refuses it.
+    /// </summary>
+    private static string? OfferRefusal(Weapon weapon, IReadOnlyList<Enchantment> ahead, EnchantmentDef def)
     {
         var catalogue = GameContent.Current.Enchantments;
-        foreach (var entry in weapon.Enchantments)
+        foreach (var entry in ahead)
             if (catalogue.Excludes(def.Id, entry.Id))
-                return CannotSitWith(def, entry.Def);
-        if (catalogue.LacksPrerequisiteAhead(def.Id, weapon.Enchantments.Select(entry => entry.Id), out var need))
-            return NeedsAhead(def, catalogue.TryGet(need, out var needed) ? needed.Name : need);
+                return CannotSitWith(entry.Def);
+        if (catalogue.LacksPrerequisiteAhead(def.Id, ahead.Select(entry => entry.Id), out var need))
+            return NeedsAhead(catalogue.TryGet(need, out var needed) ? needed.Name : need);
         if (weapon.Class == WeaponClass.Wand && ContentValidator.NoWandCarries(def))
-            return WandCastsNoStatus(def);
+            return WandCastsNoStatusWhy;
         // A staff's cast: its first entry picks the side (TurnSystem.CanCastOn), and
         // every status its entries apply lands on that one body (ApplyCast).
-        if (weapon.Innate is { Def.Applies: not null } cast && def.Effect == EffectKind.ApplyStatus
+        if (weapon.IsCaster && ahead.Count > 0 && ahead[0] is { Def.Applies: not null } cast && def.Effect == EffectKind.ApplyStatus
             && def.Targets != TargetSide.Any && def.Targets != cast.Def.Targets)
-            return StaffCastsItOn(def, cast.Def.Targets);
+            return StaffCastsItOn(cast.Def.Targets);
         return null;
     }
+
+    /// <summary>A reason put to the entry it refuses, as the offer list says it: <c>COLD - CANNOT SIT WITH FLAMING</c>.</summary>
+    private static string Named(EnchantmentDef def, string why) => $"{def.Name.ToUpperInvariant()} - {why}";
 
     /// <summary>Whether <paramref name="def"/> ever fires on <paramref name="weapon"/>: a behaviour on an event it raises (<see cref="Raises"/>), or a step on its wielder when hit.</summary>
     private static bool FiresOn(Weapon weapon, EnchantmentDef def)
@@ -298,36 +363,57 @@ public static class Enchanter
     public static string CannotSitWith(EnchantmentDef offered, EnchantmentDef carried)
     {
         ArgumentNullException.ThrowIfNull(offered);
+        return Named(offered, CannotSitWith(carried));
+    }
+
+    /// <summary><see cref="CannotSitWith(EnchantmentDef, EnchantmentDef)"/>'s reason, not naming the entry refused — how a transfer's list says it, after the soul's place: <c>CANNOT SIT WITH FLAMING</c>.</summary>
+    public static string CannotSitWith(EnchantmentDef carried)
+    {
         ArgumentNullException.ThrowIfNull(carried);
-        return $"{offered.Name.ToUpperInvariant()} - CANNOT SIT WITH {carried.Name.ToUpperInvariant()}";
+        return $"CANNOT SIT WITH {carried.Name.ToUpperInvariant()}";
     }
 
     /// <summary>An offer whose prerequisite is not on the weapon ahead of it (PHASE 6a DECISION 12): <c>BURNING - NEEDS FLAMING AHEAD OF IT</c>.</summary>
     public static string NeedsAhead(EnchantmentDef offered, string needed)
     {
         ArgumentNullException.ThrowIfNull(offered);
-        ArgumentNullException.ThrowIfNull(needed);
-        return $"{offered.Name.ToUpperInvariant()} - NEEDS {needed.ToUpperInvariant()} AHEAD OF IT";
+        return Named(offered, NeedsAhead(needed));
     }
+
+    /// <summary><see cref="NeedsAhead(EnchantmentDef, string)"/>'s reason, not naming the entry refused: <c>NEEDS FLAMING AHEAD OF IT</c>.</summary>
+    public static string NeedsAhead(string needed)
+    {
+        ArgumentNullException.ThrowIfNull(needed);
+        return $"NEEDS {needed.ToUpperInvariant()} AHEAD OF IT";
+    }
+
+    /// <summary><see cref="WandCastsNoStatus"/>'s reason, not naming the entry refused.</summary>
+    public const string WandCastsNoStatusWhy = "A WAND CASTS NO STATUS";
 
     /// <summary>A status-applying offer to a wand (PHASE 6a DECISION 12): <c>REGENERATION - A WAND CASTS NO STATUS</c>.</summary>
     public static string WandCastsNoStatus(EnchantmentDef offered)
     {
         ArgumentNullException.ThrowIfNull(offered);
-        return $"{offered.Name.ToUpperInvariant()} - A WAND CASTS NO STATUS";
+        return Named(offered, WandCastsNoStatusWhy);
     }
 
     /// <summary>A status for one side offered to a staff whose cast is for the other (PHASE 6a DECISION 12), naming the side <paramref name="casts"/> it would land on: <c>MIRE - THIS STAFF WOULD CAST IT ON AN ALLY</c>.</summary>
     public static string StaffCastsItOn(EnchantmentDef offered, TargetSide casts)
     {
         ArgumentNullException.ThrowIfNull(offered);
+        return Named(offered, StaffCastsItOn(casts));
+    }
+
+    /// <summary><see cref="StaffCastsItOn(EnchantmentDef, TargetSide)"/>'s reason, not naming the entry refused: <c>THIS STAFF WOULD CAST IT ON AN ALLY</c>.</summary>
+    public static string StaffCastsItOn(TargetSide casts)
+    {
         string side = casts switch
         {
             TargetSide.Ally => "AN ALLY",
             TargetSide.Enemy => "AN ENEMY",
             _ => throw new ArgumentOutOfRangeException(nameof(casts), casts, "A staff casts on allies or on enemies, never either (ContentValidator.RuleCasterInnate)."),
         };
-        return $"{offered.Name.ToUpperInvariant()} - THIS STAFF WOULD CAST IT ON {side}";
+        return $"THIS STAFF WOULD CAST IT ON {side}";
     }
 
     /// <summary>
@@ -392,7 +478,8 @@ public static class Enchanter
     /// <param name="enchantmentId">The enchantment an Enchant would attach; null for a refinement.</param>
     /// <exception cref="ArgumentException">
     /// <paramref name="weapon"/> is none the party owns; an Enchant names no
-    /// enchantment, or a refinement names one.
+    /// enchantment, or a refinement names one; or a Transfer is asked here, which
+    /// names its soul by where it lies (<see cref="TransferRefusal"/>).
     /// </exception>
     public static string? Refusal(CampaignState campaign, Weapon weapon, Service service, string? enchantmentId = null)
     {
@@ -404,6 +491,8 @@ public static class Enchanter
                 throw new ArgumentException("An Enchant names the enchantment it buys.", nameof(enchantmentId));
             case Service.Refine when enchantmentId is not null:
                 throw new ArgumentException($"A refinement attaches nothing, and '{enchantmentId}' is named.", nameof(enchantmentId));
+            case Service.Transfer:
+                throw new ArgumentException("A transfer names the soul it moves by where it lies, and is asked of TransferRefusal.", nameof(service));
             case not (Service.Enchant or Service.Refine):
                 throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
         }
@@ -415,7 +504,7 @@ public static class Enchanter
         if (!campaign.HasSeen(enchantmentId!))
             return Unseen(enchantmentId!);
         var def = GameContent.Current.Enchantments[enchantmentId!];   // met, so the content's
-        return NeverOffered(def) ?? OfferRefusal(weapon, def);
+        return NeverOffered(def) ?? (OfferRefusal(weapon, weapon.Enchantments, def) is { } why ? Named(def, why) : null);
     }
 
     /// <summary>
@@ -426,7 +515,8 @@ public static class Enchanter
     /// <list type="number">
     /// <item><strong>Closed</strong>: the tutorial is not beaten, and the enchanter
     /// is not open until it is (§6.3; S:411–419).</item>
-    /// <item><strong>In the shop</strong> already: a weapon is in one place.</item>
+    /// <item><strong>In the shop</strong> already, deposited or held as a
+    /// transfer's source: a weapon is in one place.</item>
     /// <item><strong>The last weapon</strong> a member carries: no deposit leaves a
     /// member carrying none (PHASE 6a DECISION 7).</item>
     /// <item>An <strong>Enchant</strong> of enchantment #n, n the count plus one,
@@ -440,6 +530,12 @@ public static class Enchanter
     /// <item>A <strong>Refine</strong> has no gate of its own: an unworn weapon may
     /// be refined, and comes back as it went (§6.4: "a fresh drop refines for
     /// nothing").</item>
+    /// <item>A <strong>Transfer</strong> (Phase 6a.6) needs a soul to move that the
+    /// enchanter would take (<see cref="TransferOffers"/>): with none, the reason an
+    /// Enchant of the next enchantment is refused — the slot, or the price, which
+    /// every soul from another weapon must meet — or <see cref="NothingToMove"/>. A
+    /// reorder of the weapon's own is asked at its count, so a weapon whose every
+    /// slot is filled may still reorder (PHASE 6a DECISION 11).</item>
     /// </list>
     /// </summary>
     /// <param name="campaign">The campaign between its runs.</param>
@@ -450,37 +546,50 @@ public static class Enchanter
     {
         ArgumentNullException.ThrowIfNull(campaign);
         ArgumentNullException.ThrowIfNull(weapon);
-        if (service is not (Service.Enchant or Service.Refine))
+        if (service is not (Service.Enchant or Service.Refine or Service.Transfer))
             throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
         if (Gates(campaign, weapon, service) is { } refused)
             return refused;
-        return service == Service.Enchant && !Offers(campaign, weapon).Any(offer => offer.Refusal is null) ? NothingToOffer : null;
+        return service switch
+        {
+            Service.Enchant when !Offers(campaign, weapon).Any(offer => offer.Refusal is null) => NothingToOffer,
+            Service.Transfer when !TransferOffers(campaign, weapon).Any(offer => offer.Refusal is null)
+                => Attaching(weapon, weapon.Enchantments.Count + 1) ?? NothingToMove,
+            _ => null,
+        };
     }
 
     /// <summary>
-    /// <see cref="ServiceRefusal"/>'s gates bar its last (<see cref="NothingToOffer"/>),
-    /// in its order: the ones <see cref="Refusal"/> asks before the enchantment it
-    /// names, which answers the last for itself.
+    /// <see cref="ServiceRefusal"/>'s gates bar its last (<see cref="NothingToOffer"/>,
+    /// <see cref="NothingToMove"/>), in its order: the ones <see cref="Refusal"/> asks
+    /// before the enchantment it names, which answers the last for itself. A
+    /// transfer's are the weapon's own alone — closed, in the shop, its member's last
+    /// — since the rest are asked of the soul it moves (<see cref="TransferRefusal"/>).
     /// </summary>
     private static string? Gates(CampaignState campaign, Weapon weapon, Service service)
     {
-        var content = GameContent.Current;
         if (!IsOpen(campaign))
-            return Closed(content.Dungeons.Tutorial);
+            return Closed(GameContent.Current.Dungeons.Tutorial);
 
-        if (campaign.AtTheEnchanter.Any(deposit => ReferenceEquals(deposit.Weapon, weapon)))
+        if (InShop(campaign, weapon))
             return InTheShop(weapon);
-        var carrier = campaign.Party.FirstOrDefault(member => Array.FindIndex(member.Inventory, carried => ReferenceEquals(carried, weapon)) >= 0);
-        if (carrier is null && !campaign.Stable.Any(kept => ReferenceEquals(kept, weapon)))
-            throw new ArgumentException($"{weapon.Name} ({weapon.Id}) is in no bag, not in the stable and not in the shop: the enchanter takes only a weapon the party owns.", nameof(weapon));
-        if (carrier is not null && carrier.Inventory.Count(carried => carried is not null) == 1)
+        if (Carrier(campaign, weapon) is { } carrier && carrier.Inventory.Count(carried => carried is not null) == 1)
             return WouldCarryNone(carrier.Id);
 
-        if (service == Service.Refine)
-            return null;
+        return service == Service.Enchant ? Attaching(weapon, weapon.Enchantments.Count + 1) : null;
+    }
 
-        var tuning = content.Tuning;
-        int n = weapon.Enchantments.Count + 1;
+    /// <summary>
+    /// Why enchantment #<paramref name="n"/> would not go on <paramref name="weapon"/>
+    /// now, or null (R4): a slot left (<see cref="AllFilled"/>), slot n open at the
+    /// capacity the weapon is deposited at, before the deposit's cash
+    /// (<see cref="NoFreeSlot"/>), and a deposit of its price (<see cref="Short"/>) —
+    /// in that order. An Enchant asks it at the count plus one; a transfer at the
+    /// place its soul lands (<see cref="TransferRefusal"/>).
+    /// </summary>
+    private static string? Attaching(Weapon weapon, int n)
+    {
+        var tuning = GameContent.Current.Tuning;
         if (n > tuning.EnchantmentSlots)
             return AllFilled(tuning.EnchantmentSlots);
         int capacity = weapon.WearCapacity;
@@ -491,6 +600,224 @@ public static class Enchanter
         if (weapon.Wear < price)
             return Short(n, price, weapon.Wear);
         return null;
+    }
+
+    /// <summary>Whether <paramref name="weapon"/> is in the shop: deposited, or held there as a transfer's source.</summary>
+    private static bool InShop(CampaignState campaign, Weapon weapon)
+        => campaign.AtTheEnchanter.Any(deposit => ReferenceEquals(deposit.Weapon, weapon) || ReferenceEquals(deposit.Source, weapon));
+
+    /// <summary>The member carrying <paramref name="weapon"/>, or null for a weapon in the stable.</summary>
+    /// <exception cref="ArgumentException"><paramref name="weapon"/> is in no bag and not in the stable: none the party owns out of the shop.</exception>
+    private static PartyMemberState? Carrier(CampaignState campaign, Weapon weapon)
+    {
+        var carrier = campaign.Party.FirstOrDefault(member => Array.FindIndex(member.Inventory, carried => ReferenceEquals(carried, weapon)) >= 0);
+        if (carrier is null && !campaign.Stable.Any(kept => ReferenceEquals(kept, weapon)))
+            throw new ArgumentException($"{weapon.Name} ({weapon.Id}) is in no bag, not in the stable and not in the shop: the enchanter takes only a weapon the party owns.", nameof(weapon));
+        return carrier;
+    }
+
+    // ── A transfer (§6.5, Phase 6a.6) ─────────────────────────────────────────
+
+    /// <summary>
+    /// The runs moving a soul onto <paramref name="weapon"/> takes (§6.5: "one
+    /// attachment's service time"): the runs of attaching it as the weapon's next —
+    /// its count plus one (<see cref="Wear.ServiceRuns"/>), as an Enchant's — or, for
+    /// a <paramref name="reorder"/> of its own, of attaching it again as the last of
+    /// the same count: the count (PHASE 6a DECISION 11).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">A reorder of a weapon carrying nothing to reorder.</exception>
+    public static int TransferRuns(Weapon weapon, bool reorder)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int count = weapon.Enchantments.Count;
+        if (reorder)
+            ArgumentOutOfRangeException.ThrowIfLessThan(count, 1, nameof(weapon));
+        return Wear.ServiceRuns(reorder ? count - 1 : count);
+    }
+
+    /// <summary>
+    /// What the enchanter could move onto <paramref name="weapon"/> (§6.5): every
+    /// soul on every other weapon the party owns out of the shop — each member's, in
+    /// roster order and slot order, then the stable's in its order — then the
+    /// weapon's own, a reorder. Each with the tier it arrives at, the runs the move
+    /// takes, why the enchanter would refuse it (<see cref="TransferRefusal"/>) or
+    /// nothing, and the note an offer carries when it would never fire on the weapon
+    /// (<see cref="NeverFiresOn"/>). A refused one is listed with its reason, never
+    /// hidden (PHASE 6a DECISION 12).
+    /// </summary>
+    /// <param name="campaign">The campaign between its runs.</param>
+    /// <param name="weapon">The weapon the soul would land on, last.</param>
+    public static IReadOnlyList<TransferOffer> TransferOffers(CampaignState campaign, Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(weapon);
+        var offers = new List<TransferOffer>();
+        void Each(WeaponPlace? from, Weapon? source)
+        {
+            var giver = source ?? weapon;
+            for (int index = 0; index < giver.Enchantments.Count; index++)
+            {
+                var soul = giver.Enchantments[index];
+                offers.Add(new TransferOffer(from, source, index, soul, soul.Transferred().Tier, TransferRuns(weapon, reorder: source is null),
+                    TransferRefusal(campaign, weapon, source, index), FiresOn(weapon, soul.Def) ? null : NeverFiresOn(weapon.Class)));
+            }
+        }
+
+        foreach (var member in campaign.Party)
+            for (int slot = 0; slot < member.Inventory.Length; slot++)
+                if (member.Inventory[slot] is { } carried && !ReferenceEquals(carried, weapon))
+                    Each(new WeaponPlace(member.Id, slot), carried);
+        for (int i = 0; i < campaign.Stable.Count; i++)
+            if (!ReferenceEquals(campaign.Stable[i], weapon))
+                Each(WeaponPlace.InTheStable(i), campaign.Stable[i]);
+        Each(null, null);
+        return offers;
+    }
+
+    /// <summary>
+    /// Why the enchanter would refuse to move the soul at <paramref name="index"/> on
+    /// <paramref name="source"/> — or, <paramref name="source"/> null, on
+    /// <paramref name="weapon"/> itself, a reorder — onto <paramref name="weapon"/>,
+    /// last, or null when it would take it (§6.5; PHASE 6a DECISIONS 11–13). The
+    /// reason names neither the soul nor where it lies, which the screen says before
+    /// it: <c>VAMPIRIC T3 ON THE NAMELESS KNIFE - …</c>. Asked in this order, the
+    /// first to fail the reason:
+    /// <list type="number">
+    /// <item><strong>Closed</strong>, and either weapon <strong>in the shop</strong>
+    /// already, as every deposit asks (<see cref="ServiceRefusal"/>).</item>
+    /// <item><strong>The last weapon</strong> a member carries, asked with both the
+    /// weapon and the source gone: a member carrying only the two is refused, the
+    /// weapon's member named first (PHASE 6a DECISION 7).</item>
+    /// <item>A reorder of the entry already <strong>last</strong>, which would move
+    /// nothing (<see cref="LastAlready"/>; PHASE 6a DECISION 11).</item>
+    /// <item>The soul's <strong>place on the weapon</strong>, #n (R4): a slot left,
+    /// slot n open at the capacity before the deposit's cash, and a deposit of its
+    /// price — n the count plus one from another weapon, and the count for a reorder,
+    /// which attaches it again as the last of the same count, so a reorder passes at
+    /// five (PHASE 6a DECISION 11).</item>
+    /// <item><strong>The soul on the weapon</strong>, as the offer asks an enchantment
+    /// (<see cref="Offers"/>): an exclusion group beside an entry the weapon keeps,
+    /// a prerequisite not ahead of where it lands, a status onto a wand, a status for
+    /// the other side onto a staff. What the offer never lists — a unique soul, a kind
+    /// that does nothing yet — is not asked: the soul is the party's already, and the
+    /// enchanter moves it, never copies it (S:279–281).</item>
+    /// <item><strong>What it leaves behind</strong> (S:176–181: the enchanter
+    /// "refuses a transfer that would strand a unique's lingering effect"): an entry
+    /// on the weapon it comes off — the source, or the weapon itself reordered — whose
+    /// prerequisite was ahead of it and no longer is (<see cref="Strands"/>).</item>
+    /// <item><strong>What each would cast</strong> (PHASE 6a DECISION 12's caster
+    /// clause): a staff or a wand, the weapon or the source, left with a first entry
+    /// it cannot cast, or none (<see cref="Weapon.CastsWith"/>; <see cref="WouldCastNothing"/>).
+    /// This narrows settled.md's "that effect can be transferred onto a dagger"
+    /// (S:339–342): a staff arrives with one soul, so it gives its effect away once
+    /// it has a second status to cast.</item>
+    /// </list>
+    /// A lock the new wielder could not afford is never a refusal: the soul sleeps
+    /// there (S:41–42).
+    /// </summary>
+    /// <param name="campaign">The campaign between its runs.</param>
+    /// <param name="weapon">The weapon the soul would land on: in a member's bag or in the stable.</param>
+    /// <param name="source">The weapon the soul is on, another the party owns; null for the weapon's own, a reorder.</param>
+    /// <param name="index">The soul's place on <paramref name="source"/>, or on <paramref name="weapon"/>.</param>
+    /// <exception cref="ArgumentException">Either weapon is none the party owns, or the source is the weapon itself — a reorder names none.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">No soul lies at <paramref name="index"/>.</exception>
+    public static string? TransferRefusal(CampaignState campaign, Weapon weapon, Weapon? source, int index)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(weapon);
+        if (ReferenceEquals(source, weapon))
+            throw new ArgumentException($"{weapon.Name} ({weapon.Id}) is named as its own source: a reorder names none.", nameof(source));
+        var giver = source ?? weapon;
+        if ((uint)index >= (uint)giver.Enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{giver.Name} ({giver.Id}) carries {giver.Enchantments.Count} enchantments.");
+
+        if (!IsOpen(campaign))
+            return Closed(GameContent.Current.Dungeons.Tutorial);
+        if (InShop(campaign, weapon))
+            return InTheShop(weapon);
+        if (source is not null && InShop(campaign, source))
+            return InTheShop(source);
+        PartyMemberState?[] carriers = [Carrier(campaign, weapon), source is null ? null : Carrier(campaign, source)];
+        foreach (var member in carriers.OfType<PartyMemberState>().Distinct())
+            if (member.Inventory.All(carried => carried is null || ReferenceEquals(carried, weapon) || ReferenceEquals(carried, source)))
+                return WouldCarryNone(member.Id);
+
+        bool reorder = source is null;
+        int count = weapon.Enchantments.Count;
+        if (reorder && index == count - 1)
+            return LastAlready;
+        if (Attaching(weapon, reorder ? count : count + 1) is { } gate)
+            return gate;
+
+        var soul = giver.Enchantments[index];
+        IReadOnlyList<Enchantment> ahead = reorder ? Without(weapon.Enchantments, index) : weapon.Enchantments;
+        if (OfferRefusal(weapon, ahead, soul.Def) is { } why)
+            return why;
+
+        // What the giver keeps, in its order — the source less the soul, or the
+        // weapon with the soul moved to its end — and where each of those stood.
+        IReadOnlyList<Enchantment> left = reorder ? [.. ahead, soul] : Without(giver.Enchantments, index);
+        int[] stood = [.. Enumerable.Range(0, giver.Enchantments.Count).Where(i => i != index), .. reorder ? [index] : Array.Empty<int>()];
+        if (Stranded(giver.Enchantments, left, stood) is { } stranded)
+            return stranded;
+
+        IReadOnlyList<Enchantment> landed = [.. ahead, soul.Transferred()];
+        if (!weapon.CastsWith(landed[0].Def))
+            return WouldCastNothing(weapon);
+        if (source is not null && !source.CastsWith(left.Count > 0 ? left[0].Def : null))
+            return WouldCastNothing(source);
+        return null;
+    }
+
+    /// <summary><paramref name="entries"/> less the one at <paramref name="index"/>, the rest in their order.</summary>
+    private static Enchantment[] Without(IReadOnlyList<Enchantment> entries, int index)
+        => [.. entries.Where((_, i) => i != index)];
+
+    /// <summary>
+    /// The first entry of <paramref name="after"/> whose prerequisite was ahead of it
+    /// in <paramref name="before"/> — where it stood, at <paramref name="stood"/> —
+    /// and is not ahead of it now, said as <see cref="Strands"/> says it; or null. An
+    /// entry that lacked one already is not this transfer's doing.
+    /// </summary>
+    private static string? Stranded(IReadOnlyList<Enchantment> before, IReadOnlyList<Enchantment> after, int[] stood)
+    {
+        var catalogue = GameContent.Current.Enchantments;
+        for (int k = 0; k < after.Count; k++)
+        {
+            if (!catalogue.LacksPrerequisiteAhead(after[k].Id, after.Take(k).Select(entry => entry.Id), out var need))
+                continue;
+            if (catalogue.LacksPrerequisiteAhead(after[k].Id, before.Take(stood[k]).Select(entry => entry.Id), out _))
+                continue;
+            return Strands(after[k].Def, catalogue.TryGet(need, out var needed) ? needed.Name : need);
+        }
+        return null;
+    }
+
+    /// <summary>A reorder of the entry already last, which would move nothing and only cost it a tier (PHASE 6a DECISION 11).</summary>
+    public const string LastAlready = "IT IS LAST ALREADY";
+
+    /// <summary>A transfer with nothing to move: every soul the party owns refused on the weapon, or none there. <c>NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT</c>.</summary>
+    public const string NothingToMove = "NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT";
+
+    /// <summary>
+    /// A transfer that would strand an entry on the weapon the soul comes off
+    /// (S:176–181: "refuses a transfer that would strand a unique's lingering
+    /// effect"), naming the entry left and what it needs ahead of it: <c>BURNING
+    /// NEEDS FLAMING AHEAD OF IT</c>.
+    /// </summary>
+    public static string Strands(EnchantmentDef stranded, string needed)
+    {
+        ArgumentNullException.ThrowIfNull(stranded);
+        ArgumentNullException.ThrowIfNull(needed);
+        return $"{stranded.Name.ToUpperInvariant()} NEEDS {needed.ToUpperInvariant()} AHEAD OF IT";
+    }
+
+    /// <summary>A transfer that would leave a staff or a wand with no first entry it can cast (PHASE 6a DECISION 12's caster clause): <c>THE ROTWOOD WOULD CAST NOTHING</c>.</summary>
+    public static string WouldCastNothing(Weapon caster)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+        string name = caster.Name.ToUpperInvariant();
+        return $"{(name.StartsWith("THE ", StringComparison.Ordinal) ? name : $"THE {name}")} WOULD CAST NOTHING";
     }
 
     /// <summary>
@@ -543,55 +870,83 @@ public static class Enchanter
     /// <summary>
     /// Deposit the weapon at <paramref name="from"/> for <paramref name="service"/>
     /// (§6.2, §6.7: one call for every service), between runs. The gates are asked
-    /// first (<see cref="Refusal"/>), and a refusal throws: the screen never asks
-    /// for a deposit it would be refused. Then, in this order:
+    /// first (<see cref="Refusal"/>, or a transfer's <see cref="TransferRefusal"/>),
+    /// and a refusal throws: the screen never asks for a deposit it would be refused.
+    /// Then, in this order:
     /// <list type="number">
     /// <item>the runs the service takes, off the count as it goes in
-    /// (<see cref="Wear.ServiceRuns"/>);</item>
+    /// (<see cref="Wear.ServiceRuns"/>; a transfer's <see cref="TransferRuns"/>);</item>
     /// <item><strong>the whole pool cashed</strong> (<see cref="Weapon.CashWear"/>):
     /// the pool empties now, and the capacity grows on the cash now, identically
     /// whatever the service (R4: "+1 per full bar … cashed in", "the pool itself
-    /// still empties at every deposit");</item>
+    /// still empties at every deposit"). A transfer's source is not cashed: its
+    /// wear stays in its pool (PHASE 6a DECISION 13);</item>
     /// <item>the weapon taken out of its place and queued, the campaign's count of
-    /// deposits its ordinal (<see cref="CampaignState.Enqueue"/>) — a hand it
+    /// deposits its ordinal (<see cref="CampaignState.Enqueue"/>) — a transfer's
+    /// source taken out with it, into the shop as the same deposit — a hand either
     /// empties armed from the bag, as a move's is.</item>
     /// </list>
-    /// Nothing is attached and nothing is rolled here: a service does that as it
+    /// Nothing is attached, moved or rolled here: a service does that as it
     /// finishes (PHASE 6a DECISION 3; <see cref="Tick"/>, <see cref="Improve"/>).
     /// </summary>
+    /// <param name="campaign">The campaign between its runs.</param>
+    /// <param name="from">Where the weapon lies.</param>
+    /// <param name="service">What the deposit buys.</param>
+    /// <param name="enchantmentId">The enchantment an Enchant attaches; null for any other service.</param>
+    /// <param name="source">Where a transfer's source lies — another weapon the party owns — or null for a reorder of the weapon's own, and for any other service.</param>
+    /// <param name="sourceIndex">A transfer's soul, by its place on its source, or on the weapon for a reorder; null for any other service.</param>
     /// <returns>The deposit made, and the capacity before and after its cash, for the screen's log.</returns>
-    /// <exception cref="InvalidOperationException">A visit is in progress, nothing lies at <paramref name="from"/>, or the enchanter refuses the deposit — the reason in the message.</exception>
-    /// <exception cref="ArgumentException">An Enchant names no enchantment, or a refinement names one; or a member the place names is not in the party.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">The place is not one the party or the stable has.</exception>
-    public static DepositMade Deposit(CampaignState campaign, WeaponPlace from, Service service, string? enchantmentId = null)
+    /// <exception cref="InvalidOperationException">A visit is in progress, nothing lies at <paramref name="from"/> or <paramref name="source"/>, or the enchanter refuses the deposit — the reason in the message.</exception>
+    /// <exception cref="ArgumentException">An Enchant names no enchantment, or another service names one; a transfer names no soul, or another service names a source; the source is the weapon itself; or a member a place names is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has, or no soul lies at <paramref name="sourceIndex"/>.</exception>
+    public static DepositMade Deposit(CampaignState campaign, WeaponPlace from, Service service, string? enchantmentId = null,
+        WeaponPlace? source = null, int? sourceIndex = null)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         if (campaign.Visit is { } visit)
             throw new InvalidOperationException(
                 $"A visit to '{visit.Def.Id}' is in progress: the enchanter takes deposits between runs only.");
         var weapon = campaign.WeaponAt(from) ?? throw new InvalidOperationException($"Nothing lies at {from} to deposit.");
-        if (Refusal(campaign, weapon, service, enchantmentId) is { } refused)
+        Weapon? giver = null;
+        string? refused;
+        if (service == Service.Transfer)
+        {
+            if (enchantmentId is not null)
+                throw new ArgumentException($"A transfer names the soul it moves by where it lies, and '{enchantmentId}' is named.", nameof(enchantmentId));
+            if (sourceIndex is not { } index)
+                throw new ArgumentException("A transfer names the soul it moves: its place on the source, or on the weapon.", nameof(sourceIndex));
+            giver = source is { } at ? campaign.WeaponAt(at) ?? throw new InvalidOperationException($"Nothing lies at {at} to take a soul from.") : null;
+            refused = TransferRefusal(campaign, weapon, giver, index);
+        }
+        else
+        {
+            if (source is not null || sourceIndex is not null)
+                throw new ArgumentException($"Only a transfer names a source, and a {service} names one.", nameof(source));
+            refused = Refusal(campaign, weapon, service, enchantmentId);
+        }
+        if (refused is not null)
             throw new InvalidOperationException($"The enchanter refuses {weapon.Name} ({weapon.Id}) for {service}: {refused}");
 
-        int runs = Wear.ServiceRuns(weapon.Enchantments.Count);
+        int runs = service == Service.Transfer ? TransferRuns(weapon, reorder: giver is null) : Wear.ServiceRuns(weapon.Enchantments.Count);
         var before = weapon.WearPool;
         int cashed = weapon.CashWear();
-        var entry = new Deposit(campaign.DepositsMade, weapon, service, cashed, runs, enchantmentId);
-        var armed = campaign.Enqueue(from, entry);
-        return new DepositMade(entry, before, weapon.WearPool, armed);
+        var entry = new Deposit(campaign.DepositsMade, weapon, service, cashed, runs, enchantmentId, giver, sourceIndex);
+        var (armed, sourceArmed) = campaign.Enqueue(from, entry, giver is null ? null : source);
+        return new DepositMade(entry, before, weapon.WearPool, armed, sourceArmed);
     }
 
     // ── A take-back ───────────────────────────────────────────────────────────
 
     /// <summary>
     /// Take <paramref name="deposit"/> back out of the shop, between runs (PHASE 6a
-    /// DECISION 8): the weapon goes to the end of the stable, nothing attached and
-    /// nothing rolled, the runs worked lost — and the deposit's cash reversed
-    /// exactly (<see cref="Weapon.RefundWear"/>), the wear back in the pool and off
-    /// what the weapon has cashed, so its capacity and the progress toward the next
-    /// point are as they were before it went in. A take-back is an undo whose cost
-    /// is the runs lost, never a way to grow a capacity with no downtime. The
-    /// ordinal is not reused.
+    /// DECISION 8): the weapon goes to the end of the stable — a transfer's source
+    /// after it, its soul still on it and its wear, never cashed, still in its pool
+    /// — nothing attached, moved or rolled, the runs worked lost; and the deposit's
+    /// cash reversed exactly (<see cref="Weapon.RefundWear"/>), the wear back in the
+    /// pool and off what the weapon has cashed, so its capacity and the progress
+    /// toward the next point are as they were before it went in. A take-back is an
+    /// undo whose cost is the runs lost, never a way to grow a capacity with no
+    /// downtime. The ordinal is not reused.
     /// </summary>
     /// <returns>The deposit taken back, and the capacity before and after its cash was reversed, for the screen's log.</returns>
     /// <exception cref="InvalidOperationException">A visit is in progress, or <paramref name="deposit"/> is not in the shop.</exception>
@@ -610,7 +965,8 @@ public static class Enchanter
     /// <summary>
     /// The deposits the next run that counts works (§6.2: "the two most recently
     /// deposited"): the <see cref="Tuning.EnchanterWorksOn"/> with the highest
-    /// ordinals, in deposit order. Every other deposit in <paramref name="queue"/>
+    /// ordinals, in deposit order — a transfer one of them, its two weapons being one
+    /// deposit (PHASE 6a DECISION 13). Every other deposit in <paramref name="queue"/>
     /// is stalled until one of these comes back. The queue has no length of its own:
     /// "dumping the whole stable achieves nothing" (P6:291–292).
     /// </summary>
@@ -630,12 +986,13 @@ public static class Enchanter
     /// <see cref="Worked"/> names a run on, in deposit order, and finishes each
     /// whose last run that was: an Enchant attaches its enchantment last, at
     /// <see cref="AttachedTier"/> with no XP — the deposit asked the offer and the
-    /// ceiling, and the weapon has been in the shop since — a refinement nothing;
-    /// then the improvement roll is made on the weapon as it now stands
-    /// (<see cref="Improve"/>, on <paramref name="mapSeed"/> and the deposit's
-    /// ordinal), and the weapon goes to the end of the stable
-    /// (<see cref="CampaignState.Return"/>). Every other deposit is reported
-    /// stalled.</item>
+    /// ceiling, and the weapon has been in the shop since — a Transfer moves its soul
+    /// off its source, or off the weapon, and on last a tier down, and a refinement
+    /// attaches nothing; then the improvement roll is made on the weapon as it now
+    /// stands (<see cref="Improve"/>, on <paramref name="mapSeed"/> and the deposit's
+    /// ordinal), and the weapon goes to the end of the stable, a transfer's source
+    /// after it (<see cref="CampaignState.Return"/>). Every other deposit is
+    /// reported stalled.</item>
     /// <item><strong>A run that did not count</strong> moves nothing and rolls
     /// nothing, and reports every deposit stalled with its runs as they were — a
     /// fresh one's at 0 — so the summary can say the enchanter worked nothing.</item>
@@ -667,25 +1024,31 @@ public static class Enchanter
             reports[i] = Report(entry, stalled: false);
             if (entry.RunsWorked >= entry.Runs)
             {
-                Complete(entry);
+                var moved = Complete(entry);
                 var (improved, roll) = Improve(entry.Weapon, entry.Service, entry.WearAtDeposit, mapSeed, entry.Ordinal);
-                reports[i] = reports[i] with { Improved = improved, Roll = roll };
+                reports[i] = reports[i] with { Improved = improved, Roll = roll, Tier = moved?.Tier };
                 campaign.Return(entry);
             }
         }
         return reports;
     }
 
-    /// <summary>What the tick says of <paramref name="entry"/>: its weapon by id, its service, its runs as they stand, whether it was left unworked, and its enchantment.</summary>
+    /// <summary>What the tick says of <paramref name="entry"/>: its weapon by id, its service, its runs as they stand, whether it was left unworked, and its enchantment — for a transfer, the soul it moves, and its source by id.</summary>
     private static ServiceReport Report(Deposit entry, bool stalled)
-        => new(entry.Weapon.Id, entry.Service, entry.RunsWorked, entry.Runs, stalled, entry.EnchantmentId);
+        => new(entry.Weapon.Id, entry.Service, entry.RunsWorked, entry.Runs, stalled,
+            entry.Service == Service.Transfer ? entry.Soul?.Id : entry.EnchantmentId, SourceId: entry.Source?.Id);
 
     /// <summary>
     /// A service's last run worked: an Enchant attaches its enchantment — the
     /// content's own entry, by id — last, at <see cref="AttachedTier"/> with no XP
-    /// (<see cref="Weapon.Attach"/>); a refinement attaches nothing.
+    /// (<see cref="Weapon.Attach"/>); a Transfer takes its soul off its source, or
+    /// off the weapon for a reorder (<see cref="Weapon.Detach"/>), and attaches it
+    /// last a tier down (<see cref="Enchantment.Transferred"/>) — the deposit asked
+    /// every gate, and both weapons have been in the shop since; a refinement
+    /// attaches nothing.
     /// </summary>
-    private static void Complete(Deposit entry)
+    /// <returns>A transfer's soul as it landed; null for any other service.</returns>
+    private static Enchantment? Complete(Deposit entry)
     {
         switch (entry.Service)
         {
@@ -693,9 +1056,15 @@ public static class Enchanter
                 string id = entry.EnchantmentId
                     ?? throw new InvalidOperationException($"Deposit {entry.Ordinal}, an Enchant of {entry.Weapon.Name}, names no enchantment.");
                 entry.Weapon.Attach(new Enchantment(GameContent.Current.Enchantments[id], AttachedTier));
-                break;
+                return null;
             case Service.Refine:
-                break;
+                return null;
+            case Service.Transfer:
+                int index = entry.SourceIndex
+                    ?? throw new InvalidOperationException($"Deposit {entry.Ordinal}, a Transfer onto {entry.Weapon.Name}, names no soul.");
+                var moved = (entry.Source ?? entry.Weapon).Detach(index).Transferred();
+                entry.Weapon.Attach(moved);
+                return moved;
             default:
                 throw new ArgumentOutOfRangeException(nameof(entry), entry.Service, "Not a Service.");
         }

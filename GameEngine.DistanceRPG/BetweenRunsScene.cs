@@ -75,12 +75,14 @@ public interface IBetweenRunsHost : ISaveHost
 /// </para>
 /// <para>
 /// <strong>The enchanter</strong> (§6.2; Phase 6a.5): D on a weapon opens the
-/// deposit panel over the page (<see cref="DepositPanel"/>) — ENCHANT or REFINE on
-/// 1 and 2, each with its odds or, dimmed, its reason, which its key says; ENCHANT's
-/// offer list, W/S and ENTER; then the confirm, where ENTER alone deposits
+/// deposit panel over the page (<see cref="DepositPanel"/>) — ENCHANT, REFINE or
+/// MOVE AN ENCHANTMENT ONTO IT on 1, 2 and 3 (the last Phase 6a.6's), each with its
+/// odds or, dimmed, its reason, which its key says; ENCHANT's offer list or MOVE's
+/// source list, W/S and ENTER; then the confirm, where ENTER alone deposits
 /// (<see cref="Enchanter.Deposit"/>). Before the tutorial is beaten D says the
-/// enchanter is shut, over the keys, and opens nothing. T on a weapon in the shop
-/// asks whether to take it back, its wear coming back with it, and ENTER alone does
+/// enchanter is shut, over the keys, and opens nothing. T on a weapon in the shop —
+/// or on a transfer's source held there — asks whether to take it back, its wear
+/// coming back with it and a transfer's two weapons together, and ENTER alone does
 /// (<see cref="Enchanter.TakeBack"/>; PHASE 6a DECISION 8). ESC goes back a step,
 /// out of the panel from its services, and answers no to the ask. TAB, D and T do
 /// nothing while either is up, and nothing changes the campaign but the ENTER that
@@ -502,7 +504,7 @@ public sealed class BetweenRunsScene : Scene
         Log.Info($"[Hub] Deposit panel on {weapon.Name} in {Where(from)}: {string.Join("; ", _panel.Services.Select(option => option.Text))}");
     }
 
-    /// <summary>T on a weapon in the shop: the take-back ask over the page (PHASE 6a DECISION 8). On anything else, nothing.</summary>
+    /// <summary>T on a weapon in the shop, or on a transfer's source held there: the take-back ask over the page, for the whole deposit (PHASE 6a DECISION 8). On anything else, nothing.</summary>
     private void AskTakeBack()
     {
         if (_weapons.ChosenRow is not { Kind: HubWeapons.RowKind.Shop, Deposit: { } deposit })
@@ -514,8 +516,8 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// The deposit panel's keys (<see cref="DepositPanel"/>): a number picks a
     /// service — a dimmed one's says why, over the keys — W/S or the arrows choose
-    /// on the offer list, ENTER chooses there and deposits on the confirm. Every
-    /// other key does nothing.
+    /// on the offer list or the source list, ENTER chooses there and deposits on the
+    /// confirm. Every other key does nothing.
     /// </summary>
     private void PanelKey(Keys key)
     {
@@ -529,7 +531,7 @@ public sealed class BetweenRunsScene : Scene
                 panel.Move(+1);
                 break;
             case Keys.Enter or Keys.KeyPadEnter:
-                if (panel.Current == DepositPanel.Step.Offer)
+                if (panel.Current is DepositPanel.Step.Offer or DepositPanel.Step.Sources)
                     panel.ChooseOffer();
                 else if (panel.Current == DepositPanel.Step.Confirm)
                     MakeDeposit(panel);
@@ -553,20 +555,22 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// ENTER on the confirm: the weapon deposited (<see cref="Enchanter.Deposit"/>) —
-    /// its whole pool cashed, its capacity grown on it, into the shop — the panel
-    /// closed, the choice on the weapon's row in the shop, the deposit logged, and a
-    /// save asked for (PHASE 6a DECISION 10). Asked again first
-    /// (<see cref="Refused"/>): refused now, nothing is deposited.
+    /// its whole pool cashed, its capacity grown on it, into the shop, a transfer's
+    /// source with it — the panel closed, the choice on the weapon's row in the shop,
+    /// the deposit logged, and a save asked for (PHASE 6a DECISION 10). Asked again
+    /// first (<see cref="Refused"/>): refused now, nothing is deposited.
     /// </summary>
     private void MakeDeposit(DepositPanel panel)
     {
         if (Refused(panel) || panel.From is not { } from)
             return;
-        string where = Where(from);   // named as it stood before the deposit closed the stable up
-        var made = Enchanter.Deposit(_campaign, from, panel.Service, panel.EnchantmentId);
+        var move = panel.ChosenMove;
+        string where = Where(from);   // each named as it stood before the deposit closed the stable up
+        string? sourceWhere = move?.From is { } at ? Where(at) : null;
+        var made = Enchanter.Deposit(_campaign, from, panel.Service, panel.EnchantmentId, move?.From, move?.Index);
         _panel = null;
         _weapons.Follow(made.Entry.Weapon);
-        Log.Info(DepositedLine(made, from, where));
+        Log.Info(DepositedLine(made, from, where, move?.From, sourceWhere));
         _host.RequestSave();
     }
 
@@ -618,14 +622,17 @@ public sealed class BetweenRunsScene : Scene
     /// <param name="made">What the deposit did.</param>
     /// <param name="from">Where the weapon was taken from.</param>
     /// <param name="where">That place as the log names it, as it stood before the deposit.</param>
-    internal static string DepositedLine(DepositMade made, WeaponPlace from, string where)
+    /// <param name="source">Where a transfer's source was taken from, or null.</param>
+    /// <param name="sourceWhere">That place as the log names it, as it stood before the deposit, or null.</param>
+    internal static string DepositedLine(DepositMade made, WeaponPlace from, string where, WeaponPlace? source = null, string? sourceWhere = null)
     {
         ArgumentNullException.ThrowIfNull(made);
         ArgumentNullException.ThrowIfNull(where);
         var entry = made.Entry;
-        return $"[Enchanter] Deposited {entry.Weapon.Name} ({entry.Weapon.Id}) from {where}: {Bought(entry)}, {entry.WearAtDeposit} wear cashed"
+        return $"[Enchanter] Deposited {entry.Weapon.Name} ({entry.Weapon.Id}) from {where}: {Bought(entry, sourceWhere)}, {entry.WearAtDeposit} wear cashed"
             + $" (capacity {made.Before.Max} -> {made.After.Max}), {RunsSaid(entry.Runs)}, deposit #{entry.Ordinal}"
-            + (made.Armed is { } armed ? $"; {from.MemberId}'s hand, emptied, took up {armed.Name} from the bag" : "");
+            + (made.Armed is { } armed ? $"; {from.MemberId}'s hand, emptied, took up {armed.Name} from the bag" : "")
+            + (made.SourceArmed is { } sourceArmed ? $"; {source?.MemberId}'s hand, emptied, took up {sourceArmed.Name} from the bag" : "");
     }
 
     /// <summary>
@@ -633,21 +640,41 @@ public sealed class BetweenRunsScene : Scene
     /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Tower Guard
     /// (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run
     /// worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c> — the
-    /// capacity after as it was before the deposit.
+    /// capacity after as it was before the deposit. A transfer's names its source
+    /// too, back at the stable's end after it, its wear never cashed: <c>[Enchanter]
+    /// Took back Riposte Blade (riposte_blade) and Nameless Knife
+    /// (flensing_knife_unique) to the stable's end: Transfer vampiric (T3) from Nameless
+    /// Knife forfeited, …</c>.
     /// </summary>
     /// <param name="taken">What the take-back did.</param>
     internal static string TookBackLine(TakenBack taken)
     {
         ArgumentNullException.ThrowIfNull(taken);
         var deposit = taken.Entry;
-        return $"[Enchanter] Took back {deposit.Weapon.Name} ({deposit.Weapon.Id}) to the stable's end: {Bought(deposit)} forfeited,"
+        string both = deposit.Source is { } source ? $" and {source.Name} ({source.Id})" : "";
+        return $"[Enchanter] Took back {deposit.Weapon.Name} ({deposit.Weapon.Id}){both} to the stable's end: {Bought(deposit, null)} forfeited,"
             + $" {deposit.RunsWorked} of {RunsSaid(deposit.Runs)} worked lost, {deposit.WearAtDeposit} wear returned"
             + $" (capacity {taken.Before.Max} -> {taken.After.Max}), deposit #{deposit.Ordinal}";
     }
 
-    /// <summary>What a deposit bought, as the log names it: <c>Enchant vampiric</c>, <c>Refine</c>.</summary>
-    private static string Bought(Deposit deposit)
-        => deposit.Service == Service.Enchant && deposit.EnchantmentId is { } id ? $"Enchant {id}" : deposit.Service.ToString();
+    /// <summary>
+    /// What a deposit bought, as the log names it: <c>Enchant vampiric</c>,
+    /// <c>Refine</c>, a transfer's <c>Transfer vampiric (T3) from Nameless Knife
+    /// (flensing_knife_unique)</c> — and where the source lay, when
+    /// <paramref name="sourceWhere"/> says — or a reorder's <c>Transfer flaming (T1)
+    /// from its own place 1 to its end</c>.
+    /// </summary>
+    private static string Bought(Deposit deposit, string? sourceWhere)
+    {
+        if (deposit.Service == Service.Transfer)
+        {
+            string soul = deposit.Soul is { } moving ? $"{moving.Id} (T{moving.Tier})" : $"the soul at {deposit.SourceIndex}";
+            return deposit.Source is { } source
+                ? $"Transfer {soul} from {source.Name} ({source.Id}){(sourceWhere is null ? "" : $" in {sourceWhere}")}"
+                : $"Transfer {soul} from its own place {deposit.SourceIndex + 1} to its end";
+        }
+        return deposit.Service == Service.Enchant && deposit.EnchantmentId is { } id ? $"Enchant {id}" : deposit.Service.ToString();
+    }
 
     /// <summary>Runs as the log says them: <c>1 run</c>, <c>2 runs</c>.</summary>
     private static string RunsSaid(int runs) => runs == 1 ? "1 run" : $"{runs} runs";

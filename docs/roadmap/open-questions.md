@@ -689,7 +689,9 @@ could carry and never fire, or whether a refused choice is shown.
 
 **Shipped provisionally** (Phase 6a.3b, `Enchanter.Offers`; the deposit panel lists
 the offer since Phase 6a.5, a refused entry dimmed with its reason, and a refused
-service — ENCHANT or REFINE — dimmed the same way, its number key saying why):
+service — ENCHANT, REFINE, or MOVE since Phase 6a.6 — dimmed the same way, its
+number key saying why; MOVE's list of souls since Phase 6a.6, a refused soul
+dimmed with its reason):
 - the enchanter refuses what `restricted.json` refuses: an entry an exclusion
   group pairs with one the weapon carries (`COLD - CANNOT SIT WITH FLAMING`, the
   weapon's entries asked in the order they were attached), and an entry whose
@@ -722,16 +724,33 @@ service — ENCHANT or REFINE — dimmed the same way, its number key saying why
 - a refused choice is listed with its reason, never hidden. An Enchant with nothing
   left to choose — every offer refused, or none left (nothing met, or only what
   the enchanter never offers) — is refused as such (`NOTHING TO OFFER - NO
-  ENCHANTMENT MET YET CAN GO ON IT`), and refining is left.
-
-What a transfer may leave as a staff's or a wand's cast, this decision's caster
-clause, arrives with the transfer (Phase 6a.6), and its alternative with it.
+  ENCHANTMENT MET YET CAN GO ON IT`), and refining is left;
+- a transfer (Phase 6a.6; `Enchanter.TransferRefusal`) asks the moved soul the
+  same relations, the wand's rule and the staff's side on the weapon it lands on
+  — its own entries, less the soul for a reorder — and refuses one that would
+  strand an entry on the weapon it leaves, whose prerequisite was ahead of it and
+  would no longer be (`BURNING NEEDS FLAMING AHEAD OF IT`: settled.md's "refuses a
+  transfer that would strand a unique's lingering effect", the `requires` row
+  asked of what the source keeps; an entry that lacked its prerequisite already is
+  not the move's doing, and is not asked);
+- **the caster clause**: it refuses a transfer after which a staff's or a wand's
+  first entry — the one it comes off, or the one it lands on — is one it cannot
+  cast, or none: a staff's must apply a status, a wand's must be an element, the
+  dungeon's own two gates (`Weapon.CastsWith`; `THE ROTWOOD WOULD CAST NOTHING`). A
+  caster left with neither could neither cast nor strike, so it could never earn
+  wear again. **This narrows settled.md's "that effect can be transferred onto a
+  dagger"**: a staff arrives with one soul, so it gives its effect away only once
+  it has grown to capacity 35 and been given a second status to cast. A wand's
+  Cold becomes Flaming through a third element, since the two cannot sit together.
 
 **This decides what the enchanter will attach, and whether §3.3's "any weapon"
 holds, so it is the user's to decide.** The alternatives: (a) hide refused
 choices; (b) refuse never-firing entries too, as the drop table does; (c) also ask
 content's arrival rules (Overheal beside a healer, a dependency only on a
-currency weapon); (e) **keep §3.3**: a status applier attaches to a wand, the
+currency weapon); (d) **keep settled.md's dagger whole**: allow a caster left
+with no castable first entry, which casts nothing until it is given one — the
+WEAPONS page already says so of such a weapon (`CASTS NOTHING - ITS FIRST
+ENCHANTMENT IS ITS CAST`); (e) **keep §3.3**: a status applier attaches to a wand, the
 wand's area cast skips it, and the offer notes it `NEVER FIRES ON A WAND`, as it
 notes any entry that never fires. For the staff: (f) attach a status for the
 other side with a note instead, the cast landing it where it lands today; (g) have
@@ -808,4 +827,75 @@ modifiers its attack or its cast reads, so a staff is never grafted `CRIT
 MULTIPLIER` — a rule of the code beside the modifiers no weapon stacks, keyed on
 a staff's cast, or a `kind` row in `restricted.json`, though a row for casters
 would keep it off a wand too, whose cast reads it.
+settled.md's Phase 6a implementation pass records the ruling.
+
+## Reordering a weapon's own enchantments (§6.5, §3.3) — PHASE 6a DECISION 11
+
+settled.md says "reordering means detaching and re-attaching, which is a
+transfer: a tier and a service", and §6.5 that a move costs "one attachment's
+service time". Two texts disagree on the weapon whose every slot is filled:
+§6.5 and settled.md describe reordering a five-enchantment weapon as "one of the
+more expensive things you can do", and settled.md elsewhere that "a weapon at five
+enchantments therefore has refinement as its only remaining service".
+
+**Shipped provisionally** (Phase 6a.6; `Enchanter.TransferRuns`,
+`Enchanter.TransferRefusal`): a reorder is a transfer whose source is the weapon
+itself — MOVE's list offers the weapon's own souls last, `FLAMING - ITS OWN -
+MOVES TO THE END - ARRIVES AT T1 - 1 RUN`:
+- it takes the **count** in runs, the service time of attaching the soul again as
+  the last of the same count ("one attachment's service time"), not the count plus
+  one every other deposit takes; and its gates are the same attachment's — slot n
+  open and a deposit of its price, n the count;
+- so it is **allowed at five**, where a move from another weapon is refused
+  (`ALL 5 SLOTS ARE FILLED`), and the WEAPONS page's price line reads `ALL 5 SLOTS
+  ARE FILLED - REFINING OR REORDERING IS LEFT`;
+- the entry already last is not moved (`IT IS LAST ALREADY`): the move would
+  change nothing but its tier.
+
+**This decides between texts that disagree, so it is the user's to decide.** The
+alternatives: (a) a reorder costs the count plus one runs, as every deposit does
+in §6.2 and settled.md's "service costs runs … `enchantments + 1`"; (b) at five
+enchantments a reorder is refused, and refining is the only service left, as
+settled.md's "refinement as its only remaining service" has it; (c) the entry
+already last may be "moved" too, a tier and the runs spent for nothing but the
+roll. settled.md's Phase 6a implementation pass records the ruling.
+
+## How a transfer works (§6.5, §6.7) — PHASE 6a DECISION 13
+
+§6.5 moves an enchantment from one weapon to another at the enchanter, a tier
+down and "one attachment's service time", and says no more of how: whether the
+weapon it lands on needs a slot and a deposit, what happens to the weapon it
+leaves while the move is made, what the queue counts it as, and what it rolls.
+§6.7's `Deposit` record names one weapon and no enchantment.
+
+**Shipped provisionally** (Phase 6a.6; `Service.Transfer`, `Enchanter.Deposit`):
+- a transfer is the Enchant service with the soul brought from a weapon the party
+  owns rather than from the offer: the weapon it lands on needs the free slot and
+  the deposit of attaching it as its next (R4), its whole pool is cashed, it takes
+  the runs of that attachment, and it gets enchanting's flat odds of improving (3
+  in 100); a reorder's are DECISION 11's;
+- the soul may come from any weapon the party owns out of the shop — a member's or
+  the stable's — whatever it is: a forged innate, a unique's soul, one of a kind
+  that does nothing yet. The enchanter moves what it never offers to copy;
+- **the source's wear is left in its pool**, uncashed, and comes back with it;
+- **both weapons stay in the shop until it is done, as one deposit**, which holds
+  one of the `EnchanterWorksOn` newest places, not two; the WEAPONS page lists the
+  source `HELD` under the weapon, and T on either takes both back, the weapon's
+  cash reversed (DECISION 8);
+- when it comes back, the soul drops a tier and starts that tier at no XP; tier 1,
+  and every unique soul, pinned there, moves intact, its XP with it; it lands
+  last, and **acquired**: a forged innate's mark stays with the weapon forged with
+  it, whose forged count drops — so a staff given a new cast this way no longer
+  levels staff proficiency on it, and a dagger given a staff's effect levels none;
+- the deposit record gains the soul by its place — its source, and its index there
+  — and `Service` gains `Transfer` (§6.7 named two); a run's report of one names
+  its soul, its source and the tier it landed at, and the save keeps both.
+
+**This decides what a move costs and what it holds, so it is the user's to
+decide.** The alternatives: (a) a transfer needs no wear, since the soul was paid
+for once; (b) only the weapon is held, the soul leaving its source at the deposit;
+(c) a caster's first entry counts as forged whatever its origin; (d) a transfer
+holds two of the worked places, since §6.2 works "the two most recently deposited
+weapons" and a transfer deposits two; (e) a transfer rolls nothing; or (f) the
+source's wear is cashed too, growing its capacity as any deposit does.
 settled.md's Phase 6a implementation pass records the ruling.
