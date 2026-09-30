@@ -652,6 +652,13 @@ build's, kept and never deleted — and bump again at every later step that adds
 weapons to the save (6a.6's transfer), the tuning hash's version following or
 staying 2. settled.md's Phase 6a implementation pass records the ruling.
 
+Phase 6a.6 stayed at version 2 too, its transfer's members appended. A 6a.3a,
+6a.4 or 6a.5 build reads the shop and the last run's reports, and a `Transfer` is
+no service it knows, so it refuses a save with a transfer in either and sets it
+aside, kept and never deleted. A 6a.1 or 6a.2 build passes over the shop unread,
+as above, and its next save loses both of a transfer's weapons with the rest of
+the shop.
+
 ## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
 
 The entry on `Echoing` above calls `aegis`'s lack of any source a filter gap
@@ -742,6 +749,19 @@ dimmed with its reason):
   dagger"**: a staff arrives with one soul, so it gives its effect away only once
   it has grown to capacity 35 and been given a second status to cast. A wand's
   Cold becomes Flaming through a third element, since the two cannot sit together.
+  **Tightened at Phase 6a.6's review** for a staff whose first entry the move
+  changes: that entry picks whom the cast lands every status on, and the dungeon
+  asks only that it apply one. Serrated does — Bleeding, on enemies — but on a
+  strike, never a cast, and nothing kept it from coming first: moved onto a Staff
+  of Renewal behind its Regeneration, then a Ward enchanted on, then the
+  Regeneration moved away, the staff cast on enemies and landed its Ward on them.
+  So the new first must be a staff's cast as content makes one, a status it casts
+  (content's `RuleCasterInnate`; `THE STAFF OF RENEWAL WOULD CAST NOTHING`), and a
+  status the staff keeps that its cast landed on the side the old first chose
+  must land on the same side after (`THE STAFF OF RENEWAL WOULD CAST WARD ON AN
+  ENEMY`: no staff play makes can meet it, but a unique `weapons.json` gives both
+  sides can). A staff wrong already is not the move's doing, and is not asked, as
+  the stranding rule reads a prerequisite.
 
 **This decides what the enchanter will attach, and whether §3.3's "any weapon"
 holds, so it is the user's to decide.** The alternatives: (a) hide refused
@@ -840,17 +860,32 @@ enchantments therefore has refinement as its only remaining service".
 
 **Shipped provisionally** (Phase 6a.6; `Enchanter.TransferRuns`,
 `Enchanter.TransferRefusal`): a reorder is a transfer whose source is the weapon
-itself — MOVE's list offers the weapon's own souls last, `FLAMING - ITS OWN -
-MOVES TO THE END - ARRIVES AT T1 - 1 RUN`:
+itself — MOVE's list offers the weapon's own souls last; on an Arming Sword
+carrying Flaming and Vampiric, `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT
+T1 - 2 RUNS`:
 - it takes the **count** in runs, the service time of attaching the soul again as
   the last of the same count ("one attachment's service time"), not the count plus
   one every other deposit takes; and its gates are the same attachment's — slot n
   open and a deposit of its price, n the count;
 - so it is **allowed at five**, where a move from another weapon is refused
-  (`ALL 5 SLOTS ARE FILLED`), and the WEAPONS page's price line reads `ALL 5 SLOTS
-  ARE FILLED - REFINING OR REORDERING IS LEFT`;
+  (`ALL 5 SLOTS ARE FILLED`), and the WEAPONS page's price line names the one move
+  left there, `ALL 5 SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 50 WEAR`. With
+  no soul to choose at five, MOVE is dimmed with the reorder's own slot and price
+  (`ENCHANTMENT 5 NEEDS A DEPOSIT OF 50 WEAR - IT CARRIES 20`), never with the
+  slots the other moves are refused by (Phase 6a.6's review);
 - the entry already last is not moved (`IT IS LAST ALREADY`): the move would
-  change nothing but its tier.
+  change nothing but its tier. **So a reorder needs two souls, and costs 2 runs at
+  the least**: a weapon with one soul has nothing to reorder, and its row says so;
+- **a weapon forged whole keeps every forged mark** — a unique reordered, its souls
+  all forged — since the forged ones are still a prefix with the soul last. **A
+  weapon forged in part loses the moved soul's mark**: a forged entry cannot
+  stand behind an acquired one, so it lands acquired, as it would on another
+  weapon (DECISION 13), and its damage share or cast levels no longer teach the
+  weapon. So a staff given a Ward that reorders its Regeneration behind it casts
+  its acquired Ward and levels no staff proficiency; a wand variant given a second
+  element that reorders its first behind it has no forged entry left. The screen
+  names no entry forged or acquired anywhere, and does not say this either
+  (Phase 6a.6's review).
 
 **This decides between texts that disagree, so it is the user's to decide.** The
 alternatives: (a) a reorder costs the count plus one runs, as every deposit does
@@ -858,7 +893,12 @@ in §6.2 and settled.md's "service costs runs … `enchantments + 1`"; (b) at fi
 enchantments a reorder is refused, and refining is the only service left, as
 settled.md's "refinement as its only remaining service" has it; (c) the entry
 already last may be "moved" too, a tier and the runs spent for nothing but the
-roll. settled.md's Phase 6a implementation pass records the ruling.
+roll — a one-soul weapon could then reorder, for 1 run; and for the forged mark
+on a weapon forged in part: (d) refuse a reorder that would put a forged entry
+behind an acquired one; (e) keep the mark with the entry wherever it stands, a
+mark on each entry rather than a count of the first ones — a change to the save;
+or (f) say the loss on the MOVE row or the confirm. settled.md's Phase 6a
+implementation pass records the ruling.
 
 ## How a transfer works (§6.5, §6.7) — PHASE 6a DECISION 13
 
@@ -886,7 +926,9 @@ leaves while the move is made, what the queue counts it as, and what it rolls.
   and every unique soul, pinned there, moves intact, its XP with it; it lands
   last, and **acquired**: a forged innate's mark stays with the weapon forged with
   it, whose forged count drops — so a staff given a new cast this way no longer
-  levels staff proficiency on it, and a dagger given a staff's effect levels none;
+  levels staff proficiency on it, and a dagger given a staff's effect levels none.
+  A reorder, which moves the soul on the weapon forged with it, keeps the mark
+  where the weapon is forged whole and loses it where it is not (DECISION 11);
 - the deposit record gains the soul by its place — its source, and its index there
   — and `Service` gains `Transfer` (§6.7 named two); a run's report of one names
   its soul, its source and the tier it landed at, and the save keeps both.

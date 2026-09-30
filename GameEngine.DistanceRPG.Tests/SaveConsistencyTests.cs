@@ -1123,6 +1123,9 @@ public sealed class SaveConsistencyTests : IDisposable
                 "2 on a source holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
             (tree => DepositNode(tree, 1)["sourceIndex"] = 2, "campaign.enchanter[1].sourceIndex",
                 "2 on a weapon holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            // The mapper's: a transfer pays the price of attaching its soul, 1 at the least.
+            (tree => DepositNode(tree, 0)["wearAtDeposit"] = 0, "campaign.enchanter[0].wearAtDeposit",
+                "0 is below 1: a transfer pays the price of attaching its soul, FirstEnchantmentWear or more, and no tuning prices one below 1"),
             // 27. A report of a transfer: its soul, its source, and the tier it landed at as it came back.
             (tree => ReportNode(tree, 0)["enchantment"] = null, "campaign.lastResult.services[0].enchantment",
                 "missing on a Transfer: a report of a transfer names the soul it moves"),

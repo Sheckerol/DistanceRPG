@@ -183,7 +183,9 @@ public sealed class Weapon
     /// (§3.1). The same line <see cref="Forged"/> draws through the modifiers,
     /// drawn through the entries — fixed at construction, and moved only by a
     /// transfer taking a forged entry off (<see cref="Detach"/>, Phase 6a.6), which
-    /// closes the list up behind it, so the forged ones stay a prefix.
+    /// closes the list up behind it, so the forged ones stay a prefix — and put back
+    /// by a reorder of a weapon forged whole, whose soul lands last still forged
+    /// (<see cref="Attach"/>).
     /// <para>
     /// The distinction is not weapon-versus-magic: a staff's effect and a wand's
     /// element are forged, and they are the whole of what those weapons do — a
@@ -195,6 +197,8 @@ public sealed class Weapon
     /// <para>
     /// A forged entry a transfer moves arrives on its new weapon acquired, last:
     /// the mark stays with the weapon that was forged with it (PHASE 6a DECISION 13).
+    /// A reorder keeps it where the weapon is forged whole, and loses it where an
+    /// acquired entry would stand ahead of it (PHASE 6a DECISION 11).
     /// </para>
     /// </summary>
     public int ForgedEnchantmentCount { get; private set; }
@@ -322,20 +326,29 @@ public sealed class Weapon
     /// <summary>
     /// Attach <paramref name="entry"/> as the weapon's last enchantment: what a
     /// finished Enchant service does (§6.2; <see cref="Enchanter"/>), and a finished
-    /// transfer with the soul it moved (§6.5). Last and acquired — never forged, and
-    /// never sorted in: "a new enchantment always goes last" (§3.3). The enchanter's
+    /// transfer with the soul it moved (§6.5). Last, never sorted in: "a new
+    /// enchantment always goes last" (§3.3). Acquired, never forged — but for the
+    /// soul a reorder moves on a weapon forged whole, <paramref name="forged"/>, which
+    /// keeps its mark behind the forged ones (PHASE 6a DECISION 11). The enchanter's
     /// own gates (<see cref="Enchanter.Refusal"/>, <see cref="Enchanter.TransferRefusal"/>)
     /// and the save's (check 29) keep a weapon below the most a weapon can hold, and
     /// this holds it there too, so no path builds a weapon the next load refuses.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The weapon already holds <see cref="ContentBounds.MostEnchantments"/>.</exception>
-    internal void Attach(Enchantment entry)
+    /// <param name="entry">The entry, attached last.</param>
+    /// <param name="forged">Whether it lands forged: only behind entries every one forged, so the forged ones stay a prefix.</param>
+    /// <exception cref="InvalidOperationException">The weapon already holds <see cref="ContentBounds.MostEnchantments"/>, or <paramref name="forged"/> behind an acquired entry.</exception>
+    internal void Attach(Enchantment entry, bool forged = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (_enchantments.Count >= ContentBounds.MostEnchantments)
             throw new InvalidOperationException(
                 $"{Name} ({Id}) holds {_enchantments.Count} enchantments, the most a weapon can (EnchantmentSlots at its most): the enchanter never attaches past it.");
+        if (forged && ForgedEnchantmentCount != _enchantments.Count)
+            throw new InvalidOperationException(
+                $"{Name} ({Id}) carries {_enchantments.Count - ForgedEnchantmentCount} acquired enchantments: a forged one cannot land behind them, since the forged ones are a prefix.");
         _enchantments.Add(entry);
+        if (forged)
+            ForgedEnchantmentCount++;
     }
 
     /// <summary>

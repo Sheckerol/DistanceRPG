@@ -757,24 +757,31 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>
     /// What a weapon's next enchantment costs (R4, §6.2), for the detail panel: the
     /// deposit it needs and the runs it spends in the shop — <c>THE NEXT NEEDS A
-    /// DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP</c> — or, with every slot filled,
-    /// <c>ALL 5 SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT</c>: a reorder
-    /// attaches its soul again as the last of the same count (PHASE 6a DECISION 11).
+    /// DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP</c> — or, with every slot filled, what
+    /// the one move left there costs, <c>ALL 5 SLOTS ARE FILLED - A REORDER NEEDS A
+    /// DEPOSIT OF 50 WEAR</c>: a reorder attaches its soul again as the last of the
+    /// same count, at that attachment's price (PHASE 6a DECISION 11). Refining, which
+    /// has no price, is always left, and it is all that is left to a weapon holding
+    /// more than there are slots — a <c>tuning.json</c> that lowered them since —
+    /// whose reorder the slots refuse too: <c>ALL 3 SLOTS ARE FILLED - REFINING IS
+    /// LEFT</c>.
     /// </summary>
     internal static string PriceLine(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
         int count = weapon.Enchantments.Count;
         int slots = GameContent.Current.Tuning.EnchantmentSlots;
-        return count >= slots
-            ? $"ALL {slots} SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT"
+        if (count > slots)
+            return $"ALL {slots} SLOTS ARE FILLED - REFINING IS LEFT";
+        return count == slots
+            ? $"ALL {slots} SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF {Wear.Price(count)} WEAR"
             : $"THE NEXT NEEDS A DEPOSIT OF {Wear.Price(count + 1)} WEAR - {DungeonHud.Runs(Wear.ServiceRuns(count))} IN THE SHOP";
     }
 
     /// <summary>Over a weapon in the shop's detail, where the others say where they are.</summary>
     internal const string AtTheEnchanterLine = "AT THE ENCHANTER";
 
-    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>, a transfer's <c>TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 2 RUNS</c> or a reorder's <c>MOVE FLAMING TO THE END - 0 OF 1 RUN</c>.</summary>
+    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>, a transfer's <c>TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 2 RUNS</c> or a reorder's <c>MOVE FLAMING TO THE END - 0 OF 2 RUNS</c>.</summary>
     internal static string ServiceLine(Deposit deposit)
     {
         ArgumentNullException.ThrowIfNull(deposit);

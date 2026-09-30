@@ -48,8 +48,9 @@ GameEngine.DistanceRPG/         # Game executable
   HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
                                 # (CampaignState.Move, the one door) and the enchanter's shop, a carry
                                 # the page's alone
-  DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT or REFINE with their odds
-                                # or reasons, the offer list, the confirm; and the take-back ask (T)
+  DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT, REFINE or MOVE with their
+                                # odds or reasons, the offer list or the source list, the confirm; and
+                                # the take-back ask (T)
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
@@ -69,9 +70,9 @@ GameEngine.DistanceRPG/         # Game executable
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
                                 # from the wear it has ever cashed (R4); where its slots open, what
                                 # an enchantment costs, a service's runs, and its improvement odds
-    Enchanter.cs                # The enchanter (§6.2–§6.4): a deposit, its gates, the service clock
-                                # every run's end ticks, the improvement roll (its own stream),
-                                # a take-back — the one place wear is spent
+    Enchanter.cs                # The enchanter (§6.2–§6.5): a deposit or a transfer, its gates, the
+                                # service clock every run's end ticks, the improvement roll (its own
+                                # stream), a take-back — the one place wear is spent
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is

@@ -398,7 +398,7 @@ internal static class SaveMapper
             var weapon = Weapon(Required(row.Weapon, $"{where}.weapon"), content, $"{where}.weapon");
             int wearAtDeposit = Count(row.WearAtDeposit, $"{where}.wearAtDeposit");
             if (service is Service.Enchant or Service.Transfer && wearAtDeposit < 1)
-                throw new SaveFormatException($"{where}.wearAtDeposit", $"{wearAtDeposit} is below 1: {EnchantWearWhy}");
+                throw new SaveFormatException($"{where}.wearAtDeposit", $"{wearAtDeposit} is below 1: {(service == Service.Transfer ? TransferWearWhy : EnchantWearWhy)}");
             int runs = ServiceRuns(row.Runs, $"{where}.runs");
             int runsWorked = Count(row.RunsWorked, $"{where}.runsWorked");
             string? enchantment = row.Enchantment is { } id ? BoughtEnchantmentId(id, content, $"{where}.enchantment") : null;
@@ -1262,6 +1262,8 @@ internal static class SaveMapper
     private const string DeepestTierWhy = "tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number";
 
     private const string EnchantWearWhy = "an enchantment is bought with a deposit of FirstEnchantmentWear or more, and no tuning prices one below 1";
+
+    private const string TransferWearWhy = "a transfer pays the price of attaching its soul, FirstEnchantmentWear or more, and no tuning prices one below 1";
 
     private static readonly string ServiceRunsWhy =
         $"a service takes the count of the weapon plus one runs, and no weapon holds more than {ContentBounds.MostEnchantments} (EnchantmentSlots at its most)";

@@ -92,7 +92,7 @@ the title.
 | 1 | `1  ENCHANT - A CHOSEN ENCHANTMENT - 3 IN 100 TO IMPROVE`: the offer list. Dimmed with its reason — `NO FREE SLOT - SLOT 2 OPENS AT CAPACITY 35 - IT IS 31`, `ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0`, `ALL 5 SLOTS ARE FILLED`, `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` — the key says the reason over the keys, and picks nothing |
 | 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
 | 3 | `3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE` (Phase 6a.6): the source list, every soul on the party's other weapons and then the weapon's own. Dimmed with its reason as ENCHANT is, or `NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT` |
-| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul and where it comes from: `VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2 RUNS`, `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 1 RUN`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING`) and skipped. Each list scrolls with the choice |
+| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul and where it comes from: `VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2 RUNS`, or on a sword carrying Flaming and Vampiric `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD - THE ROTWOOD WOULD CAST NOTHING`) and skipped. Each list scrolls with the choice |
 | Enter | On either list, choose it: the confirm. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
 | Esc | Back a step: from the confirm to the list it came from (or the services), from either list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
 | Tab, D, T | Nothing |
@@ -258,18 +258,24 @@ KNIFE` under `WORKING  RIPOSTE BLADE - 0 OF 1 RUN`, its detail `HELD - GIVING
 VAMPIRIC TO THE RIPOSTE BLADE`, and T on either takes both back. The summary says
 `RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
 under it, `NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF`. Moving a
-weapon's own soul to its end is a reorder: it takes the weapon's count in runs rather
-than the count plus one, and it is allowed with every slot filled — `ALL 5 SLOTS ARE
-FILLED - REFINING OR REORDERING IS LEFT` — but not for the entry already last (PHASE
-6a DECISION 11). The enchanter refuses a move that would leave a member carrying no
-weapon, asked with both weapons gone (`[B] WOULD CARRY NO WEAPON - …`); one the
-relations refuse on the weapon, as ENCHANT's offer does; one that would strand an
-entry behind it on the weapon it leaves (`BURNING NEEDS FLAMING AHEAD OF IT`); and
-one that would leave a staff or a wand casting nothing (`THE ROTWOOD WOULD CAST
-NOTHING`: a staff's first enchantment is its cast and must apply a status, a wand's
-must be an element — so a staff gives its effect away once it has a second status
-to cast; PHASE 6a DECISION 12). A lock the new wielder cannot pay is no refusal: the
-soul sleeps there. The log names both: `[Enchanter] Deposited Riposte Blade
+weapon's own soul to its end is a reorder: it takes the weapon's count in runs
+rather than the count plus one, and it is allowed with every slot filled — `ALL 5
+SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 50 WEAR` — but not for the entry
+already last, so it needs two souls and takes 2 runs at the least. A weapon forged
+whole keeps every forged mark through a reorder; one forged in part loses the moved
+soul's, since a forged entry cannot stand behind an acquired one (PHASE 6a DECISION
+11). The enchanter refuses a move that would leave a member carrying no weapon,
+asked with both weapons gone (`[B] WOULD CARRY NO WEAPON - …`); one the relations
+refuse on the weapon, as ENCHANT's offer does; one that would strand an entry behind
+it on the weapon it leaves (`BURNING NEEDS FLAMING AHEAD OF IT`); and one that would
+leave a staff or a wand casting nothing (`THE ROTWOOD WOULD CAST NOTHING`: a staff's
+first enchantment is its cast and must apply a status, a wand's must be an element —
+so a staff gives its effect away once it has a second status to cast). A staff whose
+first enchantment a move changes must be left casting a status a staff casts — never
+Serrated, whose Bleeding rides a strike — and landing each status it keeps on the
+side it landed it before (`THE STAFF OF RENEWAL WOULD CAST WARD ON AN ENEMY`; PHASE
+6a DECISION 12). A lock the new wielder cannot pay is no refusal: the soul sleeps
+there. The log names both: `[Enchanter] Deposited Riposte Blade
 (riposte_blade) from B's bag slot 3: Transfer vampiric (T3) from Nameless Knife
 (flensing_knife_unique) in B's bag slot 4, 30 wear cashed (capacity 30 -> 31), 1
 run, deposit #0`, and `[Enchanter] Riposte Blade finished: vampiric moved on at T2
@@ -471,9 +477,11 @@ back to it, and the game quits from it.
   what it does not know of (the stable, the enchanter's queue), and its next save —
   from Phase 6a.2 on, the first weapon moved between runs — drops those, and the
   weapons in them: a 6a.1 or 6a.2 build loses every weapon in a 6a.3a save's shop
-  (PHASE 6a DECISION 14). A 6a.5 or earlier build refuses a save with a transfer in
-  its shop or its last run's report (`Transfer` is no service it knows) and sets it
-  aside, kept and never deleted, as it does any it cannot read.
+  (PHASE 6a DECISION 14). A 6a.3a, 6a.4 or 6a.5 build refuses a save with a
+  transfer in its shop or its last run's report (`Transfer` is no service it knows)
+  and sets it aside, kept and never deleted, as it does any it cannot read; a 6a.1
+  or 6a.2 build loses both of the transfer's weapons, as it loses the rest of the
+  shop.
   While Phase 6a is being built, one more thing of the steps between: a save an
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
@@ -686,18 +694,19 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `FirstEnchantmentWear` and `EnchantmentWearStep`, the deposit attaching
   enchantment n needs (`FirstEnchantmentWear + EnchantmentWearStep x (n - 1)`); and
   `EnchanterWorksOn`, how many of the newest deposits a run that counts works (1 to
-  10; the doc's 2). Since Phase 6a.4, the improvement roll's: `GraftBaseChance`, the
-  chance in 100 a service improves the weapon anyway (0 to 100; flat when it
-  enchants, times 1 + wear ÷ `StartingPool` when it refines), and two provisional
-  numbers, `GraftSharePercent`, how many of the rolls that land graft (0 to 100; 25),
-  and `DeepenSignatureWeight`, how many times likelier a deepen lands on the class's
-  signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. Turning any says `THE
-  NUMBERS HAVE CHANGED` when a campaign saved under the other number resumes — but
-  never to a save from before Phase 6a, whose record of its numbers covers only the
-  keys played then; a save an earlier 6a step's build wrote says it once, though no
-  number moved, since each step adds the numbers it plays to version 2's record. The
-  docs' older `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file
-  naming either is told which key took its place.
+  10; the doc's 2) — a transfer is one deposit, its two weapons together. Since
+  Phase 6a.4, the improvement roll's: `GraftBaseChance`, the chance in 100 a service
+  improves the weapon anyway (0 to 100; flat when it enchants or moves an
+  enchantment onto it, times 1 + wear ÷ `StartingPool` when it refines), and two
+  provisional numbers, `GraftSharePercent`, how many of the rolls that land graft (0
+  to 100; 25), and `DeepenSignatureWeight`, how many times likelier a deepen lands on
+  the class's signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. Turning any
+  says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other number
+  resumes — but never to a save from before Phase 6a, whose record of its numbers
+  covers only the keys played then; a save an earlier 6a step's build wrote says it
+  once, though no number moved, since each step adds the numbers it plays to version
+  2's record. The docs' older `WearCapacityLadder` and `EnchantmentWearCost` are no
+  keys: a file naming either is told which key took its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at

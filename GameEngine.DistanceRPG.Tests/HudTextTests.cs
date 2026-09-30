@@ -1247,6 +1247,21 @@ public sealed class HudTextTests : IDisposable
         Assert.InRange(step, 16f, 21.99f);   // closed up, and no closer than a line's glyphs and a gap
         Assert.All(texts, text => Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window"));
 
+        // A finished transfer in the Enchant's place (Phase 6a.6) tells two lines, the
+        // weapon its soul went to and its source under it, together: they are the
+        // panel's two, the cap counting lines, so the worst summary is no taller.
+        var moving = reports.Select(report => report.Service == Service.Enchant && report.Finished
+            ? report with { Service = Service.Transfer, Tier = 98, SourceId = longest.Id } : report).ToArray();
+        var moved = DungeonHud.RunSummaryLines(worst with { Services = moving });
+        var movedTexts = moved.Select(line => line.Text).ToArray();
+        string name = longest.Name.ToUpperInvariant();
+        Assert.Equal([$"{name} IS BACK FROM THE ENCHANTER - {soul.Name.ToUpperInvariant()} MOVED ON AT T98 - DEEPENED {DungeonHud.ModifierName(deepest)}",
+                $"{name} IS BACK FROM THE ENCHANTER - {soul.Name.ToUpperInvariant()} MOVED OFF"],
+            movedTexts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+        Assert.Contains(BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - 1), movedTexts);
+        Assert.Equal(lines.Count, moved.Count);
+        Assert.All(movedTexts, text => Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window"));
+
         // A long summary the lift alone fits keeps the full step: a member clawed
         // back in one weapon's class, and in HP and mana, one line a member.
         var lifted = DungeonHud.RunSummaryLines(worst with { Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray() });

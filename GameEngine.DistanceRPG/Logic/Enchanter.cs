@@ -405,16 +405,15 @@ public static class Enchanter
     }
 
     /// <summary><see cref="StaffCastsItOn(EnchantmentDef, TargetSide)"/>'s reason, not naming the entry refused: <c>THIS STAFF WOULD CAST IT ON AN ALLY</c>.</summary>
-    public static string StaffCastsItOn(TargetSide casts)
+    public static string StaffCastsItOn(TargetSide casts) => $"THIS STAFF WOULD CAST IT ON {SideOf(casts)}";
+
+    /// <summary>The side a staff's cast lands on, as a refusal says it: <c>AN ALLY</c>, <c>AN ENEMY</c>.</summary>
+    private static string SideOf(TargetSide casts) => casts switch
     {
-        string side = casts switch
-        {
-            TargetSide.Ally => "AN ALLY",
-            TargetSide.Enemy => "AN ENEMY",
-            _ => throw new ArgumentOutOfRangeException(nameof(casts), casts, "A staff casts on allies or on enemies, never either (ContentValidator.RuleCasterInnate)."),
-        };
-        return $"THIS STAFF WOULD CAST IT ON {side}";
-    }
+        TargetSide.Ally => "AN ALLY",
+        TargetSide.Enemy => "AN ENEMY",
+        _ => throw new ArgumentOutOfRangeException(nameof(casts), casts, "A staff casts on allies or on enemies, never either (ContentValidator.RuleCasterInnate)."),
+    };
 
     /// <summary>
     /// The note on an offer that fires on no event a <paramref name="cls"/> raises,
@@ -535,7 +534,9 @@ public static class Enchanter
     /// Enchant of the next enchantment is refused — the slot, or the price, which
     /// every soul from another weapon must meet — or <see cref="NothingToMove"/>. A
     /// reorder of the weapon's own is asked at its count, so a weapon whose every
-    /// slot is filled may still reorder (PHASE 6a DECISION 11).</item>
+    /// slot is filled may still reorder (PHASE 6a DECISION 11); there, with every
+    /// move from another weapon refused as <see cref="AllFilled"/>, the reason is the
+    /// reorder's own slot and price, at the count, since only a reorder is left.</item>
     /// </list>
     /// </summary>
     /// <param name="campaign">The campaign between its runs.</param>
@@ -553,10 +554,22 @@ public static class Enchanter
         return service switch
         {
             Service.Enchant when !Offers(campaign, weapon).Any(offer => offer.Refusal is null) => NothingToOffer,
-            Service.Transfer when !TransferOffers(campaign, weapon).Any(offer => offer.Refusal is null)
-                => Attaching(weapon, weapon.Enchantments.Count + 1) ?? NothingToMove,
+            Service.Transfer when !TransferOffers(campaign, weapon).Any(offer => offer.Refusal is null) => NothingMoves(weapon),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Why MOVE is refused on <paramref name="weapon"/> when no soul can be chosen:
+    /// the gate at the place a soul would land — the next enchantment's, which every
+    /// soul from another weapon must pass, or, with every slot filled, a reorder's at
+    /// the count, the one move left there (PHASE 6a DECISION 11) — and past it,
+    /// <see cref="NothingToMove"/>.
+    /// </summary>
+    private static string NothingMoves(Weapon weapon)
+    {
+        int count = weapon.Enchantments.Count;
+        return Attaching(weapon, count >= GameContent.Current.Tuning.EnchantmentSlots ? count : count + 1) ?? NothingToMove;
     }
 
     /// <summary>
@@ -707,10 +720,12 @@ public static class Enchanter
     /// prerequisite was ahead of it and no longer is (<see cref="Strands"/>).</item>
     /// <item><strong>What each would cast</strong> (PHASE 6a DECISION 12's caster
     /// clause): a staff or a wand, the weapon or the source, left with a first entry
-    /// it cannot cast, or none (<see cref="Weapon.CastsWith"/>; <see cref="WouldCastNothing"/>).
-    /// This narrows settled.md's "that effect can be transferred onto a dagger"
-    /// (S:339–342): a staff arrives with one soul, so it gives its effect away once
-    /// it has a second status to cast.</item>
+    /// it cannot cast, or none (<see cref="Weapon.CastsWith"/>; <see cref="WouldCastNothing"/>);
+    /// and a staff whose first entry the move changes, left casting what no staff's
+    /// cast is, or landing a status it keeps on the other side from before
+    /// (<see cref="CastRefusal"/>). This narrows settled.md's "that effect can be
+    /// transferred onto a dagger" (S:339–342): a staff arrives with one soul, so it
+    /// gives its effect away once it has a second status to cast.</item>
     /// </list>
     /// A lock the new wielder could not afford is never a refusal: the soul sleeps
     /// there (S:41–42).
@@ -762,10 +777,44 @@ public static class Enchanter
             return stranded;
 
         IReadOnlyList<Enchantment> landed = [.. ahead, soul.Transferred()];
-        if (!weapon.CastsWith(landed[0].Def))
-            return WouldCastNothing(weapon);
-        if (source is not null && !source.CastsWith(left.Count > 0 ? left[0].Def : null))
-            return WouldCastNothing(source);
+        return CastRefusal(weapon, weapon.Enchantments, landed)
+            ?? (source is null ? null : CastRefusal(source, source.Enchantments, left));
+    }
+
+    /// <summary>
+    /// R-cast of one weapon a transfer changes, from <paramref name="before"/> to
+    /// <paramref name="after"/> (PHASE 6a DECISION 12's caster clause), or null. A
+    /// weapon that casts nothing needs nothing. A staff or a wand needs a first entry
+    /// it can cast, as the dungeon's gates ask (<see cref="Weapon.CastsWith"/>;
+    /// <see cref="WouldCastNothing"/>). And a staff whose first entry the move changes
+    /// is asked two things more, since that entry picks whom its cast lands every
+    /// status on (<c>TurnSystem.CanCastOn</c>, <see cref="EnchantmentBehaviours.CastLoop"/>):
+    /// <list type="number">
+    /// <item>the new first is a staff's cast as content makes one, a status it casts
+    /// (<see cref="ContentValidator.RuleCasterInnate"/>) — not merely one that applies a
+    /// status: Serrated's Bleeding rides a strike, so a staff casting it first would
+    /// pick enemies and land nothing (<see cref="WouldCastNothing"/>);</item>
+    /// <item>a status it keeps, which its cast landed on the side the old first
+    /// chose, lands on the same side after (<see cref="WouldCastOn"/>): Ward behind a
+    /// new first of Mire would ward the enemy it mires.</item>
+    /// </list>
+    /// A staff wrong already is not the move's doing, as <see cref="Stranded"/> reads
+    /// a prerequisite (Phase 6a.6's review).
+    /// </summary>
+    private static string? CastRefusal(Weapon caster, IReadOnlyList<Enchantment> before, IReadOnlyList<Enchantment> after)
+    {
+        var first = after.Count > 0 ? after[0] : null;
+        if (!caster.CastsWith(first?.Def))
+            return WouldCastNothing(caster);
+        if (first is null || !caster.IsCaster || caster.AreaShape is not null || (before.Count > 0 && ReferenceEquals(before[0], first)))
+            return null;   // no staff, or its cast as it was
+        if (first.Def.Effect != EffectKind.ApplyStatus)
+            return WouldCastNothing(caster);
+        // A staff carrying nothing before (a hand-edited save) keeps nothing behind the soul it takes.
+        foreach (var kept in after.Skip(1))
+            if (kept.Def.Effect == EffectKind.ApplyStatus && kept.Def.Targets != TargetSide.Any
+                && kept.Def.Targets == before[0].Def.Targets && kept.Def.Targets != first.Def.Targets)
+                return WouldCastOn(caster, kept.Def, first.Def.Targets);
         return null;
     }
 
@@ -816,8 +865,29 @@ public static class Enchanter
     public static string WouldCastNothing(Weapon caster)
     {
         ArgumentNullException.ThrowIfNull(caster);
+        return $"{TheCaster(caster)} WOULD CAST NOTHING";
+    }
+
+    /// <summary>
+    /// A transfer after which a staff's new first entry would land a status it keeps
+    /// on the other side from the one its cast landed it on (PHASE 6a DECISION 12's
+    /// caster clause), naming the status and the side <paramref name="casts"/> it
+    /// would land on: <c>THE STAFF OF RENEWAL WOULD CAST WARD ON AN ENEMY</c>. No
+    /// staff play makes can meet it — the enchanter keeps a staff's statuses on its
+    /// cast's side — but a unique <c>weapons.json</c> gives two sides can.
+    /// </summary>
+    public static string WouldCastOn(Weapon staff, EnchantmentDef status, TargetSide casts)
+    {
+        ArgumentNullException.ThrowIfNull(staff);
+        ArgumentNullException.ThrowIfNull(status);
+        return $"{TheCaster(staff)} WOULD CAST {status.Name.ToUpperInvariant()} ON {SideOf(casts)}";
+    }
+
+    /// <summary>A caster as a refusal names it: <c>THE ROTWOOD</c>, <c>THE STAFF OF RENEWAL</c>, a name already starting <c>THE</c> kept as it is.</summary>
+    private static string TheCaster(Weapon caster)
+    {
         string name = caster.Name.ToUpperInvariant();
-        return $"{(name.StartsWith("THE ", StringComparison.Ordinal) ? name : $"THE {name}")} WOULD CAST NOTHING";
+        return name.StartsWith("THE ", StringComparison.Ordinal) ? name : $"THE {name}";
     }
 
     /// <summary>
@@ -1045,7 +1115,10 @@ public static class Enchanter
     /// off the weapon for a reorder (<see cref="Weapon.Detach"/>), and attaches it
     /// last a tier down (<see cref="Enchantment.Transferred"/>) — the deposit asked
     /// every gate, and both weapons have been in the shop since; a refinement
-    /// attaches nothing.
+    /// attaches nothing. The soul lands acquired, but for a reorder of a weapon
+    /// forged whole, which keeps every mark: the forged ones are still a prefix with
+    /// the soul last. A partly forged weapon's reorder loses the moved soul's mark,
+    /// since a forged entry cannot sit behind an acquired one (PHASE 6a DECISION 11).
     /// </summary>
     /// <returns>A transfer's soul as it landed; null for any other service.</returns>
     private static Enchantment? Complete(Deposit entry)
@@ -1062,8 +1135,10 @@ public static class Enchanter
             case Service.Transfer:
                 int index = entry.SourceIndex
                     ?? throw new InvalidOperationException($"Deposit {entry.Ordinal}, a Transfer onto {entry.Weapon.Name}, names no soul.");
-                var moved = (entry.Source ?? entry.Weapon).Detach(index).Transferred();
-                entry.Weapon.Attach(moved);
+                var giver = entry.Source ?? entry.Weapon;
+                bool forgedWhole = entry.Source is null && giver.ForgedEnchantmentCount == giver.Enchantments.Count;
+                var moved = giver.Detach(index).Transferred();
+                entry.Weapon.Attach(moved, forged: forgedWhole);
                 return moved;
             default:
                 throw new ArgumentOutOfRangeException(nameof(entry), entry.Service, "Not a Service.");

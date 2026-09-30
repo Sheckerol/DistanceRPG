@@ -230,7 +230,7 @@ internal sealed class DepositPanel
     /// <c>DEPOSIT THE WEAKSPOT STILETTO TO REFINE - 1 RUN - IT CARRIES NO WEAR</c>. A
     /// transfer names the soul and where it comes from — <c>DEPOSIT THE ARMING SWORD
     /// TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT</c> —
-    /// or a reorder <c>… TO MOVE FLAMING TO THE END - 1 RUN - …</c>; that both weapons
+    /// or a reorder <c>… TO MOVE FLAMING TO THE END - 2 RUNS - …</c>; that both weapons
     /// stay in the shop is the heading's over it (<see cref="SourcesHeading"/>), since
     /// the ask has no room left for it at the widest names.
     /// </summary>
@@ -291,7 +291,9 @@ internal sealed class DepositPanel
     /// <summary>
     /// One soul's line on the source list: where it lies, then the tier it arrives
     /// at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE - ARRIVES AT T2 - 2
-    /// RUNS</c>, <c>FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 1 RUN</c> —
+    /// RUNS</c>, or on an Arming Sword carrying Flaming and Vampiric <c>FLAMING - ITS
+    /// OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS</c> (a reorder moves one of two
+    /// souls at the least, so it takes 2 runs at the least: PHASE 6a DECISION 11) —
     /// or, refused, its reason in their place (<c>FLAMING ON THE NAMELESS NOVA -
     /// BURNING NEEDS FLAMING AHEAD OF IT</c>) — and then, on one that can be chosen,
     /// its note (<c>… - NEVER FIRES ON A SWORD</c>). A refused one says its reason

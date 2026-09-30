@@ -141,10 +141,10 @@ public sealed class TransferTests : IDisposable
         Counted(campaign);
         Assert.Equal([("cold", 1), ("vampiric", 2)], cold.Enchantments.Select(soul => (soul.Id, soul.Tier)));   // last, behind what it carried
         Assert.Equal([("vampiric", 1), ("flaming", 1)], sword.Enchantments.Select(soul => (soul.Id, soul.Tier)));   // its Flaming last, a tier down
-        Assert.Equal(0, sword.ForgedEnchantmentCount);
 
         // At five: every slot filled, a reorder is left, and a move from another
-        // weapon is refused. MOVE is open on the panel for the reorder alone.
+        // weapon is refused. MOVE is open on the panel for the reorder alone, and the
+        // price line names what the reorder costs.
         var full = Souled("arming_sword", 50, 840, [.. Enumerable.Repeat(("vampiric", 1), 4), ("cold", 1)]);
         Assert.Equal(51, full.WearCapacity);
         var knife = Knife();
@@ -155,10 +155,55 @@ public sealed class TransferTests : IDisposable
         Assert.Equal(Enchanter.LastAlready, Enchanter.TransferRefusal(campaign, full, null, 4));
         Assert.Null(Enchanter.ServiceRefusal(campaign, full, Service.Transfer));
         Assert.Equal(Enchanter.AllFilled(5), Enchanter.ServiceRefusal(campaign, full, Service.Enchant));
-        Assert.Equal("ALL 5 SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT", BetweenRunsHud.PriceLine(full));
+        Assert.Equal("ALL 5 SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 50 WEAR", BetweenRunsHud.PriceLine(full));
+
+        // Short of the reorder's price at five, MOVE is dimmed with that price — the
+        // one move left there — never with the slots every other move is refused by.
+        var shortOfIt = Souled("arming_sword", 20, 840, [.. Enumerable.Repeat(("vampiric", 1), 4), ("cold", 1)]);
+        Give(campaign, "D", 3, shortOfIt);
+        Assert.Equal(Enchanter.Short(5, 50, 20), Enchanter.TransferRefusal(campaign, shortOfIt, null, 0));
+        Assert.Equal(Enchanter.AllFilled(5), Enchanter.TransferRefusal(campaign, shortOfIt, knife, 1));
+        Assert.Equal(Enchanter.Short(5, 50, 20), Enchanter.ServiceRefusal(campaign, shortOfIt, Service.Transfer));
+
         var fifth = Enchanter.Deposit(campaign, new WeaponPlace("B", 3), Service.Transfer, sourceIndex: 0).Entry;
         Assert.Equal(5, fifth.Runs);   // the count: one fewer than any other service at five
         Assert.Throws<ArgumentException>(() => Enchanter.Deposit(campaign, new WeaponPlace("C", 3), Service.Transfer, source: new WeaponPlace("C", 3), sourceIndex: 0));   // a reorder names no source
+    }
+
+    [Fact]
+    public void AReorderKeepsTheForgedMarks_OfAWeaponForgedWhole()
+    {
+        // A reorder moves a soul on the weapon it was forged with, so a weapon forged
+        // whole — a unique, as the content makes it — keeps every mark: the forged
+        // ones are still a prefix with the soul last, and the soul's damage share and
+        // cast levels go on teaching the weapon (ForgedShare, ForgedLevels). A weapon
+        // forged in part cannot keep it: a forged entry cannot stand behind an
+        // acquired one, so the soul lands acquired, as it would on another weapon
+        // (PHASE 6a DECISION 11) — a staff's forged effect, reordered behind the Ward
+        // it was given, levels no staff proficiency after.
+        var campaign = Opened();
+        var knife = Worn("flensing_knife_unique", wear: 40, cashed: 345);   // Serrated, Vampiric T3, Overheal, all forged; capacity 40: slot 3 open, its price met
+        Assert.Equal((40, 3), (knife.WearCapacity, knife.ForgedEnchantmentCount));
+        var reorder = Enchanter.Deposit(campaign, Give(campaign, "B", 2, knife), Service.Transfer, sourceIndex: 0).Entry;
+        Assert.Equal(3, reorder.Runs);
+        for (int run = 0; run < 3; run++)
+            Counted(campaign);
+        Assert.Equal([("vampiric", 3), ("overheal", 1), ("serrated", 1)], knife.Enchantments.Select(soul => (soul.Id, soul.Tier)));   // a unique soul intact
+        Assert.Equal(3, knife.ForgedEnchantmentCount);
+        Assert.True(knife.IsForged(2));
+
+        var made = TestWeapons.Get("staff_of_renewal");
+        var staff = new Weapon(GameContent.Current.Weapons["staff_of_renewal"], made.Forged, made.Modifiers,
+            [.. made.Enchantments, new Enchantment(Def("ward"), 1)], made.ForgedEnchantmentCount, wear: 35, wearCashed: 160);
+        Assert.Equal((1, 35), (staff.ForgedEnchantmentCount, staff.WearCapacity));
+        var at = Give(campaign, "C", 2, staff);
+        Assert.Null(Enchanter.TransferRefusal(campaign, staff, null, 0));
+        Enchanter.Deposit(campaign, at, Service.Transfer, sourceIndex: 0);
+        Counted(campaign);
+        Counted(campaign);
+        Assert.Equal(["ward", "regeneration"], staff.Enchantments.Select(soul => soul.Id));
+        Assert.Equal(0, staff.ForgedEnchantmentCount);
+        Assert.Throws<InvalidOperationException>(() => staff.Attach(new Enchantment(Def("regeneration"), 1), forged: true));   // never behind an acquired one
     }
 
     [Fact]
@@ -422,6 +467,63 @@ public sealed class TransferTests : IDisposable
     }
 
     [Fact]
+    public void AStaffsNewFirstEntryIsACast_OnTheSideItCastOn()
+    {
+        // The caster clause, as the review of Phase 6a.6 tightened it: a staff's first
+        // entry picks whom its cast lands every status on, and the dungeon asks only
+        // that it apply a status. Serrated does — Bleeding, on enemies — but on a
+        // strike, never a cast. Moved onto a Staff of Renewal behind its Regeneration
+        // it is an entry that never fires there, as any is; given a Ward after it, and
+        // then giving its Regeneration away, the staff would cast Serrated first: on
+        // enemies, landing nothing but the Ward — on the enemy. Refused: a staff whose
+        // first entry a move changes must be left casting a status, a staff's cast as
+        // content makes one, and every status it keeps must land where it landed.
+        var campaign = Opened();
+        var dagger = Worn("flensing_knife", wear: 30);
+        Give(campaign, "B", 2, dagger);
+        var renewal = Souled("staff_of_renewal", 35, 160, ("regeneration", 1));   // capacity 35: slot 2 open, its price met
+        Give(campaign, "C", 2, renewal);
+        var knife = Knife();
+        Give(campaign, "C", 3, knife);
+        Assert.Null(Enchanter.TransferRefusal(campaign, renewal, knife, 0));
+        Assert.Equal(Enchanter.NeverFiresOn(WeaponClass.Staff),
+            Enchanter.TransferOffers(campaign, renewal).Single(move => ReferenceEquals(move.Source, knife) && move.Index == 0).Note);
+
+        // As those three left it: its Regeneration may not go, its Serrated and its Ward may.
+        var staff = Souled("staff_of_renewal", 0, 0, ("regeneration", 1), ("serrated", 1), ("ward", 1));
+        Give(campaign, "C", 4, staff);
+        Assert.Equal("THE STAFF OF RENEWAL WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, dagger, staff, 0));
+        Assert.Null(Enchanter.TransferRefusal(campaign, dagger, staff, 1));
+        Assert.Null(Enchanter.TransferRefusal(campaign, dagger, staff, 2));
+        var pair = Souled("staff_of_renewal", 0, 0, ("regeneration", 1), ("serrated", 1));
+        Give(campaign, "D", 2, pair);
+        Assert.Equal("THE STAFF OF RENEWAL WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, dagger, pair, 0));
+        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            DepositPanel.MoveLine(Enchanter.TransferOffers(campaign, dagger).Single(move => ReferenceEquals(move.Source, pair) && move.Index == 0)));
+
+        // A staff given its first entry — a soulless one, as only a hand-edited save
+        // holds — takes a status it casts, and not Serrated.
+        var soulless = Souled("staff_of_renewal", 30, 0);
+        Give(campaign, "A", 2, soulless);
+        Assert.Equal("THE STAFF OF RENEWAL WOULD CAST NOTHING", Enchanter.TransferRefusal(campaign, soulless, knife, 0));
+        Assert.Null(Enchanter.TransferRefusal(campaign, soulless, staff, 2));
+
+        // A status kept lands where it landed: a unique weapons.json gives both sides
+        // (none ships one) — Regeneration, Mire, Ward — would, its Regeneration given
+        // away, cast Mire and ward the enemy it mires. With nothing behind that its
+        // cast landed right, the move is no one's harm: Regeneration, Mire gives its
+        // Regeneration away, and casts its Mire where Mire goes.
+        var mixed = Souled("staff_of_renewal", 0, 0, ("regeneration", 1), ("mire", 1), ("ward", 1));
+        Give(campaign, "D", 3, mixed);
+        string wrongSide = Enchanter.WouldCastOn(mixed, Def("ward"), TargetSide.Enemy);
+        Assert.Equal("THE STAFF OF RENEWAL WOULD CAST WARD ON AN ENEMY", wrongSide);
+        Assert.Equal(wrongSide, Enchanter.TransferRefusal(campaign, dagger, mixed, 0));
+        var righted = Souled("staff_of_renewal", 0, 0, ("regeneration", 1), ("mire", 1));
+        Give(campaign, "D", 4, righted);
+        Assert.Null(Enchanter.TransferRefusal(campaign, dagger, righted, 0));
+    }
+
+    [Fact]
     public void AForgedInnateArrivesAcquired_ItsForgedMarkLeavesWithIt()
     {
         // A staff's forged innate moved onto a dagger arrives acquired, last: the
@@ -487,6 +589,242 @@ public sealed class TransferTests : IDisposable
         Assert.True(b.MaxMana - sword.Enchantments[0].EffectiveLock < sword.Enchantments[1].EffectiveLock, "the premise: the moved soul's lock does not fit what is left");
         Assert.Equal((false, true), (b.IsDormant(0), b.IsDormant(1)));
         Assert.Equal(sword.Enchantments[0].EffectiveLock, b.PaidLocks);
+    }
+
+    [Fact]
+    public void TheTransferGatesAreAskedInTheirOrder()
+    {
+        // TransferRefusal asks its gates in one order, and the first to fail is the
+        // reason the screen says: in the shop (the weapon, then the source), a
+        // member's last weapon, the entry already last, the slot and the price, the
+        // soul on the weapon, what the giver keeps, and what each would cast (the
+        // weapon, then the source). Each case fails two neighbours at once and is told
+        // the earlier one.
+        (string Pair, string Expected, string? Refused) Case(string pair, Func<CampaignState, (string Expected, string? Refused)> ask)
+        {
+            var (expected, refused) = ask(Opened());
+            return (pair, expected, refused);
+        }
+        var cases = new[]
+        {
+            Case("in the shop: the weapon before the source", campaign =>
+            {
+                var blade = Worn("riposte_blade", wear: 30);
+                var knife = Knife();
+                Enchanter.Deposit(campaign, Give(campaign, "B", 2, blade), Service.Refine);
+                Enchanter.Deposit(campaign, Give(campaign, "C", 2, Worn("tower_guard", wear: 30)), Service.Transfer, source: Give(campaign, "C", 3, knife), sourceIndex: 0);
+                return (Enchanter.InTheShop(blade), Enchanter.TransferRefusal(campaign, blade, knife, 1));
+            }),
+            Case("a member's last weapon before the entry already last", campaign =>
+            {
+                var sword = Souled("arming_sword", 35, 160, ("flaming", 1), ("vampiric", 1));
+                campaign.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(0));
+                Give(campaign, "D", 0, sword);   // over D's Staff of Renewal: D carries the sword alone
+                return (Enchanter.WouldCarryNone("D"), Enchanter.TransferRefusal(campaign, sword, null, 1));
+            }),
+            Case("the entry already last before the slot and the price", campaign =>
+            {
+                var sword = Souled("arming_sword", 0, 0, ("flaming", 1), ("vampiric", 1));   // capacity 30, unworn: slot 2 shut, nothing to pay with
+                Give(campaign, "B", 2, sword);
+                return (Enchanter.LastAlready, Enchanter.TransferRefusal(campaign, sword, null, 1));
+            }),
+            Case("a member's last weapon before the slot and the price", campaign =>
+            {
+                var guard = Worn("tower_guard", wear: 0);
+                var knife = Knife();
+                campaign.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(0));
+                Give(campaign, "D", 0, guard);
+                Give(campaign, "D", 1, knife);   // D carries the unworn guard and the knife, and nothing else
+                return (Enchanter.WouldCarryNone("D"), Enchanter.TransferRefusal(campaign, guard, knife, 1));
+            }),
+            Case("the price before the soul on the weapon", campaign =>
+            {
+                var cold = Souled("arming_sword", 20, 195, ("cold", 1));   // capacity 36, a deposit of 20
+                var lit = Souled("arming_sword", 0, 0, ("flaming", 1));
+                Give(campaign, "B", 2, cold);
+                Give(campaign, "C", 2, lit);
+                return (Enchanter.Short(2, 35, 20), Enchanter.TransferRefusal(campaign, cold, lit, 0));
+            }),
+            Case("the soul on the weapon before what the giver keeps", campaign =>
+            {
+                var cold = Souled("arming_sword", 35, 160, ("cold", 1));
+                var nova = Worn("wand_of_the_nova_unique", wear: 0);   // Flaming, Burning
+                Give(campaign, "B", 2, cold);
+                Give(campaign, "C", 2, nova);
+                return (Enchanter.CannotSitWith(Def("cold")), Enchanter.TransferRefusal(campaign, cold, nova, 0));
+            }),
+            Case("what the giver keeps before what the weapon would cast", campaign =>
+            {
+                var soulless = Souled("staff_of_renewal", 30, 0);   // a staff with no cast, as only a hand-edited save holds
+                var nova = Worn("wand_of_the_nova_unique", wear: 0);
+                Give(campaign, "B", 2, soulless);
+                Give(campaign, "C", 2, nova);
+                return (Enchanter.Strands(Def("burning"), "Flaming"), Enchanter.TransferRefusal(campaign, soulless, nova, 0));
+            }),
+            Case("what the weapon would cast before what the source would", campaign =>
+            {
+                var soulless = Souled("staff_of_renewal", 30, 0);
+                var cone = Souled("wand_of_the_cone", 0, 0, ("cold", 1));
+                Give(campaign, "B", 2, soulless);
+                Give(campaign, "C", 2, cone);
+                return (Enchanter.WouldCastNothing(soulless), Enchanter.TransferRefusal(campaign, soulless, cone, 0));
+            }),
+        };
+        Assert.All(cases, told => Assert.True(told.Expected == told.Refused, $"{told.Pair}: '{told.Refused}', not '{told.Expected}'"));
+    }
+
+    [Fact]
+    public void ATransferFromTheStableTakesEachWeaponFromItsPlace()
+    {
+        // Both weapons of a transfer may lie in the stable, either first, with others
+        // between and after: the deposit takes each from its own place — the later
+        // first, so the earlier has not moved — and leaves the rest in their order; the
+        // log names each place as it stood; and a take-back returns the weapon and then
+        // its source to the stable's end. The list of souls passes over the weapon's
+        // own place, and a weapon in the stable, carried by nobody, still asks the
+        // source's member to keep a weapon.
+        foreach (bool weaponFirst in new[] { true, false })
+        {
+            var campaign = Opened();
+            var blade = Worn("riposte_blade", wear: 30);
+            var knife = Knife();
+            var (x, y, z) = (Worn("tower_guard", wear: 0), Worn("tower_guard", wear: 0), Worn("tower_guard", wear: 0));
+            Weapon[] laid = weaponFirst ? [x, blade, y, knife, z] : [x, knife, y, blade, z];
+            foreach (var weapon in laid)
+                campaign.Move(Give(campaign, "B", 2, weapon), WeaponPlace.InTheStable(campaign.Stable.Count));
+            Assert.Equal(laid, campaign.Stable);
+            var at = TestShop.InTheStable(campaign, knife);
+            var offers = Enchanter.TransferOffers(campaign, blade);
+            Assert.DoesNotContain(offers, move => ReferenceEquals(move.Source, blade));
+            Assert.All(offers.Where(move => ReferenceEquals(move.Source, knife)), move => Assert.Equal(at, move.From));
+            Assert.Null(Enchanter.TransferRefusal(campaign, blade, knife, 1));
+
+            var host = new RecordingHost();
+            var scene = new BetweenRunsScene(game: null!, campaign, host, shownWhole: 0);
+            scene.OnKey(Keys.Tab);
+            ChooseRow(scene, "  RIPOSTE BLADE - WEAR 30/30 FULL");
+            foreach (var key in new[] { Keys.D, Keys.D3, Keys.S, Keys.Enter })
+                scene.OnKey(key);
+            Assert.Equal((knife, 1), (scene.Panel!.ChosenMove!.Source, scene.Panel.ChosenMove.Index));
+            scene.OnKey(Keys.Enter);
+            var deposit = Assert.Single(campaign.AtTheEnchanter);
+            Assert.Equal((blade, knife), (deposit.Weapon, deposit.Source));
+            Assert.Equal([x, y, z], campaign.Stable);
+            var (weaponAt, sourceAt) = weaponFirst ? ("2 of 5", "4 of 5") : ("4 of 5", "2 of 5");
+            Assert.Contains($"[Enchanter] Deposited Riposte Blade (riposte_blade) from the stable ({weaponAt}): Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique)"
+                + $" in the stable ({sourceAt}), 30 wear cashed (capacity 30 -> 31), 1 run, deposit #0", Logged());
+
+            foreach (var key in new[] { Keys.T, Keys.Enter })
+                scene.OnKey(key);
+            Assert.Empty(campaign.AtTheEnchanter);
+            Assert.Equal([x, y, z, blade, knife], campaign.Stable);
+        }
+
+        var carried = Opened();
+        var inTheStable = Worn("riposte_blade", wear: 30);
+        carried.Move(Give(carried, "B", 2, inTheStable), WeaponPlace.InTheStable(0));
+        var d = carried.Party[3];
+        carried.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(1));
+        var alone = Knife();
+        Give(carried, "D", 0, alone);   // over D's Staff of Renewal: D carries the knife alone
+        Assert.Equal(1, d.Inventory.Count(weapon => weapon is not null));
+        Assert.Equal(Enchanter.WouldCarryNone("D"), Enchanter.TransferRefusal(carried, inTheStable, alone, 1));
+
+        static IEnumerable<string> Logged() => GameEngine.Core.Diagnostics.Log.RecentEntries.Select(entry => entry.Message);
+    }
+
+    [Fact]
+    public void AReorderIsWalkedAndSaidAsTheWeaponsOwn()
+    {
+        // A reorder on the screen (PHASE 6a DECISION 11): D, 3, the weapon's own soul
+        // — a sword carrying Flaming and Vampiric can move its Flaming, and a reorder
+        // moves one of two souls at the least, so it takes 2 runs at the least —
+        // ENTER, ENTER: one weapon in the shop and none held, said as a move to its
+        // end everywhere it is said — the confirm, the shop's line, the take-back's
+        // ask, the log's lines, and the summary's, which has no source's line under it.
+        var campaign = Opened();
+        var sword = Souled("arming_sword", 35, 160, ("flaming", 1), ("vampiric", 1));   // capacity 35
+        Give(campaign, "B", 2, sword);
+        var host = new RecordingHost();
+        var scene = new BetweenRunsScene(game: null!, campaign, host, shownWhole: 0);
+        scene.OnKey(Keys.Tab);
+        ChooseRow(scene, "  BAG   ARMING SWORD - WEAR 35/35 FULL");
+        scene.OnKey(Keys.D);
+        scene.OnKey(Keys.D3);
+        var panel = scene.Panel!;
+        Assert.Equal([null], panel.Moves.Where(move => move.Refusal is null).Select(move => move.Source));   // every other soul the party owns is a staff's only one
+        var rows = BetweenRunsHud.PanelRows(panel, 20).Select(row => row.Text).ToArray();
+        Assert.Equal("> FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS <", Assert.Single(rows, row => row.StartsWith('>')));
+        Assert.Contains("VAMPIRIC - ITS OWN - IT IS LAST ALREADY", rows);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal("DEPOSIT THE ARMING SWORD TO MOVE FLAMING TO THE END - 2 RUNS - ITS 35 WEAR IS SPENT", scene.Panel!.Ask);
+        scene.OnKey(Keys.Enter);
+        var deposit = Assert.Single(campaign.AtTheEnchanter);
+        Assert.Equal(((Weapon?)null, (int?)0, 2), (deposit.Source, deposit.SourceIndex, deposit.Runs));
+        Assert.Equal("  WORKING  ARMING SWORD - 0 OF 2 RUNS", scene.Weapons.ChosenRow.Text);
+        Assert.DoesNotContain(scene.Weapons.Rows(), row => row.Held);
+        Assert.Equal("MOVE FLAMING TO THE END - 0 OF 2 RUNS", BetweenRunsHud.ServiceLine(deposit));
+        Assert.Equal("TAKE BACK THE ARMING SWORD - THE MOVE IS LOST - ITS 35 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
+        Assert.Contains("[Enchanter] Deposited Arming Sword (arming_sword) from B's bag slot 3: Transfer flaming (T1) from its own place 1 to its end,"
+            + " 35 wear cashed (capacity 35 -> 36), 2 runs, deposit #0", Logged());
+        foreach (var key in new[] { Keys.T, Keys.Enter })
+            scene.OnKey(key);
+        Assert.Contains("[Enchanter] Took back Arming Sword (arming_sword) to the stable's end: Transfer flaming (T1) from its own place 1 to its end forfeited,"
+            + " 0 of 2 runs worked lost, 35 wear returned (capacity 36 -> 35), deposit #0", Logged());
+        Assert.Equal(2, host.HubSavesAsked);
+
+        Enchanter.Deposit(campaign, TestShop.InTheStable(campaign, sword), Service.Transfer, sourceIndex: 0);
+        Counted(campaign);
+        var result = Counted(campaign);
+        Assert.Equal([("vampiric", 1), ("flaming", 1)], sword.Enchantments.Select(soul => (soul.Id, soul.Tier)));
+        var report = Assert.Single(result.Services!);
+        Assert.Null(BetweenRunsHud.SourceBack(report));
+        var lines = BetweenRunsHud.HubSummaryLines(result).Select(line => line.Text).ToArray();
+        var back = Assert.Single(lines, line => line.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal));
+        Assert.Equal($"ARMING SWORD IS BACK FROM THE ENCHANTER - FLAMING NOW LAST AT T1 - {BetweenRunsHud.Outcome(report.Improved)}", back);
+        Assert.StartsWith("[Enchanter] Arming Sword finished: flaming moved to the end at T1; improvement roll ",
+            DistanceRpgGame.EnchanterLines(result)[1], StringComparison.Ordinal);
+
+        static IEnumerable<string> Logged() => GameEngine.Core.Diagnostics.Log.RecentEntries.Select(entry => entry.Message);
+    }
+
+    [Fact]
+    public void TheDoorsAskAMoveItsOwnQuestions()
+    {
+        // The argument contracts of a transfer at each door, whatever asked before:
+        // Enchanter.Deposit names a transfer's soul by its place and no enchantment,
+        // and no other service names a source; Refusal is not a transfer's question
+        // (TransferRefusal is); CampaignState.Enqueue takes a transfer's source where
+        // it lies, and a source only with a transfer's; and a load's Restore counts a
+        // held source as a weapon in one place. Refused, nothing moves and nothing is
+        // cashed.
+        var campaign = Opened();
+        var blade = Worn("riposte_blade", wear: 30);
+        var knife = Knife();
+        var at = Give(campaign, "B", 2, blade);
+        var from = Give(campaign, "C", 2, knife);
+        Assert.Throws<ArgumentException>(() => Enchanter.Deposit(campaign, at, Service.Transfer, "vampiric", from, 1));   // names an enchantment
+        Assert.Throws<ArgumentException>(() => Enchanter.Deposit(campaign, at, Service.Transfer, source: from));   // names no soul
+        Assert.Throws<ArgumentException>(() => Enchanter.Deposit(campaign, at, Service.Refine, source: from));
+        Assert.Throws<ArgumentException>(() => Enchanter.Deposit(campaign, at, Service.Enchant, "vampiric", sourceIndex: 0));
+        Assert.Throws<ArgumentException>(() => Enchanter.Refusal(campaign, blade, Service.Transfer));
+        Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, at, Service.Transfer, source: new WeaponPlace("C", 4), sourceIndex: 0));   // nothing lies there
+        Assert.Throws<ArgumentOutOfRangeException>(() => Enchanter.TransferRefusal(campaign, blade, knife, 3));   // no soul lies there
+
+        var transfer = new Deposit(0, blade, Service.Transfer, 30, 1, null, knife, 1);
+        Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, transfer));   // its source named at no place
+        Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, transfer, new WeaponPlace("C", 0)));   // another weapon at the place named
+        Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, new Deposit(0, blade, Service.Refine, 30, 1), from));   // a place named for a deposit with no source
+        Assert.Empty(campaign.AtTheEnchanter);
+        Assert.Equal((30, 0), (blade.Wear, campaign.DepositsMade));
+        Assert.Equal((blade, knife), (campaign.WeaponAt(at), campaign.WeaponAt(from)));
+
+        // A load's one-place check counts a held source: one in the stable too is refused.
+        var shop = TestShop.Transfers();
+        var held = shop.AtTheEnchanter[0].Source!;
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(shop.Party, shop.SeenInOrder, shop.RunCounter, [], [], [], null, null,
+            [.. shop.Stable, held], shop.AtTheEnchanter, shop.DepositsMade));
+        CampaignState.Restore(shop.Party, shop.SeenInOrder, shop.RunCounter, [], [], [], null, null, shop.Stable, shop.AtTheEnchanter, shop.DepositsMade);
     }
 
     [Fact]

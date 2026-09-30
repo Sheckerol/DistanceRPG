@@ -657,8 +657,12 @@ public sealed class DepositPanelTests : IDisposable
         // A soul that would never fire on the weapon is chosen all the same, noted.
         Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
             DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("A", 1), campaign.Party[0].Inventory[1], 0, campaign.Party[0].Inventory[1]!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
-        Assert.Equal("FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 1 RUN",
-            DepositPanel.MoveLine(new TransferOffer(null, null, 0, sword.Enchantments[0], 1, 1, null, null)));
+        // A reorder moves one of two souls at the least (the last is last already), so
+        // it takes 2 runs at the least (PHASE 6a DECISION 11).
+        var own = TestShop.Opened();
+        var two = TestShop.Give(own, "B", 2, Sword(wear: 35, cashed: 160, "flaming", "vampiric"));
+        Assert.Equal("FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS",
+            DepositPanel.MoveLine(Enchanter.TransferOffers(own, own.WeaponAt(two)!).Single(move => move.Source is null && move.Index == 0)));
 
         // The choice goes round what can be chosen, over the refused; ENTER chooses,
         // and the confirm asks, the list's heading over it saying both stay.
@@ -865,7 +869,7 @@ public sealed class DepositPanelTests : IDisposable
             Enchanter.WouldCarryNone("A"), Enchanter.LastAlready, Enchanter.AllFilled(10), Enchanter.NoFreeSlot(10, Wear.SlotOpensAt(10), 9999),
             Enchanter.Short(10, Wear.Price(10), 9999), Enchanter.InTheShop(nine), Enchanter.CannotSitWith(soul), Enchanter.NeedsAhead(soul.Name),
             Enchanter.WandCastsNoStatusWhy, Enchanter.StaffCastsItOn(TargetSide.Ally), Enchanter.StaffCastsItOn(TargetSide.Enemy),
-            Enchanter.Strands(soul, soul.Name), Enchanter.WouldCastNothing(nine),
+            Enchanter.Strands(soul, soul.Name), Enchanter.WouldCastNothing(nine), Enchanter.WouldCastOn(nine, soul, TargetSide.Enemy),
         ];
         foreach (var source in new[] { nine, null })
         {

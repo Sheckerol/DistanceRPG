@@ -1219,8 +1219,10 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("THE NEXT NEEDS A DEPOSIT OF 45 WEAR - 4 RUNS IN THE SHOP", Price("flensing_knife_unique", 0));
         using (TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { EnchantmentSlots = 3 }))
         {
-            Assert.Equal("ALL 3 SLOTS ARE FILLED - REFINING OR REORDERING IS LEFT", Price("flensing_knife_unique", 0));   // a reorder at the count (PHASE 6a DECISION 11)
+            Assert.Equal("ALL 3 SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 40 WEAR", Price("flensing_knife_unique", 0));   // a reorder at the count (PHASE 6a DECISION 11)
             Assert.Equal("ENCHANTMENTS 3 - SLOTS OPEN 1 OF 3", Slots("flensing_knife_unique", 0));
+            var past = TestShop.Souled("arming_sword", 0, 0, [.. Enumerable.Repeat(("vampiric", 1), 4)]);   // four, since a tuning.json lowered the slots to three
+            Assert.Equal("ALL 3 SLOTS ARE FILLED - REFINING IS LEFT", BetweenRunsHud.PriceLine(past));
         }
 
         // Browsing stops on the shop's rows; carrying never does, and ENTER on one
@@ -1279,7 +1281,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         using (TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { FirstSlotCapacity = 9999, SlotCapacityStep = 9999, EnchantmentSlots = 10, FirstEnchantmentWear = 9999, EnchantmentWearStep = 9999 }))
         {
             var nine = new Weapon(longest, Made(longest).Forged, Made(longest).Modifiers, Enumerable.Range(0, 9).Select(_ => new Enchantment(soul, 1)).ToArray(), 0, wear: 9999, wearCashed: 0);
-            foreach (string line in new[] { BetweenRunsHud.SlotsLine(nine), BetweenRunsHud.PriceLine(nine) })
+            var ten = new Weapon(longest, Made(longest).Forged, Made(longest).Modifiers, Enumerable.Range(0, 10).Select(_ => new Enchantment(soul, 1)).ToArray(), 0, wear: 9999, wearCashed: 0);
+            foreach (string line in new[] { BetweenRunsHud.SlotsLine(nine), BetweenRunsHud.PriceLine(nine), BetweenRunsHud.PriceLine(ten) })
             {
                 Fits(line, BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth);
                 Glyphs(line);
@@ -1377,6 +1380,37 @@ public sealed class BetweenRunsHudTests : IDisposable
         var panel = DungeonHud.RunSummaryLines(back);
         Assert.Equal([grafted, deepened, new(BetweenRunsHud.MoreAtTheEnchanter(1), DungeonHud.Cyan)],
             panel.SkipWhile(line => !line.Text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1).Take(3));
+    }
+
+    [Fact]
+    public void ATransfersTwoLinesAreToldTogether_TheCapCountingLines()
+    {
+        // The cap on the enchanter's services counts lines, not services, and tells a
+        // service whole or not at all, in order (Phase 6a.6): a finished transfer's two
+        // lines — the weapon its soul went to, and its source under it — stay
+        // together, and a service they leave no room for is counted among how many
+        // more, with every service after it. On the dungeon's end panel (two lines), a
+        // finished Enchant and then a finished transfer say the Enchant and one more;
+        // on the hub (three), a transfer, an Enchant and a worked refinement say the
+        // transfer's two lines, the Enchant's, and one more; and two Enchants, a
+        // transfer and a worked refinement say the Enchants and two more — the
+        // refinement's one line, which would fit, not told past the transfer.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var enchant = new ServiceReport("great_axe", Service.Enchant, 2, 2, EnchantmentId: "vampiric");
+        var again = new ServiceReport("tower_guard", Service.Enchant, 1, 1, EnchantmentId: "cold");
+        var transfer = new ServiceReport("riposte_blade", Service.Transfer, 1, 1, EnchantmentId: "vampiric", Tier: 2, SourceId: "flensing_knife_unique");
+        var refine = new ServiceReport("weakspot_stiletto", Service.Refine, 1, 2);
+        RunResult Ran(params ServiceReport[] reports) => new("spear_hall", RunOutcome.Retreat, false, 3, null, true, true, 4, null, false, [], [], [], reports);
+        static string[] Told(IEnumerable<DungeonHud.Run> lines) => Texts(lines).Where(text => text.Contains("ENCHANTER", StringComparison.Ordinal)).ToArray();
+        const string Axe = "GREAT AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO CHANGE";
+        const string Blade = "RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE";
+        const string Knife = "NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF";
+
+        Assert.Equal([Axe, "AND 1 MORE AT THE ENCHANTER"], Told(DungeonHud.RunSummaryLines(Ran(enchant, transfer))));
+        Assert.Equal([Blade, Knife, "AND 2 MORE AT THE ENCHANTER"], Told(DungeonHud.RunSummaryLines(Ran(transfer, enchant, refine))));
+        Assert.Equal([Blade, Knife, Axe, "AND 1 MORE AT THE ENCHANTER - TAB WEAPONS"], Told(BetweenRunsHud.HubSummaryLines(Ran(transfer, enchant, refine))));
+        Assert.Equal([Axe, "TOWER GUARD IS BACK FROM THE ENCHANTER - ATTACHED COLD - NO CHANGE", "AND 2 MORE AT THE ENCHANTER - TAB WEAPONS"],
+            Told(BetweenRunsHud.HubSummaryLines(Ran(enchant, again, transfer, refine))));
     }
 
     [Fact]
