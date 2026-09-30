@@ -253,21 +253,28 @@
   /* How near the stairs, in whole tiles, every living member must stand for the party to take them. */
   "StairGatherTiles": 3,
 
-  /* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */
-  /* What a deposit costs at the enchanter, as the user ruled on 2026-09-25: a weapon's wear
-     capacity opens on StartingPool and grows as full bars of wear are cashed, its enchantment slots
-     open along that capacity, and attaching each enchantment needs a deposit of its own size. The
-     user keeps a number they may revisit in this file, so the six keys below are here before the
-     Phase 6a enchanter that reads them, and nothing reads them until then: each is read, clamped
-     and warned like every other key, and a save's hash leaves them out, so turning one never says
-     the numbers have changed. WearPerHit and GraftBaseChance are not keys yet: they arrive with
-     the Phase 6a code that reads them. */
+  /* ---- Enchanter - Phase 6a: GraftBaseChance ---- */
+  /* What a hit wears, and what a deposit costs at the enchanter, as the user ruled on 2026-09-25:
+     a weapon's wear capacity opens on StartingPool and grows as full bars of wear are cashed, its
+     enchantment slots open along that capacity, and attaching each enchantment needs a deposit of
+     its own size. The user keeps a number they may revisit in this file, so the ruling's six keys
+     were here before the Phase 6a enchanter that reads them. WearPerHit and WearCapacityPerBar
+     play now, and turning either says the numbers have changed; the other four are read, clamped
+     and warned like every other key, but nothing plays them until the enchanter takes deposits, so
+     turning one of them says nothing yet. GraftBaseChance is not a key yet: it arrives with the
+     Phase 6a code that reads it. */
+
+  /* The wear a weapon banks for every hit it lands - each body a swing, a cleave, a shot or a
+     wand's cast strikes, and each landed cast of a staff - up to its capacity. A deposit at the
+     enchanter spends it all. 0 means no weapon ever wears, so none can be enchanted. */
+  "WearPerHit": 1,
 
   /* The capacity a full bar's worth of cashed wear adds, the bar being the capacity at the time:
      cashing 30 lifts a fresh 30 to 31, then 31 more lifts it to 32, with no top. The progress
      carries - a deposit short of a full bar still counts toward the next point, and what one cashes
      past a bar starts the next - and it grows alike whichever service the deposit bought. 0 freezes
-     capacity. */
+     capacity. A weapon's capacity is worked out afresh from the wear it has ever cashed, so a change
+     here moves every weapon's capacity at once. */
   "WearCapacityPerBar": 1,
 
   /* The capacity a weapon's first enchantment slot opens at: slot n opens at FirstSlotCapacity +

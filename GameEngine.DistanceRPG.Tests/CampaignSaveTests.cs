@@ -328,6 +328,91 @@ public sealed class CampaignSaveTests : IDisposable
     }
 
     [Fact]
+    public void WearAndWhatWasCashedRoundTrip()
+    {
+        // §6.1, §6.7 (Phase 6a.1): a weapon's wear and the wear it has ever cashed
+        // are the item's own, saved with it and brought back — in a hand, in a bag,
+        // on a spoil — and its capacity comes back replayed from what was cashed,
+        // under the tuning loaded now (PHASE 6a DECISION 2): no capacity is in the
+        // document, so a StartingPool or WearCapacityPerBar edit moves it.
+        var campaign = NewCampaign();
+        Clear(campaign, "tutorial");
+        var def = GameContent.Current.Weapons["arming_sword"];
+        var sword = TestWeapons.Get("arming_sword");
+        var serviced = new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear: 17, wearCashed: 195);
+        Assert.Equal((17, 195, 36), (serviced.Wear, serviced.WearCashed, serviced.WearCapacity));
+        campaign.Party[0].Inventory[2] = serviced;
+        var hand = campaign.Party[1].Inventory[0]!;
+        for (int hit = 0; hit < 40; hit++)
+            Wear.Accrue(hand);
+        Assert.Equal((30, true), (hand.Wear, hand.WornFull));
+
+        var restored = RoundTrip(campaign);
+        var back = restored.Party[0].Inventory[2]!;
+        Assert.NotSame(serviced, back);
+        Assert.Equal((17, 195, 36, serviced.WearPool), (back.Wear, back.WearCashed, back.WearCapacity, back.WearPool));
+        Assert.Equal((30, 0, true), (restored.Party[1].Inventory[0]!.Wear, restored.Party[1].Inventory[0]!.WearCashed, restored.Party[1].Inventory[0]!.WornFull));
+
+        // The document holds the two counts and no capacity.
+        var row = Party(JsonNode.Parse(Save(campaign))!.AsObject(), 0)["inventory"]![2]!.AsObject();
+        Assert.Equal((17, 195), (row["wear"]!.GetValue<int>(), row["wearCashed"]!.GetValue<int>()));
+        Assert.DoesNotContain(row, member => member.Key.Contains("capacity", StringComparison.OrdinalIgnoreCase));
+
+        // Under another bar the same save replays another capacity, and the wear
+        // is kept as it was, full or not: the numbers changed, and it says so.
+        string text = Save(campaign);
+        using (TestContent.UsePremise(tuning: t => t with { StartingPool = 40, WearCapacityPerBar = 2 }))
+        {
+            var loaded = Load(text);
+            Assert.True(loaded.TuningChanged);
+            var under = loaded.Campaign.Party[0].Inventory[2]!;
+            Assert.Equal((17, 195, Wear.Capacity(195).Max), (under.Wear, under.WearCashed, under.WearCapacity));
+            Assert.Equal(48, under.WearCapacity);   // bars of 40, 42, 44 and 46 of the 195 cashed: 40 + 2 x 4, and 23 toward the next
+            Assert.False(loaded.Campaign.Party[1].Inventory[0]!.WornFull);
+        }
+
+        // A negative count is none play reaches: the restore door refuses it, whoever calls it.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Weapon(def, sword.Forged, sword.Modifiers, [], 0, wear: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Weapon(def, sword.Forged, sword.Modifiers, [], 0, wearCashed: -1));
+    }
+
+    [Fact]
+    public void ATuningHashVersionOutsideItsDocumentIsRefused()
+    {
+        // PHASE 6a DECISION 9: a save names the version whose keys its tuning hash
+        // is of — the current version from a capture, 1 from the step that lifts a
+        // version-1 document. From 1 to the document's own version: a hash is never
+        // of a key set newer than its document, and version 0 hashed nothing. Raw
+        // text a hand can edit, so anything else is refused, naming the member; and
+        // a version-2 document without it is refused by the reader, as any missing
+        // member is.
+        var campaign = NewCampaign();
+        Clear(campaign, "tutorial");
+        string text = Save(campaign);
+        var file = SaveCodec.Read(text);
+        Assert.Equal(SaveCodec.CurrentVersion, file.TuningHashVersion);
+        Assert.False(SaveGame.Restore(file, GameContent.Current).TuningChanged);
+
+        foreach (int version in new[] { 0, -1, SaveCodec.CurrentVersion + 1, int.MaxValue })
+        {
+            var refused = Assert.Throws<SaveFormatException>(() => SaveGame.Restore(file with { TuningHashVersion = version }, GameContent.Current));
+            Assert.Equal("tuningHashVersion", refused.Where);
+            Assert.StartsWith($"{version} is no version of this document", refused.Problem, StringComparison.Ordinal);
+            Assert.All(NoticeText.Wrap(refused.Message), line => Assert.Matches(@"^[A-Z0-9 .,:\-_!?()/<>\[\]+=#*]+$", line));   // the notice of a save set aside shows it
+        }
+
+        // Version 1's keys, the hash of the same numbers on them: nothing changed.
+        var ofVersion1 = file with { TuningHash = TuningJson.Hash(GameContent.Current.Tuning, version: 1), TuningHashVersion = 1 };
+        Assert.False(SaveGame.Restore(ofVersion1, GameContent.Current).TuningChanged);
+
+        var tree = JsonNode.Parse(text)!.AsObject();
+        Assert.True(tree.Remove("tuningHashVersion"));
+        var missing = Assert.Throws<SaveFormatException>(() => SaveCodec.Read(tree.ToJsonString()));
+        Assert.Equal("$", missing.Where);
+        Assert.Contains("tuningHashVersion", missing.Problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EnchantmentsKeepTheirOrderTierAndXp()
     {
         // PHASE5-015, settled.md: "Weapon.Enchantments is a list because order is

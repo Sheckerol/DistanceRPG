@@ -247,7 +247,7 @@ public class TuningSchemaTests
             (Uniques, [nameof(Tuning.UniqueChanceCeilingPercent), nameof(Tuning.UniqueChanceMidpoint), nameof(Tuning.UniqueChanceKPercent)]),
             (Dungeon, [nameof(Tuning.BossFloorMin), nameof(Tuning.BossFloorMax), nameof(Tuning.BossStackOffset),
                 nameof(Tuning.CooldownRunsPerFloor), nameof(Tuning.MercyFloor), nameof(Tuning.DeathXpLossPercent)]),
-            (Enchanter, RulingsEnchanterKeys),
+            (Enchanter, [nameof(Tuning.WearPerHit), .. RulingsEnchanterKeys]),
             (Inventory, [nameof(Tuning.PartyCarrySlots)]),
         ];
         foreach (var (group, keys) in starting)
@@ -259,12 +259,14 @@ public class TuningSchemaTests
         var groups = TuningSchema.Keys.Select(k => k.Group).ToArray();
         Assert.Equal(groups.Order(), groups);   // the file's order is the groups' order
 
-        // The six 6a/6b keys still to come wait for their readers (bend (e)): no
+        // The five 6a/6b keys still to come wait for their readers (bend (e)): no
         // key and no property, listed under their group with the phase that
-        // brings them. The Enchanter's six the ruling made keys ahead of their
-        // reader are each a property, and no rule plays one.
+        // brings them. WearPerHit came with its reader in Phase 6a.1. The
+        // Enchanter's six the ruling made keys ahead of their reader are each a
+        // property, and a rule plays each once Phase 6a reads it: the capacity a
+        // bar adds from 6a.1, the other five not yet.
         Assert.Equal("Phase 6a", TuningSchema.Deferred[Enchanter].Phase);
-        Assert.Equal(["WearPerHit", "GraftBaseChance"], TuningSchema.Deferred[Enchanter].Keys.ToArray());
+        Assert.Equal(["GraftBaseChance"], TuningSchema.Deferred[Enchanter].Keys.ToArray());
         Assert.Equal("Phase 6b", TuningSchema.Deferred[Consumables].Phase);
         Assert.Equal(["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"], TuningSchema.Deferred[Consumables].Keys.ToArray());
         Assert.Equal([Enchanter, Consumables], TuningSchema.Deferred.Keys.Order());
@@ -276,8 +278,10 @@ public class TuningSchemaTests
         foreach (string name in RulingsEnchanterKeys)
         {
             Assert.NotNull(typeof(Tuning).GetProperty(name));
-            Assert.False(Key(name).Played, $"{name} is played");
+            Assert.Equal(name == nameof(Tuning.WearCapacityPerBar), Key(name).Played);
         }
+        Assert.NotNull(typeof(Tuning).GetProperty(nameof(Tuning.WearPerHit)));
+        Assert.True(Key(nameof(Tuning.WearPerHit)).Played);
         Assert.DoesNotContain(TuningSchema.Keys, k => k.Group is Consumables);
 
         // What each key is set to is tuning.json's to say: the one derivation a
@@ -305,29 +309,40 @@ public class TuningSchemaTests
         // R4, the user's ruling of 2026-09-25: every number of what a deposit
         // costs is a tuning.json key of the Enchanter group, each its own, so any
         // one can move alone — declared ahead of Phase 6a's enchanter, which reads
-        // them. Until then no rule of play reads one (Played false), and each is a
-        // key like any other: a property, the only number its Set moves, and the
-        // master's number inside its clamp. What the master sets each to is its own
-        // to say (REWORK DECISION 3), so no value is asserted here.
+        // them — and WearPerHit, what a hit wears, heads the group, arrived with
+        // its reader. A key no rule reads yet is Played false; one a Phase 6a rule
+        // reads is played, and a save's hash covers it from version 2 (HashedFrom,
+        // PHASE 6a DECISION 9): from 6a.1, what a hit wears and the capacity a bar
+        // adds. Each is a key like any other: a property, the only number its Set
+        // moves, and the master's number inside its clamp. What the master sets
+        // each to is its own to say (REWORK DECISION 3), so no value is asserted here.
         var enchanter = TuningSchema.Keys.Where(k => k.Group == Enchanter).ToArray();
-        Assert.Equal(RulingsEnchanterKeys, enchanter.Select(k => k.Name));
+        Assert.Equal([nameof(Tuning.WearPerHit), .. RulingsEnchanterKeys], enchanter.Select(k => k.Name));
+        string[] playedFrom2 = [nameof(Tuning.WearPerHit), nameof(Tuning.WearCapacityPerBar)];
         foreach (var key in enchanter)
         {
             var k = Assert.IsType<IntKey>(key);
-            Assert.False(k.Played, $"{k.Name} is played");
+            bool plays = playedFrom2.Contains(k.Name);
+            Assert.True(k.Played == plays, $"{k.Name} is {(k.Played ? "" : "not ")}played");
+            Assert.Equal(plays ? 2 : 1, k.HashedFrom);
             int value = k.Get(BuiltIn);
             Assert.InRange(value, k.Min, k.Max);
             Assert.Equal([k.Name], TuningValues.Moved(BuiltIn, k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1)));
         }
+        Assert.Equal((0, 1000), (((IntKey)Key(nameof(Tuning.WearPerHit))).Min, ((IntKey)Key(nameof(Tuning.WearPerHit))).Max));   // 0 wears nothing, a dial; 1000 where a magnitude clamps
 
-        // The Enchanter's two numbers that are not the ruling's still wait with
-        // their Phase 6a readers; the two placeholders the ruling replaced are no
-        // longer keys to come but point at the keys that took their place, each
-        // why in words the HUD's font can draw (the whole warning around it is
-        // held to the font by TuningJsonTests' sweep of every name warning); and
-        // the graft formula's StartingWearCapacity is still StartingPool, the bar
-        // a capacity opens on.
-        Assert.Equal(("Phase 6a", "Phase 6a"), (TuningSchema.DeferredPhase("WearPerHit"), TuningSchema.DeferredPhase("GraftBaseChance")));
+        // Every key outside the group is hashed from version 1, as it was: only
+        // what Phase 6a plays is new to version 2's hash.
+        Assert.All(TuningSchema.Keys.Where(k => k.Group != Enchanter), k => Assert.Equal(1, k.HashedFrom));
+
+        // The Enchanter's other number that is not the ruling's still waits with
+        // its Phase 6a reader, and WearPerHit no longer does; the two placeholders
+        // the ruling replaced are no longer keys to come but point at the keys that
+        // took their place, each why in words the HUD's font can draw (the whole
+        // warning around it is held to the font by TuningJsonTests' sweep of every
+        // name warning); and the graft formula's StartingWearCapacity is still
+        // StartingPool, the bar a capacity opens on.
+        Assert.Equal(((string?)null, "Phase 6a"), (TuningSchema.DeferredPhase("WearPerHit"), TuningSchema.DeferredPhase("GraftBaseChance")));
         foreach (var (placeholder, key) in new[] { ("WearCapacityLadder", nameof(Tuning.WearCapacityPerBar)), ("EnchantmentWearCost", nameof(Tuning.FirstEnchantmentWear)) })
         {
             Assert.Null(TuningSchema.DeferredPhase(placeholder));

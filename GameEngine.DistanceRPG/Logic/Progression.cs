@@ -75,13 +75,36 @@ public static class Progression
     /// maximum and diverge from there — the whole thesis of §2.1 as arithmetic.
     /// </summary>
     /// <param name="xp">Cumulative raw XP credited to this pool.</param>
-    /// <param name="stat">CON for health, INT for mana; a flat 1 for wear (Phase 6a).</param>
+    /// <param name="stat">CON for health, INT for mana. A weapon's wear capacity replays through the overload below, at a flat 1 (<see cref="Wear.Capacity"/>).</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="stat"/> is outside 1..4, or <paramref name="xp"/> is negative.</exception>
     public static PoolProgress Pool(int xp, int stat)
     {
         RequireStat(stat);
         RequireXp(xp);
-        int max = RequireBar(GameContent.Current.Tuning.StartingPool, nameof(Tuning.StartingPool));
+        return Pool(xp, stat, RequireBar(GameContent.Current.Tuning.StartingPool, nameof(Tuning.StartingPool)), pointSize: 1);
+    }
+
+    /// <summary>
+    /// The same replay with its opening bar and the size of a point handed in:
+    /// each point costs the bar it just made, and adds <paramref name="pointSize"/>
+    /// to it. A member's pools add one a point (<see cref="Pool(int, int)"/>); a
+    /// weapon's wear capacity adds <c>WearCapacityPerBar</c> a full bar
+    /// (<see cref="Wear.Capacity"/>, §6.1). A point of nothing would never end the
+    /// replay's growth and makes the pool a flat bar, which is its caller's to
+    /// work out in closed form, so it is refused here.
+    /// </summary>
+    /// <param name="xp">Cumulative raw XP credited to this pool: for wear, the wear ever cashed.</param>
+    /// <param name="stat">The governing stat, 1..4; a flat 1 for a thing with no nature.</param>
+    /// <param name="bar">The bar the pool opens on, 1 or more.</param>
+    /// <param name="pointSize">What a point adds to the bar, 1 or more.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A stat outside 1..4, a negative <paramref name="xp"/>, a bar below 1, or a point below 1.</exception>
+    internal static PoolProgress Pool(int xp, int stat, int bar, int pointSize)
+    {
+        RequireStat(stat);
+        RequireXp(xp);
+        int max = RequireBar(bar, nameof(bar));
+        if (pointSize < 1)
+            throw new ArgumentOutOfRangeException(nameof(pointSize), pointSize, "A point adds 1 or more to the bar: a point of nothing is a flat bar, worked out in closed form by its caller.");
 
         int points = 0;
         int remaining = xp;
@@ -90,7 +113,7 @@ public static class Progression
         {
             remaining -= cost;
             points++;
-            max++;
+            max += pointSize;
             cost = Step(max, stat);
         }
         return new PoolProgress(points, max, remaining, cost);

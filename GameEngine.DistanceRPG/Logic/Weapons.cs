@@ -1,3 +1,5 @@
+using WearRules = GameEngine.DistanceRPG.Logic.Wear;   // inside Weapon the property Wear hides the class
+
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
@@ -12,6 +14,15 @@ namespace GameEngine.DistanceRPG.Logic;
 /// resolution site reads. Made by <see cref="WeaponCatalogue.Instantiate"/>,
 /// one instance per item, and brought back by a load with both spreads as they
 /// were saved (§5.1).
+/// <para>
+/// It also carries its wear (§6.1): the work it has done since it was last
+/// serviced, banked a hit at a time up to its capacity, and the wear it has
+/// ever cashed at the enchanter, which its capacity is replayed from
+/// (<see cref="WearRules.Capacity"/>, PHASE 6a DECISION 2). Every new weapon
+/// has neither: a drop, a boss's drop, an enemy's weapon and the starting kit
+/// arrive at 0 of <see cref="Tuning.StartingPool"/>. Nothing in combat reads
+/// either, so a full weapon plays as a fresh one does.
+/// </para>
 /// </summary>
 public sealed class Weapon
 {
@@ -82,9 +93,13 @@ public sealed class Weapon
     /// <para>
     /// Nothing is re-asked of the relations or the forge limit: the item was
     /// legal when it was made, and a restore brings it back rather than making
-    /// it again. Two things are refused, because no play can reach them: a live
-    /// spread below the forged one — acquired stacks are only ever added — and a
-    /// forged count that is not a prefix of the entries.
+    /// it again. Three things are refused, because no play can reach them: a live
+    /// spread below the forged one — acquired stacks are only ever added — a
+    /// forged count that is not a prefix of the entries, and a negative wear or
+    /// wear cashed. Wear above today's capacity is not refused: capacity is
+    /// today's tuning's, replayed, and a tuning that lowered it takes no wear
+    /// away (<see cref="AccrueWear"/>); the load holds wear to a ceiling no tuning
+    /// in range can pass instead (<c>SaveMapper</c>).
     /// </para>
     /// </summary>
     /// <param name="def">The catalogue row, by the saved id.</param>
@@ -92,9 +107,12 @@ public sealed class Weapon
     /// <param name="modifiers">The live total: forged plus acquired.</param>
     /// <param name="enchantments">The attached entries, in attachment order, each at its tier with its XP.</param>
     /// <param name="forgedEnchantmentCount">How many of <paramref name="enchantments"/>, from the front, are forged.</param>
+    /// <param name="wear">The wear banked since its last service (<see cref="Wear"/>).</param>
+    /// <param name="wearCashed">The wear it has ever cashed at the enchanter (<see cref="WearCashed"/>), its capacity's history.</param>
     /// <exception cref="ArgumentException"><paramref name="modifiers"/> holds fewer stacks of some modifier than <paramref name="forged"/>.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="forgedEnchantmentCount"/> is not a count of <paramref name="enchantments"/>.</exception>
-    internal Weapon(WeaponDef def, ModifierSet forged, ModifierSet modifiers, IReadOnlyList<Enchantment> enchantments, int forgedEnchantmentCount)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="forgedEnchantmentCount"/> is not a count of <paramref name="enchantments"/>, or <paramref name="wear"/> or <paramref name="wearCashed"/> is negative.</exception>
+    internal Weapon(WeaponDef def, ModifierSet forged, ModifierSet modifiers, IReadOnlyList<Enchantment> enchantments, int forgedEnchantmentCount,
+        int wear = 0, int wearCashed = 0)
         : this(def, enchantments)
     {
         ArgumentNullException.ThrowIfNull(forged);
@@ -107,10 +125,14 @@ public sealed class Weapon
         if (forgedEnchantmentCount < 0 || forgedEnchantmentCount > _enchantments.Length)
             throw new ArgumentOutOfRangeException(nameof(forgedEnchantmentCount), forgedEnchantmentCount,
                 $"'{def.Id}' carries {_enchantments.Length} entries; the forged ones are a prefix of them.");
+        ArgumentOutOfRangeException.ThrowIfNegative(wear);
+        ArgumentOutOfRangeException.ThrowIfNegative(wearCashed);
 
         Forged = forged;
         Modifiers = modifiers;
         ForgedEnchantmentCount = forgedEnchantmentCount;
+        Wear = wear;
+        WearCashed = wearCashed;
         Resolve();
     }
 
@@ -199,6 +221,56 @@ public sealed class Weapon
 
     /// <summary>A caster's innate enchantment — the effect a staff casts, the element a wand carries — first in attachment order; null on a martial weapon.</summary>
     public Enchantment? Innate => IsCaster && Enchantments.Count > 0 ? Enchantments[0] : null;
+
+    // ── Wear (§6.1) ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The wear this weapon has banked since it was last serviced (§6.1): a
+    /// count of the work it has done, one direction only — the game never says
+    /// durability. 0 on every new weapon, never negative, and no more than
+    /// <see cref="WearCapacity"/> whenever accrual wrote it
+    /// (<see cref="AccrueWear"/>); a tuning that lowered the capacity since leaves
+    /// it where it was. Nothing in combat reads it.
+    /// </summary>
+    public int Wear { get; private set; }
+
+    /// <summary>
+    /// The wear this weapon has ever cashed at the enchanter: its capacity's
+    /// whole history, the one number <see cref="WearPool"/> is replayed from, as
+    /// a member's maxima are from its XP (PHASE 6a DECISION 2). 0 on every new
+    /// weapon.
+    /// </summary>
+    public int WearCashed { get; private set; }
+
+    /// <summary>
+    /// Where the capacity stands, replayed from <see cref="WearCashed"/> under the
+    /// current tuning (<see cref="WearRules.Capacity"/>): <c>Max</c> is the
+    /// capacity, <c>XpIntoNext</c> the wear cashed toward its next point and
+    /// <c>XpToNext</c> the bar that point costs.
+    /// </summary>
+    public PoolProgress WearPool => WearRules.Capacity(WearCashed);
+
+    /// <summary>The most wear this weapon banks: <see cref="Tuning.StartingPool"/> on a new weapon, grown by full bars cashed (§6.1).</summary>
+    public int WearCapacity => WearPool.Max;
+
+    /// <summary>Whether this weapon has banked all the wear it can: a hit banks nothing more until a deposit spends it. It still plays exactly as it did (§6.1: "a fully worn weapon is not broken").</summary>
+    public bool WornFull => Wear >= WearCapacity;
+
+    /// <summary>
+    /// Bank <paramref name="n"/> wear, up to <see cref="WearCapacity"/>. A weapon
+    /// at or over its capacity banks nothing, so a tuning that lowered the
+    /// capacity never takes wear away and never adds past it. The one caller is
+    /// <see cref="WearRules.Accrue"/>, the turn system's wear feed's door
+    /// (<c>WearTests.WearAccruesInOnePlace</c>).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is negative: wear is only ever banked here.</exception>
+    internal void AccrueWear(int n)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(n);
+        int capacity = WearCapacity;
+        if (Wear < capacity)
+            Wear = (int)Math.Min(capacity, (long)Wear + n);
+    }
 
     /// <summary>
     /// What this item would reserve of a wielder's pool if every entry fitted:

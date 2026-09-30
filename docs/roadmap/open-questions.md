@@ -391,3 +391,87 @@ update asks which slot, on NEW CAMPAIGN's list, setting a slot in use aside as
 NEW CAMPAIGN does; or (b) it stays listed as the `OLD AUTOSAVE` until it is
 loaded, and its load then asks for a slot to move it into. settled.md's Phase 5
 implementation pass records the ruling.
+
+## What counts as a hit for wear (§6.1) — PHASE 6a DECISION 1
+
+A weapon banks `WearPerHit` "per hit rather than per swing, per turn or scaled by
+damage" (settled.md's `WearPerHit = 1` entry; phase-6-between-runs.md §6.1). That
+much is settled, so every body a hit lands on counts: a swing, each body a cleave
+fans to, a shot carried on, a brace, a counter, an ally caught by friendly fire,
+and each body a wand's area cast strikes. A status's tick and an enchantment's own
+discharge are no hits (the one names no weapon, the other rides the hit that
+counted), and an enemy carries no pools. Two cases the words leave open: whether a
+staff's cast — which deals no damage, and may heal or ward an ally — is a hit, and
+what a wipe does to the run's wear.
+
+**Shipped provisionally: a staff's landed cast wears it once, on an ally or an
+enemy alike** (§1.3, "a cast is a hit"), a wand's Cast being no hit of its own —
+its hits are the bodies its shape strikes; **and a wipe keeps the run's wear**:
+"a wipe forfeits spoils, not gear" (settled.md), and the claw-back is the member
+pools' alone. The log says when a member's weapon fills
+(`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`), and the weapon line
+reads `WEAR 30/30 FULL` in yellow.
+
+**This decides how a caster and a wipe earn toward the enchanter, so it is the
+user's to decide.** The alternatives: (a) staves accrue nothing — so a staff is
+never enchanted or refined, against §6.2's caster cases — or only a staff's casts
+on enemies count; or (b) a wipe claws back `DeathXpLossPercent` of the run's wear,
+as it does XP. settled.md's Phase 6a implementation pass records the ruling.
+
+## How a weapon's capacity is kept (§6.1, §6.7) — PHASE 6a DECISION 2
+
+The user's ruling of 2026-09-25 on what a deposit costs (R4, settled.md) gives a
+weapon's `WearCapacity` a start, 30 (`StartingPool`), a growth of
+`WearCapacityPerBar` a full bar of wear cashed, the bar the capacity at the time,
+and a progress that carries from one deposit to the next. The v2 hand-off
+(settled.md) words the save as holding "`wear` and `wearCapacity` … and beside
+them the capacity's progress toward its next point"; how the capacity is kept is
+the build's.
+
+**Shipped provisionally: the save keeps `wear` and `wearCashed`, the wear the
+weapon has ever cashed**, and its capacity and the progress toward the next
+point are replayed from `StartingPool` on read (`Wear.Capacity`), as a member's
+maximum HP and mana are from its XP (settled.md: "Max HP and wear capacity move
+with it"; `Progression`'s "one integer is the whole pool"). So a `StartingPool` or
+`WearCapacityPerBar` edit re-derives every weapon's capacity at once, and the
+numbers-changed notice says so. Wear over a capacity a tuning lowered since is
+kept, never taken away, and the weapon reads full (`WEAR 30/20 FULL`). A save's
+wear is held to a ceiling no tuning in range can pass, `10000 + 1000 ×
+wearCashed` (`StartingPool` and `WearCapacityPerBar` at their clamps' tops).
+
+**This decides whether a tuning edit moves a weapon's grown capacity, so it is
+the user's to decide.** The alternative: keep the capacity and its progress as
+numbers, as the hand-off words it; the migration then writes a capacity that
+reads as `StartingPool`, and a grown capacity stays where it grew whatever the
+tuning says later. settled.md's Phase 6a implementation pass records the ruling.
+
+## The tuning hash of a save from before Phase 6a (§5.3) — PHASE 6a DECISION 9
+
+A save records the hash of the `tuning.json` numbers a rule of play reads
+(settled.md, the hash entry), and a load under other numbers says `THE NUMBERS
+HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED` once. Phase 6a starts to play keys a
+phase-5 save was never played under — `WearPerHit` and `WearCapacityPerBar` from
+6a.1, the rest of the Enchanter group as the enchanter reads them — so a hash
+over the current keys would differ from every phase-5 save's, though no number
+it was played under moved: the cost the entry on the gameplay numbers still
+compiled accepts for a new key.
+
+**Shipped provisionally: a save's hash is compared on the keys played at the
+version that wrote it.** Each key names the save version whose hash first covers
+it (`HashedFrom`: 1 for Phase 5's, 2 for Phase 6a's); a save names the version
+its hash is of (`tuningHashVersion`), which the step that lifts a version-1
+document writes as 1; and a load compares on that version's keys. A phase-5 save
+therefore resumes with nothing to say unless a number it was played under moved,
+and its next save is hashed on version 2's keys. The log's numbers-changed line
+prints the game's hash on the same keys and names the version. **During the
+Phase 6a steps** version 2's key set grows — at the enchanter's queue (6a.3a) and
+at the improvement roll (6a.4) — so a save written on an earlier 6a build shows
+the notice once under a later one, though no number moved; a released version 2
+never does.
+
+**This decides what a phase-5 save says on its first resume, so it is the user's
+to decide.** The alternative: accept one `THE NUMBERS HAVE CHANGED SINCE THIS
+CAMPAIGN WAS SAVED` on the first resume of every phase-5 save, as a new key costs
+(the entry on the gameplay numbers still compiled), with no new member at the
+save's root. settled.md's
+Phase 6a implementation pass records the ruling.

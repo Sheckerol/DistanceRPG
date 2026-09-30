@@ -72,6 +72,51 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void TheWearReadoutSaysFullPlainly()
+    {
+        // §6.1 (Phase 6a.1): every weapon line reads its wear against its
+        // capacity — the work done, one way, never durability (P6:44–58) — white
+        // while it banks, and at the cap WEAR n/n FULL in yellow: "a weapon at its
+        // cap should say so plainly" (P6:74–78), and never in a unique's orange.
+        // The sentence form a panel with room prints says what to do about it.
+        var def = GameContent.Current.Weapons["arming_sword"];
+        Weapon Worn(int wear, int cashed = 0)
+        {
+            var sword = TestWeapons.Get("arming_sword");
+            return new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear, cashed);
+        }
+
+        var fresh = TestWeapons.Get("arming_sword");
+        Assert.Equal("WEAR 0/30", DungeonHud.WearReadout(fresh));
+        Assert.Equal(DungeonHud.White, DungeonHud.WearColor(fresh));
+        Assert.Equal("WEAR 0 OF 30 - 30 MORE FILLS IT", DungeonHud.WearLine(fresh));
+
+        var banked = Worn(12, cashed: 30);   // a bar cashed: capacity 31
+        Assert.Equal("WEAR 12/31", DungeonHud.WearReadout(banked));
+        Assert.Equal("WEAR 12 OF 31 - 19 MORE FILLS IT", DungeonHud.WearLine(banked));
+
+        var full = Worn(31, cashed: 30);
+        Assert.Equal("WEAR 31/31 FULL", DungeonHud.WearReadout(full));
+        Assert.Equal(DungeonHud.Yellow, DungeonHud.WearColor(full));
+        Assert.NotEqual(DungeonHud.Orange, DungeonHud.WearColor(full));
+        Assert.Equal("WEAR 31 OF 31 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(full));
+
+        // A capacity a tuning has since lowered under the wear reads full, over the
+        // wear it kept: nothing takes wear away.
+        using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
+        {
+            var over = Worn(25);
+            Assert.Equal("WEAR 25/20 FULL", DungeonHud.WearReadout(over));
+            Assert.Equal(DungeonHud.Yellow, DungeonHud.WearColor(over));
+        }
+
+        // In the HUD's font, at the widest numbers a save holds.
+        var widest = Worn(99999, cashed: 9_999_999);
+        foreach (string line in new[] { DungeonHud.WearReadout(widest), DungeonHud.WearLine(widest), DungeonHud.WearLine(fresh) })
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", line);
+    }
+
+    [Fact]
     public void ModifierReadout_IsResolvedValuesInTableOrder_TheCritPairOneEntry()
     {
         Assert.Equal("CRIT 19+ x3  LIGHT", DungeonHud.ModifierReadout(TestWeapons.Get("flensing_knife")));

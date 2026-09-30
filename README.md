@@ -106,6 +106,21 @@ bag.
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
 
+**Wear** (Phase 6a): every weapon banks wear as it is used — `WearPerHit`
+(1) for every hit it lands: each body a swing, a cleave, a shot or a wand's cast
+strikes, each counter and each brace, and each landed cast of a staff, a heal or
+a curse alike — up to its capacity, 30 on every new weapon (`StartingPool`). The
+weapon line at the top of the screen, and each weapon in the bag, reads its wear
+over its capacity after the statline, `WEAR 12/30` in white; a full weapon reads
+`WEAR 30/30 FULL` in yellow, banks nothing more, and plays exactly as it did —
+wear is a resource the enchanter spends between runs, never damage, and a full
+weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on the
+dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
+hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
+`docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
+`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter itself, which
+spends wear and grows a weapon's capacity, arrives in the later Phase 6a steps.
+
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
 left, and the turn cycles automatically once everyone's movement runs out.
@@ -263,6 +278,26 @@ back to it, and the game quits from it.
   asks nothing: LOAD GAME's keys line says it, `PLAY SAVES INTO THE SLOT YOU
   LOAD`. A slot you kept as a checkpoint is played forward from its first load,
   its save before one save deep as the backup, then gone.
+- **The format is version 2** (Phase 6a): every weapon in a save carries its
+  wear (`"wear"`) and the wear it has ever cashed at the enchanter
+  (`"wearCashed"` — its capacity is worked out afresh from that under the
+  `tuning.json` loaded now, never stored), and the save names which version's
+  numbers its record of the tuning covers (`"tuningHashVersion"`). A save an
+  earlier build wrote — version 1, Phase 5's, the slots' included — loads as
+  ever: it is lifted to version 2 as it is read, every weapon unworn at 0 of 30,
+  and saved as version 2 from then on. It says `THE NUMBERS HAVE CHANGED` only if
+  a number it was played under moved: the ones Phase 6a began to play
+  (`WearPerHit`, `WearCapacityPerBar`) are none it was played under (PHASE 6a
+  DECISION 9). **Do not open a slot this build has saved with an older
+  checkout** — Phase 5, or an earlier Phase 6a step: an older build reads version
+  2 as a newer build's save and sets it aside, kept and never deleted (renamed
+  back to `campaign.json`, it loads again here), and loads nothing in its place.
+  While Phase 6a is being built, two things of the steps between: a save a later
+  step wrote, opened by an earlier step's build, loses at its next save what the
+  earlier step does not know of (the stable, the enchanter's queue); and a save
+  an earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
+  loads it, though no number moved, since each step adds the numbers it plays to
+  version 2's record. A released version 2 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
@@ -341,11 +376,15 @@ back to it, and the game quits from it.
   writes it and, where a larger one would break the game's arithmetic, no larger
   than play can reach: a forged stack past 3, a live one past its forged count
   plus 50, an enchantment's tier past 2147, more than 10 on a weapon, a run
-  counter in the billions, hit points past the largest bar plus what was earned
-  — and then against the rest: a retired dungeon never cleared, a last run's
-  summary that disagrees with the campaign (its run count, its lock, the dungeon
-  it cleared), a run in progress in a dungeon the list could not have offered,
-  a boss standing that the run has down. A save that fails any of it is set
+  counter in the billions, hit points past the largest bar plus what was earned,
+  a weapon's wear past any capacity any `tuning.json` could give it (10000 plus
+  1000 for each wear it has cashed) — and then against the rest: a retired
+  dungeon never cleared, a last run's summary that disagrees with the campaign
+  (its run count, its lock, the dungeon it cleared), a run in progress in a
+  dungeon the list could not have offered, a boss standing that the run has down,
+  an enemy's weapon or a drop carrying wear. Wear above the capacity today's
+  `tuning.json` gives is no fault: lower `StartingPool` and a full weapon keeps
+  its wear, reading `WEAR 30/20 FULL`. A save that fails any of it is set
   aside as one that cannot be read, the notice naming the field and what is
   wrong there: edit `"retired": ["tutorial"]` while `"cleared": []` and loading
   it says `CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.RETIRED[0]: TUTORIAL IS
@@ -451,20 +490,29 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   movement budget and the cast costs, and turning `MovementBudget` leaves it
   where it was — so a longer budget also banks more mana a turn. Its comment
   gives the formula to re-derive it by hand.
-- **The Enchanter's keys play nothing yet**: `WearCapacityPerBar`,
-  `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
-  `FirstEnchantmentWear` and `EnchantmentWearStep` are what a deposit at the
-  enchanter costs, as the user ruled on 2026-09-25 — how a weapon's wear
-  capacity grows, where its enchantment slots open, and the wear attaching each
-  enchantment needs (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2). The
-  enchanter arrives in Phase 6a, and until then turning one changes nothing in
-  play. Each is still checked like every key — `"EnchantmentSlots": 0` is
-  taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0 IS BELOW 3 - USING 3` —
-  and the log lists it among the numbers the file changed; but a save's record
-  of the numbers it was played under leaves them out, so turning one never says
-  `THE NUMBERS HAVE CHANGED` when a campaign resumes. The docs' older
-  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
-  either is told which key took its place.
+- **The Enchanter's keys** are what a hit wears and what a deposit at the
+  enchanter costs, as the user ruled on 2026-09-25
+  (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2). **Two play**, since Phase
+  6a.1: `WearPerHit`, the wear a weapon banks for every hit it lands (0 wears
+  nothing, so nothing could be enchanted), and `WearCapacityPerBar`, what a full
+  bar of wear cashed adds to a weapon's capacity — worked out afresh from the
+  wear the weapon has ever cashed, so a change moves every weapon's capacity at
+  once. Turning either says `THE NUMBERS HAVE CHANGED` when a campaign saved
+  under the other number resumes — but never to a save from before Phase 6a,
+  whose record of its numbers covers only the keys played then. **The rest play
+  nothing yet**: `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
+  `FirstEnchantmentWear` and `EnchantmentWearStep` — where a weapon's
+  enchantment slots open, and the wear attaching each enchantment needs — wait
+  for the enchanter's queue, a later Phase 6a step, and until then turning one
+  changes nothing in play. Each is still checked like every key —
+  `"EnchantmentSlots": 0` is taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0
+  IS BELOW 3 - USING 3` — and the log lists it among the numbers the file
+  changed; but a save's record of the numbers it was played under leaves them
+  out, so turning one never says `THE NUMBERS HAVE CHANGED` when a campaign
+  resumes. `GraftBaseChance` is no key yet: a file naming it is told it arrives
+  with the Phase 6a code that reads it. The docs' older `WearCapacityLadder` and
+  `EnchantmentWearCost` are no keys: a file naming either is told which key took
+  its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at
@@ -473,7 +521,7 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   the count keeps its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and
   loaded, it goes on saving the campaign played from it; NEW CAMPAIGN never
   offers it. The launcher reads it and no rule of play does, so, like the
-  Enchanter's keys, turning it never says `THE NUMBERS HAVE CHANGED`.
+  Enchanter's keys not yet played, turning it never says `THE NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`
@@ -495,7 +543,10 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `MovementBudgetTests.TheBudgetIsTheTuningsKey` by name, and the doc and the
   derived key move with them; and `FriendlyFireEnabled` turned on fails
   `WandTests.FriendlyFire_OffByDefault_HalfWhenOn`, since the same doc ships
-  wands with friendly fire off until the wand placement scorer exists. Every
+  wands with friendly fire off until the wand placement scorer exists; and
+  `StartingPool` 30 and `WearCapacityPerBar` 1 fail
+  `WearTests.ACapacityReplaysFullBars_TheRulingsNumbers`, since the user's ruling
+  on what a deposit costs states them and the capacities they give. Every
   other number in it fails nothing: the tests read it from the master, or stand
   on numbers of their own (`Premise`, in the test project: the numbers the
   worked examples were written against, which most scenario suites play instead

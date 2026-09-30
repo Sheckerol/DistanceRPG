@@ -42,6 +42,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The tutorial's row: its boss pinned to floor 2, and its golem's 80 HP,
 /// movement budget of 40 and Block x3 — phase-5-save.md L376 and L377 (§5.8):
 /// <see cref="DungeonContentTests.TheTutorialIsTheShippedDungeon"/>.</item>
+/// <item>A weapon's wear capacity: <c>StartingPool</c> 30, the capacity it opens
+/// on, and <c>WearCapacityPerBar</c> 1, a point for every full bar cashed — the
+/// user's ruling of 2026-09-25 on what a deposit costs, R4 (settled.md L1653-1676),
+/// and its worked capacities: <see cref="WearTests.ACapacityReplaysFullBars_TheRulingsNumbers"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

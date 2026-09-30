@@ -118,6 +118,7 @@ public sealed class TurnSystem
     public event Action<ActorState>? RiposteTriggered;                      // a successful block answered with a counter-swing
     public event Action<PartyMemberState, XpCredit, int>? XpCredited;       // a credit bought a member points or levels: the credit and how many (§2.2), for the level-up beat
     public event Action<ActorState, Weapon, Enchantment>? EnchantmentTiered;   // mana an entry spent bought it a tier (§3.3): the wielder, the weapon the circle is cut into, and the entry as it now reads
+    public event Action<PartyMemberState, Weapon>? WeaponWornFull;          // the hit that filled a member's weapon to its wear capacity (§6.1): once, on the crossing
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -202,6 +203,15 @@ public sealed class TurnSystem
     // roster was typed, so no applier asks an actor its kind, and the day
     // enemies gain progression is the day this line changes and nothing else.
     private readonly Dictionary<ActorState, Action<XpCredit>> _xpFeeds = new(ReferenceEqualityComparer.Instance);
+
+    // And for wear (§6.1): the two appliers that land a hit — the DamageTaken
+    // applier, once for every body a hit lands on, and the Cast applier, once for
+    // a staff's landed cast — hand the weapon it landed with to the feed the
+    // roster fixed for its wielder. A party member's banks WearPerHit on it and
+    // says when that filled it (WeaponWornFull); an enemy's does nothing, because
+    // an enemy carries no pools, so no enemy weapon ever wears — the roster says
+    // so, never a type test, exactly as it does for XP.
+    private readonly Dictionary<ActorState, Action<Weapon>> _wearFeeds = new(ReferenceEqualityComparer.Instance);
 
     // And for a defeat (§3.2): the Killed applier hands the blow's unclamped
     // figure to the feed the roster fixed for whatever died, and a dummy's
@@ -329,6 +339,11 @@ public sealed class TurnSystem
                 if (gained > 0)
                     XpCredited?.Invoke(member, credit, gained);
             };
+            _wearFeeds[member] = weapon =>
+            {
+                if (Wear.Accrue(weapon))
+                    WeaponWornFull?.Invoke(member, weapon);
+            };
             _defeatFeeds[member] = static _ => { };                       // a member's defeats are not a ladder anyone farms
             _sides[member] = Side.Party;
             _mayReact[member] = static () => true;                       // the party's zones are always armed
@@ -342,6 +357,7 @@ public sealed class TurnSystem
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
             _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
             _xpFeeds[enemy] = static _ => { };                           // an enemy carries no pools: the roster says so, never a type test
+            _wearFeeds[enemy] = static _ => { };                         // nor wear: no enemy's weapon is ever the party's to service
             // The n-th defeat of this dummy deepens what it is carrying, and the
             // bar is its own constitution: dealt >= MaxHp counts twice (§3.2).
             _defeatFeeds[enemy] = dealt => enemy.DefeatCount += FarmLadder.DefeatAdvance(dealt, enemy.MaxHp);
@@ -654,7 +670,9 @@ public sealed class TurnSystem
     /// reach. A Blast's aim is the point it centres
     /// on (pulled back to the wand's reach), a Cone's or Beam's the direction
     /// from the caster, and a Nova ignores it. The element's trigger is no
-    /// gate: unaffordable, it does not fire and the hits land untyped.
+    /// gate: unaffordable, it does not fire and the hits land untyped. A wand
+    /// whose first entry is no element casts nothing: instantiation never makes
+    /// one, but a save is raw JSON, and the cast reads its element off that entry.
     /// </summary>
     public bool CanCastArea(PartyMemberState caster, (float X, float Y) aim)
     {
@@ -662,6 +680,7 @@ public sealed class TurnSystem
         if (Phase != TurnPhase.Player || !caster.Alive) return false;
         var w = caster.EquippedWeapon;
         if (w == null || !IsAreaCaster(w)) return false;
+        if (w.Innate?.Def.DamageType is null or DamageType.None) return false;
         if (caster.DistLeft < caster.MovementCost(w) || caster.Mana < w.ResolvedManaCost) return false;
         return AreaTargets(caster, aim).Count > 0;
     }
@@ -1791,6 +1810,13 @@ public sealed class TurnSystem
         // nothing and its hits credit themselves, each with its own share.
         CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.ForgedLevels));
 
+        // A staff's landed cast is a hit (§1.3), and wears the staff once, on an
+        // ally or an enemy alike (PHASE 6a DECISION 1). A wand's Cast is not: its
+        // hits are the bodies its shape struck, each worn through the DamageTaken
+        // applier.
+        if (settled.Weapon.AreaShape is null)
+            WearHit(caster, settled.Weapon);
+
         // One record for the cast and the triggers its entries paid, and one
         // credit per entry out of the same record (§3.3): the cast's own mana is
         // nobody's experience, so it is in the record and not in the payments.
@@ -1964,6 +1990,22 @@ public sealed class TurnSystem
     }
 
     /// <summary>
+    /// One hit landed by <paramref name="wielder"/> with <paramref name="weapon"/>
+    /// (§6.1), through the wear feed the roster fixed for it — a member's banks
+    /// <see cref="Tuning.WearPerHit"/> and says when that filled the weapon, an
+    /// enemy's does nothing. The two hit appliers are its only callers, so wear
+    /// accrues where a hit is written and nowhere else (§6.7: "the unified attack
+    /// resolver is the single place it accrues").
+    /// </summary>
+    /// <exception cref="InvalidOperationException"><paramref name="wielder"/> is not on this system's roster.</exception>
+    private void WearHit(ActorState wielder, Weapon weapon)
+    {
+        if (!_wearFeeds.TryGetValue(wielder, out var feed))
+            throw new InvalidOperationException("Wore a weapon for an actor that is not on this turn system's roster.");
+        feed(weapon);
+    }
+
+    /// <summary>
     /// The DamageTaken applier — the single world-write for a hit. Takes
     /// <see cref="DamagePayload.Taken"/> off the target's HP, spends the Ward
     /// levels that swallowed the rest, lands the settled status applications
@@ -2021,6 +2063,13 @@ public sealed class TurnSystem
         // and by AttackShapeTests.GreatAxe_TwoExtra, so a single body taking one
         // extra point reads as a level-up rather than an arithmetic slip.
         CreditXp(attacker, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.WeaponDealt + settled.ForgedShare));
+
+        // And what it wore the weapon (§6.1): a hit, per body it lands on — a
+        // swing, each body a cleave fans to, a shot carried on, a brace, a counter,
+        // an ally caught by friendly fire, each body a wand's cast strikes — and
+        // never scaled by what it dealt, so a blow a Ward all but swallows wears
+        // the weapon as a crit does (S:785–788). Only here and in the Cast applier.
+        WearHit(attacker, settled.Weapon);
 
         // The triggers the chain settled — the attacker's entries at step 4,
         // the defender's Sturdy and Immovable — are spent first, each side's

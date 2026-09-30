@@ -115,16 +115,28 @@ public static class TuningJson
     /// key order and comments never move it, and any value a rule of play reads
     /// does — a number the master copy ships, changed by a new build, included.
     /// A key no rule of play reads (<see cref="TuningKey.Played"/> false — the
-    /// Enchanter's, declared ahead of Phase 6a, and <c>SaveSlots</c>, the
-    /// launcher's) is left out: a save's hash answers "are these the numbers it was
-    /// played under?", and a number nothing plays is none it was played under. So
-    /// turning one never says the numbers changed, and declaring one moves no
-    /// save's hash. A save stores this, never the values.
+    /// Enchanter's still declared ahead of their Phase 6a reader, and
+    /// <c>SaveSlots</c>, the launcher's) is left out: a save's hash answers "are
+    /// these the numbers it was played under?", and a number nothing plays is none
+    /// it was played under. So turning one never says the numbers changed, and
+    /// declaring one moves no save's hash. A save stores this, never the values.
+    /// <para>
+    /// <strong>Hashed per save version</strong> (PHASE 6a DECISION 9): the keys
+    /// are those played at <paramref name="version"/> — a key a rule began to play
+    /// with a later version (<see cref="TuningKey.HashedFrom"/>) is left out of an
+    /// older version's hash, since no campaign saved then was played under it. A
+    /// save records the version its hash is of
+    /// (<see cref="SaveFile.TuningHashVersion"/>), and a load compares on that
+    /// version's keys, so a campaign saved before Phase 6a resumes with nothing to
+    /// say unless a number it was played under moved.
+    /// </para>
     /// </summary>
-    public static string Hash(Tuning tuning)
+    /// <param name="tuning">The tuning to hash.</param>
+    /// <param name="version">The save version whose keys are hashed: the current one's, unless a save of an older one is being compared.</param>
+    public static string Hash(Tuning tuning, int version = SaveCodec.CurrentVersion)
     {
         ArgumentNullException.ThrowIfNull(tuning);
-        var lines = Values(tuning, TuningSchema.Keys.Where(key => key.Played)).Select(v => $"{v.Name}={v.Value}").Order(StringComparer.Ordinal);
+        var lines = Values(tuning, TuningSchema.Keys.Where(key => key.Played && key.HashedFrom <= version)).Select(v => $"{v.Name}={v.Value}").Order(StringComparer.Ordinal);
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", lines)));
         return Convert.ToHexStringLower(digest, 0, 8);
     }
@@ -341,7 +353,7 @@ public static class TuningJson
         /// <summary>
         /// A name no key has: ignored, with a warning that points at the key the
         /// reader meant (1g) — the phase that brings one of §5.3's keys still to
-        /// come (<c>WearPerHit</c>, <c>GraftBaseChance</c> and the Consumables'),
+        /// come (<c>GraftBaseChance</c> and the Consumables'),
         /// the code's name for a doc's spelling and why (a placeholder the user's
         /// ruling of 2026-09-25 replaced among them: <c>WearCapacityLadder</c> is
         /// <c>WearCapacityPerBar</c>), or the key a typo is nearest — and never

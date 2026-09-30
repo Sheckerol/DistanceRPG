@@ -30,15 +30,19 @@ load dumps to the same text as the compiled content (`ContentDump`, retired with
 
 ## What reads them
 
-`PreReworkSaveTests`: each save reads (version 1) and restores whole under the
-current content, and — its floor opened as a resume opens it — captured again it
-writes the same document, its `tuningHash` aside (that is the current tuning's).
-The saves' hash is the hash of `pre-rework-tuning.json`, read by the current
-reader over the master copy, as a copy beside the game is read: the file is
-frozen, so it lacks the keys added since, and the test asserts those are exactly
-the keys no rule of play reads yet — what a deposit costs, the user's ruling of
-2026-09-25, which a save's hash leaves out — so every number the hash covers is
-the file's own. The game says the numbers have changed exactly when the numbers
+`PreReworkSaveTests`: each save is read at version 1 and migrated to 2 (Phase
+6a.1: the step adds exactly an unworn `wear` and `wearCashed` to every weapon row
+and `"tuningHashVersion": 1` at the root, and keeps every other member at its
+value and in its order), restores whole under the current content, and — its
+floor opened as a resume opens it — captured again it writes the same document as
+the migration writes it, the `tuningHash` and `tuningHashVersion` aside (those
+are the current tuning's, on the current version's keys). The saves' hash is the
+hash of `pre-rework-tuning.json` on version 1's keys, read by the current reader
+over the master copy, as a copy beside the game is read: the file is frozen, so
+it lacks the keys added since, and the test asserts those are exactly the keys
+no version-1 hash covers — what a hit wears and what a deposit costs, the user's
+ruling of 2026-09-25, either unplayed or played only from version 2, and the
+launcher's `SaveSlots` — so every number the hash covers is the file's own. The game says the numbers have changed exactly when the numbers
 it ships differ from that file's. And the launch resumes each one — the mid-run
 one in the dungeon, on its floor and turn, where its visit plays on.
 

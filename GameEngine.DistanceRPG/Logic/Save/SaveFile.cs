@@ -10,7 +10,10 @@ namespace GameEngine.DistanceRPG.Logic;
 // Members serialise camel-cased in declaration order. A member a later step
 // appends carries a default and sits last in its record: a missing member is
 // an error (RespectRequiredConstructorParameters), a defaulted one is not, so
-// every save an earlier build of the same version wrote still reads.
+// every save an earlier build of the same version wrote still reads. A required
+// member arrives only with a version, whose migration writes it into every older
+// document (SaveCodec.Migrations): version 2's are a weapon row's wear and wear
+// cashed, and the root's tuning hash version (Phase 6a.1).
 
 /// <summary>
 /// One campaign, saved (§5.1): the version of this format it was written in,
@@ -25,6 +28,17 @@ namespace GameEngine.DistanceRPG.Logic;
 /// the hash and never the values (§5.3: "the hash costs nothing and answers the
 /// only question that matters: are these the same numbers?"). A load under
 /// another tuning warns and plays on (<see cref="LoadedCampaign.TuningChanged"/>).
+/// </param>
+/// <param name="TuningHashVersion">
+/// The save version whose keys <see cref="TuningHash"/> is of (PHASE 6a DECISION
+/// 9): a key a rule began to play with a later version
+/// (<see cref="TuningKey.HashedFrom"/>) is in no older version's hash. A capture
+/// writes <see cref="SaveCodec.CurrentVersion"/>; the step that lifts a version-1
+/// document writes 1, since its hash was taken on version 1's keys, so a load
+/// compares it on those (<see cref="SaveGame.Restore"/>) and a campaign saved
+/// before Phase 6a is told the numbers changed only when one it was played under
+/// moved. From 1 to the document's own version: a hash is never of a key set
+/// newer than its document. Version 2's, and required from it.
 /// </param>
 /// <param name="Campaign">The campaign: the party and everything a run's end wrote.</param>
 /// <param name="View">What the scene was showing, which it reads back and <c>Logic/</c> never does; null for nothing to say.</param>
@@ -43,7 +57,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// by Phase 5.S5, with its default, last: a document written before it reads as
 /// a save with no time.
 /// </param>
-public sealed record SaveFile(int Version, string TuningHash, CampaignDto Campaign, ViewDto? View = null, string? SavedAt = null);
+public sealed record SaveFile(int Version, string TuningHash, int TuningHashVersion, CampaignDto Campaign, ViewDto? View = null, string? SavedAt = null);
 
 /// <summary>
 /// Presentation the document carries for the scene, which <c>Logic/</c> never
@@ -139,15 +153,25 @@ public sealed record StatusDto(string Type, string? Element, int Levels);
 /// modifier sets (§5.1), by modifier name in <see cref="ModifierType"/> order,
 /// and its enchantments in attachment order, which is gameplay and never
 /// sorted (settled.md: "a migration that rebuilds it in a different sequence is
-/// a silent balance change").
+/// a silent balance change") — and its wear (§6.1, version 2).
 /// </summary>
 /// <param name="Id">The catalogue id.</param>
 /// <param name="Forged">The identity spread, fixed when the item was made: its ceiling is read off it.</param>
 /// <param name="Modifiers">The live total, forged plus acquired.</param>
 /// <param name="Enchantments">The attached entries, in attachment order.</param>
 /// <param name="ForgedEnchantments">How many of them, from the front, are forged.</param>
+/// <param name="Wear">
+/// The wear banked since its last service (<see cref="Weapon.Wear"/>). Version 2's,
+/// and required from it: the step that lifts a version-1 document writes 0 on
+/// every weapon row, since no weapon wore before it.
+/// </param>
+/// <param name="WearCashed">
+/// The wear it has ever cashed at the enchanter (<see cref="Weapon.WearCashed"/>):
+/// its capacity is replayed from this under the tuning loaded now, never stored
+/// (PHASE 6a DECISION 2). Version 2's, and required from it; 0 on a lifted row.
+/// </param>
 public sealed record WeaponDto(string Id, IReadOnlyDictionary<string, int> Forged, IReadOnlyDictionary<string, int> Modifiers,
-    IReadOnlyList<EnchantmentDto> Enchantments, int ForgedEnchantments);
+    IReadOnlyList<EnchantmentDto> Enchantments, int ForgedEnchantments, int Wear, int WearCashed);
 
 /// <summary>An attached enchantment: its catalogue id, the tier it is on, and the XP into that tier (§3.3: "a saved instance is two ints").</summary>
 public sealed record EnchantmentDto(string Id, int Tier, int Xp);

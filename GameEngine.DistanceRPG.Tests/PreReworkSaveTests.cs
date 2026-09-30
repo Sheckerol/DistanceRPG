@@ -12,9 +12,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <see cref="VisitSaveTests.Flagship"/> visit), one between runs (a campaign
 /// with the tutorial retired, the Spear Hall locked, and in B's bag the unique,
 /// wand and caster unique the rework's weapon rows touch). Each reads at version 1,
-/// restores whole under the current content — every id and name it holds
-/// resolves — and, opened as a resume opens it, writes back the same document;
-/// its tuning hash is the hash of the tuning it was played under, read by the
+/// migrated to 2 (Phase 6a.1: every weapon row unworn, and its hash of version 1's
+/// keys), restores whole under the current content — every id and name it holds
+/// resolves — and, opened as a resume opens it, writes back the same document as
+/// the migration writes it, the tuning hash and its version aside; its tuning hash
+/// is the hash of the tuning it was played under, on version 1's keys, read by the
 /// current reader; the game says the numbers changed exactly when the numbers
 /// it ships are not those; and a launch resumes each — the save folder itself
 /// being the old autosave, which the launch moves into slot 1, where the listing
@@ -37,6 +39,9 @@ public class PreReworkSaveTests
     /// <summary>The document's member holding the hash of the tuning it was saved under: the one member a capture under other numbers writes differently.</summary>
     private const string TuningHashMember = "tuningHash";
 
+    /// <summary>The document's member naming the version whose keys that hash is of: 1 in a migrated save, the current version in a capture (PHASE 6a DECISION 9).</summary>
+    private const string TuningHashVersionMember = "tuningHashVersion";
+
     /// <summary>The document's member holding when it was saved: appended since the saves were written, so a capture writes it (null, with no time handed in) and the saves have none.</summary>
     private const string SavedAtMember = "savedAt";
 
@@ -48,13 +53,16 @@ public class PreReworkSaveTests
 
     /// <summary>
     /// The keys added since <c>febe036</c>, which <see cref="PlayedTuning"/> is
-    /// frozen before and so lacks — each one no rule of play reads, and so none a
-    /// save's hash covers: what a deposit costs, the user's ruling of 2026-09-25,
-    /// declared ahead of Phase 6a's enchanter; and how many save slots there are,
-    /// the ruling of the same day on the save model, the launcher's.
+    /// frozen before and so lacks — each one no rule of play reads, or one a rule
+    /// began to read with the save's version 2, and so none a version-1 save's hash
+    /// covers: what a hit wears, and what a deposit costs, the user's ruling of
+    /// 2026-09-25, declared ahead of Phase 6a's enchanter and played from version
+    /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>); and how many save
+    /// slots there are, the ruling of the same day on the save model, the launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [
+        nameof(Tuning.WearPerHit),
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
         nameof(Tuning.SaveSlots),
@@ -64,8 +72,9 @@ public class PreReworkSaveTests
     /// The tuning the saves were played under, as the current reader reads
     /// <see cref="PlayedTuning"/>: over the shipped tuning, as the game reads a
     /// copy beside it, since the file is frozen and predates the keys no rule of
-    /// play reads (<see cref="TuningKey.Played"/>). Those are the only keys it
-    /// lacks — asserted on every read — so every number a save's hash covers is
+    /// play reads (<see cref="TuningKey.Played"/>) and those version 2 began to
+    /// hash (<see cref="TuningKey.HashedFrom"/>). Those are the only keys it lacks
+    /// — asserted on every read — so every number a version-1 save's hash covers is
     /// the file's own, and nothing under it is taken from anywhere else.
     /// </summary>
     private static TuningRead ReadPlayedTuning()
@@ -76,7 +85,8 @@ public class PreReworkSaveTests
             var named = document.RootElement.EnumerateObject().Select(key => key.Name).ToHashSet(StringComparer.Ordinal);
             var lacking = TuningSchema.Keys.Where(key => !named.Contains(key.Name)).ToList();
             Assert.Equal(KeysSinceTheSaves, lacking.Select(key => key.Name));
-            Assert.All(lacking, key => Assert.False(key.Played, $"{key.Name} is played, and the saves' tuning has no number for it"));
+            Assert.All(lacking, key => Assert.True(!key.Played || key.HashedFrom > 1,
+                $"{key.Name} is played at version 1, and the saves' tuning has no number for it"));
         }
         return TuningJson.Read(text, ShippedContent.Tuning);
     }
@@ -89,8 +99,10 @@ public class PreReworkSaveTests
     /// <c>$.campaign.party[1].inventory[3].enchantments[0].tier</c> — with what
     /// each holds there; null when they are the same document, member order
     /// included. The root's <see cref="TuningHashMember"/> is left out: a capture
-    /// writes the current tuning's hash there. So is its <see cref="SavedAtMember"/>,
-    /// which a capture writes and the saves, older than it, do not.
+    /// writes the current tuning's hash there, and with it its
+    /// <see cref="TuningHashVersionMember"/>, the current version, where a migrated
+    /// save has 1. So is its <see cref="SavedAtMember"/>, which a capture writes and
+    /// the saves, older than it, do not.
     /// </summary>
     private static string? FirstDifference(JsonNode? expected, JsonNode? actual, string path, bool root = false)
     {
@@ -100,7 +112,7 @@ public class PreReworkSaveTests
                 return null;
             case (JsonObject was, JsonObject now):
             {
-                bool Compared(string name) => !(root && name is TuningHashMember or SavedAtMember);
+                bool Compared(string name) => !(root && name is TuningHashMember or TuningHashVersionMember or SavedAtMember);
                 var wasNames = was.Select(member => member.Key).Where(Compared).ToList();
                 var nowNames = now.Select(member => member.Key).Where(Compared).ToList();
                 foreach (string name in wasNames)
@@ -131,41 +143,115 @@ public class PreReworkSaveTests
         }
     }
 
+    /// <summary>
+    /// What <paramref name="now"/> adds to <paramref name="was"/>, as paths from the
+    /// root, once every member of <paramref name="was"/> is asserted to be in
+    /// <paramref name="now"/> at its own value and in its own order: a failure
+    /// names the first member that moved, went, or changed.
+    /// </summary>
+    private static List<string> Added(JsonNode? was, JsonNode? now, string path)
+    {
+        var added = new List<string>();
+        void Walk(JsonNode? a, JsonNode? b, string at)
+        {
+            switch (a, b)
+            {
+                case (JsonObject left, JsonObject right):
+                    var kept = right.Select(member => member.Key).Where(left.ContainsKey).ToList();
+                    Assert.True(left.Select(member => member.Key).SequenceEqual(kept, StringComparer.Ordinal), $"{at}: the migration moved or dropped a member");
+                    foreach (var (name, value) in left)
+                        Walk(value, right[name], $"{at}.{name}");
+                    added.AddRange(right.Select(member => member.Key).Where(name => !left.ContainsKey(name)).Select(name => $"{at}.{name}"));
+                    break;
+                case (JsonArray left, JsonArray right):
+                    Assert.True(left.Count == right.Count, $"{at}: {left.Count} items saved, {right.Count} migrated");
+                    for (int i = 0; i < left.Count; i++)
+                        Walk(left[i], right[i], $"{at}[{i}]");
+                    break;
+                default:
+                    Assert.True(a?.ToJsonString() == b?.ToJsonString(), $"{at}: {a?.ToJsonString() ?? "null"} saved, {b?.ToJsonString() ?? "null"} migrated");
+                    break;
+            }
+        }
+        Walk(was, now, path);
+        return added;
+    }
+
+    /// <summary>Every weapon row's path in <paramref name="node"/>, found by its shape — an object carrying <c>forgedEnchantments</c> — never by where it sits: the test's own oracle for the step, which walks the places by name.</summary>
+    private static IEnumerable<(string Path, JsonObject Row)> WeaponRows(JsonNode? node, string path)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                if (obj.ContainsKey("forgedEnchantments"))
+                    yield return (path, obj);
+                foreach (var (name, value) in obj)
+                    foreach (var row in WeaponRows(value, $"{path}.{name}"))
+                        yield return row;
+                break;
+            case JsonArray array:
+                for (int i = 0; i < array.Count; i++)
+                    foreach (var row in WeaponRows(array[i], $"{path}[{i}]"))
+                        yield return row;
+                break;
+        }
+    }
+
     [Fact]
     public void ASaveFromBeforeTheReworkRestoresWhole()
     {
         foreach (string name in Saves)
         {
-            // The save reads at version 1 — no bump, no migration — and restores under
-            // the content loaded now: every weapon, enchantment, dungeon, status and
-            // member it names resolves, or the restore refuses it, naming where.
+            // The save's text is version 1, and it reads at version 2, lifted by the
+            // one step this build ships (Phase 6a.1): every member of the saved tree
+            // kept at its value and in its order, and exactly two things added — an
+            // unworn wear on every weapon row, wherever it sits, and the root's hash
+            // version 1, since its hash was taken on version 1's keys.
             string text = TextOf(name);
+            var saved = JsonNode.Parse(text)!.AsObject();
+            Assert.Equal(1, saved["version"]!.GetValue<int>());
+            var lifted = SaveCodec.LiftToVersion2(saved.DeepClone().AsObject());
+            var rows = WeaponRows(saved, "$").Select(row => row.Path).ToList();
+            Assert.NotEmpty(rows);
+            Assert.Equal(rows, WeaponRows(lifted, "$").Select(row => row.Path));
+            Assert.Equal(
+                rows.SelectMany(row => new[] { $"{row}.wear", $"{row}.wearCashed" }).Append($"$.{TuningHashVersionMember}").Order(StringComparer.Ordinal),
+                Added(saved, lifted, "$").Order(StringComparer.Ordinal));
+            Assert.Equal(1, lifted[TuningHashVersionMember]!.GetValue<int>());
+            Assert.All(WeaponRows(lifted, "$"), row => Assert.Equal((0, 0), (row.Row["wear"]!.GetValue<int>(), row.Row["wearCashed"]!.GetValue<int>())));
+
+            // Read, it restores under the content loaded now: every weapon,
+            // enchantment, dungeon, status and member it names resolves, or the
+            // restore refuses it, naming where. Every weapon is unworn, on a fresh
+            // capacity.
             var file = SaveCodec.Read(text);
-            Assert.Equal(1, file.Version);
+            Assert.Equal((SaveCodec.CurrentVersion, 1), (file.Version, file.TuningHashVersion));
+            string migrated = SaveCodec.Write(file);
             var loaded = SaveGame.Restore(file, GameContent.Current);
             var campaign = loaded.Campaign;
             Assert.Equal(name == MidRun, campaign.Visit is not null);
+            Assert.All(campaign.Party.SelectMany(member => member.Inventory).OfType<Weapon>(),
+                weapon => Assert.Equal((0, 0, GameContent.Current.Tuning.StartingPool), (weapon.Wear, weapon.WearCashed, weapon.WearCapacity)));
 
             // A run in progress is opened as the game's resume opens it — on the
-            // visit's own die — and captured again it is the same document, every
-            // weapon row field by field: nothing lost, nothing re-derived differently.
-            // The tuning hash aside, which is the current tuning's.
+            // visit's own die — and captured again it is the migrated document,
+            // every weapon row field by field: nothing lost, nothing re-derived
+            // differently. The tuning hash aside, which is the current tuning's, on
+            // the current version's keys, where the migrated save's is of version 1's.
             campaign.Visit?.OpenTurns(campaign.Party);
             string again = SaveCodec.Write(SaveGame.Capture(campaign, loaded.View));
             string hash = TuningJson.Hash(GameContent.Current.Tuning);
-            Assert.Equal(hash, SaveCodec.Read(again).TuningHash);
-            if (FirstDifference(JsonNode.Parse(text), JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
-                Assert.Fail($"captured again, the document is not the save: {difference}");
+            var recaptured = SaveCodec.Read(again);
+            Assert.Equal((hash, SaveCodec.CurrentVersion), (recaptured.TuningHash, recaptured.TuningHashVersion));
+            if (FirstDifference(JsonNode.Parse(migrated), JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
+                Assert.Fail($"captured again, the document is not the migrated save: {difference}");
 
-            // And as text, whitespace and number formatting included — but for the
-            // time a capture writes last, null with none handed in, which the save,
-            // older than the member, never had.
-            string untimed = again.Replace($",\n  \"{SavedAtMember}\": null\n}}", "\n}", StringComparison.Ordinal);
-            Assert.NotEqual(again, untimed);
+            // And as text, whitespace and number formatting included: the migrated
+            // save as the codec writes it — its time null, as it never had one — with
+            // the capture's hash and hash version in place of its own.
             Assert.Null(file.SavedAt);
-            string savedHash = $"\"{TuningHashMember}\": \"{file.TuningHash}\"";
-            Assert.True(text.Replace(savedHash, $"\"{TuningHashMember}\": \"{hash}\"", StringComparison.Ordinal) == untimed,
-                $"{name}: captured again, the document's text is not the save's, though every value and member order is");
+            Assert.True(SaveCodec.Write(file with { TuningHash = hash, TuningHashVersion = SaveCodec.CurrentVersion }) == again,
+                $"{name}: captured again, the document's text is not the migrated save's, though every value and member order is");
         }
     }
 
@@ -173,12 +259,13 @@ public class PreReworkSaveTests
     public void ItsHashIsItsTuningsHash()
     {
         // The hash each save carries is the hash of the tuning it was played under,
-        // as the current reader reads that file: the hash covers the same numbers
-        // it did before the rework, so a save written then is recognised as played
-        // under exactly those numbers.
+        // as the current reader reads that file, on version 1's keys — the version
+        // the migration says it is of: the hash covers the same numbers it did
+        // before the rework, so a save written then is recognised as played under
+        // exactly those numbers.
         var read = ReadPlayedTuning();
         Assert.Empty(read.Warnings);
-        string hash = TuningJson.Hash(read.Tuning);
+        string hash = TuningJson.Hash(read.Tuning, version: 1);
         foreach (string name in Saves)
             Assert.Equal(hash, SaveCodec.Read(TextOf(name)).TuningHash);
     }
@@ -190,7 +277,8 @@ public class PreReworkSaveTests
         // not the ones it was played under — under the shipped tuning, as the game
         // resumes it, that is whether any shipped number differs from the save's
         // tuning; under the save's own tuning, never; and under it with one number
-        // moved, always.
+        // moved, always — but for a number no rule played at version 1, one version
+        // 2 began to hash, which is none it was played under (PHASE 6a DECISION 9).
         var played = ReadPlayedTuning().Tuning;
         bool moved = NumbersMoved(ShippedContent.Tuning);
         foreach (string name in Saves)
@@ -202,6 +290,8 @@ public class PreReworkSaveTests
                 Assert.False(SaveGame.Restore(file, GameContent.Current).TuningChanged);
             using (TestContent.Use(tuning: played with { MovementBudget = played.MovementBudget + 1 }))
                 Assert.True(SaveGame.Restore(file, GameContent.Current).TuningChanged);
+            using (TestContent.Use(tuning: played with { WearPerHit = played.WearPerHit + 1 }))
+                Assert.False(SaveGame.Restore(file, GameContent.Current).TuningChanged);
         }
     }
 

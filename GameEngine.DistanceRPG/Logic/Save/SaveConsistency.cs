@@ -32,7 +32,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// counter itself, so that is play's everyday state; a lock on a retired dungeon,
 /// which play writes when <c>dungeons.json</c> moves <c>retiresOnClear</c> onto a
 /// dungeon already locked; hit points or mana over a maximum the load derives
-/// from today's tuning and content; a soul's tier, which its pin plays at 1; and
+/// from today's tuning and content, and a weapon's wear over the capacity today's
+/// tuning replays for it (held instead to a ceiling no tuning in range can pass,
+/// <see cref="SaveMapper"/>); a soul's tier, which its pin plays at 1; and
 /// the counts no clamp or rule gives an honest ceiling, which
 /// <see cref="SaveMapper"/> holds only to the sanity bound past which the next
 /// step of play would wrap (<see cref="ContentBounds.MostCount"/>).
@@ -216,10 +218,10 @@ internal static class SaveConsistency
     }
 
     /// <summary>
-    /// 15–19. The visit in progress, against the campaign that entered it and
+    /// 15–20. The visit in progress, against the campaign that entered it and
     /// against itself: entered as <see cref="CampaignState.Enter"/> enters, played
     /// as a visit plays — XP only gained, the boss down for good once it falls, a
-    /// drop handed over only then.
+    /// drop handed over only then, and no weapon worn that no member wielded.
     /// </summary>
     private static void Visit(CampaignDto campaign, VisitDto visit, HashSet<string> retired, Dictionary<string, int> locks)
     {
@@ -279,6 +281,31 @@ internal static class SaveConsistency
                     throw new SaveFormatException(where, "taken from a standing row: a drop lies only on a corpse, and nothing rises once the boss is down");
             }
         }
+
+        // 20. No enemy's weapon wears (an enemy's wear feed does nothing), and a
+        // drop is made when it is rolled: neither has banked or cashed any wear
+        // (Phase 6a.1). A weapon the party put down, and a spoil, are the party's,
+        // and carry their wear.
+        for (int f = 0; f < visit.Floors.Count; f++)
+        {
+            var rows = visit.Floors[f].Enemies;
+            for (int k = 0; k < rows.Count; k++)
+            {
+                string where = $"{at}.floors[{f}].enemies[{k}]";
+                Unworn(rows[k].Weapon, $"{where}.weapon", "no enemy weapon is ever one the party wields, so it never wears");
+                if (rows[k].GroundItem is { } lying)
+                    Unworn(lying.Weapon, $"{where}.groundItem.weapon", "a drop is made when it is rolled, and nothing has wielded it since");
+            }
+        }
+    }
+
+    /// <summary>20's one question: a weapon no member has wielded has banked no wear and cashed none.</summary>
+    private static void Unworn(WeaponDto weapon, string at, string why)
+    {
+        if (weapon.Wear != 0)
+            throw new SaveFormatException($"{at}.wear", $"{weapon.Wear} worn: {why}");
+        if (weapon.WearCashed != 0)
+            throw new SaveFormatException($"{at}.wearCashed", $"{weapon.WearCashed} cashed: {why}");
     }
 
     /// <summary>16's one question: what a pool held at the door is no more than what it holds now.</summary>

@@ -300,7 +300,7 @@ public sealed record Tuning
 
     /// <summary>
     /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
-    /// from Phase 6a — a weapon's wear capacity alike, so the 30 is never a bare
+    /// since Phase 6a — a weapon's wear capacity alike, so the 30 is never a bare
     /// literal in three places. A point costs <c>currentMax / governingStat</c>
     /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
     /// diverge rather than starting apart. Below 1 there is no step to take, and
@@ -392,13 +392,26 @@ public sealed record Tuning
     public int StairGatherTiles { get; init; }
 
     // ---- Enchanter (Phase 6a; the user's ruling of 2026-09-25) ----
-    // What a deposit costs (§6.1, §6.2): how a weapon's wear capacity grows, where
-    // its enchantment slots open, and how much wear attaching each enchantment
-    // needs. The user ruled the numbers and keeps each in tuning.json, so they are
-    // keys ahead of their reader: no rule of play reads one until Phase 6a builds
-    // the enchanter, and until then a save's hash leaves them out
-    // (TuningKey.Played). A weapon's capacity opens on StartingPool, the one bar
-    // every pool opens on, which stays one key.
+    // What a hit wears (§6.1), and what a deposit costs (§6.1, §6.2): how a
+    // weapon's wear capacity grows, where its enchantment slots open, and how much
+    // wear attaching each enchantment needs. The user ruled the deposit's numbers
+    // and keeps each in tuning.json, so they were declared ahead of their reader;
+    // Phase 6a sets each played as a rule of it reads it (TuningKey.Played), and a
+    // save's hash covers each from version 2 (TuningKey.HashedFrom). A weapon's
+    // capacity opens on StartingPool, the one bar every pool opens on, which stays
+    // one key.
+
+    /// <summary>
+    /// The wear a weapon banks for every hit it lands (§6.1): each body a swing,
+    /// a cleave, a shot or a wand's cast strikes, and each landed cast of a staff
+    /// (<see cref="Wear.Accrue"/>, PHASE 6a DECISION 1) — per hit, never per
+    /// swing, per turn or scaled by damage, so the pool is a plain count of the
+    /// work a weapon has done. It banks up to the weapon's
+    /// <see cref="Weapon.WearCapacity"/> and no further, and a deposit at the
+    /// enchanter spends it all. 0 means no weapon ever wears, so none can be
+    /// enchanted: a dial, not an error.
+    /// </summary>
+    public int WearPerHit { get; init; }
 
     /// <summary>
     /// The capacity a full bar's worth of cashed wear adds to a weapon's
@@ -406,7 +419,8 @@ public sealed record Tuning
     /// progress carries — a deposit short of a full bar still counts toward the
     /// next point, and what one cashes past a bar starts the next. The growth is
     /// the same whichever service the deposit bought (§6.4). 0 freezes capacity.
-    /// No rule reads it yet: Phase 6a's enchanter will.
+    /// Read by <see cref="Wear.Capacity"/>, which replays a weapon's capacity from
+    /// the wear it has ever cashed, as a member's pools are replayed from its XP.
     /// </summary>
     public int WearCapacityPerBar { get; init; }
 

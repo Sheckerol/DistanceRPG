@@ -33,8 +33,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// ruling of 2026-09-25, R3(b)). Every field is read on its own first — every
 /// count from its floor, and every count whose larger value would wrap the
 /// arithmetic that reads it up to a ceiling, beside its floor: a forged stack,
-/// a live one, a member's innate, an entry's tier, a weapon's entries, the run
-/// counter, a body's hit points, the boss floor, a status's levels, a hold, and
+/// a live one, a member's innate, an entry's tier, a weapon's entries and its
+/// wear, the run counter, a body's hit points, the boss floor, a status's levels,
+/// a hold, and
 /// every count play grows a step at a time (<see cref="Count"/>). A float is
 /// finite, a body stands on the map, and a member's movement budgets nest as a
 /// turn leaves them. A lock wraps nothing, so it
@@ -279,7 +280,9 @@ internal static class SaveMapper
         Table(weapon.Forged.Entries),
         Table(weapon.Modifiers.Entries),
         weapon.Enchantments.Select(entry => new EnchantmentDto(entry.Id, entry.Tier, entry.Xp)).ToArray(),
-        weapon.ForgedEnchantmentCount);
+        weapon.ForgedEnchantmentCount,
+        weapon.Wear,
+        weapon.WearCashed);
 
     internal static RunResultDto Result(RunResult result) => new(
         result.DungeonId,
@@ -460,11 +463,12 @@ internal static class SaveMapper
 
     /// <summary>
     /// A weapon as saved: the row by id, both spreads by name, the entries by id
-    /// at their tiers, in attachment order. A forged stack is no deeper than any
-    /// forge goes, a live one no deeper than its forged count plus the most
-    /// headroom any tuning gives, an entry's tier no deeper than its arithmetic
-    /// stays whole at, and the entries no more than a weapon holds
-    /// (<see cref="ContentBounds"/>).
+    /// at their tiers, in attachment order, and its wear. A forged stack is no
+    /// deeper than any forge goes, a live one no deeper than its forged count plus
+    /// the most headroom any tuning gives, an entry's tier no deeper than its
+    /// arithmetic stays whole at, the entries no more than a weapon holds, the wear
+    /// cashed a count, and the wear no more than any tuning's capacity for what was
+    /// cashed (<see cref="ContentBounds"/>).
     /// </summary>
     private static Weapon Weapon(WeaponDto row, GameContent content, string at)
     {
@@ -500,7 +504,17 @@ internal static class SaveMapper
             throw new SaveFormatException($"{at}.forgedEnchantments",
                 $"{row.ForgedEnchantments} of {entries.Length} entries: the forged ones are a prefix of the list");
 
-        return new Weapon(def, forged, live, entries, row.ForgedEnchantments);
+        // The wear banked is held to a ceiling no tuning in range can move, as a
+        // member's hit points are (Body): a capacity opens on a bar no larger than
+        // Bar and grows at most MostCapacityPerBar a point, each point costing a
+        // bar of one wear cashed or more, and accrual never banks past capacity.
+        // Summed as a long, so wear cashed at its own ceiling cannot wrap it. Wear
+        // over today's capacity is not refused: capacity is today's tuning's.
+        int wear = Count(row.Wear, $"{at}.wear");
+        int wearCashed = Count(row.WearCashed, $"{at}.wearCashed");
+        AtMost(wear, ContentBounds.Bar + (long)ContentBounds.MostCapacityPerBar * wearCashed, $"{at}.wear", WearWhy);
+
+        return new Weapon(def, forged, live, entries, row.ForgedEnchantments, wear, wearCashed);
     }
 
     /// <summary>
@@ -1058,6 +1072,9 @@ internal static class SaveMapper
 
     private static readonly string RowHpWhy =
         $"a row holds no more hit points than the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), plus what its revivals added";
+
+    private static readonly string WearWhy =
+        $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
 
     /// <summary>Why a live stack stops at its forged count plus the most headroom any tuning gives.</summary>
     private static string AcquiredWhy(int forged)

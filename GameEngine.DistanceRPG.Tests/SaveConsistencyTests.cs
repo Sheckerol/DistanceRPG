@@ -39,6 +39,10 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>Why the run counter stops below <see cref="ContentBounds.MostRuns"/>: what its refusal says after the value and the ceiling.</summary>
     private const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
 
+    /// <summary>Why a weapon's wear stops where it does: what its refusal says after the value and the ceiling.</summary>
+    private static readonly string WearWhy =
+        $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
+
     private static string FixtureText(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name));
 
     private static CampaignState NewCampaign() => CampaignState.Start(GameContent.Current);
@@ -173,6 +177,14 @@ public sealed class SaveConsistencyTests : IDisposable
         return result;
     }
 
+    /// <summary><paramref name="hits"/> hits' wear on <paramref name="weapon"/>, through the one door a landed hit banks it through (<see cref="Wear.Accrue"/>).</summary>
+    private static Weapon Worn(Weapon weapon, int hits)
+    {
+        for (int i = 0; i < hits; i++)
+            Wear.Accrue(weapon);
+        return weapon;
+    }
+
     // ── What play writes ─────────────────────────────────────────────────────
 
     [Fact]
@@ -259,6 +271,43 @@ public sealed class SaveConsistencyTests : IDisposable
             script.Open();
             script.EndTurn();
             Loads(early, "the early offer a turn in");
+        }
+
+        // Wear (Phase 6a.1): a weapon the party wields keeps what it has banked
+        // wherever it goes — in a hand, full, in a bag, a spoil kept or lost, a
+        // weapon put down on a floor — and a capacity a tuning lowered below it
+        // since: each is what play writes, and each loads.
+        var worn = NewCampaign();
+        CampaignRuns.Clear(worn, "tutorial", GoldenSeed);
+        Worn(worn.Party[0].Inventory[0]!, 12);
+        Assert.True(Worn(worn.Party[1].Inventory[0]!, 40).WornFull);
+        Loads(worn, "worn weapons in hand, one full");
+
+        var visit = worn.Enter("spear_hall", FiveDeep);
+        visit.OpenTurns(worn.Party, CampaignRuns.Ten);
+        var gear = Worn(worn.Party[3].Inventory[1]!, 7);   // D's second staff, cast with before it went back in the bag
+        Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
+        Loads(worn, "a worn weapon put down on a floor, mid-run");
+        var kept = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.NotEqual(Pickup.BagFull, Pickup.Take(worn, visit.Current.Enemies[0], kept, worn.Party[2], visit));
+        Worn(kept.Weapon, 5);
+        var exited = CampaignRuns.Exit(worn);
+        Assert.Equal(5, Assert.Single(exited.SpoilsKept).Wear);
+        Loads(worn, "a worn spoil kept");
+
+        var wiping = worn.Enter("knife_warrens", FiveDeep);
+        var wipeTurns = wiping.OpenTurns(worn.Party, CampaignRuns.Ten);
+        var lost = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.NotEqual(Pickup.BagFull, Pickup.Take(worn, wiping.Current.Enemies[0], lost, worn.Party[1], wiping));
+        Worn(lost.Weapon, 3);
+        var wiped = CampaignRuns.Wipe(worn, wipeTurns);
+        Assert.Equal(3, Assert.Single(wiped.SpoilsLost).Wear);
+        Loads(worn, "a worn spoil lost to a wipe");
+
+        using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
+        {
+            Assert.True(worn.Party[1].Inventory[0]!.Wear > worn.Party[1].Inventory[0]!.WearCapacity);
+            Loads(worn, "wear over a capacity a tuning lowered since");
         }
     }
 
@@ -546,6 +595,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         int deepestForge = ContentBounds.DeepestForge, mostAcquired = ContentBounds.MostAcquired, deepestStack = ContentBounds.DeepestStack;
         int deepestTier = ContentBounds.DeepestTier, mostEnchantments = ContentBounds.MostEnchantments, bar = ContentBounds.Bar;
+        int perBar = ContentBounds.MostCapacityPerBar;
         int mostRuns = ContentBounds.MostRuns - 1;
         void Runs(JsonObject tree, int counter, int summary, int summaryLock, int campaignLock)
         {
@@ -601,6 +651,16 @@ public sealed class SaveConsistencyTests : IDisposable
                 tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
                 tree => Runs(tree, mostRuns, mostRuns + 1, mostRuns, mostRuns),
                 "campaign.lastResult.runCounter", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
+            // 0i. A weapon's wear: no capacity any tuning in range gives it, the largest
+            // bar plus the most a bar adds for each wear cashed (Phase 6a.1).
+            ("a weapon's wear", hall,
+                tree => WeaponNode(tree, 0, 0)["wear"] = bar,
+                tree => WeaponNode(tree, 0, 0)["wear"] = bar + 1,
+                "campaign.party[0].inventory[0].wear", $"{bar + 1} is above {bar}: {WearWhy}"),
+            ("a weapon's wear, a bar cashed", hall,
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar; },
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar + 1; },
+                "campaign.party[0].inventory[0].wear", $"{bar + 30 * perBar + 1} is above {bar + 30 * perBar}: {WearWhy}"),
             // 0h. A member's hit points: the largest bar plus a point for each HP XP.
             ("a member's hit points", hall,
                 tree => MemberNode(tree, 2)["body"]!["hp"] = bar + hpXp,
@@ -652,6 +712,7 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal(int.MaxValue / (Top(nameof(Tuning.ApplyPercent)) * Top(nameof(Tuning.ArcanePotency))), ContentBounds.DeepestTier);
         Assert.Equal(int.MaxValue - Top(nameof(Tuning.BossFloorMax)) * Top(nameof(Tuning.CooldownRunsPerFloor)), ContentBounds.MostRuns);
         Assert.Equal(Top(nameof(Tuning.EnchantmentSlots)), ContentBounds.MostEnchantments);
+        Assert.Equal(Top(nameof(Tuning.WearCapacityPerBar)), ContentBounds.MostCapacityPerBar);
         Assert.Equal(int.MaxValue / (2 * Top(nameof(Tuning.EffectPerLevel))), ContentBounds.MostLevels);
         Assert.Equal(Top(nameof(Tuning.Offset)) + Top(nameof(Tuning.PerStack)) * ContentBounds.DeepestStack, ContentBounds.MostHeldShots);
     }
@@ -699,6 +760,19 @@ public sealed class SaveConsistencyTests : IDisposable
                 tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most,
                 tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most + 1,
                 "campaign.party[3].inventory[0].enchantments[0].xp", $"{most + 1} is above {most}: {countWhy}"),
+            // Wear cashed grows a deposit at a time, and wear a hit at a time (Phase 6a.1):
+            // counts, each at the sanity bound, the wear with enough cashed that its
+            // own capacity ceiling is no nearer.
+            ("wear cashed", hall,
+                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most,
+                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most + 1,
+                "campaign.party[0].inventory[0].wearCashed", $"{most + 1} is above {most}: {countWhy}"),
+            ("wear", hall,
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most; },
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most + 1; },
+                "campaign.party[0].inventory[0].wear", $"{most + 1} is above {most}: {countWhy}"),
+            ("negative wear", hall, tree => { }, tree => WeaponNode(tree, 0, 0)["wear"] = -1,
+                "campaign.party[0].inventory[0].wear", "-1 is below 0"),
             ("mana", hall, tree => MemberNode(tree, 3)["body"]!["mana"] = most, tree => MemberNode(tree, 3)["body"]!["mana"] = most + 1,
                 "campaign.party[3].body.mana", $"{most + 1} is above {most}: {countWhy}"),
             ("a held shot", hall,
@@ -746,6 +820,94 @@ public sealed class SaveConsistencyTests : IDisposable
             Restores(Edited(text, atCeiling), $"{what} at its ceiling");
             RefusedAt(Edited(text, past), where, problem);
         }
+    }
+
+    [Fact]
+    public void AnEnemyOrADropCarryingWearIsRefused()
+    {
+        // Check 20 (Phase 6a.1): no enemy's weapon ever wears — its wear feed does
+        // nothing — and a drop is made when it is rolled, so neither has banked
+        // wear or cashed any. A save that says otherwise is none play wrote. The
+        // Flagship: a halberd standing on floor 4, and a corpse on floor 4 lying on
+        // its drop; and a weapon the party put down there, which is the party's and
+        // keeps its wear.
+        string text = Save(VisitSaveTests.Flagship().Campaign);
+        Restores(text, "the Flagship");
+        const string EnemyWhy = "no enemy weapon is ever one the party wields, so it never wears";
+        const string DropWhy = "a drop is made when it is rolled, and nothing has wielded it since";
+        RefusedAt(Edited(text, tree => FloorNode(tree, 3)["enemies"]![0]!["weapon"]!["wear"] = 1),
+            "campaign.visit.floors[3].enemies[0].weapon.wear", $"1 worn: {EnemyWhy}");
+        RefusedAt(Edited(text, tree => FloorNode(tree, 3)["enemies"]![0]!["weapon"]!["wearCashed"] = 30),
+            "campaign.visit.floors[3].enemies[0].weapon.wearCashed", $"30 cashed: {EnemyWhy}");
+
+        var floors = VisitNode(JsonNode.Parse(text)!.AsObject())["floors"]!.AsArray();
+        var (f, k) = Enumerable.Range(0, floors.Count)
+            .SelectMany(n => Enumerable.Range(0, floors[n]!["enemies"]!.AsArray().Count).Select(row => (n, row)))
+            .First(at => floors[at.n]!["enemies"]![at.row]!["groundItem"] is JsonObject);
+        RefusedAt(Edited(text, tree => FloorNode(tree, f)["enemies"]![k]!["groundItem"]!["weapon"]!["wear"] = 4),
+            $"campaign.visit.floors[{f}].enemies[{k}].groundItem.weapon.wear", $"4 worn: {DropWhy}");
+        RefusedAt(Edited(text, tree => FloorNode(tree, f)["enemies"]![k]!["groundItem"]!["weapon"]!["wearCashed"] = 1),
+            $"campaign.visit.floors[{f}].enemies[{k}].groundItem.weapon.wearCashed", $"1 cashed: {DropWhy}");
+
+        // The boss's row is an enemy's like any other: the Spear Hall's bottom floor, reached.
+        var bottom = VisitScript.Enter(NewCampaign(), "spear_hall", FiveDeep);
+        while (bottom.Floor.DownStairs is not null)
+            bottom.Down();
+        string lair = Save(bottom.Campaign);
+        int deepest = bottom.Visit.BossFloor - 1, boss = BossRow(lair, deepest);
+        RefusedAt(Edited(lair, tree => FloorNode(tree, deepest)["enemies"]![boss]!["weapon"]!["wear"] = 2),
+            $"campaign.visit.floors[{deepest}].enemies[{boss}].weapon.wear", $"2 worn: {EnemyWhy}");
+
+        // What the party put down is the party's, and keeps what it banked.
+        Assert.NotEmpty(FloorNode(JsonNode.Parse(text)!.AsObject(), 3)["looseItems"]!.AsArray());
+        Restores(Edited(text, tree =>
+        {
+            var weapon = FloorNode(tree, 3)["looseItems"]![0]!["weapon"]!;
+            weapon["wear"] = 9;
+            weapon["wearCashed"] = 30;
+        }), "a worn weapon put down");
+    }
+
+    [Fact]
+    public void AWeaponWornPastAnyCapacityIsRefused()
+    {
+        // A weapon's wear has a ceiling no tuning in range can move (Phase 6a.1), as
+        // a member's hit points do: its capacity opens on a bar no larger than Bar
+        // and grows at most MostCapacityPerBar a full bar, each bar one wear cashed
+        // or more, and accrual never banks past capacity — so wear is at most Bar
+        // plus MostCapacityPerBar for each wear cashed. At it the save loads, one
+        // past it is refused at the wear's own path. A fresh weapon — nothing
+        // cashed — carrying 900 000 is refused so.
+        string hall = Save(HallCleared());
+        int bar = ContentBounds.Bar, perBar = ContentBounds.MostCapacityPerBar;
+        string Wearing(int wear, int cashed) => Edited(hall, tree =>
+        {
+            WeaponNode(tree, 0, 0)["wear"] = wear;
+            WeaponNode(tree, 0, 0)["wearCashed"] = cashed;
+        });
+        foreach (int cashed in new[] { 0, 1, 7, 1335 })
+        {
+            long ceiling = bar + (long)perBar * cashed;
+            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].Inventory[0]!;
+            Assert.Equal(((int)ceiling, cashed), (loaded.Wear, loaded.WearCashed));
+            RefusedAt(Wearing((int)ceiling + 1, cashed), "campaign.party[0].inventory[0].wear", $"{ceiling + 1} is above {ceiling}: {WearWhy}");
+        }
+        RefusedAt(Wearing(900_000, 0), "campaign.party[0].inventory[0].wear", $"900000 is above {bar}: {WearWhy}");
+
+        // Summed as a long: wear cashed at its own ceiling cannot wrap the wear's,
+        // and the weapon it loads replays its capacity from the most a count holds.
+        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].Inventory[0]!;
+        Assert.Equal(Wear.Capacity(ContentBounds.MostCount).Max, most.WearCapacity);
+        Assert.True(most.WornFull);
+
+        // And no tuning in range gives a capacity past the ceiling: at each end of
+        // StartingPool's and WearCapacityPerBar's clamps, whatever was cashed.
+        foreach (int start in new[] { 1, 30, bar })
+            foreach (int growth in new[] { 0, 1, perBar })
+                using (TestContent.UsePremise(tuning: t => t with { StartingPool = start, WearCapacityPerBar = growth }))
+                    foreach (int cashed in new[] { 0, 1, 29, 30, 1335, 1_000_000 })
+                        Assert.True(Wear.Capacity(cashed).Max <= bar + (long)perBar * cashed,
+                            $"StartingPool {start}, WearCapacityPerBar {growth}, {cashed} cashed: capacity {Wear.Capacity(cashed).Max}");
     }
 
     [Fact]

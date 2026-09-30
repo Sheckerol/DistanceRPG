@@ -1493,8 +1493,9 @@ public sealed class DungeonHud
 
     /// <summary>
     /// A weapon as one line of runs: its name (a unique's in gold) and resolved
-    /// statline, its modifiers, then its enchantments in attachment order — a
-    /// caster's innate, a unique's souls.
+    /// statline, its wear against its capacity (<see cref="WearReadout"/>: white,
+    /// and yellow once full), its modifiers, then its enchantments in attachment
+    /// order — a caster's innate, a unique's souls.
     /// </summary>
     private static List<Run> WeaponRuns(string prefix, Weapon weapon, ActorState? wielder, int attacksThisTurn, Vector4 color)
     {
@@ -1502,6 +1503,7 @@ public sealed class DungeonHud
         {
             new($"{prefix}{weapon.Name}", weapon.Unique ? Orange : color),
             new(WeaponStats(weapon), color),
+            new(WearReadout(weapon), WearColor(weapon)),
         };
         string modifiers = ModifierReadout(weapon, wielder, attacksThisTurn);
         if (modifiers.Length > 0)
@@ -1525,6 +1527,39 @@ public sealed class DungeonHud
             : weapon.IsCaster
                 ? $"RNG {weapon.Range}  COST {weapon.ResolvedCost}  MANA {weapon.ResolvedManaCost}"
                 : $"DMG {weapon.Damage}  RNG {weapon.Range}  COST {weapon.ResolvedCost}";
+
+    /// <summary>
+    /// A weapon's wear as the weapon line reads it (§6.1): the wear banked over
+    /// the capacity, <c>WEAR 12/31</c>, and <c>WEAR 31/31 FULL</c> once it is full
+    /// — a weapon that banks nothing more until the enchanter spends it, and plays
+    /// on exactly as it did. Wear counts one way, the work done: the game never
+    /// says durability (P6:44–58). A capacity a tuning lowered below the wear
+    /// reads full too, over its old wear: nothing takes wear away.
+    /// </summary>
+    internal static string WearReadout(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return $"WEAR {weapon.Wear}/{weapon.WearCapacity}{(weapon.WornFull ? " FULL" : "")}";
+    }
+
+    /// <summary>The colour a weapon's wear reads in: yellow once full, so the cap says so plainly beside a white readout (never a unique's orange); white short of it.</summary>
+    internal static Vector4 WearColor(Weapon weapon) => weapon.WornFull ? Yellow : White;
+
+    /// <summary>
+    /// A weapon's wear said whole, for a panel with room for a sentence: how far
+    /// it is from full — <c>WEAR 12 OF 31 - 19 MORE FILLS IT</c> — or, once full,
+    /// what to do about it: <c>WEAR 31 OF 31 - FULL - TIME TO ROTATE IT INTO THE
+    /// SHOP</c> (P6:74–78, "a weapon at its cap should say so plainly"). Drawn in
+    /// <see cref="WearColor"/>.
+    /// </summary>
+    internal static string WearLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int capacity = weapon.WearCapacity;
+        return weapon.WornFull
+            ? $"WEAR {weapon.Wear} OF {capacity} - FULL - TIME TO ROTATE IT INTO THE SHOP"
+            : $"WEAR {weapon.Wear} OF {capacity} - {capacity - weapon.Wear} MORE FILLS IT";
+    }
 
     /// <summary>
     /// How a modifier reads when its number alone would mislead: the crit pair

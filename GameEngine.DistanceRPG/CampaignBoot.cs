@@ -553,7 +553,9 @@ internal static class CampaignBoot
     /// <summary>
     /// Read and restore the save, or the backup: true with the campaign, or false
     /// with why not in a few words (<see cref="WhyUnreadable"/>) — the whole error
-    /// in the log. A tuning that changed since is logged with both hashes. A
+    /// in the log. A tuning that changed since is logged with both hashes, each
+    /// of the keys of the version the save's hash is of
+    /// (<see cref="SaveFile.TuningHashVersion"/>): two hashes over one key set. A
     /// campaign that comes back with a run in progress is resumed like any other:
     /// the game plays its visit on in the dungeon (Phase 5.8), and the log says
     /// where — the dungeon, the floor and the turn.
@@ -573,7 +575,7 @@ internal static class CampaignBoot
                     : loaded.Campaign.LastResult is { } last ? $", the last run {last.Outcome} in {last.DungeonId}" : ", no run played yet")
                 + (file.SavedAt is { } savedAt ? $", saved {savedAt}" : ", no time recorded"));
             if (loaded.TuningChanged)
-                report?.Invoke($"[Save] {path} was saved under tuning {file.TuningHash} and the game plays under {TuningJson.Hash(content.Tuning)}: the numbers have changed, and the campaign plays on under the new ones");
+                report?.Invoke($"[Save] {path} was saved under tuning {file.TuningHash} (version {file.TuningHashVersion}'s keys) and the game plays under {TuningJson.Hash(content.Tuning, file.TuningHashVersion)} on them: the numbers have changed, and the campaign plays on under the new ones");
             why = "";
             return true;
         }

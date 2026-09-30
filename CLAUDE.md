@@ -61,6 +61,8 @@ GameEngine.DistanceRPG/         # Game executable
     FogGeometry.cs / FogBoxBuilder.cs / FogState.cs   # Fog-box math + runtime grids
     GridCollision.cs            # Axis-separated circle-vs-tile-grid collision
     TurnSystem.cs               # Turn state machine, drives combat via events
+    Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
+                                # from the wear it has ever cashed (R4)
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -86,11 +88,14 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   add a C# copy of a JSON value: the load validates the code catalogues against
   the JSON instead. Nothing the golden tests pin may go in `tuning.json`.
 - A `tuning.json` key arrives with the code that reads it — except a number the
-  user has ruled and wants in the file first (the Enchanter group's, until Phase
-  6a): declare it in `TuningSchema` with `Played = false`, and it is read,
-  clamped and warned like every key but left out of the save's tuning hash, so
-  turning it never says the numbers changed. The change that gives a rule of
-  play one to read sets it played. A key no rule of play reads at all — the
+  user has ruled and wants in the file first (the Enchanter group's, which Phase
+  6a sets played as it reads each): declare it in `TuningSchema` with
+  `Played = false`, and it is read, clamped and warned like every key but left
+  out of the save's tuning hash, so turning it never says the numbers changed.
+  The change that gives a rule of play one to read sets it played. A key that
+  starts to play with a save version is hashed from that version (`HashedFrom`:
+  Phase 6a's are 2), so a save of an older version is compared on its own
+  version's keys and never told a number it was not played under has changed. A key no rule of play reads at all — the
   launcher's `SaveSlots`, how many save slots there are — is `Played = false`
   for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,

@@ -28,13 +28,19 @@ public class SaveCodecTests
         [
             new WeaponDto("weakspot_stiletto", new Dictionary<string, int> { ["CritWindow"] = 1, ["CritMultiplier"] = 1, ["CritSunder"] = 1 },
                 new Dictionary<string, int> { ["CritWindow"] = 1, ["CritMultiplier"] = 2, ["CritSunder"] = 1 },
-                [new EnchantmentDto("vampiric", 3, 7)], ForgedEnchantments: 1),
+                [new EnchantmentDto("vampiric", 3, 7)], ForgedEnchantments: 1, Wear: 0, WearCashed: 0),
             null,
         ],
         DistLeft: 112f, EffectiveMax: 160f, SavedMovement: 0f, BudgetBeforeMire: 160f);
 
+    /// <summary>
+    /// A document at the current version. Its weapon rows are unworn and its hash is
+    /// of version 1's keys — what the step that lifts a version-1 document writes on
+    /// both (<see cref="SaveCodec.LiftToVersion2"/>) — so a synthetic older version
+    /// made of it, lifted through the real step, reads back as the same text.
+    /// </summary>
     private static SaveFile Sample(params MemberDto[] party) => new(
-        SaveCodec.CurrentVersion, "5c0e9a41d27b33f8",
+        SaveCodec.CurrentVersion, "5c0e9a41d27b33f8", TuningHashVersion: 1,
         new CampaignDto(party.Length == 0 ? [Member("A")] : party, ["mire", "regeneration"], RunCounter: 2,
             [new LockDto("spear_hall", 8)], ["spear_hall", "tutorial"], ["tutorial"], LastResult: null),
         new ViewDto("A"));
@@ -53,13 +59,14 @@ public class SaveCodecTests
     public void TheDocumentCarriesItsVersion()
     {
         // PHASE5-027: System.Text.Json "with an explicit version field". This build
-        // writes version 1, first in the document, and reads it back.
-        Assert.Equal(1, SaveCodec.CurrentVersion);
+        // writes version 2 (Phase 6a: a weapon's wear), first in the document, and
+        // reads it back.
+        Assert.Equal(2, SaveCodec.CurrentVersion);
         string text = SaveCodec.Write(Sample());
         using (var document = JsonDocument.Parse(text))
         {
             var first = document.RootElement.EnumerateObject().First();
-            Assert.Equal(("version", 1), (first.Name, first.Value.GetInt32()));
+            Assert.Equal(("version", 2), (first.Name, first.Value.GetInt32()));
         }
         Assert.Equal(SaveCodec.CurrentVersion, SaveCodec.Read(text).Version);
 
@@ -106,12 +113,16 @@ public class SaveCodecTests
         campaign["runs"] = campaign["runCounter"]!.DeepClone();
         campaign.Remove("runCounter");
         string versionZero = old.ToJsonString();
-        Assert.Empty(SaveCodec.Migrations);   // version 1 is the first: this build ships no step
+        var shipped = Assert.Single(SaveCodec.Migrations);   // version 1 is the first: this build ships the one step, 1 to 2 (Phase 6a)
+        Assert.Equal(1, shipped.From);
         var unlifted = Refused(versionZero);
         Assert.Equal("version", unlifted.Where);
         Assert.Contains("no migration", unlifted.Problem, StringComparison.Ordinal);
 
-        // ...and a step that renames the member lifts it: the document reads at 1.
+        // ...and a step that renames the member lifts it to 1, and the real step
+        // on to 2: the document reads at the current version. The real step writes
+        // an unworn weapon row and version 1's hash, which the sample holds, so the
+        // text is the sample's again.
         static SaveMigration Rename(int from, string was, string now, List<int> ran) => new(from, document =>
         {
             ran.Add(document["version"]!.GetValue<int>());   // what the step was handed says the version it reads
@@ -121,29 +132,184 @@ public class SaveCodecTests
             return document;
         });
         var ran = new List<int>();
-        var lifted = SaveCodec.Read(versionZero, [Rename(0, "runs", "runCounter", ran)]);
+        var lifted = SaveCodec.Read(versionZero, [.. SaveCodec.Migrations, Rename(0, "runs", "runCounter", ran)]);
         Assert.Equal((SaveCodec.CurrentVersion, 2), (lifted.Version, lifted.Campaign.RunCounter));
         Assert.Equal([0], ran);
         Assert.Equal(text, SaveCodec.Write(lifted));   // the same document it started as, before version 0 was made of it
 
         // Step by step, in version order whatever order the table lists them in:
-        // a version -1 that also called the seen set "met" runs -1 → 0 → 1, each
-        // step handed the document at its own version.
+        // a version -1 that also called the seen set "met" runs -1 → 0 → 1 → 2,
+        // each step handed the document at its own version.
         var older = Tree(versionZero);
         older["version"] = -1;
         var olderCampaign = Campaign(older);
         olderCampaign["met"] = olderCampaign["seen"]!.DeepClone();
         olderCampaign.Remove("seen");
         ran.Clear();
-        var twice = SaveCodec.Read(older.ToJsonString(), [Rename(0, "runs", "runCounter", ran), Rename(-1, "met", "seen", ran)]);
+        var twice = SaveCodec.Read(older.ToJsonString(), [.. SaveCodec.Migrations, Rename(0, "runs", "runCounter", ran), Rename(-1, "met", "seen", ran)]);
         Assert.Equal([-1, 0], ran);
         Assert.Equal(text, SaveCodec.Write(twice));
 
         // A table with a gap is a refusal of the document; a table that lifts one
         // version two ways is a table that cannot mean anything.
-        Assert.Equal("version", Refused(older.ToJsonString(), [Rename(0, "runs", "runCounter", ran)]).Where);
+        Assert.Equal("version", Refused(older.ToJsonString(), [.. SaveCodec.Migrations, Rename(0, "runs", "runCounter", ran)]).Where);
         Assert.Throws<ArgumentException>(() => SaveCodec.Read(versionZero,
             [Rename(0, "runs", "runCounter", ran), Rename(0, "runs", "runCounter", ran)]));
+    }
+
+    /// <summary>A weapon row as the document spells one, unworn: what version 1 means by a weapon's wear.</summary>
+    private static WeaponDto Row(string id) => new(id, new Dictionary<string, int>(), new Dictionary<string, int>(), [], ForgedEnchantments: 0, Wear: 0, WearCashed: 0);
+
+    /// <summary>
+    /// A document with a weapon row in each of the five places a <see cref="WeaponDto"/>
+    /// sits: A's bag, the last run's spoils kept and lost, a visited floor's enemy
+    /// row, the drop a corpse lies on and a weapon put down on a floor. Plain values
+    /// only: the codec resolves nothing, so none of it need be a campaign play made.
+    /// </summary>
+    private static SaveFile EveryWeaponPlace()
+    {
+        var body = new ActorDto(48f, 48f, Hp: 0, Mana: null, Alive: false, HeldShots: 0, []);
+        var enemy = new EnemyDto(0, Boss: false, body, Row("hatchet"), DefeatedAtTurn: 2, TurnsSinceSeen: 0, DefeatCount: 1, RevivalsRolled: 1,
+            RevivalDamage: 0, RevivalMaxHp: 0, DropTaken: false, GroundItem: new DropDto(Row("hunting_bow"), WasUniqueRoll: false));
+        var floor = new FloorDto(0, [enemy], ["01"], [new LooseItemDto(Row("tower_guard"), Row: 3, Col: 4)]);
+        var visit = new VisitDto("spear_hall", MapSeed: 4, BossFloor: 5, PromisedStacks: 1, FloorIndex: 0, DeepestFloorIndex: 0, Turn: 3,
+            BossDefeated: false, BossDefeatedAtTurn: -1, new XpSnapshotDto([]), [], Carry: null, [floor]);
+        var last = new RunResultDto("knife_warrens", "Death", BossDefeated: false, DeepestFloor: 1, BossFloorRevealed: null, ServiceTick: false,
+            MercyTick: false, RunCounter: 2, LockedUntilRun: null, Retired: false, [Row("longbow")], [Row("great_axe")], []);
+        var sample = Sample();
+        return sample with { Campaign = sample.Campaign with { LastResult = last, Visit = visit } };
+    }
+
+    /// <summary>Every weapon row in <paramref name="node"/>, found by its shape — an object carrying <c>forgedEnchantments</c> — never by where it sits: the test's own oracle for the step, which walks the places by name.</summary>
+    private static IEnumerable<JsonObject> WeaponRows(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                if (obj.ContainsKey("forgedEnchantments"))
+                    yield return obj;
+                foreach (var (_, value) in obj)
+                    foreach (var row in WeaponRows(value))
+                        yield return row;
+                break;
+            case JsonArray array:
+                foreach (var item in array)
+                    foreach (var row in WeaponRows(item))
+                        yield return row;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="text"/>, a version-2 document, as version 1 wrote the same
+    /// campaign: version 1, no tuning hash version, and no wear on any weapon row.
+    /// </summary>
+    private static JsonObject AsVersion1(string text)
+    {
+        var tree = Tree(text);
+        tree["version"] = 1;
+        Assert.True(tree.Remove("tuningHashVersion"));
+        foreach (var row in WeaponRows(tree).ToList())
+        {
+            Assert.True(row.Remove("wear"));
+            Assert.True(row.Remove("wearCashed"));
+        }
+        return tree;
+    }
+
+    [Fact]
+    public void TheVersion1StepAddsWearToEveryWeaponRow_AndTheHashVersion()
+    {
+        // The v2 hand-off (settled.md), Phase 6a.1: a weapon wears from version 2,
+        // and a save records the version its tuning hash is of (PHASE 6a DECISION
+        // 9). The one step this build ships lifts a version-1 document by writing
+        // what version 1 meant by both — no weapon had worn, and its hash was of
+        // version 1's keys — and nothing else: every weapon row wherever it sits,
+        // in all five places, is 0 worn and 0 cashed, and the root's hash version 1.
+        string text = SaveCodec.Write(EveryWeaponPlace());
+        Assert.Equal(6, WeaponRows(Tree(text)).Count());   // a bag, two spoils, an enemy's, a drop, one put down
+        var v1 = AsVersion1(text);
+        Assert.DoesNotContain(WeaponRows(v1), row => row.ContainsKey("wear") || row.ContainsKey("wearCashed"));
+
+        // The step alone: the rows it found are the rows the shape finds, each
+        // unworn, and the root's hash is version 1's. It reshapes, and leaves the
+        // version to the codec.
+        var stepped = SaveCodec.LiftToVersion2(v1.DeepClone().AsObject());
+        Assert.Equal(1, stepped["version"]!.GetValue<int>());
+        Assert.Equal(1, stepped["tuningHashVersion"]!.GetValue<int>());
+        Assert.Equal(6, WeaponRows(stepped).Count());
+        Assert.All(WeaponRows(stepped), row => Assert.Equal((0, 0), (row["wear"]!.GetValue<int>(), row["wearCashed"]!.GetValue<int>())));
+
+        // Read through the codec, the document is the version-2 one the campaign
+        // writes today: every member as it was, the two new ones as the step wrote them.
+        var read = SaveCodec.Read(v1.ToJsonString());
+        Assert.Equal((SaveCodec.CurrentVersion, 1), (read.Version, read.TuningHashVersion));
+        Assert.Equal(text, SaveCodec.Write(read));
+
+        // A hand-edited version-1 row that already carries a stray wear — the
+        // version-1 reader ignored it — is overwritten with version 1's meaning, 0,
+        // and a stray root hash version with 1, whatever kind of thing it was: the
+        // document's hash was taken on version 1's keys, whatever a hand wrote
+        // beside it. Never refused, never kept.
+        var stray = v1.DeepClone().AsObject();
+        stray["campaign"]!["visit"]!["floors"]![0]!["looseItems"]![0]!["weapon"]!["wear"] = 17;
+        stray["campaign"]!["party"]![0]!["inventory"]![0]!["wearCashed"] = 40;
+        stray["tuningHashVersion"] = 2;
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+        stray["tuningHashVersion"] = "one";
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+
+        // At version 2 the members are the document's own, read as written.
+        var worn = Tree(text);
+        worn["campaign"]!["party"]![0]!["inventory"]![0]!["wear"] = 12;
+        worn["tuningHashVersion"] = 2;
+        var kept = SaveCodec.Read(worn.ToJsonString());
+        Assert.Equal((12, 2), (kept.Campaign.Party[0].Inventory[0]!.Wear, kept.TuningHashVersion));
+    }
+
+    [Fact]
+    public void TheVersion1StepPassesOverWhatItCannotRead()
+    {
+        // The step runs before the reader and outside its refusals (SaveCodec.Read),
+        // so it must never throw on a hand-edited document: a member missing, null
+        // or holding the wrong kind of thing is passed over, and the reader then
+        // refuses the document where it is wrong, by the same path it names at
+        // version 2 — never an exception that says nothing of where (the notice of
+        // a save set aside shows the path, CampaignBoot.WhyUnreadable).
+        string text = SaveCodec.Write(EveryWeaponPlace());
+        (Action<JsonObject> Spoil, string Where)[] wrong =
+        [
+            (tree => tree["campaign"] = 4, "campaign"),
+            (tree => Campaign(tree)["party"] = 4, "campaign.party"),
+            (tree => Campaign(tree)["party"]![0] = "A", "campaign.party[0]"),
+            (tree => FirstMember(tree)["inventory"] = new JsonObject(), "campaign.party[0].inventory"),
+            (tree => FirstMember(tree)["inventory"] = 5, "campaign.party[0].inventory"),
+            (tree => FirstMember(tree)["inventory"]![0] = "arming_sword", "campaign.party[0].inventory[0]"),
+            (tree => Campaign(tree)["lastResult"]!["spoilsKept"] = "longbow", "campaign.lastResult.spoilsKept"),
+            (tree => Campaign(tree)["lastResult"]!["spoilsLost"]![0] = 7, "campaign.lastResult.spoilsLost[0]"),
+            (tree => Campaign(tree)["visit"] = new JsonArray(), "campaign.visit"),
+            (tree => Campaign(tree)["visit"]!["floors"] = new JsonObject(), "campaign.visit.floors"),
+            (tree => Campaign(tree)["visit"]!["floors"]![0]!["enemies"]![0]!["weapon"] = "hatchet", "campaign.visit.floors[0].enemies[0].weapon"),
+            (tree => Campaign(tree)["visit"]!["floors"]![0]!["enemies"]![0]!["groundItem"] = 3, "campaign.visit.floors[0].enemies[0].groundItem"),
+            (tree => Campaign(tree)["visit"]!["floors"]![0]!["looseItems"]![0]!["weapon"] = true, "campaign.visit.floors[0].looseItems[0].weapon"),
+        ];
+        foreach (var (spoil, where) in wrong)
+        {
+            var two = Tree(text);
+            spoil(two);
+            var one = AsVersion1(text);
+            spoil(one);
+            Assert.Equal(where, Refused(two.ToJsonString()).Where);
+            Assert.Equal(where, Refused(one.ToJsonString()).Where);   // a SaveFormatException, exactly: never the step's own exception
+        }
+
+        // And a null where a campaign belongs: the step has nothing to walk, and
+        // the reader says so where the campaign is missing, at either version.
+        var nothing = AsVersion1(text);
+        nothing["campaign"] = null;
+        var twoNothing = Tree(text);
+        twoNothing["campaign"] = null;
+        Assert.Equal(Refused(twoNothing.ToJsonString()).Where, Refused(nothing.ToJsonString()).Where);
     }
 
     [Fact]
@@ -165,12 +331,15 @@ public class SaveCodecTests
         (Func<JsonObject, JsonObject> Holder, string Member, string Where)[] cuts =
         [
             (tree => tree, "tuningHash", "$"),
+            (tree => tree, "tuningHashVersion", "$"),   // version 2's, required from it
             (tree => tree, "campaign", "$"),
             (Campaign, "runCounter", "campaign"),
             (Campaign, "lastResult", "campaign"),   // nullable, and still required: null is written, never left out
             (FirstMember, "body", "campaign.party[0]"),
             (FirstMember, "attunement", "campaign.party[0]"),
             (tree => FirstMember(tree)["inventory"]![0]!.AsObject(), "forged", "campaign.party[0].inventory[0]"),
+            (tree => FirstMember(tree)["inventory"]![0]!.AsObject(), "wear", "campaign.party[0].inventory[0]"),   // version 2's, required from it
+            (tree => FirstMember(tree)["inventory"]![0]!.AsObject(), "wearCashed", "campaign.party[0].inventory[0]"),
         ];
         foreach (var (holder, member, where) in cuts)
         {

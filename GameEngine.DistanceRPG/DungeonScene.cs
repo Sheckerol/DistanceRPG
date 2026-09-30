@@ -1311,6 +1311,12 @@ public class DungeonScene : Scene
                 _hud.AddFloatingText(obj.Position, $"{entry.Def.Name.ToUpperInvariant()} T{entry.Tier}!", LevelUpColor, -64f);
         };
 
+        // The hit that filled a member's weapon to its wear capacity (§6.1). The
+        // weapon line already says FULL where the player reads it (WearReadout);
+        // the log says when, once, since a full weapon banks nothing more.
+        _turns.WeaponWornFull += (member, weapon) =>
+            Log.Info($"[Wear] {member.Id}'s {weapon.Name} is full: wear {weapon.Wear} of {weapon.WearCapacity}");
+
         _turns.CharacterHealed += (c, amount) =>
         {
             Log.Info($"[Combat] {c.Id} regenerates {amount} — HP {c.Hp}");

@@ -60,7 +60,9 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// <strong>The save reads its ceilings here too</strong> (R3(b): a save is raw
 /// JSON as well, <c>SaveMapper</c>): the deepest forge, the most acquisition
 /// adds and the deepest stack for a saved spread, the deepest boss floor, the
-/// largest bar for a body's hit points, and three the content has no field for
+/// largest bar for a body's hit points and — with the most a bar of cashed wear
+/// adds to a capacity (<see cref="MostCapacityPerBar"/>) — for a weapon's wear,
+/// and three the content has no field for
 /// — the deepest tier an entry's arithmetic stays whole at
 /// (<see cref="DeepestTier"/>), the run count a run's end could carry past the
 /// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
@@ -176,6 +178,17 @@ internal static class ContentBounds
 
     /// <summary>The largest bar a pool opens on: <c>StartingPool</c>'s clamp ceiling.</summary>
     internal static int Bar { get; } = Int(nameof(Tuning.StartingPool)).Max;
+
+    /// <summary>
+    /// The most capacity a full bar of cashed wear adds: <c>WearCapacityPerBar</c>'s
+    /// clamp ceiling (§6.1). A weapon's capacity opens on a bar no larger than
+    /// <see cref="Bar"/> and grows at most this a point, each point costing a bar
+    /// of at least one wear cashed, so no tuning in range gives a weapon a capacity
+    /// above <c>Bar + MostCapacityPerBar × wearCashed</c> — the ceiling a saved
+    /// weapon's wear is held to (<c>SaveMapper</c>), since accrual never banks past
+    /// capacity.
+    /// </summary>
+    internal static int MostCapacityPerBar { get; } = Int(nameof(Tuning.WearCapacityPerBar)).Max;
 
     /// <summary>The degrees of a full turn: a cone no wider than all around.</summary>
     internal const int FullTurn = 360;
