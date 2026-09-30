@@ -123,16 +123,32 @@ public static class LootTable
     /// without fixing what they are worth. They are kept out of
     /// <see cref="DropOrder"/> because a drop's one enchantment is guaranteed to
     /// be its only one: winning the rare roll and getting an inert entry would
-    /// spend the roll <em>and</em> reserve the entry's lock for nothing. Code
-    /// rather than content, because whether a kind has a behaviour is code; a
-    /// kind leaves this set in the change that gives it one.
+    /// spend the roll <em>and</em> reserve the entry's lock for nothing — and out
+    /// of the enchanter's offer (<see cref="Enchanter.Offers"/>) for the same
+    /// reason, a deposit's runs and wear spent on a lock that buys nothing. Both
+    /// ask <see cref="IsInert"/>, the one question. Code rather than content,
+    /// because whether a kind has a behaviour is code; a kind leaves this set in
+    /// the change that gives it one.
     /// </summary>
-    private static readonly IReadOnlySet<EffectKind> InertKinds = new HashSet<EffectKind>
+    internal static readonly IReadOnlySet<EffectKind> InertKinds = new HashSet<EffectKind>
     {
         EffectKind.Weightless,
         EffectKind.Momentum,
-        EffectKind.Echoing,   // the first of them that is not a unique soul: without this filter a martial drop could win it
+        EffectKind.Echoing,   // the first of them that is not a unique soul: without this filter a martial drop could win it, and the enchanter offer it
     };
+
+    /// <summary>
+    /// Whether <paramref name="def"/> is of a kind declared and inert
+    /// (<see cref="InertKinds"/>): the live-behaviour test a drop's pool
+    /// (<see cref="DropOrder"/>) and the enchanter's offer
+    /// (<see cref="Enchanter.Offers"/>) both apply, and a save's queue is read
+    /// against (an inert kind is one no deposit could have bought).
+    /// </summary>
+    internal static bool IsInert(EnchantmentDef def)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        return InertKinds.Contains(def.Effect);
+    }
 
     /// <summary>
     /// The drop pool: every enchantment id a drop may ever roll, in a fixed
@@ -217,7 +233,7 @@ public static class LootTable
         foreach (var id in DropPool)
         {
             var def = catalogue[id];   // validated at load: every pool id resolves
-            if (catalogue.NeverRolled.Contains(id) || InertKinds.Contains(def.Effect))
+            if (catalogue.NeverRolled.Contains(id) || IsInert(def))
                 continue;
             if (!raised.Any(e => EnchantmentBehaviours.FiresOn(e, def.Effect)))
                 continue;
@@ -537,9 +553,10 @@ public static class LootTable
     /// strikes, lands a hit, kills and can be healed past full; a caster — a class
     /// whose row in the loaded weapons is <see cref="WeaponKind.Caster"/> — casts
     /// as well. What an entry needs is one live behaviour among them — the test
-    /// <see cref="DropOrder"/> applies.
+    /// <see cref="DropOrder"/> applies, and the enchanter's offer notes (never
+    /// refuses) an entry that fails it (<see cref="Enchanter.Offers"/>).
     /// </summary>
-    private static GameEvent[] RaisedBy(WeaponClass cls) => GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster
+    internal static GameEvent[] RaisedBy(WeaponClass cls) => GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster
         ? [GameEvent.Cast, GameEvent.DamageTaken, GameEvent.DamageDealt, GameEvent.Killed, GameEvent.HealingAboveFull]
         : [GameEvent.DamageTaken, GameEvent.DamageDealt, GameEvent.Killed, GameEvent.HealingAboveFull];
 }

@@ -68,11 +68,27 @@ public sealed class Deposit(int ordinal, Weapon weapon, Service service, int wea
 public sealed record DepositMade(Deposit Entry, PoolProgress Before, PoolProgress After, Weapon? Armed);
 
 /// <summary>
+/// One enchantment the enchanter offers a weapon (§6.2, "you pick the
+/// enchantment"; <see cref="Enchanter.Offers"/>): an id the campaign has met, why
+/// the enchanter would refuse to attach it to that weapon — or null when it would
+/// — and what the screen says beside it, or null. A refused offer is listed with
+/// its reason and never hidden (PHASE 6a DECISION 12).
+/// </summary>
+/// <param name="Id">The enchantment, by id.</param>
+/// <param name="Refusal">Why it would not go on the weapon, in the HUD's font and naming the entry first — <c>COLD - CANNOT SIT WITH FLAMING</c> — or null.</param>
+/// <param name="Note">What the screen says of an entry it would attach all the same — <c>NEVER FIRES ON A SWORD</c> — or null.</param>
+public sealed record Offer(string Id, string? Refusal, string? Note);
+
+/// <summary>
 /// The enchanter (§6.2–§6.4, §6.7; Phase 6a.3a): where wear is spent, a weapon's
 /// capacity grows, and enchantments are bought — slowly, in runs that count.
 /// Engine-free and deterministic, like everything under <c>Logic/</c>, and the one
 /// place wear is spent (P6:860–861).
 /// <list type="bullet">
+/// <item><strong>The offer</strong> (<see cref="Offers"/>, Phase 6a.3b) is what an
+/// Enchant may buy: what the campaign has met, less the unique souls and the
+/// kinds that do nothing yet, each with the reason the enchanter would refuse it
+/// on the weapon — the relations, and a status onto a wand — or none.</item>
 /// <item><strong>A deposit</strong> (<see cref="Deposit"/>), between runs only,
 /// takes a weapon out of the party's hands and into the shop, cashes its whole
 /// pool — the capacity growing on the cash, a point a full bar, whatever the
@@ -99,32 +115,175 @@ public static class Enchanter
     /// <summary>The tier an enchantment is attached at: the enchanter sells breadth and never a tier (§6.2, S:33–36), and "can cut a circle", no more (S:1097–1100).</summary>
     public const int AttachedTier = 1;
 
+    // ── The offer ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What the enchanter offers to attach to <paramref name="weapon"/> (§6.2:
+    /// "you pick the enchantment, from everything your campaign has seen"): every
+    /// enchantment the campaign has met, in <see cref="CampaignState.SeenInOrder"/>'s
+    /// order, less the two sorts it never offers —
+    /// <list type="bullet">
+    /// <item>an id <c>restricted.json</c> says no roll grants and no service
+    /// copies (<see cref="EnchantmentCatalogue.NeverRolled"/>: the unique souls, as
+    /// shipped, "transferable but never catalogued", S:279–281);</item>
+    /// <item>an entry of a kind declared and inert (<see cref="LootTable.IsInert"/>),
+    /// the live-behaviour test a drop's pool applies: so <c>echoing</c> is never
+    /// offered, a lock reserved for nothing (open-questions.md, the Echoing entry).
+    /// <c>aegis</c> passes, but nothing puts it among what a campaign has met
+    /// (PHASE 6a DECISION 4).</item>
+    /// </list>
+    /// Nothing else is left out (PHASE 6a DECISION 12). Each offer says why the
+    /// enchanter would refuse to attach it to this weapon, the first to apply, or
+    /// nothing:
+    /// <list type="number">
+    /// <item>it and an entry the weapon carries are an exclusion group of
+    /// <c>restricted.json</c>'s (<see cref="EnchantmentCatalogue.Excludes"/>), the
+    /// weapon's asked in attachment order, so the pair named is the same every
+    /// time (<see cref="CannotSitWith"/>);</item>
+    /// <item>a prerequisite of its is not on the weapon ahead of where it would
+    /// land, last — the question content validation asks of every weapon
+    /// (<see cref="EnchantmentCatalogue.LacksPrerequisiteAhead"/>;
+    /// <see cref="NeedsAhead"/>);</item>
+    /// <item>it is a staff's kind, a status its cast lands, and the weapon is a
+    /// wand, whose area cast would land it on the caster — the content rule
+    /// <see cref="ContentValidator.RuleWandNoStatusApplier"/>'s question
+    /// (<see cref="ContentValidator.NoWandCarries"/>; <see cref="WandCastsNoStatus"/>).
+    /// This bends §3.3's "any enchantment goes on any weapon" (PHASE 6a DECISION
+    /// 12).</item>
+    /// </list>
+    /// An entry that fires on no event the weapon's class raises is offered all the
+    /// same, with a note (<see cref="NeverFiresOn"/>); a defender's step, which
+    /// fires whenever the wielder is hit, is never that
+    /// (<see cref="EnchantmentBehaviours.DefendsTheWielder"/>). The same enchantment
+    /// again is offered — only opposed enchantments exclude each other (S:352–354)
+    /// — and a lock the wielder could not afford is never asked: the entry is
+    /// dormant (S:41–42), so where the weapon is, and who carries it, change nothing.
+    /// </summary>
+    /// <param name="campaign">The campaign whose met enchantments are offered.</param>
+    /// <param name="weapon">The weapon they would be attached to, last.</param>
+    public static IReadOnlyList<Offer> Offers(CampaignState campaign, Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(weapon);
+        var catalogue = GameContent.Current.Enchantments;
+        var offers = new List<Offer>();
+        foreach (string id in campaign.SeenInOrder)
+        {
+            var def = catalogue[id];   // what a campaign has met is the content's: a load resolves every id
+            if (NeverOffered(def) is null)
+                offers.Add(OfferOf(weapon, def));
+        }
+        return offers;
+    }
+
+    /// <summary>
+    /// Why <paramref name="def"/> is never offered, whatever the weapon: an id
+    /// <c>restricted.json</c> never copies (<see cref="NeverCopied"/>), or a kind
+    /// that does nothing yet (<see cref="DoesNothingYet"/>); null for every other.
+    /// </summary>
+    private static string? NeverOffered(EnchantmentDef def)
+        => GameContent.Current.Enchantments.NeverRolled.Contains(def.Id) ? NeverCopied(def)
+            : LootTable.IsInert(def) ? DoesNothingYet(def)
+            : null;
+
+    /// <summary>The offer of <paramref name="def"/> to <paramref name="weapon"/>: why the enchanter would refuse to attach it there, last, and whether it would never fire there (<see cref="Offers"/>).</summary>
+    private static Offer OfferOf(Weapon weapon, EnchantmentDef def)
+        => new(def.Id, OfferRefusal(weapon, def), FiresOn(weapon.Class, def) ? null : NeverFiresOn(weapon.Class));
+
+    /// <summary>The relations and the wand, asked of <paramref name="def"/> attached last to <paramref name="weapon"/>, in <see cref="Offers"/>' order; null when none refuses it.</summary>
+    private static string? OfferRefusal(Weapon weapon, EnchantmentDef def)
+    {
+        var catalogue = GameContent.Current.Enchantments;
+        foreach (var entry in weapon.Enchantments)
+            if (catalogue.Excludes(def.Id, entry.Id))
+                return CannotSitWith(def, entry.Def);
+        if (catalogue.LacksPrerequisiteAhead(def.Id, weapon.Enchantments.Select(entry => entry.Id), out var need))
+            return NeedsAhead(def, catalogue.TryGet(need, out var needed) ? needed.Name : need);
+        if (weapon.Class == WeaponClass.Wand && ContentValidator.NoWandCarries(def))
+            return WandCastsNoStatus(def);
+        return null;
+    }
+
+    /// <summary>Whether <paramref name="def"/> ever fires on a weapon of <paramref name="cls"/>: a behaviour on an event the class raises (<see cref="LootTable.RaisedBy"/>, the drop pool's test), or a step on its wielder when hit.</summary>
+    private static bool FiresOn(WeaponClass cls, EnchantmentDef def)
+        => EnchantmentBehaviours.DefendsTheWielder(def.Effect)
+            || LootTable.RaisedBy(cls).Any(raised => EnchantmentBehaviours.FiresOn(raised, def.Effect));
+
+    /// <summary>An offer <c>restricted.json</c> excludes beside an entry the weapon carries (PHASE 6a DECISION 12): <c>COLD - CANNOT SIT WITH FLAMING</c>.</summary>
+    public static string CannotSitWith(EnchantmentDef offered, EnchantmentDef carried)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        ArgumentNullException.ThrowIfNull(carried);
+        return $"{offered.Name.ToUpperInvariant()} - CANNOT SIT WITH {carried.Name.ToUpperInvariant()}";
+    }
+
+    /// <summary>An offer whose prerequisite is not on the weapon ahead of it (PHASE 6a DECISION 12): <c>BURNING - NEEDS FLAMING AHEAD OF IT</c>.</summary>
+    public static string NeedsAhead(EnchantmentDef offered, string needed)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        ArgumentNullException.ThrowIfNull(needed);
+        return $"{offered.Name.ToUpperInvariant()} - NEEDS {needed.ToUpperInvariant()} AHEAD OF IT";
+    }
+
+    /// <summary>A status-applying offer to a wand (PHASE 6a DECISION 12): <c>REGENERATION - A WAND CASTS NO STATUS</c>.</summary>
+    public static string WandCastsNoStatus(EnchantmentDef offered)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        return $"{offered.Name.ToUpperInvariant()} - A WAND CASTS NO STATUS";
+    }
+
+    /// <summary>
+    /// The note on an offer that fires on no event a <paramref name="cls"/> raises,
+    /// offered all the same (PHASE 6a DECISION 12): <c>NEVER FIRES ON A SWORD</c>,
+    /// <c>NEVER FIRES ON AN AXE</c>, <c>NEVER FIRES ON A RANGED WEAPON</c> — the
+    /// class as the HUD names it, made a noun where its name is not one.
+    /// </summary>
+    public static string NeverFiresOn(WeaponClass cls)
+    {
+        string name = cls.ToString().ToUpperInvariant();
+        string noun = cls is WeaponClass.Ranged or WeaponClass.Throwing ? $"{name} WEAPON" : name;
+        return $"NEVER FIRES ON {("AEIOU".Contains(noun[0]) ? "AN" : "A")} {noun}";
+    }
+
+    /// <summary>An Enchant with nothing left to choose (R-none): every offer refused on the weapon, or none left. <c>NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT</c>.</summary>
+    public const string NothingToOffer = "NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT";
+
+    /// <summary>An enchantment <c>restricted.json</c> never copies, met on a unique as shipped: <c>SERRATED IS NEVER COPIED - THE ENCHANTER DOES NOT OFFER IT</c>. The screen lists only offers, so only a caller that names one meets it.</summary>
+    public static string NeverCopied(EnchantmentDef def)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        return $"{def.Name.ToUpperInvariant()} IS NEVER COPIED - THE ENCHANTER DOES NOT OFFER IT";
+    }
+
+    /// <summary>An enchantment of a kind declared and inert: <c>ECHOING DOES NOTHING YET - THE ENCHANTER DOES NOT OFFER IT</c>. The screen lists only offers, so only a caller that names one meets it.</summary>
+    public static string DoesNothingYet(EnchantmentDef def)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        return $"{def.Name.ToUpperInvariant()} DOES NOTHING YET - THE ENCHANTER DOES NOT OFFER IT";
+    }
+
     // ── The gates ─────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Why the enchanter would refuse <paramref name="weapon"/> for
     /// <paramref name="service"/> now, or null when it would take it — the gates
     /// in the order they are asked, the first to fail the reason, each in the HUD's
-    /// font for the screen to say (§1g's strings):
+    /// font for the screen to say (§1g's strings). First the service's own, which
+    /// name no enchantment (<see cref="ServiceRefusal"/>); then, for an Enchant,
+    /// the enchantment it names:
     /// <list type="number">
-    /// <item><strong>Closed</strong>: the tutorial is not beaten, and the enchanter
-    /// is not open until it is (§6.3; S:411–419).</item>
-    /// <item><strong>In the shop</strong> already: a weapon is in one place.</item>
-    /// <item><strong>The last weapon</strong> a member carries: no deposit leaves a
-    /// member carrying none (PHASE 6a DECISION 7).</item>
-    /// <item>An <strong>Enchant</strong> of enchantment #n, n the count plus one,
-    /// needs every one of: a slot left (<see cref="Tuning.EnchantmentSlots"/>),
-    /// slot n open at the capacity the weapon is deposited at — before this
-    /// deposit's cash (<see cref="Wear.SlotOpensAt"/>) — a deposit of at least its
-    /// price (<see cref="Wear.Price"/>), and an enchantment the campaign has met
-    /// (§6.2's offer, <see cref="CampaignState.HasSeen"/>). Capacity above the
-    /// price is breathing room (R4).</item>
-    /// <item>A <strong>Refine</strong> has no gate of its own: an unworn weapon may
-    /// be refined, and comes back as it went (§6.4: "a fresh drop refines for
-    /// nothing").</item>
+    /// <item>one the campaign has met (§6.2's offer, <see cref="CampaignState.HasSeen"/>;
+    /// <see cref="Unseen"/>);</item>
+    /// <item>one the enchanter offers at all — not an id <c>restricted.json</c>
+    /// never copies, nor a kind that does nothing yet (<see cref="Offers"/>;
+    /// <see cref="NeverCopied"/>, <see cref="DoesNothingYet"/>);</item>
+    /// <item>and its offer to this weapon not refused: an id whose offer is
+    /// refused is refused with the offer's own reason (the relations, a status
+    /// onto a wand).</item>
     /// </list>
-    /// A lock the wielder could not afford is never a refusal: the enchantment is
-    /// dormant (S:41–42).
+    /// The screen lists only offers, so the first two meet only a caller that names
+    /// another. A lock the wielder could not afford is never a refusal: the
+    /// enchantment is dormant (S:41–42).
     /// </summary>
     /// <param name="campaign">The campaign between its runs.</param>
     /// <param name="weapon">A weapon the party owns: in a member's bag, in the stable, or in the shop.</param>
@@ -147,6 +306,51 @@ public static class Enchanter
             case not (Service.Enchant or Service.Refine):
                 throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
         }
+
+        if (ServiceRefusal(campaign, weapon, service) is { } refused)
+            return refused;
+        if (service == Service.Refine)
+            return null;
+        if (!campaign.HasSeen(enchantmentId!))
+            return Unseen(enchantmentId!);
+        var def = GameContent.Current.Enchantments[enchantmentId!];   // met, so the content's
+        return NeverOffered(def) ?? OfferRefusal(weapon, def);
+    }
+
+    /// <summary>
+    /// Why the enchanter would refuse <paramref name="weapon"/> for
+    /// <paramref name="service"/> whatever enchantment it named, or null — the gates
+    /// that come before the enchantment, in the order they are asked, the first to
+    /// fail the reason: what a screen dims a service by before anything is chosen.
+    /// <list type="number">
+    /// <item><strong>Closed</strong>: the tutorial is not beaten, and the enchanter
+    /// is not open until it is (§6.3; S:411–419).</item>
+    /// <item><strong>In the shop</strong> already: a weapon is in one place.</item>
+    /// <item><strong>The last weapon</strong> a member carries: no deposit leaves a
+    /// member carrying none (PHASE 6a DECISION 7).</item>
+    /// <item>An <strong>Enchant</strong> of enchantment #n, n the count plus one,
+    /// needs every one of: a slot left (<see cref="Tuning.EnchantmentSlots"/>),
+    /// slot n open at the capacity the weapon is deposited at — before this
+    /// deposit's cash (<see cref="Wear.SlotOpensAt"/>) — a deposit of at least its
+    /// price (<see cref="Wear.Price"/>), and something to choose: an offer the
+    /// enchanter would attach (<see cref="Offers"/>; <see cref="NothingToOffer"/>
+    /// when every one is refused, or none is left). Capacity above the price is
+    /// breathing room (R4).</item>
+    /// <item>A <strong>Refine</strong> has no gate of its own: an unworn weapon may
+    /// be refined, and comes back as it went (§6.4: "a fresh drop refines for
+    /// nothing").</item>
+    /// </list>
+    /// </summary>
+    /// <param name="campaign">The campaign between its runs.</param>
+    /// <param name="weapon">A weapon the party owns: in a member's bag, in the stable, or in the shop.</param>
+    /// <param name="service">What the deposit would buy.</param>
+    /// <exception cref="ArgumentException"><paramref name="weapon"/> is none the party owns.</exception>
+    public static string? ServiceRefusal(CampaignState campaign, Weapon weapon, Service service)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentNullException.ThrowIfNull(weapon);
+        if (service is not (Service.Enchant or Service.Refine))
+            throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
 
         var content = GameContent.Current;
         var tutorial = content.Dungeons.Tutorial;
@@ -175,8 +379,8 @@ public static class Enchanter
         long price = Wear.Price(n);
         if (weapon.Wear < price)
             return Short(n, price, weapon.Wear);
-        if (!campaign.HasSeen(enchantmentId!))
-            return Unseen(enchantmentId!);
+        if (!Offers(campaign, weapon).Any(offer => offer.Refusal is null))
+            return NothingToOffer;
         return null;
     }
 

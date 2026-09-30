@@ -374,7 +374,8 @@ internal static class SaveMapper
     /// service a <see cref="Service"/>'s name; the wear it cashed a count, and for an
     /// Enchant one at least, since no tuning prices an enchantment below 1; the runs
     /// it takes one to <see cref="ContentBounds.MostServiceRuns"/>; and its
-    /// enchantment one the content has. Whether an Enchant names one the campaign
+    /// enchantment one the content has, of a kind that does something
+    /// (<see cref="QueuedEnchantmentId"/>). Whether an Enchant names one the campaign
     /// has met, and the rest of what a deposit says of itself, are the checks'
     /// (<see cref="SaveConsistency"/>). What <c>restricted.json</c> says of the
     /// enchantment now is not asked: the deposit was legal when it was made, and
@@ -396,7 +397,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.wearAtDeposit", $"{wearAtDeposit} is below 1: {EnchantWearWhy}");
             int runs = ServiceRuns(row.Runs, $"{where}.runs");
             int runsWorked = Count(row.RunsWorked, $"{where}.runsWorked");
-            string? enchantment = row.Enchantment is { } id ? EnchantmentId(id, content, $"{where}.enchantment") : null;
+            string? enchantment = row.Enchantment is { } id ? QueuedEnchantmentId(id, content, $"{where}.enchantment") : null;
             queue[i] = new Deposit(ordinal, weapon, service, wearAtDeposit, runs, enchantment) { RunsWorked = runsWorked };
         }
         return queue;
@@ -441,6 +442,22 @@ internal static class SaveMapper
     /// <summary>An enchantment by the id a deposit or a report names: one the content has.</summary>
     private static string EnchantmentId(string id, GameContent content, string at)
         => content.Enchantments.TryGet(id, out _) ? id : throw new SaveFormatException(at, $"'{id}' is no enchantment in the content");
+
+    /// <summary>
+    /// An enchantment by the id a deposit in the shop names: one the content has,
+    /// and not of a kind declared and inert (<see cref="LootTable.IsInert"/>). The
+    /// enchanter never offers one, and whether a kind does anything is the code's,
+    /// which no file beside the game edits, so no deposit play made could name one
+    /// (Phase 6a.3b). What <c>restricted.json</c> says of the id is not asked, its
+    /// <c>neverRolled</c> included: the deposit was legal when it was made.
+    /// </summary>
+    private static string QueuedEnchantmentId(string id, GameContent content, string at)
+    {
+        EnchantmentId(id, content, at);
+        return LootTable.IsInert(content.Enchantments[id])
+            ? throw new SaveFormatException(at, $"{id} is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it")
+            : id;
+    }
 
     /// <summary>
     /// The stable, in its order: every row a weapon, read as every weapon is

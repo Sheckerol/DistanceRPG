@@ -14,7 +14,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// 1). Every run's end ticks the clock: a run that counts works the two newest
 /// deposits a run on, and a finished Enchant attaches its enchantment last at tier
 /// 1; a run that does not count works nothing. A take-back reverses the cash
-/// exactly. The ruling's own climb is pinned against the master
+/// exactly. What an Enchant may buy is the offer (Phase 6a.3b): what the campaign
+/// has met, less the souls and the kinds that do nothing yet, each refused on the
+/// weapon by the relations or a wand's cast, or noted as never firing there. The
+/// ruling's own climb is pinned against the master
 /// (<see cref="TheRulingsClimb_WearDepositsAndRuns"/>, listed in
 /// <c>ShippedDataTests</c>' doc); every other test states the ruling's numbers as
 /// its own input over the numbers the runs were written against
@@ -40,6 +43,23 @@ public sealed class EnchanterTests : IDisposable
     private static RunResult NotCounted(CampaignState campaign) => TestShop.NotCounted(campaign);
 
     private static Deposit Queued(CampaignState campaign, Weapon weapon) => campaign.AtTheEnchanter.Single(deposit => ReferenceEquals(deposit.Weapon, weapon));
+
+    /// <summary><paramref name="id"/>'s row brought back carrying <paramref name="souls"/> at tier 1, acquired, in that order — a wand's forged as a cold one — with <paramref name="wear"/> banked and <paramref name="cashed"/> ever cashed.</summary>
+    private static Weapon Carrying(string id, string[] souls, int wear = 0, int cashed = 0)
+    {
+        var made = TestWeapons.Get(id, GameContent.Current.Weapons[id].Class == WeaponClass.Wand ? DamageType.Cold : null);
+        return new Weapon(GameContent.Current.Weapons[id], made.Forged, made.Modifiers,
+            souls.Select(soul => new Enchantment(GameContent.Current.Enchantments[soul], 1)).ToArray(), 0, wear, cashed);
+    }
+
+    /// <summary>The offer of <paramref name="id"/> to <paramref name="weapon"/>, of what <paramref name="campaign"/> has met.</summary>
+    private static Offer OfferOf(CampaignState campaign, Weapon weapon, string id) => Enchanter.Offers(campaign, weapon).Single(offer => offer.Id == id);
+
+    /// <summary>The relations as shipped, with the burn let out of <c>neverRolled</c>, so the enchanter offers it and its <c>requires</c> row is asked.</summary>
+    private static RestrictedData BurningOffered() => ShippedContent.Restricted with
+    {
+        NeverRolled = ShippedContent.Restricted.NeverRolled.Where(id => id != "burning").ToArray(),
+    };
 
     // ── The ruling's numbers ─────────────────────────────────────────────────
 
@@ -302,6 +322,311 @@ public sealed class EnchanterTests : IDisposable
 
         // Refused below nothing: a count is never negative.
         Assert.Throws<ArgumentOutOfRangeException>(() => Wear.ServiceRuns(-1));
+    }
+
+    // ── The offer (Phase 6a.3b) ──────────────────────────────────────────────
+
+    [Fact]
+    public void TheOfferIsTheSeenLessSoulsAndTheInert()
+    {
+        // §6.2: "you pick the enchantment, from everything your campaign has seen" —
+        // in the seen set's order, less what restricted.json never copies (the unique
+        // souls as shipped, "transferable but never catalogued") and the kinds that do
+        // nothing yet: the drop pool's own live-behaviour test (LootTable.IsInert), so
+        // Echoing is never offered (open-questions.md, the Echoing entry). Nothing
+        // else is left out: on a bare Tower Guard, nothing is refused.
+        var campaign = Opened();
+        campaign.See(TestWeapons.Get("flensing_knife_unique"));   // Overheal, Serrated, Vampiric
+        campaign.See(TestWeapons.Enchanted("Echo", 40, 10, 30, "echoing"));
+        var catalogue = GameContent.Current.Enchantments;
+        Assert.Subset(campaign.SeenInOrder.ToHashSet(), new HashSet<string> { "echoing", "overheal", "serrated", "vampiric" });
+        Assert.Subset(catalogue.NeverRolled.ToHashSet(), new HashSet<string> { "overheal", "serrated" });
+        Assert.True(LootTable.IsInert(catalogue["echoing"]));
+
+        var guard = Worn("tower_guard", wear: 30);
+        Give(campaign, "B", 2, guard);
+        var offers = Enchanter.Offers(campaign, guard);
+        Assert.Equal(campaign.SeenInOrder.Where(id => id is not ("echoing" or "overheal" or "serrated")), offers.Select(offer => offer.Id));
+        Assert.All(offers, offer => Assert.Null(offer.Refusal));
+
+        // Aegis passes the filter — a defender's step fires whenever its wielder is
+        // hit, so it is offered with no note — once a hand puts it among the met. No
+        // campaign meets it: no drop of any class rolls it, and no weapon the content
+        // ships carries it (PHASE 6a DECISION 4).
+        Assert.DoesNotContain("aegis", campaign.SeenInOrder);
+        Assert.All(Enum.GetValues<WeaponClass>(), cls => Assert.DoesNotContain("aegis", LootTable.DropOrder(cls)));
+        Assert.DoesNotContain(GameContent.Current.Weapons.All, def => def.Enchantments.Any(entry => entry.Id == "aegis"));
+        campaign.See(TestWeapons.Enchanted("Shield", 40, 10, 30, "aegis"));
+        Assert.Equal(new Offer("aegis", null, null), OfferOf(campaign, guard, "aegis"));
+
+        // A soul restricted.json lets out of neverRolled is offered once met; one it
+        // takes in is not. The file's alone, as a drop's pool is.
+        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        {
+            NeverRolled = [.. ShippedContent.Restricted.NeverRolled.Where(id => id != "serrated"), "vampiric"],
+        }))
+        {
+            var edited = Enchanter.Offers(campaign, guard).Select(offer => offer.Id).ToList();
+            Assert.Contains("serrated", edited);
+            Assert.DoesNotContain("vampiric", edited);
+        }
+    }
+
+    [Fact]
+    public void TheOfferRefusesOpposedAndMissingPrerequisites_NeverALock()
+    {
+        // PHASE 6a DECISION 12: the enchanter refuses what restricted.json refuses. An
+        // excluded pair — the opposed elements, as shipped — is named with the entry
+        // the weapon carries, the weapon's asked in attachment order so the pair
+        // named is the same every time. The same entry again is no pair: only opposed
+        // enchantments exclude each other.
+        var campaign = Opened();
+        var fiery = Carrying("tower_guard", ["vampiric", "flaming"]);
+        Give(campaign, "B", 2, fiery);
+        Assert.Equal(new Offer("cold", "COLD - CANNOT SIT WITH FLAMING", null), OfferOf(campaign, fiery, "cold"));
+        Assert.Equal(new Offer("flaming", null, null), OfferOf(campaign, fiery, "flaming"));
+        Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, fiery, "vampiric"));
+
+        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        {
+            Excludes = [.. ShippedContent.Restricted.Excludes, ["vampiric", "arcane"], ["vampiric", "shattering"]],
+        }))
+        {
+            var met = Opened();
+            met.See(TestWeapons.Enchanted("Rider", 40, 10, 30, "arcane", "shattering"));
+            var (crits, hits) = (Carrying("tower_guard", ["shattering", "arcane"]), Carrying("tower_guard", ["arcane", "shattering"]));
+            Give(met, "B", 2, crits);
+            Give(met, "B", 3, hits);
+            Assert.Equal("VAMPIRIC - CANNOT SIT WITH SHATTERING", OfferOf(met, crits, "vampiric").Refusal);
+            Assert.Equal("VAMPIRIC - CANNOT SIT WITH ARCANE", OfferOf(met, hits, "vampiric").Refusal);
+            Assert.Equal("ARCANE - CANNOT SIT WITH VAMPIRIC", OfferOf(met, fiery, "arcane").Refusal);   // both ways, as a group means
+        }
+
+        // A prerequisite not on the weapon ahead of where the offer lands — last — is
+        // refused, naming it; with it ahead, the offer stands. The burn needs its
+        // element, as content validation asks of every weapon.
+        using (TestContent.UsePremise(tuning: Ruled, restricted: BurningOffered()))
+        {
+            var met = Opened();
+            met.See(TestWeapons.Get("wand_of_the_nova_unique"));   // Flaming, Burning
+            var (bare, lit) = (Worn("tower_guard", wear: 30), Carrying("tower_guard", ["flaming"], wear: 35, cashed: 160));
+            var at = Give(met, "B", 2, bare);
+            Give(met, "B", 3, lit);
+            Assert.Equal(new Offer("burning", "BURNING - NEEDS FLAMING AHEAD OF IT", null), OfferOf(met, bare, "burning"));
+            Assert.Equal(new Offer("burning", null, null), OfferOf(met, lit, "burning"));
+            Assert.Equal("BURNING - NEEDS FLAMING AHEAD OF IT", Enchanter.Refusal(met, bare, Service.Enchant, "burning"));
+            Assert.Null(Enchanter.Refusal(met, lit, Service.Enchant, "burning"));
+            Assert.Null(Enchanter.Refusal(met, bare, Service.Enchant, "flaming"));
+            Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(met, at, Service.Enchant, "burning"));
+        }
+
+        // A lock the wielder cannot afford is never a refusal (S:41–42): the entry is
+        // dormant. B holds a Tower Guard whose four souls already reserve more than its
+        // mana, and Arcane's 30 more is offered and bought all the same; the offer is
+        // the weapon's alone, and reads the same in the stable.
+        campaign.See(TestWeapons.Enchanted("Arc", 40, 10, 30, "arcane"));
+        var heavy = Carrying("tower_guard", ["vampiric", "vampiric", "vampiric", "vampiric"], wear: 50, cashed: 840);
+        var hand = Give(campaign, "B", 0, heavy);
+        var b = campaign.Party[1];
+        Assert.True(heavy.Enchantments.Sum(entry => entry.EffectiveLock) + GameContent.Current.Enchantments["arcane"].Lock > b.MaxMana);
+        var carried = Enchanter.Offers(campaign, heavy);
+        Assert.Equal(new Offer("arcane", null, null), carried.Single(offer => offer.Id == "arcane"));
+        Assert.Null(Enchanter.Refusal(campaign, heavy, Service.Enchant, "arcane"));
+        campaign.Move(hand, WeaponPlace.InTheStable(campaign.Stable.Count));
+        Assert.Equal(carried, Enchanter.Offers(campaign, heavy));
+        Enchanter.Deposit(campaign, WeaponPlace.InTheStable(campaign.Stable.Count - 1), Service.Enchant, "arcane");
+        Assert.Equal(5, Queued(campaign, heavy).Runs);
+    }
+
+    [Fact]
+    public void AWandTakesNoStatus()
+    {
+        // PHASE 6a DECISION 12, the wand clause: the enchanter refuses a status applier
+        // onto a wand, whose area cast names its caster as its own target, so the
+        // status would land on the wielder — the question content asks of every wand
+        // (ContentValidator.RuleWandNoStatusApplier), asked of what would be attached.
+        // It bends §3.3's "any enchantment goes on any weapon". A staff takes one; a
+        // wand takes everything else the relations allow.
+        var campaign = Opened();
+        var wand = Carrying("wand_of_the_cone", ["cold"], wear: 35, cashed: 160);
+        var at = Give(campaign, "B", 2, wand);
+        Assert.Equal(new Offer("regeneration", "REGENERATION - A WAND CASTS NO STATUS", null), OfferOf(campaign, wand, "regeneration"));
+        Assert.Equal(new Offer("mire", "MIRE - A WAND CASTS NO STATUS", null), OfferOf(campaign, wand, "mire"));
+        Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, wand, "vampiric"));
+        Assert.Equal(new Offer("cold", null, null), OfferOf(campaign, wand, "cold"));
+        Assert.Equal("MIRE - A WAND CASTS NO STATUS", Enchanter.Refusal(campaign, wand, Service.Enchant, "mire"));
+        Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, at, Service.Enchant, "mire"));
+
+        var staff = Carrying("staff_of_renewal", ["regeneration"], wear: 35, cashed: 160);
+        Give(campaign, "B", 3, staff);
+        Assert.Equal(new Offer("mire", null, null), OfferOf(campaign, staff, "mire"));
+        Assert.Null(Enchanter.Refusal(campaign, staff, Service.Enchant, "mire"));
+
+        // The one question: the content rule and the enchanter ask the same predicate,
+        // read off the IL, and it is true of the staff kind alone.
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
+        var question = typeof(ContentValidator).GetMethod(nameof(ContentValidator.NoWandCarries), Declared)!;
+        Assert.Equal(["ContentValidator.ValidateCasterInnate", "Enchanter.OfferRefusal"],
+            Edges(typeof(Enchanter).Assembly).Where(edge => Same(edge.Target, question))
+                .Select(edge => $"{Root(edge.From.DeclaringType)!.Name}.{edge.From.Name}").Distinct().Order(StringComparer.Ordinal));
+        Assert.Equal(["mire", "poison", "regeneration", "ward"],
+            GameContent.Current.Enchantments.All.Where(ContentValidator.NoWandCarries).Select(def => def.Id).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void ANeverFiringEntryIsOfferedWithItsNote()
+    {
+        // PHASE 6a DECISION 12: everything else attaches, an entry that can never fire
+        // on the weapon included. A staff's status fires on a cast, which no sword
+        // raises — the drop pool's own test (LootTable.RaisedBy) — so on a Tower Guard
+        // Regeneration is offered with a note rather than refused, and it attaches. On
+        // a staff it casts, and there is no note.
+        var campaign = Opened();
+        var guard = Worn("tower_guard", wear: 30);
+        var at = Give(campaign, "B", 2, guard);
+        Assert.Equal(new Offer("regeneration", null, "NEVER FIRES ON A SWORD"), OfferOf(campaign, guard, "regeneration"));
+        Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, guard, "vampiric"));
+        Assert.Equal(new Offer("regeneration", null, null), OfferOf(campaign, Carrying("staff_of_renewal", ["regeneration"]), "regeneration"));
+        Assert.Equal("NEVER FIRES ON AN AXE", OfferOf(campaign, campaign.Party[2].Inventory[0]!, "mire").Note);
+
+        Assert.Null(Enchanter.Refusal(campaign, guard, Service.Enchant, "regeneration"));
+        Enchanter.Deposit(campaign, at, Service.Enchant, "regeneration");
+        Counted(campaign);
+        Assert.Equal(["regeneration"], guard.Enchantments.Select(entry => entry.Id));
+
+        // The class as the HUD names it, made a noun where its name is not one.
+        Assert.Equal(["NEVER FIRES ON A DAGGER", "NEVER FIRES ON A SWORD", "NEVER FIRES ON A SPEAR", "NEVER FIRES ON AN AXE",
+            "NEVER FIRES ON A RANGED WEAPON", "NEVER FIRES ON A THROWING WEAPON", "NEVER FIRES ON A STAFF", "NEVER FIRES ON A WAND"],
+            Enum.GetValues<WeaponClass>().Select(Enchanter.NeverFiresOn));
+    }
+
+    [Fact]
+    public void ADepositOfARefusedOfferIsRefusedWithItsReason()
+    {
+        // An Enchant of an id whose offer is refused is refused with the offer's own
+        // reason, and an id the enchanter never offers — a soul, a kind that does
+        // nothing yet — with its own; the deposit throws, cashing and moving nothing.
+        // The screen lists only offers, so only a caller that names another meets
+        // these. An offer that stands is bought.
+        var campaign = Opened();
+        campaign.See(TestWeapons.Get("flensing_knife_unique"));
+        campaign.See(TestWeapons.Enchanted("Echo", 40, 10, 30, "echoing"));
+        var wand = Carrying("wand_of_the_cone", ["cold"], wear: 35, cashed: 160);   // capacity 35: slot 2 open, and its price met
+        var at = Give(campaign, "B", 2, wand);
+        foreach (var (id, reason) in new[]
+                 {
+                     ("flaming", "FLAMING - CANNOT SIT WITH COLD"),
+                     ("regeneration", "REGENERATION - A WAND CASTS NO STATUS"),
+                     ("serrated", "SERRATED IS NEVER COPIED - THE ENCHANTER DOES NOT OFFER IT"),
+                     ("echoing", "ECHOING DOES NOTHING YET - THE ENCHANTER DOES NOT OFFER IT"),
+                 })
+        {
+            Assert.Equal(reason, Enchanter.Refusal(campaign, wand, Service.Enchant, id));
+            var refused = Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, at, Service.Enchant, id));
+            Assert.EndsWith($": {reason}", refused.Message);
+            Assert.Equal((35, 160), (wand.Wear, wand.WearCashed));
+            Assert.Same(wand, campaign.Party[1].Inventory[2]);
+            Assert.Empty(campaign.AtTheEnchanter);
+        }
+        Assert.Equal(Enchanter.NeverCopied(GameContent.Current.Enchantments["serrated"]), Enchanter.Refusal(campaign, wand, Service.Enchant, "serrated"));
+        Assert.Equal(Enchanter.DoesNothingYet(GameContent.Current.Enchantments["echoing"]), Enchanter.Refusal(campaign, wand, Service.Enchant, "echoing"));
+
+        // Something is left to choose, so the service stands; an unmet id is still
+        // refused as unmet, before what the enchanter would say of it.
+        Assert.Null(Enchanter.ServiceRefusal(campaign, wand, Service.Enchant));
+        Assert.Equal(Enchanter.Unseen("shocking"), Enchanter.Refusal(campaign, wand, Service.Enchant, "shocking"));
+        var made = Enchanter.Deposit(campaign, at, Service.Enchant, "vampiric");
+        Assert.Equal(("vampiric", 35), (made.Entry.EnchantmentId, made.Entry.WearAtDeposit));
+    }
+
+    [Fact]
+    public void NothingToOfferIsItsOwnReason()
+    {
+        // R-none: an Enchant with nothing to choose — every offer refused on the
+        // weapon, or none left — is refused as such, whatever enchantment it names:
+        // the service's own gate, asked before the enchantment is, and after the slot
+        // and the price. Refining is left.
+        var campaign = CampaignState.Start(GameContent.Current);
+        CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+        Assert.Equal(["mire", "regeneration"], campaign.SeenInOrder);   // the party's staves
+        campaign.See(TestWeapons.Enchanted("Frost", 40, 10, 30, "cold"));
+        var flaming = Carrying("wand_of_the_cone", ["flaming"], wear: 35, cashed: 160);   // capacity 35: slot 2 open, and its price met
+        var at = Give(campaign, "B", 2, flaming);
+        Assert.All(Enchanter.Offers(campaign, flaming), offer => Assert.NotNull(offer.Refusal));
+        Assert.Equal("NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT", Enchanter.NothingToOffer);
+        Assert.Equal(Enchanter.NothingToOffer, Enchanter.ServiceRefusal(campaign, flaming, Service.Enchant));
+        foreach (string id in new[] { "cold", "mire", "flaming", "shocking" })
+            Assert.Equal(Enchanter.NothingToOffer, Enchanter.Refusal(campaign, flaming, Service.Enchant, id));
+        Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, at, Service.Enchant, "cold"));
+        Assert.Null(Enchanter.Refusal(campaign, flaming, Service.Refine));
+
+        // The slot and the price are asked first: a fresh wand says its slot.
+        var fresh = Carrying("wand_of_the_cone", ["flaming"], wear: 30);
+        Give(campaign, "B", 3, fresh);
+        Assert.Equal(Enchanter.NoFreeSlot(2, 35, 30), Enchanter.ServiceRefusal(campaign, fresh, Service.Enchant));
+
+        // None left: a campaign that has met only what restricted.json never copies.
+        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        {
+            NeverRolled = [.. ShippedContent.Restricted.NeverRolled, "mire", "regeneration"],
+        }))
+        {
+            var bare = CampaignState.Start(GameContent.Current);
+            CampaignRuns.Clear(bare, "tutorial", CampaignRuns.GoldenSeed);
+            var guard = Worn("tower_guard", wear: 30);
+            Give(bare, "B", 2, guard);
+            Assert.Empty(Enchanter.Offers(bare, guard));
+            Assert.Equal(Enchanter.NothingToOffer, Enchanter.ServiceRefusal(bare, guard, Service.Enchant));
+            Assert.Equal(Enchanter.NothingToOffer, Enchanter.Refusal(bare, guard, Service.Enchant, "mire"));
+        }
+    }
+
+    [Fact]
+    public void TheValidatorAndTheEnchanterAskOneDependencyQuestion()
+    {
+        // The enchanter's dependency refusal is content validation's own question
+        // (ContentValidator.RuleEnchantmentDependency), the catalogue's one predicate
+        // beside the requires rows, so the two can never part. Read off the IL, both
+        // ask it and the validator walks no requires row of its own; asked of the same
+        // lists, they agree — a burn with no Flaming ahead is refused by both, naming
+        // Flaming, and a burn behind it is allowed by both.
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
+        var question = typeof(EnchantmentCatalogue).GetMethod(nameof(EnchantmentCatalogue.LacksPrerequisiteAhead), Declared)!;
+        Assert.Equal(["ContentValidator.ValidateWeapons", "Enchanter.OfferRefusal"],
+            Calls(typeof(Enchanter).Assembly).Where(call => Same(call.Target, question))
+                .Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}").Distinct().Order(StringComparer.Ordinal));
+        var validate = typeof(ContentValidator).GetMethod(nameof(ContentValidator.ValidateWeapons), Declared)!;
+        Assert.DoesNotContain(CallsIn(validate), called => called.Name == nameof(EnchantmentCatalogue.Prerequisites));
+
+        var catalogue = GameContent.Current.Enchantments;
+        Assert.True(catalogue.LacksPrerequisiteAhead("burning", [], out var missing));
+        Assert.Equal("flaming", missing);
+        Assert.True(catalogue.LacksPrerequisiteAhead("burning", ["cold", "vampiric"], out missing));
+        Assert.Equal("flaming", missing);
+        Assert.False(catalogue.LacksPrerequisiteAhead("burning", ["cold", "flaming"], out missing));
+        Assert.Null(missing);
+        Assert.False(catalogue.LacksPrerequisiteAhead("flaming", [], out _));
+
+        // Content listing the burn with no Flaming ahead is refused at load, naming it...
+        var refused = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, BurningOffered(), ShippedContent.Enchantments,
+            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
+        Assert.Equal(("wand_of_the_nova_unique", ContentValidator.RuleEnchantmentDependency), (refused.EntryId, refused.Rule));
+        Assert.Contains("'burning' needs 'flaming' ahead of it", refused.Message);
+
+        // ...and the enchanter refuses to put it on a weapon with no Flaming, naming it too.
+        using (TestContent.UsePremise(tuning: Ruled, restricted: BurningOffered()))
+        {
+            var campaign = Opened();
+            campaign.See(TestWeapons.Get("wand_of_the_nova_unique"));
+            var cold = Carrying("tower_guard", ["cold"], wear: 35, cashed: 160);
+            var lit = Carrying("tower_guard", ["cold", "flaming"]);
+            Give(campaign, "B", 2, cold);
+            Give(campaign, "B", 3, lit);
+            Assert.Equal("BURNING - NEEDS FLAMING AHEAD OF IT", OfferOf(campaign, cold, "burning").Refusal);
+            Assert.Null(OfferOf(campaign, lit, "burning").Refusal);
+        }
     }
 
     // ── The clock ────────────────────────────────────────────────────────────

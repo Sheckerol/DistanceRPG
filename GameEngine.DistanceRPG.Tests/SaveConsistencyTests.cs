@@ -1135,6 +1135,35 @@ public sealed class SaveConsistencyTests : IDisposable
     }
 
     [Fact]
+    public void AQueuedInertKindIsRefused()
+    {
+        // Phase 6a.3b: the enchanter never offers an enchantment of a kind declared
+        // and inert (LootTable.IsInert) — and whether a kind does anything is the
+        // code's, which no file beside the game edits — so no deposit play made can
+        // name one. A shop whose Enchant names Echoing, met, is refused at the
+        // deposit's enchantment; the same shop naming an element it met loads. (What
+        // restricted.json says of a queued id is not asked: the case above.)
+        string shop;
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+            shop = Save(TestShop.Shop());
+        Assert.Equal("vampiric", JsonNode.Parse(shop)!["campaign"]!["enchanter"]![1]!["enchantment"]!.GetValue<string>());
+
+        string Buying(string id) => Edited(shop, tree =>
+        {
+            var seen = CampaignNode(tree)["seen"]!.AsArray().Select(node => node!.GetValue<string>()).Append(id).Distinct().Order(StringComparer.Ordinal);
+            CampaignNode(tree)["seen"] = new JsonArray(seen.Select(met => (JsonNode)JsonValue.Create(met)!).ToArray());
+            CampaignNode(tree)["enchanter"]![1]!["enchantment"] = id;
+        });
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            Assert.True(LootTable.IsInert(GameContent.Current.Enchantments["echoing"]));
+            RefusedAt(Buying("echoing"), "campaign.enchanter[1].enchantment",
+                "echoing is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it");
+            Restores(Buying("flaming"), "a queued element the campaign met");
+        }
+    }
+
+    [Fact]
     public void AnEnemyOrADropCarryingWearIsRefused()
     {
         // Check 20 (Phase 6a.1): no enemy's weapon ever wears — its wear feed does

@@ -183,6 +183,26 @@ public static class EnchantmentBehaviours
     public static bool HealsTheWielder(EffectKind kind) => WielderHealers.Contains(kind);
 
     /// <summary>
+    /// The kinds whose behaviour is a compiled step on the <em>defender</em> —
+    /// Aegis, Sturdy and Immovable (<see cref="Register"/>) — rather than a row in
+    /// any loop's table: each fires when its wielder is hit, and every wielder of
+    /// every class can be, so none of them is ever an entry that cannot fire on
+    /// the weapon it sits on. What the enchanter's offer asks before it notes an
+    /// entry as never firing (<see cref="Enchanter.Offers"/>); a drop's pool keeps
+    /// them out regardless (<see cref="LootTable.DropOrder"/>). A table beside the
+    /// behaviour tables: a new defender step is a row here as it is a registration.
+    /// </summary>
+    private static readonly IReadOnlySet<EffectKind> WielderDefenders = new HashSet<EffectKind>
+    {
+        EffectKind.Shielding,
+        EffectKind.Sturdy,
+        EffectKind.Immovable,
+    };
+
+    /// <summary>Whether <paramref name="kind"/>'s behaviour is a compiled step on its wielder when hit (<see cref="WielderDefenders"/>).</summary>
+    public static bool DefendsTheWielder(EffectKind kind) => WielderDefenders.Contains(kind);
+
+    /// <summary>
     /// The kinds whose behaviour lands the entry's own
     /// <see cref="EnchantmentDef.Applies"/> status — a staff's cast, Serrated's
     /// wound, a lingering element's burn — and so the kinds content must name

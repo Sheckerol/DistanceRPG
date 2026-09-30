@@ -1267,13 +1267,13 @@ public static class ContentValidator
             // element that fired before it, so behind it the burn could never
             // fire. Content that leaves the element off is refused here, naming
             // the restricted.json row it breaks; a transfer that takes it off
-            // later (§6.5) leaves the burn quiet.
+            // later (§6.5) leaves the burn quiet. The question is the catalogue's,
+            // the one the enchanter asks of what it would attach (Phase 6a.3b).
             for (int i = 0; i < def.Enchantments.Count; i++)
             {
                 string id = def.Enchantments[i].Id;
-                foreach (var need in enchantments.Prerequisites(id))
-                    if (!def.Enchantments.Take(i).Any(r => r.Id == need))
-                        throw new ContentException(def.Id, RuleEnchantmentDependency, WithRelation($"'{id}' needs '{need}' ahead of it", RequiresRow(restricted, id)));
+                if (enchantments.LacksPrerequisiteAhead(id, def.Enchantments.Take(i).Select(r => r.Id), out var need))
+                    throw new ContentException(def.Id, RuleEnchantmentDependency, WithRelation($"'{id}' needs '{need}' ahead of it", RequiresRow(restricted, id)));
             }
 
             // Overheal alone is inert (§1.5): an entry whose behaviour fires on
@@ -1537,10 +1537,23 @@ public static class ContentValidator
             // Refused, wherever it sits in the list, until Phase 3 decides what
             // one means on a wand: every caught actor, or nothing. Hit-side
             // kinds (a lingering element) fire on the hits and are unaffected.
-            var applier = attached.FirstOrDefault(e => e.Effect == EffectKind.ApplyStatus);
+            var applier = attached.FirstOrDefault(NoWandCarries);
             if (applier != null)
                 throw new ContentException(def.Id, RuleWandNoStatusApplier, $"'{applier.Id}' applies {applier.Applies}");
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="entry"/> is one a wand may not carry
+    /// (<see cref="RuleWandNoStatusApplier"/>): a status-applying cast entry, a
+    /// staff's kind, which a wand's area cast would land on the caster. The one
+    /// question content asks of a wand's list and the enchanter asks of an entry
+    /// it would attach to a wand (<see cref="Enchanter.Offers"/>).
+    /// </summary>
+    internal static bool NoWandCarries(EnchantmentDef entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return entry.Effect == EffectKind.ApplyStatus;
     }
 
     /// <summary>

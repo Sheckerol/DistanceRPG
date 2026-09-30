@@ -55,6 +55,18 @@ enchanter exists nothing can put a shield on a weapon that did not ship with
 one. Both are filter gaps rather than content gaps, and both are resolved by
 whoever writes §6.4's offer.
 
+**Phase 6a.3b wrote the offer, and it closes the enchanter's half of the
+`Echoing` gap.** `Enchanter.Offers` is what the campaign has met,
+`CampaignState.SeenInOrder`, less `NeverRolled` and less the kinds declared inert
+— the inert half of the test `LootTable.DropOrder` applies, asked through the one
+predicate both now share (`LootTable.IsInert`) — so `Echoing` is never offered,
+and a save whose shop names it is refused as one no play wrote. What `Echoing`
+does, and who raises `AttackDeclared`, are untouched and as open as above. Of the
+`aegis` half, the offer does what a filter can: `aegis` passes it, and would be
+offered with nothing against it — a defender's step fires on any weapon. But the
+offer lists only what a campaign has met, and nothing puts `aegis` there, so
+where it comes from is **PHASE 6a DECISION 4** below.
+
 ## What decides a `Serrated`/`Arcane` pair (§3.3)
 
 §3.3's worked example on attachment order reads: "A dagger that leads with
@@ -638,3 +650,72 @@ older document), so a 6a.1 or 6a.2 build sets a 6a.3a save aside as a newer
 build's, kept and never deleted — and bump again at every later step that adds
 weapons to the save (6a.6's transfer), the tuning hash's version following or
 staying 2. settled.md's Phase 6a implementation pass records the ruling.
+
+## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
+
+The entry on `Echoing` above calls `aegis`'s lack of any source a filter gap
+rather than a content gap, "resolved by whoever writes §6.4's offer". Phase 6a.3b
+wrote it (`Enchanter.Offers`): what the campaign has met, less `neverRolled` and
+the kinds declared inert. `aegis` passes that — it is neither, and its step on the
+defender fires on any weapon, so it is offered with no refusal and no note. But
+nothing puts it among what a campaign has met: `LootTable.DropOrder` leaves it out
+of every class's drops (its behaviour is a compiled step on the defender rather
+than a row in a loop, so the class-event test finds nothing for it), and no weapon
+the content ships carries it. So the offer alone can never contain it.
+
+**Shipped provisionally: `aegis` stays out of reach until content carries it.**
+The offer lists only what the campaign has met, as §6.2 words it ("from
+everything your campaign has seen"), so a playtester never sees `aegis` at the
+enchanter. It stays in the catalogue, checked at load, and it fires on any weapon
+that carries it.
+
+**This decides whether a shield can ever be put on a weapon, so it is the user's
+to decide.** The alternatives: (a) the offer also lists the catalogue's
+defender-step kinds (`aegis`) unmet, as a standing offer; or (b) a drop may roll
+`aegis`, as a class-agnostic arrival — the drop pool taught that a defender's step
+fires on any class, which moves what drops — and the offer then takes it as it
+takes any entry met. settled.md's Phase 6a implementation pass records the ruling.
+
+## What the enchanter refuses, and how a refusal shows (§6.2, §6.5) — PHASE 6a DECISION 12
+
+§6.2 has you pick the enchantment "from everything your campaign has seen", and
+§3.3 that "any enchantment goes on any weapon … nothing keys off `WeaponClass`"
+(phase-3-loot.md); settled.md that "only opposed enchantments exclude each other
+… a second rule would be a cap by another name", and that a lock the wielder
+cannot afford leaves the enchantment dormant. None says what the enchanter does
+with an entry the relations would refuse on the weapon, or with one the weapon
+could carry and never fire, or whether a refused choice is shown.
+
+**Shipped provisionally** (Phase 6a.3b, `Enchanter.Offers`; the screen that lists
+the offer arrives with the deposit's key, Phase 6a.5):
+- the enchanter refuses what `restricted.json` refuses: an entry an exclusion
+  group pairs with one the weapon carries (`COLD - CANNOT SIT WITH FLAMING`, the
+  weapon's entries asked in the order they were attached), and an entry whose
+  prerequisite is not on the weapon ahead of where it would land, last (`BURNING -
+  NEEDS FLAMING AHEAD OF IT`), the very question content validation asks of every
+  weapon;
+- it refuses a status applier onto a wand (`REGENERATION - A WAND CASTS NO
+  STATUS`), the content rule that no wand carries one: an area cast names its
+  caster as its own target, so the status would land on the wielder. **This bends
+  the phase docs**: §3.3's "any enchantment goes on any weapon … nothing keys off
+  `WeaponClass`", §6.2's "on any weapon, forever after", and settled.md's "a
+  second rule would be a cap by another name". The rule is Phase 1.8's content
+  rule, not a ruling;
+- everything else attaches: the same entry again, an entry whose lock the wielder
+  cannot pay (it sleeps), and an entry that never fires on the weapon, which the
+  offer notes (`NEVER FIRES ON A SWORD`, a staff's status on a blade);
+- a refused choice is listed with its reason, never hidden. An Enchant with nothing
+  left to choose — every offer refused, or none met — is refused as such
+  (`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`), and refining is left.
+
+What a transfer may leave as a staff's or a wand's cast, this decision's caster
+clause, arrives with the transfer (Phase 6a.6), and its alternative with it.
+
+**This decides what the enchanter will attach, and whether §3.3's "any weapon"
+holds, so it is the user's to decide.** The alternatives: (a) hide refused
+choices; (b) refuse never-firing entries too, as the drop table does; (c) also ask
+content's arrival rules (Overheal beside a healer, a dependency only on a
+currency weapon); or (e) **keep §3.3**: a status applier attaches to a wand, the
+wand's area cast skips it, and the offer notes it `NEVER FIRES ON A WAND`, as it
+notes any entry that never fires. settled.md's Phase 6a implementation pass
+records the ruling.
