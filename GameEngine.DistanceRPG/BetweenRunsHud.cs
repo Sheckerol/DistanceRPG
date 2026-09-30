@@ -538,14 +538,37 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>Under a room's line: how a weapon comes to be there.</summary>
     internal const string RoomHint = "TAKE A WEAPON UP - THEN PUT IT DOWN HERE";
 
+    /// <summary>Under a caster's enchantments, in the warning's orange, when it casts nothing (<see cref="CastsNothing"/>): why.</summary>
+    internal const string CastsNothingLine = "CASTS NOTHING - ITS FIRST ENCHANTMENT IS ITS CAST";
+
+    /// <summary>
+    /// Whether <paramref name="weapon"/> is a caster that casts nothing: a staff
+    /// whose first enchantment applies no status, a wand whose first is no
+    /// element — or either carrying none. The dungeon's own gates ask the same, the
+    /// staff's cast (<c>TurnSystem.CanCastOn</c>) and the wand's
+    /// (<see cref="TurnSystem.CanCastArea"/>), so such a weapon never casts, and
+    /// cannot strike: a caster casts. No weapon the content ships is made so, and
+    /// the enchanter is to leave none so (the plan's caster rule, Phase 6a.6); only
+    /// a hand-edited save can put one on the WEAPONS page, whose detail then says why.
+    /// </summary>
+    internal static bool CastsNothing(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return weapon.IsCaster
+            && (weapon.AreaShape is null
+                ? weapon.Innate?.Def.Applies is null
+                : weapon.Innate?.Def.DamageType is null or DamageType.None);
+    }
+
     /// <summary>
     /// The detail panel for the row chosen, top to bottom, on the right: for a
     /// weapon, where it is, its name — a unique's in orange — and the dungeon's
     /// readouts with no wielder (<see cref="DungeonHud.WeaponStats"/>, the
-    /// modifiers and the enchantments, each list wrapped to the column), then its
-    /// wear said whole (<see cref="DungeonHud.WearLine"/>, green once full) and its
-    /// capacity (<see cref="CapacityLine"/>). For a room, what it is and what it is
-    /// for. Nothing for a row that is neither.
+    /// modifiers and the enchantments, each list wrapped to the column), under a
+    /// caster that casts nothing why, in orange (<see cref="CastsNothingLine"/>),
+    /// then its wear said whole (<see cref="DungeonHud.WearLine"/>, green once
+    /// full) and its capacity (<see cref="CapacityLine"/>). For a room, what it is
+    /// and what it is for. Nothing for a row that is neither.
     /// </summary>
     internal static IReadOnlyList<ListRow> DetailRows(HubWeapons.Row row)
     {
@@ -567,6 +590,8 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(line, DungeonHud.White, DetailScale, DetailPitch));
         foreach (string line in Listed("* ", DungeonHud.EnchantmentReadout(weapon), DetailChars))
             rows.Add(new ListRow(line, DungeonHud.Cyan, DetailScale, DetailPitch));
+        if (CastsNothing(weapon))
+            rows.Add(new ListRow(CastsNothingLine, DungeonHud.Orange, DetailScale, DetailPitch));
         rows.Add(new ListRow(DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
         rows.Add(new ListRow(CapacityLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
         return rows;

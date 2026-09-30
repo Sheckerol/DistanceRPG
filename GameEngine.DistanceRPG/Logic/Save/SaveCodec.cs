@@ -60,6 +60,9 @@ public static class SaveCodec
     /// <summary>A weapon row's wear ever cashed (<see cref="WeaponDto.WearCashed"/>): version 2's.</summary>
     internal const string WearCashedMember = "wearCashed";
 
+    /// <summary>The campaign's stable (<see cref="CampaignDto.Stable"/>): version 2's, from Phase 6a.2.</summary>
+    internal const string StableMember = "stable";
+
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
 
@@ -78,8 +81,8 @@ public static class SaveCodec
     /// <summary>
     /// Version 1 to 2 (Phase 6a.1; the v2 hand-off, settled.md): a weapon wears
     /// from version 2, and the tuning hash records the version whose keys it is
-    /// of. The step writes what a version-1 document means by both, and nothing
-    /// else — it reads no content and no tuning:
+    /// of. The step writes what a version-1 document means by both, and by the
+    /// stable it never had, and nothing else — it reads no content and no tuning:
     /// <list type="bullet">
     /// <item><strong>Every weapon row</strong> gets <c>"wear": 0</c> and
     /// <c>"wearCashed": 0</c>: no weapon wore before version 2, and a capacity
@@ -90,11 +93,18 @@ public static class SaveCodec
     /// <item><strong>The root</strong> gets <c>"tuningHashVersion": 1</c>: a
     /// version-1 document's hash was taken on version 1's keys
     /// (<see cref="TuningKey.HashedFrom"/>, PHASE 6a DECISION 9).</item>
+    /// <item><strong>The campaign's stable</strong>, a member version 1 never had,
+    /// is removed if a hand put one there: the version-1 reader ignored it, so to
+    /// version 1 it meant no stable, and read at version 2 it would be weapons the
+    /// campaign never owned — or a refusal of a save version 1 loaded. Where there
+    /// is none the step writes none, and the reader takes the member's default,
+    /// an empty stable (Phase 6a.2's review).</item>
     /// </list>
     /// <strong>It never throws on a hand-edited document.</strong> It writes by
     /// the indexer, so a stray <c>wear</c> a version-1 row already carried (the
     /// reader ignored it) is overwritten with version 1's meaning, 0, and a stray
-    /// root <c>tuningHashVersion</c> with 1. And a member that is missing, null or
+    /// root <c>tuningHashVersion</c> with 1; a stray <c>stable</c> is removed,
+    /// whatever kind of thing it is. And a member that is missing, null or
     /// the wrong kind of thing — a party that is a number, a bag that is a table,
     /// a weapon row that is a string — is passed over, so the reader then refuses
     /// the document where it is wrong, by its path
@@ -119,6 +129,7 @@ public static class SaveCodec
         document[TuningHashVersionMember] = 1;
         if (document["campaign"] is not JsonObject campaign)
             return document;
+        campaign.Remove(StableMember);   // version 1 had none: one a hand put there meant nothing to it
 
         foreach (var member in Items(campaign["party"]))
             if (member is JsonObject row)

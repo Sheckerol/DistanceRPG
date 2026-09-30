@@ -529,8 +529,9 @@ through its host (`IBetweenRunsHost.RequestSave`), which the game answers with
 the same request the dungeon's autosaves make, written through the one door
 every save of the campaign goes through; the log says `Saving the campaign
 between runs, after a change on the hub`. A save that fails is said at once under
-the hub's title, in orange, as one over a floor is, and on the next screen until
-a later save goes through.
+the hub's title, in orange, as one over a floor is — but where a floor's notice
+goes after a few seconds, the hub's stays, and the next screen says it too, until
+a later save goes through, which takes it back from both.
 
 **This decides whether a crash between runs can cost the changes made there, so
 it is the user's to decide.** The alternative: only the run's end, SAVE GAME and

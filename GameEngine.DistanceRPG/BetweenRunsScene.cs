@@ -102,8 +102,9 @@ public interface IBetweenRunsHost : ISaveHost
 /// a set-aside notice's full path and how to try the file again, the numbers
 /// changed since the save — and anything else is capped after it
 /// (<see cref="NoticeText.Rows"/>). A save of the hub's own changes that cannot be
-/// written is said there at once, the same way (<see cref="SaveFailed"/>). The log
-/// keeps them all.
+/// written is said there at once, the same way (<see cref="SaveFailed"/>), and a
+/// failure is taken back once a later save goes through
+/// (<see cref="SaveWentThrough"/>). The log keeps them all.
 /// </para>
 /// </summary>
 public sealed class BetweenRunsScene : Scene
@@ -174,7 +175,8 @@ public sealed class BetweenRunsScene : Scene
     private string? _answer;
 
     // What the game had to say under the title, and how many of them, from the
-    // first, are shown whole: a save of the hub's that failed is laid ahead of them.
+    // first, are shown whole: a save of the hub's that failed is laid ahead of
+    // them, and a failure is taken back out once a later save goes through.
     private IReadOnlyList<string> _notices;
     private int _shownWhole;
 
@@ -204,7 +206,7 @@ public sealed class BetweenRunsScene : Scene
         _weapons = new HubWeapons(campaign);
     }
 
-    /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, the save's word whole and the rest capped, or none — and a save of the hub's that failed, whole, ahead of them (<see cref="SaveFailed"/>).</summary>
+    /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, the save's word whole and the rest capped, or none — and a save of the hub's that failed, whole, ahead of them (<see cref="SaveFailed"/>), until a later save goes through (<see cref="SaveWentThrough"/>).</summary>
     internal IReadOnlyList<string> NoticeRows { get; private set; }
 
     /// <summary>The dungeon list, as the campaign gave it when the screen was made.</summary>
@@ -477,10 +479,11 @@ public sealed class BetweenRunsScene : Scene
     /// The host could not write a save of the campaign between runs (PHASE 6a
     /// DECISION 10): said at once under the title, in the warning's orange, shown
     /// whole ahead of the notices up — where the player is, so a change on the hub
-    /// whose save failed is never taken for saved. The next screen says it too,
-    /// until a later save goes through. A notice already shown whole is not said
-    /// twice. A file of the slot the write set aside first is said the same way
-    /// (<see cref="CampaignBoot.Save"/>).
+    /// whose save failed is never taken for saved — and there until a later save
+    /// goes through, which takes it back (<see cref="SaveWentThrough"/>). The next
+    /// screen says it too, on the same terms. A notice already shown whole is not
+    /// said twice. A file of the slot the write set aside first is said the same
+    /// way (<see cref="CampaignBoot.Save"/>), and is never taken back.
     /// </summary>
     /// <param name="notice">What the failed write says (<see cref="CampaignBoot.NotSaved"/>), or what the write set aside (<see cref="CampaignBoot.SetAsideNotice"/>).</param>
     internal void SaveFailed(string notice)
@@ -490,6 +493,37 @@ public sealed class BetweenRunsScene : Scene
             return;
         _notices = [notice, .. _notices];
         _shownWhole++;
+        NoticeRows = NoticeText.Rows(_notices, _shownWhole);
+    }
+
+    /// <summary>
+    /// A save of the campaign went through (<see cref="CampaignBoot.Save"/>): the
+    /// disk holds it again, so what the screen says of every save that failed
+    /// since the last one that went through is no longer true, and is taken back
+    /// from under the title — a failure of the hub's own, said at once
+    /// (<see cref="SaveFailed"/>), and one the screen was handed from the run's end
+    /// alike — as the game takes it back from the next screen. What else is said
+    /// stays as it was: the save's word on the campaign, the data files' notices,
+    /// and a file set aside, which is a fact about a file whatever the saves after
+    /// it do, and never among <paramref name="stale"/>.
+    /// </summary>
+    /// <param name="stale">What each save that failed since the last one that went through said (<see cref="CampaignBoot.NotSaved"/>).</param>
+    internal void SaveWentThrough(IReadOnlyCollection<string> stale)
+    {
+        ArgumentNullException.ThrowIfNull(stale);
+        var kept = new List<string>(_notices.Count);
+        int shownWhole = _shownWhole;
+        for (int i = 0; i < _notices.Count; i++)
+        {
+            if (!stale.Contains(_notices[i], StringComparer.Ordinal))
+                kept.Add(_notices[i]);
+            else if (i < _shownWhole)
+                shownWhole--;
+        }
+        if (kept.Count == _notices.Count)
+            return;
+        _notices = kept;
+        _shownWhole = shownWhole;
         NoticeRows = NoticeText.Rows(_notices, _shownWhole);
     }
 

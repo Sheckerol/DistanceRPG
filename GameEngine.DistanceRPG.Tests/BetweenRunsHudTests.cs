@@ -455,6 +455,20 @@ public sealed class BetweenRunsHudTests : IDisposable
                 ? DamageType.Shocking
                 : null);
 
+    /// <summary>
+    /// <paramref name="def"/>'s row as the most a save may load one carrying: its
+    /// drop's spreads, and ten of the longest enchantment the content ships at tier
+    /// 99 (<see cref="ContentBounds.MostEnchantments"/>), with four-digit wear and
+    /// cash — the widest and the tallest detail the page can be handed.
+    /// </summary>
+    private static Weapon Laden(WeaponDef def)
+    {
+        var made = Made(def);
+        var soul = GameContent.Current.Enchantments.All.MaxBy(entry => entry.Name.Length)!;
+        return new Weapon(def, made.Forged, made.Modifiers, Enumerable.Range(0, ContentBounds.MostEnchantments).Select(_ => new Enchantment(soul, 99)).ToArray(), 0,
+            wear: 9999, wearCashed: 9998);
+    }
+
     /// <summary>Every member's slots, as they stand: what a carry must leave alone.</summary>
     private static Weapon?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
 
@@ -671,6 +685,37 @@ public sealed class BetweenRunsHudTests : IDisposable
         using (TestContent.UsePremise(tuning: t => t with { WearCapacityPerBar = 0 }))
             Assert.Equal("CAPACITY 30 - IT DOES NOT GROW", BetweenRunsHud.CapacityLine(serviced));
 
+        // A caster that casts nothing says why, under its enchantments and in orange
+        // (the 6a.2 review; the plan's detail panel): a staff whose first enchantment
+        // applies no status, a wand whose first is no element, or either with none —
+        // what the dungeon's cast gates refuse. Only a hand-edited save holds one: no
+        // weapon the content ships, as dropped, says it.
+        var enchantments = GameContent.Current.Enchantments.All;
+        var noStatus = enchantments.First(def => def.Applies is null);
+        var noElement = enchantments.First(def => def.Applies is not null && def.DamageType is null or DamageType.None);
+        var staffDef = GameContent.Current.Weapons["staff_of_renewal"];
+        var wandDef = GameContent.Current.Weapons.All.First(def => def.Class == WeaponClass.Wand);
+        var (staffMade, wandMade) = (Made(staffDef), Made(wandDef));
+        foreach (var caster in new[]
+        {
+            new Weapon(staffDef, staffMade.Forged, staffMade.Modifiers, [], 0),
+            new Weapon(staffDef, staffMade.Forged, staffMade.Modifiers, [new Enchantment(noStatus, 1), .. staffMade.Enchantments], 0),
+            new Weapon(wandDef, wandMade.Forged, wandMade.Modifiers, [], 0),
+            new Weapon(wandDef, wandMade.Forged, wandMade.Modifiers, [new Enchantment(noElement, 1), .. wandMade.Enchantments], 0),
+        })
+        {
+            Assert.True(BetweenRunsHud.CastsNothing(caster), $"{caster.Name} carrying {caster.Enchantments.Count} casts something");
+            var said = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("D", 1), caster));
+            var why = Assert.Single(said, line => line.Text == BetweenRunsHud.CastsNothingLine);
+            Assert.Equal(DungeonHud.Orange, why.Color);
+            Assert.Equal(said.Count - 3, said.ToList().IndexOf(why));   // under the enchantments, over the wear and the capacity
+        }
+        Assert.DoesNotContain(GameContent.Current.Weapons.All.Select(Made), BetweenRunsHud.CastsNothing);
+        var dStaff = campaign.Party[3].EquippedWeapon!;
+        Assert.True(dStaff.IsCaster);
+        Assert.DoesNotContain(BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("D", 0), dStaff)),
+            line => line.Text == BetweenRunsHud.CastsNothingLine);
+
         // A room says where it is and how a weapon gets there; a heading says nothing.
         Assert.Equal(new[] { "THE HAND OF [A] IS EMPTY", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[2]).Select(row => row.Text));
         Assert.Equal(new[] { "ROOM IN THE BAG OF [A]", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[4]).Select(row => row.Text));
@@ -736,12 +781,58 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(20, HubWeapons.ScrollTop(25, 29, 30, 10));
         Assert.Equal(0, HubWeapons.ScrollTop(7, 8, 9, 10));   // every row fits: no scroll
 
-        // And the tallest detail the page draws — the weapon with the most lines of
-        // readouts — fits in the same height beside the window.
-        float tallest = GameContent.Current.Weapons.All
-            .Select(def => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("A", 1), Made(def))))
-            .Max(detail => detail.Sum(row => row.Pitch));
-        Assert.True(layout.Top + tallest <= layout.Bottom, "the tallest detail runs into the refusal row under the most notices");
+        // Walked a frame at a time, as the HUD asks it (the 6a.2 review): W/S onto a
+        // row already in view never move the window — it once pulled [B] in over B's
+        // hand at the top whenever the choice left room, so W and S between two rows
+        // in view moved it a row each press. A choice that is the first under a
+        // member's name or a heading brings that row in with it, where there is room.
+        // The rows: the party's heading, then each member's name, hand, bag weapon
+        // and room at 1-4, 5-8, 9-12 and 13-16; the stable's heading at 17, its
+        // twenty at 18-37 and its room at 38.
+        const int fit = 15;
+        var (walked, _) = Hub(campaign);
+        walked.OnKey(Keys.Tab);
+        int Press(Keys key)
+        {
+            walked.OnKey(key);
+            return walked.Weapons.Window(fit);
+        }
+        Assert.Equal((2, 0), (walked.Weapons.Chosen, walked.Weapons.Window(fit)));
+        while (walked.Weapons.Chosen != 20)
+            Press(Keys.S);
+        Assert.Equal(6, walked.Weapons.Window(fit));   // B's hand at the top: [B] has no room over it with the choice at the bottom
+        for (int press = 0; press < 3; press++)
+        {
+            Assert.Equal(6, Press(Keys.W));
+            Assert.Equal(19, walked.Weapons.Chosen);
+            Assert.Equal(6, Press(Keys.S));
+            Assert.Equal(20, walked.Weapons.Chosen);
+        }
+        while (walked.Weapons.Chosen != 7)
+            Assert.Equal(6, Press(Keys.W));   // up to B's bag weapon, the window where it was
+        Assert.Equal(5, Press(Keys.W));   // B's hand, the first under [B]: [B] comes in over it
+        Assert.Equal(("[B]", "  HAND  TOWER GUARD - WEAR 0/30"), (walked.Weapons.Rows()[5].Text, ChosenText(walked)));
+        Assert.Equal(5, Press(Keys.S));   // and stays in
+        Assert.Equal(5, Press(Keys.W));
+        Assert.Equal(4, Press(Keys.W));   // A's room, out of view above: just far enough
+        Assert.Equal(3, Press(Keys.W));
+        Assert.Equal(0, Press(Keys.W));   // A's hand: [A] and the party's heading come in over it
+        Assert.Equal(39 - fit, Press(Keys.W));   // round the start to the stable's room, the last window
+        while (walked.Weapons.Chosen != 18)
+            Press(Keys.W);
+        Assert.Equal(17, walked.Weapons.Window(fit));   // the stable's first weapon, its heading over it
+        Assert.Equal(HubWeapons.StableHeading(20), walked.Weapons.Rows()[17].Text);
+
+        // And the tallest detail the page draws fits in the same height beside the
+        // window: every weapon the content ships, as dropped and as the most a save
+        // may load it carrying — ten of the longest enchantment, which on a staff or
+        // a wand is no cast, so its CASTS NOTHING line too.
+        var tallestWeapon = GameContent.Current.Weapons.All.SelectMany(def => new[] { Made(def), Laden(def) })
+            .Select(weapon => BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("A", 1), weapon)))
+            .MaxBy(detail => detail.Sum(row => row.Pitch))!;
+        float tallest = tallestWeapon.Sum(row => row.Pitch);
+        Assert.True(layout.Top + tallest <= layout.Bottom,
+            $"the tallest detail, {tallestWeapon[1].Text}'s at {tallest} px, runs into the refusal row under the most notices ({layout.Bottom - layout.Top} px)");
     }
 
     [Fact]
@@ -903,6 +994,31 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.SaveFailed(aside);
         Assert.Equal(NoticeText.Wrap(aside), scene.NoticeRows.Take(NoticeText.Wrap(aside).Count));
         Assert.True(BetweenRunsHud.WeaponsPage(720f, scene.NoticeRows.Count).Rows >= 5);
+
+        // A later save that goes through takes the failure back on the hub (the
+        // 6a.2 review): the slot holds the campaign again, so the row saying it could
+        // not is no longer true — taken back as the next screen's is, not left for
+        // the rest of the showing. What else is said stays as it was: the save's
+        // word, the data files', and a file set aside, a fact about a file.
+        const string data = "tuning.json: Key1 0 is below 1 - using 1";
+        scene.SaveWentThrough([]);
+        Assert.Equal(NoticeText.Rows([aside, failed, resumed, data], 3), scene.NoticeRows);
+        scene.SaveWentThrough([failed]);
+        Assert.Equal(NoticeText.Rows([aside, resumed, data], 2), scene.NoticeRows);
+        Assert.Equal([.. NoticeText.Wrap(aside), .. before], scene.NoticeRows);
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(scene.NoticeRows[NoticeText.Wrap(aside).Count]));
+
+        // Failing again, it is said again, at once.
+        scene.SaveFailed(failed);
+        Assert.Equal(failedRows, scene.NoticeRows.Take(failedRows.Count));
+
+        // And a failure the screen was handed — the run's end's save, which failed
+        // before the screen was up — is taken back the same way, by the hub's next
+        // save that goes through; a stale notice the screen never said moves nothing.
+        string atTheEnd = CampaignBoot.NotSaved(Named(2), "Another program has it open.");
+        var (handed, _) = Hub(notices: [atTheEnd, resumed, data], shownWhole: 2);
+        handed.SaveWentThrough([atTheEnd, CampaignBoot.NotSaved(Named(2), "never said")]);
+        Assert.Equal(NoticeText.Rows([resumed, data], 1), handed.NoticeRows);
     }
 
     [Fact]
@@ -912,22 +1028,21 @@ public sealed class BetweenRunsHudTests : IDisposable
         // the rows the left, the detail the right — each 580 px, side by side on the
         // shipped 1280 — and the lines across the window, the keys and the refusal,
         // 1240. The worst case is the longest shipped name, marked as chosen, with
-        // four-digit wear and capacity; every weapon the content ships is drawn, and
-        // one carrying ten of the longest enchantment at its deepest tier.
+        // four-digit wear and capacity; every weapon the content ships is drawn, as
+        // dropped and as the most a save may load it carrying (Laden: ten of the
+        // longest enchantment at tier 99). Their height beside the window, under the
+        // most notice rows the screen can lead, is ChoosingSkipsHeadings'.
         using var numbers = TestContent.UsePremise(tuning: t => t with { StartingPool = 9999 });
         var weapons = GameContent.Current.Weapons;
         var longest = weapons.All.MaxBy(def => def.Name.Length)!;
-        var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
-        var plain = Made(longest);
-        var worn = new Weapon(longest, plain.Forged, plain.Modifiers, Enumerable.Range(0, ContentBounds.MostEnchantments).Select(_ => new Enchantment(soul, 99)).ToArray(), 0,
-            wear: 9999, wearCashed: 9998);
+        var worn = Laden(longest);
         Assert.Equal((9999, true), (worn.WearCapacity, worn.WornFull));
 
         static void Fits(string text, float scale, float width, string what)
             => Assert.True(text.Length * 6f * scale <= width, $"{what}: '{text}' is {text.Length * 6f * scale} px, past {width}");
         static void Glyphs(string text) => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]*$", text.ToUpperInvariant());
 
-        var drawn = weapons.All.Select(Made).Append(worn).ToList();
+        var drawn = weapons.All.SelectMany(def => new[] { Made(def), Laden(def) }).ToList();
         foreach (var weapon in drawn)
         {
             foreach (var place in new[] { new WeaponPlace("A", 0), new WeaponPlace("A", 3), WeaponPlace.InTheStable(9998) })
@@ -963,6 +1078,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         }
         foreach (string text in new[] { DungeonHud.WearLine(worn), BetweenRunsHud.CapacityLine(worn), DungeonHud.WearReadout(worn) })
             Glyphs(text);
+        Fits(BetweenRunsHud.CastsNothingLine, BetweenRunsHud.DetailScale, BetweenRunsHud.ColumnWidth, "the detail");
+        Glyphs(BetweenRunsHud.CastsNothingLine);
 
         foreach (string line in new[] { BetweenRunsHud.KeysLine, BetweenRunsHud.WeaponsKeysLine, HubWeapons.KeepsAWeapon("A"), BetweenRunsHud.MenuKeysLine(hasTitle: true) })
         {

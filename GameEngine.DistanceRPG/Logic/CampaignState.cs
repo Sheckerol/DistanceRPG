@@ -197,8 +197,9 @@ public sealed class CampaignState
     /// rebuilt it, what it has met, the run counter, every lock a clear wrote — an
     /// early offer's rewrite as it stands — the dungeons cleared and retired, how
     /// the last run ended, the visit in progress, or none between runs, and the
-    /// stable, in its order — filled before the visit is held, so a mid-run save
-    /// with a stable comes back through no door the hub's guard shuts. The
+    /// stable, in its order — filled here, never through the hub's door
+    /// (<see cref="Move"/>), so a mid-run save with a stable comes back whole
+    /// though that door is shut until its run ends. The
     /// one door the run's-end records come back through: internal, so there is
     /// still no public setter on the counter and no public <c>Retire</c> (a run's
     /// end is the only other writer). Nothing is re-derived and nothing is met: a
@@ -252,7 +253,7 @@ public sealed class CampaignState
         }
         campaign._cleared.UnionWith(cleared);
         campaign._retired.UnionWith(retired);
-        campaign._stable.AddRange(stable);   // before the visit is held: the hub's door is shut once it is
+        campaign._stable.AddRange(stable);   // not through Move: the hub's door is the player's, and shut while a visit is held
         if (visit is not null)
         {
             if (campaign._party.Count == 0)

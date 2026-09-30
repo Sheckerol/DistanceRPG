@@ -259,6 +259,16 @@ public class SaveCodecTests
         stray["tuningHashVersion"] = "one";
         Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
 
+        // And a stray campaign stable, a member version 1 never had (the 6a.2
+        // review): to the version-1 reader it was nothing, so the step removes it,
+        // whatever it holds — never read as weapons the campaign never owned, never
+        // refused at a row's missing wear.
+        stray["campaign"]!["stable"] = new JsonArray(v1["campaign"]!["party"]![0]!["inventory"]![0]!.DeepClone());
+        Assert.False(SaveCodec.LiftToVersion2(stray.DeepClone().AsObject())["campaign"]!.AsObject().ContainsKey("stable"));
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+        stray["campaign"]!["stable"] = "every weapon";
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(stray.ToJsonString())));
+
         // At version 2 the members are the document's own, read as written.
         var worn = Tree(text);
         worn["campaign"]!["party"]![0]!["inventory"]![0]!["wear"] = 12;

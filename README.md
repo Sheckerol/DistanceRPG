@@ -144,14 +144,16 @@ kept with the campaign in the order they were put there, as many as you like. Th
 WEAPONS page between runs lists every member — `[A]`, its `HAND` and each weapon
 in its `BAG`, with `- ROOM FOR 4 MORE -` while its bag has room — then `THE
 STABLE - 3 WEAPONS` and its `- ROOM -`, each weapon with its wear (`WEAR 12/30`,
-green once `FULL`). Take a weapon up with Enter and put it down elsewhere with
+green once `FULL`). A staff or wand that casts nothing — only a hand-edited save
+holds one — says `CASTS NOTHING - ITS FIRST ENCHANTMENT IS ITS CAST` in its
+detail. Take a weapon up with Enter and put it down elsewhere with
 Enter: into another member's hand (equipping it) or bag, into the stable, or back
 out of it. Taking up moves nothing — Esc puts it back — and only the put-down
 changes the campaign, which is saved at once, into its own slot (PHASE 6a
 DECISION 10 in `docs/roadmap/open-questions.md`); a save that fails says so at
-once under the title. No move leaves a member carrying no weapon, and a hand a
-move empties takes up the first weapon in its bag, as it would before a dungeon
-(PHASE 6a DECISION 7). The log says each move: `[Hub] Moved Staff of Renewal from
+once under the title, until a later save goes through. No move leaves a member
+carrying no weapon, and a hand a move empties takes up the first weapon in its
+bag, as it would before a dungeon (PHASE 6a DECISION 7). The log says each move: `[Hub] Moved Staff of Renewal from
 A's bag slot 2 to the stable's end`.
 
 Outside combat the rest of the party marches behind the active character in a
@@ -330,7 +332,8 @@ back to it, and the game quits from it.
   loads again here), and loads nothing in its place. An earlier Phase 6a step's
   build does worse: every 6a step reads version 2 as its own, so it loads a save
   a later step wrote, passes over what it does not know of (the stable, the
-  enchanter's queue), and its next save drops those, and the weapons in them.
+  enchanter's queue), and its next save — from Phase 6a.2 on, the first weapon
+  moved between runs — drops those, and the weapons in them.
   While Phase 6a is being built, one more thing of the steps between: a save an
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
@@ -341,7 +344,8 @@ back to it, and the game quits from it.
   no rights — costs nothing: the save on the disk is the last good one, the log
   says why, and the game says `SLOT 2 COULD NOT BE SAVED` (or `THE OLD AUTOSAVE
   COULD NOT BE SAVED`) at once, over the floor you are playing or under the
-  title between runs, and again on the next screen — the screen between runs, or the title after QUIT TO TITLE —
+  title between runs (there until a later save goes through, which takes it
+  back), and again on the next screen — the screen between runs, or the title after QUIT TO TITLE —
   once, however many saves failed, and not at all if a later save has gone
   through by then, the quit's own included. It never saves into another slot
   instead. A quit that cannot save leaves `campaign.unsaved` beside the save of

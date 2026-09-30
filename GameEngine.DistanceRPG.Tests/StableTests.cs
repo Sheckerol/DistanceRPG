@@ -298,15 +298,30 @@ public sealed class StableTests : IDisposable
         var earlier = JsonNode.Parse(Save(NewCampaign()))!.AsObject();
         Assert.True(earlier["campaign"]!.AsObject().Remove("stable"));
         Assert.Empty(Load(earlier.ToJsonString()).Campaign.Stable);
+
+        // A version-1 save a hand gave a stable (the 6a.2 review): the version-1
+        // reader ignored the member, so to version 1 there was none, and the step
+        // removes it rather than read weapons the campaign never owned — or refuse,
+        // at the row's missing wear, a save version 1 loaded. Whatever kind of thing
+        // it is.
+        var bRow = JsonNode.Parse(v1)!["campaign"]!["party"]![1]!["inventory"]![2]!;
+        foreach (JsonNode stray in new JsonNode[] { new JsonArray(bRow.DeepClone()), JsonValue.Create(4) })
+        {
+            var grafted = JsonNode.Parse(v1)!.AsObject();
+            grafted["campaign"]!["stable"] = stray;
+            var lifted = SaveGame.Restore(SaveCodec.Read(grafted.ToJsonString()), GameContent.Current).Campaign;
+            Assert.Empty(lifted.Stable);
+            Assert.Equal(6, lifted.Party[1].Inventory.Count(carried => carried is not null));
+        }
     }
 
     [Fact]
     public void AMidRunSaveWithAStableRestores()
     {
         // A stable filled between runs is carried through the run, and a save made
-        // mid-run holds it: the load fills the stable before it holds the visit, so
-        // no guard the visit raises stands in its way — and once it is held, the hub's
-        // door is shut again until the run ends.
+        // mid-run holds it: the load fills the stable itself, never through the hub's
+        // door, so it comes back whole with the visit held — and the door stays shut
+        // until the run ends.
         var campaign = NewCampaign();
         campaign.Move(Slot("A", 1), Stable(0));
         campaign.Move(Slot("D", 1), Stable(1));

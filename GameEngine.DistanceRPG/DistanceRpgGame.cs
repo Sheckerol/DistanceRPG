@@ -987,13 +987,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws,
     /// stamped with the clock's time: every line to the log. A write that fails is
     /// said at once over the floor being played, when a run is
-    /// (<see cref="DungeonScene.SaveFailed"/>), or under the hub's title between
-    /// runs (<see cref="BetweenRunsScene.SaveFailed"/>), and on the next screen the game
-    /// shows — there once, however many times it failed, and only until a later
-    /// save goes through, which takes it back (<see cref="TakeBackFailedSaves"/>) —
-    /// this door's, or the quit's (<see cref="SaveOnQuit"/>). A file of the slot the
-    /// write set aside first, since no save could be read from it, is said the same
-    /// way — at once, and on the next screen — and never taken back: it is a fact
+    /// (<see cref="DungeonScene.SaveFailed"/>, for its notice's life), or under the
+    /// hub's title between runs (<see cref="BetweenRunsScene.SaveFailed"/>), and on
+    /// the next screen the game shows — there once, however many times it failed,
+    /// and only until a later save goes through, which takes it back from the next
+    /// screen (<see cref="TakeBackFailedSaves"/>) and from the hub up
+    /// (<see cref="BetweenRunsScene.SaveWentThrough"/>) — this door's, or the
+    /// quit's (<see cref="SaveOnQuit"/>). A file of the slot the write set aside
+    /// first, since no save could be read from it, is said the same way — at
+    /// once, and on the next screen — and never taken back: it is a fact
     /// about a file, whatever the saves after it do. The save on the disk is kept
     /// whatever happens. A save by hand (<paramref name="byHand"/>) restamps a save
     /// that holds the campaign already, rather than write nothing.
@@ -1007,8 +1009,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var setAside = said.ToList();
         foreach (string notice in setAside)
             Log.Warn($"[Save] {notice}");
+        var hub = HubScene(campaign);
         if (failed is null)
         {
+            hub?.SaveWentThrough(_failedSaves);   // taken back on the hub up too, before the list is forgotten
             TakeBackFailedSaves();
         }
         else
@@ -1026,7 +1030,6 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         // said is laid last, on top.
         _notices.Lead(said);
         var scene = PlayingScene(campaign);
-        var hub = HubScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
         {
             scene?.SaveFailed(said[i]);
@@ -1065,7 +1068,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>
     /// The screen between runs, when it is the scene up now and the campaign is
     /// between runs — where a save of the hub's changes that failed is said at once
-    /// (PHASE 6a DECISION 10) — or null: mid-run, or on any other screen.
+    /// (PHASE 6a DECISION 10), and taken back once a later one goes through — or
+    /// null: mid-run, or on any other screen.
     /// </summary>
     private static BetweenRunsScene? HubScene(CampaignState campaign)
         => SceneManager.Instance.CurrentScene is BetweenRunsScene hub && campaign.Visit is null ? hub : null;

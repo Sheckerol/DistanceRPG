@@ -270,17 +270,22 @@ internal sealed class HubWeapons
     /// <summary>
     /// The first row a window of <paramref name="fit"/> rows shows, with the choice
     /// in it (<see cref="ScrollTop"/>): kept from one frame to the next, so the
-    /// window moves only as far as the choice asks. Where the window has room, the
-    /// rows just over the choice that no choice stops on — a member's name, a
-    /// heading — come into it too, so the first weapon of a member or of the stable
-    /// is never read without whose it is.
+    /// window moves only as far as the choice asks, and W/S onto a row already in
+    /// view never move it. A choice that is the first row under a member's name or
+    /// a heading — the first weapon of a member or of the stable, or the room where
+    /// there is none — asks for the rows over it that no choice stops on too, where
+    /// the window has room, so it is never read without whose it is.
     /// </summary>
     public int Window(int fit)
     {
         var rows = Rows();
-        int top = ScrollTop(_top, _chosen, rows.Count, fit);
-        while (top > 0 && !rows[top - 1].Choosable && _chosen - (top - 1) < fit)
-            top--;
+        int chosen = Math.Clamp(_chosen, 0, rows.Count - 1);
+        int top = ScrollTop(_top, chosen, rows.Count, fit);
+        int over = chosen;   // the first of the rows no choice stops on just over the choice, or the choice itself when there are none
+        while (over > 0 && !rows[over - 1].Choosable)
+            over--;
+        if (over < top)
+            top = Math.Max(over, chosen - fit + 1);
         _top = top;
         return top;
     }
