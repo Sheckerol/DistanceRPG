@@ -47,12 +47,13 @@ public static class Wear
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="cashed"/> is negative.</exception>
     public static PoolProgress Capacity(int cashed)
     {
+        if (cashed < 0)
+            throw new ArgumentOutOfRangeException(nameof(cashed), cashed, "Wear cashed is never negative: a weapon only ever cashes wear in.");
+
         var tuning = GameContent.Current.Tuning;
         if (tuning.WearCapacityPerBar > 0)
             return Progression.Pool(cashed, InnateStats.Low, tuning.StartingPool, tuning.WearCapacityPerBar);
 
-        if (cashed < 0)
-            throw new ArgumentOutOfRangeException(nameof(cashed), cashed, "Wear cashed is never negative: a weapon only ever cashes wear in.");
         if (tuning.StartingPool < 1)
             throw new ArgumentOutOfRangeException(nameof(Tuning.StartingPool), tuning.StartingPool, "StartingPool is the bar a capacity opens on; below 1 there is no bar to fill.");
         int bar = tuning.StartingPool;

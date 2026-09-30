@@ -75,45 +75,70 @@ public sealed class HudTextTests : IDisposable
     public void TheWearReadoutSaysFullPlainly()
     {
         // §6.1 (Phase 6a.1): every weapon line reads its wear against its
-        // capacity — the work done, one way, never durability (P6:44–58) — white
-        // while it banks, and at the cap WEAR n/n FULL in yellow: "a weapon at its
-        // cap should say so plainly" (P6:74–78), and never in a unique's orange.
-        // The sentence form a panel with room prints says what to do about it.
-        var def = GameContent.Current.Weapons["arming_sword"];
-        Weapon Worn(int wear, int cashed = 0)
-        {
-            var sword = TestWeapons.Get("arming_sword");
-            return new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear, cashed);
-        }
-
+        // capacity — the work done, one way, never durability (P6:44–58) — in the
+        // line's own colour while it banks, and at the cap WEAR n/n FULL in green:
+        // "a weapon at its cap should say so plainly" (P6:74–78), and never in a
+        // unique's orange. The sentence form a panel with room prints says what to
+        // do about it.
         var fresh = TestWeapons.Get("arming_sword");
         Assert.Equal("WEAR 0/30", DungeonHud.WearReadout(fresh));
-        Assert.Equal(DungeonHud.White, DungeonHud.WearColor(fresh));
+        Assert.Equal(DungeonHud.White, DungeonHud.WearColor(fresh, DungeonHud.White));
         Assert.Equal("WEAR 0 OF 30 - 30 MORE FILLS IT", DungeonHud.WearLine(fresh));
 
-        var banked = Worn(12, cashed: 30);   // a bar cashed: capacity 31
+        var banked = WornSword(12, cashed: 30);   // a bar cashed: capacity 31
         Assert.Equal("WEAR 12/31", DungeonHud.WearReadout(banked));
         Assert.Equal("WEAR 12 OF 31 - 19 MORE FILLS IT", DungeonHud.WearLine(banked));
 
-        var full = Worn(31, cashed: 30);
+        var full = WornSword(31, cashed: 30);
         Assert.Equal("WEAR 31/31 FULL", DungeonHud.WearReadout(full));
-        Assert.Equal(DungeonHud.Yellow, DungeonHud.WearColor(full));
-        Assert.NotEqual(DungeonHud.Orange, DungeonHud.WearColor(full));
+        Assert.Equal(DungeonHud.Green, DungeonHud.WearColor(full, DungeonHud.White));
+        Assert.NotEqual(DungeonHud.Orange, DungeonHud.WearColor(full, DungeonHud.White));
         Assert.Equal("WEAR 31 OF 31 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(full));
 
         // A capacity a tuning has since lowered under the wear reads full, over the
         // wear it kept: nothing takes wear away.
         using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
         {
-            var over = Worn(25);
+            var over = WornSword(25);
             Assert.Equal("WEAR 25/20 FULL", DungeonHud.WearReadout(over));
-            Assert.Equal(DungeonHud.Yellow, DungeonHud.WearColor(over));
+            Assert.Equal(DungeonHud.Green, DungeonHud.WearColor(over, DungeonHud.White));
         }
 
         // In the HUD's font, at the widest numbers a save holds.
-        var widest = Worn(99999, cashed: 9_999_999);
+        var widest = WornSword(99999, cashed: 9_999_999);
         foreach (string line in new[] { DungeonHud.WearReadout(widest), DungeonHud.WearLine(widest), DungeonHud.WearLine(fresh) })
             Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", line);
+    }
+
+    [Fact]
+    public void AFullReadoutStandsOutOnEveryWeaponLine()
+    {
+        // Only the weapon in hand banks wear, and its lines — the top line and bag
+        // slot 1 — are yellow: so FULL is said in a colour no weapon line is drawn
+        // in, on the line where a weapon fills as on every other, while a readout
+        // short of full reads in its line's own colour, part of the statline. And
+        // never in a unique's orange or an enchantment's cyan, which the line's
+        // other runs are drawn in.
+        var fresh = TestWeapons.Get("arming_sword");
+        var full = WornSword(30);
+        Assert.True(full.WornFull);
+        var lines = Enumerable.Range(0, 6).Select(DungeonHud.WeaponLineColor).ToList();
+        Assert.Equal(DungeonHud.Yellow, lines[0]);   // the weapon in hand, the top line's colour too
+        foreach (var line in lines)
+        {
+            Assert.Equal(line, DungeonHud.WearColor(fresh, line));
+            var cap = DungeonHud.WearColor(full, line);
+            Assert.DoesNotContain(cap, lines);
+            Assert.NotEqual(DungeonHud.Orange, cap);
+            Assert.NotEqual(DungeonHud.Cyan, cap);
+        }
+    }
+
+    /// <summary>An arming sword brought back as a save would bring it, with <paramref name="wear"/> banked and <paramref name="cashed"/> ever cashed.</summary>
+    private static Weapon WornSword(int wear, int cashed = 0)
+    {
+        var sword = TestWeapons.Get("arming_sword");
+        return new Weapon(GameContent.Current.Weapons["arming_sword"], sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear, cashed);
     }
 
     [Fact]

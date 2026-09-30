@@ -226,7 +226,6 @@ public class PreReworkSaveTests
             // capacity.
             var file = SaveCodec.Read(text);
             Assert.Equal((SaveCodec.CurrentVersion, 1), (file.Version, file.TuningHashVersion));
-            string migrated = SaveCodec.Write(file);
             var loaded = SaveGame.Restore(file, GameContent.Current);
             var campaign = loaded.Campaign;
             Assert.Equal(name == MidRun, campaign.Visit is not null);
@@ -236,14 +235,21 @@ public class PreReworkSaveTests
             // A run in progress is opened as the game's resume opens it — on the
             // visit's own die — and captured again it is the migrated document,
             // every weapon row field by field: nothing lost, nothing re-derived
-            // differently. The tuning hash aside, which is the current tuning's, on
-            // the current version's keys, where the migrated save's is of version 1's.
+            // differently. It is the tree the step wrote that is compared, not the
+            // reader's rendering of it, so a member the reader drops or defaults —
+            // one renamed since, say — fails here as a member of the save the
+            // capture lacks. The step leaves the version to the reader, which
+            // stamps the current one; the tuning hash is set aside, the current
+            // tuning's, on the current version's keys, where the migrated save's is
+            // of version 1's.
             campaign.Visit?.OpenTurns(campaign.Party);
             string again = SaveCodec.Write(SaveGame.Capture(campaign, loaded.View));
             string hash = TuningJson.Hash(GameContent.Current.Tuning);
             var recaptured = SaveCodec.Read(again);
             Assert.Equal((hash, SaveCodec.CurrentVersion), (recaptured.TuningHash, recaptured.TuningHashVersion));
-            if (FirstDifference(JsonNode.Parse(migrated), JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
+            var migrated = lifted.DeepClone().AsObject();
+            migrated["version"] = SaveCodec.CurrentVersion;
+            if (FirstDifference(migrated, JsonNode.Parse(again), $"{name} $", root: true) is { } difference)
                 Assert.Fail($"captured again, the document is not the migrated save: {difference}");
 
             // And as text, whitespace and number formatting included: the migrated

@@ -521,7 +521,7 @@ public sealed class DungeonHud
         if (weapon == null)
             DrawCentered(w, 42f, $"[{active.Id}] (NO WEAPON)", 1.5f, Yellow);
         else
-            DrawRunsCenteredAt(w / 2f, 42f, 1.5f, WeaponRuns($"[{active.Id}] ", weapon, active, turns.AttacksThisTurn(active), Yellow));
+            DrawRunsCenteredAt(w / 2f, 42f, 1.5f, WeaponRuns($"[{active.Id}] ", weapon, active, turns.AttacksThisTurn(active), WeaponLineColor(0)));
     }
 
     /// <summary>
@@ -1257,7 +1257,7 @@ public sealed class DungeonHud
             }
 
             // The name, then the statline and modifiers under it as they read in this member's hands.
-            var color = slot == 0 ? Yellow : White;
+            var color = WeaponLineColor(slot);
             _text.DrawText($"{slot + 1}  {weapon.Name}", left, y, 2f, weapon.Unique ? Orange : color);
             var detail = WeaponRuns("", weapon, active, turns.AttacksThisTurn(active), color);
             detail.RemoveAt(0); // the name is the line above
@@ -1493,9 +1493,10 @@ public sealed class DungeonHud
 
     /// <summary>
     /// A weapon as one line of runs: its name (a unique's in gold) and resolved
-    /// statline, its wear against its capacity (<see cref="WearReadout"/>: white,
-    /// and yellow once full), its modifiers, then its enchantments in attachment
-    /// order — a caster's innate, a unique's souls.
+    /// statline, its wear against its capacity (<see cref="WearReadout"/>: in the
+    /// line's colour, and green once full, <see cref="WearColor"/>), its
+    /// modifiers, then its enchantments in attachment order — a caster's innate,
+    /// a unique's souls.
     /// </summary>
     private static List<Run> WeaponRuns(string prefix, Weapon weapon, ActorState? wielder, int attacksThisTurn, Vector4 color)
     {
@@ -1503,7 +1504,7 @@ public sealed class DungeonHud
         {
             new($"{prefix}{weapon.Name}", weapon.Unique ? Orange : color),
             new(WeaponStats(weapon), color),
-            new(WearReadout(weapon), WearColor(weapon)),
+            new(WearReadout(weapon), WearColor(weapon, color)),
         };
         string modifiers = ModifierReadout(weapon, wielder, attacksThisTurn);
         if (modifiers.Length > 0)
@@ -1542,8 +1543,19 @@ public sealed class DungeonHud
         return $"WEAR {weapon.Wear}/{weapon.WearCapacity}{(weapon.WornFull ? " FULL" : "")}";
     }
 
-    /// <summary>The colour a weapon's wear reads in: yellow once full, so the cap says so plainly beside a white readout (never a unique's orange); white short of it.</summary>
-    internal static Vector4 WearColor(Weapon weapon) => weapon.WornFull ? Yellow : White;
+    /// <summary>
+    /// The colour a weapon's wear reads in on a line drawn in
+    /// <paramref name="line"/>: short of full, the line's own, so it reads as
+    /// part of the statline; once full, green, so the cap says so plainly on
+    /// every line a weapon is drawn on (P6:74–78) — the yellow line of the weapon
+    /// in hand (<see cref="WeaponLineColor"/>), the only one that banks wear and
+    /// so where a weapon fills, as on a white one — and never a unique's orange
+    /// or an enchantment's cyan.
+    /// </summary>
+    internal static Vector4 WearColor(Weapon weapon, Vector4 line) => weapon.WornFull ? Green : line;
+
+    /// <summary>The colour a weapon's line reads in, by its bag slot: the weapon in hand (slot 0) yellow, on the top line and in the bag alike, the rest white.</summary>
+    internal static Vector4 WeaponLineColor(int slot) => slot == 0 ? Yellow : White;
 
     /// <summary>
     /// A weapon's wear said whole, for a panel with room for a sentence: how far

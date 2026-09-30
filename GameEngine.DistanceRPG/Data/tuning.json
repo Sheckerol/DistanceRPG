@@ -259,10 +259,10 @@
      enchantment slots open along that capacity, and attaching each enchantment needs a deposit of
      its own size. The user keeps a number they may revisit in this file, so the ruling's six keys
      were here before the Phase 6a enchanter that reads them. WearPerHit and WearCapacityPerBar
-     play now, and turning either says the numbers have changed; the other four are read, clamped
-     and warned like every other key, but nothing plays them until the enchanter takes deposits, so
-     turning one of them says nothing yet. GraftBaseChance is not a key yet: it arrives with the
-     Phase 6a code that reads it. */
+     play now, and turning either says the numbers have changed; the ruling's other five are read,
+     clamped and warned like every other key, but nothing plays them until the enchanter takes
+     deposits, so turning one of them says nothing yet. GraftBaseChance is not a key yet: it
+     arrives with the Phase 6a code that reads it. */
 
   /* The wear a weapon banks for every hit it lands - each body a swing, a cleave, a shot or a
      wand's cast strikes, and each landed cast of a staff - up to its capacity. A deposit at the

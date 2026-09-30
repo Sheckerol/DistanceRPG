@@ -95,9 +95,9 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   The change that gives a rule of play one to read sets it played. A key that
   starts to play with a save version is hashed from that version (`HashedFrom`:
   Phase 6a's are 2), so a save of an older version is compared on its own
-  version's keys and never told a number it was not played under has changed. A key no rule of play reads at all — the
-  launcher's `SaveSlots`, how many save slots there are — is `Played = false`
-  for good.
+  version's keys and never told a number it was not played under has changed.
+  A key no rule of play reads at all — the launcher's `SaveSlots`, how many save
+  slots there are — is `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric

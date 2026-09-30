@@ -42,9 +42,10 @@ over the master copy, as a copy beside the game is read: the file is frozen, so
 it lacks the keys added since, and the test asserts those are exactly the keys
 no version-1 hash covers — what a hit wears and what a deposit costs, the user's
 ruling of 2026-09-25, either unplayed or played only from version 2, and the
-launcher's `SaveSlots` — so every number the hash covers is the file's own. The game says the numbers have changed exactly when the numbers
-it ships differ from that file's. And the launch resumes each one — the mid-run
-one in the dungeon, on its floor and turn, where its visit plays on.
+launcher's `SaveSlots` — so every number the hash covers is the file's own. The
+game says the numbers have changed exactly when the numbers it ships differ from
+that file's. And the launch resumes each one — the mid-run one in the dungeon, on
+its floor and turn, where its visit plays on.
 
 `pre-rework-tuning.json` has one more reader: the suite's `Premise`, the numbers
 the worked examples were written against. A suite whose scenarios stand on the

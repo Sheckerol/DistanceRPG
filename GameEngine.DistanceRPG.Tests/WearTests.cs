@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
 using static GameEngine.DistanceRPG.Tests.TestIl;
@@ -116,8 +117,11 @@ public sealed class WearTests : IDisposable
             Assert.InRange(most.XpIntoNext, 0, most.XpToNext - 1);
         }
 
-        // Wear cashed is never negative.
-        Assert.Throws<ArgumentOutOfRangeException>(() => Wear.Capacity(-1));
+        // Wear cashed is never negative: one refusal, Wear's own, naming what it
+        // was handed, whether the capacity grows (replayed) or is frozen (closed form).
+        Assert.Equal("cashed", Assert.Throws<ArgumentOutOfRangeException>(() => Wear.Capacity(-1)).ParamName);
+        using (TestContent.Use(tuning: ShippedContent.Tuning with { WearCapacityPerBar = 0 }))
+            Assert.Equal("cashed", Assert.Throws<ArgumentOutOfRangeException>(() => Wear.Capacity(-1)).ParamName);
     }
 
     // ── What is a hit ────────────────────────────────────────────────────────
@@ -228,13 +232,21 @@ public sealed class WearTests : IDisposable
 
         // A wand whose first entry is no element — none instantiation makes, and
         // one only a hand-edited save could hold — casts nothing: the cast reads
-        // its element off that entry, so it is refused before it is made.
-        var soulless = new Weapon(GameContent.Current.Weapons["wand_of_the_nova"], wand.Forged, wand.Modifiers, [], 0);
-        var s = Char("S", 5, 5, soulless);
-        var dud = new TurnSystem(grid, new[] { s }, new[] { Enemy(5, 6) }, () => 10);
-        Assert.False(dud.CanCastArea(s, (s.X, s.Y)));
-        Assert.False(dud.TryCastArea(s, (s.X, s.Y)));
-        Assert.Equal(0, soulless.Wear);
+        // its element off that entry, so it is refused before it is made. Both ways
+        // a save can say it: no entries at all, and a first entry that is there but
+        // carries no element — a leech where the element belongs.
+        var nova = GameContent.Current.Weapons["wand_of_the_nova"];
+        var soulless = new Weapon(nova, wand.Forged, wand.Modifiers, [], 0);
+        var leeching = new Weapon(nova, wand.Forged, wand.Modifiers, [new Enchantment(GameContent.Current.Enchantments["vampiric"], 1)], 0);
+        Assert.True(leeching.Innate!.Def.DamageType is null or DamageType.None);
+        foreach (var dudWand in new[] { soulless, leeching })
+        {
+            var s = Char("S", 5, 5, dudWand);
+            var dud = new TurnSystem(grid, new[] { s }, new[] { Enemy(5, 6) }, () => 10);
+            Assert.False(dud.CanCastArea(s, (s.X, s.Y)));
+            Assert.False(dud.TryCastArea(s, (s.X, s.Y)));
+            Assert.Equal(0, dudWand.Wear);
+        }
     }
 
     [Fact]
@@ -368,6 +380,20 @@ public sealed class WearTests : IDisposable
             Hit(lowered, c, dummy);
             Assert.Equal((25, 0), (c.EquippedWeapon!.Wear, said));
         }
+
+        // And the dungeon writes the crossing to the log, the one place it is
+        // said as it happens ([Wear] A's Weakspot Stiletto is full: wear 30 of 30):
+        // the scene's wiring subscribes to it once, with a handler that logs. Read
+        // off the IL, as no test drives the scene.
+        var wire = typeof(DungeonScene).GetMethod("WireTurnSystem", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var subscribe = typeof(TurnSystem).GetEvent(nameof(TurnSystem.WeaponWornFull))!.AddMethod!;
+        static bool Same(MethodBase? a, MethodBase b) => a is not null && a.Module == b.Module && a.MetadataToken == b.MetadataToken;
+        var wiring = Instructions(Body(wire)!).ToList();
+        int subscribed = wiring.FindIndex(i => IsCall(i.Op) && Same(Resolve(wire, i.Token), subscribe));
+        Assert.True(subscribed >= 0, "DungeonScene.WireTurnSystem does not subscribe to WeaponWornFull");
+        Assert.Equal(1, wiring.Count(i => IsCall(i.Op) && Same(Resolve(wire, i.Token), subscribe)));
+        var handler = Resolve(wire, wiring.Take(subscribed).Last(i => IsDelegate(i.Op)).Token)!;
+        Assert.Contains(Instructions(Body(handler)!), i => IsCall(i.Op) && Resolve(handler, i.Token) is { Name: "Info", DeclaringType.Name: "Log" });
     }
 
     [Fact]
@@ -451,6 +477,21 @@ public sealed class WearTests : IDisposable
         Assert.Contains(".ctor", feed.Name, StringComparison.Ordinal);   // a lambda the constructor made: the roster's feed
         Assert.Equal(["ApplyCast", "ApplyDamage"], CallersOf(wearHit).Select(c => c.Name).Order(StringComparer.Ordinal));
         Assert.All(CallersOf(wearHit), c => Assert.Equal(typeof(TurnSystem), c.Root));
+
+        // A feed is a delegate, and calling one leaves no call edge: so what is
+        // pinned beside the calls is who touches the feeds at all — the
+        // constructor, which fills them, and WearHit, which calls one. A second
+        // door that fed a weapon straight off the table fails here.
+        var feeds = typeof(TurnSystem).GetField("_wearFeeds", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        string[] Touching(params OpCode[] ops) => typeof(TurnSystem).GetNestedTypes(Declared).Prepend(typeof(TurnSystem))
+            .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+            .Where(method => Body(method) is { } il && InstructionsAt(il).Any(i => ops.Contains(i.Op)
+                && method.Module.ResolveField(BitConverter.ToInt32(il, i.At)) is { } field
+                && field.Module == feeds.Module && field.MetadataToken == feeds.MetadataToken))
+            .Select(method => method.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([".ctor", "WearHit"], Touching(OpCodes.Ldfld, OpCodes.Ldflda));
+        Assert.Equal([".ctor"], Touching(OpCodes.Stfld));
     }
 
     [Fact]

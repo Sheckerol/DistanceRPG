@@ -111,8 +111,9 @@ bag.
 strikes, each counter and each brace, and each landed cast of a staff, a heal or
 a curse alike — up to its capacity, 30 on every new weapon (`StartingPool`). The
 weapon line at the top of the screen, and each weapon in the bag, reads its wear
-over its capacity after the statline, `WEAR 12/30` in white; a full weapon reads
-`WEAR 30/30 FULL` in yellow, banks nothing more, and plays exactly as it did —
+over its capacity after the statline, `WEAR 12/30`, in the line's own colour; a
+full weapon reads `WEAR 30/30 FULL` in green — on the yellow line of the weapon
+in hand as on a white one — banks nothing more, and plays exactly as it did —
 wear is a resource the enchanter spends between runs, never damage, and a full
 weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on the
 dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
@@ -289,13 +290,14 @@ back to it, and the game quits from it.
   a number it was played under moved: the ones Phase 6a began to play
   (`WearPerHit`, `WearCapacityPerBar`) are none it was played under (PHASE 6a
   DECISION 9). **Do not open a slot this build has saved with an older
-  checkout** — Phase 5, or an earlier Phase 6a step: an older build reads version
-  2 as a newer build's save and sets it aside, kept and never deleted (renamed
-  back to `campaign.json`, it loads again here), and loads nothing in its place.
-  While Phase 6a is being built, two things of the steps between: a save a later
-  step wrote, opened by an earlier step's build, loses at its next save what the
-  earlier step does not know of (the stable, the enchanter's queue); and a save
-  an earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
+  checkout.** A Phase 5 checkout reads version 2 as a newer build's save and
+  sets it aside, kept and never deleted (renamed back to `campaign.json`, it
+  loads again here), and loads nothing in its place. An earlier Phase 6a step's
+  build does worse: every 6a step reads version 2 as its own, so it loads a save
+  a later step wrote, passes over what it does not know of (the stable, the
+  enchanter's queue), and its next save drops those, and the weapons in them.
+  While Phase 6a is being built, one more thing of the steps between: a save an
+  earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
   version 2's record. A released version 2 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a

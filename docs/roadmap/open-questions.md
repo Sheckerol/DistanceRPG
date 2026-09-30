@@ -410,7 +410,15 @@ its hits are the bodies its shape strikes; **and a wipe keeps the run's wear**:
 "a wipe forfeits spoils, not gear" (settled.md), and the claw-back is the member
 pools' alone. The log says when a member's weapon fills
 (`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`), and the weapon line
-reads `WEAR 30/30 FULL` in yellow.
+reads `WEAR 30/30 FULL` in green.
+
+**What the pick lets a player do.** A staff whose cast lands on its own side — a
+heal, a ward — can fill its wear with no enemy in play: cast on itself or an
+ally, end the turn, cast again as the mana comes back, on a cleared floor or
+anywhere safe. A blade or a wand earns only by striking a body. Wear is what
+every service at the enchanter is paid in (R4), so this loop is what the pick
+rules on; alternative (a)'s second half, only a staff's casts on enemies count,
+closes it.
 
 **This decides how a caster and a wipe earn toward the enchanter, so it is the
 user's to decide.** The alternatives: (a) staves accrue nothing — so a staff is
@@ -473,5 +481,4 @@ never does.
 to decide.** The alternative: accept one `THE NUMBERS HAVE CHANGED SINCE THIS
 CAMPAIGN WAS SAVED` on the first resume of every phase-5 save, as a new key costs
 (the entry on the gameplay numbers still compiled), with no new member at the
-save's root. settled.md's
-Phase 6a implementation pass records the ruling.
+save's root. settled.md's Phase 6a implementation pass records the ruling.

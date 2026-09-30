@@ -1814,7 +1814,7 @@ public sealed class TurnSystem
         // ally or an enemy alike (PHASE 6a DECISION 1). A wand's Cast is not: its
         // hits are the bodies its shape struck, each worn through the DamageTaken
         // applier.
-        if (settled.Weapon.AreaShape is null)
+        if (!IsAreaCaster(settled.Weapon))
             WearHit(caster, settled.Weapon);
 
         // One record for the cast and the triggers its entries paid, and one
