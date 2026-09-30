@@ -7,7 +7,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// What the campaign has met (§3.3): the enchantment ids a weapon has brought
 /// into the party's hands, which is what §6.2's enchanter offers from
-/// (<see cref="Enchanter.Offers"/>) and what §5.1 saves. Small, and the one collection that only ever grows.
+/// (<see cref="Enchanter.Offers"/>) and what §5.1 saves. Small, and the one
+/// collection that only ever grows.
 /// </summary>
 public class CampaignStateTests
 {
@@ -134,8 +135,8 @@ public class CampaignStateTests
         // may ever grant. They still go in: the set is what the campaign has MET,
         // and whether an entry may then be copied is a different question with an
         // answer already in the content (§5.5's neverRolled). Filtering here would
-        // make the set answer the enchanter's question for it. So does an entry
-        // that does nothing yet: Echoing, met, is met.
+        // make the set answer the enchanter's question for it. An entry that does
+        // nothing yet goes in too: Echoing, met, is met.
         var campaign = new CampaignState();
         campaign.See(TestWeapons.Get("flensing_knife_unique"));
         campaign.See(Carrying("echoing"));

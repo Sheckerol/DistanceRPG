@@ -54,10 +54,11 @@ public readonly record struct WeaponPlace(string? MemberId, int Index)
 /// <para>
 /// And what the campaign has met, as against what a run is carrying: the set of
 /// enchantment ids a weapon has brought into the party's hands (§3.3). It is
-/// save data (§5.1) and it is the one collection that only ever grows — §6.4's
-/// enchanter offers "what you have seen", and this is the list it will be
-/// reading. It is campaign-wide, never per floor or per visit: an entry met on
-/// floor 2 is still met after the party walks out, and on every visit after.
+/// save data (§5.1) and it is the one collection that only ever grows — §6.2's
+/// enchanter offers from it (<see cref="Enchanter.Offers"/>), less the souls and
+/// the kinds that do nothing yet. It is campaign-wide, never per floor or per
+/// visit: an entry met on floor 2 is still met after the party walks out, and on
+/// every visit after.
 /// </para>
 /// <para>
 /// <strong>Pickup is the trigger, not sight.</strong> An entry is met when the
@@ -69,7 +70,7 @@ public readonly record struct WeaponPlace(string? MemberId, int Index)
 /// <strong>Unique souls go in.</strong> The set is what the campaign has met, and
 /// whether an entry may then be copied is a different question with an answer
 /// already in the content: <see cref="EnchantmentCatalogue.NeverRolled"/>. Filtering
-/// here instead would make the set answer a question §6.4 has not asked yet.
+/// here instead would make the set answer the enchanter's question for it.
 /// </para>
 /// <para>
 /// <strong>And it is never handed out as a <see cref="HashSet{T}"/>.</strong> .NET
@@ -799,7 +800,7 @@ public sealed class CampaignState
     /// <see cref="PartyMemberState.From"/> off the roster. Without this the only
     /// entries the campaign would ever meet are the ones taken off a corpse, and a
     /// party starting with <c>staff_of_renewal</c>, <c>wand_of_the_nova</c> or the
-    /// Efficiency dagger would reach §6.4's enchanter to be told it cannot offer
+    /// Efficiency dagger would reach §6.2's enchanter to be told it cannot offer
     /// <c>regeneration</c>, an element or <c>vampiric</c> — entries it has been
     /// carrying since turn 0. They are in a bag; how they got there is not this
     /// set's question.

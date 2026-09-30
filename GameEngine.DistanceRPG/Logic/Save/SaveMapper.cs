@@ -375,7 +375,7 @@ internal static class SaveMapper
     /// Enchant one at least, since no tuning prices an enchantment below 1; the runs
     /// it takes one to <see cref="ContentBounds.MostServiceRuns"/>; and its
     /// enchantment one the content has, of a kind that does something
-    /// (<see cref="QueuedEnchantmentId"/>). Whether an Enchant names one the campaign
+    /// (<see cref="BoughtEnchantmentId"/>). Whether an Enchant names one the campaign
     /// has met, and the rest of what a deposit says of itself, are the checks'
     /// (<see cref="SaveConsistency"/>). What <c>restricted.json</c> says of the
     /// enchantment now is not asked: the deposit was legal when it was made, and
@@ -397,7 +397,7 @@ internal static class SaveMapper
                 throw new SaveFormatException($"{where}.wearAtDeposit", $"{wearAtDeposit} is below 1: {EnchantWearWhy}");
             int runs = ServiceRuns(row.Runs, $"{where}.runs");
             int runsWorked = Count(row.RunsWorked, $"{where}.runsWorked");
-            string? enchantment = row.Enchantment is { } id ? QueuedEnchantmentId(id, content, $"{where}.enchantment") : null;
+            string? enchantment = row.Enchantment is { } id ? BoughtEnchantmentId(id, content, $"{where}.enchantment") : null;
             queue[i] = new Deposit(ordinal, weapon, service, wearAtDeposit, runs, enchantment) { RunsWorked = runsWorked };
         }
         return queue;
@@ -406,10 +406,12 @@ internal static class SaveMapper
     /// <summary>
     /// A run's end's reports at the enchanter, as the summary reads them: each names
     /// a weapon and an enchantment the content has — the summary names them every
-    /// frame, and a bad id must never throw while it draws — a service by name, the
-    /// runs it takes one to <see cref="ContentBounds.MostServiceRuns"/>, and the runs
-    /// worked 0 to those: play writes a stalled report at 0, a deposit the run left
-    /// unworked. Which of those a report may be is check 27's.
+    /// frame, and a bad id must never throw while it draws — the enchantment of a
+    /// kind that does something, as its deposit's is (<see cref="BoughtEnchantmentId"/>),
+    /// a service by name, the runs it takes one to
+    /// <see cref="ContentBounds.MostServiceRuns"/>, and the runs worked 0 to those:
+    /// play writes a stalled report at 0, a deposit the run left unworked. Which of
+    /// those a report may be is check 27's.
     /// </summary>
     private static ServiceReport[] Services(IReadOnlyList<ServiceDto> dtos, GameContent content, string at)
     {
@@ -425,7 +427,7 @@ internal static class SaveMapper
             int runs = ServiceRuns(row.Runs, $"{where}.runs");
             int runsWorked = AtMost(NotNegative(row.RunsWorked, $"{where}.runsWorked"), runs, $"{where}.runsWorked",
                 "a service works no more runs than it takes (runs)");
-            string? enchantment = row.Enchantment is { } id ? EnchantmentId(id, content, $"{where}.enchantment") : null;
+            string? enchantment = row.Enchantment is { } id ? BoughtEnchantmentId(id, content, $"{where}.enchantment") : null;
             reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment);
         }
         return reports;
@@ -439,22 +441,22 @@ internal static class SaveMapper
         return AtMost(value, ContentBounds.MostServiceRuns, at, ServiceRunsWhy);
     }
 
-    /// <summary>An enchantment by the id a deposit or a report names: one the content has.</summary>
-    private static string EnchantmentId(string id, GameContent content, string at)
-        => content.Enchantments.TryGet(id, out _) ? id : throw new SaveFormatException(at, $"'{id}' is no enchantment in the content");
-
     /// <summary>
-    /// An enchantment by the id a deposit in the shop names: one the content has,
-    /// and not of a kind declared and inert (<see cref="LootTable.IsInert"/>). The
-    /// enchanter never offers one, and whether a kind does anything is the code's,
-    /// which no file beside the game edits, so no deposit play made could name one
-    /// (Phase 6a.3b). What <c>restricted.json</c> says of the id is not asked, its
-    /// <c>neverRolled</c> included: the deposit was legal when it was made.
+    /// An enchantment by the id a deposit in the shop names, or a run's report of
+    /// one: one the content has, and not of a kind declared and inert
+    /// (<see cref="LootTable.IsInert"/>). The enchanter never offers one, and whether
+    /// a kind does anything is the code's, which no file beside the game edits, so
+    /// no deposit play made could name one (Phase 6a.3b), nor any report of a
+    /// deposit (Phase 6a.3b's review). What <c>restricted.json</c> says of the id is not asked,
+    /// its <c>neverRolled</c> included: the deposit was legal when it was made. The
+    /// id is named bare, as <see cref="SaveConsistency"/> names one: the notice of a
+    /// save set aside shows this clause, and the HUD's font has no apostrophe.
     /// </summary>
-    private static string QueuedEnchantmentId(string id, GameContent content, string at)
+    private static string BoughtEnchantmentId(string id, GameContent content, string at)
     {
-        EnchantmentId(id, content, at);
-        return LootTable.IsInert(content.Enchantments[id])
+        if (!content.Enchantments.TryGet(id, out var def))
+            throw new SaveFormatException(at, $"'{id}' is no enchantment in the content");
+        return LootTable.IsInert(def)
             ? throw new SaveFormatException(at, $"{id} is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it")
             : id;
     }

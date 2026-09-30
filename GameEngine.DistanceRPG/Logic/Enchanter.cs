@@ -71,12 +71,13 @@ public sealed record DepositMade(Deposit Entry, PoolProgress Before, PoolProgres
 /// One enchantment the enchanter offers a weapon (§6.2, "you pick the
 /// enchantment"; <see cref="Enchanter.Offers"/>): an id the campaign has met, why
 /// the enchanter would refuse to attach it to that weapon — or null when it would
-/// — and what the screen says beside it, or null. A refused offer is listed with
-/// its reason and never hidden (PHASE 6a DECISION 12).
+/// — and what the screen says beside it, or null. The two are asked apart, so an
+/// offer may carry both. A refused offer is listed with its reason and never
+/// hidden (PHASE 6a DECISION 12).
 /// </summary>
 /// <param name="Id">The enchantment, by id.</param>
 /// <param name="Refusal">Why it would not go on the weapon, in the HUD's font and naming the entry first — <c>COLD - CANNOT SIT WITH FLAMING</c> — or null.</param>
-/// <param name="Note">What the screen says of an entry it would attach all the same — <c>NEVER FIRES ON A SWORD</c> — or null.</param>
+/// <param name="Note">What the screen says beside the entry, whether or not it is refused — <c>NEVER FIRES ON A SWORD</c> — or null.</param>
 public sealed record Offer(string Id, string? Refusal, string? Note);
 
 /// <summary>
@@ -88,7 +89,8 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// <item><strong>The offer</strong> (<see cref="Offers"/>, Phase 6a.3b) is what an
 /// Enchant may buy: what the campaign has met, less the unique souls and the
 /// kinds that do nothing yet, each with the reason the enchanter would refuse it
-/// on the weapon — the relations, and a status onto a wand — or none.</item>
+/// on the weapon — the relations, a status onto a wand, and a status for the
+/// other side onto a staff — or none.</item>
 /// <item><strong>A deposit</strong> (<see cref="Deposit"/>), between runs only,
 /// takes a weapon out of the party's hands and into the shop, cashes its whole
 /// pool — the capacity growing on the cash, a point a full bar, whatever the
@@ -149,11 +151,18 @@ public static class Enchanter
     /// <see cref="ContentValidator.RuleWandNoStatusApplier"/>'s question
     /// (<see cref="ContentValidator.NoWandCarries"/>; <see cref="WandCastsNoStatus"/>).
     /// This bends §3.3's "any enchantment goes on any weapon" (PHASE 6a DECISION
-    /// 12).</item>
+    /// 12);</item>
+    /// <item>it is a staff's kind for one side, and the weapon a staff whose cast
+    /// is for the other: the cast lands every status its entries apply on the one
+    /// body its first entry chose, so Mire on a Staff of Renewal would mire the
+    /// ally it casts on (<see cref="StaffCastsItOn"/>). The same bend, for the same
+    /// hazard — a status landing on the wrong body (PHASE 6a DECISION 12).</item>
     /// </list>
-    /// An entry that fires on no event the weapon's class raises is offered all the
-    /// same, with a note (<see cref="NeverFiresOn"/>); a defender's step, which
-    /// fires whenever the wielder is hit, is never that
+    /// An entry that fires on no event the weapon raises is offered all the same,
+    /// with a note (<see cref="NeverFiresOn"/>): the events are its class's, as a
+    /// drop's pool reads them, but a staff's are its own — it casts on one body and
+    /// never strikes, so nothing that rides a strike or a kill fires on it. A
+    /// defender's step, which fires whenever the wielder is hit, is never that
     /// (<see cref="EnchantmentBehaviours.DefendsTheWielder"/>). The same enchantment
     /// again is offered — only opposed enchantments exclude each other (S:352–354)
     /// — and a lock the wielder could not afford is never asked: the entry is
@@ -186,11 +195,11 @@ public static class Enchanter
             : LootTable.IsInert(def) ? DoesNothingYet(def)
             : null;
 
-    /// <summary>The offer of <paramref name="def"/> to <paramref name="weapon"/>: why the enchanter would refuse to attach it there, last, and whether it would never fire there (<see cref="Offers"/>).</summary>
+    /// <summary>The offer of <paramref name="def"/> to <paramref name="weapon"/>: why the enchanter would refuse to attach it there, last, and whether it would never fire there (<see cref="Offers"/>) — each asked on its own.</summary>
     private static Offer OfferOf(Weapon weapon, EnchantmentDef def)
-        => new(def.Id, OfferRefusal(weapon, def), FiresOn(weapon.Class, def) ? null : NeverFiresOn(weapon.Class));
+        => new(def.Id, OfferRefusal(weapon, def), FiresOn(weapon, def) ? null : NeverFiresOn(weapon.Class));
 
-    /// <summary>The relations and the wand, asked of <paramref name="def"/> attached last to <paramref name="weapon"/>, in <see cref="Offers"/>' order; null when none refuses it.</summary>
+    /// <summary>The relations, the wand and the staff's side, asked of <paramref name="def"/> attached last to <paramref name="weapon"/>, in <see cref="Offers"/>' order; null when none refuses it.</summary>
     private static string? OfferRefusal(Weapon weapon, EnchantmentDef def)
     {
         var catalogue = GameContent.Current.Enchantments;
@@ -201,13 +210,33 @@ public static class Enchanter
             return NeedsAhead(def, catalogue.TryGet(need, out var needed) ? needed.Name : need);
         if (weapon.Class == WeaponClass.Wand && ContentValidator.NoWandCarries(def))
             return WandCastsNoStatus(def);
+        // A staff's cast: its first entry picks the side (TurnSystem.CanCastOn), and
+        // every status its entries apply lands on that one body (ApplyCast).
+        if (weapon.Innate is { Def.Applies: not null } cast && def.Effect == EffectKind.ApplyStatus
+            && def.Targets != TargetSide.Any && def.Targets != cast.Def.Targets)
+            return StaffCastsItOn(def, cast.Def.Targets);
         return null;
     }
 
-    /// <summary>Whether <paramref name="def"/> ever fires on a weapon of <paramref name="cls"/>: a behaviour on an event the class raises (<see cref="LootTable.RaisedBy"/>, the drop pool's test), or a step on its wielder when hit.</summary>
-    private static bool FiresOn(WeaponClass cls, EnchantmentDef def)
+    /// <summary>Whether <paramref name="def"/> ever fires on <paramref name="weapon"/>: a behaviour on an event it raises (<see cref="Raises"/>), or a step on its wielder when hit.</summary>
+    private static bool FiresOn(Weapon weapon, EnchantmentDef def)
         => EnchantmentBehaviours.DefendsTheWielder(def.Effect)
-            || LootTable.RaisedBy(cls).Any(raised => EnchantmentBehaviours.FiresOn(raised, def.Effect));
+            || Raises(weapon).Any(raised => EnchantmentBehaviours.FiresOn(raised, def.Effect));
+
+    /// <summary>
+    /// The events whose loops run <paramref name="weapon"/>'s entries. A staff — a
+    /// caster with no area shape — casts on one body and never strikes: a caster
+    /// cannot swing, and neither a counter nor a reaction takes one, so no strike
+    /// and no kill runs its entries; it casts, and its wielder can be healed past
+    /// full.
+    /// Every other weapon raises what its class does (<see cref="LootTable.RaisedBy"/>,
+    /// the drop pool's test, which counts a staff as striking — harmless there, since
+    /// a staff's drop draws no entry).
+    /// </summary>
+    private static GameEvent[] Raises(Weapon weapon)
+        => weapon.IsCaster && weapon.AreaShape is null
+            ? [GameEvent.Cast, GameEvent.HealingAboveFull]
+            : LootTable.RaisedBy(weapon.Class);
 
     /// <summary>An offer <c>restricted.json</c> excludes beside an entry the weapon carries (PHASE 6a DECISION 12): <c>COLD - CANNOT SIT WITH FLAMING</c>.</summary>
     public static string CannotSitWith(EnchantmentDef offered, EnchantmentDef carried)
@@ -230,6 +259,19 @@ public static class Enchanter
     {
         ArgumentNullException.ThrowIfNull(offered);
         return $"{offered.Name.ToUpperInvariant()} - A WAND CASTS NO STATUS";
+    }
+
+    /// <summary>A status for one side offered to a staff whose cast is for the other (PHASE 6a DECISION 12), naming the side <paramref name="casts"/> it would land on: <c>MIRE - THIS STAFF WOULD CAST IT ON AN ALLY</c>.</summary>
+    public static string StaffCastsItOn(EnchantmentDef offered, TargetSide casts)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        string side = casts switch
+        {
+            TargetSide.Ally => "AN ALLY",
+            TargetSide.Enemy => "AN ENEMY",
+            _ => throw new ArgumentOutOfRangeException(nameof(casts), casts, "A staff casts on allies or on enemies, never either (ContentValidator.RuleCasterInnate)."),
+        };
+        return $"{offered.Name.ToUpperInvariant()} - THIS STAFF WOULD CAST IT ON {side}";
     }
 
     /// <summary>
@@ -269,8 +311,8 @@ public static class Enchanter
     /// <paramref name="service"/> now, or null when it would take it — the gates
     /// in the order they are asked, the first to fail the reason, each in the HUD's
     /// font for the screen to say (§1g's strings). First the service's own, which
-    /// name no enchantment (<see cref="ServiceRefusal"/>); then, for an Enchant,
-    /// the enchantment it names:
+    /// name no enchantment (<see cref="ServiceRefusal"/>'s, all but the last); then,
+    /// for an Enchant, the enchantment it names:
     /// <list type="number">
     /// <item>one the campaign has met (§6.2's offer, <see cref="CampaignState.HasSeen"/>;
     /// <see cref="Unseen"/>);</item>
@@ -279,11 +321,14 @@ public static class Enchanter
     /// <see cref="NeverCopied"/>, <see cref="DoesNothingYet"/>);</item>
     /// <item>and its offer to this weapon not refused: an id whose offer is
     /// refused is refused with the offer's own reason (the relations, a status
-    /// onto a wand).</item>
+    /// onto a wand, a status for the other side onto a staff).</item>
     /// </list>
-    /// The screen lists only offers, so the first two meet only a caller that names
-    /// another. A lock the wielder could not afford is never a refusal: the
-    /// enchantment is dormant (S:41–42).
+    /// <see cref="ServiceRefusal"/>'s last gate, <see cref="NothingToOffer"/>, is
+    /// not asked: an id that passes these three is itself an offer the enchanter
+    /// would attach, so something is left to choose, and an id that fails one is
+    /// refused with its own reason, which says more. The screen lists only offers,
+    /// so the first two meet only a caller that names another. A lock the wielder
+    /// could not afford is never a refusal: the enchantment is dormant (S:41–42).
     /// </summary>
     /// <param name="campaign">The campaign between its runs.</param>
     /// <param name="weapon">A weapon the party owns: in a member's bag, in the stable, or in the shop.</param>
@@ -307,7 +352,7 @@ public static class Enchanter
                 throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
         }
 
-        if (ServiceRefusal(campaign, weapon, service) is { } refused)
+        if (Gates(campaign, weapon, service) is { } refused)
             return refused;
         if (service == Service.Refine)
             return null;
@@ -351,7 +396,18 @@ public static class Enchanter
         ArgumentNullException.ThrowIfNull(weapon);
         if (service is not (Service.Enchant or Service.Refine))
             throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service.");
+        if (Gates(campaign, weapon, service) is { } refused)
+            return refused;
+        return service == Service.Enchant && !Offers(campaign, weapon).Any(offer => offer.Refusal is null) ? NothingToOffer : null;
+    }
 
+    /// <summary>
+    /// <see cref="ServiceRefusal"/>'s gates bar its last (<see cref="NothingToOffer"/>),
+    /// in its order: the ones <see cref="Refusal"/> asks before the enchantment it
+    /// names, which answers the last for itself.
+    /// </summary>
+    private static string? Gates(CampaignState campaign, Weapon weapon, Service service)
+    {
         var content = GameContent.Current;
         var tutorial = content.Dungeons.Tutorial;
         if (!campaign.IsRetired(tutorial.Id))
@@ -379,8 +435,6 @@ public static class Enchanter
         long price = Wear.Price(n);
         if (weapon.Wear < price)
             return Short(n, price, weapon.Wear);
-        if (!Offers(campaign, weapon).Any(offer => offer.Refusal is null))
-            return NothingToOffer;
         return null;
     }
 

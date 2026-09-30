@@ -235,7 +235,11 @@ single weapon.
 
 The enchanter is not a gamble. **You pick the enchantment**, from everything
 your campaign has seen — anything currently on a weapon in the stable, and
-anything that has ever passed through your hands.
+anything that has ever passed through your hands. (Built in Phase 6a.3b: the
+offer is what the campaign has met, less the unique souls and what does nothing
+yet. What it refuses on a weapon, and how a refusal shows, is PHASE 6a DECISION
+12 in open-questions.md, provisional and the user's to rule; it bends "on any
+weapon, forever after" below. Where `aegis` comes from is PHASE 6a DECISION 4.)
 
 This is the one place in itemisation that is deliberately not a roll, and it is
 what makes every other roll bearable. Drops are class-locked and variant-rolled,

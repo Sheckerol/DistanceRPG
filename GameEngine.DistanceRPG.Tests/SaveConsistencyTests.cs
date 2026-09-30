@@ -1140,26 +1140,33 @@ public sealed class SaveConsistencyTests : IDisposable
         // Phase 6a.3b: the enchanter never offers an enchantment of a kind declared
         // and inert (LootTable.IsInert) — and whether a kind does anything is the
         // code's, which no file beside the game edits — so no deposit play made can
-        // name one. A shop whose Enchant names Echoing, met, is refused at the
-        // deposit's enchantment; the same shop naming an element it met loads. (What
-        // restricted.json says of a queued id is not asked: the case above.)
+        // name one, nor any run's report of a deposit (the 6a.3b review). A shop whose
+        // Enchant names Echoing, met, is refused at the deposit's enchantment, and a
+        // last run's report of one at the report's; the same shop naming an element
+        // it met, in either place, loads. (What restricted.json says of a queued id
+        // is not asked: the case above.)
         string shop;
         using (TestContent.UsePremise(tuning: TestShop.Ruled))
             shop = Save(TestShop.Shop());
         Assert.Equal("vampiric", JsonNode.Parse(shop)!["campaign"]!["enchanter"]![1]!["enchantment"]!.GetValue<string>());
+        Assert.Equal("vampiric", JsonNode.Parse(shop)!["campaign"]!["lastResult"]!["services"]![1]!["enchantment"]!.GetValue<string>());
 
-        string Buying(string id) => Edited(shop, tree =>
+        string Naming(string id, Action<JsonObject, string> put) => Edited(shop, tree =>
         {
             var seen = CampaignNode(tree)["seen"]!.AsArray().Select(node => node!.GetValue<string>()).Append(id).Distinct().Order(StringComparer.Ordinal);
             CampaignNode(tree)["seen"] = new JsonArray(seen.Select(met => (JsonNode)JsonValue.Create(met)!).ToArray());
-            CampaignNode(tree)["enchanter"]![1]!["enchantment"] = id;
+            put(tree, id);
         });
+        string Buying(string id) => Naming(id, (tree, named) => CampaignNode(tree)["enchanter"]![1]!["enchantment"] = named);
+        string Reporting(string id) => Naming(id, (tree, named) => ReportNode(tree, 1)["enchantment"] = named);
+        const string Inert = "echoing is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it";
         using (TestContent.UsePremise(tuning: TestShop.Ruled))
         {
             Assert.True(LootTable.IsInert(GameContent.Current.Enchantments["echoing"]));
-            RefusedAt(Buying("echoing"), "campaign.enchanter[1].enchantment",
-                "echoing is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it");
+            RefusedAt(Buying("echoing"), "campaign.enchanter[1].enchantment", Inert);
+            RefusedAt(Reporting("echoing"), "campaign.lastResult.services[1].enchantment", Inert);
             Restores(Buying("flaming"), "a queued element the campaign met");
+            Restores(Reporting("flaming"), "a reported element the campaign met");
         }
     }
 

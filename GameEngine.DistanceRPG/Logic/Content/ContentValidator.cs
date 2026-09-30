@@ -1232,7 +1232,6 @@ public static class ContentValidator
             if (!seen.Add(def.Id))
                 throw new ContentException(def.Id, RuleDuplicateId);
 
-        var excludes = Closure(restricted.Excludes);
         foreach (var def in data.Weapons)
         {
             var of = OfAWeaponIn(def, data);
@@ -1253,11 +1252,13 @@ public static class ContentValidator
             // never include a pair the relations exclude, in attachment order so
             // the pair reported is the same one every run — naming the
             // restricted.json group that excludes them (S:260-264: "naming both").
+            // The pair is the catalogue's question, the one the enchanter asks of
+            // what it would attach beside the weapon's entries (Phase 6a.3b).
             for (int i = 0; i < def.Enchantments.Count; i++)
                 for (int j = i + 1; j < def.Enchantments.Count; j++)
                 {
                     string a = def.Enchantments[i].Id, b = def.Enchantments[j].Id;
-                    if (excludes.TryGetValue(a, out var excludedByA) && excludedByA.Contains(b))
+                    if (enchantments.Excludes(a, b))
                         throw new ContentException(def.Id, RuleEnchantmentsExcluded, WithRelation($"'{a}' and '{b}'", ExcludingGroup(restricted, a, b)));
                 }
 

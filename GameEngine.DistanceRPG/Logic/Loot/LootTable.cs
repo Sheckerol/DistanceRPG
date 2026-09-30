@@ -549,12 +549,16 @@ public static class LootTable
     }
 
     /// <summary>
-    /// The events a weapon of <paramref name="cls"/> actually raises: everything
-    /// strikes, lands a hit, kills and can be healed past full; a caster — a class
-    /// whose row in the loaded weapons is <see cref="WeaponKind.Caster"/> — casts
-    /// as well. What an entry needs is one live behaviour among them — the test
-    /// <see cref="DropOrder"/> applies, and the enchanter's offer notes (never
-    /// refuses) an entry that fails it (<see cref="Enchanter.Offers"/>).
+    /// The events a weapon of <paramref name="cls"/> raises, as a drop's pool reads
+    /// them: everything strikes, lands a hit, kills and can be healed past full; a
+    /// caster — a class whose row in the loaded weapons is
+    /// <see cref="WeaponKind.Caster"/> — casts as well. What an entry needs is one
+    /// live behaviour among them — the test <see cref="DropOrder"/> applies, and the
+    /// enchanter's offer notes (never refuses) an entry that fails it
+    /// (<see cref="Enchanter.Offers"/>). A staff is the exception it does not draw:
+    /// it casts on one body and never strikes, so no strike or kill runs its entries.
+    /// A staff's drop draws no entry, so the pool never meets it, and the offer asks
+    /// a staff its own.
     /// </summary>
     internal static GameEvent[] RaisedBy(WeaponClass cls) => GameContent.Current.Weapons.KindOf(cls) == WeaponKind.Caster
         ? [GameEvent.Cast, GameEvent.DamageTaken, GameEvent.DamageDealt, GameEvent.Killed, GameEvent.HealingAboveFull]

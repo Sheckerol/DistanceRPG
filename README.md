@@ -176,18 +176,20 @@ it in the shop for its enchantment count plus one runs that count (PHASE 6a DECI
 6); the key that deposits (D) arrives in Phase 6a.5, so until then only a
 hand-edited save fills the shop. What an Enchant may buy (Phase 6a.3b) is any
 enchantment the campaign has met, less what `restricted.json` never copies (the
-unique souls) and what does nothing yet (`echoing`): one the relations refuse on
-the weapon (`COLD - CANNOT SIT WITH FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF
-IT`) or a status onto a wand (`REGENERATION - A WAND CASTS NO STATUS`) is refused,
-and one that never fires on the weapon attaches all the same, noted `NEVER FIRES
-ON A SWORD` (PHASE 6a DECISION 12); with nothing left to choose the Enchant says
+unique souls) and what does nothing yet (`echoing`): one the relations refuse on the
+weapon (`COLD - CANNOT SIT WITH FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF IT`), a
+status onto a wand (`REGENERATION - A WAND CASTS NO STATUS`) or a status a staff
+would cast on the wrong side (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`) is
+refused, and one that never fires on the weapon attaches all the same, noted `NEVER
+FIRES ON A SWORD` — on a staff, anything that rides a strike or a kill, since a staff
+never strikes (PHASE 6a DECISION 12); with nothing left to choose the Enchant says
 `NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. The
-list that shows it arrives with the deposit's key. A run that counts works the two newest a run on,
-and a service whose last run it works comes back to the end of the stable, an
-Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION 3); a run
-that does not count works nothing. The run's summary says so after whether the run
-counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC`, `THE
-ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`, `STALLED AT THE ENCHANTER: RIPOSTE
+list that shows it arrives with the deposit's key. A run that counts works the two
+newest a run on, and a service whose last run it works comes back to the end of the
+stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
+3); a run that does not count works nothing. The run's summary says so after whether
+the run counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC`,
+`THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`, `STALLED AT THE ENCHANTER: RIPOSTE
 BLADE`, or `THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT` — and past three
 services on the screen between runs (two over the floor), `AND 2 MORE AT THE
 ENCHANTER - TAB WEAPONS`. The log says it too: `[Enchanter] Run counted: worked Wand
@@ -366,10 +368,10 @@ back to it, and the game quits from it.
   (`"depositsMade"`), with the last run's word on the shop in its result
   (`"services"`, `null` for an empty shop; Phase 6a.3a). A save whose shop
   contradicts itself — a weapon in it worn, a service past its last run, an
-  enchantment the campaign never met or one that does nothing yet (Phase 6a.3b),
-  a deposit before the tutorial is beaten, a
-  run's report of the shop that says what no run's end says, a deposit whose
-  take-back would give back a weapon no load reads — is refused as one that
+  enchantment the campaign never met or one that does nothing yet (Phase 6a.3b,
+  in a deposit or in a run's report of one), a deposit before the tutorial is
+  beaten, a run's report of the shop that says what no run's end says, a deposit
+  whose take-back would give back a weapon no load reads — is refused as one that
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable

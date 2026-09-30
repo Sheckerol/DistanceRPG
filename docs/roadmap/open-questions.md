@@ -701,12 +701,26 @@ the offer arrives with the deposit's key, Phase 6a.5):
   `WeaponClass`", §6.2's "on any weapon, forever after", and settled.md's "a
   second rule would be a cap by another name". The rule is Phase 1.8's content
   rule, not a ruling;
+- it refuses a staff's status for one side onto a staff whose cast is for the
+  other (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`): a staff's first entry
+  picks whom it casts on, and the cast lands every status its entries apply on
+  that one body, so Mire on a Staff of Renewal would mire the ally it casts on,
+  and Regeneration on a Staff of Mire would heal every enemy it mires. The same
+  bend of the phase docs as the wand's, for the same hazard — a status landing on
+  the wrong body — but with no content rule behind it: no shipped staff mixes
+  sides and a staff's drop rolls no second entry, so the enchanter is the first
+  way to make one (Phase 6a.3b's review);
 - everything else attaches: the same entry again, an entry whose lock the wielder
   cannot pay (it sleeps), and an entry that never fires on the weapon, which the
-  offer notes (`NEVER FIRES ON A SWORD`, a staff's status on a blade);
+  offer notes (`NEVER FIRES ON A SWORD`, a staff's status on a blade; `NEVER FIRES
+  ON A STAFF`, anything that rides a strike or a kill, since a staff casts and
+  never strikes). An element on a staff is offered with no note: it fires on the
+  cast, paying its trigger, and types a cast that lands no damage, so it spends
+  mana for nothing;
 - a refused choice is listed with its reason, never hidden. An Enchant with nothing
-  left to choose — every offer refused, or none met — is refused as such
-  (`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`), and refining is left.
+  left to choose — every offer refused, or none left (nothing met, or only what
+  the enchanter never offers) — is refused as such (`NOTHING TO OFFER - NO
+  ENCHANTMENT MET YET CAN GO ON IT`), and refining is left.
 
 What a transfer may leave as a staff's or a wand's cast, this decision's caster
 clause, arrives with the transfer (Phase 6a.6), and its alternative with it.
@@ -715,7 +729,12 @@ clause, arrives with the transfer (Phase 6a.6), and its alternative with it.
 holds, so it is the user's to decide.** The alternatives: (a) hide refused
 choices; (b) refuse never-firing entries too, as the drop table does; (c) also ask
 content's arrival rules (Overheal beside a healer, a dependency only on a
-currency weapon); or (e) **keep §3.3**: a status applier attaches to a wand, the
+currency weapon); (e) **keep §3.3**: a status applier attaches to a wand, the
 wand's area cast skips it, and the offer notes it `NEVER FIRES ON A WAND`, as it
-notes any entry that never fires. settled.md's Phase 6a implementation pass
-records the ruling.
+notes any entry that never fires. For the staff: (f) attach a status for the
+other side with a note instead, the cast landing it where it lands today; (g) have
+a staff's cast skip an entry for the other side — a change to how a cast plays —
+and note it `NEVER FIRES ON A STAFF`; or (h) give `weapons.json` the rule too, so
+a unique staff cannot ship what the enchanter refuses, as the wand's rule is
+shared. And for an element on a staff: (i) note it as never firing, or refuse it.
+settled.md's Phase 6a implementation pass records the ruling.
