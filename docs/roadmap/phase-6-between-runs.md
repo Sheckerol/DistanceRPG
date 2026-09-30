@@ -31,6 +31,13 @@ Consequence worth stating plainly: **you cannot enchant a weapon you have not
 fought with.** A fresh unique straight off the floor is inert until it has done
 some work.
 
+(Built in Phase 6a: every body a hit lands on banks `WearPerHit`, up to the
+weapon's capacity, and nothing else wears a weapon. Whether a staff's cast is a
+hit, and what a wipe does to the run's wear, is PHASE 6a DECISION 1 in
+open-questions.md, and how a weapon's capacity is kept is DECISION 2, both
+provisional and the user's to rule; settled.md's Phase 6a implementation pass
+records the rest.)
+
 ### A deposit spends the whole pool
 
 Wear does not part-pay and it does not carry over. **Depositing empties the
@@ -297,6 +304,13 @@ nothing, so you choose what matters. It stays legible in a way a pure
 last-in-only rule would not — "the smith is working on these two" reads
 correctly at a glance, where a silently stalled queue reads as a bug.
 
+(Built in Phase 6a: the two is `tuning.json`'s `EnchanterWorksOn`, and the
+screen between runs lists the shop `WORKING` and `STALLED`. Where the weapons
+the party is not carrying live — the stable — is PHASE 6a DECISION 7 in
+open-questions.md, taking a weapon back from the shop early DECISION 8, and the
+`+ 1` in a service's time staying a rule DECISION 6, each provisional and the
+user's to rule.)
+
 ## 6.3 What counts as a run
 
 **Entering the dungeon ticks nothing.** Otherwise the optimal play is a stack
@@ -358,7 +372,11 @@ than a stroll. It still does not demand a good run.
 
 Note the mercy tick and the success tick are currently worth the same. Since a
 boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
-see the open questions.
+settled.md's "A deeper boss pays more" keeps the tick at one per win, the tick
+rewarding the achievement and the drop the depth, and its "Entering does not
+tick service" keeps the mercy tick at one. (Reworded in Phase 6a: this read
+"see the open questions", which have held no question on it since the roadmap
+was split into these files.)
 
 **The tutorial has no mercy tick at all**, since its boss sits on floor 2 (§4.3)
 and the bar is three. It needs no exception to say so: **the enchanter is not
@@ -601,6 +619,15 @@ Rules that keep it coherent:
   enchantments has nothing left to attach, so refinement is simply the only
   service it can still buy: the fork closes itself at the top end without a
   rule.
+
+(Built in Phase 6a: the roll is made as the service's last run is worked, on a
+stream of the finishing run's map seed and the deposit's ordinal, so a reload
+never rerolls it — PHASE 6a DECISION 3 in open-questions.md. How a landed roll
+chooses — how often it grafts, how strongly a deepen favours the signature, and
+what a roll with nothing to take does, where the first and third rules above
+pull apart — is DECISION 5, and a reorder at five enchantments, which the last
+rule's "only service it can still buy" meets, is DECISION 11; each provisional
+and the user's to rule.)
 
 ## 6.5 Transferring an enchantment
 
@@ -891,7 +918,7 @@ enchantment an Enchant attaches, and a transfer's source and the soul's place on
 it; `Service` gains `Transfer`, §6.5's move. A weapon keeps `Wear` and the wear
 it has ever cashed, its capacity and that capacity's progress replayed from the
 latter under the tuning loaded — PHASE 6a DECISION 2. settled.md's Phase 6a
-implementation pass, written at Phase 6a.7, records both.)
+implementation pass records both, with the save's version 2 they are kept in.)
 
 The graft roll is `GraftBaseChance` for `Enchant` and
 `GraftBaseChance * (1 + wear / StartingWearCapacity)` for `Refine` (§6.4) — one

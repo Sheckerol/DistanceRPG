@@ -1651,8 +1651,8 @@ makes false is marked where it stands.
   actor and the attack's ordinal instead stays not taken. The question leaves
   open-questions.md.
 - **R4 — what a deposit costs.** Recorded for Phase 6a, which builds the
-  enchanter: nothing of it is played yet — its numbers are `tuning.json` keys
-  (below), which no rule reads until then. The user's rule:
+  enchanter, its numbers `tuning.json` keys (below). (Played whole since Phase
+  6a — its pass, below; this read "nothing of it is played yet".) The user's rule:
   - A weapon's `WearCapacity` starts at **30**: `StartingPool`, the one bar
     every pool opens on (the Phase 2 pass above), which the graft formula spells
     `StartingWearCapacity`.
@@ -1740,8 +1740,8 @@ makes false is marked where it stands.
   of at least `FirstEnchantmentWear + EnchantmentWearStep × (n − 1)`). They
   replace the `WearCapacityLadder` and `EnchantmentWearCost` placeholders: a file
   naming either is told it is no key and pointed at the key that took its place.
-  `WearPerHit` and `GraftBaseChance` are not R4's numbers, and wait with their
-  Phase 6a readers as before.
+  `WearPerHit` and `GraftBaseChance` are not R4's numbers, and waited for their
+  Phase 6a readers as before (keys since, with them: the Phase 6a pass, below).
   - **Each number its own key — how they split is provisional, the user's to
     rule.** Apart, any one number moves alone, and a weapon's starting capacity
     stays `StartingPool`, the Phase 2 pass's one key for every pool. The
@@ -1778,7 +1778,14 @@ makes false is marked where it stands.
     tuning file, read over the master, lacks these six keys and no other. No
     `ContentValidator.ValidateTuning` rule: it holds what a reader
     needs of a `Tuning` built in code, and nothing reads these. Phase 6a flips
-    each to played as it reads it, with the save's version 2.
+    each to played as it reads it, with the save's version 2. (Done in Phase 6a:
+    all six play, with `WearPerHit`, `EnchanterWorksOn` and the improvement
+    roll's three beside them, and each is hashed from the save's version 2 —
+    `TuningKey.HashedFrom` — so a version-1 save is compared on version 1's keys,
+    as it was played, and a Phase 5 save still resumes with nothing to say unless
+    a number it was played under moved; still no `ValidateTuning` rule, since
+    the one divisor they bring, `StartingPool` in the improvement odds, is 1 at
+    least already — the Phase 6a pass, below.)
   - **The docs' five is two numbers, kept apart on purpose.** `EnchantmentSlots`
     is how many enchantments the enchanter lets a weapon hold; the Light shape's
     five — `ContentValidator.LightShapeSlots`, a rule constant: `signature ×n`
@@ -1911,6 +1918,15 @@ makes false is marked where it stands.
   | the visit's boss floor | above 99 | `DeepestBossFloor`, R3(a)'s | a dungeon no content made, every floor of which a load generates |
   | a member's hit points; a row's | above 10000 plus its HP XP; above 10000 plus its revival gains — each summed as a long | `StartingPool`'s clamp ceiling (`Bar`): a maximum is its bar plus a point for each HP XP at most, or its base plus what its revivals added | a member standing on 99999 HP |
 
+  (Grown in Phase 6a, with the save's version 2: a weapon's wear is held as a
+  member's hit points are, to 10000 plus 1000 for each wear it has cashed —
+  `Bar` and `WearCapacityPerBar`'s clamp ceiling, `MostCapacityPerBar` — and the
+  enchanter's shop brings two ceilings of its own, a service's runs to 11
+  (`MostServiceRuns`, the most enchantments plus one) and a run's end's worked
+  reports to 10 (`MostWorked`, `EnchanterWorksOn`'s clamp ceiling); the row of a
+  weapon's enchantments is what check 29 holds a deposit to, and check 28 holds a
+  take-back to the wear ceiling — the Phase 6a pass, below.)
+
   - **The tier's ceiling is a sanity bound, and is recorded as one.** Tier is
     uncapped by design (§3.3, "the pool is the cap"), and 2147 is only where the
     arithmetic of an entry stops being whole. Play never nears it: an entry
@@ -1957,7 +1973,12 @@ makes false is marked where it stands.
     stacks than the boss floor; (18) where the bottom floor is saved, its boss
     row stands exactly while the visit has the boss standing — its fall records
     it, and a boss never rises; (19) a drop is taken only from a corpse, once the
-    boss is down.
+    boss is down. (Grown in Phase 6a to thirty: (20) no enemy's weapon and no
+    drop is worn, and (21) to (30) ask the enchanter's shop and the last run's
+    word on it — among them (28), a deposit cashed no more than its weapon has,
+    and a take-back gives back a weapon that loads, and (29), what an Enchant or
+    a move from another weapon attaches fits the most a weapon holds — the Phase
+    6a pass, below.)
   - **The ruling's own example is legal state — please confirm.** "A lock ending
     before the current run count" is how a lifted lock stays: nothing removes a
     lock (`CampaignState.LockedInOrder`: "a lock that has lifted stays, reading a
@@ -1986,6 +2007,9 @@ makes false is marked where it stands.
     visit's — tests fell rows by hand, and only a revival's timing reads them,
     which tolerates it; a member's `alive` against its HP, written apart; and
     bags of unequal length, each member keeping the bag it was built with.
+    (Phase 6a adds its own, a weapon's wear over the capacity today's tuning
+    replays and a queued enchantment today's `restricted.json` would refuse or
+    lists as `neverRolled` among them — the Phase 6a pass, below.)
   - **The walk's known edge.** Every other count — the XP pools and an entry's
     XP, the turn and the dice rolled, a row's farm counters and revival gains,
     held shots, a status's levels — keeps its floor alone, since no clamp or rule
@@ -2953,7 +2977,10 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   Phase 2 pass named, in logic units, and the party's refill, its bank's cap and
   the enemies' cost scale read it. (Superseded by the user's ruling of
   2026-09-25 on the deposit, in its count: six more keys came with it, the
-  Enchanter's — R4's keys, above.)
+  Enchanter's — R4's keys, above. And by Phase 6a, which brought five more with
+  their readers, each named as its property is: `WearPerHit`,
+  `EnchanterWorksOn`, `GraftBaseChance`, `GraftSharePercent` and
+  `DeepenSignatureWeight` — the Phase 6a pass, below.)
 - **`OverhealPerWard` is the key, and `OverhealPerWardLevel` is the other
   spelling of it.** The Overheal entry above calls its rate
   `OverhealPerWardLevel`; §5.3 and the provisional-numbers batch call the same
@@ -3003,7 +3030,12 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   keys, above. And by the ruling of the same day on the save model, `SaveSlots`,
   which the launcher reads and no rule of play does, is left out the same way:
   R2, the folder, above — every slot's count since the ruling on the save slots,
-  R5, the old autosave, above.)
+  R5, the old autosave, above. And by Phase 6a, in whose keys: a save's hash is
+  of the keys played at the version that wrote it, which the save names
+  (`tuningHashVersion`), each key hashed from the version its reader came with
+  (`TuningKey.HashedFrom`: Phase 6a's from 2), so a Phase 5 save is compared on
+  version 1's keys and says the numbers changed only when one it was played
+  under moved — the Phase 6a pass, below, and PHASE 6a DECISION 9.)
 - **The `…Percent` key names — bends the phase doc** (§5.3 fixes
   `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
   `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
@@ -3033,7 +3065,11 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   keeps a number they may revisit in the file, and a safe one, since nothing
   plays them and the save's hash leaves them out (R4's keys, above). A file
   naming either placeholder is pointed at the key that took its place.
-  `WearPerHit` and `GraftBaseChance` still wait with their Phase 6a readers.)
+  `WearPerHit` and `GraftBaseChance` still wait with their Phase 6a readers.
+  Done in Phase 6a, the Enchanter's half: `WearPerHit` and `GraftBaseChance`
+  came with their readers, the six ruled keys play as the enchanter reads them,
+  and the group's heading in `tuning.json` names no key still to come; the
+  Consumables half waits for Phase 6b as it did — the Phase 6a pass, below.)
 
 ### The content files
 
@@ -3277,4 +3313,508 @@ play in a slot whose writes keep failing, and where the old autosave goes.
   reads it, adds `WearPerHit` and `GraftBaseChance`, the two still to come, with
   their readers, and saves beside `wear` and `wearCapacity` the capacity's
   progress toward its next point, which carries from one deposit to the next
-  (§6.7).)
+  (§6.7).) (Done in Phase 6a, the wear's half, and bent once: version 2 adds
+  `wear` and `wearCashed` to every weapon row, the wear the weapon has ever
+  cashed, from which its capacity and that capacity's progress are replayed
+  rather than saved (PHASE 6a DECISION 2), and names at the root the version its
+  tuning hash is of (`tuningHashVersion`, DECISION 9); the one step from version
+  1 writes only those, every weapon unworn, and the campaign's stable, the
+  enchanter's queue and its count, and the last run's word on the shop are
+  appended with defaults, as the save's header rule lets a member be — the Phase
+  6a pass, below. Carried consumables wait for Phase 6b as they did.)
+
+## Implementation pass — Phase 6a (between runs)
+
+Rulings the Phase 6a branch made where the phase doc was silent, or where two
+passages met and one had to be read in the light of the other: wear, a weapon's
+capacity, the stable, the enchanter's queue and its clock, the two services and
+the improvement roll either may win, and the transfer (§6.1–§6.5 and §6.7),
+built under the user's ruling on what a deposit costs (R4, the Phase 5 pass
+above), which this phase plays whole. Each is written down here so the next
+reader meets the ruling rather than the code that assumes it. They are of two
+kinds. **Readings that need no ruling** — the docs settle them once read
+together — are written as settled. **Choices the docs leave open** shipped
+provisionally as PHASE 6a DECISIONS 1 to 14, each the user's to rule;
+open-questions.md sets out each one's alternatives, and this pass records each
+as shipped, and then the ruling. Five of them bend or narrow a line of the docs
+rather than fill a silence, and each is marked where it stands: the capacity
+saved as the wear cashed (DECISION 2, **bends the v2 hand-off**, above); a
+landed roll with nothing to take (DECISION 5, **chooses between two sentences
+of §6.4**); a reorder at five enchantments (DECISION 11, **chooses between two
+passages above that disagree**); the enchanter's refusals of a status onto a
+wand and of a staff's status for the other side (DECISION 12, **bends the phase
+doc** — §3.3's "any enchantment goes on any weapon", §6.2's "on any weapon,
+forever after", and "a second rule would be a cap by another name", above) and
+its caster clause (**narrows** "that effect can be transferred onto a dagger",
+above); and the deposit's record (DECISION 13, **extends §6.7's**). Nothing
+here touches USER DECISION 1 — the deposit's numbers stay six keys, read as
+shipped — nor what `Echoing` does, a `Serrated`/`Arcane` pair or "and then
+nothing" (open-questions.md), nor the REWORK and SLOT DECISIONS.
+
+### Wear, capacity and what a deposit costs, as built
+
+- **Wear is banked per body a hit lands on.** "Per hit rather than per swing,
+  per turn or scaled by damage" (`WearPerHit = 1`, above; §6.1), so every body
+  the hit applier lands a blow on banks `WearPerHit`: a swing, each body a
+  cleave fans to, a shot carried on, a brace, a counter, an ally caught by
+  friendly fire, and each body a wand's area cast strikes — a blow Block takes
+  to 0 among them. A status's tick names no weapon, an enchantment's own
+  discharge rides the hit that already counted, and a hit on the dead lands
+  nothing. An enemy carries no pools, so its wear feed does nothing — the roster
+  says so, never a type test — and nothing arrives worn: a drop, a boss's drop,
+  an enemy's weapon and the starting party's kit are new at no wear and none
+  cashed, which the save holds (check 20, below). What a staff's cast and a
+  wipe do is DECISION 1.
+- **Wear accrues in one place, and a full weapon plays as a fresh one.** The
+  turn system's wear feed, beside its XP feeds, is the only way into a weapon's
+  pool (`Wear.Accrue`, then `Weapon.AccrueWear`, pinned off the IL). Nothing in
+  combat reads wear, and a test holds a full weapon's resolution — its damage,
+  its range, its every stack and enchantment — to a fresh copy's: "a fully worn
+  weapon is not broken" (above). A weapon at or over its capacity banks
+  nothing, and a tuning that lowered the capacity since takes no wear away, so
+  it reads `WEAR 30/20 FULL`. The screen counts one way, as §6.1 keeps the
+  vocabulary — `WEAR 12/30`, and `WEAR 30/30 FULL` in green, a colour no weapon
+  line, no unique's name and no enchantment is drawn in — and never says
+  durability. The crossing is logged once, at the edge, since Logic never logs
+  (`TurnSystem.WeaponWornFull`; `[Wear] A's Weakspot Stiletto is full: wear 30
+  of 30`).
+- **R4 as built.** Capacity opens on `StartingPool` (30) and rises
+  `WearCapacityPerBar` (1) for every full bar cashed, the bar the capacity at the
+  time and the progress carrying: `Progression`'s own replay at a flat 1, the
+  curve every pool climbs (the entry above on R4 agreeing with §2.1), worked out
+  from what the weapon has ever cashed (DECISION 2) — and `WearCapacityPerBar` 0,
+  "a dial rather than an error", freezes it, worked out in closed form so no
+  billion bars are replayed. The slots (`FirstSlotCapacity`, `SlotCapacityStep`)
+  and the price (`FirstEnchantmentWear`, `EnchantmentWearStep`) are separate
+  functions of separate keys, so they "part only if tuned apart" (consequence
+  4). The free slot is read at the capacity **before** the deposit's cash, and
+  capacity above the price is breathing room: at capacity 35 with no
+  enchantment, a deposit of 30 attaches the first, and a test pins it. **The
+  cash, and capacity's growth on it, happen at the deposit** — "+1 per full bar
+  … cashed in", "the pool itself still empties at every deposit" — for every
+  service alike (consequence 1), so the whole pool is spent whatever the deposit
+  buys. The ruling's numbers are a design doc's, pinned as literals (REWORK
+  DECISION 3): 31 at the first bar, 35 at 160 cashed; #1 at 30, #2 at 195, #3 at
+  385, #4 at 600 and #5 at 840, over twenty-one deposits; 71 runs attaching as
+  the slots open, 31 at the least, and 72/48, 78/66 and 89/85 for what a weapon
+  arrives with; and capacity past 50 with no top
+  (`WearTests.ACapacityReplaysFullBars_TheRulingsNumbers`,
+  `EnchanterTests.TheRulingsClimb_WearDepositsAndRuns`).
+- **A service takes the count plus one runs, the count what the weapon holds,
+  what it arrived with included** — "Service costs runs … `enchantments + 1`"
+  (above), refinement too (§6.4) — fixed as the weapon goes in, since nothing
+  changes a weapon in the shop: 1, 3, 6, 10 and 15 attaching five in a row. The
+  `+ 1` stays a rule (DECISION 6); a transfer's are DECISIONS 11 and 13's.
+- **The enchanter works the `EnchanterWorksOn` newest, 2** — the entries with
+  the highest ordinals, "the two most recently deposited" (§6.2), the enchanter
+  keeping "its two-newest-slots rule" (above) — and every other entry is
+  `STALLED`. That the two is a `tuning.json` key follows the user's standing
+  rule that a number they may revisit lives in the file, and its 2 is the
+  doc's, so it is no decision; a transfer is one entry (DECISION 13). **The queue
+  has no length limit**: the rule "is a soft cap that enforces itself: dumping
+  the whole stable achieves nothing" (§6.2).
+- **An unworn weapon may be refined, and it comes back as it went.**
+  "Refinement on an unworn weapon needs no rule … There is no 0% to explain"
+  (above), and "a fresh drop refines for nothing. No wear, no roll … the gamble
+  needs no cooldown, no per-weapon limit and no guard of its own" (§6.4). So the
+  deposit is accepted: it takes its count plus one runs, grows nothing and rolls
+  nothing — the roll's guard on a deposit that cashed no wear is that "no wear,
+  no roll", never a 3 in 100 — and the deposit panel notes it, `NOTHING TO
+  REPAIR - IT WILL COME BACK AS IT WENT`, and never refuses it. An Enchant and a
+  transfer always cash a wear at least, since their price does.
+- **What counts as a run is Phase 4's, and the enchanter's clock hangs on its
+  tick.** Every run's end asks the enchanter (`Enchanter.Tick`, from
+  `CampaignState.EndRun`, after the visit is let go, so a finished weapon goes
+  back through the campaign's own door, never the hub's), and only a run that
+  counts — the boss killed, or §6.3's mercy for failing deep — works the newest
+  a run on. One that does not count moves nothing and reports every entry
+  stalled, a fresh one at no runs worked, and the summary says `THE ENCHANTER
+  WORKED NOTHING - THE RUN DID NOT COUNT`. The enchanter is shut until the
+  tutorial is beaten (§6.3: "the enchanter is not open during the tutorial"):
+  the WEAPONS page heads the shop `THE ENCHANTER OPENS WHEN THE TUTORIAL IS
+  BEATEN`, and D says so and opens nothing. §6.3's note that the mercy tick and
+  the success tick are worth the same pointed at "the open questions", which
+  have held nothing on it since the roadmap was split into its files; it points
+  at this file's own entries now — "Entering does not tick service" and "A
+  deeper boss pays more" (above), a tick at one per run that counts.
+- **What an Enchant attaches is the soul chosen, at tier 1 with no XP, last.**
+  "The enchanter sells breadth" and "can *cut* a circle" (above): a fresh tier-1
+  entry of the enchantment chosen, appended after every entry the weapon holds
+  and never sorted, attached when the service's last run is worked (DECISION 3).
+  A lock the wielder cannot pay leaves it dormant, never refused ("a lock you
+  cannot afford", above). **Duplicates may be attached**: "Only opposed
+  enchantments exclude each other … a second rule would be a cap by another
+  name" (above).
+- **The offer is what the campaign has met, less `neverRolled` and less the
+  kinds that do nothing yet** (`Enchanter.Offers`): "a unique enchantment is
+  transferable but never catalogued" (above), and "the same live-behaviour test
+  `LootTable.DropOrder` applies" (the `Echoing` entry, open-questions.md), asked
+  through the one predicate both now share (`LootTable.IsInert`). Not
+  `DropOrder`'s class-event test, which says what a drop may roll: §3.3's "any
+  enchantment goes on any weapon" is about attaching. An entry that never fires
+  on the weapon is offered and noted, `NEVER FIRES ON A SWORD`; one the enchanter
+  refuses is listed dimmed with its reason (DECISION 12); and `aegis` passes the
+  filter and has no way to be met (DECISION 4). That closes the enchanter's half
+  of the `Echoing` entry, which keeps its own framing — "filter gaps rather than
+  content gaps" — and leaves what `Echoing` does as open as it was.
+- **An improvement is bounded by §1.1 and the relations.** A deepen takes a
+  stack of a modifier the weapon carries below its `forged + 5` cap; a graft,
+  one it has never carried, forged 0 and so capped at 5, that the relations
+  allow in the order the weapon holds them (`kind`, `excludes`, and `requires` —
+  a Riposte only once a Block is there) and never a `forgedOnly` one, so never
+  `Charges`: "`Charges` is the only negative graft" (above), with the test that
+  entry asked for, every modifier's first stack a non-decrease, measured by what
+  the game reads of it (`EveryModifiersFirstStackIsANonDecrease`). How often
+  each, and what a roll with nothing to take does, is DECISION 5.
+- **`GraftBaseChance` keeps §5.3's name, in percent**, as `DefeatStackChance`
+  keeps its own: the `…Percent` bend (the Phase 5 pass's numbers, above) renamed
+  the keys whose doc value was a fraction, and 3% is a whole percentage
+  already. The odds are whole numbers — `GraftBaseChance × (StartingPool +
+  wear)` in `100 × StartingPool` for a refinement, `GraftBaseChance` in 100
+  otherwise — so 6, 7 and 9 in 100 at capacities 30, 40 and 60 are exact
+  (`ImprovementRollTests.TheOddsAreTheRulings`), and the panel says `6.6 IN
+  100` where they are not whole, cut to one place.
+- **The improvement roll is a stream of its own, keyed by what the save holds**
+  — "its own stream derived from the map seed … never a continuation"
+  (ROADMAP): `SplitMix32(mapSeed ^ ServiceSalt ^ ordinal × ServiceMix)`, the
+  completing run's map seed and the deposit's ordinal, under two compiled
+  constants of its own, murmur3's two mixing constants — odd, no other salt's
+  or mix's, and never tuning keys, since they decide what a seed rolls. Both are
+  saved while the run is under way, the seed with its visit and the ordinal with
+  its deposit, so a reload that replays the same run's end replays the same
+  roll, and a bad roll is never reloaded away (R1). No deposit a campaign can
+  plausibly make, ordinals 0 to 4096, rolls on a stream any drop, revival, boss
+  drop or die of the visit rolls on under the shipped `BossFloorMax`, which a
+  test holds. It draws whether it lands, then graft or deepen, then which, in
+  that order, so refinement moves the first draw alone: it "improves whether
+  the roll lands, not what it lands on" (above).
+- **`ForgedEnchantmentCount` is written by a transfer.** It was fixed at
+  construction and never written again; a transfer is the one door that takes
+  an entry off a weapon (`Weapon.Detach`), the forged entries stay a prefix
+  through it, and the count drops when a forged one leaves. A reorder of a
+  weapon forged whole keeps every mark (DECISION 11).
+- **A caster's first enchantment is its cast, and a caster that has none casts
+  nothing.** The dungeon has always cast a staff's first entry on the body it
+  picks and a wand's element over its shape (`Weapon.Innate`); the enchanter
+  keeps every caster it touches castable (DECISION 12's caster clause), and a
+  hand-edited save's soulless wand is refused its cast before the cast reads an
+  element it lacks, where it would have thrown. The WEAPONS page says of such a
+  weapon `CASTS NOTHING - ITS FIRST ENCHANTMENT IS ITS CAST`.
+
+### The stable, the shop and the screen between runs
+
+- **The screen between runs is two pages, and Tab goes between them**:
+  DUNGEONS — the Phase 4 pass's list, the last run's summary above it — and
+  WEAPONS: every member's hand and bag, the stable (DECISION 7) and the
+  enchanter's shop, the chosen weapon said whole beside them — its readouts, its
+  wear, its capacity and how far what it has cashed has come toward the next
+  point, the slots its capacity has opened and what its next enchantment costs
+  (`ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5 - SLOT 2 OPENS AT CAPACITY 35`, `THE NEXT
+  NEEDS A DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP`). Enter takes a weapon up and
+  Enter puts it down — onto a weapon it swaps, into a hand it equips — and **a
+  carry is the page's alone**: the campaign changes only at the put-down, through
+  its one door (`CampaignState.Move`), so Esc, a quit, the window's close or a
+  crash mid-carry loses nothing, and no save ever holds a carry. Every change
+  there is saved at once (DECISION 10).
+- **The shop reads at a glance, as §6.2 asks** ("the smith is working on these
+  two" reads correctly, "where a silently stalled queue reads as a bug"): `THE
+  ENCHANTER - WORKS ON THE 2 NEWEST`, then each deposit, the newest first —
+  `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan, `STALLED  RIPOSTE BLADE - 0 OF 1
+  RUN` in yellow, a transfer's source `HELD` under its weapon in grey — each
+  detail saying what the deposit bought and when it comes back, or what it waits
+  on. D on a weapon opens the deposit panel: ENCHANT, REFINE and MOVE, each with
+  its odds of improving the weapon (an unworn refinement its note), a refused one
+  dimmed with its reason and its key saying why, then the offer or the souls,
+  then the confirm, which names the wear it spends; only Enter deposits, and the
+  panel asks the campaign again then, so a weapon moved or a deposit gone since
+  it opened deposits nothing. T on a deposit asks to take it back (DECISION 8).
+- **A run's summary says what came back, and caps it.** After whether the run
+  counted: `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO
+  CHANGE`, `… - REFINED - DEEPENED BLOCK`, `… - GRAFTED RIPOSTE` on a green line,
+  a transfer's two lines together, `THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2
+  RUNS`, `STALLED AT THE ENCHANTER: …` wrapped as the spoils are and cut at three
+  names, and `THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT`. Three
+  lines of services on the hub and two over the floor, a service told whole,
+  then `AND 2 MORE AT THE ENCHANTER`, the hub alone adding `- TAB WEAPONS`,
+  since Tab does nothing over the floor. The floor's end panel, which never cut
+  its lines, lifts toward the top and then closes its lines from 22 pixels to no
+  fewer than 16 when a summary would run off a 720-pixel window: every pool of
+  every member clawed back, three lines a member, fills it before the
+  enchanter's lines do.
+
+### The save: version 2
+
+- **Version 2, one step from version 1.** Every weapon row gains `wear` and
+  `wearCashed`, and the root `tuningHashVersion`, each required; the campaign
+  gains its `stable`, the enchanter's queue (`enchanter`) and its count
+  (`depositsMade`), and the last run's result its word on the shop
+  (`services`), each **appended with a default** (the save's header rule: a
+  member appended with a default reads without a step) and written `null` while
+  empty, as `visit` is between runs — `null` and `[]` read alike. The one step
+  (`SaveCodec.LiftToVersion2`) is pure — no content, no tuning — and writes only
+  what version 2 requires: every weapon row, in the five places a weapon sits,
+  each walked by name, unworn at 0 and 0, and the root's hash version, 1. **It
+  never throws on a hand-edited document**: it writes by the indexer, so a stray
+  `wear` a version-1 row carried is version 1's 0 and a stray root
+  `tuningHashVersion` its 1; it removes a stray `stable`, `enchanter`,
+  `depositsMade` or `services`, whatever kind of thing, which version 1 read as
+  nothing; and it passes over a member missing or of the wrong kind, so the
+  reader refuses it where it is wrong, by its path, as at version 2. A Phase 5
+  save — both the pre-rework code wrote among them — loads every weapon at 0 of
+  30 with nothing in the stable or the shop, and, restored and captured again,
+  is the migrated document member by member, its hash and hash version aside.
+- **The tuning hash is per version** (DECISION 9): a save's hash is of the keys
+  played at the version that wrote it, which it names, each key hashed from the
+  version its reader came with (`TuningKey.HashedFrom`: Phase 6a's eleven from
+  2). A save names no version newer than its own document, or is refused. The
+  log's numbers-changed line hashes the game's tuning on the save's version and
+  names it, where it had put two hashes of different key sets side by side.
+- **A save's new fields are raw JSON too (R3(b)): each read on its own, then
+  asked of the rest.** On its own: a count from its floor to the sanity bound
+  (`MostCount`), a service a `Service`'s name, and the ceilings below, each off
+  a clamp or a rule and never the tuning in hand, so no tuning in range refuses
+  a save play wrote:
+
+  | Count | Refused when | Read off | What it would break |
+  | --- | --- | --- | --- |
+  | a weapon's wear, wherever the weapon is — a bag, the stable, the shop, a floor, a spoil | above 10000 plus 1000 for each wear it has cashed, summed as a long | `StartingPool`'s clamp ceiling (`Bar`) and `WearCapacityPerBar`'s (`MostCapacityPerBar`): a capacity opens on a bar no larger and grows at most that for each full bar, a wear at least, and wear never banks past capacity | a fresh weapon holding 900,000 wear, which no tuning in range gives room for |
+  | a deposit's runs; a run's report's | above 11 | `MostServiceRuns`: `EnchantmentSlots`' clamp ceiling plus one — a service takes the count plus one, and no weapon holds more than 10 | a service no tick could ever finish |
+  | a run's end's worked reports | more than 10 | `MostWorked`: `EnchanterWorksOn`'s clamp ceiling (check 27) | a run's end working more than the enchanter ever works on |
+
+  A deposit's wear at deposit is a wear at least for an Enchant and a transfer,
+  whose price is (`FirstEnchantmentWear` clamps at 1), and may be 0 for a
+  refinement (an unworn one, above); a report's runs worked run from 0, since
+  play writes a stalled report at 0, to its runs; a transfer's report lands at a
+  tier from 1 to 2147, as a carried entry is held. An Enchant's enchantment, in
+  the shop or in a report of one, is one the content has and no kind that does
+  nothing yet — which kinds do something is the code's, which no file beside the
+  game edits, so no deposit play made could name one; a transfer's soul may be
+  any the content has, since a unique may carry an inert kind and the enchanter
+  moves what it never offers. What an improvement gave a stack of is a
+  modifier some weapon stacks, the code's `NeverStacked` asked and no relation.
+  A report's weapon and a transfer's source are weapons the content has: the
+  summary names them every frame, and a bad id must never throw while it
+  draws. The stable is weapon rows, none null, each read as every weapon is.
+- **The cross-checks, 20 to 30**, after the Phase 5 pass's nineteen, in the
+  order asked: (20) no enemy row's weapon and no drop lying on a corpse is worn
+  or has cashed wear — no enemy weapon is the party's, and a drop is made when it
+  is rolled; (21) the shop is in deposit order, each ordinal its own and below
+  the deposits made; (22) a weapon in the shop holds no wear — the deposit
+  cashed it all; (23) no deposit has worked its last run — the tick that works
+  it brings the weapon back; (24) a deposit's runs are its weapon's count plus
+  one, a reorder's the count — the count does not move in the shop; (25) an
+  Enchant names an enchantment the campaign has met, a refinement names none,
+  and neither holds a source; (26) a transfer names no enchantment, names its
+  soul's place, and the soul lies there, on its source or, for a reorder, on the
+  weapon; (27) the last run's reports say what their deposits bought, as 25 and
+  26 ask — a transfer's names its soul, never asked among the met, its source
+  only on a transfer and the tier it landed at exactly once it came back — an
+  improvement comes with its modifier and only on a service that came back, a
+  stalled report is short of its last run, a run that counted worked the newest
+  and left no stalled report after a worked one, a run that did not count left
+  every report stalled, a worked report worked a run at least, no more are
+  worked than `MostWorked` and there are no more reports than deposits made;
+  (28) a deposit cashed no more than its weapon has ever cashed, and no more than
+  a weapon that had cashed the rest could bank, so a take-back gives back a
+  weapon the wear's ceiling admits; (29) an Enchant, and a transfer from another
+  weapon, goes onto a weapon with room for one more — what completes must load,
+  or an Enchant on a ten-entry weapon would finish into an eleventh the next load
+  refuses; (30) with no dungeon retired, the shop is empty, no run's end reported
+  on it and no deposit was made — the enchanter opens once the tutorial is
+  beaten, which retires it — asked of the retired list alone, never of which
+  dungeon today's `dungeons.json` retires on its clear, which a copy beside the
+  game may move (as check 3's withdrawal found). Every state play writes at an
+  edge loads (`SaveConsistencyTests.WhatPlayCanWriteAlwaysLoads`): a worn weapon
+  in each place, an unworn refinement in the shop, a worked deposit and a
+  stalled one, a stalled report at no runs worked on a run that counted and on
+  one that did not, and a shop saved before `retiresOnClear` moved onto a
+  dungeon not yet beaten.
+- **Considered and not refused**, each for its reason: a weapon's wear over the
+  capacity today's tuning replays, and its progress against a bar — capacity is
+  today's tuning's, as a maximum HP is, and play meets it (a hit banks nothing
+  past full, a deposit cashes it all), the ceiling no tuning can pass being
+  held instead; an Enchant's wear at deposit below today's price or above today's
+  capacity, both today's tuning; a queued enchantment today's `restricted.json`
+  would refuse on its weapon, or lists as `neverRolled` — the deposit was legal
+  when it was made, the relations are JSON-master data beside the game, and no
+  content that loads refuses a save play wrote; a transfer's soul today's
+  relations would refuse on its weapon, one whose leaving would strand an entry
+  on its source, or one that would leave a caster casting nothing, each the
+  content's to say, which may have moved since; a transfer's report whose soul
+  is not among the met, the soul having been the party's own; which dungeon is
+  retired while something is in the shop (check 30 asks that one is); a report
+  against the deposits still in the shop, since a report outlives its deposit;
+  an improvement's modifier today's relations would refuse — even a reported
+  graft of `Charges` loads, since a report outlives its weapon's shape; and the
+  stable, which has no cross-check and no length ceiling, each of its rows
+  checked as every weapon is, and nothing reading its count but an index.
+- **The walk's known edges, grown.** A take-back reverses the deposit's cash
+  exactly — the wear back in the pool and off what was cashed — except where
+  what was cashed had stopped at the sanity bound, a billion hits in, which no
+  play reaches. And a stable longer than play fills costs load time, never a
+  wrong number.
+- **The v2 hand-off, bent once** (above): it had the save keep `wear`, a
+  `wearCapacity` and the capacity's progress, and the step write them; it keeps
+  `wear` and the wear cashed, capacity replayed (DECISION 2), and the members
+  later steps added to the campaign are appended with defaults, the step writing
+  none of them.
+
+### The numbers
+
+- **Every Enchanter key plays, and each is hashed from version 2**: the six R4
+  ruled (their clamps above), and five more that came with their readers —
+  `WearPerHit` 0–1000 (0 wears nothing, so nothing can be enchanted: a dial),
+  `EnchanterWorksOn` 1–10 (0 would freeze every service; 10, the most
+  enchantments a weapon holds, is the most worked reports a run's end may
+  write), `GraftBaseChance` 0–100, and the two provisional numbers of DECISION 5,
+  `GraftSharePercent` 0–100 and `DeepenSignatureWeight` 1–1000 (1 is no bias),
+  each comment starting `Provisional:`, the file's marker. No
+  `ContentValidator.ValidateTuning` rule: the one divisor they bring,
+  `StartingPool` in the odds, is 1 at least already (`RulePoolBarIsPositive`),
+  and every other constraint is a clamp. The group's heading names no key still
+  to come — `/* ---- Enchanter ---- */` — and only Phase 6b's Consumables wait
+  with their reader. `WearCapacityLadder` and `EnchantmentWearCost` stay no keys,
+  a file naming either pointed at the key that took its place.
+
+### PHASE 6a DECISIONS, shipped provisionally
+
+Each is the user's to rule; open-questions.md sets out its alternatives, under
+its number, and this pass records the ruling when it is made.
+
+- **PHASE 6a DECISION 1 — what counts as a hit for wear (§6.1).** A staff's
+  landed cast wears it once, on an ally or an enemy alike (§1.3: "a cast is a
+  hit"), a wand's cast being no hit of its own — its hits are the bodies its
+  shape strikes; and a wipe keeps the run's wear ("a wipe forfeits spoils, not
+  gear", above), the claw-back the member pools' alone. So a staff that heals or
+  wards can fill its wear with no enemy in play, which a blade and a wand
+  cannot, and open-questions.md's entry names that loop.
+- **PHASE 6a DECISION 2 — how a weapon's capacity is kept (§6.1, §6.7).** The
+  save keeps `wear` and `wearCashed`, the wear ever cashed, and the capacity and
+  its progress are replayed from `StartingPool` on read, as a member's maxima
+  are from its XP ("Max HP and wear capacity move with it", above). So a
+  `StartingPool` or `WearCapacityPerBar` edit moves every weapon's capacity, and
+  the numbers-changed notice says so. **Bends the v2 hand-off** (above), which
+  worded the save as holding the capacity and its progress: that is the
+  alternative, capacity kept where it grew whatever the tuning says later.
+- **PHASE 6a DECISION 3 — when a service's purchase lands (§6.2, §6.4).** The
+  cash and the growth are R4's, at the deposit (above). The enchantment an
+  Enchant buys is attached, and the improvement roll made, when the service's
+  last run is worked, inside the end of the run that works it — the weapon
+  waiting out its runs as it went in — on the completing run's map seed and the
+  deposit's ordinal (the stream, above).
+- **PHASE 6a DECISION 4 — where `aegis` comes from (§6.2's offer).** It passes
+  the offer's filter, but nothing puts it among what a campaign has met — no
+  drop rolls it and no shipped weapon carries it — so it stays out of reach
+  until content carries it; it stays in the catalogue, checked, and fires on any
+  weapon that holds one.
+- **PHASE 6a DECISION 5 — how a landed improvement chooses (§6.4).** Of the
+  rolls that land, `GraftSharePercent` (25) in 100 graft and the rest deepen; a
+  deepen weighs the class's signature `DeepenSignatureWeight` (3) to 1 against
+  every other modifier the weapon carries below its cap, and a caster, which has
+  no signature, has no bias. An outcome with nothing to take falls through to
+  the other, and with neither the landed roll changes nothing (`NO CHANGE`, the
+  log saying `landed, nothing to deepen or graft`). **Chooses between two
+  sentences of §6.4**: "a weapon with every modifier capped rolls nothing at all"
+  and "a finished weapon is not inert … can still gain *breadth* through
+  grafts" — "every modifier" read as every modifier the weapon may hold, so a
+  weapon whose carried modifiers are all capped still grafts. A graft asks the
+  relations and nothing else, so it may land on a modifier the weapon never
+  reads — `CRIT MULTIPLIER` on a staff, whose cast crits at a fixed x2 — and the
+  record pulls both ways on that: "at worst inert on the wrong weapon" and
+  "restriction is reserved for grafts that would be negative, not merely
+  off-class" for it; "no stack may be dead", `CritMultiplier` "a martial-only
+  stat" and "a service roll that bought nothing" against it.
+- **PHASE 6a DECISION 6 — the `+ 1` in a service's time (§6.2).** It stays a
+  rule, never a key, so the tutorial's one run keeps landing on a first
+  enchantment's one run (§6.3).
+- **PHASE 6a DECISION 7 — the stable (§6.2).** It is the campaign's, unbounded,
+  in the order weapons were put there; a finished service returns its weapons
+  to its end; spoils carried home stay in the bags; no move and no deposit
+  leaves a member carrying no weapon — `EACH MEMBER KEEPS A WEAPON - [A] WOULD
+  CARRY NONE`, a transfer asked with both its weapons gone — and a hand a move
+  or a deposit empties takes up the first weapon in its bag, as the rest before
+  a dungeon arms it.
+- **PHASE 6a DECISION 8 — taking a weapon back early (§6.2).** Any deposit,
+  worked or stalled, can be taken back between runs, to the stable's end, a
+  transfer's two weapons together: its service is forfeit, nothing attached and
+  nothing rolled, its runs worked lost and its ordinal never reused, and **its
+  cash is reversed exactly**, the wear back in the pool and off what was cashed,
+  so the capacity is as before the deposit (`TAKE BACK THE ARMING SWORD - ITS
+  SERVICE IS LOST - ITS 36 WEAR COMES BACK`). Kept spent, the growth would let a
+  refinement taken back at once bank a point of capacity a full bar with no
+  downtime, which R4's consequences 1 and 3 and §6.2's "dumping the whole stable
+  achieves nothing" rule out.
+- **PHASE 6a DECISION 9 — the tuning hash of a save from before Phase 6a
+  (§5.3).** Compared on the keys played at the version that wrote it (above),
+  so a Phase 5 save resumes with nothing to say unless a number it was played
+  under moved. While Phase 6a was built, version 2's keys grew at two steps (the
+  enchanter's queue, and the improvement roll), so a save an earlier step's build
+  wrote said the numbers had changed once under a later one; a released version
+  2 never does.
+- **PHASE 6a DECISION 10 — autosaving between runs (§5.1's safe points).**
+  Every change the screen between runs makes to the campaign — a move, a
+  deposit, a take-back — is saved into the campaign's own slot at the end of the
+  frame it was made in, through the one door every save of it goes through
+  (`[Save] Saving the campaign between runs, after a change on the hub`), and a
+  save that fails is said at once under the hub's title, as one over a floor is.
+  It lengthens the list of when the game saves (the save model's entry, above);
+  between runs was always a safe point.
+- **PHASE 6a DECISION 11 — reordering a weapon's own enchantments (§6.5).** A
+  reorder is a transfer whose source is the weapon itself: it takes the count in
+  runs, attaching the soul again as the last of the same count — "one
+  attachment's service time" (§6.5) — at that attachment's slot and price, and
+  it is allowed at five enchantments; the entry already last is not moved (`IT
+  IS LAST ALREADY`), so a reorder needs two souls and 2 runs at the least; a
+  weapon forged whole keeps every forged mark, and one forged in part loses the
+  moved soul's, a forged entry never standing behind an acquired one — which the
+  screen does not say. **Chooses between two passages above that disagree**:
+  "A weapon at five enchantments therefore has refinement as its only remaining
+  service", and "reordering means detaching and re-attaching, which is a
+  transfer: a tier and a service", the order of a five-enchantment weapon
+  changed at a price — "one of the more expensive things you can do" (§6.2).
+- **PHASE 6a DECISION 12 — what the enchanter refuses, and how a refusal shows
+  (§6.2, §6.5).** It refuses what `restricted.json` refuses on the weapon — an
+  entry an exclusion group pairs with one it carries, and one whose prerequisite
+  is not ahead of where it would land, the very question content validation asks
+  — and, for a transfer, a soul whose leaving would strand an entry behind it
+  on the weapon it leaves: "the enchanter refuses a transfer that would strand a
+  unique's lingering effect" (above), the `requires` row asked of what the
+  source keeps. It refuses a status onto a wand (`REGENERATION - A WAND CASTS NO
+  STATUS`: an area cast names its caster as its target, so the status would land
+  on the wielder — Phase 1.8's content rule, shared) and a staff's status for
+  the other side onto a staff (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`, the
+  same hazard, no content rule behind it); **both bend the phase doc**, §3.3's
+  "any enchantment goes on any weapon … nothing keys off `WeaponClass`", §6.2's
+  "on any weapon, forever after" and "a second rule would be a cap by another
+  name" (above). Its caster clause refuses a transfer after which a staff's or a
+  wand's first entry is one it cannot cast, or none — a staff's a status it
+  casts, landing each status it keeps on the side it landed it before, a wand's
+  an element (`THE ROTWOOD WOULD CAST NOTHING`) — since a caster left with
+  neither could never earn wear again; **it narrows** "that effect can be
+  transferred onto a dagger" (above): a staff arrives with one soul, so it gives
+  its effect away only once it has grown to capacity 35 and been given a second
+  status to cast. Everything else attaches — an entry again, one whose lock
+  sleeps, one that never fires on the weapon, noted — and a refused choice is
+  listed dimmed with its reason, never hidden.
+- **PHASE 6a DECISION 13 — how a transfer works (§6.5, §6.7).** It is the
+  Enchant service with the soul brought from a weapon the party owns out of the
+  shop, whatever the soul — a forged innate, a unique's: the weapon it lands on
+  needs the free slot and the deposit of attaching it as its next, its whole
+  pool is cashed, it takes that attachment's runs and enchanting's flat odds; the
+  source's wear stays in its pool, uncashed; both weapons wait in the shop as
+  one deposit, one of the worked newest; the soul drops a tier and starts it
+  from no XP — tier 1, and every unique soul, moves intact with its XP ("Tier 1
+  travels intact", above) — and lands last, acquired, the forged mark staying
+  with the weapon forged with it. **Extends §6.7's record**, which named one
+  weapon and no enchantment: a deposit also holds its ordinal, its runs and runs
+  worked, an Enchant's enchantment, and a transfer's source and the soul's place
+  there, and `Service` gains `Transfer`.
+- **PHASE 6a DECISION 14 — what an earlier Phase 6a build does with a later
+  step's save (§5.2).** The save stayed at version 2 through every step, the
+  standing instruction's "version bump and a migration so phase-5 saves still
+  load" read as met by the one bump every Phase 5 save migrates by. So a build
+  of an earlier step reads a later step's save as its own and its next save drops
+  what it did not know — the stable, the shop and every weapon in them — and a
+  build that knows the shop but not the transfer sets a save holding one aside,
+  kept and never deleted; the README warns not to open such a slot with an
+  older build. Only the builds between released versions can meet it.

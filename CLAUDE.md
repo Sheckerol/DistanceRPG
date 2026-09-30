@@ -45,6 +45,9 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
+  BetweenRunsScene.cs           # The screen between runs: DUNGEONS (the last run's summary, the list)
+                                # and WEAPONS (Tab); every change there asks the game for a save
+                                # (IBetweenRunsHost.RequestSave). BetweenRunsHud draws both pages
   HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
                                 # (CampaignState.Move, the one door) and the enchanter's shop, a carry
                                 # the page's alone
@@ -104,10 +107,10 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   out of the save's tuning hash, so turning it never says the numbers changed.
   The change that gives a rule of play one to read sets it played. A key that
   starts to play with a save version is hashed from that version (`HashedFrom`:
-  Phase 6a's are 2), so a save of an older version is compared on its own
-  version's keys and never told a number it was not played under has changed.
-  A key no rule of play reads at all — the launcher's `SaveSlots`, how many save
-  slots there are — is `Played = false` for good.
+  Phase 5's are 1, Phase 6a's 2), so a save of an older version is compared on
+  its own version's keys and never told a number it was not played under has
+  changed. A key no rule of play reads at all — the launcher's `SaveSlots`, how
+  many save slots there are — is `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric
@@ -120,3 +123,11 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   that fails is set aside, never restored. A new field of the save gets its
   checks in the same change, and everything play writes must still load
   (`SaveConsistencyTests`).
+- The save is versioned (`SaveCodec.CurrentVersion`: 2 since Phase 6a), and
+  every older save must still load. A member appended with a default needs no
+  step (`Logic/Save/SaveFile.cs`' header rule; a list written `null` while
+  empty); a member every document must carry bumps the version, with a step in
+  `SaveCodec.Migrations` that writes it into every older document — pure,
+  walking the document by name, never throwing on a hand edit — pinned by the
+  two saves the pre-rework code wrote (`PreReworkSaveTests`; their
+  `TestData/saves` are never edited).
