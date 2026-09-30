@@ -121,7 +121,7 @@ public class SaveInventoryTests
             new("Stalled", Kept.Saved, "lastResult.services[].stalled"),
             new("EnchantmentId", Kept.Saved, "lastResult.services[].enchantment, by id"),
             new("Improved", Kept.Saved, "lastResult.services[].improved and .modifier, each by name: what the improvement roll did (Phase 6a.4)"),
-            new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which a save made during the run replays: it holds the visit's map seed and the queued deposit's ordinal"),
+            new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which a save made during the run replays: it holds the visit's map seed and the queued deposit's ordinal, each named in the log where it was made (deposit #n, Phase 6a.5)"),
         ],
         [typeof(Improvement)] =
         [
@@ -376,7 +376,8 @@ public class SaveInventoryTests
             new("_shownWhole", Kept.NotSaved, "how many of this showing's notices are shown whole"),
             new("_weapons", Kept.NotSaved, "the WEAPONS page: its rows are the campaign's, read afresh; its choice, its window and a carry are presentation (HubWeapons, below)"),
             new("_onWeapons", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
-            new("_refusal", Kept.NotSaved, "what a put-down was refused with, until the next key"),
+            new("_refusal", Kept.NotSaved, "what the last key was refused with, until the next key"),
+            new("_panel", Kept.NotSaved, "the deposit panel or the take-back ask (Phase 6a.5): the screen's alone, like a carry — the campaign changes only at the ENTER that deposits or takes back, so a save never sees one, and every showing opens with none up (DepositPanel, below)"),
         ],
         [typeof(HubWeapons)] =
         [
@@ -384,6 +385,18 @@ public class SaveInventoryTests
             new("_chosen", Kept.NotSaved, "the page's choice: every showing opens on the first row it can choose"),
             new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
             new("_carried", Kept.NotSaved, "a carry is the page's alone and moves nothing: the campaign changes only as it is put down (CampaignState.Move), so a save never sees one, and a quit mid-carry loses nothing"),
+        ],
+        [typeof(DepositPanel)] =
+        [
+            new("Weapon", Kept.Derived, "the weapon the panel is about: the campaign's, where the save keeps it — in a bag, the stable or the shop"),
+            new("From", Kept.Derived, "where the weapon lies, as the campaign has it"),
+            new("TakingBack", Kept.Derived, "the deposit a take-back asks about: the campaign's shop, saved"),
+            new("_services", Kept.Derived, "the services as the enchanter answers them (Enchanter.ServiceRefusal), asked of the campaign as the panel opens"),
+            new("_offers", Kept.Derived, "the offer as the enchanter answers it (Enchanter.Offers), asked of the campaign as the panel opens"),
+            new("_step", Kept.NotSaved, "which question is up: a panel is the screen's alone, and nothing is deposited until the confirm's ENTER"),
+            new("_service", Kept.NotSaved, "the service chosen: nothing is deposited until the confirm's ENTER"),
+            new("_chosen", Kept.NotSaved, "the offer chosen: nothing is deposited until the confirm's ENTER"),
+            new("_top", Kept.NotSaved, "the offer list's window: presentation, kept to the choice"),
         ],
     };
 
@@ -421,8 +434,9 @@ public class SaveInventoryTests
     public void EverySceneFieldIsViewDerivedOrNamedAsNot()
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
-        // scenes — and of the WEAPONS page the screen between runs holds (Phase 6a.2)
-        // — is in the document's view, derived from what the save restores, or not
+        // scenes — and of the WEAPONS page the screen between runs holds (Phase 6a.2),
+        // and of its deposit panel (Phase 6a.5) — is in the document's view, derived
+        // from what the save restores, or not
         // saved for the reason given — so a scene field added later fails here until
         // someone decides whether a resume needs it.
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;

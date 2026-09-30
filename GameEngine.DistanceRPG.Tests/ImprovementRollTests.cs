@@ -616,9 +616,11 @@ public sealed class ImprovementRollTests : IDisposable
         // Logic never logs: a finished service's report carries its roll as it was
         // drawn — the first draw off its stream, out of 100 × StartingPool, against
         // the odds' numerator — for the run's end's log line, which shows the roll;
-        // its keys, the map seed and the ordinal, are held by a save made during the
-        // run, a load of which replays it. The save keeps what the roll did, never
-        // the roll: a report a load brings back has none, and the document names no
+        // its keys, the map seed and the ordinal, are named in the log where each
+        // was made (the run's entry; the deposit's line, deposit #n, Phase 6a.5) and
+        // held by a save made during the run, a load of which replays it. The save
+        // keeps what the roll did, never the roll: a report a load brings back has
+        // none, and the document names no
         // roll. TestShop's shop, worked home on a run entered on FiveDeep:
         // B's staff enchanted Vampiric (deposit 1, 35 cashed) and C's Tower Guard
         // refined (deposit 2, 30 cashed).

@@ -536,7 +536,7 @@ and the enchanter's deposits and take-backs follow.
 
 **Shipped provisionally: every change the hub makes to the campaign is saved**,
 into the campaign's own slot, at the end of the frame it was made in — a move
-(Phase 6a.2), and a deposit and a take-back when they arrive. The screen asks
+(Phase 6a.2), a deposit and a take-back (Phase 6a.5). The screen asks
 through its host (`IBetweenRunsHost.RequestSave`), which the game answers with
 the same request the dungeon's autosaves make, written through the one door
 every save of the campaign goes through; the log says `Saving the campaign
@@ -607,8 +607,9 @@ attached, nothing rolled — and the runs worked are lost, the ordinal never reu
 **The deposit's cash is reversed exactly**: the wear goes back into the pool and
 off what the weapon has cashed, so its capacity and the progress toward the next
 point are as they were before it went in. The take-back is the enchanter's since
-Phase 6a.3a; the key that asks for it on the WEAPONS page arrives with the
-deposit's (Phase 6a.5).
+Phase 6a.3a, and since Phase 6a.5 T on a weapon's row in the shop asks for it and
+says what it costs — `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR
+COMES BACK` — and only Enter takes it back.
 
 *Why not keep the cash spent:* capacity grows at the deposit. A take-back that
 kept the growth would let a player deposit to refine, take the weapon back at once,
@@ -686,8 +687,9 @@ cannot afford leaves the enchantment dormant. None says what the enchanter does
 with an entry the relations would refuse on the weapon, or with one the weapon
 could carry and never fire, or whether a refused choice is shown.
 
-**Shipped provisionally** (Phase 6a.3b, `Enchanter.Offers`; the screen that lists
-the offer arrives with the deposit's key, Phase 6a.5):
+**Shipped provisionally** (Phase 6a.3b, `Enchanter.Offers`; the deposit panel lists
+the offer since Phase 6a.5, a refused entry dimmed with its reason, and a refused
+service — ENCHANT or REFINE — dimmed the same way, its number key saying why):
 - the enchanter refuses what `restricted.json` refuses: an entry an exclusion
   group pairs with one the weapon carries (`COLD - CANNOT SIT WITH FLAMING`, the
   weapon's entries asked in the order they were attached), and an entry whose

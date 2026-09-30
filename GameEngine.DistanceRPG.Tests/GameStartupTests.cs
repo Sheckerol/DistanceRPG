@@ -805,10 +805,16 @@ public class GameStartupTests
 
         // Between runs (PHASE 6a DECISION 10): the hub asks through its own host,
         // IBetweenRunsHost.RequestSave — the game's same RequestSave — after every
-        // change it makes to the campaign, and those are its put-downs alone
-        // (Phase 6a.2). Only asked for, as the dungeon's are.
+        // change it makes to the campaign, and those are its put-downs (Phase 6a.2),
+        // its deposits and its take-backs (Phase 6a.5). Only asked for, as the
+        // dungeon's are.
         var hubAsks = typeof(IBetweenRunsHost).GetMethod(nameof(IBetweenRunsHost.RequestSave))!;
-        Assert.Equal(["BetweenRunsScene.PutDown"], Callers(hubAsks));
+        Assert.Equal(["BetweenRunsScene.MakeDeposit", "BetweenRunsScene.PutDown", "BetweenRunsScene.TakeBack"], Callers(hubAsks));
+        // And those are the only callers of the doors the hub changes the campaign
+        // through, so no change on the hub goes unsaved.
+        Assert.Equal(["BetweenRunsScene.PutDown"], Callers(typeof(CampaignState).GetMethod("Move", Declared)!));
+        Assert.Equal(["BetweenRunsScene.MakeDeposit"], Callers(typeof(Enchanter).GetMethod(nameof(Enchanter.Deposit))!));
+        Assert.Equal(["BetweenRunsScene.TakeBack"], Callers(typeof(Enchanter).GetMethod(nameof(Enchanter.TakeBack))!));
         Assert.Contains(typeof(IBetweenRunsHost), game.GetInterfaces());
         Assert.Equal(request, game.GetInterfaceMap(typeof(IBetweenRunsHost)).TargetMethods
             .Single(method => method.Name.EndsWith(nameof(IBetweenRunsHost.RequestSave), StringComparison.Ordinal)));

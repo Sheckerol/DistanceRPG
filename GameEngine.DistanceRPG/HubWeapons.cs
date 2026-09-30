@@ -20,6 +20,11 @@ namespace GameEngine.DistanceRPG;
 /// and nothing has moved. So a quit, the window's close or a crash mid-carry
 /// loses nothing, and a save never sees a carry.
 /// </para>
+/// <para>
+/// D on a weapon opens the deposit panel over the page, and T on a weapon in the
+/// shop asks whether to take it back (<see cref="DepositPanel"/>, Phase 6a.5); the
+/// choice follows the weapon into the shop and back out (<see cref="Follow"/>).
+/// </para>
 /// Every string of the page's rows is built here, <c>internal static</c> where it
 /// can be, and tested (<c>BetweenRunsHudTests</c>); the HUD draws them
 /// (<see cref="BetweenRunsHud"/>).
@@ -41,7 +46,7 @@ internal sealed class HubWeapons
         /// <summary>Somewhere a weapon can go that holds none — a member's empty hand, the room in its bag, the stable's end: chosen, and put down on.</summary>
         Room,
 
-        /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a): chosen, to be read, but neither taken up nor put down on — it is out of the party's hands.</summary>
+        /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a): chosen, to be read and taken back (T, Phase 6a.5), but neither taken up nor put down on — it is out of the party's hands.</summary>
         Shop,
     }
 
@@ -448,6 +453,23 @@ internal sealed class HubWeapons
         ArgumentNullException.ThrowIfNull(moved);
         _carried = null;
         ChooseRowOf(moved);
+    }
+
+    /// <summary>
+    /// A weapon has gone into the shop or come back out of it (Phase 6a.5): the
+    /// choice follows it to its row wherever it now is — a deposit's to its shop row,
+    /// a take-back's to the stable's end — or, gone from the page, onto the first
+    /// row it can stop on.
+    /// </summary>
+    public void Follow(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var rows = Rows();
+        int at = -1;
+        for (int i = 0; i < rows.Count && at < 0; i++)
+            if (rows[i].Choosable && ReferenceEquals(rows[i].Weapon, weapon))
+                at = i;
+        _chosen = at >= 0 ? at : Next(rows, -1, +1, row => row.Choosable);
     }
 
     /// <summary>

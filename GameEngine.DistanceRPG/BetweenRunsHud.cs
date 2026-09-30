@@ -13,7 +13,8 @@ namespace GameEngine.DistanceRPG;
 /// choose from it; on the WEAPONS page (Phase 6a.2) the party's hands and bags,
 /// the stable and the enchanter's shop down the left (<see cref="HubWeapons"/>), a window that scrolls with
 /// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
-/// and a refused put-down over the keys — and, under
+/// a refused key over the keys, and the deposit panel or the take-back ask over the
+/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>) — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
@@ -68,8 +69,8 @@ public sealed class BetweenRunsHud : IDisposable
     /// </summary>
     internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU";
 
-    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, TAB turns back to DUNGEONS, ESC opens the menu.</summary>
-    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - TAB DUNGEONS - ESC MENU";
+    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns back to DUNGEONS, ESC opens the menu.</summary>
+    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU";
 
     /// <summary>
     /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
@@ -528,18 +529,22 @@ public sealed class BetweenRunsHud : IDisposable
     /// The line along the bottom, and its colour, in grey: the keys the screen
     /// answers in what it is doing — the DUNGEONS page's (<see cref="KeysLine"/>),
     /// the WEAPONS page's (<see cref="WeaponsKeysLine"/>), a carry's, naming the
-    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu is up, the
-    /// menu's (<see cref="MenuKeysLine"/>) in their place.
+    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu, the deposit
+    /// panel or the take-back ask is up, its own (<see cref="MenuKeysLine"/>,
+    /// <see cref="DepositPanel.KeysLine"/>) in their place.
     /// </summary>
     /// <param name="mode">What the screen is doing.</param>
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
     /// <param name="carried">The weapon taken up, while carrying.</param>
-    internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null)
+    /// <param name="panel">The deposit panel or the take-back ask, while one is up.</param>
+    internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null,
+        DepositPanel? panel = null)
         => (mode switch
         {
             BetweenRunsScene.HubMode.Menu => MenuKeysLine(hasTitle),
             BetweenRunsScene.HubMode.Weapons => WeaponsKeysLine,
             BetweenRunsScene.HubMode.Carrying => carried is null ? WeaponsKeysLine : CarryingKeysLine(carried),
+            BetweenRunsScene.HubMode.Deposit or BetweenRunsScene.HubMode.Ask => panel?.KeysLine ?? WeaponsKeysLine,
             _ => KeysLine,
         }, DungeonHud.Grey);
 
@@ -604,8 +609,9 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The refusal row's distance up from the bottom: one row over the keys line,
-    /// in the warning's orange — what a put-down was refused with, until the next
-    /// key — and the clearance the page's rows keep above it.
+    /// in the warning's orange — what the last key was refused with, a put-down, D
+    /// on a shut enchanter or a dimmed service's number, until the next key — and
+    /// the clearance the page's rows and the deposit panel keep above it.
     /// </summary>
     internal const float RefusalFromBottom = 50f;
     private const float RefusalClearance = 6f;
@@ -841,13 +847,115 @@ public sealed class BetweenRunsHud : IDisposable
         yield return line.ToString();
     }
 
+    // ── The deposit panel (§6.2, Phase 6a.5) ────────────────────────────────
+
+    /// <summary>The panel's lines, top to bottom: its heading, the weapon's state under it, a service a line, the offer list's heading and its lines, and the ask, a gap under the rest.</summary>
+    internal const float PanelHeadingScale = 2f;
+    private const float PanelHeadingPitch = 30f;
+    internal const float PanelStateScale = 1.4f;
+    private const float PanelStatePitch = 30f;
+    internal const float PanelOptionScale = 1.5f;
+    private const float PanelOptionPitch = 24f;
+    internal const float PanelOfferHeadingScale = 1.6f;
+    private const float PanelOfferHeadingPitch = 28f;
+    internal const float PanelOfferScale = 1.5f;
+    internal const float PanelOfferPitch = 20f;
+    internal const float PanelAskScale = 1.5f;
+    private const float PanelAskGap = 12f;
+
+    /// <summary>The top of the deposit panel under the notices, the lowest a line's glyphs may reach over the refusal row, and how many of the offer list's lines its window shows.</summary>
+    internal readonly record struct PanelLayout(float Top, float Bottom, int OfferRows);
+
+    /// <summary>
+    /// Where the deposit panel goes in a window <paramref name="windowHeight"/>
+    /// pixels tall: where the WEAPONS page's rows start, under the notices
+    /// (<see cref="WeaponsPage"/>), down to the refusal row's clearance, which stays
+    /// clear for what a dimmed service's key says. The offer list's window is as
+    /// many lines as fit between its heading and the confirm's ask, which is
+    /// reserved even before it is asked, so the list never moves as the confirm
+    /// comes up — at least one, so the choice is always in view.
+    /// </summary>
+    internal static PanelLayout PanelPlace(float windowHeight, int noticeRows = 0)
+    {
+        var page = WeaponsPage(windowHeight, noticeRows);
+        float firstOffer = page.Top + PanelOfferHeadingPitch;
+        int rows = (int)MathF.Floor((page.Bottom - firstOffer - PanelAskGap - GlyphHeight * PanelAskScale) / PanelOfferPitch);
+        return new PanelLayout(page.Top, page.Bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>
+    /// The deposit panel's lines as the screen draws them, centred over the dimmed
+    /// page, top to bottom (<see cref="DepositPanel"/>):
+    /// <list type="bullet">
+    /// <item>on the services — and on the confirm of a refinement — the heading, the
+    /// weapon's state in grey, and a service a line: white, dimmed where refused, the
+    /// one confirmed yellow and marked <c>&gt; … &lt;</c>;</item>
+    /// <item>on the offer list — and the confirm of an enchantment — its heading, and
+    /// a window of <paramref name="offerRows"/> of its lines that scrolls with the
+    /// choice (<see cref="DepositPanel.Window"/>): the choice yellow and marked, a
+    /// refused offer dimmed, the rest white;</item>
+    /// <item>on the take-back ask, the weapon's name — a unique's orange — and what
+    /// its deposit bought and its runs, in cyan (<see cref="ServiceLine"/>);</item>
+    /// </list>
+    /// and on the confirm and the ask, the ask itself, in yellow, a gap under the rest.
+    /// </summary>
+    internal static IReadOnlyList<ListRow> PanelRows(DepositPanel panel, int offerRows)
+    {
+        ArgumentNullException.ThrowIfNull(panel);
+        var rows = new List<ListRow>();
+        var weapon = panel.Weapon;
+        switch (panel.Current)
+        {
+            case DepositPanel.Step.Ask:
+                rows.Add(new ListRow(HubWeapons.Name(weapon), weapon.Unique ? DungeonHud.Orange : DungeonHud.White, PanelHeadingScale, PanelHeadingPitch));
+                rows.Add(new ListRow(ServiceLine(panel.TakingBack!), DungeonHud.Cyan, PanelStateScale, PanelStatePitch));
+                break;
+
+            case DepositPanel.Step.Offer:
+            case DepositPanel.Step.Confirm when panel.Service == Service.Enchant:
+            {
+                rows.Add(new ListRow(DepositPanel.OfferHeading(weapon), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
+                int top = panel.Window(offerRows);
+                for (int i = top; i < Math.Min(panel.Offers.Count, top + offerRows); i++)
+                {
+                    var offer = panel.Offers[i];
+                    string line = DepositPanel.OfferLine(offer);
+                    bool chosen = i == panel.Chosen;
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line,
+                        chosen ? DungeonHud.Yellow : offer.Refusal is null ? DungeonHud.White : DungeonHud.DarkGrey, PanelOfferScale, PanelOfferPitch));
+                }
+                break;
+            }
+
+            default:
+                rows.Add(new ListRow(DepositPanel.Heading(weapon), DungeonHud.White, PanelHeadingScale, PanelHeadingPitch));
+                rows.Add(new ListRow(DepositPanel.StateLine(weapon), DungeonHud.Grey, PanelStateScale, PanelStatePitch));
+                foreach (var option in panel.Services)
+                {
+                    bool chosen = panel.Current == DepositPanel.Step.Confirm && option.Service == panel.Service;
+                    rows.Add(new ListRow(chosen ? $"> {option.Text} <" : option.Text,
+                        chosen ? DungeonHud.Yellow : option.Dimmed ? DungeonHud.DarkGrey : DungeonHud.White, PanelOptionScale, PanelOptionPitch));
+                }
+                break;
+        }
+
+        if (panel.Ask is { } ask)
+        {
+            rows[^1] = rows[^1] with { Pitch = rows[^1].Pitch + PanelAskGap };
+            rows.Add(new ListRow(ask, DungeonHud.Yellow, PanelAskScale, PanelOptionPitch));
+        }
+        return rows;
+    }
+
     // ── Drawing ──────────────────────────────────────────────────────────────
 
     /// <summary>
     /// The screen: its title, the startup notices under it (when there are any),
     /// the last run above (when there has been one), the list under it with the
     /// choice marked, and the keys along the bottom — and, while the menu is up,
-    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>).
+    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>);
+    /// while the deposit panel or the take-back ask is up, WEAPONS dimmed under it
+    /// and the panel over it (<see cref="PanelRows"/>).
     /// </summary>
     public void Render(BetweenRunsScene scene)
     {
@@ -882,12 +990,27 @@ public sealed class BetweenRunsHud : IDisposable
                          scene.MenuAnswer))
                 _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
         }
-        else if (scene.Refusal is { } refusal)
+        else
         {
-            DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
+            if (scene.Panel is { } panel)
+            {
+                // The page dims under the deposit panel, as the hub does under the
+                // menu, and the panel is drawn over it.
+                _text.Flush(_game.ShaderManager);
+                _fade.Draw(_game.ShaderManager, MenuDim);
+                var place = PanelPlace(h, notices.Count);
+                float y = place.Top;
+                foreach (var row in PanelRows(panel, place.OfferRows))
+                {
+                    DrawCentered(w, y, row.Text, row.Scale, row.Color);
+                    y += row.Pitch;
+                }
+            }
+            if (scene.Refusal is { } refusal)
+                DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon);
+        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel);
         DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }

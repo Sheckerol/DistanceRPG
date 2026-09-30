@@ -499,7 +499,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(BetweenRunsHud.KeysLine, BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
         scene.OnKey(Keys.Tab);
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, true), (scene.Mode, scene.OnWeapons));
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - TAB DUNGEONS - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
         scene.OnKey(Keys.Tab);
         Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
         scene.OnKey(Keys.Tab);
@@ -527,9 +527,9 @@ public sealed class BetweenRunsHudTests : IDisposable
     [Fact]
     public void EveryModeRoutesEveryKey_EscThroughHandleEscape()
     {
-        // The hub's modes by its keys (the plan's §1g table, the modes Phase 6a.2
-        // has): where Route sends each key — ESC always to the game, which asks
-        // HandleEscape — and then what the screen does with it, walked.
+        // The hub's modes by its keys (the plan's §1g table): where Route sends each
+        // key — ESC always to the game, which asks HandleEscape — and then what the
+        // screen does with it, walked.
         var modes = Enum.GetValues<BetweenRunsScene.HubMode>();
         Keys[] keys = [Keys.Tab, Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.D, Keys.T, Keys.N, Keys.Space];
         foreach (var mode in modes)
@@ -542,28 +542,36 @@ public sealed class BetweenRunsHudTests : IDisposable
                     BetweenRunsScene.HubMode.Menu => BetweenRunsScene.KeyRoute.Menu,
                     BetweenRunsScene.HubMode.Dungeons => key == Keys.Tab ? BetweenRunsScene.KeyRoute.Page : BetweenRunsScene.KeyRoute.List,
                     BetweenRunsScene.HubMode.Weapons => key == Keys.Tab ? BetweenRunsScene.KeyRoute.Page : BetweenRunsScene.KeyRoute.Weapons,
-                    _ => BetweenRunsScene.KeyRoute.Carrying,   // TAB is the carry's, and does nothing
+                    BetweenRunsScene.HubMode.Carrying => BetweenRunsScene.KeyRoute.Carrying,   // TAB is the carry's, and does nothing
+                    BetweenRunsScene.HubMode.Deposit => BetweenRunsScene.KeyRoute.Panel,       // TAB, D and T are the panel's, and do nothing
+                    BetweenRunsScene.HubMode.Ask => BetweenRunsScene.KeyRoute.Ask,             // and the ask's
+                    _ => throw new InvalidOperationException($"{mode} is a mode the table does not have: add its row"),
                 };
                 Assert.True(expected == BetweenRunsScene.Route(mode, key), $"{mode}, {key}: routed to {BetweenRunsScene.Route(mode, key)}, not {expected}");
             }
         }
 
         // DUNGEONS: W/S choose, ENTER descends, TAB turns the page, and every other
-        // key is inert — D and T are WEAPONS' keys to come (Phase 6a.5), and here
-        // they say nothing.
+        // key is inert — D and T are WEAPONS' keys, and here they say nothing.
         var (scene, host) = Hub();
         foreach (var key in new[] { Keys.D, Keys.T, Keys.D1, Keys.N, Keys.Space })
             scene.OnKey(key);
         Assert.Equal((BetweenRunsScene.HubMode.Dungeons, 0, (string?)null), (scene.Mode, scene.Chosen, scene.Refusal));
 
-        // WEAPONS, browsing: W/S choose, ENTER takes up, and the rest is inert.
+        // WEAPONS, browsing: W/S choose, ENTER takes up, T on a weapon out of the
+        // shop and the rest are inert; D on a weapon, with the tutorial not beaten,
+        // says the enchanter is shut over the keys (§6.3) and opens nothing.
         scene.OnKey(Keys.Tab);
         string first = ChosenText(scene);
-        foreach (var key in new[] { Keys.D, Keys.T, Keys.D1, Keys.D2, Keys.N, Keys.Space })
+        foreach (var key in new[] { Keys.T, Keys.D1, Keys.D2, Keys.N, Keys.Space })
             scene.OnKey(key);
-        Assert.Equal((BetweenRunsScene.HubMode.Weapons, first), (scene.Mode, ChosenText(scene)));
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, first, (string?)null), (scene.Mode, ChosenText(scene), scene.Refusal));
+        scene.OnKey(Keys.D);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, first, "THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN", (DepositPanel?)null),
+            (scene.Mode, ChosenText(scene), scene.Refusal, scene.Panel));
         scene.OnKey(Keys.S);
         Assert.NotEqual(first, ChosenText(scene));
+        Assert.Null(scene.Refusal);
         scene.OnKey(Keys.W);
         Assert.Equal(first, ChosenText(scene));
 
@@ -590,6 +598,100 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.True(scene.HandleEscape());
         Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
         Assert.Equal((0, 0, 0), (host.Descended.Count, host.HubSavesAsked, host.HandSaves));
+
+        // The deposit panel and the take-back ask (Phase 6a.5), the enchanter open:
+        // every key is theirs, and TAB, D and T do nothing in either — no page turns,
+        // nothing is deposited or taken back, nothing is said. ESC, through
+        // HandleEscape, goes back a step, out of the panel from its services, and
+        // answers no to the ask; neither opens the menu.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var campaign = TestShop.Opened();
+        var guard = TestShop.Worn("tower_guard", wear: 30);
+        TestShop.Give(campaign, "B", 2, guard);
+        var (hub, asked) = Hub(campaign);
+        hub.OnKey(Keys.Tab);
+        ChooseRow(hub, "  BAG   TOWER GUARD - WEAR 30/30 FULL");
+        hub.OnKey(Keys.D);
+        Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Services), (hub.Mode, hub.Panel!.Current));
+        foreach (var key in new[] { Keys.Tab, Keys.D, Keys.T, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.Enter, Keys.KeyPadEnter, Keys.D3, Keys.N, Keys.Space })
+            hub.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Services, true, (string?)null), (hub.Mode, hub.Panel!.Current, hub.OnWeapons, hub.Refusal));
+        hub.OnKey(Keys.D1);
+        int chosen = hub.Panel!.Chosen;
+        foreach (var key in new[] { Keys.Tab, Keys.D, Keys.T, Keys.D1, Keys.D2, Keys.D3, Keys.N, Keys.Space })
+            hub.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Offer, chosen, true), (hub.Mode, hub.Panel!.Current, hub.Panel.Chosen, hub.OnWeapons));
+        Assert.True(hub.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Services), (hub.Mode, hub.Panel!.Current));
+        Assert.True(hub.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, false, (DepositPanel?)null), (hub.Mode, hub.MenuOpen, hub.Panel));
+        Assert.Same(guard, campaign.Party[1].Inventory[2]);
+
+        foreach (var key in new[] { Keys.D, Keys.D1, Keys.Enter, Keys.Enter })
+            hub.OnKey(key);
+        Assert.Same(guard, Assert.Single(campaign.AtTheEnchanter).Weapon);
+        hub.OnKey(Keys.T);
+        Assert.Equal(BetweenRunsScene.HubMode.Ask, hub.Mode);
+        foreach (var key in new[] { Keys.Tab, Keys.D, Keys.T, Keys.W, Keys.S, Keys.D1, Keys.D2, Keys.N, Keys.Space })
+            hub.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Ask, true, (string?)null), (hub.Mode, hub.OnWeapons, hub.Refusal));
+        Assert.True(hub.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, false, (DepositPanel?)null), (hub.Mode, hub.MenuOpen, hub.Panel));
+        Assert.Single(campaign.AtTheEnchanter);
+        Assert.Equal(1, asked.HubSavesAsked);   // the deposit's, and nothing since
+    }
+
+    [Fact]
+    public void TheKeysLineNamesDepositAndTakeBack()
+    {
+        // Phase 6a.5: browsing WEAPONS, the keys line names D, which deposits the
+        // weapon chosen at the enchanter, and T, which takes a weapon in the shop
+        // back; carrying, neither is named, and neither does anything. While the
+        // deposit panel or the take-back ask is up, its keys stand in the hub's
+        // place, as the menu's do.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU", BetweenRunsHud.WeaponsKeysLine);
+        Assert.Equal((BetweenRunsHud.WeaponsKeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Weapons));
+        var sword = TestWeapons.Get("arming_sword");
+        Assert.DoesNotContain(" D ", BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Carrying, carried: sword).Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(" T ", BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Carrying, carried: sword).Text, StringComparison.Ordinal);
+        Assert.True(BetweenRunsHud.WeaponsKeysLine.Length * 6f * BetweenRunsHud.KeysLineScale <= BetweenRunsHud.FullWidth);
+
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var campaign = TestShop.Opened();
+        TestShop.Give(campaign, "B", 2, TestShop.Worn("tower_guard", wear: 30));
+        var panel = DepositPanel.Open(campaign, new WeaponPlace("B", 2));
+        var shown = new List<string>();
+        void Shown() => shown.Add(BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Deposit, panel: panel).Text);
+        Shown();
+        panel.Pick(1);
+        Shown();
+        panel.ChooseOffer();
+        Shown();
+        Assert.Equal(["1 OR 2 CHOOSES - ESC BACK", "W/S CHOOSE - ENTER CHOOSES - ESC BACK", "ENTER: DEPOSIT - ESC: BACK"], shown);
+        Enchanter.Deposit(campaign, new WeaponPlace("B", 2), Service.Refine);
+        var ask = DepositPanel.Asking(Assert.Single(campaign.AtTheEnchanter));
+        Assert.Equal(("ENTER: TAKE IT BACK - ESC: NO", DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Ask, panel: ask));
+
+        // Walked: browsing, D on a weapon opens the panel, T on a weapon in the shop
+        // opens the ask; carrying, neither opens anything.
+        var (scene, _) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        ChooseRow(scene, "  WORKING  TOWER GUARD - 0 OF 1 RUN");
+        scene.OnKey(Keys.D);
+        Assert.Null(scene.Panel);   // a weapon in the shop is deposited already
+        scene.OnKey(Keys.T);
+        Assert.Equal(BetweenRunsScene.HubMode.Ask, scene.Mode);
+        Assert.True(scene.HandleEscape());
+        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        scene.OnKey(Keys.T);
+        Assert.Null(scene.Panel);   // nothing to take back out of the shop
+        scene.OnKey(Keys.Enter);
+        foreach (var key in new[] { Keys.D, Keys.T })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Carrying, (DepositPanel?)null), (scene.Mode, scene.Panel));
+        Assert.True(scene.HandleEscape());
+        scene.OnKey(Keys.D);
+        Assert.Equal(BetweenRunsScene.HubMode.Deposit, scene.Mode);
     }
 
     [Fact]

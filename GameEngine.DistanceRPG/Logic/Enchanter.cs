@@ -82,11 +82,13 @@ public sealed record Improvement(ImprovementKind Kind, ModifierType Modifier);
 /// A service's improvement roll as it was drawn, for the log alone (Logic never
 /// logs): the first draw off the roll's stream, 0 to <see cref="Denominator"/> − 1,
 /// against the odds' numerator — it landed exactly when the draw is below it
-/// (<see cref="Wear.ImproveOdds"/>). Its two keys are not both in the log: the
-/// run's map seed is, as the run begins, but no log line names the deposit's
-/// ordinal, and once the service has finished no save holds it either. A save made
-/// during the run holds both — the visit's seed and the queued deposit — and a load
-/// of it replays the roll. Never saved: a report a load brings back has none.
+/// (<see cref="Wear.ImproveOdds"/>). Its two keys are in the log where they were
+/// made: the run's map seed as the run begins, and the deposit's ordinal where the
+/// deposit was made (<c>deposit #3</c>, Phase 6a.5) — in the session that made it,
+/// which may not be the one the service finishes in; and once the service has
+/// finished no save holds the ordinal. A save made during the run holds both — the
+/// visit's seed and the queued deposit — and a load of it replays the roll. Never
+/// saved: a report a load brings back has none.
 /// </summary>
 /// <param name="Draw">The draw, 0 to <paramref name="Denominator"/> − 1.</param>
 /// <param name="Denominator">The odds' denominator: 100 × StartingPool.</param>
@@ -454,9 +456,8 @@ public static class Enchanter
     private static string? Gates(CampaignState campaign, Weapon weapon, Service service)
     {
         var content = GameContent.Current;
-        var tutorial = content.Dungeons.Tutorial;
-        if (!campaign.IsRetired(tutorial.Id))
-            return Closed(tutorial);
+        if (!IsOpen(campaign))
+            return Closed(content.Dungeons.Tutorial);
 
         if (campaign.AtTheEnchanter.Any(deposit => ReferenceEquals(deposit.Weapon, weapon)))
             return InTheShop(weapon);
@@ -481,6 +482,17 @@ public static class Enchanter
         if (weapon.Wear < price)
             return Short(n, price, weapon.Wear);
         return null;
+    }
+
+    /// <summary>
+    /// Whether the enchanter takes deposits (§6.3; S:411–419): the tutorial beaten —
+    /// the first gate every deposit asks (<see cref="Closed"/> says why not), and
+    /// what the WEAPONS page asks before it opens the deposit panel at all.
+    /// </summary>
+    public static bool IsOpen(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        return campaign.IsRetired(GameContent.Current.Dungeons.Tutorial.Id);
     }
 
     /// <summary>The enchanter's gate before the tutorial is beaten (§6.3), naming the tutorial as the hub's gate does: <c>THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN</c>. Also what the WEAPONS page heads its shop with until then.</summary>

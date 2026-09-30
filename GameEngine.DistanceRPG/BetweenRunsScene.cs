@@ -27,7 +27,8 @@ public interface IBetweenRunsHost : ISaveHost
 
     /// <summary>
     /// Save the campaign once the frame is over: the hub has just changed it — a
-    /// weapon moved between the bags and the stable (PHASE 6a DECISION 10). Asked
+    /// weapon moved between the bags and the stable, deposited at the enchanter, or
+    /// taken back out of the shop (PHASE 6a DECISION 10). Asked
     /// after every change, so a crash between runs loses none of them; asking twice
     /// in a frame is one save, into the campaign's own slot, and between runs is
     /// always a safe point. It is only asked for, as the dungeon's autosaves are
@@ -73,6 +74,20 @@ public interface IBetweenRunsHost : ISaveHost
 /// DECISION 7). Every move asks the host for a save (PHASE 6a DECISION 10).
 /// </para>
 /// <para>
+/// <strong>The enchanter</strong> (§6.2; Phase 6a.5): D on a weapon opens the
+/// deposit panel over the page (<see cref="DepositPanel"/>) — ENCHANT or REFINE on
+/// 1 and 2, each with its odds or, dimmed, its reason, which its key says; ENCHANT's
+/// offer list, W/S and ENTER; then the confirm, where ENTER alone deposits
+/// (<see cref="Enchanter.Deposit"/>). Before the tutorial is beaten D says the
+/// enchanter is shut, over the keys, and opens nothing. T on a weapon in the shop
+/// asks whether to take it back, its wear coming back with it, and ENTER alone does
+/// (<see cref="Enchanter.TakeBack"/>; PHASE 6a DECISION 8). ESC goes back a step,
+/// out of the panel from its services, and answers no to the ask. TAB, D and T do
+/// nothing while either is up, and nothing changes the campaign but the ENTER that
+/// deposits or takes back — each logged and followed by a save asked for (PHASE 6a
+/// DECISION 10), the choice following the weapon into the shop and back out.
+/// </para>
+/// <para>
 /// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
 /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e);
 /// <see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign into its own slot,
@@ -83,14 +98,15 @@ public interface IBetweenRunsHost : ISaveHost
 /// menu is up every key is its</strong> — 1, 2 and 3 act and every other key does
 /// nothing, so ENTER never descends behind it (<see cref="Route"/>). ESC closes
 /// the menu, and with a weapon carried ESC puts it back instead of opening the
-/// menu: always consumed here, so the game never quits from this screen but by
+/// menu, and with the deposit panel or the take-back ask up it goes back out of
+/// them: always consumed here, so the game never quits from this screen but by
 /// the menu or the window's close.
 /// </para>
 /// <para>
 /// Like every gameplay scene it is single-use: the host registers a fresh one
 /// each time the screen is shown. What it reads is the campaign's, and it writes
-/// to it only between runs, through the campaign's own moves, and asks for a save
-/// after each (PHASE 6a DECISION 10). The dungeon list is read once, when the
+/// to it only between runs, through the campaign's own moves and the enchanter,
+/// and asks for a save after each (PHASE 6a DECISION 10). The dungeon list is read once, when the
 /// screen is made: nothing the hub does moves a lock.
 /// </para>
 /// <para>
@@ -123,6 +139,12 @@ public sealed class BetweenRunsScene : Scene
 
         /// <summary>The WEAPONS page with a weapon taken up, to be put down.</summary>
         Carrying,
+
+        /// <summary>The deposit panel over WEAPONS (Phase 6a.5): its services, ENCHANT's offer list, or the confirm.</summary>
+        Deposit,
+
+        /// <summary>The take-back ask over WEAPONS (Phase 6a.5): whether to take a weapon in the shop back.</summary>
+        Ask,
     }
 
     /// <summary>Where one key press goes between runs (<see cref="Route"/>).</summary>
@@ -140,11 +162,17 @@ public sealed class BetweenRunsScene : Scene
         /// <summary>TAB on either page: to the other.</summary>
         Page,
 
-        /// <summary>The WEAPONS page's, browsing: W/S and the arrows move the choice, ENTER takes a weapon up, and every other key does nothing.</summary>
+        /// <summary>The WEAPONS page's, browsing: W/S and the arrows move the choice, ENTER takes a weapon up, D opens the deposit panel on a weapon, T the take-back ask on a weapon in the shop, and every other key does nothing.</summary>
         Weapons,
 
-        /// <summary>The WEAPONS page's, carrying: W/S and the arrows move the choice over where it can go, ENTER puts it down, and every other key does nothing — TAB included.</summary>
+        /// <summary>The WEAPONS page's, carrying: W/S and the arrows move the choice over where it can go, ENTER puts it down, and every other key does nothing — TAB, D and T included.</summary>
         Carrying,
+
+        /// <summary>The deposit panel's: 1 and 2 pick a service, W/S and the arrows choose on the offer list, ENTER chooses there and deposits on the confirm, and every other key does nothing — TAB, D and T included.</summary>
+        Panel,
+
+        /// <summary>The take-back ask's: ENTER takes the weapon back, and every other key does nothing.</summary>
+        Ask,
     }
 
     private readonly Game _game;
@@ -163,6 +191,11 @@ public sealed class BetweenRunsScene : Scene
     private readonly HubWeapons _weapons;
     private bool _onWeapons;
     private string? _refusal;
+
+    // The deposit panel or the take-back ask, up over WEAPONS (Phase 6a.5): the
+    // screen's alone, like a carry — the campaign changes only at the ENTER that
+    // deposits or takes back.
+    private DepositPanel? _panel;
 
     // The host has been told something that ends this screen: a descent, or the
     // quit to the title. After it every key is ignored while the screen fades out.
@@ -221,12 +254,17 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>Whether the menu is up, over the hub.</summary>
     internal bool MenuOpen => _menu;
 
-    /// <summary>What the screen is doing now: the menu, a page, or a weapon carried on WEAPONS.</summary>
+    /// <summary>What the screen is doing now: the menu, a page, a weapon carried on WEAPONS, or the deposit panel or the take-back ask over it.</summary>
     internal HubMode Mode
         => _menu ? HubMode.Menu
+            : _panel is { Current: DepositPanel.Step.Ask } ? HubMode.Ask
+            : _panel is not null ? HubMode.Deposit
             : !_onWeapons ? HubMode.Dungeons
             : _weapons.Carried is null ? HubMode.Weapons
             : HubMode.Carrying;
+
+    /// <summary>The deposit panel or the take-back ask, while one is up over WEAPONS; null otherwise.</summary>
+    internal DepositPanel? Panel => _panel;
 
     /// <summary>Whether the WEAPONS page is up, rather than DUNGEONS — under the menu too.</summary>
     internal bool OnWeapons => _onWeapons;
@@ -234,7 +272,7 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>The WEAPONS page: its rows, its choice, its window and a weapon carried.</summary>
     internal HubWeapons Weapons => _weapons;
 
-    /// <summary>What the last put-down was refused with (<see cref="HubWeapons.KeepsAWeapon"/>), said over the keys until the next key; null for nothing.</summary>
+    /// <summary>What the last key was refused with — a put-down that would leave a member unarmed (<see cref="HubWeapons.KeepsAWeapon"/>), D while the enchanter is shut (<see cref="Enchanter.Closed"/>), a dimmed service's number key — said over the keys until the next key; null for nothing.</summary>
     internal string? Refusal => _refusal;
 
     /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>) — until the next key or until the menu closes; null for nothing.</summary>
@@ -278,9 +316,9 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// One key press: where <see cref="Route"/> sends it. Any key but ESC clears what
-    /// the menu answered and what a put-down was refused with — each stays until the
-    /// next key — before it does anything else. Nothing on the way out, or while the
-    /// engine fades between scenes.
+    /// the menu answered and what the last key was refused with — each stays until
+    /// the next key — before it does anything else. Nothing on the way out, or while
+    /// the engine fades between scenes.
     /// </summary>
     internal void OnKey(Keys key)
     {
@@ -307,6 +345,12 @@ public sealed class BetweenRunsScene : Scene
             case KeyRoute.Carrying:
                 WeaponsKey(key);
                 break;
+            case KeyRoute.Panel:
+                PanelKey(key);
+                break;
+            case KeyRoute.Ask:
+                AskKey(key);
+                break;
         }
     }
 
@@ -317,8 +361,9 @@ public sealed class BetweenRunsScene : Scene
     /// 1, 2 and 3 act, and ENTER, TAB, W/S and the arrows do nothing, so nothing
     /// descends or moves behind the menu; TAB on either page, to the other; and
     /// otherwise to the page — the dungeon list, or WEAPONS browsing or carrying,
-    /// where TAB is the carry's and does nothing. Pure, so it is walked key by key
-    /// (<c>BetweenRunsHudTests</c>).
+    /// where TAB is the carry's and does nothing — or to the deposit panel or the
+    /// take-back ask up over it, whose every key is theirs, TAB included, so no page
+    /// turns under them. Pure, so it is walked key by key (<c>BetweenRunsHudTests</c>).
     /// </summary>
     /// <param name="mode">What the screen is doing.</param>
     /// <param name="key">The key pressed.</param>
@@ -331,6 +376,8 @@ public sealed class BetweenRunsScene : Scene
                 HubMode.Dungeons => KeyRoute.List,
                 HubMode.Weapons => KeyRoute.Weapons,
                 HubMode.Carrying => KeyRoute.Carrying,
+                HubMode.Deposit => KeyRoute.Panel,
+                HubMode.Ask => KeyRoute.Ask,
                 _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Not a HubMode."),
             };
 
@@ -353,9 +400,11 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// The WEAPONS page's keys: W/S or the arrows move the choice — over the
-    /// weapons and the rooms, or, carrying, over where the weapon can go — and
-    /// ENTER takes the weapon chosen up, or puts the one carried down. Every other
-    /// key does nothing.
+    /// weapons, the rooms and the shop, or, carrying, over where the weapon can go —
+    /// and ENTER takes the weapon chosen up, or puts the one carried down. Browsing,
+    /// D opens the deposit panel on a weapon (<see cref="OpenDeposit"/>) and T the
+    /// take-back ask on a weapon in the shop (<see cref="AskTakeBack"/>); carrying,
+    /// both do nothing. Every other key does nothing.
     /// </summary>
     private void WeaponsKey(Keys key)
     {
@@ -372,6 +421,12 @@ public sealed class BetweenRunsScene : Scene
                     TakeUp();
                 else
                     PutDown();
+                break;
+            case Keys.D when _weapons.Carried is null:
+                OpenDeposit();
+                break;
+            case Keys.T when _weapons.Carried is null:
+                AskTakeBack();
                 break;
         }
     }
@@ -422,6 +477,155 @@ public sealed class BetweenRunsScene : Scene
         => !place.IsStable ? place.Index == 0 ? $"{place.MemberId}'s hand" : $"{place.MemberId}'s bag slot {place.Index + 1}"
             : place.Index < _campaign.Stable.Count ? $"the stable ({place.Index + 1} of {_campaign.Stable.Count})"
             : "the stable's end";
+
+    // ── The enchanter (§6.2, Phase 6a.5) ────────────────────────────────────
+
+    /// <summary>
+    /// D on a weapon: the deposit panel over the page, its services asked of the
+    /// enchanter as the campaign stands (<see cref="DepositPanel.Open"/>) — or,
+    /// before the tutorial is beaten, the enchanter's gate said over the keys, and
+    /// nothing opened (§6.3). On anything but a weapon out of the shop, nothing.
+    /// </summary>
+    private void OpenDeposit()
+    {
+        if (_weapons.ChosenRow is not { Kind: HubWeapons.RowKind.Weapon, Place: { } from, Weapon: { } weapon })
+            return;
+        if (!Enchanter.IsOpen(_campaign))
+        {
+            _refusal = Enchanter.Closed(GameContent.Current.Dungeons.Tutorial);
+            Log.Info($"[Hub] Refused: {_refusal}");
+            return;
+        }
+        _panel = DepositPanel.Open(_campaign, from);
+        Log.Info($"[Hub] Deposit panel on {weapon.Name} in {Where(from)}: {string.Join("; ", _panel.Services.Select(option => option.Text))}");
+    }
+
+    /// <summary>T on a weapon in the shop: the take-back ask over the page (PHASE 6a DECISION 8). On anything else, nothing.</summary>
+    private void AskTakeBack()
+    {
+        if (_weapons.ChosenRow is not { Kind: HubWeapons.RowKind.Shop, Deposit: { } deposit })
+            return;
+        _panel = DepositPanel.Asking(deposit);
+        Log.Info($"[Hub] Asked to take back {deposit.Weapon.Name}, deposit #{deposit.Ordinal}");
+    }
+
+    /// <summary>
+    /// The deposit panel's keys (<see cref="DepositPanel"/>): a number picks a
+    /// service — a dimmed one's says why, over the keys — W/S or the arrows choose
+    /// on the offer list, ENTER chooses there and deposits on the confirm. Every
+    /// other key does nothing.
+    /// </summary>
+    private void PanelKey(Keys key)
+    {
+        var panel = _panel!;
+        switch (key)
+        {
+            case Keys.W or Keys.Up:
+                panel.Move(-1);
+                break;
+            case Keys.S or Keys.Down:
+                panel.Move(+1);
+                break;
+            case Keys.Enter or Keys.KeyPadEnter:
+                if (panel.Current == DepositPanel.Step.Offer)
+                    panel.ChooseOffer();
+                else if (panel.Current == DepositPanel.Step.Confirm)
+                    MakeDeposit(panel);
+                break;
+            default:
+                if (SlotMenu.Digit(key) is { } digit && panel.Pick(digit) is { } refused)
+                {
+                    _refusal = refused;
+                    Log.Info($"[Hub] Refused: {refused}");
+                }
+                break;
+        }
+    }
+
+    /// <summary>The take-back ask's keys: ENTER takes the weapon back; every other key does nothing.</summary>
+    private void AskKey(Keys key)
+    {
+        if (key is Keys.Enter or Keys.KeyPadEnter)
+            TakeBack(_panel!);
+    }
+
+    /// <summary>
+    /// ENTER on the confirm: the weapon deposited (<see cref="Enchanter.Deposit"/>) —
+    /// its whole pool cashed, its capacity grown on it, into the shop — the panel
+    /// closed, the choice on the weapon's row in the shop, the deposit logged, and a
+    /// save asked for (PHASE 6a DECISION 10).
+    /// </summary>
+    private void MakeDeposit(DepositPanel panel)
+    {
+        string from = Where(panel.From);   // named as it stood before the deposit closed the stable up
+        var made = Enchanter.Deposit(_campaign, panel.From, panel.Service, panel.EnchantmentId);
+        _panel = null;
+        _weapons.Follow(made.Entry.Weapon);
+        Log.Info(DepositedLine(made, panel.From, from));
+        _host.RequestSave();
+    }
+
+    /// <summary>
+    /// ENTER on the ask: the weapon taken back (<see cref="Enchanter.TakeBack"/>) to
+    /// the stable's end, its service forfeit and its deposit's cash reversed (PHASE
+    /// 6a DECISION 8), the ask closed, the choice on the weapon, the take-back
+    /// logged, and a save asked for (PHASE 6a DECISION 10).
+    /// </summary>
+    private void TakeBack(DepositPanel ask)
+    {
+        var deposit = ask.TakingBack!;
+        var before = deposit.Weapon.WearPool;
+        Enchanter.TakeBack(_campaign, deposit);
+        _panel = null;
+        _weapons.Follow(deposit.Weapon);
+        Log.Info(TookBackLine(deposit, before, deposit.Weapon.WearPool));
+        _host.RequestSave();
+    }
+
+    /// <summary>
+    /// A deposit, as the log says it (the plan's 1h), from what the enchanter handed
+    /// back (<see cref="DepositMade"/>; Logic never logs): <c>[Enchanter] Deposited
+    /// Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+    /// (capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of
+    /// Renewal from the bag</c>. The ordinal is named here, in the session that made
+    /// the deposit, so a finished service's improvement roll, which the run's end
+    /// logs, can be keyed again from the log.
+    /// </summary>
+    /// <param name="made">What the deposit did.</param>
+    /// <param name="from">Where the weapon was taken from.</param>
+    /// <param name="where">That place as the log names it, as it stood before the deposit.</param>
+    internal static string DepositedLine(DepositMade made, WeaponPlace from, string where)
+    {
+        ArgumentNullException.ThrowIfNull(made);
+        ArgumentNullException.ThrowIfNull(where);
+        var entry = made.Entry;
+        return $"[Enchanter] Deposited {entry.Weapon.Name} ({entry.Weapon.Id}) from {where}: {Bought(entry)}, {entry.WearAtDeposit} wear cashed"
+            + $" (capacity {made.Before.Max} -> {made.After.Max}), {RunsSaid(entry.Runs)}, deposit #{entry.Ordinal}"
+            + (made.Armed is { } armed ? $"; {from.MemberId}'s hand, emptied, took up {armed.Name} from the bag" : "");
+    }
+
+    /// <summary>
+    /// A take-back, as the log says it (the plan's 1h): <c>[Enchanter] Took back
+    /// Tower Guard (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of
+    /// 1 run worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c>.
+    /// </summary>
+    /// <param name="deposit">The deposit taken back.</param>
+    /// <param name="before">The weapon's capacity before the take-back.</param>
+    /// <param name="after">Its capacity after: as it was before the deposit.</param>
+    internal static string TookBackLine(Deposit deposit, PoolProgress before, PoolProgress after)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        return $"[Enchanter] Took back {deposit.Weapon.Name} ({deposit.Weapon.Id}) to the stable's end: {Bought(deposit)} forfeited,"
+            + $" {deposit.RunsWorked} of {RunsSaid(deposit.Runs)} worked lost, {deposit.WearAtDeposit} wear returned"
+            + $" (capacity {before.Max} -> {after.Max}), deposit #{deposit.Ordinal}";
+    }
+
+    /// <summary>What a deposit bought, as the log names it: <c>Enchant vampiric</c>, <c>Refine</c>.</summary>
+    private static string Bought(Deposit deposit)
+        => deposit.Service == Service.Enchant && deposit.EnchantmentId is { } id ? $"Enchant {id}" : deposit.Service.ToString();
+
+    /// <summary>Runs as the log says them: <c>1 run</c>, <c>2 runs</c>.</summary>
+    private static string RunsSaid(int runs) => runs == 1 ? "1 run" : $"{runs} runs";
 
     /// <summary>
     /// The menu's keys (<see cref="PauseMenu.Press"/>): 1 closes it, 2 asks the host
@@ -529,10 +733,13 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// ESC, asked by the game before it does anything else with it, and always
-    /// taken here: with a weapon carried it puts it back, and nothing has moved; on
-    /// the menu it closes it; with nothing up it opens the menu. So the game never
-    /// quits from this screen but by the menu's QUIT TO TITLE, a dev-override
-    /// session's QUIT GAME, or the window's close.
+    /// taken here: with a weapon carried it puts it back, and nothing has moved; with
+    /// the deposit panel up it goes back a step, and from its services closes it,
+    /// nothing deposited; on the take-back ask it answers no; on the menu it closes
+    /// it; with nothing up it opens the menu. So the game never quits from this
+    /// screen but by the menu's QUIT TO TITLE, a dev-override session's QUIT GAME, or
+    /// the window's close. Nothing here reads the content: the game's own ESC
+    /// reaches it from before the window is up.
     /// </summary>
     public bool HandleEscape()
     {
@@ -543,6 +750,16 @@ public sealed class BetweenRunsScene : Scene
         if (_weapons.PutBack() is { } putBack)
         {
             Log.Info($"[Hub] Put {putBack.Name} back: nothing moved");
+            return true;
+        }
+        if (_panel is { } panel)
+        {
+            bool asked = panel.Current == DepositPanel.Step.Ask;
+            if (panel.Back())
+            {
+                _panel = null;
+                Log.Info(asked ? $"[Hub] Left {panel.Weapon.Name} in the shop: nothing taken back" : $"[Hub] Closed the deposit panel on {panel.Weapon.Name}: nothing deposited");
+            }
             return true;
         }
         _menu = !_menu;

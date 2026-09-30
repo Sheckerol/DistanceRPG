@@ -48,6 +48,8 @@ GameEngine.DistanceRPG/         # Game executable
   HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
                                 # (CampaignState.Move, the one door) and the enchanter's shop, a carry
                                 # the page's alone
+  DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT or REFINE with their odds
+                                # or reasons, the offer list, the confirm; and the take-back ask (T)
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)

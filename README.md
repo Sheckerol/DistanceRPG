@@ -44,8 +44,8 @@ back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 is passed over. The screen between runs is two pages, Tab going from one to the
 other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
 has ended — until the tutorial's golem is beaten it lists the tutorial alone —
-and WEAPONS, every member's hand and bag and the stable, where weapons are moved
-between them (below). In play — in a dungeon or between runs — Esc opens the
+and WEAPONS, every member's hand and bag, the stable and the enchanter's shop,
+where weapons are moved between them and deposited at the enchanter (below). In play — in a dungeon or between runs — Esc opens the
 menu, where the campaign is saved by hand into its own slot, the one it saves
 into all the time, and play is left for the title.
 
@@ -79,10 +79,27 @@ into all the time, and play is left for the title.
 
 | Between runs: WEAPONS | Action |
 | --- | --- |
-| W/S / arrows | Choose a weapon, or a room: a member's empty hand, the room left in its bag, the stable's end (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
+| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
 | Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
+| D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
+| T | On a weapon in the shop (`WORKING` or `STALLED`): ask whether to take it back (below) |
 | Tab | The DUNGEONS page |
 | Esc | Open the menu, over the hub |
+
+| Between runs: the deposit panel (D) | Action |
+| --- | --- |
+| 1 | `1  ENCHANT - A CHOSEN ENCHANTMENT - 3 IN 100 TO IMPROVE`: the offer list. Dimmed with its reason — `NO FREE SLOT - SLOT 2 OPENS AT CAPACITY 35 - IT IS 31`, `ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0`, `ALL 5 SLOTS ARE FILLED`, `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` — the key says the reason over the keys, and picks nothing |
+| 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
+| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`) and skipped. The list scrolls with the choice |
+| Enter | On the offer list, choose it: the confirm. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a hand it empties takes up the first weapon in its bag, and the campaign is saved at once |
+| Esc | Back a step: from the confirm to the offer list (or the services), from the offer list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
+| Tab, D, T | Nothing |
+
+| Between runs: the take-back ask (T) | Action |
+| --- | --- |
+| Enter | `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once |
+| Esc | No: it stays in the shop |
+| Tab, D, T | Nothing |
 
 | Between runs: WEAPONS, carrying a weapon | Action |
 | --- | --- |
@@ -173,8 +190,12 @@ arrives with filling its slots from the first, and attaching enchantment n needs
 free slot and a deposit of 30 + 5(n − 1) wear. A deposit cashes the weapon's whole
 pool — its capacity growing on it, a point a full bar, whatever it bought — and puts
 it in the shop for its enchantment count plus one runs that count (PHASE 6a DECISION
-6); the key that deposits (D) arrives in Phase 6a.5, so until then only a
-hand-edited save fills the shop. What an Enchant may buy (Phase 6a.3b) is any
+6). D on a weapon deposits it (Phase 6a.5): the panel says the weapon's wear, its
+enchantments, the slots its capacity has opened and its runs in the shop — `WEAR 36
+OF 36 - ENCHANTMENTS 1 OF 5 - SLOTS OPEN 2 - 2 RUNS IN THE SHOP` — and offers ENCHANT
+and REFINE, each with the odds its return improves the weapon anyway (below), a
+refused one dimmed with the enchanter's reason, and an unworn weapon's refinement
+noted as coming back as it went; then the confirm, which names the wear it spends. What an Enchant may buy (Phase 6a.3b) is any
 enchantment the campaign has met, less what `restricted.json` never copies (the
 unique souls) and what does nothing yet (`echoing`): one the relations refuse on the
 weapon (`COLD - CANNOT SIT WITH FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF IT`), a
@@ -183,8 +204,8 @@ would cast on the wrong side (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`) is
 refused, and one that never fires on the weapon attaches all the same, noted `NEVER
 FIRES ON A SWORD` — on a staff, anything that rides a strike or a kill, since a staff
 never strikes (PHASE 6a DECISION 12); with nothing left to choose the Enchant says
-`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. The
-list that shows it arrives with the deposit's key. A run that counts works the two
+`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. ENCHANT
+lists the offer, a refused one dimmed with its reason and never hidden. A run that counts works the two
 newest a run on, and a service whose last run it works comes back to the end of the
 stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
 3); a run that does not count works nothing. A service coming back may improve the
@@ -207,9 +228,16 @@ the floor), `AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. The log says it too:
 Blade 0/1`, then `[Enchanter] Wand of the Cone finished: attached vampiric;
 improvement roll 1073 of 3000 against 90: no change` — the draw, out of 100 ×
 `StartingPool`, against the odds (`… : grafted Block`, `… : deepened Push`, or `;
-no wear, no roll`). A weapon taken back early (its key arrives with the deposit's)
-comes back with its wear and its capacity as they were before it went in (PHASE 6a
-DECISION 8).
+no wear, no roll`). A weapon taken back early (T on its row in the shop, and Enter
+on the ask) comes back to the end of the stable with its wear and its capacity as they
+were before it went in, its service lost (PHASE 6a DECISION 8). A deposit and a
+take-back are each saved at once (PHASE 6a DECISION 10), and logged: `[Enchanter]
+Deposited Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+(capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of Renewal
+from the bag` — the deposit's number, with the run's map seed, is what a finished
+service's improvement roll is keyed by — and `[Enchanter] Took back Tower Guard
+(tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked
+lost, 30 wear returned (capacity 31 -> 30), deposit #0`.
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
