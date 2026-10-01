@@ -1010,3 +1010,56 @@ between bags, as it moves a weapon; (b) a potion is put down on a floor as a
 weapon is, and taken back with G (a floor's `LooseItem` and its save row would
 hold either); or (c) a potion cannot be put down at all, only drunk. settled.md's
 Phase 6b implementation pass records the ruling.
+
+## What a drink costs out of combat (§3.4, §1.2) — PHASE 6b DECISION 2
+
+§3.4 prices a drink at `PotionUseCost`, 40, "on the same principle as swapping
+(§1.2): anything that changes your situation mid-turn comes out of the same
+budget as moving and swinging" (phase-3-loot.md). A swap is free out of combat —
+it costs `WeaponSwapCost` only once a live enemy has been seen this turn, so
+loadout management between fights stays free (settled.md) — and §3.4 states the
+drink's cost with no such condition.
+
+**Shipped provisionally (Phase 6b.2): a drink always costs `PotionUseCost`, in
+combat and out.** The rule is one line, and topping up after every fight still
+costs a turn's walking: a party that drinks between fights spends 40 of a 160
+budget each time, as it would in one. The cost is paid whole or the drink is
+refused, as a swap short of its cost is, and the bag says which before the key is
+pressed — `A DRINK COSTS 40 MOVE`, or `... - NOT ENOUGH LEFT` in red — while a
+potion's number short of it says `NOT ENOUGH MOVE TO DRINK - IT COSTS 40` over
+the member and drinks nothing.
+
+**This decides whether a potion is cheaper outside a fight, so it is the user's to
+decide.** The alternative: free out of combat, priced as a swap is — the cost only
+once a live enemy has been seen this turn (`TurnSystem.SwapCost`'s condition),
+so a party tops up for nothing between fights and pays 40 only when the drink is
+a mid-fight decision. settled.md's Phase 6b implementation pass records the ruling.
+
+## How a potion's share rounds, and of which pool (§3.4) — PHASE 6b DECISION 3
+
+§3.4 has a potion restore "a share of max HP" or "a share of max mana", per unit
+of quality (`HealthPotionPercent`, `ManaPotionPercent`, 20 each; §6.6's
+"healthRestored = HealthPotionPercent × quality × maxHp"). Nothing says how a
+share that is not whole rounds — 20 percent of 33 is 6.6 — or which maximum a
+mana potion is a share of: the pool the member has earned (`MaxMana`, what the
+ladder grows, "the mana pool" §3.4 names) or what a spend can reach
+(`UsableMaxMana`, the earned pool less what the equipped enchantments' locks
+reserve).
+
+**Shipped provisionally (Phase 6b.2): rounded down, the house's truncation, with
+no minimum**, so quality 1 on 33 HP restores 6, quality 3 restores 19, and quality
+5 restores all 33 — the ceiling §6.6 names, "a potion that heals you completely
+from 1 HP", which rounding down never weakens, since five units are then 100
+percent or more. **Health is a share of `MaxHp`; mana is a share of `MaxMana`, the
+earned pool, and what it restores is capped at `UsableMaxMana`**, as Siphon's
+refund is: so at quality 5 a mana potion refills the spendable pool whatever the
+locks reserve. The bag says what a potion offers of the member's maximum as it
+stands — `RESTORES 12 OF 30 HP`, `RESTORES ALL 30 HP - 6 OVER` — and a drink
+reports what the pool took.
+
+**This decides how much a potion restores at the margins, so it is the user's to
+decide.** The alternatives: (a) round to the nearest, or up, or restore at least
+1, so a quality-1 potion on a small pool always restores something; or (b) a mana
+potion is a share of `UsableMaxMana`, so a heavily locked caster's potion restores
+less, and quality 5 still refills exactly what is spendable. settled.md's Phase 6b
+implementation pass records the ruling.

@@ -1331,6 +1331,21 @@ public class DungeonScene : Scene
         _turns.WeaponWornFull += (member, weapon) =>
             Log.Info($"[Wear] {member.Id}'s {weapon.Name} is full: wear {weapon.Wear} of {weapon.WearCapacity}");
 
+        // A potion drunk from a member's bag (§3.4): what it was, what it offered
+        // and what the pool took, in the log, and what the pool gained over the
+        // member, in the potion's colour, in place of any answer still rising there.
+        // A heal also rises as +12 from CharacterHealed, as every heal does.
+        _turns.PotionDrunk += (member, drink) =>
+        {
+            var potion = drink.Potion;
+            string pool = potion.Type == PotionType.Health
+                ? $"+{drink.Restored} HP of {drink.Share} offered ({member.Hp}/{member.MaxHp})"
+                : $"+{drink.Restored} mana of {drink.Share} offered ({member.Mana}/{member.UsableMaxMana} usable)";
+            Log.Info($"[Potion] {member.Id} drinks a {potion.Type} potion (quality {potion.Quality}) from slot {drink.Slot + 1}: {pool}, {drink.Cost} movement");
+            if (TryObjectFor(member, out var obj) && obj.IsActive)
+                _hud.AddAnswer(obj, obj.Position, DungeonHud.DrankBeat(drink), DungeonHud.PotionColor(potion.Type), -52f);
+        };
+
         _turns.CharacterHealed += (c, amount) =>
         {
             Log.Info($"[Combat] {c.Id} regenerates {amount} — HP {c.Hp}");
@@ -1570,8 +1585,9 @@ public class DungeonScene : Scene
     /// <summary>
     /// A number key, routed by the menu that is open (§4.4: the swap keys
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
-    /// printed with that number into the hand — 1 is the hand itself — or, with
-    /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
+    /// printed with that number into the hand — 1 is the hand itself — or drink
+    /// the potion there (<see cref="DrinkSlot"/>), or, with the bag's X armed,
+    /// put that slot's weapon down or pour its potion out (<see cref="LeaveSlot"/>);
     /// on the pause menu (<see cref="PauseMenu.Press"/>), 1 closes it, 2 asks the
     /// host to save the campaign into its own slot on the party's own turn — the
     /// menu kept up for the answer — and otherwise says why not, and 3 quits to
@@ -1624,7 +1640,7 @@ public class DungeonScene : Scene
                 if (LeaveArmed)
                     LeaveSlot(slot);
                 else if (ActiveCharacter.State.PotionIn(slot) is not null)
-                    Log.Info($"[Potion] {ActiveCharacter.State.Id} cannot equip slot {slot + 1}: a potion is drunk, never held");   // the hand keeps a weapon (PHASE 6b DECISION 1)
+                    DrinkSlot(slot);   // a potion is drunk, never held: the hand keeps a weapon (PHASE 6b DECISION 1)
                 else
                     EquipSlot(slot);
             }
@@ -1706,6 +1722,32 @@ public class DungeonScene : Scene
             Log.Info($"[Combat] {state.Id} equips {state.EquippedWeapon?.Name} (swap cost {_turns.SwapCost})");
         else
             Log.Info($"[Combat] {state.Id} cannot swap to slot {slot} (cost {_turns.SwapCost}, movement {state.DistLeft:0})");
+    }
+
+    /// <summary>
+    /// A bag number on a potion's slot (§3.4): the active member drinks it, through
+    /// the turn system, which prices it — <see cref="TurnSystem.PotionUseCost"/>
+    /// movement, in combat and out (PHASE 6b DECISION 2), paid whole or refused —
+    /// and restores what it offers through the heal or mana applier. What was drunk
+    /// says so over the member and in the log from <see cref="TurnSystem.PotionDrunk"/>
+    /// (<see cref="WireTurnSystem"/>). Short of the whole cost, the drink is refused
+    /// and says why over the member — <c>NOT ENOUGH MOVE TO DRINK - IT COSTS 40</c>
+    /// — with nothing drunk and nothing spent; outside the party's phase it only
+    /// logs, as a swap refused there does.
+    /// </summary>
+    private void DrinkSlot(int slot)
+    {
+        var member = ActiveCharacter.State;
+        if (_turns.TryDrink(member, slot) is not null) return;   // the beat and the log line are PotionDrunk's
+
+        int cost = _turns.PotionUseCost;
+        if (_turns.Phase == TurnPhase.Player && member.Alive && member.DistLeft < cost)
+        {
+            Log.Info($"[Potion] {member.Id} cannot drink from slot {slot + 1}: {member.DistLeft:0} movement left, a drink costs {cost}");
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.DrinkShortCue(cost), false));
+        }
+        else
+            Log.Info($"[Potion] {member.Id} cannot drink from slot {slot + 1}: a drink is the party's own, in its turn and alive");
     }
 
     /// <summary>

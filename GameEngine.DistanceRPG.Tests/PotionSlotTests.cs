@@ -277,9 +277,10 @@ public sealed class PotionSlotTests : IDisposable
     public void APotionLeavesABagThroughOneDoor()
     {
         // Read off the IL: a potion leaves a bag by one door (PartyMemberState.TakePotion),
-        // and its one caller is the pour-out in a dungeon — X then the potion's number.
-        // Phase 6b's later steps add theirs here, each by name: the drink, the run's
-        // end's spoilage, the pour-back at the alchemist.
-        Assert.Equal(["DungeonScene.LeaveSlot"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.TakePotion)));
+        // and its callers are the pour-out in a dungeon — X then the potion's number —
+        // and the drink (Phase 6b.2), the potion's number alone. Phase 6b's later
+        // steps add theirs here, each by name: the run's end's spoilage, the
+        // pour-back at the alchemist.
+        Assert.Equal(["DungeonScene.LeaveSlot", "TurnSystem.TryDrink"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.TakePotion)));
     }
 }

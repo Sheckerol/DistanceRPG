@@ -1331,6 +1331,9 @@ public sealed class DungeonHud
     private const float InventorySwapGap = 16f;
     private const float InventoryHintGap = 26f;
 
+    /// <summary>What a drink costs, under the swap line while the bag holds a potion (<see cref="DrinkCostLine"/>): the key hint moves down by this.</summary>
+    private const float InventoryDrinkPitch = 18f;
+
     /// <summary>The last line's own glyphs, so a height covers what the panel draws and not just where it starts.</summary>
     private const float InventoryLineHeight = 12f;
 
@@ -1366,12 +1369,14 @@ public sealed class DungeonHud
     /// HUD is laid out for either. A slot whose statline wraps
     /// (<see cref="SlotDetailLines"/>) grows the panel by
     /// <paramref name="wrappedLines"/> — every slot's lines past its first —
-    /// as a class row does: slid up first, then rows dropped.
+    /// as a class row does: slid up first, then rows dropped. So does the line
+    /// that says what a drink costs, under the swap line while the bag holds a
+    /// potion (<paramref name="drinkLine"/>, <see cref="DrinkCostLine"/>).
     /// </summary>
-    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0)
+    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0, bool drinkLine = false)
     {
         float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + wrappedLines * InventoryDetailPitch + InventoryLabelHeight
-            + InventorySwapGap + InventoryHintGap + InventoryLineHeight;
+            + InventorySwapGap + (drinkLine ? InventoryDrinkPitch : 0f) + InventoryHintGap + InventoryLineHeight;
         float floorLine = windowHeight - InventoryBottomMargin;
         float top = MathF.Min(windowHeight / 2f - InventoryCentredOffset,
                               floorLine - fixedHeight - rowCount * InventoryRowPitch);
@@ -1408,8 +1413,11 @@ public sealed class DungeonHud
     /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
     /// wherever X would arm it: in the party's phase, with a bag to put a weapon
     /// down from. A potion's slot names the potion in its colour
-    /// (<see cref="SlotName"/>), and while the bag holds one both hints say it is
-    /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1).
+    /// (<see cref="SlotName"/>) and says under it what it restores now
+    /// (<see cref="PotionDetail"/>); while the bag holds one both hints say it is
+    /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1), the key hint
+    /// that its number drinks it (<see cref="EquipHint"/>), and a line under the
+    /// swap line what a drink costs (<see cref="DrinkCostLine"/>).
     /// </summary>
     private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
     {
@@ -1425,14 +1433,20 @@ public sealed class DungeonHud
 
         // Each weapon's statline as it reads in this member's hands, wrapped to the
         // room right of its slot's number: a slot grows by the lines it wraps to.
+        // A potion's says what it restores now, on one line.
         int attacks = turns.AttacksThisTurn(active);
         var details = active.Inventory
-            .Select((item, slot) => item is Weapon weapon ? SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)) : [])
+            .Select((item, slot) => item switch
+            {
+                Weapon weapon => SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)),
+                Potion potion => PotionDetailLines(potion, active),
+                _ => [],
+            })
             .ToArray();
         bool potions = active.Potions.Any();
         int wrapped = details.Sum(lines => Math.Max(0, lines.Count - 1));
 
-        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped);
+        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped, drinkLine: potions);
         float top = layout.Top;
         float left = cx - InventoryHalfWidth;
 
@@ -1484,10 +1498,19 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
+        // A drink costs movement in combat and out (§3.4): said under the swap line while there is one to drink.
+        float hintY = swapY + InventoryHintGap;
+        if (potions)
+        {
+            var drink = DrinkCostLine(turns.PotionUseCost, active.DistLeft);
+            DrawCentered(w, swapY + InventoryDrinkPitch, drink.Text, 1.5f, drink.Color);
+            hintY += InventoryDrinkPitch;
+        }
+
         if (leaving)
-            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
+            DrawCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
         else
-            DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
+            DrawCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
     }
 
     /// <summary>
@@ -1515,16 +1538,78 @@ public sealed class DungeonHud
     internal static Vector4 PotionColor(PotionType type) => type == PotionType.Health ? Green : Cyan;
 
     /// <summary>
+    /// What a potion in the bag restores now, under its name (§3.4): the share it
+    /// offers of <paramref name="member"/>'s maximum as it stands
+    /// (<see cref="Alchemist.Share(Potion, ActorState)"/>) — <c>RESTORES 12 OF 30
+    /// HP</c>, <c>RESTORES 32 OF 160 MANA</c> — and at a whole pool,
+    /// <c>RESTORES ALL 30 HP</c>, or past it, <c>RESTORES ALL 30 HP - 6 OVER</c>:
+    /// the overshoot, which only Overheal keeps. Mana is a share of the pool the
+    /// member has earned (PHASE 6b DECISION 3).
+    /// </summary>
+    internal static string PotionDetail(Potion potion, ActorState member)
+    {
+        ArgumentNullException.ThrowIfNull(potion);
+        ArgumentNullException.ThrowIfNull(member);
+        int share = Alchemist.Share(potion, member);
+        int max = Alchemist.MaxOf(potion.Type, member);
+        string pool = potion.Type == PotionType.Health ? "HP" : "MANA";
+        if (share < max)
+            return $"RESTORES {share} OF {max} {pool}";
+        return share == max ? $"RESTORES ALL {max} {pool}" : $"RESTORES ALL {max} {pool} - {share - max} OVER";
+    }
+
+    /// <summary>A potion's slot's detail as the bag panel draws it under the name: <see cref="PotionDetail"/>, one line in the potion's colour.</summary>
+    internal static IReadOnlyList<IReadOnlyList<Run>> PotionDetailLines(Potion potion, ActorState member)
+        => [[new Run(PotionDetail(potion, member), PotionColor(potion.Type))]];
+
+    /// <summary>
+    /// What a drink costs, under the swap line while the bag holds a potion: a
+    /// drink costs <paramref name="cost"/> movement in combat and out (PHASE 6b
+    /// DECISION 2) — <c>A DRINK COSTS 40 MOVE</c>, grey; red and
+    /// <c>... - NOT ENOUGH LEFT</c> when the member has less, since the cost is
+    /// paid whole or the drink refused; <c>DRINKING IS FREE</c> at a cost of 0.
+    /// </summary>
+    internal static Run DrinkCostLine(int cost, float distLeft)
+    {
+        if (cost <= 0) return new Run("DRINKING IS FREE", Grey);
+        return distLeft < cost
+            ? new Run($"A DRINK COSTS {cost} MOVE - NOT ENOUGH LEFT", Red)
+            : new Run($"A DRINK COSTS {cost} MOVE", Grey);
+    }
+
+    /// <summary>
+    /// The beat over a member who has just drunk: the potion, and what the pool
+    /// gained — <c>DRANK HEALTH POTION Q2 - +12 HP</c>, <c>DRANK MANA POTION Q1 -
+    /// +6 MANA</c> — or, at a full pool, <c>DRANK HEALTH POTION Q2 - NOTHING TO
+    /// RESTORE</c>: drinking at full is allowed, and wasted (§3.4).
+    /// </summary>
+    internal static string DrankBeat(PotionDrink drink)
+    {
+        ArgumentNullException.ThrowIfNull(drink);
+        string gained = drink.Restored > 0
+            ? $"+{drink.Restored} {(drink.Potion.Type == PotionType.Health ? "HP" : "MANA")}"
+            : "NOTHING TO RESTORE";
+        return $"DRANK {drink.Potion.ShownName} - {gained}";
+    }
+
+    /// <summary>What a potion's number says over the member when the drink's whole cost is not left (§3.4): <c>NOT ENOUGH MOVE TO DRINK - IT COSTS 40</c>. Nothing is drunk, and nothing spent.</summary>
+    internal static string DrinkShortCue(int cost) => $"NOT ENOUGH MOVE TO DRINK - IT COSTS {cost}";
+
+    /// <summary>
     /// The inventory panel's key hint: the number keys that equip a bag slot —
     /// each the number the panel prints beside that slot, so the hand is 1 and
     /// the bag runs from 2 — then the key that closes the bag. For §4.4's six
     /// slots, <c>PRESS 2-6 TO EQUIP - I TO CLOSE</c>. The range is read off the
     /// member's slots and the scene's own highest binding
     /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names every slot a key
-    /// reaches and no key that does nothing.
+    /// reaches and no key that does nothing. While the bag holds a potion
+    /// (<paramref name="potion"/>) the same keys drink it:
+    /// <c>PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE</c>.
     /// </summary>
-    internal static string EquipHint(int slots)
-        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO EQUIP - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
+    /// <param name="slots">The member's slots, the hand among them.</param>
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string EquipHint(int slots, bool potion = false)
+        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO {(potion ? "EQUIP OR DRINK" : "EQUIP")} - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
 
     /// <summary>
     /// The number keys that reach a bag slot, as a hint prints them — <c>2-6</c>

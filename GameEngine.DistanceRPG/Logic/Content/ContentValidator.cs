@@ -384,7 +384,8 @@ public static class ContentValidator
     /// the members carry, and shares out no deeper than the number keys equip
     /// (<see cref="GameConstants.MaxInventorySlots"/>, nine a member), or loot
     /// lands in a slot no key can reach; and the stairs gather from at least a
-    /// tile away.
+    /// tile away. So is §3.4's: a drink's cost (<see cref="Tuning.PotionUseCost"/>)
+    /// is a count, movement spent or none, never movement handed back.
     /// How far short of the farm a boss should stop, and every other judgement
     /// between these numbers, is a test on the shipped values, never a refusal
     /// here.
@@ -397,7 +398,10 @@ public static class ContentValidator
     /// (<see cref="Tuning.MovementBudget"/>), the surplus healing a Ward level
     /// takes (<see cref="Tuning.OverhealPerWard"/>) and the damage a point of
     /// trigger mana buys (<see cref="Tuning.DotDamagePerMana"/>, which divides
-    /// with no guard of its own). A <c>tuning.json</c> never reaches this with
+    /// with no guard of its own), and a potion's share a unit of quality
+    /// (<see cref="Tuning.HealthPotionPercent"/>, <see cref="Tuning.ManaPotionPercent"/>),
+    /// which the quality that restores a whole pool divides by
+    /// (<see cref="Alchemist.QualityForAll"/>). A <c>tuning.json</c> never reaches this with
     /// one below 1 — the file clamps (<see cref="TuningJson.Read"/>) — so this
     /// is the refusal for a <see cref="Tuning"/> built in code.
     /// </para>
@@ -427,6 +431,8 @@ public static class ContentValidator
         RequireDivisor(tuning.MovementBudget, nameof(Tuning.MovementBudget));
         RequireDivisor(tuning.OverhealPerWard, nameof(Tuning.OverhealPerWard));
         RequireDivisor(tuning.DotDamagePerMana, nameof(Tuning.DotDamagePerMana));
+        RequireDivisor(tuning.HealthPotionPercent, nameof(Tuning.HealthPotionPercent));
+        RequireDivisor(tuning.ManaPotionPercent, nameof(Tuning.ManaPotionPercent));
 
         RequirePercentage(tuning.DefeatStackChance, nameof(Tuning.DefeatStackChance));
         RequirePercentage(tuning.DropEnchantChancePercent, nameof(Tuning.DropEnchantChancePercent));
@@ -459,6 +465,7 @@ public static class ContentValidator
                 $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members is {PartyMemberState.SlotsFor(tuning)} each, past {GameConstants.MaxInventorySlots}");
         if (tuning.StairGatherTiles < 1)
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
+        RequireCount(tuning.PotionUseCost, nameof(Tuning.PotionUseCost));
     }
 
     /// <summary>

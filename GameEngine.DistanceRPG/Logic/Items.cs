@@ -63,3 +63,16 @@ public sealed record Potion(PotionType Type, int Quality) : IItem
     /// <summary>The potion as the screen says it: <c>HEALTH POTION Q2</c>, <c>MANA POTION Q1</c>.</summary>
     public string ShownName => $"{(Type == PotionType.Health ? "HEALTH" : "MANA")} POTION Q{Quality}";
 }
+
+/// <summary>
+/// One potion drunk (§3.4), as <see cref="TurnSystem.TryDrink"/> reports it and
+/// <see cref="TurnSystem.PotionDrunk"/> hands the scene for its beat and its log
+/// line: what was drunk and from which slot, what it offered, what the pool
+/// gained, and the movement it cost.
+/// </summary>
+/// <param name="Potion">The potion, gone from the bag.</param>
+/// <param name="Slot">The bag slot it was drunk from, 0 being the hand.</param>
+/// <param name="Share">What it offered the drinker's pool: the share of its maximum, overshoot and all (<see cref="Alchemist.Share(Potion, ActorState)"/>).</param>
+/// <param name="Restored">What the pool gained: HP after less HP before, or the mana the pool took — never the overshoot, whatever Overheal banked of it.</param>
+/// <param name="Cost">The movement it cost (<see cref="TurnSystem.PotionUseCost"/>).</param>
+public sealed record PotionDrink(Potion Potion, int Slot, int Share, int Restored, int Cost);

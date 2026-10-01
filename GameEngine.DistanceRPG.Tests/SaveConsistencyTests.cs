@@ -366,7 +366,8 @@ public sealed class SaveConsistencyTests : IDisposable
         // Potions (Phase 6b.1), once a dungeon besides the tutorial is cleared, each
         // laid between runs as a mix lays them (TestPotions), and none asked to
         // outlive a run's end, which spoils them from Phase 6b's farm on: in two bags
-        // between runs; carried into a dungeon, one poured out; in the bag of a
+        // between runs; carried into a dungeon, one poured out, then one drunk
+        // (Phase 6b.2); in the bag of a
         // member whose hand a wipe emptied — it held a spoil — laid after that wipe,
         // which took the boss down first, a clear, so the run counted; and in the bag
         // of a member who is down mid-run, carried into that run.
@@ -378,6 +379,15 @@ public sealed class SaveConsistencyTests : IDisposable
         var potionTurns = carriedIn.OpenTurns(potions.Party, CampaignRuns.Ten);
         potions.Party[0].TakePotion(3);
         Loads(potions, "potions carried into a dungeon, one poured out");
+
+        // Drunk (Phase 6b.2): A, hurt, drinks the other, its HP and HP XP the drink's
+        // and its movement spent; C's is still carried. Saved at the party's turn, it loads.
+        potions.Party[0].Hp -= 5;
+        var drunk = potionTurns.TryDrink(potions.Party[0], 2);
+        Assert.Equal((5, true), (drunk!.Restored, potions.Party[0].DistLeft < Premise.Budget));
+        Assert.Empty(potions.Party[0].Potions);
+        Assert.Equal(TestPotions.Health(3), potions.Party[2].PotionIn(5));
+        Loads(potions, "potions carried into a dungeon, one drunk and one still carried");
         while (carriedIn.Current.DownStairs is not null)
             potionTurns = CampaignRuns.Down(carriedIn, potions.Party);
         var heldSpoil = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);

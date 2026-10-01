@@ -136,7 +136,7 @@ bag.
 | Space / Enter | End turn (banks half your unspent movement) |
 | E | Take the stairs the active character stands on: down, up, or out by the first floor's way out. Every living member must be within 3 tiles; the way out asks first, and E or Enter says yes |
 | G | Pick up what the active character stands on: a drop, or a weapon the party left there |
-| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot's weapon into the hand). A slot can hold a potion instead of a weapon — `3  HEALTH POTION Q2` in green, `4  MANA POTION Q1` in cyan — which fills it (a pickup finds no room there) and is never taken into the hand |
+| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot's weapon into the hand). A slot can hold a potion instead of a weapon — `3  HEALTH POTION Q2` in green, `4  MANA POTION Q1` in cyan, with what it restores now under it (`RESTORES 12 OF 30 HP`) — which fills it (a pickup finds no room there) and is never taken into the hand: its number drinks it (below), and the key hint says `PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE` while the bag holds one |
 | X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free — or, on a potion's slot, pours the potion out, free: `POURED OUT THE HEALTH POTION Q2`, and it is gone, nothing left on the floor (PHASE 6b DECISION 1). The keys say so while the bag holds a potion: `X TO LEAVE OR POUR ONE OUT`, then `LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS`. X again cancels; G takes a weapon back |
 | Scroll wheel | Zoom |
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
@@ -160,6 +160,32 @@ hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
 `[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter spends it
 and grows a weapon's capacity (below).
+
+**Potions** (Phase 6b): a potion in a member's bag is drunk by its number with the
+bag open (I), from the member's own bag — health or mana, the whole list — and
+costs `PotionUseCost` (40) movement, in combat and out alike (PHASE 6b DECISION 2
+in `docs/roadmap/open-questions.md`): the whole of it, or the drink is refused and
+says so over the member, `NOT ENOUGH MOVE TO DRINK - IT COSTS 40`, nothing drunk
+and nothing spent. The bag says what a drink costs under the swap line while it
+holds a potion — `A DRINK COSTS 40 MOVE`, red and `- NOT ENOUGH LEFT` when it is
+short, `DRINKING IS FREE` at 0 — and under each potion what it restores now: a
+share of the member's maximum, `HealthPotionPercent` (20) of max HP or
+`ManaPotionPercent` (20) of max mana for each unit of quality it was mixed at,
+rounded down (PHASE 6b DECISION 3) — `RESTORES 12 OF 30 HP` for quality 2 at 30,
+`RESTORES ALL 30 HP - 6 OVER` once it is a whole pool and more. So a potion rides
+the ladder its member climbs, and quality 5 is the best there is at 20: it heals
+completely from 1 HP. No cooldown and no limit a turn: several drinks while the
+movement lasts. A health potion heals through the same applier every heal does —
+never past full, and the HP it restored is HP XP, so a drink at full restores and
+teaches nothing (allowed, and wasted) — and what lands past full is lost, unless
+the member holds Overheal, which banks it as Ward. A mana potion fills the pool up
+to what the equipped locks leave spendable, and teaches nothing: mana XP is mana
+spent. What was drunk rises over the member in the potion's colour —
+`DRANK HEALTH POTION Q2 - +12 HP`, `DRANK MANA POTION Q1 - +6 MANA`, or `... -
+NOTHING TO RESTORE` at full — and the log says it whole: `[Potion] A drinks a
+Health potion (quality 2) from slot 3: +12 HP of 12 offered (30/30), 40
+movement`. Nothing makes a potion yet: the farm and the alchemist that mix them
+come in Phase 6b's later steps.
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The
@@ -753,6 +779,17 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   the numbers it plays to version 2's record. The docs' older
   `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming either
   is told which key took its place.
+- **The Consumables' keys** (Phase 6b) are what a drink costs and what a potion
+  restores (`docs/roadmap/phase-3-loot.md` §3.4): `PotionUseCost`, the movement a
+  drink costs, in combat and out (0 to 10000, as `WeaponSwapCost`; 0 makes a drink
+  free; PHASE 6b DECISION 2), and `HealthPotionPercent` and `ManaPotionPercent`, the
+  share of max HP or max mana a unit of quality restores, rounded down (1 to 100;
+  20 each, equal until play says otherwise; PHASE 6b DECISION 3) — at 20, quality 5
+  is the best potion there is. They play since Phase 6b's drink reads them, and
+  turning one says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other
+  number resumes — never to a save from before Phase 6b, whose record covers only
+  the keys played then. The group's fourth, `FarmYieldPerClear`, arrives with the
+  farm that reads it; a file naming it is told so.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at

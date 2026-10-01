@@ -144,9 +144,10 @@ public class TuningJsonTests
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");
 
-        // One of §5.3's keys still to come says which phase brings it (the
-        // Consumables': GraftBaseChance, the Enchanter's last, is a key since 6a.4).
-        Ignored("""{ "HealthPotionPercent": 20 }""", "HealthPotionPercent is not a key yet", "Phase 6b");
+        // §5.3's one key still to come says which phase brings it (the farm's
+        // yield: the Consumables' other three are keys since the drink, 6b.2, and
+        // GraftBaseChance, the Enchanter's last, since 6a.4).
+        Ignored("""{ "FarmYieldPerClear": 7 }""", "FarmYieldPerClear is not a key yet", "Phase 6b");
     }
 
     /// <summary>
@@ -180,7 +181,14 @@ public class TuningJsonTests
             """{ "ApplyPercent": { "flamming": 30 } }""",
             """{ "ApplyPercent": { "frost_rune": 30 } }""",
         ]).ToList();
-        Assert.True(files.Count > 20, $"{files.Count} files: the sweep is not reading the schema");
+
+        // Exactly one file a name the schema holds, and the seven the sweep adds:
+        // proof it reads the schema, which a floor (once "more than 20") stopped
+        // being as the keys still to come arrived with their readers — 21 files
+        // before the drink, 18 after it, 17 once the farm's yield is a key.
+        int deferred = TuningSchema.Deferred.Values.Sum(d => d.Keys.Count);
+        Assert.Equal(deferred + TuningSchema.Aliases.Count + 3 + 4, files.Count);
+        Assert.True(deferred + TuningSchema.Aliases.Count > 0, "the sweep is not reading the schema");
 
         var said = new List<string>();
         foreach (string file in files)
@@ -530,7 +538,7 @@ public class TuningJsonTests
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
         Assert.Contains("/* ---- Enchanter ---- */", headings);   // its last key to come plays since Phase 6a.4
-        Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);
+        Assert.Contains("/* ---- Consumables - Phase 6b: FarmYieldPerClear ---- */", headings);   // the drink's three are keys since 6b.2
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
         Assert.Equal(at.Order(), at);
@@ -793,11 +801,72 @@ public class TuningJsonTests
         }
         using (TestContent.Use(tuning: wearMoved with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) }))
             Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
-        var ofVersion2 = saved with { TuningHash = TuningJson.Hash(BuiltIn), TuningHashVersion = 2 };
+        var ofVersion2 = saved with { TuningHash = TuningJson.Hash(BuiltIn, version: 2), TuningHashVersion = 2 };
         using (TestContent.Use())
             Assert.False(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
         using (TestContent.Use(tuning: wearMoved))
             Assert.True(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
+    }
+
+    [Fact]
+    public void AVersion2SaveIsHashedOnVersion2sKeys()
+    {
+        // PHASE 6a DECISION 9 again, a version on: a key a rule began to play with
+        // version 3 — what a drink costs and what a potion restores, from Phase
+        // 6b.2 — is in version 3's hash and not in version 2's or version 1's, so
+        // moving it moves the one and leaves the others where they were; a key
+        // played since version 2 moves versions 2 and 3, and one played since
+        // version 1 moves all three. The current version's is the default.
+        var v3Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name).ToArray();
+        Assert.Equal([nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent)], v3Keys);
+        Assert.Equal(3, SaveCodec.CurrentVersion);
+        Assert.Equal(TuningJson.Hash(BuiltIn, version: 3), TuningJson.Hash(BuiltIn));
+        string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2), three = TuningJson.Hash(BuiltIn, version: 3);
+        Assert.Equal(3, new[] { one, two, three }.Distinct().Count());
+        foreach (string name in v3Keys)
+        {
+            var k = Assert.IsType<IntKey>(TuningSchema.Find(name));
+            int value = k.Get(BuiltIn);
+            var moved = k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1);
+            Assert.Equal((one, two), (TuningJson.Hash(moved, version: 1), TuningJson.Hash(moved, version: 2)));
+            Assert.NotEqual(three, TuningJson.Hash(moved, version: 3));
+        }
+        var wear = BuiltIn with { WearPerHit = Step(BuiltIn.WearPerHit, 1000) };
+        Assert.Equal(one, TuningJson.Hash(wear, version: 1));
+        Assert.NotEqual(two, TuningJson.Hash(wear, version: 2));
+        Assert.NotEqual(three, TuningJson.Hash(wear, version: 3));
+
+        // So a campaign saved at version 2 — Phase 6a's, its hash of version 2's
+        // keys — resumes under a tuning that moved only what version 3 began to
+        // play with nothing to say, and says it the moment a number it was played
+        // under moves. Saved again, its hash is of version 3's keys, and a drink's
+        // number moved says so.
+        SaveFile saved;
+        using (TestContent.Use())
+        {
+            var current = SaveGame.Capture(CampaignState.Start(GameContent.Current));
+            saved = current with { TuningHash = TuningJson.Hash(GameContent.Current.Tuning, version: 2), TuningHashVersion = 2 };
+        }
+        var drinkMoved = BuiltIn with
+        {
+            PotionUseCost = Step(BuiltIn.PotionUseCost, 10000),
+            HealthPotionPercent = Step(BuiltIn.HealthPotionPercent, 100),
+            ManaPotionPercent = Step(BuiltIn.ManaPotionPercent, 100),
+        };
+        SaveFile again;
+        using (TestContent.Use(tuning: drinkMoved))
+        {
+            var loaded = SaveGame.Restore(saved, GameContent.Current);
+            Assert.False(loaded.TuningChanged);
+            again = SaveGame.Capture(loaded.Campaign);
+            Assert.Equal((SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning)), (again.TuningHashVersion, again.TuningHash));
+        }
+        using (TestContent.Use(tuning: drinkMoved with { WearPerHit = Step(BuiltIn.WearPerHit, 1000) }))
+            Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
+        using (TestContent.Use(tuning: drinkMoved))
+            Assert.False(SaveGame.Restore(again, GameContent.Current).TuningChanged);
+        using (TestContent.Use())
+            Assert.True(SaveGame.Restore(again, GameContent.Current).TuningChanged);
     }
 
     [Fact]

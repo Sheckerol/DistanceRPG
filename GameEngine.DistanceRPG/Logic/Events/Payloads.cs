@@ -251,11 +251,13 @@ public sealed record CritPayload(Weapon Weapon, int Roll);
 /// one spend, which is the one thing this sentence forbids.
 /// <paramref name="Restored"/> is mana the same record hands back — Siphon's
 /// refund on a kill — taken after the spend and never past the pool, so one
-/// record says what a kill cost and what it returned.
+/// record says what a kill cost and what it returned. A mana potion's drink
+/// (§3.4, <see cref="TurnSystem.TryDrink"/>) is the one record that spends nothing
+/// and only hands back: "the reload, skipped", so it teaches no mana XP.
 /// </summary>
 public sealed record ManaPayload(int Wanted, int Spent, string Source, int Restored = 0);
 
-/// <summary><see cref="GameEvent.MovementSpent"/> — attack, cast and swap costs in Phase 1.</summary>
+/// <summary><see cref="GameEvent.MovementSpent"/> — attack, cast and swap costs in Phase 1, and a potion's drink (§3.4, Phase 6b).</summary>
 public sealed record MovementPayload(int Wanted, int Spent, string Source);
 
 /// <summary>

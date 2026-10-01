@@ -276,6 +276,7 @@ public class SaveInventoryTests
             new("XpCredited", Kept.NotSaved, "an event"),
             new("EnchantmentTiered", Kept.NotSaved, "an event"),
             new("WeaponWornFull", Kept.NotSaved, "an event"),
+            new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
         ],
     };

@@ -774,15 +774,24 @@ public sealed class HudTextTests : IDisposable
 
         // The invariant, over every window the settings allow (320 x 240 up) and
         // every row count a member can reach: what is drawn clears the help line
-        // at h - 24, or the panel has already dropped every row it could.
-        for (int h = 240; h <= 1600; h += 2)
-            for (int rows = 0; rows <= most; rows++)
-            {
-                var layout = DungeonHud.LayoutInventory(h, slots, rows);
-                Assert.InRange(layout.Rows, 0, rows);
-                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
-                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
-            }
+        // at h - 24, or the panel has already dropped every row it could. And the
+        // same with a potion in the bag (Phase 6b.2), whose line under the swap
+        // line — what a drink costs — the panel makes room for as it does a row.
+        foreach (bool drink in new[] { false, true })
+            for (int h = 240; h <= 1600; h += 2)
+                for (int rows = 0; rows <= most; rows++)
+                {
+                    var layout = DungeonHud.LayoutInventory(h, slots, rows, drinkLine: drink);
+                    Assert.InRange(layout.Rows, 0, rows);
+                    Assert.True(layout.Top >= 56f, $"h={h} rows={rows} drink={drink}: over the top readouts");
+                    Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows} drink={drink}: past the help line");
+                }
+
+        // The drink line takes its room below the swap line: the roomy panel opens
+        // where it did and ends lower.
+        var drinking = DungeonHud.LayoutInventory(720f, slots, most, drinkLine: true);
+        Assert.Equal((roomy.Top, most), (drinking.Top, drinking.Rows));
+        Assert.True(drinking.Bottom > roomy.Bottom);
     }
 
     [Fact]
@@ -797,27 +806,33 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(slots, TestPools.Char("A").Inventory.Length);
         const int most = 2 + 8;   // the two pools and every weapon class at once
 
-        for (int rows = 0; rows <= most; rows++)
-        {
-            var layout = DungeonHud.LayoutInventory(720f, slots, rows);
-            Assert.Equal(rows, layout.Rows);                          // every row printed
-            Assert.True(layout.Top >= 56f, $"rows={rows}: over the top readouts");
-            Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows}: past the help line");
-        }
+        // A bag of potions too (Phase 6b.2): each potion's slot says what it restores
+        // on one line, as an unwrapped weapon's does, and the drink line goes under
+        // the swap line — and every row is still printed.
+        foreach (bool drink in new[] { false, true })
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(720f, slots, rows, drinkLine: drink);
+                Assert.Equal(rows, layout.Rows);                          // every row printed
+                Assert.True(layout.Top >= 56f, $"rows={rows} drink={drink}: over the top readouts");
+                Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows} drink={drink}: past the help line");
+            }
+        Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Health(ContentBounds.MostCount), TestPools.Char("A")));
 
         var full = DungeonHud.LayoutInventory(720f, slots, most);
         Assert.True(full.Top < 720f / 2f - 150f);   // slid up from where the three-slot panel opened
 
         // And past 720 the invariant the three-slot panel keeps holds for six too:
         // what is drawn clears the help line, or every row it could drop has gone.
-        for (int h = 240; h <= 1600; h += 2)
-            for (int rows = 0; rows <= most; rows++)
-            {
-                var layout = DungeonHud.LayoutInventory(h, slots, rows);
-                Assert.InRange(layout.Rows, 0, rows);
-                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
-                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
-            }
+        foreach (bool drink in new[] { false, true })
+            for (int h = 240; h <= 1600; h += 2)
+                for (int rows = 0; rows <= most; rows++)
+                {
+                    var layout = DungeonHud.LayoutInventory(h, slots, rows, drinkLine: drink);
+                    Assert.InRange(layout.Rows, 0, rows);
+                    Assert.True(layout.Top >= 56f, $"h={h} rows={rows} drink={drink}: over the top readouts");
+                    Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows} drink={drink}: past the help line");
+                }
     }
 
     [Fact]
@@ -1045,6 +1060,111 @@ public sealed class HudTextTests : IDisposable
             Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
         Assert.True(DungeonHud.LeaveHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
         Assert.True(("EQUIPPED".Length + 1 + DungeonHud.PourKeyHint.Length) * 6f * 1.2f <= 380f);
+    }
+
+    /// <summary>The drink's numbers as this file states them, over the premise: §3.4's 20 a unit for both pools, and 40 a drink.</summary>
+    private static IDisposable Drinks() => TestContent.UsePremise(tuning: t => t with { HealthPotionPercent = 20, ManaPotionPercent = 20, PotionUseCost = 40 });
+
+    [Fact]
+    public void APotionsLineSaysWhatItRestoresNow()
+    {
+        // Phase 6b.2: under a potion's name, the bag says what it restores now — the
+        // share it offers of the member's maximum as it stands (PHASE 6b DECISION
+        // 3), rounded down — and, at a whole pool or past it, the overshoot, which
+        // only Overheal keeps. In the potion's colour, one line.
+        using var drinks = Drinks();
+        var a = Holding("arming_sword");
+        Assert.Equal((100, 100), (a.MaxHp, a.MaxMana));
+        Assert.Equal("RESTORES 20 OF 100 HP", DungeonHud.PotionDetail(TestPotions.Health(1), a));
+        Assert.Equal("RESTORES 80 OF 100 HP", DungeonHud.PotionDetail(TestPotions.Health(4), a));
+        Assert.Equal("RESTORES ALL 100 HP", DungeonHud.PotionDetail(TestPotions.Health(5), a));
+        Assert.Equal("RESTORES ALL 100 HP - 40 OVER", DungeonHud.PotionDetail(TestPotions.Health(7), a));
+        Assert.Equal("RESTORES 40 OF 100 MANA", DungeonHud.PotionDetail(TestPotions.Mana(2), a));
+        Assert.Equal("RESTORES ALL 100 MANA - 20 OVER", DungeonHud.PotionDetail(TestPotions.Mana(6), a));
+
+        // Now: the same potion says more once the member has grown. And a mana
+        // potion is a share of the earned pool, whatever the locks reserve.
+        a.Grown(maxHp: 150);
+        Assert.Equal("RESTORES 30 OF 150 HP", DungeonHud.PotionDetail(TestPotions.Health(1), a));
+        var caster = Holding("staff_of_renewal");
+        Assert.True(caster.MaxMana > caster.UsableMaxMana);
+        Assert.Equal($"RESTORES {caster.MaxMana / 5} OF {caster.MaxMana} MANA", DungeonHud.PotionDetail(TestPotions.Mana(1), caster));
+
+        var line = Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Mana(2), a));
+        Assert.Equal([new DungeonHud.Run("RESTORES 40 OF 100 MANA", DungeonHud.Cyan)], line);
+        Assert.Equal(DungeonHud.Green, Assert.Single(Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Health(2), a))).Color);
+
+        // The widest a save may hold — the sanity bound's quality, saturating its
+        // share, on a pool at the save's ceiling — in the HUD's font, right of the
+        // slot's number inside a 1280 window at the statline's scale.
+        a.HpXp = ContentBounds.MostCount;
+        string widest = DungeonHud.PotionDetail(TestPotions.Health(ContentBounds.MostCount), a);
+        Assert.Equal($"RESTORES ALL {a.MaxHp} HP - {int.MaxValue - a.MaxHp} OVER", widest);
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+        Assert.True(widest.Length * 6f * DungeonHud.InventoryDetailScale <= DungeonHud.InventoryDetailWidth(1280f), $"'{widest}' runs off the window");
+    }
+
+    [Fact]
+    public void TheBagSaysWhatADrinkCosts()
+    {
+        // Phase 6b.2: under the swap line, while the bag holds a potion, what a drink
+        // costs — in combat and out alike (PHASE 6b DECISION 2) — and, red, when the
+        // member has less than the whole of it, since it is paid whole or refused.
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE", DungeonHud.Grey), DungeonHud.DrinkCostLine(40, 160f));
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE", DungeonHud.Grey), DungeonHud.DrinkCostLine(40, 40f));
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE - NOT ENOUGH LEFT", DungeonHud.Red), DungeonHud.DrinkCostLine(40, 39.5f));
+        Assert.Equal(new DungeonHud.Run("DRINKING IS FREE", DungeonHud.Grey), DungeonHud.DrinkCostLine(0, 0f));
+
+        // At the clamp's ceiling it is one line across a 1280 window, in the font.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PotionUseCost))!).Max;
+        string widest = DungeonHud.DrinkCostLine(most, 0f).Text;
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+        Assert.True(widest.Length * 6f * 1.5f <= 1240f);
+    }
+
+    [Fact]
+    public void TheEquipHintSaysDrinkWhenTheBagHoldsAPotion()
+    {
+        // Phase 6b.2: a bag number on a potion's slot drinks it, so while the bag
+        // holds one the hint says the same keys equip or drink. A bag of weapons
+        // says what it always said; a hand and no bag has neither to offer.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(slots, potion: true));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots, potion: false));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots));
+        Assert.Equal("PRESS 2 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(2, potion: true));
+        Assert.Equal("PRESS 2-9 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(12, potion: true));
+        Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1, potion: true));
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", DungeonHud.EquipHint(12, potion: true));
+        Assert.True(DungeonHud.EquipHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
+    }
+
+    [Fact]
+    public void TheDrinkBeatsAndCueFitTheFont()
+    {
+        // Phase 6b.2: what rises over a member who drinks — the potion, and what the
+        // pool gained, or that a full pool took nothing — and what a potion's number
+        // says when the drink's whole cost is not left. Each in the HUD's font: the
+        // plus is a glyph, and there is no percent sign.
+        Assert.Equal("DRANK HEALTH POTION Q2 - +12 HP", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(2), 3, 12, 12, 40)));
+        Assert.Equal("DRANK MANA POTION Q1 - +6 MANA", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(1), 4, 6, 6, 40)));
+        Assert.Equal("DRANK HEALTH POTION Q2 - NOTHING TO RESTORE", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(2), 3, 12, 0, 40)));
+        Assert.Equal("DRANK MANA POTION Q3 - NOTHING TO RESTORE", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(3), 1, 18, 0, 0)));
+        Assert.Equal("NOT ENOUGH MOVE TO DRINK - IT COSTS 40", DungeonHud.DrinkShortCue(40));
+
+        // The widest of each, at the numbers' ceilings, as floating text over the
+        // member (scale 2) inside a 1280 window.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PotionUseCost))!).Max;
+        foreach (string text in new[]
+        {
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(ContentBounds.MostCount), 8, int.MaxValue, int.MaxValue, most)),
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(ContentBounds.MostCount), 8, int.MaxValue, 0, most)),
+            DungeonHud.DrinkShortCue(most),
+        })
+        {
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
+            Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window");
+        }
     }
 
     [Fact]

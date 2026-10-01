@@ -94,8 +94,10 @@ public class PreReworkSaveTests
     /// 2026-09-25, declared ahead of Phase 6a's enchanter and played from version
     /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>), and how many
     /// deposits the enchanter works on (Phase 6a.3a) and the improvement roll's
-    /// odds and split (6a.4), played from version 2 too; and how many save slots
-    /// there are, the ruling of the same day on the save model, the launcher's.
+    /// odds and split (6a.4), played from version 2 too; what a drink costs and
+    /// what a potion restores (Phase 6b.2), played from version 3; and how many
+    /// save slots there are, the ruling of the same day on the save model, the
+    /// launcher's.
     /// </summary>
     private static readonly string[] KeysSinceTheSaves =
     [
@@ -103,6 +105,7 @@ public class PreReworkSaveTests
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
         nameof(Tuning.EnchanterWorksOn), nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent),
         nameof(Tuning.SaveSlots),
     ];
 

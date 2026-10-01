@@ -78,6 +78,9 @@ GameEngine.DistanceRPG/         # Game executable
                                 # stream), a take-back — the one place wear is spent
     Items.cs                    # What a bag slot holds (IItem): a weapon, or a potion — a value, its
                                 # type and quality (§3.4) — one a slot; the hand keeps a weapon
+    Alchemist.cs                # What a potion restores (§3.4, §6.6): a share of the drinker's max,
+                                # rounded down and saturating, and the quality for a whole pool;
+                                # TurnSystem.TryDrink drinks one, through the heal and mana appliers
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -109,10 +112,10 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   out of the save's tuning hash, so turning it never says the numbers changed.
   The change that gives a rule of play one to read sets it played. A key that
   starts to play with a save version is hashed from that version (`HashedFrom`:
-  Phase 5's are 1, Phase 6a's 2), so a save of an older version is compared on
-  its own version's keys and never told a number it was not played under has
-  changed. A key no rule of play reads at all — the launcher's `SaveSlots`, how
-  many save slots there are — is `Played = false` for good.
+  Phase 5's are 1, Phase 6a's 2, Phase 6b's 3), so a save of an older version is
+  compared on its own version's keys and never told a number it was not played
+  under has changed. A key no rule of play reads at all — the launcher's
+  `SaveSlots`, how many save slots there are — is `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric

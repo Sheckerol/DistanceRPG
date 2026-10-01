@@ -524,6 +524,42 @@ public sealed record Tuning
     /// </summary>
     public int PartyCarrySlots { get; init; }
 
+    // ---- Consumables (§3.4, §6.6) ----
+    // What a drink costs and what a potion restores (Phase 6b.2), each arriving
+    // with the rule that reads it and played from the save's version 3
+    // (TuningKey.HashedFrom). The farm's yield, the group's fourth, comes with the
+    // farm that reads it (TuningSchema.Deferred).
+
+    /// <summary>
+    /// The movement a member spends to drink a potion from its own bag (§3.4: "on
+    /// the same principle as swapping"), in combat and out (PHASE 6b DECISION 2),
+    /// paid whole or the drink is refused, as a swap's is: the turn's leftover
+    /// movement never buys part of a potion. 0 makes a drink free. Read by
+    /// <see cref="TurnSystem.PotionUseCost"/>, which <see cref="TurnSystem.CanDrink"/>
+    /// gates on and <see cref="TurnSystem.TryDrink"/> spends.
+    /// </summary>
+    public int PotionUseCost { get; init; }
+
+    /// <summary>
+    /// The share of max HP, as a percentage, a health potion restores for each unit
+    /// of quality it was mixed at, rounded down (§3.4, PHASE 6b DECISION 3): a
+    /// share rides the ladder the member is climbing, where a flat number would
+    /// decay into irrelevance. It sets the span, not the height — how many units
+    /// the best potion costs (<see cref="Alchemist.QualityForAll"/>). At least 1,
+    /// since it divides that. Read by <see cref="Alchemist.Share(PotionType, int, int)"/>.
+    /// </summary>
+    public int HealthPotionPercent { get; init; }
+
+    /// <summary>
+    /// The share of max mana — the pool the member has earned — as a percentage, a
+    /// mana potion restores for each unit of quality, rounded down and never past
+    /// what the equipped locks leave spendable (§3.4, PHASE 6b DECISION 3). It
+    /// starts equal to <see cref="HealthPotionPercent"/> (§6.6), so the split
+    /// between the two is a pure preference. Read by
+    /// <see cref="Alchemist.Share(PotionType, int, int)"/>.
+    /// </summary>
+    public int ManaPotionPercent { get; init; }
+
     // ---- Saves (the user's ruling of 2026-09-25 on the save model) ----
 
     /// <summary>

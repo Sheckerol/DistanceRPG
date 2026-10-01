@@ -119,6 +119,7 @@ public sealed class TurnSystem
     public event Action<PartyMemberState, XpCredit, int>? XpCredited;       // a credit bought a member points or levels: the credit and how many (§2.2), for the level-up beat
     public event Action<ActorState, Weapon, Enchantment>? EnchantmentTiered;   // mana an entry spent bought it a tier (§3.3): the wielder, the weapon the circle is cut into, and the entry as it now reads
     public event Action<PartyMemberState, Weapon>? WeaponWornFull;          // the hit that filled a member's weapon to its wear capacity (§6.1): once, on the crossing
+    public event Action<PartyMemberState, PotionDrink>? PotionDrunk;       // a member drank a potion from its bag (§3.4): what it was, offered and restored, for the scene's beat and log line
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -627,6 +628,99 @@ public sealed class TurnSystem
         NotifyWeaponChanged(c);
         return true;
     }
+
+    // ── Potions (§3.4) ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What a drink costs: <see cref="Tuning.PotionUseCost"/> movement, in combat
+    /// and out (PHASE 6b DECISION 2) — §3.4 prices it "on the same principle as
+    /// swapping" and states no exception out of combat, where a swap's is free.
+    /// </summary>
+    public int PotionUseCost => GameContent.Current.Tuning.PotionUseCost;
+
+    /// <summary>
+    /// Can the member drink the potion in <paramref name="slot"/> of its own bag
+    /// (self-only: the movement lands on whoever benefits)? In the party's phase,
+    /// alive — a potion never revives — with a potion in that bag slot, and the
+    /// drink's whole cost to spend: the cost is paid whole or the drink is
+    /// refused, as a swap's is, so the turn's leftover movement never buys part of
+    /// a potion. No cooldown and no limit a turn: several drinks while the
+    /// movement lasts.
+    /// </summary>
+    public bool CanDrink(PartyMemberState c, int slot)
+    {
+        ArgumentNullException.ThrowIfNull(c);
+        if (Phase != TurnPhase.Player || !c.Alive) return false;
+        if (slot <= 0 || slot >= c.Inventory.Length || c.Inventory[slot] is not Potion) return false;
+        return c.DistLeft >= PotionUseCost;
+    }
+
+    /// <summary>
+    /// Drink the potion in <paramref name="slot"/> (§3.4): spend the drink's
+    /// movement through <see cref="GameEvent.MovementSpent"/>, raised for every
+    /// drink as a swap's is (a free one settles at zero), take the potion out of
+    /// the bag through its one door (<see cref="PartyMemberState.TakePotion"/>),
+    /// and restore what it offers through the same appliers every source does:
+    /// <list type="bullet">
+    /// <item>health through <see cref="GameEvent.HealingReceived"/> — the call a
+    /// regeneration tick makes — which restores what was missing, credits HP XP
+    /// with exactly that (§2.2: a potion cannot manufacture the wound it heals, so
+    /// a full-HP drink restores and teaches nothing), and carries the rest past
+    /// full to whatever banks it: an Overheal carrier's Ward, and otherwise
+    /// nothing;</item>
+    /// <item>mana through <see cref="GameEvent.ManaSpent"/>'s refund — Siphon's
+    /// route — which fills the spendable pool and credits no mana XP, since mana
+    /// XP is mana spent (§2.2): "the reload, skipped".</item>
+    /// </list>
+    /// <para>
+    /// <strong>The appliers are handed bounded amounts, never the raw share.</strong>
+    /// A potion's quality is uncapped, so its share can saturate; the mana applier
+    /// is handed exactly what the spendable pool can take, and the heal applier
+    /// what is missing and at most <see cref="ContentBounds.MostOverflow"/> past it,
+    /// so the arithmetic behind them — the refund's add, Overheal's grant, the
+    /// hidden pool's conversion — stays whole. Each only ever cuts an overshoot no
+    /// pool can take, so every number play reaches is the share's.
+    /// </para>
+    /// The hand never moves, so nothing is re-armed. Raises
+    /// <see cref="PotionDrunk"/> with what was drunk. Draws no die.
+    /// </summary>
+    /// <returns>What was drunk, offered and restored, and what it cost; null, with nothing spent or moved, when the drink is refused (<see cref="CanDrink"/>).</returns>
+    public PotionDrink? TryDrink(PartyMemberState c, int slot)
+    {
+        if (!CanDrink(c, slot)) return null;
+
+        int cost = PotionUseCost;
+        _events.Raise(GameEvent.MovementSpent, new MovementPayload(cost, cost, "potion"), c, c);
+        var potion = c.TakePotion(slot);
+        int share = Alchemist.Share(potion, c);
+
+        int restored;
+        if (potion.Type == PotionType.Health)
+        {
+            int before = c.Hp;
+            long missing = Math.Max(0L, (long)c.MaxHp - c.Hp);
+            int handed = (int)Math.Min(share, missing + ContentBounds.MostOverflow);
+            _events.Raise(GameEvent.HealingReceived, new HealPayload(handed, Applied: 0, Overflow: 0, HealthPotionSource), c, c);
+            restored = c.Hp - before;
+        }
+        else
+        {
+            int handed = (int)Math.Min(share, Math.Max(0L, (long)c.UsableMaxMana - c.Mana));
+            if (handed > 0)
+                _events.Raise(GameEvent.ManaSpent, new ManaPayload(Wanted: 0, Spent: 0, ManaPotionSource, Restored: handed), c, c);
+            restored = handed;
+        }
+
+        var drink = new PotionDrink(potion, slot, share, restored, cost);
+        PotionDrunk?.Invoke(c, drink);
+        return drink;
+    }
+
+    /// <summary>The source a health potion's heal names on its payload.</summary>
+    internal const string HealthPotionSource = "HealthPotion";
+
+    /// <summary>The source a mana potion's refund names on its record.</summary>
+    internal const string ManaPotionSource = "ManaPotion";
 
     /// <summary>
     /// Can the caster cast their equipped staff on <paramref name="target"/>?
@@ -1546,7 +1640,8 @@ public sealed class TurnSystem
             // credit is what was actually restored, already capped at what was
             // missing, so overheal teaches nothing. Every source of healing in
             // the game arrives at this one applier — a regen tick, a soul's
-            // drink, a potion later — so none of them needs a rule of its own.
+            // drink, a health potion (TryDrink) — so none of them needs a rule
+            // of its own.
             CreditXp(self, new XpCredit(XpPool.Health, null, applied));
         }
         ApplyTicks(settled.Ticks, self, table);
@@ -1830,7 +1925,8 @@ public sealed class TurnSystem
     /// <summary>
     /// The ManaSpent applier: take what the chain settled as spent off the
     /// actor's pool (every actor carries one, so no feed is needed), never
-    /// below zero; then hand back what the record restores — Siphon's refund
+    /// below zero; then hand back what the record restores — Siphon's refund,
+    /// or a mana potion's (<see cref="TryDrink"/>, a record that spends nothing)
     /// — never past the pool, which is the <em>spendable</em> one
     /// (<see cref="ActorState.UsableMaxMana"/>, §3.3): a refund fills what a
     /// spend can empty and never the part the equipped locks have reserved.
@@ -1842,7 +1938,7 @@ public sealed class TurnSystem
         if (settled.Spent <= 0 && settled.Restored <= 0) return;
         int after = Math.Max(0, self.Mana - settled.Spent);
         if (settled.Restored > 0)
-            after = Math.Min(self.UsableMaxMana, after + settled.Restored);
+            after = (int)Math.Min(self.UsableMaxMana, (long)after + settled.Restored);   // added wide: a refund near the largest whole number never wraps
         self.Mana = after;
 
         // Mana actually spent (§2.2): what the pool paid, never what the spend

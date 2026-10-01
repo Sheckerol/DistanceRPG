@@ -259,16 +259,18 @@ public class TuningSchemaTests
         var groups = TuningSchema.Keys.Select(k => k.Group).ToArray();
         Assert.Equal(groups.Order(), groups);   // the file's order is the groups' order
 
-        // The four 6b keys still to come wait for their readers (bend (e)): no
-        // key and no property, listed under their group with the phase that
-        // brings them. WearPerHit came with its reader in Phase 6a.1,
+        // The one 6b key still to come waits for its reader (bend (e)): no key
+        // and no property, listed under its group with the phase that brings it.
+        // The Consumables' first three — what a drink costs and what a potion
+        // restores — came with the drink in Phase 6b.2, and the farm's yield waits
+        // for the farm. WearPerHit came with its reader in Phase 6a.1,
         // EnchanterWorksOn with its reader in 6a.3a, and GraftBaseChance — the last
         // Enchanter key that waited — with the improvement roll in 6a.4, so no
         // Enchanter key waits now. The Enchanter's six the ruling made keys ahead
         // of their reader are each a property, and a rule plays each since Phase 6a
         // reads it: the capacity a bar adds from 6a.1, the other five from 6a.3a.
         Assert.Equal("Phase 6b", TuningSchema.Deferred[Consumables].Phase);
-        Assert.Equal(["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"], TuningSchema.Deferred[Consumables].Keys.ToArray());
+        Assert.Equal(["FarmYieldPerClear"], TuningSchema.Deferred[Consumables].Keys.ToArray());
         Assert.Equal([Consumables], TuningSchema.Deferred.Keys.Order());
         foreach (string name in TuningSchema.Deferred.Values.SelectMany(d => d.Keys))
         {
@@ -282,7 +284,7 @@ public class TuningSchemaTests
         }
         Assert.NotNull(typeof(Tuning).GetProperty(nameof(Tuning.WearPerHit)));
         Assert.True(Key(nameof(Tuning.WearPerHit)).Played);
-        Assert.DoesNotContain(TuningSchema.Keys, k => k.Group is Consumables);
+        Assert.Equal(ConsumablesKeys, TuningSchema.Keys.Where(k => k.Group is Consumables).Select(k => k.Name));
 
         // What each key is set to is tuning.json's to say: the one derivation a
         // doc fixes — the divisor off the budget, W:774 — is pinned where its
@@ -350,9 +352,10 @@ public class TuningSchemaTests
             Assert.Equal([k.Name], TuningValues.Moved(BuiltIn, k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1)));
         }
 
-        // Every key outside the group is hashed from version 1, as it was: only
-        // what Phase 6a plays is new to version 2's hash.
-        Assert.All(TuningSchema.Keys.Where(k => k.Group != TuningGroup.Enchanter), k => Assert.Equal(1, k.HashedFrom));
+        // Every key outside the group and the Consumables is hashed from version 1,
+        // as it was: only what Phase 6a plays is new to version 2's hash (and what
+        // Phase 6b plays, to version 3's: TheConsumablesAreKeys_PlayedFromVersion3).
+        Assert.All(TuningSchema.Keys.Where(k => k.Group is not (TuningGroup.Enchanter or Consumables)), k => Assert.Equal(1, k.HashedFrom));
 
         // No Enchanter number waits with a Phase 6a reader any more: neither
         // WearPerHit nor, since the improvement roll reads it (6a.4), GraftBaseChance;
@@ -375,6 +378,69 @@ public class TuningSchemaTests
         // filling: its clamp starts at the most any weapon arrives carrying, read
         // off the validator's own constant, so the two cannot drift apart.
         Assert.Equal(ContentValidator.MostArrivingEnchantments, ((IntKey)Key(nameof(Tuning.EnchantmentSlots))).Min);
+    }
+
+    /// <summary>
+    /// The Consumables that are keys (Phase 6b.2), in the file's order: what a drink
+    /// costs, and the share of a pool a unit of quality restores, health and mana.
+    /// The farm's yield, the group's fourth, waits for the farm
+    /// (<see cref="TuningSchema.Deferred"/>).
+    /// </summary>
+    private static readonly string[] ConsumablesKeys =
+    [
+        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent),
+    ];
+
+    [Fact]
+    public void TheConsumablesAreKeys_PlayedFromVersion3()
+    {
+        // §3.4 and §5.3's Consumables row, arriving with the drink that reads them
+        // (Phase 6b.2): each a key of the group, in the file's order, after the
+        // carry — a property, the only number its Set moves, the master's number
+        // inside its clamp, and the clamp the plan's (1e). Each is played, and a
+        // save's hash covers each from version 3 (HashedFrom), so a campaign saved
+        // at version 1 or 2 is compared without them. What the master sets each to
+        // is its own to say, so no value is asserted here.
+        var consumables = TuningSchema.Keys.Where(k => k.Group == Consumables).ToArray();
+        Assert.Equal(ConsumablesKeys, consumables.Select(k => k.Name));
+        var keys = TuningSchema.Keys.ToList();
+        Assert.Equal(keys.FindIndex(k => k.Name == nameof(Tuning.PartyCarrySlots)) + 1, keys.IndexOf(consumables[0]));
+        var clamps = new Dictionary<string, (int Min, int Max)>
+        {
+            [nameof(Tuning.PotionUseCost)] = (0, 10000),   // as WeaponSwapCost, whose principle it shares: 0 is free; MovementBudget's ceiling
+            [nameof(Tuning.HealthPotionPercent)] = (1, 100),   // it divides the quality for a whole pool; 100 makes one unit a whole pool
+            [nameof(Tuning.ManaPotionPercent)] = (1, 100),
+        };
+        foreach (var key in consumables)
+        {
+            var k = Assert.IsType<IntKey>(key);
+            Assert.True(k.Played, $"{k.Name} is not played");
+            Assert.Equal(3, k.HashedFrom);
+            Assert.Equal(clamps[k.Name], (k.Min, k.Max));
+            int value = k.Get(BuiltIn);
+            Assert.InRange(value, k.Min, k.Max);
+            Assert.Equal([k.Name], TuningValues.Moved(BuiltIn, k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1)));
+            Assert.Null(TuningSchema.DeferredPhase(k.Name));
+        }
+        Assert.Equal(((IntKey)Key(nameof(Tuning.WeaponSwapCost))).Max, ((IntKey)Key(nameof(Tuning.PotionUseCost))).Max);
+        Assert.Equal(((IntKey)Key(nameof(Tuning.MovementBudget))).Max, ((IntKey)Key(nameof(Tuning.PotionUseCost))).Max);
+
+        // And they are all version 3's hash adds: each moves it, and leaves the
+        // hashes of versions 1 and 2 where they were (TuningJsonTests'
+        // AVersion2SaveIsHashedOnVersion2sKeys).
+        Assert.Equal(TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name), ConsumablesKeys);
+
+        // A file clamps; a tuning built in code is still refused (S:2999): a
+        // negative cost would hand movement back for a drink — a count is never
+        // negative — while 0, a free drink, is a choice. (A percentage of 0 is
+        // refused as a divisor: EveryDivisorIsAtLeastOne.)
+        var refused = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(BuiltIn with { PotionUseCost = -1 }));
+        Assert.Equal((nameof(Tuning.PotionUseCost), ContentValidator.RuleCountIsNeverNegative), (refused.EntryId, refused.Rule));
+        ContentValidator.ValidateTuning(BuiltIn with { PotionUseCost = 0 });
+        var read = TuningJson.Read("""{ "PotionUseCost": -5, "HealthPotionPercent": 0, "ManaPotionPercent": 250 }""", BuiltIn);
+        Assert.Equal((0, 1, 100), (read.Tuning.PotionUseCost, read.Tuning.HealthPotionPercent, read.Tuning.ManaPotionPercent));
+        Assert.Equal(3, read.Warnings.Count);
+        ContentValidator.ValidateTuning(read.Tuning);
     }
 
     [Fact]
@@ -468,7 +534,8 @@ public class TuningSchemaTests
         // PHASE5-043: a ratio is an integer divisor, and a divisor is at least 1 —
         // the file cannot get one below it (its range starts at 1), and a tuning
         // built in code with one at 0 is refused at load under its own rule.
-        string[] divisors = [nameof(Tuning.MovementUnitsPerMana), nameof(Tuning.MovementBudget), nameof(Tuning.OverhealPerWard), nameof(Tuning.DotDamagePerMana)];
+        string[] divisors = [nameof(Tuning.MovementUnitsPerMana), nameof(Tuning.MovementBudget), nameof(Tuning.OverhealPerWard), nameof(Tuning.DotDamagePerMana),
+            nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent)];   // a share a unit of quality: the quality for a whole pool divides by it
         foreach (string name in divisors)
         {
             var key = (IntKey)Key(name);
