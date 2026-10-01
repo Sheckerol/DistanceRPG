@@ -295,14 +295,32 @@ public sealed class PartyMemberState : ActorState
     }
 
     /// <summary>
+    /// The bag's empty slots, 1 and up, in slot order: where a potion mixed between
+    /// runs can go — the first of them (<see cref="CampaignState.Stow"/>) — and the
+    /// room the ALCHEMIST page counts. The hand is never among them, empty or not: it
+    /// keeps a weapon, and a potion lies in the bag (PHASE 6b DECISION 1). A potion's
+    /// slot is full, as a weapon's is.
+    /// </summary>
+    public IEnumerable<int> EmptyBagSlots
+    {
+        get
+        {
+            for (int slot = 1; slot < Inventory.Length; slot++)
+                if (Inventory[slot] is null)
+                    yield return slot;
+        }
+    }
+
+    /// <summary>
     /// Empty bag slot <paramref name="slot"/>, which holds a potion, and hand the
     /// potion back: <strong>the one way a potion leaves a bag</strong>. Its callers
     /// are pinned (<c>PotionSlotTests.APotionLeavesABagThroughOneDoor</c>): the
     /// pour-out in a dungeon (<c>DungeonScene.LeaveSlot</c>, PHASE 6b DECISION 1),
     /// the drink (<see cref="TurnSystem.TryDrink"/>, Phase 6b.2), the run's end,
     /// which spoils every potion carried (<see cref="Farm.Spoil"/>, Phase 6b.3), and
-    /// from Phase 6b's next step a pour-back at the alchemist. A potion is never put
-    /// down on a floor, moved to the stable or carried into another bag.
+    /// a pour-back at the alchemist between runs (<see cref="CampaignState.Unstow"/>,
+    /// Phase 6b.4, PHASE 6b DECISION 9). A potion is never put down on a floor, moved
+    /// to the stable or carried into another bag.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is the hand (0), which keeps a weapon, or no slot the member carries.</exception>
     /// <exception cref="ArgumentException">The slot holds no potion: it is empty or holds a weapon.</exception>

@@ -15,7 +15,11 @@ namespace GameEngine.DistanceRPG;
 /// the stable and the enchanter's shop down the left (<see cref="HubWeapons"/>), a window that scrolls with
 /// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
 /// a refused key over the keys, and the deposit panel or the take-back ask over the
-/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>) — and, under
+/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>); on the ALCHEMIST page (Phase
+/// 6b.4) the farm, the batch and the quality, the members' bags and their potions in
+/// a window that scrolls with the choice, and the chosen row said whole
+/// (<see cref="AlchemistPage"/>), or before the alchemist arrives the line that says
+/// when he does — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
@@ -70,8 +74,20 @@ public sealed class BetweenRunsHud : IDisposable
     /// </summary>
     internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU";
 
-    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns back to DUNGEONS, ESC opens the menu.</summary>
-    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU";
+    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns to the ALCHEMIST page (Phase 6b.4), ESC opens the menu.</summary>
+    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB ALCHEMIST - ESC MENU";
+
+    /// <summary>
+    /// The keys the ALCHEMIST page answers once the alchemist has arrived (§6.6, Phase
+    /// 6b.4): W/S or the up and down arrows move the choice over the members and the
+    /// potions, A/D or the left and right arrows set the quality, H and M mix a health
+    /// or a mana potion at it into the chosen member's bag, T pours a potion back, TAB
+    /// turns back to DUNGEONS, ESC opens the menu.
+    /// </summary>
+    internal const string AlchemistKeysLine = "W/S OR ARROWS CHOOSE - A/D OR ARROWS QUALITY - H MIXES HEALTH - M MIXES MANA - T POURS BACK - TAB DUNGEONS - ESC MENU";
+
+    /// <summary>The keys the ALCHEMIST page answers before he has arrived (PHASE 6b DECISION 10): nothing on it is chosen, so TAB and ESC alone.</summary>
+    internal const string AlchemistClosedKeysLine = "TAB DUNGEONS - ESC MENU";
 
     /// <summary>
     /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
@@ -517,11 +533,13 @@ public sealed class BetweenRunsHud : IDisposable
     /// where a run is committed to, so the warning is there. While the tutorial
     /// is all there is, the list says the rest opens behind it
     /// (<see cref="HubGate"/>). Under any countdown it says what a countdown
-    /// counts (<see cref="LockRule"/>).
+    /// counts (<see cref="LockRule"/>). And last, while the alchemist holds units
+    /// unmixed, that they spoil on the descent (<see cref="UnmixedNote"/>).
     /// </summary>
     /// <param name="listings">The campaign's list (<see cref="CampaignState.Listings"/>).</param>
     /// <param name="chosen">The index of the listing ENTER would descend into, or -1.</param>
-    internal static IReadOnlyList<ListRow> ListRows(IReadOnlyList<DungeonListing> listings, int chosen)
+    /// <param name="unmixed">The units the alchemist's batch holds unmixed (<see cref="Farm.Batch"/>, Phase 6b.4): above 0, the list ends with what becomes of them on the descent (<see cref="UnmixedNote"/>), in orange.</param>
+    internal static IReadOnlyList<ListRow> ListRows(IReadOnlyList<DungeonListing> listings, int chosen, int unmixed = 0)
     {
         ArgumentNullException.ThrowIfNull(listings);
         var rows = new List<ListRow> { new(ChooseHeading, DungeonHud.Grey, HeadingScale, HeadingPitch) };
@@ -549,8 +567,21 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(HubGate(only.Def), DungeonHud.Grey, NoteScale, NotePitch));
         if (listings.Any(listing => !listing.Selectable))
             rows.Add(new ListRow(LockRule(content.Tuning.MercyFloor), DungeonHud.Grey, NoteScale, NotePitch));
+        if (unmixed > 0)
+            rows.Add(new ListRow(UnmixedNote(unmixed), DungeonHud.Orange, NoteScale, NotePitch));
         return rows;
     }
+
+    /// <summary>
+    /// What the list says last while the alchemist holds units unmixed (§6.6, Phase
+    /// 6b.4): the descent is where they spoil, so it is said where the descent is
+    /// chosen — <c>THE ALCHEMIST HOLDS 9 UNMIXED UNITS - THEY SPOIL WHEN YOU
+    /// DESCEND</c>, or <c>... 1 UNMIXED UNIT - IT SPOILS ...</c>.
+    /// </summary>
+    internal static string UnmixedNote(int units)
+        => units == 1
+            ? "THE ALCHEMIST HOLDS 1 UNMIXED UNIT - IT SPOILS WHEN YOU DESCEND"
+            : $"THE ALCHEMIST HOLDS {units} UNMIXED UNITS - THEY SPOIL WHEN YOU DESCEND";
 
     // ── Where it all goes ────────────────────────────────────────────────────
 
@@ -620,7 +651,9 @@ public sealed class BetweenRunsHud : IDisposable
     /// The line along the bottom, and its colour, in grey: the keys the screen
     /// answers in what it is doing — the DUNGEONS page's (<see cref="KeysLine"/>),
     /// the WEAPONS page's (<see cref="WeaponsKeysLine"/>), a carry's, naming the
-    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu, the deposit
+    /// weapon (<see cref="CarryingKeysLine"/>), the ALCHEMIST page's
+    /// (<see cref="AlchemistKeysLine"/>, or before he arrives
+    /// <see cref="AlchemistClosedKeysLine"/>) — and while the menu, the deposit
     /// panel or the take-back ask is up, its own (<see cref="MenuKeysLine"/>,
     /// <see cref="DepositPanel.KeysLine"/>) in their place.
     /// </summary>
@@ -628,14 +661,16 @@ public sealed class BetweenRunsHud : IDisposable
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
     /// <param name="carried">The weapon taken up, while carrying.</param>
     /// <param name="panel">The deposit panel or the take-back ask, while one is up.</param>
+    /// <param name="alchemistOpen">Whether the alchemist has arrived, on the ALCHEMIST page (<see cref="AlchemistPage.Open"/>).</param>
     internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null,
-        DepositPanel? panel = null)
+        DepositPanel? panel = null, bool alchemistOpen = true)
         => (mode switch
         {
             BetweenRunsScene.HubMode.Menu => MenuKeysLine(hasTitle),
             BetweenRunsScene.HubMode.Weapons => WeaponsKeysLine,
             BetweenRunsScene.HubMode.Carrying => carried is null ? WeaponsKeysLine : CarryingKeysLine(carried),
             BetweenRunsScene.HubMode.Deposit or BetweenRunsScene.HubMode.Ask => panel?.KeysLine ?? WeaponsKeysLine,
+            BetweenRunsScene.HubMode.Alchemist => alchemistOpen ? AlchemistKeysLine : AlchemistClosedKeysLine,
             _ => KeysLine,
         }, DungeonHud.Grey);
 
@@ -694,9 +729,9 @@ public sealed class BetweenRunsHud : IDisposable
     internal const float DetailWhereScale = 1.3f;
     private const float DetailWherePitch = 20f;
     internal const float DetailNameScale = 2f;
-    private const float DetailNamePitch = 26f;
+    internal const float DetailNamePitch = 26f;
     internal const float DetailScale = 1.4f;
-    private const float DetailPitch = 18f;
+    internal const float DetailPitch = 18f;
 
     /// <summary>
     /// The refusal row's distance up from the bottom: one row over the keys line,
@@ -724,6 +759,31 @@ public sealed class BetweenRunsHud : IDisposable
         float bottom = windowHeight - RefusalFromBottom - RefusalClearance;
         int rows = (int)MathF.Floor((bottom - top - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
         return new WeaponsLayout(top, bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>How many lines the ALCHEMIST page draws over its rows (Phase 6b.4; <see cref="AlchemistPage.Lines(CampaignState, int)"/>): the farm, the batch, what spoils, the quality.</summary>
+    internal const int AlchemistLineCount = 4;
+
+    /// <summary>The gap between the ALCHEMIST page's lines and the rows under them.</summary>
+    private const float AlchemistGap = 10f;
+
+    /// <summary>The top of the ALCHEMIST page under the notices, where its rows start under its lines, the lowest a row's glyphs may reach over the refusal row, and how many rows fit between.</summary>
+    internal readonly record struct AlchemistLayout(float Top, float RowsTop, float Bottom, int Rows);
+
+    /// <summary>
+    /// Where the ALCHEMIST page goes in a window <paramref name="windowHeight"/> pixels
+    /// tall (Phase 6b.4): from where the WEAPONS page starts (<see cref="WeaponsPage"/>),
+    /// its lines — kept in view, since A/D change one and a mix another — then, a gap
+    /// under them, the rows the choice goes over, down to the refusal row's clearance:
+    /// the window the choice scrolls (<see cref="AlchemistPage.Window"/>). At least one
+    /// row, so the choice is always in view.
+    /// </summary>
+    internal static AlchemistLayout AlchemistPlace(float windowHeight, int noticeRows = 0)
+    {
+        var page = WeaponsPage(windowHeight, noticeRows);
+        float rowsTop = page.Top + AlchemistLineCount * WeaponRowPitch + AlchemistGap;
+        int rows = (int)MathF.Floor((page.Bottom - rowsTop - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
+        return new AlchemistLayout(page.Top, rowsTop, page.Bottom, Math.Max(1, rows));
     }
 
     /// <summary>How many characters a detail line runs to before a list on it wraps: the right column's width at <see cref="DetailScale"/>.</summary>
@@ -1158,10 +1218,18 @@ public sealed class BetweenRunsHud : IDisposable
         for (int i = 0; i < notices.Count; i++)
             DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
 
-        if (scene.OnWeapons)
-            DrawWeapons(scene, w, h, notices.Count);
-        else
-            DrawDungeons(scene, w, h, notices.Count);
+        switch (scene.Page)
+        {
+            case BetweenRunsScene.HubPage.Weapons:
+                DrawWeapons(scene, w, h, notices.Count);
+                break;
+            case BetweenRunsScene.HubPage.Alchemist:
+                DrawAlchemist(scene, w, h, notices.Count);
+                break;
+            default:
+                DrawDungeons(scene, w, h, notices.Count);
+                break;
+        }
 
         if (scene.MenuOpen)
         {
@@ -1197,7 +1265,7 @@ public sealed class BetweenRunsHud : IDisposable
                 DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel);
+        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel, scene.Alchemist.Open);
         DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
@@ -1205,7 +1273,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>The DUNGEONS page: the last run above (when there has been one), and the list under it with the choice marked.</summary>
     private void DrawDungeons(BetweenRunsScene scene, int w, int h, int noticeRows)
     {
-        var rows = ListRows(scene.Listings, scene.Chosen);
+        var rows = ListRows(scene.Listings, scene.Chosen, scene.Unmixed);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? HubSummaryLines(lastRun) : [];
         var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), noticeRows);
 
@@ -1256,6 +1324,46 @@ public sealed class BetweenRunsHud : IDisposable
         float right = w / 2f + RightColumn;
         float y = layout.Top;
         foreach (var line in DetailRows(page.ChosenRow))
+        {
+            _text.DrawText(line.Text, right, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+    }
+
+    /// <summary>
+    /// The ALCHEMIST page (§6.6, Phase 6b.4): before the alchemist arrives, the one
+    /// grey line that says when he does (<see cref="AlchemistPage.ClosedLine"/>); after,
+    /// down the left its lines — the farm, the batch, what spoils, the quality — and
+    /// under them the members and the potions, as many as the window holds, scrolled
+    /// to keep the choice in view and the choice marked; and the chosen row said whole
+    /// on the right (<see cref="AlchemistPage.DetailRows"/>).
+    /// </summary>
+    private void DrawAlchemist(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
+        var page = scene.Alchemist;
+        var layout = AlchemistPlace(h, noticeRows);
+        float left = w / 2f + LeftColumn;
+        if (!page.Open)
+        {
+            _text.DrawText(AlchemistPage.ClosedLine, left, layout.Top, WeaponRowScale, DungeonHud.Grey);
+            return;
+        }
+
+        float y = layout.Top;
+        foreach (var line in page.Lines())
+        {
+            _text.DrawText(line.Text, left, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+        var rows = page.Rows();
+        int top = page.Window(layout.Rows);
+        int chosen = page.Chosen;
+        for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
+            DrawRuns(left, layout.RowsTop + (i - top) * WeaponRowPitch, WeaponRowScale, AlchemistPage.Runs(rows[i], chosen: i == chosen));
+
+        float right = w / 2f + RightColumn;
+        y = layout.Top;
+        foreach (var line in page.Detail())
         {
             _text.DrawText(line.Text, right, y, line.Scale, line.Color);
             y += line.Pitch;

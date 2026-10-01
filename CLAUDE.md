@@ -45,15 +45,19 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
-  BetweenRunsScene.cs           # The screen between runs: DUNGEONS (the last run's summary, the list)
-                                # and WEAPONS (Tab); every change there asks the game for a save
-                                # (IBetweenRunsHost.RequestSave). BetweenRunsHud draws both pages
+  BetweenRunsScene.cs           # The screen between runs, three pages Tab goes round: DUNGEONS (the
+                                # last run's summary, the list), WEAPONS and ALCHEMIST; every change
+                                # there asks the game for a save (IBetweenRunsHost.RequestSave).
+                                # BetweenRunsHud draws all three
   HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
                                 # (CampaignState.Move, the one door) and the enchanter's shop, a carry
                                 # the page's alone
   DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT, REFINE or MOVE with their
                                 # odds or reasons, the offer list or the source list, the confirm; and
                                 # the take-back ask (T)
+  AlchemistPage.cs              # The ALCHEMIST page between runs: the farm, the batch, the quality, the
+                                # bags and their potions (H/M mix, T pours back, through Alchemist),
+                                # its choice kept by place; or, before he arrives, when he does
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
@@ -80,7 +84,9 @@ GameEngine.DistanceRPG/         # Game executable
                                 # type and quality (§3.4) — one a slot; the hand keeps a weapon
     Alchemist.cs                # What a potion restores (§3.4, §6.6): a share of the drinker's max,
                                 # rounded down and saturating, and the quality for a whole pool;
-                                # TurnSystem.TryDrink drinks one, through the heal and mana appliers
+                                # TurnSystem.TryDrink drinks one, through the heal and mana appliers.
+                                # And his doors between runs: Mix (its gates, MixRefusal) and PourBack,
+                                # through CampaignState.Stow/Unstow
     Farm.cs                     # The farm (§6.6): a worker a dungeon beaten besides the tutorial, a
                                 # yield every run that counts, the batch worked out from the last
                                 # result and the bags (never a field), and the spoilage rule's one

@@ -553,7 +553,10 @@ every save of the campaign goes through; the log says `Saving the campaign
 between runs, after a change on the hub`. A save that fails is said at once under
 the hub's title, in orange, as one over a floor is — but where a floor's notice
 goes after a few seconds, the hub's stays, and the next screen says it too, until
-a later save goes through, which takes it back from both.
+a later save goes through, which takes it back from both. Phase 6b.4 grows the
+list with the alchemist's two changes, a potion mixed into a bag and one poured
+back, each saved the same way, under the same log line; so a quit and a load after
+a mix bring the potion back and never refill the batch (PHASE 6b DECISION 6).
 
 **This decides whether a crash between runs can cost the changes made there, so
 it is the user's to decide.** The alternative: only the run's end, SAVE GAME and
@@ -997,8 +1000,8 @@ is "a flow, not a stock" (settled.md).
 never in the stable, and never moved between bags: the WEAPONS page lists it
 under its member, grey, and never chooses it nor puts a weapon down on it, and the
 campaign's door for a move refuses a potion's slot either way. The alchemist
-(Phase 6b's later steps) mixes one into the first empty bag slot of the member
-chosen, and a potion in the wrong bag is poured back there and mixed again. In a
+(Phase 6b.4) mixes one into the first empty bag slot of the member chosen, and a
+potion in the wrong bag is poured back there and mixed again (DECISION 9). In a
 dungeon, X then a potion's number pours it out — `POURED OUT THE HEALTH POTION
 Q2` over the member — and it is gone, not laid on the floor, so a floor and its
 save hold weapons alone; it costs nothing, as putting a weapon down costs nothing.
@@ -1138,8 +1141,8 @@ away: a batch recomputed on every load would be mixed again after a quit and a l
 run's result** (`lastResult.farmYield`, beside the clears it was made at, whether
 the run was a first clear, and the potions that spoiled as it ended). **The batch is
 that yield less every potion's quality the bags hold, worked out (`Farm.Batch`),
-never a field of the campaign.** A mix (Phase 6b's next step) writes only a potion
-into a bag, which is saved; so quitting and loading never refills the batch, a held
+never a field of the campaign.** A mix (Phase 6b.4) writes only a potion into a
+bag, which is saved; so quitting and loading never refills the batch, a held
 visit reads it as 0, and the units left unmixed spoil on the descent with no code to
 spoil them. The next run's end replaces the result, and the yield with it: nothing
 is ever added to a batch. The save refuses bags holding more units than the last
@@ -1243,8 +1246,10 @@ and nothing mixes one until he is back. So the save's check that a potion needs 
 worker (31) refuses nothing play writes. The log's arrival line says only what is
 true both times, `[Farm] The alchemist has arrived: The Long Gallery, beaten for the
 first time, is the one dungeon the farm counts`, never "the first dungeon beaten
-besides the tutorial", which the Spear Hall was. The ALCHEMIST page, Phase 6b's next
-step, opens and closes on the same question, so it will follow this reading.
+besides the tutorial", which the Spear Hall was. The ALCHEMIST page (Phase 6b.4)
+opens and closes on the same question, so it follows this reading: under that file
+it says when he arrives again, naming the content's tutorial — `THE ALCHEMIST
+ARRIVES WITH THE FIRST CLEAR BEYOND THE SPEAR HALL` — until the next first clear.
 
 **This decides whether the hub can lose a service it has opened, so it is the
 user's to decide.** The alternatives: (a) he stays for good once any dungeon besides
@@ -1256,3 +1261,65 @@ an empty batch until the next first clear, whose summary would say the farm grow
 (b) He counts every dungeon ever beaten but the first, taking the tutorial to come
 first. A dev-override launch (`DISTANCERPG_DUNGEON`) beats a real dungeon first, so
 (b) would miscount it. settled.md's Phase 6b implementation pass records the ruling.
+
+## Pouring a potion back before the descent (§6.6) — PHASE 6b DECISION 9
+
+§6.6 has the split made once: "that trade is decided at the moment the potions are
+handed to you, with the run's whole supply in front of you and nothing recoverable
+afterwards" (phase-6-between-runs.md), and §3.4 "you split it between health and
+mana *and strength* when you collect it, and anything you leave with him has
+spoiled by the time you climb back out" (phase-3-loot.md). The doc's most literal
+shape is a single hand-over: the whole split set at once, and what is left spoiling
+there and then. Nothing says whether a potion, once mixed, can be undone before the
+party descends.
+
+**Shipped provisionally (Phase 6b.4): potions are mixed one at a time, and each is
+reversible until the descent.** On the ALCHEMIST page, H or M mixes a health or a
+mana potion at the quality A/D set into the chosen member's bag, and T on any
+potion in a bag pours it back, its units back in the batch exactly — the batch is
+the last run's yield less what the bags hold, so a pour-back needs no number of its
+own (DECISION 6). Each mix and each pour-back is saved at once (PHASE 6a DECISION
+10). So a misplaced mix — the wrong bag, the wrong strength — costs nothing before
+the descent, and nothing can be recovered after it: what is left unmixed spoils as
+the party descends, which DUNGEONS says beforehand (`THE ALCHEMIST HOLDS 3 UNMIXED
+UNITS - THEY SPOIL WHEN YOU DESCEND`), and every potion carried spoils as the run
+ends. The descent logs the run's split — `[Alchemist] Descending with 3 health
+potions (9 units) and 2 mana potions (4 units); 1 of 14 units unmixed, spoiled` —
+the numbers §6.6 asks a playtest for ("if every party mixes the same ratio every
+run, the prices are wrong").
+
+**What the pick lets a player do.** Try a split, read what each potion would
+restore each member on the page's right, and change it, for nothing, until the
+party goes down; and move a potion to another bag by pouring it back and mixing it
+again.
+
+**This decides whether the split is a commitment before the descent, so it is the
+user's to decide.** The alternatives: (a) a mix is final, made one at a time — no
+pour-back, so a misplaced potion is carried or poured out in the dungeon; or (b)
+**a single hand-over**, the doc's literal shape: the whole split set on the page
+and confirmed once, what is left spoiling at that moment rather than at the
+descent, and nothing mixed or poured back after it until the next batch.
+settled.md's Phase 6b implementation pass records the ruling.
+
+## The ALCHEMIST page before the alchemist arrives (§6.6) — PHASE 6b DECISION 10
+
+§6.6: before the first real clear there are "no potions on the shelf and no shelf"
+(phase-6-between-runs.md). The enchanter, shut until the tutorial is beaten, says
+so where he would be — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` — and the
+presentation backlog asks for what is unavailable to be shown as unavailable
+"rather than simply absent" (settled.md).
+
+**Shipped provisionally (Phase 6b.4): the third page is there from the start.**
+TAB goes DUNGEONS, WEAPONS, ALCHEMIST and round on every campaign, and until the
+first clear of a dungeon besides the tutorial the ALCHEMIST page says `THE
+ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`, naming the tutorial
+off its row as the enchanter's gate does, with nothing to choose; H and M say it
+over the keys, every other key but TAB and ESC does nothing, and its keys line is
+`TAB DUNGEONS - ESC MENU`. It opens with his arrival, and closes again if he goes
+(DECISION 11).
+
+**This decides whether the hub shows a service before it has one, so it is the
+user's to decide.** The alternative: the page is absent until he arrives — TAB goes
+between DUNGEONS and WEAPONS alone until then — and the run's summary that brings
+him (`A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - ...`) announces the third page.
+settled.md's Phase 6b implementation pass records the ruling.

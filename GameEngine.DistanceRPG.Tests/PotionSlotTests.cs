@@ -96,6 +96,21 @@ public sealed class PotionSlotTests : IDisposable
         // And a save that lays a potion in the hand is refused there, by its path.
         var campaign = CampaignState.Start(GameContent.Current);
         Carrying(campaign, "A", (2, Health(2)));
+        var saved = SaveCodec.Write(SaveGame.Capture(campaign));
+
+        // A mix (Phase 6b.4) lays its potion in the bag's first empty slot, never in
+        // the hand — not even an empty one — and a bag with no empty slot takes none,
+        // whatever the hand holds.
+        var bareHanded = SaveGame.Restore(SaveCodec.Read(saved), GameContent.Current).Campaign;
+        var c = bareHanded.Party[2];
+        c.Inventory[0] = null;
+        Assert.Equal(2, bareHanded.Stow("C", Mana(1)));
+        Assert.Equal(((IItem?)null, Mana(1)), (c.Inventory[0], c.PotionIn(2)));
+        foreach (int slot in c.EmptyBagSlots.ToArray())
+            bareHanded.Stow("C", Health(1));
+        Assert.Null(c.Inventory[0]);
+        Assert.Throws<InvalidOperationException>(() => bareHanded.Stow("C", Health(1)));
+        Assert.Equal(1, c.WeaponsCarried);
         var tree = JsonNode.Parse(SaveCodec.Write(SaveGame.Capture(campaign)))!.AsObject();
         tree["campaign"]!["party"]![0]!["potions"]![0]!["slot"] = 0;
         var refused = Assert.Throws<SaveFormatException>(() => SaveGame.Restore(SaveCodec.Read(tree.ToJsonString()), GameContent.Current));
@@ -278,9 +293,9 @@ public sealed class PotionSlotTests : IDisposable
     {
         // Read off the IL: a potion leaves a bag by one door (PartyMemberState.TakePotion),
         // and its callers are the pour-out in a dungeon — X then the potion's number —
-        // the drink (Phase 6b.2), the potion's number alone, and the run's end's
-        // spoilage (Phase 6b.3), every potion carried as a run ends. Phase 6b's next
-        // step adds its own here by name: the pour-back at the alchemist.
-        Assert.Equal(["DungeonScene.LeaveSlot", "Farm.Spoil", "TurnSystem.TryDrink"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.TakePotion)));
+        // the drink (Phase 6b.2), the potion's number alone, the run's end's
+        // spoilage (Phase 6b.3), every potion carried as a run ends, and the
+        // pour-back at the alchemist between runs (Phase 6b.4), the campaign's door.
+        Assert.Equal(["CampaignState.Unstow", "DungeonScene.LeaveSlot", "Farm.Spoil", "TurnSystem.TryDrink"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.TakePotion)));
     }
 }

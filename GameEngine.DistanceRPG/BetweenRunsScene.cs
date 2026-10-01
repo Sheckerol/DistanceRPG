@@ -28,7 +28,8 @@ public interface IBetweenRunsHost : ISaveHost
     /// <summary>
     /// Save the campaign once the frame is over: the hub has just changed it — a
     /// weapon moved between the bags and the stable, deposited at the enchanter, or
-    /// taken back out of the shop (PHASE 6a DECISION 10). Asked after every change,
+    /// taken back out of the shop (PHASE 6a DECISION 10), or a potion mixed into a bag
+    /// or poured back at the alchemist (Phase 6b.4). Asked after every change,
     /// so a crash between runs loses none of them; asking twice in a frame is one
     /// save, into the campaign's own slot, and between runs is always a safe point.
     /// It is only asked for, as the dungeon's autosaves are
@@ -39,11 +40,13 @@ public interface IBetweenRunsHost : ISaveHost
 }
 
 /// <summary>
-/// The screen between runs (§4.5, §6.2, §6.7): two pages, TAB going from one to
-/// the other. <strong>DUNGEONS</strong> is the hub's dungeon list, and the last
-/// run's summary above it. <strong>WEAPONS</strong> (Phase 6a.2) is every
-/// member's hand and bag, and the stable (<see cref="HubWeapons"/>), where a
-/// weapon is taken up and put down elsewhere. A campaign continued or loaded
+/// The screen between runs (§4.5, §6.2, §6.6, §6.7): three pages, TAB going from
+/// each to the next and round. <strong>DUNGEONS</strong> is the hub's dungeon list,
+/// and the last run's summary above it. <strong>WEAPONS</strong> (Phase 6a.2) is
+/// every member's hand and bag, and the stable (<see cref="HubWeapons"/>), where a
+/// weapon is taken up and put down elsewhere. <strong>ALCHEMIST</strong> (Phase
+/// 6b.4) is the farm's batch and the bags it is mixed into
+/// (<see cref="AlchemistPage"/>). A campaign continued or loaded
 /// from the title opens on DUNGEONS when it was saved between runs — with
 /// <c>CAMPAIGN RESUMED FROM SLOT 2</c> under the title — and so does a new one;
 /// and every run's end comes back to it.
@@ -92,6 +95,21 @@ public interface IBetweenRunsHost : ISaveHost
 /// and refused, closes the panel and says why over the keys, doing nothing.
 /// </para>
 /// <para>
+/// <strong>The alchemist</strong> (§6.6; Phase 6b.4): before he arrives — the first
+/// clear of a dungeon besides the tutorial — ALCHEMIST says when he does, and H and M
+/// say it over the keys; nothing else there does anything (PHASE 6b DECISION 10).
+/// After, W/S or the up and down arrows choose a member or a potion in a bag, A/D or
+/// the left and right arrows set the quality, held to the batch, and H or M mixes a
+/// health or a mana potion at it into the chosen member's bag — on a potion's row,
+/// its member's (<see cref="Logic.Alchemist.Mix"/>) — and T on a potion pours it back
+/// (<see cref="Logic.Alchemist.PourBack"/>, PHASE 6b DECISION 9). A mix the alchemist
+/// refuses is said over the keys, mixing nothing. Each mix and pour-back is logged
+/// and followed by a save asked for (PHASE 6a DECISION 10), the WEAPONS page's choice
+/// kept on what it was on (<see cref="HubWeapons.Keep"/>) and the ALCHEMIST page's by
+/// place. While units are left unmixed, DUNGEONS says they spoil on the descent, and
+/// the descent logs the run's split.
+/// </para>
+/// <para>
 /// <strong>ESC opens the menu</strong> — the dungeon's pause menu, over the hub
 /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e);
 /// <see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign into its own slot,
@@ -109,9 +127,9 @@ public interface IBetweenRunsHost : ISaveHost
 /// <para>
 /// Like every gameplay scene it is single-use: the host registers a fresh one
 /// each time the screen is shown. What it reads is the campaign's, and it writes
-/// to it only between runs, through the campaign's own moves and the enchanter,
-/// and asks for a save after each (PHASE 6a DECISION 10). The dungeon list is
-/// read once, when the screen is made: nothing the hub does moves a lock.
+/// to it only between runs, through the campaign's own moves, the enchanter and the
+/// alchemist, and asks for a save after each (PHASE 6a DECISION 10). The dungeon
+/// list is read once, when the screen is made: nothing the hub does moves a lock.
 /// </para>
 /// <para>
 /// A screen is handed what the game has to say under its title — on the first one
@@ -129,10 +147,23 @@ public interface IBetweenRunsHost : ISaveHost
 /// </summary>
 public sealed class BetweenRunsScene : Scene
 {
+    /// <summary>The screen's pages, in the order TAB goes through them, round from the last to the first: every showing opens on DUNGEONS.</summary>
+    internal enum HubPage
+    {
+        /// <summary>The last run and the dungeon list.</summary>
+        Dungeons,
+
+        /// <summary>The hands, the bags, the stable and the enchanter's shop (Phase 6a.2).</summary>
+        Weapons,
+
+        /// <summary>The farm's batch and the bags it is mixed into (Phase 6b.4).</summary>
+        Alchemist,
+    }
+
     /// <summary>What the screen is doing, which decides where a key goes (<see cref="Route"/>).</summary>
     internal enum HubMode
     {
-        /// <summary>The menu ESC opens is up, over either page.</summary>
+        /// <summary>The menu ESC opens is up, over any page.</summary>
         Menu,
 
         /// <summary>The DUNGEONS page: the last run and the dungeon list.</summary>
@@ -149,6 +180,9 @@ public sealed class BetweenRunsScene : Scene
 
         /// <summary>The take-back ask over WEAPONS (Phase 6a.5): whether to take a weapon in the shop back.</summary>
         Ask,
+
+        /// <summary>The ALCHEMIST page (Phase 6b.4): the batch, the quality, the bags — or, before the alchemist arrives, the line that says when he does.</summary>
+        Alchemist,
     }
 
     /// <summary>Where one key press goes between runs (<see cref="Route"/>).</summary>
@@ -163,7 +197,7 @@ public sealed class BetweenRunsScene : Scene
         /// <summary>The menu's: 1, 2 and 3 act, and every other key does nothing — ENTER, TAB and the arrows included.</summary>
         Menu,
 
-        /// <summary>TAB on either page: to the other.</summary>
+        /// <summary>TAB on a page: to the next, round from ALCHEMIST to DUNGEONS.</summary>
         Page,
 
         /// <summary>The WEAPONS page's, browsing: W/S and the arrows move the choice, ENTER takes a weapon up, D opens the deposit panel on a weapon, T the take-back ask on a weapon in the shop, and every other key does nothing.</summary>
@@ -177,6 +211,9 @@ public sealed class BetweenRunsScene : Scene
 
         /// <summary>The take-back ask's: ENTER takes the weapon back, and every other key does nothing.</summary>
         Ask,
+
+        /// <summary>The ALCHEMIST page's: W/S and the up and down arrows choose, A/D and the left and right arrows set the quality, H and M mix, T pours back, and every other key does nothing — before the alchemist arrives, H and M say so and the rest do nothing.</summary>
+        Alchemist,
     }
 
     private readonly Game _game;
@@ -189,11 +226,13 @@ public sealed class BetweenRunsScene : Scene
 
     // The WEAPONS page: its rows, read off the campaign each time, its choice, its
     // window and a weapon taken up — a carry is the page's alone, and the campaign
-    // changes only when it is put down. Which page is up: DUNGEONS on every
-    // showing. And what the last put-down was refused with, over the keys, until
-    // the next key.
+    // changes only when it is put down. The ALCHEMIST page (Phase 6b.4): its rows,
+    // read off the campaign each time, its choice kept by place, its window and its
+    // quality. Which page is up: DUNGEONS on every showing. And what the last key
+    // was refused with, over the keys, until the next key.
     private readonly HubWeapons _weapons;
-    private bool _onWeapons;
+    private readonly AlchemistPage _alchemist;
+    private HubPage _page;
     private string? _refusal;
 
     // The deposit panel or the take-back ask, up over WEAPONS (Phase 6a.5): the
@@ -241,6 +280,7 @@ public sealed class BetweenRunsScene : Scene
         _listings = campaign.Listings();
         _chosen = FirstChoice(_listings, DefaultNextOrNull(campaign));
         _weapons = new HubWeapons(campaign);
+        _alchemist = new AlchemistPage(campaign);
     }
 
     /// <summary>The notices as the screen draws them under its title (<see cref="NoticeText.Rows"/>): wrapped, the save's word whole and the rest capped, or none — and a save of the hub's that failed, whole, ahead of them (<see cref="SaveFailed"/>), until a later save goes through (<see cref="SaveWentThrough"/>).</summary>
@@ -263,20 +303,30 @@ public sealed class BetweenRunsScene : Scene
         => _menu ? HubMode.Menu
             : _panel is { Current: DepositPanel.Step.Ask } ? HubMode.Ask
             : _panel is not null ? HubMode.Deposit
-            : !_onWeapons ? HubMode.Dungeons
+            : _page == HubPage.Alchemist ? HubMode.Alchemist
+            : _page != HubPage.Weapons ? HubMode.Dungeons
             : _weapons.Carried is null ? HubMode.Weapons
             : HubMode.Carrying;
 
     /// <summary>The deposit panel or the take-back ask, while one is up over WEAPONS; null otherwise.</summary>
     internal DepositPanel? Panel => _panel;
 
-    /// <summary>Whether the WEAPONS page is up, rather than DUNGEONS — under the menu too.</summary>
-    internal bool OnWeapons => _onWeapons;
+    /// <summary>Which page is up — under the menu too.</summary>
+    internal HubPage Page => _page;
+
+    /// <summary>Whether the WEAPONS page is up, rather than DUNGEONS or ALCHEMIST — under the menu too.</summary>
+    internal bool OnWeapons => _page == HubPage.Weapons;
 
     /// <summary>The WEAPONS page: its rows, its choice, its window and a weapon carried.</summary>
     internal HubWeapons Weapons => _weapons;
 
-    /// <summary>What the last key was refused with — a put-down that would leave a member unarmed (<see cref="HubWeapons.KeepsAWeapon"/>), D while the enchanter is shut (<see cref="Enchanter.Closed"/>), a dimmed service's number key, an ENTER on a panel the campaign has changed under (<see cref="DepositPanel.RefusalNow"/>) — said over the keys until the next key; null for nothing.</summary>
+    /// <summary>The ALCHEMIST page (Phase 6b.4): its lines, its rows, its choice, its window and its quality.</summary>
+    internal AlchemistPage Alchemist => _alchemist;
+
+    /// <summary>The units the alchemist holds unmixed, which spoil on the descent (§6.6): the batch once he has arrived (<see cref="Farm.Batch"/>), and 0 before. What DUNGEONS warns of (<see cref="BetweenRunsHud.UnmixedNote"/>).</summary>
+    internal int Unmixed => Farm.AlchemistHasArrived(_campaign) ? Farm.Batch(_campaign) : 0;
+
+    /// <summary>What the last key was refused with — a put-down that would leave a member unarmed (<see cref="HubWeapons.KeepsAWeapon"/>), D while the enchanter is shut (<see cref="Enchanter.Closed"/>), a dimmed service's number key, an ENTER on a panel the campaign has changed under (<see cref="DepositPanel.RefusalNow"/>), a mix the alchemist refuses (<see cref="Logic.Alchemist.MixRefusal"/>) — said over the keys until the next key; null for nothing.</summary>
     internal string? Refusal => _refusal;
 
     /// <summary>What the menu answers under its lines — what a save by hand came to (<see cref="SlotSaved"/>) — until the next key or until the menu closes; null for nothing.</summary>
@@ -296,7 +346,8 @@ public sealed class BetweenRunsScene : Scene
         Log.Info($"[Hub] Between runs, run counter {_campaign.RunCounter}: "
             + (_listings.Count == 0 ? "nothing left to enter" : string.Join("; ", _listings.Select(BetweenRunsHud.ListingLine)))
             + (_chosen >= 0 ? $" - {_listings[_chosen].Def.Name} chosen" : "")
-            + $" - the stable holds {_campaign.Stable.Count}, the enchanter {_campaign.AtTheEnchanter.Count}");
+            + $" - the stable holds {_campaign.Stable.Count}, the enchanter {_campaign.AtTheEnchanter.Count}"
+            + (Farm.AlchemistHasArrived(_campaign) ? $" - the batch holds {Farm.Batch(_campaign)} of {UnitsSaid(_campaign.LastResult?.FarmYield ?? 0)}" : ""));
     }
 
     public override void Render(Camera camera)
@@ -343,7 +394,12 @@ public sealed class BetweenRunsScene : Scene
                 ListKey(key);
                 break;
             case KeyRoute.Page:
-                _onWeapons = !_onWeapons;
+                _page = _page switch
+                {
+                    HubPage.Dungeons => HubPage.Weapons,
+                    HubPage.Weapons => HubPage.Alchemist,
+                    _ => HubPage.Dungeons,
+                };
                 break;
             case KeyRoute.Weapons:
             case KeyRoute.Carrying:
@@ -355,6 +411,9 @@ public sealed class BetweenRunsScene : Scene
             case KeyRoute.Ask:
                 AskKey(key);
                 break;
+            case KeyRoute.Alchemist:
+                AlchemistKey(key);
+                break;
         }
     }
 
@@ -363,11 +422,12 @@ public sealed class BetweenRunsScene : Scene
     /// (<paramref name="mode"/>): ESC always to the game, which asks
     /// <see cref="HandleEscape"/>; with the menu up, every other key to the menu —
     /// 1, 2 and 3 act, and ENTER, TAB, W/S and the arrows do nothing, so nothing
-    /// descends or moves behind the menu; TAB on either page, to the other; and
-    /// otherwise to the page — the dungeon list, or WEAPONS browsing or carrying,
-    /// where TAB is the carry's and does nothing — or to the deposit panel or the
-    /// take-back ask up over it, whose every key is theirs, TAB included, so no page
-    /// turns under them. Pure, so it is walked key by key (<c>BetweenRunsHudTests</c>).
+    /// descends or moves behind the menu; TAB on a page, to the next, round from
+    /// ALCHEMIST to DUNGEONS; and otherwise to the page — the dungeon list, WEAPONS
+    /// browsing or carrying, where TAB is the carry's and does nothing, or ALCHEMIST —
+    /// or to the deposit panel or the take-back ask up over WEAPONS, whose every key
+    /// is theirs, TAB included, so no page turns under them. Pure, so it is walked key
+    /// by key (<c>BetweenRunsHudTests</c>).
     /// </summary>
     /// <param name="mode">What the screen is doing.</param>
     /// <param name="key">The key pressed.</param>
@@ -376,12 +436,13 @@ public sealed class BetweenRunsScene : Scene
             : mode switch
             {
                 HubMode.Menu => KeyRoute.Menu,
-                HubMode.Dungeons or HubMode.Weapons when key == Keys.Tab => KeyRoute.Page,
+                HubMode.Dungeons or HubMode.Weapons or HubMode.Alchemist when key == Keys.Tab => KeyRoute.Page,
                 HubMode.Dungeons => KeyRoute.List,
                 HubMode.Weapons => KeyRoute.Weapons,
                 HubMode.Carrying => KeyRoute.Carrying,
                 HubMode.Deposit => KeyRoute.Panel,
                 HubMode.Ask => KeyRoute.Ask,
+                HubMode.Alchemist => KeyRoute.Alchemist,
                 _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Not a HubMode."),
             };
 
@@ -691,6 +752,149 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>Runs as the log says them: <c>1 run</c>, <c>2 runs</c>.</summary>
     private static string RunsSaid(int runs) => runs == 1 ? "1 run" : $"{runs} runs";
 
+    // ── The alchemist (§6.6, Phase 6b.4) ────────────────────────────────────
+
+    /// <summary>
+    /// The ALCHEMIST page's keys: W/S or the up and down arrows choose a member or a
+    /// potion, A/D or the left and right arrows set the quality, H and M mix a health
+    /// or a mana potion at it (<see cref="Mix"/>), and T on a potion pours it back
+    /// (<see cref="PourBack"/>). Before the alchemist arrives, H and M say so over the
+    /// keys and every other key does nothing (PHASE 6b DECISION 10). D is the
+    /// quality's here: WEAPONS' deposit is not on this page. Every other key does
+    /// nothing.
+    /// </summary>
+    private void AlchemistKey(Keys key)
+    {
+        if (!_alchemist.Open)
+        {
+            if (key is Keys.H or Keys.M)
+                Mix(key == Keys.H ? PotionType.Health : PotionType.Mana);   // refused: he has not arrived
+            return;
+        }
+        switch (key)
+        {
+            case Keys.W or Keys.Up:
+                _alchemist.Step(-1);
+                break;
+            case Keys.S or Keys.Down:
+                _alchemist.Step(+1);
+                break;
+            case Keys.A or Keys.Left:
+                _alchemist.Shift(-1);
+                break;
+            case Keys.D or Keys.Right:
+                _alchemist.Shift(+1);
+                break;
+            case Keys.H:
+                Mix(PotionType.Health);
+                break;
+            case Keys.M:
+                Mix(PotionType.Mana);
+                break;
+            case Keys.T:
+                PourBack();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// H or M: a potion of <paramref name="type"/> at the page's quality mixed into the
+    /// chosen member's bag — on a potion's row, its member's — through the alchemist
+    /// (<see cref="Logic.Alchemist.Mix"/>), the WEAPONS page's choice kept on what it was
+    /// on (<see cref="HubWeapons.Keep"/>), the mix logged, and a save asked for (PHASE 6a
+    /// DECISION 10). Refused (<see cref="Logic.Alchemist.MixRefusal"/>) — he has not
+    /// arrived, the batch is spent or none came, the bag is full — it is said over the
+    /// keys until the next key, and nothing is mixed or saved.
+    /// </summary>
+    private void Mix(PotionType type)
+    {
+        if (_alchemist.ChosenRow is not { } row)
+            return;
+        string memberId = row.Place.MemberId;
+        int quality = _alchemist.Quality;
+        if (Logic.Alchemist.MixRefusal(_campaign, memberId, quality) is { } refused)
+        {
+            _refusal = refused;
+            Log.Info($"[Alchemist] Refused: {refused}");
+            return;
+        }
+        var before = _weapons.ChosenRow;
+        var mixed = Logic.Alchemist.Mix(_campaign, memberId, type, quality);
+        _weapons.Keep(before);
+        _alchemist.AfterMix(mixed);
+        Log.Info(MixedLine(mixed, _campaign.LastResult?.FarmYield ?? 0));
+        _host.RequestSave();
+    }
+
+    /// <summary>
+    /// T on a potion: poured back (<see cref="Logic.Alchemist.PourBack"/>, PHASE 6b
+    /// DECISION 9), its units back in the batch, the WEAPONS page's choice kept on what
+    /// it was on, the ALCHEMIST page's on the member's next potion or the member, the
+    /// pour-back logged, and a save asked for (PHASE 6a DECISION 10). On a member's
+    /// row, nothing.
+    /// </summary>
+    private void PourBack()
+    {
+        if (_alchemist.ChosenRow is not { Kind: AlchemistPage.RowKind.Potion, Place: var place })
+            return;
+        var before = _weapons.ChosenRow;
+        var poured = Logic.Alchemist.PourBack(_campaign, place.MemberId, place.Slot);
+        _weapons.Keep(before);
+        _alchemist.AfterPourBack(poured);
+        Log.Info(PouredBackLine(poured, _campaign.LastResult?.FarmYield ?? 0));
+        _host.RequestSave();
+    }
+
+    /// <summary>
+    /// A mix, as the log says it, from what the alchemist handed back
+    /// (<see cref="Mixed"/>; Logic never logs): <c>[Alchemist] Mixed a Health potion,
+    /// quality 3, into A's bag slot 4: 11 of 14 units left</c> — the slot numbered as
+    /// the hub's log numbers a bag slot, the hand 1.
+    /// </summary>
+    /// <param name="mixed">What the mix did.</param>
+    /// <param name="yielded">What the last run's end yielded: the batch's whole.</param>
+    internal static string MixedLine(Mixed mixed, int yielded)
+    {
+        ArgumentNullException.ThrowIfNull(mixed);
+        return $"[Alchemist] Mixed a {mixed.Potion.Type} potion, quality {mixed.Potion.Quality}, into {mixed.MemberId}'s bag slot {mixed.Slot + 1}: {mixed.BatchLeft} of {UnitsSaid(yielded)} left";
+    }
+
+    /// <summary>A pour-back, as the log says it: <c>[Alchemist] Poured back A's Health potion, quality 3, from bag slot 4: 14 of 14 units left</c>.</summary>
+    /// <param name="poured">What the pour-back did.</param>
+    /// <param name="yielded">What the last run's end yielded: the batch's whole.</param>
+    internal static string PouredBackLine(PouredBack poured, int yielded)
+    {
+        ArgumentNullException.ThrowIfNull(poured);
+        return $"[Alchemist] Poured back {poured.MemberId}'s {poured.Potion.Type} potion, quality {poured.Potion.Quality}, from bag slot {poured.Slot + 1}: {poured.BatchLeft} of {UnitsSaid(yielded)} left";
+    }
+
+    /// <summary>
+    /// The run's split, as the log says it on the descent once the alchemist has
+    /// arrived — the numbers a playtest needs to see whether every party mixes the same
+    /// ratio (§6.6: "if every party mixes the same ratio every run, the prices are
+    /// wrong"): <c>[Alchemist] Descending with 3 health potions (9 units) and 2 mana
+    /// potions (4 units); 1 of 14 units unmixed, spoiled</c>. Null before he has
+    /// arrived.
+    /// </summary>
+    internal static string? DescentLine(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        if (!Farm.AlchemistHasArrived(campaign))
+            return null;
+        var potions = campaign.Party.SelectMany(member => member.Potions.Select(carried => carried.Potion)).ToList();
+        string Carried(PotionType type, string name)
+        {
+            var ofType = potions.Where(potion => potion.Type == type).ToList();
+            long units = ofType.Sum(potion => (long)potion.Quality);
+            return $"{ofType.Count} {name} {(ofType.Count == 1 ? "potion" : "potions")} ({units} {(units == 1 ? "unit" : "units")})";
+        }
+        return $"[Alchemist] Descending with {Carried(PotionType.Health, "health")} and {Carried(PotionType.Mana, "mana")}; "
+            + $"{Farm.Batch(campaign)} of {UnitsSaid(campaign.LastResult?.FarmYield ?? 0)} unmixed, spoiled";
+    }
+
+    /// <summary>Units as the log says them: <c>1 unit</c>, <c>14 units</c>.</summary>
+    private static string UnitsSaid(int units) => units == 1 ? "1 unit" : $"{units} units";
+
     /// <summary>
     /// The menu's keys (<see cref="PauseMenu.Press"/>): 1 closes it, 2 asks the host
     /// to save the campaign into its own slot — between runs is always a safe point
@@ -836,7 +1040,9 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// ENTER: descend into the chosen dungeon, once. The host enters it and fades
     /// to the run. Never while the engine is still fading between scenes, and
-    /// never twice: after the first press the screen is on its way out.
+    /// never twice: after the first press the screen is on its way out. Once the
+    /// alchemist has arrived the log says the run's split first, and what is left
+    /// unmixed, which the descent spoils (<see cref="DescentLine"/>).
     /// </summary>
     private void Descend()
     {
@@ -845,6 +1051,8 @@ public sealed class BetweenRunsScene : Scene
         var choice = _listings[_chosen];
         _leaving = true;
         Log.Info($"[Hub] Descending into {choice.Def.Name}{(choice.Early ? ", offered early: every dungeon is locked" : "")}");
+        if (DescentLine(_campaign) is { } split)
+            Log.Info(split);   // before the entry, which leaves the batch at 0: what is unmixed spoils here
         _host.Descend(choice.Def.Id);
     }
 

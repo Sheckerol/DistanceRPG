@@ -41,11 +41,13 @@ recent save and resumes it where it was left: on the screen between runs, with
 `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title, or
 back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 [Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
-is passed over. The screen between runs is two pages, Tab going from one to the
-other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
-has ended — until the tutorial's golem is beaten it lists the tutorial alone — and
-WEAPONS, every member's hand and bag, the stable and the enchanter's shop, where
-weapons are moved between them and deposited at the enchanter (below). In play —
+is passed over. The screen between runs is three pages, Tab going from each to the
+next and round: DUNGEONS, the dungeon list, with the last run's summary above it
+once a run has ended — until the tutorial's golem is beaten it lists the tutorial
+alone; WEAPONS, every member's hand and bag, the stable and the enchanter's shop,
+where weapons are moved between them and deposited at the enchanter (below); and
+ALCHEMIST, the farm's batch and the bags it is mixed into as potions (below).
+Every showing opens on DUNGEONS. In play —
 in a dungeon or between runs — Esc opens the menu, where the campaign is saved by
 hand into its own slot, the one it saves into all the time, and play is left for
 the title.
@@ -84,8 +86,23 @@ the title.
 | Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
 | D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
 | T | On a weapon in the shop (`WORKING` or `STALLED`), or a transfer's source held there (`HELD`): ask whether to take it back (below) — a transfer's two weapons together |
+| Tab | The ALCHEMIST page |
+| Esc | Open the menu, over the hub |
+
+| Between runs: ALCHEMIST | Action |
+| --- | --- |
+| W/S / Up/Down | Choose a member — `[A] - 2 BAG SLOTS FREE` — or a potion in its bag, `  BAG 3  HEALTH POTION Q3` (the farm, the batch, what spoils and the quality over them are read, never chosen). The window scrolls with the choice, and the chosen row is said whole on the right: for a member, what a health and a mana potion at the quality would restore it now (`H  HEALTH POTION Q3 - RESTORES 18 OF 30 HP`); for a potion, what it restores and what pouring it back gives the batch |
+| A/D / Left/Right | The quality a unit down or up — `QUALITY 3 - 3 UNITS A POTION - A/D CHANGES IT` — from 1 to the units left. Every showing starts at 1 |
+| H / M | Mix a health or a mana potion at the quality into the chosen member's bag — on a potion, its member's — in its first empty bag slot, never the hand: its units leave the batch, and the campaign is saved at once. Refused, it says why over the keys and mixes nothing: `THE BATCH IS SPENT - POUR ONE BACK TO MIX ANOTHER`, `[A] HAS NO ROOM IN THE BAG - THE HAND KEEPS A WEAPON`, `NO BATCH - THE LAST RUN DID NOT COUNT` |
+| T | On a potion: pour it back — its units return to the batch exactly, and the campaign is saved at once (PHASE 6b DECISION 9). On a member, nothing |
 | Tab | The DUNGEONS page |
 | Esc | Open the menu, over the hub |
+| Enter, the digits, every other key | Nothing (D is the quality's here: WEAPONS' deposit is not on this page) |
+
+Before the alchemist arrives — the first clear of a dungeon besides the tutorial
+— the page says `THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`,
+nothing on it is chosen, H and M say that over the keys, and Tab and Esc are its
+only other keys (PHASE 6b DECISION 10).
 
 | Between runs: the deposit panel (D) | Action |
 | --- | --- |
@@ -192,7 +209,7 @@ follow a drink at 15/30). A drink refused short of its cost logs the movement le
 rounded down — `39 movement left, a drink costs 40` at 39.6 — while the MOVE
 readout rounds up, as it always has, and reads 40: the bag's red `- NOT ENOUGH
 LEFT` is the one to trust. The farm (below) yields the units a potion is mixed
-from; the alchemist who mixes them comes in Phase 6b's next step.
+from, and the alchemist mixes them between runs (below).
 
 **The farm** (Phase 6b): every dungeon besides the tutorial beaten once is one of
 the farm's workers, and every run that counts — a boss kill, or a mercy for
@@ -221,10 +238,40 @@ a batch of 14 units`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Man
 Q1`. The alchemist is there while the farm has a worker: a `dungeons.json` beside
 the game that moves `retiresOnClear` onto the farm's one worker retires it on its
 next clear, and he arrives again with the next first clear (DECISION 11). Mixing
-— how many potions of which type, at what quality — is the alchemist's, Phase 6b's
-next step: until then the batch is shown in the summary alone. The roster stays at
-the four dungeons that ship (DECISION 8), and `FarmYieldPerClear` is derived for
-them by hand (DECISION 7; see [Tuning the numbers](#tuning-the-numbers-tuningjson)).
+— how many potions of which type, at what quality, in whose bag — is the
+alchemist's (below). The roster stays at the four dungeons that ship (DECISION 8),
+and `FarmYieldPerClear` is derived for them by hand (DECISION 7; see [Tuning the
+numbers](#tuning-the-numbers-tuningjson)).
+
+**The alchemist** (Phase 6b): the ALCHEMIST page between runs, the third Tab
+page, is where the batch is split. Before the first clear of a dungeon besides the
+tutorial it says `THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`
+and nothing else (PHASE 6b DECISION 10); it closes again if he goes (DECISION 11).
+Once he is there it shows numbers, never a person: what the farm yields a run that
+counts — `THE FARM - 2 DUNGEONS BEATEN - 14 UNITS A COUNTED RUN`, or `... - IT
+YIELDS NOTHING` at a rate of 0 — the batch, `THE BATCH - 9 OF 14 UNITS LEFT` in
+cyan (`THE BATCH - ALL 14 UNITS MIXED`; and with none, why: `NO BATCH - THE LAST
+RUN DID NOT COUNT`, `NO BATCH - THE FARM YIELDS NOTHING`, or `NO BATCH YET - THE
+NEXT RUN THAT COUNTS BRINGS ONE` on a save from before the farm), `UNMIXED UNITS
+SPOIL ON THE DESCENT - A POTION KEEPS ONE TRIP`, the quality A/D set, in yellow,
+and each member with the room its bag has and its potions under it. A potion of
+quality *q* costs *q* units, takes no runs and no place in a queue, and goes into
+the chosen member's first empty bag slot — never the hand, and never the stable,
+another bag or the floor (PHASE 6b DECISION 1): pour it back with T and mix it
+again. No quality is refused but by the batch: past the quality that restores a
+whole pool (5 at 20 a unit, which the detail says, `QUALITY 5 RESTORES A WHOLE
+POOL`) more is overshoot, which only Overheal keeps. Each mix and each pour-back is
+saved at once (PHASE 6a DECISION 10), so a quit and a load bring the potions back
+and never refill the batch; and any potion can be poured back, its units back in
+the batch exactly, until the descent (PHASE 6b DECISION 9). While units are left
+unmixed, DUNGEONS ends its list with `THE ALCHEMIST HOLDS 3 UNMIXED UNITS - THEY
+SPOIL WHEN YOU DESCEND`, in orange. The log says each: `[Alchemist] Mixed a Health
+potion, quality 3, into A's bag slot 3: 4 of 7 units left`, `[Alchemist] Poured
+back A's Health potion, quality 3, from bag slot 3: 7 of 7 units left`, a refusal
+as `[Alchemist] Refused: ...`, and on the descent the run's split, `[Alchemist]
+Descending with 3 health potions (9 units) and 2 mana potions (4 units); 1 of 14
+units unmixed, spoiled`; the hub's own line on opening says `- the batch holds 9 of
+14 units`.
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The
@@ -454,7 +501,8 @@ back to it, and the game quits from it.
   (the summary with it), when NEW CAMPAIGN on the title or `--new-campaign` begins
   one, after every change made on the screen between runs — a weapon moved
   between the bags and the stable, a deposit at the enchanter, a weapon taken
-  back from it (PHASE 6a DECISION 10) — and whenever play is left — the menu's
+  back from it, a potion mixed or poured back at the alchemist (PHASE 6a DECISION
+  10) — and whenever play is left — the menu's
   `3  QUIT TO TITLE`, or the window's close button. A save is never taken while
   the enemies are moving: a quit during their turn (the menu can be opened then,
   and the close button pressed any time) plays their turn out to your next one

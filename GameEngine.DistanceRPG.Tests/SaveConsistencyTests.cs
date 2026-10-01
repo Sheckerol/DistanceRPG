@@ -466,6 +466,23 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal((true, false, 2, 2), (grown.FirstClear, grown.Retired, grown.FarmClears, grown.Spoiled!.Count));
         Loads(farmed, "potions spoiled on the first clear of a second dungeon besides the tutorial");
 
+        // The alchemist's doors (Phase 6b.4): a batch mixed to its last unit, and then
+        // partly poured back, each saved between runs as the hub saves every change —
+        // the farm's rate this case's own input (7).
+        using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 }))
+        {
+            var mixing = NewCampaign();
+            CampaignRuns.Clear(mixing, "tutorial", GoldenSeed);
+            CampaignRuns.Clear(mixing, "spear_hall", FiveDeep);
+            Alchemist.Mix(mixing, "A", PotionType.Health, 5);
+            Alchemist.Mix(mixing, "D", PotionType.Mana, 2);
+            Assert.Equal(0, Farm.Batch(mixing));
+            Loads(mixing, "a batch mixed to its last unit");
+            Alchemist.PourBack(mixing, "A", 2);
+            Assert.Equal(5, Farm.Batch(mixing));
+            Loads(mixing, "a batch mixed and partly poured back");
+        }
+
         // And the alchemist's arrival on a wipe: the first real clear, the boss killed
         // and the party dead on the way out, which counts and yields.
         var wipeArrival = NewCampaign();

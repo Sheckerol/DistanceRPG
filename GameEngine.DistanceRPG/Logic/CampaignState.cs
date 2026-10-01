@@ -115,6 +115,14 @@ public readonly record struct WeaponPlace(string? MemberId, int Index)
 /// (<see cref="Return"/>) — a transfer's two, its source after it (Phase 6a.6); a
 /// load brings it back through <see cref="Restore"/>.
 /// </para>
+/// <para>
+/// <strong>And the alchemist's doors</strong> (§6.6, Phase 6b.4): a potion mixed is
+/// laid in a bag by hand between runs (<see cref="Stow"/>), and one poured back is
+/// taken out again (<see cref="Unstow"/>), each called by the alchemist alone
+/// (<see cref="Alchemist"/>). No batch is kept here: it is worked out from the last
+/// run's yield and the bags (<see cref="Farm.Batch"/>, §6.7: "the batch must never
+/// reach <c>CampaignState</c>").
+/// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>: it
 /// rolls nothing — a visit's seed is handed to <see cref="Enter"/> by whoever
 /// enters.
@@ -1007,6 +1015,55 @@ public sealed class CampaignState
     private PartyMemberState MemberOf(WeaponPlace place)
         => _party.FirstOrDefault(member => member.Id == place.MemberId)
             ?? throw new ArgumentException($"'{place.MemberId}' is no member of the party.", nameof(place));
+
+    // ── The alchemist's doors (§6.6, Phase 6b.4) ─────────────────────────────
+
+    /// <summary>
+    /// Lay <paramref name="potion"/>, just mixed, in <paramref name="memberId"/>'s
+    /// bag by hand between runs: the first empty slot from 1, never the hand, which
+    /// keeps a weapon (PHASE 6b DECISION 1). The hub's door for a mix, which the
+    /// alchemist calls once he has asked his gates (<see cref="Alchemist.Mix"/>, its
+    /// one caller); nothing here asks the batch, which is worked out from the bags
+    /// (<see cref="Farm.Batch"/>) and so falls by the potion's quality as it lands.
+    /// </summary>
+    /// <returns>The slot it went into.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress, or the bag has no empty slot.</exception>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    internal int Stow(string memberId, Potion potion)
+    {
+        ArgumentNullException.ThrowIfNull(memberId);
+        ArgumentNullException.ThrowIfNull(potion);
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the bags are changed by hand only between runs.");
+        var member = MemberOf(new WeaponPlace(memberId, 0));
+        int slot = member.EmptyBagSlots.DefaultIfEmpty(-1).First();
+        if (slot < 0)
+            throw new InvalidOperationException($"Member '{memberId}' has no empty bag slot: the hand keeps a weapon, and a slot holds one thing.");
+        member.Inventory[slot] = potion;
+        return slot;
+    }
+
+    /// <summary>
+    /// Take the potion in bag slot <paramref name="slot"/> of
+    /// <paramref name="memberId"/>'s bag back out, by hand between runs: the hub's
+    /// door for a pour-back (PHASE 6b DECISION 9), which the alchemist calls
+    /// (<see cref="Alchemist.PourBack"/>, its one caller), through the one door a
+    /// potion leaves a bag by (<see cref="PartyMemberState.TakePotion"/>). Its units
+    /// are back in the batch at once, which is worked out from the bags.
+    /// </summary>
+    /// <returns>The potion taken out.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress.</exception>
+    /// <exception cref="ArgumentException">No member of the party has the id, or the slot holds no potion.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The slot is the hand, or not one the member carries.</exception>
+    internal Potion Unstow(string memberId, int slot)
+    {
+        ArgumentNullException.ThrowIfNull(memberId);
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the bags are changed by hand only between runs.");
+        return MemberOf(new WeaponPlace(memberId, 0)).TakePotion(slot);
+    }
 
     /// <summary>Lay <paramref name="weapon"/> at <paramref name="place"/>, over what is there: a slot, or a place in the stable.</summary>
     private void Put(WeaponPlace place, Weapon weapon)

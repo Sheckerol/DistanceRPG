@@ -389,7 +389,8 @@ public class SaveInventoryTests
             new("_notices", Kept.NotSaved, "this showing's notices, a failed save of the hub's laid ahead of them: the log keeps them"),
             new("_shownWhole", Kept.NotSaved, "how many of this showing's notices are shown whole"),
             new("_weapons", Kept.NotSaved, "the WEAPONS page: its rows are the campaign's, read afresh; its choice, its window and a carry are presentation (HubWeapons, below)"),
-            new("_onWeapons", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
+            new("_alchemist", Kept.NotSaved, "the ALCHEMIST page (Phase 6b.4): its rows are the campaign's, read afresh, and the batch is worked out from the last result and the bags; its choice, its window and its quality are presentation (AlchemistPage, below)"),
+            new("_page", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
             new("_refusal", Kept.NotSaved, "what the last key was refused with, until the next key"),
             new("_panel", Kept.NotSaved, "the deposit panel or the take-back ask (Phase 6a.5): the screen's alone, like a carry — the campaign changes only at the ENTER that deposits or takes back, so a save never sees one, and every showing opens with none up (DepositPanel, below)"),
         ],
@@ -399,6 +400,13 @@ public class SaveInventoryTests
             new("_chosen", Kept.NotSaved, "the page's choice: every showing opens on the first row it can choose"),
             new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
             new("_carried", Kept.NotSaved, "a carry is the page's alone and moves nothing: the campaign changes only as it is put down (CampaignState.Move), so a save never sees one, and a quit mid-carry loses nothing"),
+        ],
+        [typeof(AlchemistPage)] =
+        [
+            new("_campaign", Kept.Derived, "the campaign the save restores — the page's rows, the farm and the batch are read off it afresh each time"),
+            new("_chosen", Kept.NotSaved, "the page's choice, kept by place: every showing opens on the first member"),
+            new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
+            new("_quality", Kept.NotSaved, "the quality H and M mix at: every showing opens on 1, and nothing is mixed until H or M"),
         ],
         [typeof(DepositPanel)] =
         [
@@ -450,7 +458,8 @@ public class SaveInventoryTests
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
         // scenes — and of the WEAPONS page the screen between runs holds (Phase
-        // 6a.2), and of its deposit panel (Phase 6a.5) — is in the document's view,
+        // 6a.2), of its deposit panel (Phase 6a.5) and of its ALCHEMIST page (Phase
+        // 6b.4) — is in the document's view,
         // derived from what the save restores, or not saved for the reason given — so
         // a scene field added later fails here until someone decides whether a resume
         // needs it.

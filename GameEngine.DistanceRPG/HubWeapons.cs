@@ -23,7 +23,9 @@ namespace GameEngine.DistanceRPG;
 /// <para>
 /// D on a weapon opens the deposit panel over the page, and T on a weapon in the
 /// shop asks whether to take it back (<see cref="DepositPanel"/>, Phase 6a.5); the
-/// choice follows the weapon into the shop and back out (<see cref="Follow"/>).
+/// choice follows the weapon into the shop and back out (<see cref="Follow"/>), and
+/// stays on what it was on as a mix or a pour-back on the ALCHEMIST page changes a
+/// bag under it (<see cref="Keep"/>, Phase 6b.4).
 /// </para>
 /// Every string of the page's rows is built here, <c>internal static</c> where it
 /// can be, and tested (<c>BetweenRunsHudTests</c>); the HUD draws them
@@ -506,6 +508,35 @@ internal sealed class HubWeapons
     {
         ArgumentNullException.ThrowIfNull(weapon);
         ChooseRowOf(Rows(), weapon);
+    }
+
+    /// <summary>
+    /// The bags have changed under the page from elsewhere (Phase 6b.4): a potion
+    /// mixed or poured back on the ALCHEMIST page adds or takes a potion row under a
+    /// member, and a mix that fills a bag takes its room row away, so every row below
+    /// moves while the page's choice is an index. The choice is kept on what it was on,
+    /// <paramref name="before"/> — the row read before the change: the row holding the
+    /// same weapon (<see cref="ChooseRowOf"/>); else, for a room, the same room — a
+    /// member's empty hand, its bag's room, the stable's end — wherever its first
+    /// empty slot now is; else the first row it can stop on. So ENTER, D and T never
+    /// act on a weapon the player did not choose. Nothing is carried meanwhile: the
+    /// ALCHEMIST page is a TAB away, and TAB is the carry's.
+    /// </summary>
+    public void Keep(Row before)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        var rows = Rows();
+        if (before.Weapon is { } weapon)
+        {
+            ChooseRowOf(rows, weapon);
+            return;
+        }
+        int at = -1;
+        if (before is { Kind: RowKind.Room, Place: { } was })
+            for (int i = 0; i < rows.Count && at < 0; i++)
+                if (rows[i] is { Kind: RowKind.Room, Place: { } room } && room.MemberId == was.MemberId && (was.IsStable || (room.Index == 0) == (was.Index == 0)))
+                    at = i;   // the same room: a member's empty hand, its bag's room, or the stable's end
+        _chosen = at >= 0 ? at : Next(rows, -1, +1, row => row.Choosable);
     }
 
     /// <summary>
