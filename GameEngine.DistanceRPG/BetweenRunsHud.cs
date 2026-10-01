@@ -286,7 +286,7 @@ public sealed class BetweenRunsHud : IDisposable
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
         // What the farm yielded, which the count decided too — before the enchanter,
-        // so a summary the hub cuts short never cuts it.
+        // so the hub's cut of a long summary takes the enchanter's lines first.
         if (FarmLine(result) is { } farm)
             lines.Add(farm);
 

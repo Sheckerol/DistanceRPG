@@ -264,8 +264,12 @@ public sealed class SaveConsistencyTests : IDisposable
         // retired and still locked, which play wrote, and which loads. The farm loses
         // that worker with it (Phase 6b.3), and the potions carried into that clear
         // spoil on a run that ends with no worker at all: they were mixed while the
-        // Spear Hall was one, which check 35 counts as the run began.
+        // Spear Hall was one, which check 35 counts as the run began. They are mixed
+        // before the file is put beside the game, as play must mix them: under it the
+        // hub lists the Spear Hall alone — the content's tutorial now, not retired —
+        // so no run that yields comes before its re-clear.
         int oldLock = lifted.LockedUntilRun("spear_hall");
+        TestPotions.Carrying(lifted, "A", (2, TestPotions.Health(1)));
         using (TestContent.UsePremise(dungeons: data => new DungeonsData(data.Dungeons.Select(def => def.Id switch
                {
                    "spear_hall" => def with { RetiresOnClear = true, BossFloorMin = 5, BossFloorMax = 5 },
@@ -273,7 +277,7 @@ public sealed class SaveConsistencyTests : IDisposable
                    _ => def,
                }).ToArray())))
         {
-            TestPotions.Carrying(lifted, "A", (2, TestPotions.Health(1)));
+            Assert.Equal(["spear_hall"], lifted.Listings().Select(listing => listing.Def.Id));
             var retiring = CampaignRuns.Clear(lifted, "spear_hall", FiveDeep);
             Assert.Equal((true, (int?)null), (retiring.Retired, retiring.LockedUntilRun));
             Assert.Equal((false, 0), (retiring.FirstClear, retiring.FarmClears));
@@ -431,7 +435,7 @@ public sealed class SaveConsistencyTests : IDisposable
             potionWipe = CampaignRuns.Wipe(potions, potionTurns);
         Assert.Equal((RunOutcome.Death, true, true), (potionWipe.Outcome, potionWipe.BossDefeated, potionWipe.ServiceTick));
         Assert.Equal([TestPotions.Health(3)], potionWipe.Spoiled!);   // C's, still carried: spoiled by the wipe, never forfeited as gear
-        Assert.Equal((1, 7), (potionWipe.FarmClears, potionWipe.FarmYield));
+        Assert.Equal(("long_gallery", true, 2, 14), (potionWipe.DungeonId, potionWipe.FirstClear, potionWipe.FarmClears, potionWipe.FarmYield));   // its first clear: the farm grows
         Loads(potions, "a wipe that spoiled a potion");
         Assert.Null(potions.Party[2].Inventory[0]);   // the spoil it held, lost
         TestPotions.Carrying(potions, "C", (3, TestPotions.Health(2)));
@@ -1668,6 +1672,17 @@ public sealed class SaveConsistencyTests : IDisposable
         int most = ContentBounds.MostYieldPerClear;
         Restores(Edited(text, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 1))), "spoiled at the most a clear yields");
         RefusedAt(Edited(text, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 2))), "campaign.lastResult.spoiled[1]",
+            $"{most + 1} units of quality spoiled by here, above {most}, the most 1 clear yields: a potion is mixed from the yield of the run before, and no tuning yields more than {most} a clear (FarmYieldPerClear at its most)");
+
+        // And on the first clear of a second dungeon besides the tutorial: the farm
+        // ends the run with two workers, but began it with one — the potions carried
+        // in were mixed before the Long Gallery was beaten — so the ceiling is still
+        // one clear's, never the two the run ends with.
+        var grown = CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
+        Assert.Equal((true, false, 2), (grown.FirstClear, grown.Retired, grown.FarmClears));
+        string grownText = Save(campaign);
+        Restores(Edited(grownText, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 1))), "spoiled on a first clear at the most the clear before it yields");
+        RefusedAt(Edited(grownText, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 2))), "campaign.lastResult.spoiled[1]",
             $"{most + 1} units of quality spoiled by here, above {most}, the most 1 clear yields: a potion is mixed from the yield of the run before, and no tuning yields more than {most} a clear (FarmYieldPerClear at its most)");
     }
 

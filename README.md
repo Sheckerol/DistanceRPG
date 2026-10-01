@@ -215,9 +215,12 @@ THE FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS` in green, `THE FARM YIELDED 
 UNITS - 2 DUNGEONS BEATEN` in cyan, `THE FARM YIELDED NOTHING - THE RUN DID NOT
 COUNT` in grey, and nothing before the alchemist — and after the spoils, `2
 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow. The log says it too:
-`[Farm] The alchemist has arrived: The Spear Hall is the first dungeon beaten
-besides the tutorial`, `[Farm] The run counted: 2 dungeons beaten yield a batch of
-14 units`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1`. Mixing
+`[Farm] The alchemist has arrived: The Spear Hall, beaten for the first time, is
+the one dungeon the farm counts`, `[Farm] The run counted: 2 dungeons beaten yield
+a batch of 14 units`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana
+Q1`. The alchemist is there while the farm has a worker: a `dungeons.json` beside
+the game that moves `retiresOnClear` onto the farm's one worker retires it on its
+next clear, and he arrives again with the next first clear (DECISION 11). Mixing
 — how many potions of which type, at what quality — is the alchemist's, Phase 6b's
 next step: until then the batch is shown in the summary alone. The roster stays at
 the four dungeons that ship (DECISION 8), and `FarmYieldPerClear` is derived for

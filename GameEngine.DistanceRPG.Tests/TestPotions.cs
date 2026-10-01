@@ -19,11 +19,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// the potions the bags hold are lifted out, one run that counts is played — the
 /// first clear of a dungeon besides the tutorial when the campaign has none, a
 /// whole run to the bottom of a dungeon that does not retire on its clear and out
-/// again (<see cref="CampaignRuns.Clear"/>), and otherwise a deep retreat, a mercy
-/// (<see cref="CampaignRuns.DeepRetreat"/>) — on the premise's numbers, with a
-/// <see cref="Tuning.FarmYieldPerClear"/> stated here that makes its yield cover the
-/// lot, and everything is laid back. So a second call on one campaign never spoils
-/// what the first laid: the run that covers it never sees a potion.
+/// again (<see cref="CampaignRuns.Clear"/>), after the tutorial's own clear while it
+/// stands, since the hub lists the tutorial alone until it is beaten; and otherwise
+/// a deep retreat, a mercy (<see cref="CampaignRuns.DeepRetreat"/>) — and everything
+/// is laid back. So a second call on one campaign never spoils what the first laid:
+/// the run that covers it never sees a potion.
+/// </para>
+/// <para>
+/// <strong>The run is played on the premise's content</strong>
+/// (<see cref="Premise"/>), with a <see cref="Tuning.FarmYieldPerClear"/> stated
+/// here that makes its yield cover the lot, whatever content the caller has in
+/// force. So a fixture under dungeons of its own — a <c>dungeons.json</c> beside the
+/// game that moves <c>retiresOnClear</c>, say — lays its potions before it enters
+/// them, as play mixes them before that file is put beside the game, or after a run
+/// that yielded enough; one that needs a run under them is refused here, by name.
 /// </para>
 /// <para>
 /// <strong>What a fixture keeps.</strong> It asserts no potion outlives a run's end
@@ -65,12 +74,17 @@ internal static class TestPotions
     }
 
     /// <summary>
-    /// Play the one run that brings the alchemist when the campaign has no real clear,
-    /// or a mercy otherwise, at a yield a clear that covers <paramref name="total"/>
-    /// units — the bags' potions lifted out first, so it spoils none, and laid back.
+    /// Play the one run that brings the alchemist when the campaign has no real clear
+    /// — the tutorial's clear first, while it stands — or a mercy otherwise, at a
+    /// yield a clear that covers <paramref name="total"/> units, on the premise's
+    /// content — the bags' potions lifted out first, so it spoils none, and laid back.
     /// </summary>
     private static void YieldEnough(CampaignState campaign, long total)
     {
+        Assert.True(GameContent.Current.Dungeons.All.Select(def => (def.Id, def.RetiresOnClear))
+                .SequenceEqual(Premise.Dungeons.Dungeons.Select(def => (def.Id, def.RetiresOnClear))),
+            "the run that yields for a potion is played on the premise's dungeons: lay a fixture's potions before it enters dungeons of its own, as play mixes them before such a dungeons.json is put beside the game");
+
         var held = campaign.Party.SelectMany(member => member.Potions.Select(carried => (Member: member, carried.Slot))).ToArray()
             .Select(at => (at.Member, at.Slot, Potion: at.Member.TakePotion(at.Slot))).ToArray();
 
@@ -81,6 +95,9 @@ internal static class TestPotions
             $"{total} units over {clears} clears is more than any tuning yields a clear: a potion fixture keeps to qualities a run could give");
         using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = (int)perClear }))
         {
+            var tutorial = GameContent.Current.Dungeons.Tutorial;
+            if (!campaign.IsRetired(tutorial.Id))
+                CampaignRuns.Clear(campaign, tutorial.Id, CampaignRuns.GoldenSeed);   // the hub lists the tutorial alone until it is beaten
             var dungeon = GameContent.Current.Dungeons.All.First(def => !def.RetiresOnClear && campaign.IsSelectable(def));
             var ran = arrives ? CampaignRuns.Clear(campaign, dungeon.Id, CampaignRuns.FiveDeep) : CampaignRuns.DeepRetreat(campaign, dungeon.Id);
             Assert.True(ran.FarmYield >= total, $"the run yielded {ran.FarmYield} for {total} units");

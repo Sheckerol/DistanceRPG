@@ -290,6 +290,43 @@ public sealed class FarmTests : IDisposable
         Assert.True(Farm.AlchemistHasArrived(restored));
     }
 
+    [Fact]
+    public void AMovedRetiresOnClearCanTakeTheFarmsOneWorker_AndTheAlchemistWithIt()
+    {
+        // PHASE 6b DECISION 11, shipped provisionally: the alchemist is there while the
+        // farm has a worker. A dungeons.json beside the game may move retiresOnClear
+        // onto a dungeon already beaten (check 3's withdrawal) — here the Spear Hall,
+        // the farm's one worker — and the hub then lists it alone, the content's
+        // tutorial now, until it is beaten again. That clear retires it: the farm has
+        // no worker, and the alchemist goes with it. The next first clear of a dungeon
+        // that does not retire brings him again, and the summary says he has arrived.
+        // The log says what is true both times — the dungeon beaten for the first time
+        // is the one the farm counts — and never that it is the first dungeon beaten
+        // besides the tutorial: the Spear Hall was. No cooldown, so the Spear Hall's
+        // lock lifts as its clear writes it.
+        static Tuning Quick(Tuning t) => Farming(t) with { CooldownRunsPerFloor = 0 };
+        using var quick = TestContent.UsePremise(tuning: Quick);
+        var campaign = TutorialBeaten();
+        CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
+        Assert.True(Farm.AlchemistHasArrived(campaign));
+        using (TestContent.UsePremise(tuning: Quick, dungeons: TestShop.TutorialMoved))
+        {
+            Assert.Equal(["spear_hall"], campaign.Listings().Select(listing => listing.Def.Id));
+            var retiring = CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
+            Assert.Equal((false, true, 0, 0), (retiring.FirstClear, retiring.Retired, retiring.FarmClears, retiring.FarmYield));
+            Assert.False(Farm.AlchemistHasArrived(campaign));
+            Assert.Null(BetweenRunsHud.FarmLine(retiring));
+            Assert.Empty(DistanceRpgGame.FarmLines(retiring));
+
+            var regained = CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
+            Assert.Equal((true, false, 1, PerClear), (regained.FirstClear, regained.Retired, regained.FarmClears, regained.FarmYield));
+            Assert.True(Farm.AlchemistHasArrived(campaign));
+            Assert.Equal($"A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED {PerClear} UNITS", BetweenRunsHud.FarmLine(regained)!.Value.Text);
+            Assert.Equal("[Farm] The alchemist has arrived: The Long Gallery, beaten for the first time, is the one dungeon the farm counts",
+                DistanceRpgGame.FarmLines(regained)[0]);
+        }
+    }
+
     /// <summary>§6.6's loadout: "it carries the same six", a full loadout of maximum-quality potions.</summary>
     private const int Loadout = 6;
 
@@ -301,9 +338,11 @@ public sealed class FarmTests : IDisposable
         // maximum-quality potions per run". The master's FarmYieldPerClear is that
         // loadout — six potions at the quality that restores a whole pool from 1 HP,
         // 6 x 5 = 30 at HealthPotionPercent 20 — over the dungeons that do not retire
-        // on their clear, rounded down: a full clear yields the target or less, and
-        // no more than one clear's worth less. A fifth dungeon in the master, or a
-        // moved percent, fails here, saying re-derive it.
+        // on their clear, rounded down, as tuning.json's comment derives it: 7.5 -> 7,
+        // so a full clear yields the target or less, short of it by less than a unit
+        // a dungeon. A fifth dungeon in the master, a moved percent, or a rate that is
+        // not that rounding — 6, or DECISION 7's rounded-up 8 — fails here, saying
+        // re-derive it.
         //
         // What this pins, and all it pins: the master copy, when the suite runs. A
         // dungeon added to the copy beside the game in a playtest, or to the master
@@ -313,9 +352,10 @@ public sealed class FarmTests : IDisposable
         int perClear = tuning.FarmYieldPerClear;
         int dungeons = ShippedContent.Dungeons.Dungeons.Count(def => !def.RetiresOnClear);
         int target = Loadout * Alchemist.QualityForAllAt(tuning.HealthPotionPercent);
+        Assert.True(dungeons > 0, "the master has no dungeon besides the tutorial for the farm to count");
         long fullClear = (long)perClear * dungeons;
-        Assert.True(fullClear >= target - perClear && fullClear <= target,
-            $"FarmYieldPerClear {perClear} over {dungeons} dungeons yields {fullClear} a full clear, against a loadout of {Loadout} at quality {Alchemist.QualityForAllAt(tuning.HealthPotionPercent)}, {target}: re-derive FarmYieldPerClear");
+        Assert.True(perClear == target / dungeons,
+            $"FarmYieldPerClear {perClear} over {dungeons} dungeons yields {fullClear} a full clear, against a loadout of {Loadout} at quality {Alchemist.QualityForAllAt(tuning.HealthPotionPercent)}, {target}, which is {target / dungeons} a dungeon rounded down: re-derive FarmYieldPerClear");
     }
 
     [Fact]
@@ -333,7 +373,7 @@ public sealed class FarmTests : IDisposable
         var hall = CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
         Assert.Equal(
         [
-            "[Farm] The alchemist has arrived: The Spear Hall is the first dungeon beaten besides the tutorial",
+            "[Farm] The alchemist has arrived: The Spear Hall, beaten for the first time, is the one dungeon the farm counts",
             $"[Farm] The run counted: 1 dungeon beaten yields a batch of {PerClear} units",
         ], DistanceRpgGame.FarmLines(hall));
         var gallery = CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
@@ -353,11 +393,17 @@ public sealed class FarmTests : IDisposable
         static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
         var game = typeof(DistanceRpgGame);
         var handler = game.GetMethod("LogTheFarm", Declared)!;
-        Assert.Equal(["Adopt", "DropCampaign"], Edges(game.Assembly).Where(edge => IsDelegate(edge.Op) && Same(edge.Target, handler))
-            .Select(edge => edge.From.Name).Distinct().Order(StringComparer.Ordinal));
+        // Each site counted, not each method: Adopt wires the new campaign and lets the
+        // one it replaces go, DropCampaign lets it go.
+        Assert.Equal([("Adopt", 2), ("DropCampaign", 1)], Edges(game.Assembly).Where(edge => IsDelegate(edge.Op) && Same(edge.Target, handler))
+            .GroupBy(edge => edge.From.Name).Select(sites => (sites.Key, sites.Count())).OrderBy(sites => sites.Key, StringComparer.Ordinal));
         Assert.Contains(CallsIn(handler), called => called.DeclaringType?.Name == "Log" && called.Name == "Info");
         Assert.Contains(CallsIn(handler), called => Same(called, game.GetMethod(nameof(DistanceRpgGame.FarmLines), Declared)!));
-        var calls = CallsIn(game.GetMethod("DropCampaign", Declared)!).Select(called => called.Name).ToList();
-        Assert.Equal(3, calls.Count(name => name == "remove_RunEnded"));   // the save request, the enchanter's log and the farm's, each let go
+        foreach (string letsGo in new[] { "Adopt", "DropCampaign" })
+        {
+            var calls = CallsIn(game.GetMethod(letsGo, Declared)!).Select(called => called.Name).ToList();
+            Assert.True(calls.Count(name => name == "remove_RunEnded") == 3,   // the save request, the enchanter's log and the farm's, each let go
+                $"{letsGo} lets {calls.Count(name => name == "remove_RunEnded")} RunEnded handlers go, not the three it wires");
+        }
     }
 }

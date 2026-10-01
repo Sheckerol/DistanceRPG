@@ -1175,7 +1175,8 @@ hand.** A loadout is six maximum potions, 6 × 5 = 30 units at `HealthPotionPerc
 20, over the four dungeons beside the tutorial that ship: 7.5, rounded down to 7,
 so a full clear yields 28 a run. Its comment in `tuning.json` carries the
 derivation and says to re-derive it, and the suite fails when the master's roster
-or `HealthPotionPercent` moves without it being re-derived
+or `HealthPotionPercent` moves without it being re-derived, or when the rate is not
+that rounding down, 6 or 8 at four dungeons
 (`FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`).
 
 **What the pick costs, plainly.** It is a rate. A dungeon added through
@@ -1216,3 +1217,42 @@ re-derived by hand when a dungeon is added. **This bends the settled hand-off.**
 alternative: two placeholder rows, each a repeated theme with provisional names,
 marked `/* provisional */` as the four are, and `FarmYieldPerClear` re-derived to 5
 (30 over six). settled.md's Phase 6b implementation pass records the ruling.
+
+## Whether the alchemist can leave (§6.6) — PHASE 6b DECISION 11
+
+§6.6 has the alchemist arrive with the first real clear: "nobody mixes potions until
+you have beaten a dungeon that is not the tutorial", and "the tutorial does not
+count" (phase-6-between-runs.md). Phase 6b.3 derives his arrival from the campaign's
+own records: he is there once the farm has a worker, a dungeon cleared and not
+retired (`Farm.AlchemistHasArrived`), asked of the retired list and never of which
+dungeon today's `dungeons.json` retires on its clear (check 30's precedent). Nothing
+says whether he can go again. Under the shipped files he cannot: only the tutorial
+retires, and it is never a worker. But a `dungeons.json` beside the game may move
+`retiresOnClear` onto a dungeon already beaten (check 3, withdrawn). If that is the
+farm's one worker, the hub lists it alone, as the content's tutorial now, until it is
+beaten again, and that clear retires it. The farm has no worker, so the alchemist is
+not there, and the next first clear of a dungeon that does not retire brings him
+again.
+
+**Shipped provisionally (the Phase 6b.3 review): he is there while the farm has a
+worker**, derived as built, with nothing saved. So under that file he goes with the
+farm's one worker, and the run that brings him back says so as the first did: `A
+FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS`. No potion can
+be in a bag while he is gone: those carried into the re-clear spoiled as it ended,
+and nothing mixes one until he is back. So the save's check that a potion needs a
+worker (31) refuses nothing play writes. The log's arrival line says only what is
+true both times, `[Farm] The alchemist has arrived: The Long Gallery, beaten for the
+first time, is the one dungeon the farm counts`, never "the first dungeon beaten
+besides the tutorial", which the Spear Hall was. The ALCHEMIST page, Phase 6b's next
+step, opens and closes on the same question, so it will follow this reading.
+
+**This decides whether the hub can lose a service it has opened, so it is the
+user's to decide.** The alternatives: (a) he stays for good once any dungeon besides
+the tutorial has been beaten. That needs the tutorial told apart from a worker a
+moved flag retired: either asked of today's content, against check 30's precedent,
+or saved, as a version-3 member such as the run he arrived on, with a check of its
+own. With no worker the farm still yields nothing, so his page would stay open over
+an empty batch until the next first clear, whose summary would say the farm grows.
+(b) He counts every dungeon ever beaten but the first, taking the tutorial to come
+first. A dev-override launch (`DISTANCERPG_DUNGEON`) beats a real dungeon first, so
+(b) would miscount it. settled.md's Phase 6b implementation pass records the ruling.

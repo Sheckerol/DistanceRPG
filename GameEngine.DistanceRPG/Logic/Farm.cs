@@ -47,7 +47,10 @@ public static class Farm
 
     /// <summary>
     /// Whether the alchemist has arrived (§6.6): with the first clear of a dungeon
-    /// besides the tutorial — the farm's first worker. Derived, never saved.
+    /// besides the tutorial — the farm's first worker. Derived, never saved. So he
+    /// is there while the farm has a worker: a <c>dungeons.json</c> that moves
+    /// <c>retiresOnClear</c> onto the farm's one worker retires it on its re-clear,
+    /// and he goes with it until the next first clear (PHASE 6b DECISION 11).
     /// </summary>
     public static bool AlchemistHasArrived(CampaignState campaign) => Clears(campaign) >= 1;
 

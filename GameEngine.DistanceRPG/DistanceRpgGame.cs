@@ -794,12 +794,16 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <summary>
     /// The log's lines for what a run's end did at the farm, off its result: the
     /// alchemist's arrival on the first clear of a dungeon besides the tutorial —
-    /// <c>[Farm] The alchemist has arrived: The Spear Hall is the first dungeon
-    /// beaten besides the tutorial</c> — then, once the farm has a worker, what it
-    /// yielded — <c>[Farm] The run counted: 2 dungeons beaten yield a batch of 14
-    /// units</c>, or <c>[Farm] The run did not count: no batch</c> (PHASE 6b
-    /// DECISION 4) — and the potions that spoiled as the run ended, whenever any
-    /// did: <c>[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1</c>.
+    /// <c>[Farm] The alchemist has arrived: The Spear Hall, beaten for the first
+    /// time, is the one dungeon the farm counts</c>, never "the first dungeon
+    /// beaten": a <c>dungeons.json</c> that moves <c>retiresOnClear</c> onto the
+    /// farm's one worker retires it on its re-clear, and the alchemist arrives again
+    /// with the next first clear (PHASE 6b DECISION 11) — then, once the farm has a
+    /// worker, what it yielded — <c>[Farm] The run counted: 2 dungeons beaten yield
+    /// a batch of 14 units</c>, or <c>[Farm] The run did not count: no batch</c>
+    /// (PHASE 6b DECISION 4) — and the potions that spoiled as the run ended,
+    /// whenever any did: <c>[Farm] 2 potions spoiled at the run's end: Health Q2,
+    /// Mana Q1</c>.
     /// Nothing before the alchemist, unless potions spoiled. The playtests read the
     /// yield here run by run. A dungeon by its content row's name, and its id where
     /// the content has none.
@@ -811,7 +815,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         if (result.FirstClear && !result.Retired && result.FarmClears == 1)
         {
             string dungeon = GameContent.Current.Dungeons.TryGet(result.DungeonId, out var def) ? def.Name : result.DungeonId;
-            lines.Add($"[Farm] The alchemist has arrived: {dungeon} is the first dungeon beaten besides the tutorial");
+            lines.Add($"[Farm] The alchemist has arrived: {dungeon}, beaten for the first time, is the one dungeon the farm counts");
         }
         if (result.FarmClears >= 1)
         {
