@@ -44,6 +44,9 @@ public sealed class SaveConsistencyTests : IDisposable
     private static readonly string WearWhy =
         $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
 
+    /// <summary>Why a potion carried before the alchemist could have mixed one is refused: what check 31 says.</summary>
+    private const string AlchemistWhy = "a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before";
+
     private static string FixtureText(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name));
 
     private static CampaignState NewCampaign() => CampaignState.Start(GameContent.Current);
@@ -360,30 +363,40 @@ public sealed class SaveConsistencyTests : IDisposable
             Loads(moved, "a shop worked after retiresOnClear moved");
         }
 
-        // Potions (Phase 6b.1), once a dungeon besides the tutorial is cleared: in two
-        // bags between runs, one of the most quality a save holds; carried into a
-        // dungeon, one poured out; in the bag of a member whose hand a wipe emptied —
-        // it held a spoil — between runs; and in the bag of a member who is down mid-run.
+        // Potions (Phase 6b.1), once a dungeon besides the tutorial is cleared, each
+        // laid between runs as a mix lays them (TestPotions), and none asked to
+        // outlive a run's end, which spoils them from Phase 6b's farm on: in two bags
+        // between runs; carried into a dungeon, one poured out; in the bag of a
+        // member whose hand a wipe emptied — it held a spoil — laid after that wipe,
+        // which took the boss down first, a clear, so the run counted; and in the bag
+        // of a member who is down mid-run, carried into that run.
         var potions = NewCampaign();
         TestPotions.Carrying(potions, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
-        TestPotions.Carrying(potions, "C", (5, TestPotions.Health(ContentBounds.MostCount)));
-        Loads(potions, "potions in two bags between runs, one of the most quality");
+        TestPotions.Carrying(potions, "C", (5, TestPotions.Health(3)));
+        Loads(potions, "potions in two bags between runs");
         var carriedIn = potions.Enter(potions.DefaultNext(), FiveDeep);
         var potionTurns = carriedIn.OpenTurns(potions.Party, CampaignRuns.Ten);
         potions.Party[0].TakePotion(3);
         Loads(potions, "potions carried into a dungeon, one poured out");
+        while (carriedIn.Current.DownStairs is not null)
+            potionTurns = CampaignRuns.Down(carriedIn, potions.Party);
         var heldSpoil = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
         int spoilSlot = Pickup.Take(potions, carriedIn.Current.Enemies[0], heldSpoil, potions.Party[2], carriedIn);
         Assert.True(potionTurns.TrySwap(potions.Party[2], spoilSlot));
         Assert.Same(heldSpoil.Weapon, potions.Party[2].EquippedWeapon);
-        CampaignRuns.Wipe(potions, potionTurns);
-        Assert.Null(potions.Party[2].Inventory[0]);
-        Assert.NotEmpty(potions.Party[2].Potions);
+        carriedIn.Current.Boss!.Alive = false;
+        carriedIn.RecordBossDefeated();
+        var potionWipe = CampaignRuns.Wipe(potions, potionTurns);
+        Assert.Equal((RunOutcome.Death, true, true), (potionWipe.Outcome, potionWipe.BossDefeated, potionWipe.ServiceTick));
+        Assert.Null(potions.Party[2].Inventory[0]);   // the spoil it held, lost
+        TestPotions.Carrying(potions, "C", (3, TestPotions.Health(2)));
+        TestPotions.Carrying(potions, "A", (4, TestPotions.Mana(1)));
+        Assert.Null(potions.Party[2].Inventory[0]);   // between runs: the next descent arms it
         Loads(potions, "potions in the bag of a member whose hand a wipe emptied");
         potions.Enter(potions.DefaultNext(), FiveDeep).OpenTurns(potions.Party, CampaignRuns.Ten);
         potions.Party[0].Hp = 0;
         potions.Party[0].Alive = false;
-        Assert.NotEmpty(potions.Party[0].Potions);
+        Assert.Equal(TestPotions.Mana(1), potions.Party[0].PotionIn(4));
         Loads(potions, "potions in the bag of a member who is down mid-run");
 
         // Transfers (Phase 6a.6): a move and a reorder in the shop, the source held
@@ -1266,8 +1279,32 @@ public sealed class SaveConsistencyTests : IDisposable
             Assert.Equal(("campaign.party[0].potions[0].type", $"'{type}' is no potion type"), (refused.Where, refused.Problem));
         }
 
-        // At its ceiling, a quality loads; and a bag's last slot is a bag slot.
-        Restores(Edited(text, tree => Row(tree, 0)["quality"] = ContentBounds.MostCount), "a potion of the most quality");
+        // A member whose bag is its hand alone — a save written under a PartyCarrySlots
+        // of one slot a member — has no slot a potion can lie in, and is told so.
+        RefusedAt(Edited(text, tree =>
+            {
+                var hand = MemberNode(tree, 0)["inventory"]![0]!.DeepClone();
+                MemberNode(tree, 0)["inventory"] = new JsonArray(hand);
+            }),
+            "campaign.party[0].potions[0].slot", "2 is no bag slot of member A: it carries a hand and no bag");
+
+        // At its ceiling a quality passes its own read. A whole save carrying one is
+        // none play will write — from Phase 6b's farm on, what the bags carry is
+        // checked against what the last run yielded, a few units — so the ceiling is
+        // asked where no such check reaches it: on a save check 31 refuses, the
+        // tutorial beaten and nothing besides. Every field is read on its own before
+        // the fields are checked together, so a potion of the most quality is refused
+        // by check 31 and never at its quality, while one past it is refused at its
+        // quality first.
+        var tutorial = NewCampaign();
+        CampaignRuns.Clear(tutorial, "tutorial", GoldenSeed);
+        string before = Save(tutorial);
+        static JsonNode Carried(long quality) => JsonNode.Parse($$"""[{ "slot": 2, "type": "Health", "quality": {{quality}} }]""")!;
+        RefusedAt(Edited(before, tree => MemberNode(tree, 0)["potions"] = Carried(ContentBounds.MostCount)), "campaign.party[0].potions[0]", AlchemistWhy);
+        RefusedAt(Edited(before, tree => MemberNode(tree, 0)["potions"] = Carried(ContentBounds.MostCount + 1L)),
+            "campaign.party[0].potions[0].quality", $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {quality}");
+
+        // And a bag's last slot is a bag slot.
         Restores(Edited(text, tree => Row(tree, 1)["slot"] = 5), "a potion in the bag's last slot");
     }
 
@@ -1280,23 +1317,22 @@ public sealed class SaveConsistencyTests : IDisposable
         // the first potion it finds. Asked of the retired list alone, never of which
         // dungeon today's dungeons.json retires on its clear: a copy beside the game
         // may move that flag, and a save play wrote still loads.
-        string why = "a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before";
         var potion = JsonNode.Parse("""[{ "slot": 2, "type": "Health", "quality": 1 }]""")!;
 
         // A new campaign, nothing cleared; and the tutorial beaten and retired, nothing else.
         var fresh = NewCampaign();
-        RefusedAt(Edited(Save(fresh), tree => MemberNode(tree, 1)["potions"] = potion.DeepClone()), "campaign.party[1].potions[0]", why);
+        RefusedAt(Edited(Save(fresh), tree => MemberNode(tree, 1)["potions"] = potion.DeepClone()), "campaign.party[1].potions[0]", AlchemistWhy);
         CampaignRuns.Clear(fresh, "tutorial", GoldenSeed);
         string tutorial = Save(fresh);
         Restores(tutorial, "the tutorial beaten, carrying nothing");
-        RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", why);
+        RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", AlchemistWhy);
 
         // The first member found carrying one is named, the roster's order.
         RefusedAt(Edited(tutorial, tree =>
         {
             MemberNode(tree, 2)["potions"] = potion.DeepClone();
             MemberNode(tree, 3)["potions"] = potion.DeepClone();
-        }), "campaign.party[2].potions[0]", why);
+        }), "campaign.party[2].potions[0]", AlchemistWhy);
 
         // Once a dungeon besides the tutorial is cleared — the Spear Hall, as the potion
         // fixtures clear one (TestPotions) — a potion loads; and under a dungeons.json
@@ -1310,7 +1346,7 @@ public sealed class SaveConsistencyTests : IDisposable
         using (TestContent.UsePremise(dungeons: TestShop.TutorialMoved))
         {
             Restores(hall, "a potion, retiresOnClear moved since onto the dungeon cleared");
-            RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", why);
+            RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", AlchemistWhy);
         }
 
         // An empty list is none, and null is none, before the alchemist as after.

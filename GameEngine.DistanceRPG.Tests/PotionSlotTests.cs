@@ -264,11 +264,12 @@ public sealed class PotionSlotTests : IDisposable
 
         // And a weapon in a hand put down in its own bag, behind nothing but potions,
         // would come straight back: the emptied hand takes the first weapon, passing
-        // the potions over. Behind a weapon, or onto a potion's slot, it would not.
+        // the potions over. Onto a potion's slot, or behind a weapon, it would not.
         Assert.True(campaign.ComesStraightBack(Slot("A", 0), Slot("A", 5)));
+        Assert.False(campaign.ComesStraightBack(Slot("A", 0), Slot("A", 1)));   // a potion lies there, and nothing ahead of it: no move puts a weapon on it
         var b = Carrying(campaign, "B", (2, Mana(3)));
         Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 3)));   // B's staff, in slot 1, is taken up instead
-        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 2)));   // a potion lies there: no move puts a weapon on it
+        Assert.False(campaign.ComesStraightBack(Slot("B", 0), Slot("B", 2)));   // B's staff is ahead of it too, and a potion lies there
         Assert.Equal(Mana(3), b.PotionIn(2));
     }
 

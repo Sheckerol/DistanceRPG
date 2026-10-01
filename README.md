@@ -517,10 +517,15 @@ back to it, and the game quits from it.
   never deleted, and loads nothing in its place. While Phase 6b is being built,
   every 6b step reads version 3 as its own, as every 6a step read version 2: an
   earlier step's build loads a save a later step wrote, passes over what it does
-  not know of, and its next save drops it (PHASE 6a DECISION 14, extended); and a
-  save an earlier 6b step wrote may say `THE NUMBERS HAVE CHANGED` once when a
-  later step loads it, though no number moved, since the steps add the numbers
-  they play to version 3's record. A released version 3 never does.
+  not know of, and its next save drops it (PHASE 6a DECISION 14, extended). From
+  6b.3 that costs more: the last run's record gains what the farm yielded, and
+  every potion carried is checked against it, so a slot a 6b.3-or-later build
+  saved and a 6b.1 or 6b.2 build then saved again with potions in its bags is
+  refused by a 6b.3-or-later build — the yield it was mixed from is gone — and set
+  aside, kept and never deleted. And a save an earlier 6b step wrote may say
+  `THE NUMBERS HAVE CHANGED` once when a later step loads it, though no number
+  moved, since the steps add the numbers they play to version 3's record. A
+  released version 3 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with

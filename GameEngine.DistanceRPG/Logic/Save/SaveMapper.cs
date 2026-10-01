@@ -608,14 +608,14 @@ internal static class SaveMapper
 
     /// <summary>
     /// A member's potions laid into its bag (§3.4), each on its own: its slot a bag
-    /// slot, 1 to the bag's last — the hand keeps a weapon — and one the bag's
-    /// weapon rows leave empty, since a slot holds one thing; the rows in strictly
-    /// ascending slot order, so no two share a slot (one potion a slot, no
-    /// stacking) and one campaign is one text; its type a <see cref="PotionType"/>'s
-    /// name; and its quality 1 at least — one unit makes an ordinary potion — and no
-    /// more than <see cref="ContentBounds.MostCount"/>, a count of units. That it was
-    /// mixed at all is asked of the fields together (<see cref="SaveConsistency"/>,
-    /// check 31).
+    /// slot, 1 to the bag's last — the hand keeps a weapon, and a member that carries
+    /// its hand alone has no slot for one — and one the bag's weapon rows leave
+    /// empty, since a slot holds one thing; the rows in strictly ascending slot
+    /// order, so no two share a slot (one potion a slot, no stacking) and one
+    /// campaign is one text; its type a <see cref="PotionType"/>'s name; and its
+    /// quality 1 at least — one unit makes an ordinary potion — and no more than
+    /// <see cref="ContentBounds.MostCount"/>, a count of units. That it was mixed at
+    /// all is asked of the fields together (<see cref="SaveConsistency"/>, check 31).
     /// </summary>
     private static void Potions(PartyMemberState member, IReadOnlyList<PotionDto> dtos, string at)
     {
@@ -629,7 +629,9 @@ internal static class SaveMapper
             if (row.Slot < 1 || row.Slot > last)
                 throw new SaveFormatException($"{where}.slot", row.Slot == 0
                     ? "0 is the hand: the hand keeps a weapon, and a bag runs from slot 1"
-                    : $"{row.Slot} is no bag slot of member {member.Id}: the bag runs 1 to {last}");
+                    : last < 1   // a bag of the hand alone: PartyCarrySlots at one slot a member
+                        ? $"{row.Slot} is no bag slot of member {member.Id}: it carries a hand and no bag"
+                        : $"{row.Slot} is no bag slot of member {member.Id}: the bag runs 1 to {last}");
             if (row.Slot <= previous)
                 throw new SaveFormatException($"{where}.slot",
                     $"{row.Slot} is not after slot {previous}: the potions are listed by slot, one a slot, no stacking");

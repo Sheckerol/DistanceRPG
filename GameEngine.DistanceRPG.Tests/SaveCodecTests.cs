@@ -392,6 +392,23 @@ public class SaveCodecTests
             Assert.Equal(text, SaveCodec.Write(loaded));
         }
 
+        // From every party row, never the first alone: a party of three with a stray
+        // on its last row only, and with one on every row.
+        string trio = SaveCodec.Write(Sample(Member("A"), Member("B"), Member("C")));
+        foreach (int[] rows in new[] { new[] { 2 }, new[] { 0, 1, 2 } })
+        {
+            var hand = Tree(trio);
+            hand["version"] = 2;
+            Assert.All(Campaign(hand)["party"]!.AsArray(), row => Assert.True(row!.AsObject().Remove("potions")));
+            foreach (int row in rows)
+                Campaign(hand)["party"]![row]!["potions"] = JsonNode.Parse(StrayPotions[0]);
+            var lifted = SaveCodec.LiftToVersion3(hand.DeepClone().AsObject());
+            Assert.All(Campaign(lifted)["party"]!.AsArray(), row => Assert.False(row!.AsObject().ContainsKey("potions")));
+            var loaded = SaveCodec.Read(hand.ToJsonString());
+            Assert.All(loaded.Campaign.Party, member => Assert.Null(member.Potions));
+            Assert.Equal(trio, SaveCodec.Write(loaded));
+        }
+
         // A version-1 document is lifted through both steps, and a stray potions on
         // it goes the same way: version 1 knew it no better.
         var v1 = Tree(text);
@@ -435,6 +452,21 @@ public class SaveCodecTests
             Assert.Equal(where, Refused(two.ToJsonString()).Where);   // a SaveFormatException, exactly: never the step's own exception
             SaveCodec.LiftToVersion3(two);   // and the step alone passes over it
         }
+
+        // A row it cannot read stops nothing: the walk goes on past it, every row that
+        // is an object loses its stray, and the reader refuses the row between by its
+        // path.
+        var mixed = Tree(SaveCodec.Write(Sample(Member("A"), Member("B"), Member("C"))));
+        mixed["version"] = 2;
+        Campaign(mixed)["party"]![1] = "x";
+        Campaign(mixed)["party"]![0]!["potions"] = JsonNode.Parse(StrayPotions[0]);
+        Campaign(mixed)["party"]![2]!["potions"] = JsonNode.Parse(StrayPotions[0]);
+        var walked = Campaign(SaveCodec.LiftToVersion3(mixed.DeepClone().AsObject()))["party"]!.AsArray();
+        Assert.False(walked[0]!.AsObject().ContainsKey("potions"));
+        Assert.Equal("x", walked[1]!.GetValue<string>());
+        Assert.False(walked[2]!.AsObject().ContainsKey("potions"));
+        Assert.Equal("campaign.party[1]", Refused(mixed.ToJsonString()).Where);
+
         // And a null where a campaign belongs: the step has nothing to walk, and the
         // reader says so where the campaign is missing, at either version.
         var nothing = Tree(text);

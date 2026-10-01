@@ -665,9 +665,10 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Empty(empty.Party[1].Potions);
         Assert.Equal(Save(campaign), Save(empty));
 
-        // Mid-run: carried into a dungeon, one poured out on the floor, and saved at
-        // the party's turn — the rest come back where they lie, and the one poured out
-        // is in no bag and on no floor.
+        // Mid-run: carried into a dungeon, one poured out — taken out of its bag by
+        // its one door, nothing laid on the floor — and saved at the party's turn:
+        // the rest come back where they lie, and the one poured out is in no bag and
+        // on no floor.
         var visit = In(campaign, campaign.DefaultNext(), FiveDeep);
         Assert.Equal(TestPotions.Health(2), campaign.Party[0].TakePotion(2));
         string midText = Save(campaign);
