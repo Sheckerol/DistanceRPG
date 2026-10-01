@@ -271,7 +271,8 @@ back A's Health potion, quality 3, from bag slot 3: 7 of 7 units left`, a refusa
 as `[Alchemist] Refused: ...`, and on the descent the run's split, `[Alchemist]
 Descending with 3 health potions (9 units) and 2 mana potions (4 units); 1 of 14
 units unmixed, spoiled`; the hub's own line on opening says `- the batch holds 9 of
-14 units`.
+14 units`. With no batch, both say why, as the page does: `- no batch: the last run
+did not count`, and the descent's `...; no batch: the last run did not count`.
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The

@@ -347,7 +347,7 @@ public sealed class BetweenRunsScene : Scene
             + (_listings.Count == 0 ? "nothing left to enter" : string.Join("; ", _listings.Select(BetweenRunsHud.ListingLine)))
             + (_chosen >= 0 ? $" - {_listings[_chosen].Def.Name} chosen" : "")
             + $" - the stable holds {_campaign.Stable.Count}, the enchanter {_campaign.AtTheEnchanter.Count}"
-            + (Farm.AlchemistHasArrived(_campaign) ? $" - the batch holds {Farm.Batch(_campaign)} of {UnitsSaid(_campaign.LastResult?.FarmYield ?? 0)}" : ""));
+            + BatchClause(_campaign));
     }
 
     public override void Render(Camera camera)
@@ -873,8 +873,9 @@ public sealed class BetweenRunsScene : Scene
     /// arrived — the numbers a playtest needs to see whether every party mixes the same
     /// ratio (§6.6: "if every party mixes the same ratio every run, the prices are
     /// wrong"): <c>[Alchemist] Descending with 3 health potions (9 units) and 2 mana
-    /// potions (4 units); 1 of 14 units unmixed, spoiled</c>. Null before he has
-    /// arrived.
+    /// potions (4 units); 1 of 14 units unmixed, spoiled</c> — and with no batch to
+    /// spoil, why there is none (<see cref="NoBatchSaid"/>): <c>...; no batch: the
+    /// last run did not count</c>. Null before he has arrived.
     /// </summary>
     internal static string? DescentLine(CampaignState campaign)
     {
@@ -889,7 +890,38 @@ public sealed class BetweenRunsScene : Scene
             return $"{ofType.Count} {name} {(ofType.Count == 1 ? "potion" : "potions")} ({units} {(units == 1 ? "unit" : "units")})";
         }
         return $"[Alchemist] Descending with {Carried(PotionType.Health, "health")} and {Carried(PotionType.Mana, "mana")}; "
-            + $"{Farm.Batch(campaign)} of {UnitsSaid(campaign.LastResult?.FarmYield ?? 0)} unmixed, spoiled";
+            + (NoBatchSaid(campaign) ?? $"{Farm.Batch(campaign)} of {UnitsSaid(campaign.LastResult!.FarmYield)} unmixed, spoiled");
+    }
+
+    /// <summary>
+    /// The batch, as the hub's opening line ends once the alchemist has arrived:
+    /// <c> - the batch holds 9 of 14 units</c> — and with nothing yielded, why there
+    /// is none (<see cref="NoBatchSaid"/>): <c> - no batch: the last run did not
+    /// count</c>. Empty before he has arrived.
+    /// </summary>
+    internal static string BatchClause(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        if (!Farm.AlchemistHasArrived(campaign))
+            return "";
+        return $" - {NoBatchSaid(campaign) ?? $"the batch holds {Farm.Batch(campaign)} of {UnitsSaid(campaign.LastResult!.FarmYield)}"}";
+    }
+
+    /// <summary>
+    /// Why there is no batch, as the log says it: the reason the page gives in the
+    /// batch's place (<see cref="Logic.Alchemist.NoBatch"/>), in the log's case —
+    /// <c>no batch: the last run did not count</c>, <c>no batch: the farm yields
+    /// nothing</c>, <c>no batch yet: the next run that counts brings one</c> — as the
+    /// farm's own log has its zero form (<c>[Farm] The run did not count: no
+    /// batch</c>). Null when the last run yielded a batch, mixed or not: then "0 of
+    /// 14 units" is a batch all mixed, never one that did not come.
+    /// </summary>
+    internal static string? NoBatchSaid(CampaignState campaign)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        return campaign.LastResult is { FarmYield: > 0 }
+            ? null
+            : Logic.Alchemist.NoBatch(campaign).ToLowerInvariant().Replace(" - ", ": ", StringComparison.Ordinal);
     }
 
     /// <summary>Units as the log says them: <c>1 unit</c>, <c>14 units</c>.</summary>

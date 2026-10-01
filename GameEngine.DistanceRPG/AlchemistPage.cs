@@ -88,18 +88,28 @@ internal sealed class AlchemistPage
     }
 
     /// <summary>
-    /// The batch (§6.6), off the last run's yield and what the bags hold: <c>THE BATCH -
-    /// 9 OF 14 UNITS LEFT</c>, <c>THE BATCH - ALL 14 UNITS MIXED</c> — and with no batch,
-    /// why (<see cref="Alchemist.NoBatch"/>): <c>NO BATCH - THE LAST RUN DID NOT
+    /// The batch (§6.6), off the last run's yield and what the bags hold
+    /// (<see cref="BatchLine(int, int)"/>) — and with no batch, why
+    /// (<see cref="Alchemist.NoBatch"/>): <c>NO BATCH - THE LAST RUN DID NOT
     /// COUNT</c>, and the rest.
     /// </summary>
     internal static string BatchLine(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         int yielded = campaign.LastResult?.FarmYield ?? 0;
-        if (yielded <= 0)
-            return Alchemist.NoBatch(campaign);
-        int left = Farm.Batch(campaign);
+        return yielded > 0 ? BatchLine(Farm.Batch(campaign), yielded) : Alchemist.NoBatch(campaign);
+    }
+
+    /// <summary>
+    /// The batch, <paramref name="left"/> of the <paramref name="yielded"/> units the
+    /// last run's end yielded: <c>THE BATCH - 9 OF 14 UNITS LEFT</c>, and with none
+    /// left, <c>THE BATCH - ALL 14 UNITS MIXED</c>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Nothing yielded — that line is why there is no batch (<see cref="Alchemist.NoBatch"/>) — or less than none left.</exception>
+    internal static string BatchLine(int left, int yielded)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(yielded, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(left);
         return left > 0 ? $"THE BATCH - {left} OF {BetweenRunsHud.Units(yielded)} LEFT" : $"THE BATCH - ALL {BetweenRunsHud.Units(yielded)} MIXED";
     }
 

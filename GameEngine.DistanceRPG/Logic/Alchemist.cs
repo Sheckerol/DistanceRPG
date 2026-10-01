@@ -239,21 +239,29 @@ public static class Alchemist
     /// <summary>
     /// Why there is no batch to mix from, the last run having yielded nothing — what
     /// the ALCHEMIST page says in the batch's place, and what H and M say then:
-    /// <c>NO BATCH - THE LAST RUN DID NOT COUNT</c>; <c>NO BATCH - THE FARM YIELDS
-    /// NOTHING</c> under a <see cref="Tuning.FarmYieldPerClear"/> of 0; and
-    /// <c>NO BATCH YET - THE NEXT RUN THAT COUNTS BRINGS ONE</c> after a run that
-    /// counted and yielded nothing — a save from before the farm (PHASE 6a's) — or
-    /// before any run has ended.
+    /// <see cref="NoBatchNotCounted"/>; <see cref="NoBatchFarmIdle"/> under a
+    /// <see cref="Tuning.FarmYieldPerClear"/> of 0; and <see cref="NoBatchYet"/>
+    /// after a run that counted and yielded nothing — a save from before the farm
+    /// (PHASE 6a's) — or before any run has ended.
     /// </summary>
     public static string NoBatch(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         if (campaign.LastResult is { ServiceTick: false })
-            return "NO BATCH - THE LAST RUN DID NOT COUNT";
+            return NoBatchNotCounted;
         if (Farm.Yield(Farm.Clears(campaign), counted: true) == 0)
-            return "NO BATCH - THE FARM YIELDS NOTHING";
-        return "NO BATCH YET - THE NEXT RUN THAT COUNTS BRINGS ONE";
+            return NoBatchFarmIdle;
+        return NoBatchYet;
     }
+
+    /// <summary>No batch: the last run did not count, so the farm yielded nothing for it.</summary>
+    public const string NoBatchNotCounted = "NO BATCH - THE LAST RUN DID NOT COUNT";
+
+    /// <summary>No batch: the farm yields nothing on any run, at a <see cref="Tuning.FarmYieldPerClear"/> of 0.</summary>
+    public const string NoBatchFarmIdle = "NO BATCH - THE FARM YIELDS NOTHING";
+
+    /// <summary>No batch yet: the last run counted and yielded nothing — a save from before the farm — or none has ended.</summary>
+    public const string NoBatchYet = "NO BATCH YET - THE NEXT RUN THAT COUNTS BRINGS ONE";
 
     /// <summary>A number of units as the screen says it: <c>1 UNIT</c>, <c>3 UNITS</c>.</summary>
     private static string UnitsSaid(int n) => $"{n} {(n == 1 ? "UNIT" : "UNITS")}";

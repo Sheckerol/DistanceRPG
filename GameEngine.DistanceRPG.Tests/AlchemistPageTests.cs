@@ -10,9 +10,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// what spoils and the quality; each member's room and each potion in its bag; the
 /// quality held to the batch; the choice over the rows and the window that scrolls
 /// with it; what each mix would restore; the choice kept by place across a mix and a
-/// pour-back; and every string in its column, in the HUD's font. On the numbers the
-/// runs were written against (<see cref="Premise"/>), with the farm's rate, the
-/// potions' shares and a drink's cost stated here as these tests' own input.
+/// pour-back; a bag's room, read in one place for this page and WEAPONS; and every
+/// string in its column, in the HUD's font. On the numbers the runs were written
+/// against (<see cref="Premise"/>), with the farm's rate, the potions' shares and a
+/// drink's cost stated here as these tests' own input.
 /// </summary>
 [Collection(TestContent.Collection)]
 public sealed class AlchemistPageTests : IDisposable
@@ -133,6 +134,14 @@ public sealed class AlchemistPageTests : IDisposable
         CampaignRuns.ShallowRetreat(campaign, "knife_warrens");
         Assert.Equal("NO BATCH - THE LAST RUN DID NOT COUNT", page.Lines()[1].Text);
         Assert.Equal(Alchemist.NoBatch(campaign), AlchemistPage.BatchLine(campaign));
+        Assert.Equal(Alchemist.NoBatchNotCounted, Alchemist.NoBatch(campaign));
+
+        // The batch's line built from its numbers alone, as the fit test measures it:
+        // there is no batch line for nothing yielded — that line is why.
+        Assert.Equal(("THE BATCH - 9 OF 14 UNITS LEFT", "THE BATCH - 1 OF 1 UNIT LEFT", "THE BATCH - ALL 14 UNITS MIXED"),
+            (AlchemistPage.BatchLine(9, 14), AlchemistPage.BatchLine(1, 1), AlchemistPage.BatchLine(0, 14)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlchemistPage.BatchLine(0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => AlchemistPage.BatchLine(-1, 14));
     }
 
     [Fact]
@@ -194,7 +203,8 @@ public sealed class AlchemistPageTests : IDisposable
         int shipped = GameConstants.PartySize * PartyMemberState.SlotsFor(ShippedContent.Tuning);
         Assert.True(BetweenRunsHud.AlchemistPlace(h).Rows >= shipped, $"a 720 window holds {BetweenRunsHud.AlchemistPlace(h).Rows} rows, and a full party {shipped}");
 
-        // Every bag filled with potions: twenty, under four members.
+        // Every bag's four empty slots filled with potions: sixteen potions under four
+        // members, twenty rows.
         var campaign = CampaignState.Start(GameContent.Current);
         foreach (var member in campaign.Party)
             Carrying(campaign, member.Id, member.EmptyBagSlots.Select(slot => (slot, Health(1))).ToArray());
@@ -349,6 +359,48 @@ public sealed class AlchemistPageTests : IDisposable
     }
 
     [Fact]
+    public void TheBagsRoomIsReadInOnePlace()
+    {
+        // A bag's room is said on two pages between runs — ALCHEMIST's "[A] - 2 BAG
+        // SLOTS FREE", and WEAPONS' "  BAG   - ROOM FOR 2 MORE -", where a weapon put
+        // down takes the first of them — and the mix's gate and its door ask it too.
+        // One reader answers all four (PartyMemberState.EmptyBagSlots), read off the
+        // IL, so the pages cannot disagree: the 6b.4 build counted WEAPONS' room with a
+        // loop of its own (its review). A pickup in a dungeon asks another question,
+        // the first empty slot with the hand among them (Pickup.FirstEmptySlot).
+        Assert.Equal(["Alchemist.MixRefusal", "AlchemistPage.MemberText", "CampaignState.Stow", "HubWeapons.PartyRows"],
+            TestIl.CallersOf(typeof(PartyMemberState), "get_EmptyBagSlots"));
+
+        // And the two pages say the same room, bag by bag, as potions go in and come out.
+        var campaign = AlchemistTests.Arrived();
+        void Agree()
+        {
+            var weapons = HubWeapons.Rows(campaign);
+            foreach (var member in campaign.Party)
+            {
+                var free = member.EmptyBagSlots.ToList();
+                var room = weapons.Where(row => row is { Kind: HubWeapons.RowKind.Room, Place: { Index: > 0 } place } && place.MemberId == member.Id).ToList();
+                if (free.Count == 0)
+                {
+                    Assert.Empty(room);
+                    Assert.Equal($"[{member.Id}] - THE BAG IS FULL", AlchemistPage.MemberText(member));
+                    continue;
+                }
+                Assert.Equal((HubWeapons.BagRoom(free.Count), new WeaponPlace(member.Id, free[0])), (Assert.Single(room).Text, room[0].Place!.Value));
+                Assert.Equal($"[{member.Id}] - {free.Count} {(free.Count == 1 ? "BAG SLOT" : "BAG SLOTS")} FREE", AlchemistPage.MemberText(member));
+            }
+        }
+        Agree();
+        for (int i = 0; i < 4; i++)
+            Alchemist.Mix(campaign, "A", PotionType.Health, 1);
+        Alchemist.Mix(campaign, "B", PotionType.Mana, 2);
+        Agree();
+        Alchemist.PourBack(campaign, "A", 3);
+        Agree();
+        Assert.Equal(new WeaponPlace("A", 3), HubWeapons.Rows(campaign).Single(row => row.Text == HubWeapons.BagRoom(1)).Place);
+    }
+
+    [Fact]
     public void EveryAlchemistStringFitsItsColumn_InTheHudsFont()
     {
         // Every string the page draws fits its own column at its own scale, in the
@@ -378,8 +430,8 @@ public sealed class AlchemistPageTests : IDisposable
             AlchemistPage.FarmLine(99, Most), AlchemistPage.FarmLine(1, 1), AlchemistPage.FarmLine(99, 0),
             AlchemistPage.SpoilNote,
             AlchemistPage.QualityLine(Most), AlchemistPage.QualityLine(1),
-            "NO BATCH - THE LAST RUN DID NOT COUNT", "NO BATCH - THE FARM YIELDS NOTHING", "NO BATCH YET - THE NEXT RUN THAT COUNTS BRINGS ONE",
-            $"THE BATCH - {Most} OF {BetweenRunsHud.Units(Most)} LEFT", $"THE BATCH - ALL {BetweenRunsHud.Units(Most)} MIXED",
+            Alchemist.NoBatchNotCounted, Alchemist.NoBatchFarmIdle, Alchemist.NoBatchYet,
+            AlchemistPage.BatchLine(Most, Most), AlchemistPage.BatchLine(0, Most),
             .. rooms,
         ];
         Assert.Equal((62, 62, 63), (AlchemistPage.ClosedLine.Length, AlchemistPage.FarmLine(99, Most).Length, AlchemistPage.QualityLine(Most).Length));

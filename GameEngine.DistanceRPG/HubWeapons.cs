@@ -199,7 +199,8 @@ internal sealed class HubWeapons
     /// The page's rows, top to bottom (§6.2): the party's heading, then each member
     /// in roster order — its name, its hand, each weapon or potion in its bag in
     /// slot order, and one row for the room its bag has left, or none when it is
-    /// full: a potion's slot is no room (Phase 6b.1) — then
+    /// full: a potion's slot is no room (Phase 6b.1), and the room is read where the
+    /// ALCHEMIST page reads it (<see cref="PartyMemberState.EmptyBagSlots"/>) — then
     /// the stable's heading, each weapon in the stable in its order, and the
     /// stable's room, which is always there: the stable is unbounded (PHASE 6a
     /// DECISION 7). An empty hand is a row of its own, somewhere a weapon can go.
@@ -232,25 +233,16 @@ internal sealed class HubWeapons
             rows.Add(member.EquippedWeapon is { } hand
                 ? new Row(RowKind.Weapon, HandLabel, new WeaponPlace(member.Id, 0), hand)
                 : new Row(RowKind.Room, EmptyHand, new WeaponPlace(member.Id, 0)));   // the hand keeps a weapon: nothing else lies there
-            int firstEmpty = -1, empty = 0;
             for (int slot = 1; slot < bag.Length; slot++)
             {
                 if (bag[slot] is Weapon carried)
-                {
                     rows.Add(new Row(RowKind.Weapon, BagLabel, new WeaponPlace(member.Id, slot), carried));
-                    continue;
-                }
-                if (bag[slot] is Potion potion)
-                {
+                else if (bag[slot] is Potion potion)
                     rows.Add(new Row(RowKind.Potion, BagLabel, new WeaponPlace(member.Id, slot), Potion: potion));   // read, never chosen: its slot is full
-                    continue;
-                }
-                empty++;
-                if (firstEmpty < 0)
-                    firstEmpty = slot;
             }
-            if (empty > 0)
-                rows.Add(new Row(RowKind.Room, BagRoom(empty), new WeaponPlace(member.Id, firstEmpty)));   // a weapon put here takes the first empty slot
+            var room = member.EmptyBagSlots.ToList();   // the bag's room, read where the ALCHEMIST page reads it, so the two pages never disagree
+            if (room.Count > 0)
+                rows.Add(new Row(RowKind.Room, BagRoom(room.Count), new WeaponPlace(member.Id, room[0])));   // a weapon put here takes the first empty slot
         }
 
         var stable = campaign.Stable;
@@ -518,9 +510,13 @@ internal sealed class HubWeapons
     /// <paramref name="before"/> — the row read before the change: the row holding the
     /// same weapon (<see cref="ChooseRowOf"/>); else, for a room, the same room — a
     /// member's empty hand, its bag's room, the stable's end — wherever its first
-    /// empty slot now is; else the first row it can stop on. So ENTER, D and T never
-    /// act on a weapon the player did not choose. Nothing is carried meanwhile: the
-    /// ALCHEMIST page is a TAB away, and TAB is the carry's.
+    /// empty slot now is; else, that room gone — the mix that fills a bag takes it —
+    /// the nearest row over where it stood that is still the same member's and that
+    /// the choice stops on: its last weapon in the bag, or its hand (Phase 6b.4's
+    /// review: the first row on the page is [A]'s, a page away from [D]'s bag); else
+    /// the first row it can stop on. So a row added or taken over the choice never
+    /// moves it onto another row. Nothing is carried meanwhile: the ALCHEMIST page
+    /// is a TAB away, and TAB is the carry's.
     /// </summary>
     public void Keep(Row before)
     {
@@ -533,9 +529,14 @@ internal sealed class HubWeapons
         }
         int at = -1;
         if (before is { Kind: RowKind.Room, Place: { } was })
+        {
             for (int i = 0; i < rows.Count && at < 0; i++)
                 if (rows[i] is { Kind: RowKind.Room, Place: { } room } && room.MemberId == was.MemberId && (was.IsStable || (room.Index == 0) == (was.Index == 0)))
                     at = i;   // the same room: a member's empty hand, its bag's room, or the stable's end
+            for (int i = rows.Count - 1; i >= 0 && at < 0; i--)
+                if (rows[i] is { Choosable: true, Place: { } near } && near.MemberId == was.MemberId)
+                    at = i;   // the room gone: the member's last row the choice stops on, which stood over it
+        }
         _chosen = at >= 0 ? at : Next(rows, -1, +1, row => row.Choosable);
     }
 

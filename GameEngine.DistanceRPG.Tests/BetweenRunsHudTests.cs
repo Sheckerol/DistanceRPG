@@ -1296,7 +1296,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal((TestPotions.Health(3), 1), (campaign.Party[0].PotionIn(2), host.HubSavesAsked));
         Assert.Contains("[Alchemist] Mixed a Health potion, quality 3, into A's bag slot 3: 4 of 7 units left", Logged());
 
-        // [B], A and the left arrow down to 2, M: a mana potion in B's bag.
+        // [B]; A and the left arrow down to 1, D back up to 2; M: a mana potion in B's bag.
         ChooseAlchemistRow(scene, "[B] - 4 BAG SLOTS FREE");
         scene.OnKey(Keys.A);
         scene.OnKey(Keys.Left);
@@ -1314,21 +1314,70 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("[A] - 4 BAG SLOTS FREE", scene.Alchemist.ChosenRow!.Text);
         Assert.Contains("[Alchemist] Poured back A's Health potion, quality 3, from bag slot 3: 5 of 7 units left", Logged());
 
-        // ENTER, the digits, W/S and TAB change nothing and ask nothing; nor does ESC.
+        // ENTER, a digit, W/S, N and the space bar change nothing and ask nothing.
         foreach (var key in new[] { Keys.Enter, Keys.D1, Keys.W, Keys.S, Keys.N, Keys.Space })
             scene.OnKey(key);
         Assert.Equal(3, host.HubSavesAsked);
 
         // The descent says the run's split, and what spoils unmixed, before it enters.
+        // The host enters there and then, as the game's does, and the entry leaves the
+        // batch at 0: said after it, the line would read 0 of 7 units unmixed.
+        host.Entering = id => campaign.Enter(id, CampaignRuns.GoldenSeed);
         scene.OnKey(Keys.Tab);
         Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
         scene.OnKey(Keys.Enter);
         Assert.Single(host.Descended);
+        Assert.Equal((true, 0), (campaign.Visit is not null, Farm.Batch(campaign)));
         Assert.Contains("[Alchemist] Descending with 0 health potions (0 units) and 1 mana potion (2 units); 5 of 7 units unmixed, spoiled", Logged());
         Assert.Equal(3, host.HubSavesAsked);
         Assert.Null(BetweenRunsScene.DescentLine(CampaignState.Start(GameContent.Current)));   // nothing before the alchemist
         Assert.Equal("[Alchemist] Mixed a Mana potion, quality 1, into C's bag slot 4: 1 of 1 unit left",
             BetweenRunsScene.MixedLine(new Mixed(TestPotions.Mana(1), "C", 3, 1), 1));
+    }
+
+    [Fact]
+    public void TheLogSaysWhyThereIsNoBatch()
+    {
+        // The hub's opening line and the descent's split say the batch once the
+        // alchemist has arrived — 7 of 7 units, and 0 of 7 with all of it mixed, a
+        // batch that came — and with nothing yielded, why there is none, in the page's
+        // words in the log's case (Alchemist.NoBatch), as the farm's own log has a zero
+        // form ("[Farm] The run did not count: no batch"): never "0 of 0 units", which
+        // the 6b.4 build logged after every run that did not count (its review).
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        Assert.Equal(" - the batch holds 7 of 7 units", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal("[Alchemist] Descending with 0 health potions (0 units) and 0 mana potions (0 units); 7 of 7 units unmixed, spoiled",
+            BetweenRunsScene.DescentLine(campaign));
+        Alchemist.Mix(campaign, "A", PotionType.Health, 7);
+        Assert.Equal(" - the batch holds 0 of 7 units", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal("[Alchemist] Descending with 1 health potion (7 units) and 0 mana potions (0 units); 0 of 7 units unmixed, spoiled",
+            BetweenRunsScene.DescentLine(campaign));
+
+        // A run that did not count — its end spoiled the potion — and a farm at a rate of 0.
+        const string Carrying = "[Alchemist] Descending with 0 health potions (0 units) and 0 mana potions (0 units); ";
+        CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal(Alchemist.NoBatchNotCounted, AlchemistPage.BatchLine(campaign));
+        Assert.Equal(" - no batch: the last run did not count", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal(Carrying + "no batch: the last run did not count", BetweenRunsScene.DescentLine(campaign));
+        using (TestContent.UsePremise(tuning: t => Farming(t) with { FarmYieldPerClear = 0 }))
+        {
+            CampaignRuns.DeepRetreat(campaign, "long_gallery");
+            Assert.Equal(Alchemist.NoBatchFarmIdle, AlchemistPage.BatchLine(campaign));
+            Assert.Equal(" - no batch: the farm yields nothing", BetweenRunsScene.BatchClause(campaign));
+            Assert.Equal(Carrying + "no batch: the farm yields nothing", BetweenRunsScene.DescentLine(campaign));
+        }
+
+        // A Phase 6a save, lifted: its last run counted, before the farm yielded anything.
+        var lifted = SaveGame.Restore(SaveCodec.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "phase-6a-between-runs.json"))),
+            GameContent.Current).Campaign;
+        Assert.Equal(Alchemist.NoBatchYet, AlchemistPage.BatchLine(lifted));
+        Assert.Equal(" - no batch yet: the next run that counts brings one", BetweenRunsScene.BatchClause(lifted));
+        Assert.Equal(Carrying + "no batch yet: the next run that counts brings one", BetweenRunsScene.DescentLine(lifted));
+
+        // Before the alchemist, neither says anything of a batch.
+        var start = CampaignState.Start(GameContent.Current);
+        Assert.Equal(("", (string?)null), (BetweenRunsScene.BatchClause(start), BetweenRunsScene.DescentLine(start)));
     }
 
     [Fact]
@@ -1414,7 +1463,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         // pour-back takes one, so every row below would move: after TAB round, the
         // choice would sit on another weapon, which ENTER, D or T would then act on.
         // So the choice is kept on what it was on (HubWeapons.Keep): the same weapon;
-        // the same room; and with that room gone, the first row it can stop on.
+        // the same room — a bag's, the stable's end, an empty hand; and with that room
+        // gone, the same member's nearest row over it, never another member's.
         using var farm = TestContent.UsePremise(tuning: Farming);
         var campaign = AlchemistTests.Arrived();
         var (scene, _) = Hub(campaign);
@@ -1432,37 +1482,81 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("  HAND  TOWER GUARD - WEAR 0/30", ChosenText(scene));
         Assert.Equal(was + 3, scene.Weapons.Chosen);
 
-        // A pour-back takes a row away over it: still on the Tower Guard.
+        // A pour-back from the full bag takes a potion row away over it and brings
+        // A's room row back: as many rows over B's hand as before. The next, from a
+        // bag with room, takes one away: B's hand is a row higher, and still chosen.
         scene.OnKey(Keys.Tab);
         ChooseAlchemistRow(scene, "  BAG 3  HEALTH POTION Q1");
         scene.OnKey(Keys.T);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
         Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "  BAG 4  HEALTH POTION Q1");
+        scene.OnKey(Keys.T);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(5, Farm.Batch(campaign));
 
-        // On A's room: a mix moves the room to its next empty slot, and the choice
-        // with it; the mix that fills the bag takes the room away, and the choice
-        // goes to the first row it can stop on.
-        ChooseRow(scene, HubWeapons.BagRoom(1));
+        // On A's room, which a mix moves to its next empty slot: the choice with it.
+        ChooseRow(scene, HubWeapons.BagRoom(2));
         Assert.Equal(new WeaponPlace("A", 2), scene.Weapons.ChosenRow.Place);
         scene.OnKey(Keys.Tab);
-        ChooseAlchemistRow(scene, "[A] - 1 BAG SLOT FREE");
+        ChooseAlchemistRow(scene, "[A] - 2 BAG SLOTS FREE");
         scene.OnKey(Keys.H);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(scene.Weapons.Rows().First(row => row.Choosable).Text, ChosenText(scene));
-        Assert.Equal(2, scene.Weapons.Chosen);   // A's hand: the party's heading and [A] over it
+        Assert.Equal((HubWeapons.BagRoom(1), new WeaponPlace("A", 3)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
 
-        // A room that survives the mix keeps the choice: B's, from slot 2 to slot 3.
-        ChooseRow(scene, HubWeapons.BagRoom(4));
-        Assert.Equal(new WeaponPlace("B", 2), scene.Weapons.ChosenRow.Place);
+        // On the stable's end: a mix into C adds a row over it, and the choice moves down with it.
+        ChooseRow(scene, HubWeapons.StableRoom);
+        int stableAt = scene.Weapons.Chosen;
         scene.OnKey(Keys.Tab);
-        ChooseAlchemistRow(scene, "[B] - 4 BAG SLOTS FREE");
-        scene.OnKey(Keys.Left);
-        scene.OnKey(Keys.M);
+        ChooseAlchemistRow(scene, "[C] - 4 BAG SLOTS FREE");
+        scene.OnKey(Keys.H);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal((HubWeapons.BagRoom(3), new WeaponPlace("B", 3)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
+        Assert.Equal((HubWeapons.StableRoom, stableAt + 1, WeaponPlace.InTheStable(0)), (ChosenText(scene), scene.Weapons.Chosen, scene.Weapons.ChosenRow.Place));
+
+        // On C's room, the mixes that fill C's bag take it away: the choice goes to
+        // the nearest row over it that is still C's — the staff in its bag — never
+        // to the first row on the page, A's hand, a page away.
+        ChooseRow(scene, HubWeapons.BagRoom(3));
+        Assert.Equal(new WeaponPlace("C", 3), scene.Weapons.ChosenRow.Place);
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "[C] - 3 BAG SLOTS FREE");
+        for (int i = 0; i < 3; i++)
+            scene.OnKey(Keys.H);
+        Assert.Equal((0, "[C] - THE BAG IS FULL"), (Farm.Batch(campaign), scene.Alchemist.ChosenRow!.Text));
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(("  BAG   STAFF OF RENEWAL - WEAR 0/30", new WeaponPlace("C", 1)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
+
+        // An empty hand is a room of its own (TheWeaponsPageListsEveryMemberAndTheStable):
+        // B's, its staff still in the bag. On it, a mix into A moves it down a row and
+        // the choice with it; on B's bag room, a mix into B moves that room, and the
+        // choice with it — never onto the hand, B's other room.
+        var bare = AlchemistTests.Arrived();
+        bare.Party[1].Inventory[0] = null;
+        var (other, _) = Hub(bare);
+        other.OnKey(Keys.Tab);
+        ChooseRow(other, HubWeapons.EmptyHand);
+        int handAt = other.Weapons.Chosen;
+        other.OnKey(Keys.Tab);
+        ChooseAlchemistRow(other, "[A] - 4 BAG SLOTS FREE");
+        other.OnKey(Keys.H);
+        other.OnKey(Keys.Tab);
+        other.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.EmptyHand, handAt + 1, new WeaponPlace("B", 0)), (ChosenText(other), other.Weapons.Chosen, other.Weapons.ChosenRow.Place));
+        ChooseRow(other, HubWeapons.BagRoom(4));
+        Assert.Equal(new WeaponPlace("B", 2), other.Weapons.ChosenRow.Place);
+        other.OnKey(Keys.Tab);
+        ChooseAlchemistRow(other, "[B] - 4 BAG SLOTS FREE");
+        other.OnKey(Keys.H);
+        other.OnKey(Keys.Tab);
+        other.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.BagRoom(3), new WeaponPlace("B", 3)), (ChosenText(other), other.Weapons.ChosenRow.Place));
     }
 
     // ── The enchanter (§6.2, §6.3; Phase 6a.3a) ─────────────────────────────

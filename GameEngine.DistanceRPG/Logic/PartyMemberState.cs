@@ -297,9 +297,14 @@ public sealed class PartyMemberState : ActorState
     /// <summary>
     /// The bag's empty slots, 1 and up, in slot order: where a potion mixed between
     /// runs can go — the first of them (<see cref="CampaignState.Stow"/>) — and the
-    /// room the ALCHEMIST page counts. The hand is never among them, empty or not: it
-    /// keeps a weapon, and a potion lies in the bag (PHASE 6b DECISION 1). A potion's
-    /// slot is full, as a weapon's is.
+    /// room both pages between runs say: the ALCHEMIST page's count, and the WEAPONS
+    /// page's room row, whose place is the first of them. It is the one reader of a
+    /// bag's room, so the two pages never disagree (its readers are pinned,
+    /// <c>AlchemistPageTests.TheBagsRoomIsReadInOnePlace</c>); a pickup in a dungeon
+    /// asks another question, the first empty slot with the hand among them
+    /// (<see cref="Pickup.FirstEmptySlot"/>). The hand is never among these, empty or
+    /// not: it keeps a weapon, and a potion lies in the bag (PHASE 6b DECISION 1). A
+    /// potion's slot is full, as a weapon's is.
     /// </summary>
     public IEnumerable<int> EmptyBagSlots
     {
