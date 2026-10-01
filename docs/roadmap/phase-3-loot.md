@@ -1197,6 +1197,9 @@ the missing-HP rule does not already bound. The cap protects ordinary healing;
 
 ### They come from the dungeon because there is nothing to buy them with
 
+(The heading's drop is superseded: nothing drops potions — the hub's farm makes
+them, as below and §6.6 say, built in Phase 6b. Nothing to buy them with stands.)
+
 **This design has no currency.** Nothing is priced in money anywhere: the
 enchanter charges in runs of downtime and accumulated wear (§6.2, §6.4), farming
 charges in turns, depth charges in mana spent. Every cost in the game is

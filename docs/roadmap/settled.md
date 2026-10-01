@@ -3906,7 +3906,7 @@ starts equal". Each is written down here so the next reader meets the ruling
 rather than the code that assumes it. They are of two kinds. **Readings that
 need no ruling** — the docs settle them once read together — are written as
 settled. **Choices the docs leave open** shipped provisionally as PHASE 6b
-DECISIONS 1 to 11, each the user's to rule; open-questions.md sets out each
+DECISIONS 1 to 12, each the user's to rule; open-questions.md sets out each
 one's alternatives, and this pass records each as shipped, and then the ruling.
 Three of them bend a line of the docs rather than fill a silence, and each is
 marked where it stands: the run's yield saved with its result, the batch worked
@@ -3965,16 +3965,24 @@ golden tests are as they were.
   Q2` in green or `4  MANA POTION Q1` in cyan, and under it what it restores now,
   off the member's maximum as it stands: `RESTORES 12 OF 30 HP`, `RESTORES ALL 30
   HP` at exactly a whole pool, `RESTORES ALL 30 HP - 6 OVER` past it, and the
-  mana forms alike. While the bag holds one, the swap line has a drink line under
-  it (`A DRINK COSTS 40 MOVE`, red with `- NOT ENOUGH LEFT` when it is short,
-  `DRINKING IS FREE` at 0), the hint reads `PRESS 2-6 TO EQUIP OR DRINK - I TO
-  CLOSE`, and X reads `X TO LEAVE OR POUR ONE OUT`, then `LEAVE OR POUR OUT
-  WHICH? 2-6 - X CANCELS`: a potion poured out is gone, nothing laid on the
-  floor, and it costs nothing, as putting a weapon down costs nothing. On the
-  WEAPONS page a potion is a grey row under its member, `  BAG   HEALTH POTION
-  Q2`, never chosen and never put down on, and a bag's room counts its empty
-  slots alone. A potion's name is `HEALTH POTION Q2` on every screen; the log
-  says `a Health potion (quality 2)`.
+  mana forms alike — said against what the locks leave spendable where they
+  reserve some, `RESTORES ALL 17 SPENDABLE MANA - 15 OVER`, the share unchanged
+  (mended in Phase 6b's audit; DECISION 3). While the bag holds one, the swap
+  line has a drink line under it (`A DRINK COSTS 40 MOVE`, red with `- NOT
+  ENOUGH LEFT` when it is short, `DRINKING IS FREE` at 0), the hint reads `PRESS
+  2-6 TO EQUIP OR DRINK - I TO CLOSE`, and X reads `X TO LEAVE OR POUR ONE OUT`,
+  then `LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS` — as G's full bag does, `BAG
+  FULL - 6 CARRIED - I THEN X LEAVES OR POURS ONE OUT`: a potion poured out is
+  gone, nothing laid on the floor, and it costs nothing, as putting a weapon
+  down costs nothing. What a key pressed in the bag did, or why it did nothing,
+  is said in a row of the panel's own under its title — a drink, a pour, a
+  weapon left, a refusal, and a level the drink bought beside it — and nothing
+  rises over the floor while the bag is open: the member it rose from stands
+  under the panel, and the answer ran into its header rows (mended in Phase 6b's
+  audit). On the WEAPONS page a potion is a grey row under its member,
+  `  BAG   HEALTH POTION Q2`, never chosen and never put down on, and a bag's room
+  counts its empty slots alone. A potion's name is `HEALTH POTION Q2` on every
+  screen; the log says `a Health potion (quality 2)`.
 
 ### Drinking
 
@@ -4085,13 +4093,18 @@ golden tests are as they were.
   alike, and never forfeited by the wipe — so "gear carried in is never taken"
   holds for every weapon.
 - **What the screen says.** The way out asks first, `THE 2 POTIONS CARRIED SPOIL
-  ON THE WAY OUT` (`THE POTION CARRIED SPOILS ...`), while a potion is carried.
-  The run's summary, at its end and on the hub, says what the farm did right
-  after whether the run counted, and nothing before the alchemist: `A FIRST CLEAR
-  - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` and `A FIRST CLEAR - THE
-  FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS` in green, each `... YIELDED
-  NOTHING` at a yield of 0; `THE FARM YIELDED 14 UNITS - 2 DUNGEONS BEATEN` in
-  cyan; `THE FARM YIELDED NOTHING` in grey at a rate of 0; and `THE FARM YIELDED
+  ON THE WAY OUT` (`THE POTION CARRIED SPOILS ...`), while a potion is carried —
+  and with the boss down its first line keeps the weapons alone, `THE BOSS IS
+  DOWN - YOU KEEP THE WEAPONS YOU CARRY`, never promising what spoils (mended in
+  Phase 6b's audit). The run's summary, at its end and on the hub, says what the
+  farm did right after whether the run counted, and nothing before the alchemist:
+  `A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` and `A
+  FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 14
+  UNITS` in green, each `... YIELDED NOTHING` at a yield of 0; `THE FARM YIELDED
+  14 UNITS - 2 DUNGEONS WORK IT` in cyan — the count the farm's workers, never
+  every dungeon beaten, which counts the tutorial too (mended in Phase 6b's audit;
+  its words are DECISION 12's) — `THE FARM YIELDED NOTHING` in grey at a rate of
+  0; and `THE FARM YIELDED
   NOTHING - THE RUN DID NOT COUNT` in grey. After the spoils it says `2 POTIONS
   SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow. The farm's line comes before
   the enchanter's, so the hub's cut of a long summary takes theirs first — not
@@ -4102,9 +4115,10 @@ golden tests are as they were.
   farm growing, one potion spoiled and 23 spoils lost — is 34 lines on the floor's
   end panel, one fewer than a 720-pixel window holds at the panel's least step
   (`HudTextTests.TheRunSummaryFitsA720Window_ServicesIncluded`, exact at 34). The
-  log says it at the edge, since logic never logs (`[Farm] The run counted: 2
-  dungeons beaten yield a batch of 14 units`, `[Farm] The run did not count: no
-  batch`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1`), from
+  log says it at the edge, since logic never logs (`[Farm] The run counted: the 2
+  dungeons the farm counts yield a batch of 14 units`, `[Farm] The run did not
+  count: no batch`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana
+  Q1`), from
   a handler beside the enchanter's, added and taken off where it is.
 
 ### The alchemist
@@ -4121,22 +4135,24 @@ golden tests are as they were.
   ALCHEMIST and round, every showing opening on DUNGEONS. The ALCHEMIST page
   shows numbers, never a person — "the presentation is an art question, not a
   design one" (§6.6). Down the left, kept in view: what the farm yields a run
-  that counts (`THE FARM - 2 DUNGEONS BEATEN - 14 UNITS A COUNTED RUN`, or `... -
+  that counts (`THE FARM - 2 DUNGEONS WORK IT - 14 UNITS A COUNTED RUN`, or `... -
   IT YIELDS NOTHING` at a rate of 0); the batch (`THE BATCH - 9 OF 14 UNITS LEFT`
   in cyan, `THE BATCH - ALL 14 UNITS MIXED`, and with none, why: `NO BATCH - THE
   LAST RUN DID NOT COUNT`, `NO BATCH - THE FARM YIELDS NOTHING`, `NO BATCH YET -
   THE NEXT RUN THAT COUNTS BRINGS ONE`); `UNMIXED UNITS SPOIL ON THE DESCENT - A
   POTION KEEPS ONE TRIP`; and the quality, `QUALITY 3 - 3 UNITS A POTION - A/D
-  CHANGES IT`, in yellow. Under them, in a window that scrolls with the choice,
-  each member with its bag's room (`[A] - 2 BAG SLOTS FREE`, `... - THE BAG IS
-  FULL`) and each potion in its bag (`  BAG 3  HEALTH POTION Q3`), and on the
-  right what a health and a mana potion at the quality would restore the member
-  now, in the bag's own words, or what the potion restores and what pouring it
-  back returns. W/S choose, A/D set the quality from 1 to the units left (1 at
-  every showing), H and M mix, T pours back. The choice is kept by place — a
-  member, or a member's bag slot — so a row added or taken above it never moves
-  it. While units are left unmixed, DUNGEONS ends its list with `THE ALCHEMIST
-  HOLDS 3 UNMIXED UNITS - THEY SPOIL WHEN YOU DESCEND`, in orange.
+  CHANGES IT`, in yellow — grey with nothing left to mix, as the H and M lines
+  are then, since A/D, H and M only refuse (mended in Phase 6b's audit). Under
+  them, in a window that scrolls with the choice, each member with its bag's room
+  (`[A] - 2 BAG SLOTS FREE`, `... - THE BAG IS FULL`) and each potion in its bag
+  (`  BAG 3  HEALTH POTION Q3`), and on the right what a health and a mana potion
+  at the quality would restore the member now, in the bag's own words, or what
+  the potion restores and what pouring it back returns. W/S choose, A/D set the
+  quality from 1 to the units left (1 at every showing), H and M mix, T pours
+  back. The choice is kept by place — a member, or a member's bag slot — so a row
+  added or taken above it never moves it. While units are left unmixed, DUNGEONS
+  ends its list with `THE ALCHEMIST HOLDS 3 UNMIXED UNITS - THEY SPOIL WHEN YOU
+  DESCEND`, in orange.
 - **A mix spends its quality in units, and takes no time.** "How many, of what
   type, at what strength, out of a fixed batch" (§6.6): a potion of quality *q*
   spends *q* units, takes no runs and no place in a queue — "a crafting bench
@@ -4354,7 +4370,10 @@ its number, and this pass records the ruling when it is made.
   max HP; mana a share of max mana, the earned pool, and what it restores is
   capped at what the equipped locks leave spendable, as Siphon's refund is — so
   at quality 5 a mana potion refills the spendable pool whatever the locks
-  reserve.
+  reserve. (Mended in Phase 6b's audit, the arithmetic unchanged: where the locks
+  reserve some, the bag and the ALCHEMIST page say the share against the
+  spendable pool, `RESTORES ALL 17 SPENDABLE MANA - 15 OVER`, so the quality that
+  fills a locked caster shows.)
 - **PHASE 6b DECISION 4 — which runs yield a batch (§6.6, §6.3).** Every run that
   counts — a boss kill, or §6.3's mercy for failing deep — exactly the runs that
   tick the enchanter, in the same event; one that does not count yields nothing,
@@ -4416,3 +4435,15 @@ its number, and this pass records the ruling when it is made.
   arrived: The Spear Hall, beaten for the first time, is the one dungeon the farm
   counts`). Under the shipped files he never goes: only the tutorial retires, and
   it is never a worker.
+- **PHASE 6b DECISION 12 — words the farm shares with older screens: spoil,
+  farm, and its count (§6.6, §4.3).** Phase 6b's audit flagged two words for the
+  user, each used in two senses that are both the docs' own, and they ship as
+  the docs use them: the summary's `NO SPOILS CARRIED` (loot) directly over `2
+  POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` (gone off), and the tutorial's
+  row on DUNGEONS, `... - AND ITS BLOCK FARM WITH IT` (§4's farming), beside the
+  hub's farm the tutorial never counts toward. The farm's count, which had read
+  as every dungeon beaten, is said as the farm's workers: `THE FARM - 3 DUNGEONS
+  WORK IT - 21 UNITS A COUNTED RUN` on the ALCHEMIST page, as much as its column
+  holds at its worst numbers, and `... - 3 DUNGEONS WORK IT` on the summary,
+  whose line for the farm growing has the room to say which count: `THE FARM
+  GROWS TO 3 DUNGEONS BEYOND THE TUTORIAL`.

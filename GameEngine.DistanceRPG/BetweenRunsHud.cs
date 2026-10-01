@@ -331,11 +331,14 @@ public sealed class BetweenRunsHud : IDisposable
     /// the run that brought the alchemist — the first clear of a dungeon besides the
     /// tutorial — <c>A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7
     /// UNITS</c>; a later first clear, <c>A FIRST CLEAR - THE FARM GROWS TO 3
-    /// DUNGEONS - IT YIELDED 21 UNITS</c> — both green, and <c>… YIELDED NOTHING</c>
-    /// at a yield of 0; any other run that counted, <c>THE FARM YIELDED 14 UNITS - 2
-    /// DUNGEONS BEATEN</c> in cyan, or <c>THE FARM YIELDED NOTHING</c> in grey at a
-    /// yield of 0; and a run that did not count, <c>THE FARM YIELDED NOTHING - THE
-    /// RUN DID NOT COUNT</c>, grey (PHASE 6b DECISION 4).
+    /// DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 21 UNITS</c> — both green, and
+    /// <c>… YIELDED NOTHING</c> at a yield of 0; any other run that counted, <c>THE
+    /// FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT</c> (<see cref="WorkIt"/>) in cyan,
+    /// or <c>THE FARM YIELDED NOTHING</c> in grey at a yield of 0; and a run that did
+    /// not count, <c>THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT</c>, grey (PHASE
+    /// 6b DECISION 4). The count is the farm's workers, never every dungeon beaten:
+    /// the tutorial is none of them, so the line that grows the farm says which
+    /// dungeons count (the audit of Phase 6b).
     /// </summary>
     internal static Run? FarmLine(RunResult result)
     {
@@ -346,13 +349,22 @@ public sealed class BetweenRunsHud : IDisposable
         if (result.FirstClear && !result.Retired)
             return new Run(result.FarmClears == 1
                 ? $"A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED {yielded}"
-                : $"A FIRST CLEAR - THE FARM GROWS TO {result.FarmClears} DUNGEONS - IT YIELDED {yielded}", DungeonHud.Green);
+                : $"A FIRST CLEAR - THE FARM GROWS TO {result.FarmClears} DUNGEONS BEYOND THE TUTORIAL - IT YIELDED {yielded}", DungeonHud.Green);
         if (!result.ServiceTick)
             return new Run("THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey);
         return result.FarmYield > 0
-            ? new Run($"THE FARM YIELDED {yielded} - {result.FarmClears} {(result.FarmClears == 1 ? "DUNGEON" : "DUNGEONS")} BEATEN", DungeonHud.Cyan)
+            ? new Run($"THE FARM YIELDED {yielded} - {WorkIt(result.FarmClears)}", DungeonHud.Cyan)
             : new Run("THE FARM YIELDED NOTHING", DungeonHud.Grey);
     }
+
+    /// <summary>
+    /// The farm's workers as the hub counts them — the dungeons beaten besides the
+    /// tutorial, which the farm grows by (§6.6) — in the words the summary and the
+    /// ALCHEMIST page share: <c>2 DUNGEONS WORK IT</c>, <c>1 DUNGEON WORKS IT</c>.
+    /// Never "beaten": that would count the tutorial too.
+    /// </summary>
+    /// <param name="clears">The farm's workers (<see cref="Farm.Clears"/>, <see cref="RunResult.FarmClears"/>).</param>
+    internal static string WorkIt(int clears) => clears == 1 ? "1 DUNGEON WORKS IT" : $"{clears} DUNGEONS WORK IT";
 
     /// <summary>A number of units of the farm's yield as the HUD says it: <c>1 UNIT</c>, <c>7 UNITS</c>.</summary>
     internal static string Units(int n) => $"{n} {(n == 1 ? "UNIT" : "UNITS")}";

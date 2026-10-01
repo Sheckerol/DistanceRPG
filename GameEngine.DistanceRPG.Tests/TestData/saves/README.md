@@ -30,19 +30,27 @@ load dumps to the same text as the compiled content (`ContentDump`, retired with
 
 ## What reads them
 
-`PreReworkSaveTests`: each save is read at version 1 and migrated to 2 (Phase
-6a.1: the step adds exactly an unworn `wear` and `wearCashed` to every weapon row
-and `"tuningHashVersion": 1` at the root, and keeps every other member at its
-value and in its order), restores whole under the current content, and — its
-floor opened as a resume opens it — captured again it writes the same document as
-the migration writes it, the `tuningHash` and `tuningHashVersion` aside (those
-are the current tuning's, on the current version's keys). The saves' hash is the
+`PreReworkSaveTests`: each save is read at version 1 and lifted through both
+steps this build ships — to 2 (Phase 6a.1: the step adds exactly an unworn `wear`
+and `wearCashed` to every weapon row and `"tuningHashVersion": 1` at the root,
+and keeps every other member at its value and in its order), then to 3 (Phase
+6b.1: a step that writes nothing) — restores whole under the current content,
+and — its floor opened as a resume opens it — captured again it writes the same
+document as the migration writes it, but for the `tuningHash` and
+`tuningHashVersion` (those are the current tuning's, on the current version's
+keys), the `savedAt` a capture writes, and the members appended since, which the
+saves lack and the capture writes at their defaults: the stable (Phase 6a.2), the
+enchanter's queue, `depositsMade` and the last result's `services` (Phase 6a.3a),
+each member's `potions` (Phase 6b.1), and the last result's `farmYield`,
+`farmClears`, `firstClear` and `spoiled` (Phase 6b.3). The saves' hash is the
 hash of `pre-rework-tuning.json` on version 1's keys, read by the current reader
 over the master copy, as a copy beside the game is read: the file is frozen, so
 it lacks the keys added since, and the test asserts those are exactly the keys
 no version-1 hash covers — what a hit wears and what a deposit costs, the user's
-ruling of 2026-09-25, either unplayed or played only from version 2, and the
-launcher's `SaveSlots` — so every number the hash covers is the file's own. The
+ruling of 2026-09-25, either unplayed or played only from version 2; the
+Consumables group's four, what a drink costs, what a potion restores and what the
+farm yields, played only from version 3; and the launcher's `SaveSlots` — so
+every number the hash covers is the file's own. The
 game says the numbers have changed exactly when the numbers it ships differ from
 that file's. And the launch resumes each one — the mid-run one in the dungeon, on
 its floor and turn, where its visit plays on.
@@ -83,9 +91,11 @@ tuning is the master at that commit, `git show 69d7bee:GameEngine.DistanceRPG/Da
 `Phase6aSaveTests`: the save is read at version 2 and lifted to 3 by a step that
 writes nothing, restores whole under `phase-6a-tuning.json` with nothing to say,
 and captured again is the document it was — every member at its value and in its
-order — but for the tuning hash and its version, the time, and each member's
-potions, written `null` (Phase 6b.1). Its hash is the frozen tuning's on version
-2's keys, read by the current reader over the master copy, as a copy beside the
-game is read; and the game says the numbers have changed exactly when a number
-version 2 hashes differs from that file's — so a later retune of `tuning.json`
-fails nothing.
+order — but for the tuning hash and its version, the time, each member's
+potions, written `null` (Phase 6b.1), and the last result's `farmYield`,
+`farmClears`, `firstClear` and `spoiled`, written at their defaults — 0, 0,
+`false` and `null` — since a run of version 2 made no batch (Phase 6b.3). Its
+hash is the frozen tuning's on version 2's keys, read by the current reader over
+the master copy, as a copy beside the game is read; and the game says the
+numbers have changed exactly when a number version 2 hashes differs from that
+file's — so a later retune of `tuning.json` fails nothing.

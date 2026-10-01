@@ -368,7 +368,8 @@ public sealed class FarmTests : IDisposable
         // yielded or that it did not count, and the potions that spoiled — nothing
         // before the alchemist, unless potions spoiled. A handler on the campaign's
         // RunEnded beside the enchanter's, wired where it is and let go where it is,
-        // read off the IL.
+        // read off the IL. The yield is said of the dungeons the farm counts, never of
+        // the dungeons beaten, which the tutorial is too (the audit of Phase 6b).
         var campaign = NewCampaign();
         var tutorial = CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
         Assert.Empty(DistanceRpgGame.FarmLines(tutorial));
@@ -376,10 +377,10 @@ public sealed class FarmTests : IDisposable
         Assert.Equal(
         [
             "[Farm] The alchemist has arrived: The Spear Hall, beaten for the first time, is the one dungeon the farm counts",
-            $"[Farm] The run counted: 1 dungeon beaten yields a batch of {PerClear} units",
+            $"[Farm] The run counted: the one dungeon the farm counts yields a batch of {PerClear} units",
         ], DistanceRpgGame.FarmLines(hall));
         var gallery = CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
-        Assert.Equal([$"[Farm] The run counted: 2 dungeons beaten yield a batch of {2 * PerClear} units"], DistanceRpgGame.FarmLines(gallery));
+        Assert.Equal([$"[Farm] The run counted: the 2 dungeons the farm counts yield a batch of {2 * PerClear} units"], DistanceRpgGame.FarmLines(gallery));
         Carrying(campaign, "A", (2, Health(2)), (3, Mana(1)));
         var idle = CampaignRuns.ShallowRetreat(campaign, "knife_warrens");
         Assert.Equal(
@@ -387,8 +388,8 @@ public sealed class FarmTests : IDisposable
             "[Farm] The run did not count: no batch",
             "[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1",
         ], DistanceRpgGame.FarmLines(idle));
-        Assert.Equal(["[Farm] The run counted: 1 dungeon beaten yields a batch of 1 unit"], DistanceRpgGame.FarmLines(hall with { FirstClear = false, FarmYield = 1 }));
-        Assert.Equal(["[Farm] The run counted: 2 dungeons beaten yield nothing"], DistanceRpgGame.FarmLines(gallery with { FirstClear = false, FarmYield = 0 }));
+        Assert.Equal(["[Farm] The run counted: the one dungeon the farm counts yields a batch of 1 unit"], DistanceRpgGame.FarmLines(hall with { FirstClear = false, FarmYield = 1 }));
+        Assert.Equal(["[Farm] The run counted: the 2 dungeons the farm counts yield nothing"], DistanceRpgGame.FarmLines(gallery with { FirstClear = false, FarmYield = 0 }));
         Assert.Equal(["[Farm] 1 potion spoiled at the run's end: Mana Q4"], DistanceRpgGame.FarmLines(tutorial with { Spoiled = [Mana(4)] }));
 
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;

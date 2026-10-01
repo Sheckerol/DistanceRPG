@@ -190,16 +190,22 @@ share of the member's maximum, `HealthPotionPercent` (20) of max HP or
 `ManaPotionPercent` (20) of max mana for each unit of quality it was mixed at,
 rounded down (PHASE 6b DECISION 3) — `RESTORES 12 OF 30 HP` for quality 2 at 30,
 `RESTORES ALL 30 HP` when it is exactly a whole pool, `RESTORES ALL 30 HP - 6 OVER`
-once it is a whole pool and more. So a potion rides the ladder its member climbs,
+once it is a whole pool and more — and for a caster whose locks reserve some of
+its mana, against what it can spend: `RESTORES ALL 17 SPENDABLE MANA - 15 OVER`.
+So a potion rides the ladder its member climbs,
 and quality 5 is the best there is at 20: it heals completely from 1 HP. No
 cooldown and no limit a turn: several drinks while the movement lasts. A health
 potion heals through the same applier every heal does — never past full, and the
 HP it restored is HP XP, so a drink at full restores and teaches nothing (allowed,
 and wasted) — and what lands past full is lost, unless the member holds Overheal,
 which banks it as Ward. A mana potion fills the pool up to what the equipped locks
-leave spendable, and teaches nothing: mana XP is mana spent. What was drunk rises
-over the member in the potion's colour — `DRANK HEALTH POTION Q2 - +12 HP`,
-`DRANK MANA POTION Q1 - +6 MANA`, or `... - NOTHING TO RESTORE` at full — and the
+leave spendable, and teaches nothing: mana XP is mana spent. What was drunk is
+said in the bag's own row, under its title, in the potion's colour — `DRANK
+HEALTH POTION Q2 - +12 HP`, `DRANK MANA POTION Q1 - +6 MANA`, or `... - NOTHING TO
+RESTORE` at full, with any level it bought beside it — as every answer to a key
+pressed in the bag is (a pour, a weapon left, a refusal), and nothing rises over
+the floor under the open bag; G's full bag says `BAG FULL - 6 CARRIED - I THEN X
+LEAVES OR POURS ONE OUT` while it holds a potion. And the
 log says it whole: `[Potion] A drinks a Health potion (quality 2) from slot 3: +12
 HP of 12 offered (30/30), 40 movement`. The `+12` is the heal the drink applied,
 the same number the heal floats and the HP XP it teaches: when that XP buys a point
@@ -225,17 +231,21 @@ never refills it, and it is gone the moment the party descends — what is left
 unmixed spoils, and the next run that counts brings a fresh one, never added to
 the last. Every potion carried spoils as the run ends, on the way out or by a
 wipe — a potion keeps for one trip — and the way out's question says so first:
-`THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT`. The run's summary, at its end and on
+`THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT`, and with the boss down, `THE BOSS IS
+DOWN - YOU KEEP THE WEAPONS YOU CARRY`. The run's summary, at its end and on
 the hub, says what the farm did right after whether the run counted — `A FIRST
 CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` and `A FIRST CLEAR -
-THE FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS` in green, `THE FARM YIELDED 14
-UNITS - 2 DUNGEONS BEATEN` in cyan, `THE FARM YIELDED NOTHING - THE RUN DID NOT
-COUNT` in grey, and nothing before the alchemist — and after the spoils, `2
-POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow. The log says it too:
+THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 14 UNITS` in green,
+`THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT` in cyan (the farm's workers,
+never the tutorial; PHASE 6b DECISION 12 holds the words), `THE FARM YIELDED
+NOTHING - THE RUN DID NOT COUNT` in grey, and nothing before the alchemist — and
+after the spoils, `2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow.
+The log says it too:
 `[Farm] The alchemist has arrived: The Spear Hall, beaten for the first time, is
-the one dungeon the farm counts`, `[Farm] The run counted: 2 dungeons beaten yield
-a batch of 14 units`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana
-Q1`. The alchemist is there while the farm has a worker: a `dungeons.json` beside
+the one dungeon the farm counts`, `[Farm] The run counted: the 2 dungeons the farm
+counts yield a batch of 14 units`, `[Farm] 2 potions spoiled at the run's end:
+Health Q2, Mana Q1`. The alchemist is there while the farm has a worker: a
+`dungeons.json` beside
 the game that moves `retiresOnClear` onto the farm's one worker retires it on its
 next clear, and he arrives again with the next first clear (DECISION 11). Mixing
 — how many potions of which type, at what quality, in whose bag — is the
@@ -248,13 +258,14 @@ page, is where the batch is split. Before the first clear of a dungeon besides t
 tutorial it says `THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`
 and nothing else (PHASE 6b DECISION 10); it closes again if he goes (DECISION 11).
 Once he is there it shows numbers, never a person: what the farm yields a run that
-counts — `THE FARM - 2 DUNGEONS BEATEN - 14 UNITS A COUNTED RUN`, or `... - IT
+counts — `THE FARM - 2 DUNGEONS WORK IT - 14 UNITS A COUNTED RUN`, or `... - IT
 YIELDS NOTHING` at a rate of 0 — the batch, `THE BATCH - 9 OF 14 UNITS LEFT` in
 cyan (`THE BATCH - ALL 14 UNITS MIXED`; and with none, why: `NO BATCH - THE LAST
 RUN DID NOT COUNT`, `NO BATCH - THE FARM YIELDS NOTHING`, or `NO BATCH YET - THE
 NEXT RUN THAT COUNTS BRINGS ONE` on a save from before the farm), `UNMIXED UNITS
-SPOIL ON THE DESCENT - A POTION KEEPS ONE TRIP`, the quality A/D set, in yellow,
-and each member with the room its bag has and its potions under it. A potion of
+SPOIL ON THE DESCENT - A POTION KEEPS ONE TRIP`, the quality A/D set, in yellow
+(grey with nothing left to mix, as the H and M lines are then), and each member
+with the room its bag has and its potions under it. A potion of
 quality *q* costs *q* units, takes no runs and no place in a queue, and goes into
 the chosen member's first empty bag slot — never the hand, and never the stable,
 another bag or the floor (PHASE 6b DECISION 1): pour it back with T and mix it

@@ -1794,7 +1794,10 @@ public sealed class BetweenRunsHudTests : IDisposable
         // farm; any other run that counted says what it yielded and at how many
         // dungeons; one that did not count yields nothing and says why — and each has
         // its zero form, a rate of 0 yielding nothing. Before the alchemist, no line.
-        // At the farm's rate stated here.
+        // At the farm's rate stated here. The count is the farm's workers, the
+        // dungeons beaten besides the tutorial, so it never reads as every dungeon
+        // beaten: the line that grows the farm says which count, and the rest that
+        // that many work it (the audit of Phase 6b, after four clears read as three).
         using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
         var campaign = CampaignRuns.Campaign();
         Assert.Null(BetweenRunsHud.FarmLine(CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed)));
@@ -1808,10 +1811,10 @@ public sealed class BetweenRunsHudTests : IDisposable
         [
             (arrival, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS", DungeonHud.Green),
             (arrival with { FarmYield = 0 }, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED NOTHING", DungeonHud.Green),
-            (grows, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS", DungeonHud.Green),
-            (grows with { FarmYield = 0 }, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS - IT YIELDED NOTHING", DungeonHud.Green),
-            (mercy, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS BEATEN", DungeonHud.Cyan),
-            (mercy with { FarmYield = 1, FarmClears = 1 }, "THE FARM YIELDED 1 UNIT - 1 DUNGEON BEATEN", DungeonHud.Cyan),
+            (grows, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 14 UNITS", DungeonHud.Green),
+            (grows with { FarmYield = 0 }, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED NOTHING", DungeonHud.Green),
+            (mercy, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT", DungeonHud.Cyan),
+            (mercy with { FarmYield = 1, FarmClears = 1 }, "THE FARM YIELDED 1 UNIT - 1 DUNGEON WORKS IT", DungeonHud.Cyan),
             (mercy with { FarmYield = 0 }, "THE FARM YIELDED NOTHING", DungeonHud.Grey),
             (idle, "THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey),
         ];
@@ -1826,13 +1829,13 @@ public sealed class BetweenRunsHudTests : IDisposable
 
         // The tutorial's own first clear retires it, and is no worker: on a farm that
         // has one, its run says what the farm yielded as any counted run does.
-        Assert.Equal(new DungeonHud.Run("THE FARM YIELDED 7 UNITS - 1 DUNGEON BEATEN", DungeonHud.Cyan),
+        Assert.Equal(new DungeonHud.Run("THE FARM YIELDED 7 UNITS - 1 DUNGEON WORKS IT", DungeonHud.Cyan),
             BetweenRunsHud.FarmLine(arrival with { DungeonId = "tutorial", Retired = true, LockedUntilRun = null }));
 
         // Before the enchanter's lines: a run that worked a deposit says the farm first.
         var worked = mercy with { Services = [new ServiceReport("tower_guard", Service.Refine, 1, 2)] };
         var told = Texts(BetweenRunsHud.SummaryLines(worked));
-        Assert.Equal(Array.IndexOf(told, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS BEATEN") + 1,
+        Assert.Equal(Array.IndexOf(told, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT") + 1,
             Array.FindIndex(told, line => line.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
 
         // Each in the font, and a summary line at its widest numbers.

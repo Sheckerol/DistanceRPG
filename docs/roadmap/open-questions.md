@@ -1071,7 +1071,13 @@ locks reserve. The bag says what a potion offers of the member's maximum as it
 stands — `RESTORES 12 OF 30 HP`, `RESTORES ALL 30 HP` at exactly a whole pool,
 `RESTORES ALL 30 HP - 6 OVER` past it — and a drink reports what the pool took:
 for health the heal it applied, the HP XP it teaches, never the point of max HP
-that XP may buy, which arrives filled as it does after any heal.
+that XP may buy, which arrives filled as it does after any heal. (Mended in Phase
+6b's audit, the arithmetic unchanged: what is shown is still the earned pool's
+share, but where the locks reserve some of the pool, the bag and the ALCHEMIST
+page say it against what the drink can fill — `RESTORES 12 OF 17 SPENDABLE MANA`,
+`RESTORES ALL 17 SPENDABLE MANA - 15 OVER` — so a locked caster sees the quality
+that fills it and the units wasted past it. A caster at `MANA 17 / 17 (32)` had
+read `RESTORES ALL 32 MANA` on a quality-5 potion that restores 17.)
 
 **This decides how much a potion restores at the margins, so it is the user's to
 decide.** The alternatives: (a) round to the nearest, or up, or restore at least
@@ -1325,4 +1331,40 @@ over the keys, every other key but TAB and ESC does nothing, and its keys line i
 user's to decide.** The alternative: the page is absent until he arrives — TAB goes
 between DUNGEONS and WEAPONS alone until then — and the run's summary that brings
 him (`A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - ...`) announces the third page.
+settled.md's Phase 6b implementation pass records the ruling.
+
+## Words the farm shares with older screens: spoil, farm, and its count (§6.6, §4.3) — PHASE 6b DECISION 12
+
+§6.6 has what is not used "spoil" — units left with the alchemist, and every
+potion by the end of its trip — the user's own word. The run's summary has always
+called what a run carries home its spoils (`NO SPOILS CARRIED`, `NO SPOILS -
+NOTHING DROPS WHILE THE BOSS STANDS`), and Phase 6b puts `2 POTIONS SPOILED - A
+POTION KEEPS FOR ONE TRIP` directly under those lines, while the ALCHEMIST page
+says `UNMIXED UNITS SPOIL ON THE DESCENT`. "Farm" has two senses on screen too:
+§4's, stacking a modifier off repeat kills, in the tutorial's row on DUNGEONS —
+`BEATING THE STONE GOLEM CLOSES IT FOR GOOD - AND ITS BLOCK FARM WITH IT`, the
+first thing a new campaign says — and §6.6's farm in the hub, which the tutorial
+is the one dungeon not to count toward. Phase 6b's audit flagged both for the
+user, since both senses are the docs' own and the presentation is an art
+question (§6.6). The same audit found the farm's count reading as every dungeon
+beaten (`THE FARM - 1 DUNGEON BEATEN` after the tutorial and the Spear Hall), and
+the words that replaced it are a pick of the same kind.
+
+**Shipped provisionally (Phase 6b's audit): the docs' words, unchanged — spoils
+and spoiled side by side, and the tutorial's Block farm — and the count as the
+farm's workers.** The ALCHEMIST page says `THE FARM - 3 DUNGEONS WORK IT - 21
+UNITS A COUNTED RUN`, as long as its column allows at its worst numbers; the
+run's summary says `THE FARM YIELDED 21 UNITS - 3 DUNGEONS WORK IT`, and where the
+farm grows, with the room to say which dungeons count, `A FIRST CLEAR - THE FARM
+GROWS TO 3 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 21 UNITS`. The log says it in
+the arrival line's words: `[Farm] The run counted: the 3 dungeons the farm counts
+yield a batch of 21 units`.
+
+**This decides wording alone, so it is the user's to decide.** The alternatives:
+(a) the potions' word changes — `2 POTIONS WENT OFF - A POTION KEEPS FOR ONE
+TRIP`, `UNMIXED UNITS GO OFF ON THE DESCENT`; (b) the loot's lines change instead,
+`NO LOOT CARRIED` and the rest; (c) the tutorial's warning keeps "farm" for the
+hub — `... - AND ITS BLOCK DROPS WITH IT`; (d) the count in other words: `1 REAL
+CLEAR` (§6.6's "the first real clear"), `1 WORKER` (the docs' own), or a page line
+that drops `A COUNTED RUN` for the room to say `1 DUNGEON PAST THE TUTORIAL`.
 settled.md's Phase 6b implementation pass records the ruling.

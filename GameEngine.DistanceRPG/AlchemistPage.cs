@@ -75,16 +75,18 @@ internal sealed class AlchemistPage
 
     /// <summary>
     /// What the farm yields a run that counts, at the workers it has now (§6.6): <c>THE
-    /// FARM - 2 DUNGEONS BEATEN - 14 UNITS A COUNTED RUN</c>, <c>1 DUNGEON</c> and
-    /// <c>1 UNIT</c> singular — or, under a <see cref="Tuning.FarmYieldPerClear"/> of 0,
-    /// <c>THE FARM - 2 DUNGEONS BEATEN - IT YIELDS NOTHING</c>.
+    /// FARM - 2 DUNGEONS WORK IT - 14 UNITS A COUNTED RUN</c>, <c>1 DUNGEON WORKS IT</c>
+    /// and <c>1 UNIT</c> singular (<see cref="BetweenRunsHud.WorkIt"/>, the summary's
+    /// words) — or, under a <see cref="Tuning.FarmYieldPerClear"/> of 0, <c>THE FARM - 2
+    /// DUNGEONS WORK IT - IT YIELDS NOTHING</c>. The workers are the dungeons beaten
+    /// besides the tutorial, so it never says "beaten" (the audit of Phase 6b).
     /// </summary>
     /// <param name="clears">The farm's workers (<see cref="Farm.Clears"/>).</param>
     /// <param name="perRun">What a run that counts yields at them (<see cref="Farm.Yield"/>).</param>
     internal static string FarmLine(int clears, int perRun)
     {
-        string beaten = $"THE FARM - {clears} {(clears == 1 ? "DUNGEON" : "DUNGEONS")} BEATEN";
-        return perRun > 0 ? $"{beaten} - {BetweenRunsHud.Units(perRun)} A COUNTED RUN" : $"{beaten} - IT YIELDS NOTHING";
+        string workers = $"THE FARM - {BetweenRunsHud.WorkIt(clears)}";
+        return perRun > 0 ? $"{workers} - {BetweenRunsHud.Units(perRun)} A COUNTED RUN" : $"{workers} - IT YIELDS NOTHING";
     }
 
     /// <summary>
@@ -122,7 +124,9 @@ internal sealed class AlchemistPage
     /// <summary>
     /// The lines over the rows, top to bottom, as the HUD draws them down the left: the
     /// farm in grey, the batch in cyan, what spoils in grey, and the quality in yellow —
-    /// read, never chosen.
+    /// read, never chosen. With nothing left to mix (<see cref="Farm.Batch"/> 0: all of
+    /// it mixed, or no batch at all) the quality is grey, as the H and M lines are
+    /// (<see cref="DetailRows"/>): A/D, H and M only refuse then (the audit of Phase 6b).
     /// </summary>
     internal static IReadOnlyList<ListRow> Lines(CampaignState campaign, int quality)
     {
@@ -133,7 +137,7 @@ internal sealed class AlchemistPage
             Line(FarmLine(clears, Farm.Yield(clears, counted: true)), DungeonHud.Grey),
             Line(BatchLine(campaign), DungeonHud.Cyan),
             Line(SpoilNote, DungeonHud.Grey),
-            Line(QualityLine(quality), DungeonHud.Yellow),
+            Line(QualityLine(quality), Farm.Batch(campaign) > 0 ? DungeonHud.Yellow : DungeonHud.Grey),
         ];
 
         static ListRow Line(string text, Vector4 color) => new(text, color, BetweenRunsHud.WeaponRowScale, BetweenRunsHud.WeaponRowPitch);
@@ -254,7 +258,8 @@ internal sealed class AlchemistPage
     /// The chosen row said whole, top to bottom, on the right. For a member: its
     /// maxima (<see cref="MemberHeading"/>), what a health and a mana potion at
     /// <paramref name="quality"/> would restore it now (<see cref="MixLines"/>), in
-    /// their colours, the quality for a whole pool (<see cref="WholeLine"/>) and what
+    /// their colours — grey with nothing left to mix (<see cref="Farm.Batch"/> 0), when
+    /// H and M only refuse — the quality for a whole pool (<see cref="WholeLine"/>) and what
     /// a drink costs (<see cref="DrinkLine"/>). For a potion: what it is and where
     /// (<see cref="PotionHeading"/>), what it restores its member now
     /// (<see cref="DungeonHud.PotionDetail"/>), in its colour, and what T gives back
@@ -277,9 +282,10 @@ internal sealed class AlchemistPage
         }
 
         rows.Add(new ListRow(MemberHeading(member), DungeonHud.White, BetweenRunsHud.DetailNameScale, BetweenRunsHud.DetailNamePitch));
+        bool mixable = Farm.Batch(campaign) > 0;
         foreach (var type in new[] { PotionType.Health, PotionType.Mana })
             foreach (string line in MixLines(type, quality, member))
-                rows.Add(new ListRow(line, DungeonHud.PotionColor(type), BetweenRunsHud.DetailScale, BetweenRunsHud.DetailPitch));
+                rows.Add(new ListRow(line, mixable ? DungeonHud.PotionColor(type) : DungeonHud.Grey, BetweenRunsHud.DetailScale, BetweenRunsHud.DetailPitch));
         rows.Add(new ListRow(WholeLine(), DungeonHud.Grey, BetweenRunsHud.DetailScale, BetweenRunsHud.DetailPitch));
         rows.Add(new ListRow(DrinkLine(GameContent.Current.Tuning.PotionUseCost), DungeonHud.Grey, BetweenRunsHud.DetailScale, BetweenRunsHud.DetailPitch));
         return rows;

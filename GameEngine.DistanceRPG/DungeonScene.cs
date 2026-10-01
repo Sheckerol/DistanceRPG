@@ -1303,13 +1303,15 @@ public class DungeonScene : Scene
         // A credit that bought something says so over whoever earned it (§2.2).
         // The beat is only a beat: what a credit was worth was settled by the
         // applier that raised this, and the label states the member's own state
-        // -- no XP rule lives out here.
+        // -- no XP rule lives out here. It is said of the member, so a drink's
+        // heal that buys a point is said in the open bag beside the drink's
+        // answer (DungeonHud.BagLine), not over the floor under the panel.
         _turns.XpCredited += (member, credit, gained) =>
         {
             string label = DungeonHud.LevelUpLabel(member, credit);
             Log.Info($"[Progress] {member.Id} {label} (+{gained})");
             if (TryObjectFor(member, out var obj) && obj.IsActive)
-                _hud.AddFloatingText(obj.Position, label, LevelUpColor, -64f);
+                _hud.AddBeat(obj, obj.Position, label, LevelUpColor, -64f);
         };
 
         // The mana an entry spent burned the circle a step deeper (§3.3). The
@@ -1333,8 +1335,10 @@ public class DungeonScene : Scene
 
         // A potion drunk from a member's bag (§3.4): what it was, what it offered
         // and what the pool took, in the log, and what the pool gained over the
-        // member, in the potion's colour, in place of any answer still rising there.
-        // A heal also rises as +12 from CharacterHealed, as every heal does.
+        // member, in the potion's colour, in place of any answer still rising there
+        // — said in the open bag's own row, where the drink was asked for
+        // (DungeonHud.BagLine). A heal also rises as +12 from CharacterHealed, as
+        // every heal does, over the floor, which is not drawn while the bag is open.
         _turns.PotionDrunk += (member, drink) =>
         {
             var potion = drink.Potion;
@@ -1791,7 +1795,8 @@ public class DungeonScene : Scene
     /// <c>BAG FULL</c>, and leaves X armed for another pick. What was left says so
     /// over the member in place of any answer still rising there, such as that
     /// <c>SLOT 3 IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
-    /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack on the open panel.
+    /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack — said in the
+    /// open bag's own row, under its title (<see cref="DungeonHud.BagLine"/>).
     /// <para>
     /// <strong>A potion is poured out, never left</strong> (PHASE 6b DECISION 1):
     /// out of the bag through its one door (<see cref="PartyMemberState.TakePotion"/>)
@@ -2778,7 +2783,8 @@ public class DungeonScene : Scene
     /// says why a full bag took nothing. That is a carry limit, not a fault:
     /// §4.4's six slots a member, 24 party-wide, which loot shares with the weapons
     /// being carried. So the cue says how to make room: the bag's X puts one down
-    /// here. A spoil taken is carried home by the way out and lost to a wipe (§4.4).
+    /// here, or pours a potion out while the bag holds one. A spoil taken is
+    /// carried home by the way out and lost to a wipe (§4.4).
     /// </summary>
     private void PickUp()
     {
@@ -2793,7 +2799,7 @@ public class DungeonScene : Scene
         };
         if (slot == Pickup.BagFull)
         {
-            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.BagFullCue(member.Inventory.Length), false));
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.BagFullCue(member), false));
             return;
         }
 

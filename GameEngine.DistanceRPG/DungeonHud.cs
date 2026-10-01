@@ -71,10 +71,21 @@ public sealed class DungeonHud
     public readonly record struct Run(string Text, Vector4 Color);
 
     /// <summary>A line rising over a world position, and fading as it rises.</summary>
-    /// <param name="Speaker">Whoever it answers for, on the answer to a key or a click (<see cref="AddAnswer"/>); null on everything else.</param>
-    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null)
+    /// <param name="Speaker">Whoever it is said over, on the answer to a key or a click (<see cref="AddAnswer"/>) and on a beat said of a member (<see cref="AddBeat"/>); null on everything else.</param>
+    /// <param name="Answer">Whether it is the speaker's answer, which the next answer replaces.</param>
+    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null, bool Answer = false)
     {
         public float Age;
+
+        /// <summary>How opaque it is at its age: whole when raised, gone at <see cref="FloatingTextLife"/>.</summary>
+        public float Alpha
+        {
+            get
+            {
+                float t = Age / FloatingTextLife;
+                return 1f - t * t;
+            }
+        }
     }
 
     private readonly List<FloatingText> _floatingTexts = new();
@@ -370,15 +381,67 @@ public sealed class DungeonHud
     /// A refusal and the act that follows it never stack on one spot. Without this,
     /// <c>SLOT 3 IS EMPTY</c> and then <c>LEFT HATCHET HERE</c> would stack over the
     /// member at the middle of the screen, which is where the open bag's panel is.
-    /// Every other rising line (a hit, a beat, a level) is left alone.
+    /// Every other rising line (a hit, a beat, a level) is left alone. While the
+    /// speaker's bag is open the answer is said in the panel, never over the floor
+    /// (<see cref="BagLine"/>).
     /// </summary>
     /// <param name="speaker">Whoever the answer is said over: the scene object it rises from.</param>
     public void AddAnswer(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
     {
         ArgumentNullException.ThrowIfNull(speaker);
-        _floatingTexts.RemoveAll(ft => ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.RemoveAll(ft => ft.Answer && ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker, Answer: true));
+    }
+
+    /// <summary>
+    /// Spawn a beat said of <paramref name="speaker"/> that answers no key — a level
+    /// it bought — rising as any beat does, beside whatever answer is rising over it,
+    /// which it never replaces. A key pressed in the bag can raise one (a drink's heal
+    /// buys a point of max HP), so while the speaker's bag is open it is said in the
+    /// panel after the answer (<see cref="BagLine"/>), never over the floor.
+    /// </summary>
+    /// <param name="speaker">The member it is said of: the scene object it rises from.</param>
+    public void AddBeat(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
         _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker));
     }
+
+    /// <summary>
+    /// What the open bag says in its own row (<see cref="InventoryAnswerDrop"/>) for
+    /// <paramref name="speaker"/>, the member whose bag it is: the answer still rising
+    /// over it (<see cref="AddAnswer"/>), then every beat said of it
+    /// (<see cref="AddBeat"/>), oldest first, side by side — each faded as it would
+    /// fade in the air, and gone when it would be. Empty when nothing is being said.
+    /// <para>
+    /// The answer to a key pressed in the bag — a drink, a pour, a weapon left, a
+    /// refusal — rises from the member, and the member stands under the middle of the
+    /// screen, where the panel is: drawn over the floor it ran into the panel's own
+    /// header rows and could not be read (the audit of Phase 6b). So while the bag is
+    /// open it is said here, and nothing rises over the floor
+    /// (<see cref="RisingLines"/>).
+    /// </para>
+    /// </summary>
+    /// <param name="speaker">The member whose bag is open: the scene object its answers rise from.</param>
+    internal IReadOnlyList<Run> BagLine(object speaker)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
+        var said = _floatingTexts.Where(ft => ReferenceEquals(ft.Speaker, speaker)).OrderByDescending(ft => ft.Answer);   // stable: beats keep their order
+        return said.SelectMany(ft => ft.Runs.Select(run => run with { Color = run.Color with { W = run.Color.W * ft.Alpha } })).ToArray();
+    }
+
+    /// <summary>
+    /// The lines that rise over the floor now, as <see cref="DrawFloatingTexts"/>
+    /// draws them: every one — and none while the bag is open
+    /// (<paramref name="bagOpen"/>), whose answers are said in the panel
+    /// (<see cref="BagLine"/>). A line over the floor would run into the panel's own
+    /// rows there: the member stands under it, and the panel has no backing. Each
+    /// still ages, so a line still in the air when the bag closes is drawn again.
+    /// </summary>
+    internal IReadOnlyList<IReadOnlyList<Run>> RisingLines(bool bagOpen) => InTheAir(bagOpen).Select(ft => ft.Runs).ToArray();
+
+    /// <summary>The floating texts <see cref="RisingLines"/> names: every one, and none while the bag is open.</summary>
+    private IEnumerable<FloatingText> InTheAir(bool bagOpen) => bagOpen ? [] : _floatingTexts;
 
     /// <summary>
     /// Spawn one line of differently coloured pieces above a world position,
@@ -450,8 +513,10 @@ public sealed class DungeonHud
             // would read as the menu's own lines: a weapon just put down would be
             // named across the bag's slots, and the way out's label would sit in
             // its own question. None of them is what the menu is asking about.
-            // The rising lines stay, because a key pressed in the bag answers
-            // there, one answer at a time (AddAnswer).
+            // The rising lines are drawn clear of the bag too: a key pressed in it
+            // answers in the panel's own row (BagLine), since the member it rises
+            // from stands under the panel, and an answer over the floor ran into
+            // the panel's header rows (the audit of Phase 6b).
             // A run's summary is drawn clear of all of it: the run is over.
             if (!scene.AnyMenuOpen)
             {
@@ -460,7 +525,7 @@ public sealed class DungeonHud
                 DrawGroundItems(camera, scene, w, h);
             }
             DrawAllyCue(camera, scene, w, h);
-            DrawFloatingTexts(camera, w, h);
+            DrawFloatingTexts(camera, w, h, bagOpen: scene.InventoryOpen);
             DrawAimCue(scene);
         }
 
@@ -472,7 +537,7 @@ public sealed class DungeonHud
         }
 
         if (scene.InventoryOpen)
-            DrawInventory(w, h, active, turns, scene.LeaveArmed);
+            DrawInventory(w, h, active, turns, scene.LeaveArmed, BagLine(scene.ActiveCharacter));
 
         if (scene.PauseMenuOpen)
             DrawMenu(w, h, scene);
@@ -879,8 +944,10 @@ public sealed class DungeonHud
     /// <summary>
     /// What leaving now means, under the way out's question (§4.4) — said before
     /// the player commits, since the answer ends the run. With the boss down it
-    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and the
-    /// dungeon closes for good (the tutorial) or locks for as many runs as its
+    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c> — while the
+    /// party carries a potion, which spoils on the way out whatever the run was,
+    /// <c>... - YOU KEEP THE WEAPONS YOU CARRY</c> (<see cref="ClearKeepsLine"/>) —
+    /// and the dungeon closes for good (the tutorial) or locks for as many runs as its
     /// floor (<see cref="DungeonState.LockRuns"/>, the number the clear will
     /// write). With it standing it is a retreat: <c>NO BOSS - A RETREAT: XP KEPT,
     /// THE DEPTH RE-ROLLS</c> — the re-roll said only where there is one, so the
@@ -904,7 +971,7 @@ public sealed class DungeonHud
             string clear = visit.Def.RetiresOnClear
                 ? $"{dungeon} CLOSES FOR GOOD"
                 : $"{dungeon} LOCKS FOR {Runs(visit.LockRuns)}";
-            lines.AddRange(["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear]);
+            lines.AddRange([ClearKeepsLine(potionsCarried), clear]);
         }
         else
         {
@@ -920,6 +987,17 @@ public sealed class DungeonHud
         lines.Add(ResetLine);
         return lines;
     }
+
+    /// <summary>
+    /// The way out's first line with the boss down: what the clear keeps. <c>THE BOSS
+    /// IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and while the party carries a potion —
+    /// which spoils on the way out, the line under it says (<see cref="PotionsSpoilLine"/>)
+    /// — <c>THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY</c>, so the two never say
+    /// opposite things of the bags (the audit of Phase 6b).
+    /// </summary>
+    /// <param name="potionsCarried">How many potions the party's bags hold.</param>
+    internal static string ClearKeepsLine(int potionsCarried)
+        => potionsCarried > 0 ? "THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY" : "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY";
 
     /// <summary>What leaving does to the potions carried (§6.6): <c>THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT</c>, or <c>THE POTION CARRIED SPOILS ON THE WAY OUT</c>.</summary>
     internal static string PotionsSpoilLine(int carried)
@@ -1297,17 +1375,19 @@ public sealed class DungeonHud
         _text.DrawText(cue.Label, scene.MousePos.X + 18f, scene.MousePos.Y + 12f, 1.5f, cue.Ready ? Yellow : Grey);
     }
 
-    private void DrawFloatingTexts(Camera camera, int w, int h)
+    /// <summary>The lines rising over the floor (<see cref="RisingLines"/>): none while the bag is open, whose answers it says itself.</summary>
+    private void DrawFloatingTexts(Camera camera, int w, int h, bool bagOpen)
     {
-        foreach (var ft in _floatingTexts)
+        foreach (var ft in InTheAir(bagOpen))
         {
             if (!WorldToScreen(camera, ft.WorldPos + Vector3.UnitY * 1.2f, w, h, out var px)) continue;
-            float t = ft.Age / FloatingTextLife;
-            float alpha = 1f - t * t;
-            float y = px.Y + ft.PixelYOffset - FloatingTextRise * t;
-            DrawRunsCenteredAt(px.X, y, 2f, ft.Runs, alpha);
+            float y = px.Y + ft.PixelYOffset - FloatingTextRise * ft.Age / FloatingTextLife;
+            DrawRunsCenteredAt(px.X, y, FloatingTextScale, ft.Runs, ft.Alpha);
         }
     }
+
+    /// <summary>A rising line's scale, over the floor and in the bag's answer row alike.</summary>
+    internal const float FloatingTextScale = 2f;
 
     // Inventory panel geometry. The panel was a fixed height until §2.2, so a
     // top fixed at the middle of the window always had room under it. It grows
@@ -1315,8 +1395,23 @@ public sealed class DungeonHud
     // short window loses first are the lines under the rows: what a swap costs
     // and which key equips.
 
+    /// <summary>The panel's title, <c>INVENTORY - CHAR A</c>, at the panel's top: its scale.</summary>
+    internal const float InventoryTitleScale = 3f;
+
+    /// <summary>The header row under the title — <c>EQUIPPED</c>, and X's hint on the right — how far under the top, and its scale.</summary>
+    internal const float InventoryHeaderDrop = 46f;
+    internal const float InventoryHeaderScale = 1.2f;
+
+    /// <summary>
+    /// The answer row (<see cref="BagLine"/>): how far under the top it sits, in the
+    /// band between the title's glyphs and the header row, which nothing else is
+    /// drawn in. At <see cref="FloatingTextScale"/> it clears the title by 5 px and
+    /// the header row by 6.
+    /// </summary>
+    internal const float InventoryAnswerDrop = 26f;
+
     /// <summary>The first slot's line, under the title and the EQUIPPED label.</summary>
-    private const float InventorySlotsTop = 70f;
+    internal const float InventorySlotsTop = 70f;
 
     /// <summary>A slot: its name, and the statline under it.</summary>
     private const float InventorySlotPitch = 46f;
@@ -1427,9 +1522,12 @@ public sealed class DungeonHud
     /// (<see cref="PotionDetail"/>); while the bag holds one both hints say it is
     /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1), the key hint
     /// that its number drinks it (<see cref="EquipHint"/>), and a line under the
-    /// swap line what a drink costs (<see cref="DrinkCostLine"/>).
+    /// swap line what a drink costs (<see cref="DrinkCostLine"/>). What a key just
+    /// did, or why it did nothing — and any level it bought — is said in a row of its
+    /// own under the title (<paramref name="answer"/>, <see cref="BagLine"/>), never
+    /// over the floor under the panel.
     /// </summary>
-    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
+    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving, IReadOnlyList<Run> answer)
     {
         float cx = w / 2f;
 
@@ -1460,14 +1558,15 @@ public sealed class DungeonHud
         float top = layout.Top;
         float left = cx - InventoryHalfWidth;
 
-        DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", 3f, Cyan);
-        _text.DrawText("EQUIPPED", left, top + 46f, 1.2f, Grey);
+        DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", InventoryTitleScale, Cyan);
+        DrawRunsCenteredAt(cx, top + InventoryAnswerDrop, FloatingTextScale, answer);   // already faded
+        _text.DrawText("EQUIPPED", left, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
         if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
         {
             // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
             string hint = potions ? PourKeyHint : LeaveKeyHint;
-            float width = hint.Length * GlyphAdvance * 1.2f;
-            _text.DrawText(hint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
+            float width = hint.Length * GlyphAdvance * InventoryHeaderScale;
+            _text.DrawText(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
         }
 
         float y = top + InventorySlotsTop;
@@ -1554,7 +1653,11 @@ public sealed class DungeonHud
     /// HP</c>, <c>RESTORES 32 OF 160 MANA</c> — and at a whole pool,
     /// <c>RESTORES ALL 30 HP</c>, or past it, <c>RESTORES ALL 30 HP - 6 OVER</c>:
     /// the overshoot, which only Overheal keeps. Mana is a share of the pool the
-    /// member has earned (PHASE 6b DECISION 3).
+    /// member has earned (PHASE 6b DECISION 3), but a drink fills no more than the
+    /// equipped locks leave spendable (<see cref="ActorState.UsableMaxMana"/>), so
+    /// where they reserve some the line is said against that pool — <c>RESTORES 12
+    /// OF 17 SPENDABLE MANA</c>, <c>RESTORES ALL 17 SPENDABLE MANA - 15 OVER</c> —
+    /// the share unchanged (the audit of Phase 6b).
     /// </summary>
     internal static string PotionDetail(Potion potion, ActorState member)
     {
@@ -1563,6 +1666,8 @@ public sealed class DungeonHud
         int share = Alchemist.Share(potion, member);
         int max = Alchemist.MaxOf(potion.Type, member);
         string pool = potion.Type == PotionType.Health ? "HP" : "MANA";
+        if (potion.Type == PotionType.Mana && member.UsableMaxMana < max)
+            (max, pool) = (member.UsableMaxMana, "SPENDABLE MANA");   // what the drink can take: TurnSystem.TryDrink's cap
         if (share < max)
             return $"RESTORES {share} OF {max} {pool}";
         return share == max ? $"RESTORES ALL {max} {pool}" : $"RESTORES ALL {max} {pool} - {share - max} OVER";
@@ -1690,10 +1795,23 @@ public sealed class DungeonHud
     /// <summary>
     /// What <c>G</c> says when the bag has no room (§4.4): a carry limit, not a
     /// fault — <c>BAG FULL - 6 CARRIED</c>, loot sharing the slots the weapons are
-    /// carried in — and how to make room: open the bag and put one down.
+    /// carried in — and how to make room: open the bag and put one down. While the
+    /// bag holds a potion (<paramref name="potion"/>) X pours one out too, as the
+    /// panel's hints say (<see cref="PourKeyHint"/>): <c>BAG FULL - 6 CARRIED - I
+    /// THEN X LEAVES OR POURS ONE OUT</c>, since a potion is never left (PHASE 6b
+    /// DECISION 1).
     /// </summary>
     /// <param name="carried">The member's slots, every one of them full.</param>
-    internal static string BagFullCue(int carried) => $"BAG FULL - {carried} CARRIED - I THEN X LEAVES ONE";
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string BagFullCue(int carried, bool potion = false)
+        => $"BAG FULL - {carried} CARRIED - I THEN X {(potion ? "LEAVES OR POURS ONE OUT" : "LEAVES ONE")}";
+
+    /// <summary><see cref="BagFullCue(int, bool)"/> for <paramref name="member"/>'s full bag: its slots, and whether one of them holds a potion.</summary>
+    internal static string BagFullCue(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        return BagFullCue(member.Inventory.Length, member.Potions.Any());
+    }
 
     /// <summary>The beat over a member who has just put a weapon down: <c>LEFT HATCHET HERE</c>, so it reads as a thing done on purpose, answered by <c>TOOK HATCHET</c> when it is taken back.</summary>
     internal static string LeftBeat(Weapon weapon)

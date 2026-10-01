@@ -86,7 +86,7 @@ public sealed class AlchemistPageTests : IDisposable
         var page = new AlchemistPage(campaign);
         Assert.Equal(
         [
-            "THE FARM - 1 DUNGEON BEATEN - 7 UNITS A COUNTED RUN",
+            "THE FARM - 1 DUNGEON WORKS IT - 7 UNITS A COUNTED RUN",
             "THE BATCH - 7 OF 7 UNITS LEFT",
             "UNMIXED UNITS SPOIL ON THE DESCENT - A POTION KEEPS ONE TRIP",
             "QUALITY 1 - 1 UNIT A POTION - A/D CHANGES IT",
@@ -115,9 +115,19 @@ public sealed class AlchemistPageTests : IDisposable
 
         Alchemist.Mix(campaign, "A", PotionType.Health, 1);
         Assert.Equal(("THE BATCH - ALL 7 UNITS MIXED", "[A] - 1 BAG SLOT FREE"), (page.Lines()[1].Text, page.Rows()[0].Text));
+
+        // With nothing left to mix, nothing offers a mix: the quality and the H and M
+        // lines go grey, as a line that cannot be acted on is (the audit of Phase 6b).
+        // A pour-back brings them back.
+        Assert.Equal([DungeonHud.Grey, DungeonHud.Cyan, DungeonHud.Grey, DungeonHud.Grey], page.Lines().Select(line => line.Color));
+        Assert.Equal([DungeonHud.White, DungeonHud.Grey, DungeonHud.Grey, DungeonHud.Grey, DungeonHud.Grey], page.Detail().Select(row => row.Color));
+        Alchemist.PourBack(campaign, "A", 4);
+        Assert.Equal(DungeonHud.Yellow, page.Lines()[3].Color);
+        Assert.Equal([DungeonHud.White, DungeonHud.Green, DungeonHud.Cyan], page.Detail().Take(3).Select(row => row.Color));
+        Alchemist.Mix(campaign, "A", PotionType.Health, 1);
         using (TestContent.UsePremise(tuning: t => Mixing(t) with { FarmYieldPerClear = 1 }))
         {
-            Assert.Equal("THE FARM - 1 DUNGEON BEATEN - 1 UNIT A COUNTED RUN", page.Lines()[0].Text);
+            Assert.Equal("THE FARM - 1 DUNGEON WORKS IT - 1 UNIT A COUNTED RUN", page.Lines()[0].Text);
             Alchemist.PourBack(campaign, "C", 2);
             Alchemist.Mix(campaign, "A", PotionType.Mana, 1);
             Assert.Equal("[A] - THE BAG IS FULL", page.Rows()[0].Text);
@@ -126,13 +136,15 @@ public sealed class AlchemistPageTests : IDisposable
         // The farm grows with a second dungeon beaten, and a run that counts brings a
         // fresh batch, every potion carried spoiled.
         CampaignRuns.Clear(campaign, "long_gallery", CampaignRuns.FiveDeep);
-        Assert.Equal(["THE FARM - 2 DUNGEONS BEATEN - 14 UNITS A COUNTED RUN", "THE BATCH - 14 OF 14 UNITS LEFT"], Texts(page.Lines()).Take(2));
+        Assert.Equal(["THE FARM - 2 DUNGEONS WORK IT - 14 UNITS A COUNTED RUN", "THE BATCH - 14 OF 14 UNITS LEFT"], Texts(page.Lines()).Take(2));
 
         // Its zero forms: a farm at a rate of 0, and no batch, and why.
         using (TestContent.UsePremise(tuning: t => Mixing(t) with { FarmYieldPerClear = 0 }))
-            Assert.Equal("THE FARM - 2 DUNGEONS BEATEN - IT YIELDS NOTHING", page.Lines()[0].Text);
+            Assert.Equal("THE FARM - 2 DUNGEONS WORK IT - IT YIELDS NOTHING", page.Lines()[0].Text);
         CampaignRuns.ShallowRetreat(campaign, "knife_warrens");
         Assert.Equal("NO BATCH - THE LAST RUN DID NOT COUNT", page.Lines()[1].Text);
+        Assert.Equal(DungeonHud.Grey, page.Lines()[3].Color);
+        Assert.Equal([DungeonHud.Grey, DungeonHud.Grey], page.Detail().Skip(1).Take(2).Select(row => row.Color));
         Assert.Equal(Alchemist.NoBatch(campaign), AlchemistPage.BatchLine(campaign));
         Assert.Equal(Alchemist.NoBatchNotCounted, Alchemist.NoBatch(campaign));
 
@@ -291,6 +303,19 @@ public sealed class AlchemistPageTests : IDisposable
         Assert.Equal(["H  HEALTH POTION Q3 - RESTORES 60 OF 100 HP", "H  HEALTH POTION Q5 - RESTORES ALL 100 HP", "H  HEALTH POTION Q7 - RESTORES ALL 100 HP - 40 OVER"],
             new[] { 3, 5, 7 }.Select(q => AlchemistPage.MixLines(PotionType.Health, q, fixture).Single()));
 
+        // A caster whose locks reserve mana — the starting party's D, its staff's
+        // Regeneration holding some of the pool — is told what a mana potion restores
+        // of what it can spend, so the quality that fills it shows, and the waste
+        // past it (the audit of Phase 6b): the share is still of the earned pool.
+        var d = campaign.Party.Single(member => member.Id == "D");
+        int earned = d.MaxMana, spendable = d.UsableMaxMana;
+        Assert.True(spendable < earned, $"D's locks reserve nothing: {spendable} of {earned}");
+        int whole = Enumerable.Range(1, 5).First(q => Alchemist.Share(PotionType.Mana, q, earned) >= spendable);
+        Assert.True(whole < Alchemist.QualityForAll(PotionType.Mana));
+        Assert.Equal($"M  MANA POTION Q1 - RESTORES {earned / 5} OF {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, 1, d).Single());
+        Assert.StartsWith($"M  MANA POTION Q{whole} - RESTORES ALL {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, whole, d).Single(), StringComparison.Ordinal);
+        Assert.Equal($"M  MANA POTION Q5 - RESTORES ALL {spendable} SPENDABLE MANA - {earned - spendable} OVER", AlchemistPage.MixLines(PotionType.Mana, 5, d).Single());
+
         // The percentages apart; a drink that is free.
         using (TestContent.UsePremise(tuning: t => Mixing(t) with { ManaPotionPercent = 25, PotionUseCost = 0 }))
             Assert.Equal(["HEALTH IS WHOLE AT QUALITY 5 - MANA AT 4", "DRINKING IS FREE IN A DUNGEON"], Texts(page.Detail()).Skip(3));
@@ -434,7 +459,7 @@ public sealed class AlchemistPageTests : IDisposable
             AlchemistPage.BatchLine(Most, Most), AlchemistPage.BatchLine(0, Most),
             .. rooms,
         ];
-        Assert.Equal((62, 62, 63), (AlchemistPage.ClosedLine.Length, AlchemistPage.FarmLine(99, Most).Length, AlchemistPage.QualityLine(Most).Length));
+        Assert.Equal((62, 63, 63), (AlchemistPage.ClosedLine.Length, AlchemistPage.FarmLine(99, Most).Length, AlchemistPage.QualityLine(Most).Length));
         foreach (string text in left)
         {
             Fits(text, BetweenRunsHud.WeaponRowScale, BetweenRunsHud.ColumnWidth, "the left column");
