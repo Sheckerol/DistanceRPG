@@ -294,7 +294,7 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// and nothing else — <c>ApplyPercent x source</c>, truncated, whatever
     /// the tier: the unique path of <see cref="LevelsFor"/>, for a magnitude
     /// that reads its scale off its source ("Serrated, and every element",
-    /// phase-3-loot.md:1273-1276). A lingering element's burn is one: its
+    /// phase-3-loot.md:1274-1277). A lingering element's burn is one: its
     /// levels are the element's percentage of the element damage, so the
     /// element's tier deepens the burn only through the damage it builds,
     /// never as a second factor on the levels — a tier-6 Flaming on a wand

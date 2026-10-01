@@ -65,8 +65,10 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>HealthPotionPercent</c> — over the dungeons that do not retire on their clear,
 /// rounded down (phase-6-between-runs.md §6.6, settled.md L1048-1054; PHASE 6b
 /// DECISION 7). No literal: the master's rate, percent and roster are read together,
-/// so moving one without re-deriving the rate fails, by name, and only when the suite
-/// runs: <see cref="FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions"/>.</item>
+/// so a move that would re-derive another rate fails until the rate follows it, by
+/// name, and only when the suite runs — a percent that leaves the quality for a whole
+/// pool where it was moves nothing:
+/// <see cref="FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

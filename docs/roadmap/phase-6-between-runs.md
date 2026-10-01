@@ -716,8 +716,8 @@ left unmixed spoils as the party descends, and every potion carried spoils as th
 run ends, a wipe's included: a consumable, lost by its lifetime, never gear a wipe
 forfeits. The split is made a potion at a time on the ALCHEMIST page, and each can
 be poured back, its units back in the batch, until the descent — DECISION 9, with
-this paragraph's single hand-over among its alternatives. settled.md's Phase 6b
-implementation pass records each.)
+this paragraph's single hand-over among its alternatives; both provisional and the
+user's to rule. settled.md's Phase 6b implementation pass records each.)
 
 ### The alchemist arrives with the first real clear, and the tutorial does not count
 
@@ -750,7 +750,7 @@ never saved, so the tutorial, which retires on its clear, never counts. The
 ALCHEMIST page is the hub's third, there from the start and saying when he
 arrives — PHASE 6b DECISION 10 — and under a `dungeons.json` that moves
 `retiresOnClear` onto the farm's one worker he goes with it until the next first
-clear — DECISION 11.)
+clear — DECISION 11; both provisional and the user's to rule.)
 
 ### It pays for the one thing nothing else pays for
 
@@ -796,11 +796,11 @@ It also means the farm and the enchanter tick together. A run advances your
 weapons and stocks your shelf in one event, which is one fewer clock for a
 player to hold.
 
-(Built in Phase 6b: every run that counts yields — a boss kill, or §6.3's mercy,
-the runs that tick the enchanter, in the same event at the run's end — and one
-that does not yields nothing, PHASE 6b DECISION 4; the run that beats a dungeon
-for the first time yields at the count it brings, so the first real clear brings
-the alchemist and a batch at once, DECISION 5.)
+(Built in Phase 6b: every run that counts yields — a boss kill, or §6.3's mercy, the
+runs that tick the enchanter, in the same event at the run's end — and one that does
+not yields nothing, PHASE 6b DECISION 4; the run that beats a dungeon for the first
+time yields at the count it brings, so the first real clear brings the alchemist and
+a batch at once, DECISION 5; both provisional and the user's to rule.)
 
 ### Quality is what surplus yield buys, so it does not saturate
 
@@ -902,7 +902,7 @@ clear's yield by 7 with no warning, so it does not keep this section's "does not
 silently inflate"; the suite catches it in the master copy only, and only when it
 runs. PHASE 6b DECISION 7 sets that out, with the form that keeps both rules — a
 key for the total, the rate computed as the content loads — among its
-alternatives.)
+alternatives; both provisional and the user's to rule.)
 
 ### Mana and health are equivalent until play says otherwise
 
@@ -934,9 +934,9 @@ New `Logic/Wear.cs`, `Logic/Enchanter.cs`, and a `CampaignState` that lives
 *outside* `DungeonState` (§4.3) — party, stable, enchanter queue, run counter,
 the set of dungeons cleared at least once, and the farm's stock.
 The existing distinction does the work for us: `DungeonState` is discarded on
-leaving, `CampaignState` is not. (Built in Phase 6b, in the farm's stock: the
-campaign keeps no stock of its own — the run's yield is a fact of its result,
-and the batch is worked out from it and the bags, PHASE 6b DECISION 6.)
+leaving, `CampaignState` is not. (Built in Phase 6b: the campaign keeps no stock
+of its own — the run's yield is a fact of its result, the batch worked out from
+it and the bags — PHASE 6b DECISION 6, provisional and the user's to rule.)
 
 `Weapon` gains `Wear` and `WearCapacity`; the unified attack resolver from Phase 0 is the single
 place it accrues, and `Enchanter` is the single place it is spent (§6.4) — a
@@ -981,11 +981,12 @@ live — the batch must never reach `CampaignState`.
 
 (Built in Phase 6b: `Logic/Farm.cs` counts the workers — the cleared set less
 the retired — makes a run's yield, works the batch out from the last result and
-the bags, and spoils every potion carried at the run's end, its one caller.
-The batch is derived, never a field — PHASE 6b DECISION 6 — and a test holds
-that `CampaignState` declares no batch, farm or yield of its own, and that a
-save and a load leave the batch as it was. The split the player chooses is the
-alchemist's, `Logic/Alchemist.cs`, beside what a potion restores.)
+the bags, and spoils every potion carried at the run's end, its one caller. The
+batch is derived, never a field — PHASE 6b DECISION 6, provisional and the
+user's to rule — and a test holds that `CampaignState` declares no batch, farm
+or yield of its own, and that a save and a load leave the batch as it was. The
+split the player chooses is the alchemist's, `Logic/Alchemist.cs`, beside what a
+potion restores.)
 
 Phase 5's save format grows a campaign section, and it becomes the *outer*
 document — a save with no dungeon in progress is now a valid state, which it

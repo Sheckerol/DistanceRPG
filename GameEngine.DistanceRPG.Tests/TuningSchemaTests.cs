@@ -124,7 +124,7 @@ public class TuningSchemaTests
 
     /// <summary>
     /// The names the golden tests pin (PHASE5-035–037, A34): what decides a map, a
-    /// fog box, a path or a stream — the three classes S:48-49 names and their
+    /// fog box, a path or a stream — the three classes P5:75-76 names and their
     /// constants, every stream's salt and mix (the dice's among them, which a later
     /// sub-step adds), what the placer, the stairs and the boss draw decide by, the
     /// tile, and every top-level key of the golden file itself. Hardcoded, so a
@@ -430,7 +430,7 @@ public class TuningSchemaTests
         // AVersion2SaveIsHashedOnVersion2sKeys).
         Assert.Equal(TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name), ConsumablesKeys);
 
-        // A file clamps; a tuning built in code is still refused (S:2999): a
+        // A file clamps; a tuning built in code is still refused (S:3000): a
         // negative cost would hand movement back for a drink — a count is never
         // negative — while 0, a free drink, is a choice. (A percentage of 0 is
         // refused as a divisor: EveryDivisorIsAtLeastOne.)

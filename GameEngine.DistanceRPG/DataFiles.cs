@@ -9,7 +9,7 @@ namespace GameEngine.DistanceRPG;
 /// file (<see cref="ContentFiles.Load"/>). Engine-free — <c>System.IO</c> only —
 /// and handed its folder every time: there is no default folder here, so nothing
 /// can read or write the real one by accident. The game hands it the
-/// executable's own folder (the files sit beside the exe, S:43), and
+/// executable's own folder (the files sit beside the exe, P5:69), and
 /// <c>--write-data</c> whatever folder it names. What the build itself carries
 /// is read by <see cref="ShippedData"/>, never here.
 /// <para>

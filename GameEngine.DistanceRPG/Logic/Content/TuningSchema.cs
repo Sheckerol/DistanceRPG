@@ -2,7 +2,7 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The groups <c>tuning.json</c> is laid out under: §5.3's ten, in §5.3's order
-/// (S:80-91), then the four groups of keys its starting set does not list, which
+/// (P5:107-118), then the four groups of keys its starting set does not list, which
 /// sit beside it. <see cref="Consumables"/> holds what a drink costs and what a
 /// potion restores, each arrived with the drink that reads it (Phase 6b.2), and
 /// the farm's yield, arrived with the farm (Phase 6b.3).
@@ -84,7 +84,7 @@ public sealed record BoolKey(string Name, TuningGroup Group,
 
 /// <summary>
 /// A table of whole numbers by name — namespaced scalars, never a list and never
-/// nested, so "scalars only" (S:60) holds leaf by leaf (A4). A file beside the
+/// nested, so "scalars only" (P5:87) holds leaf by leaf (A4). A file beside the
 /// game names only the entries it changes, and the rest keep the built-in
 /// copy's numbers: the read merges per entry (<see cref="TuningJson.Read"/>).
 /// </summary>
@@ -113,10 +113,10 @@ public sealed record TableKey(string Name, TuningGroup Group, int Min, int Max,
 /// <para>
 /// <strong>What it never holds</strong>: anything the golden tests pin — the
 /// map generator's, the random streams' and the pathfinder's constants stay
-/// compiled "permanently and without exception" (S:48-51), which a test asserts
-/// against a hardcoded list — and nothing structural (S:57-60): the relations
+/// compiled "permanently and without exception" (P5:75-78), which a test asserts
+/// against a hardcoded list — and nothing structural (P5:84-87): the relations
 /// are <c>restricted.json</c>'s, the classes and variants content's. And no
-/// decay constant: a status loses one level a round, universally (S:83).
+/// decay constant: a status loses one level a round, universally (P5:110).
 /// </para>
 /// </summary>
 public static class TuningSchema
@@ -441,7 +441,7 @@ public static class TuningSchema
     /// <summary>
     /// <c>ApplyPercent</c>, keyed by enchantment id: the catalogue lays each
     /// entry the table names over that entry's own percentage, so the dial owns
-    /// the number for every id it names (S:84, S:128) — and for the entries the
+    /// the number for every id it names (P5:111, P5:155) — and for the entries the
     /// catalogue leaves to it (<see cref="EnchantmentDefinitions.SetByTuning"/>),
     /// it is the only number there is. The table is every id the tuning names,
     /// in ordinal order.

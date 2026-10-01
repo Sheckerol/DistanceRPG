@@ -359,12 +359,13 @@
   /* Provisional: the units of yield the farm makes at the end of every run that counts, for each
      dungeon besides the tutorial beaten at least once (open-questions.md, PHASE 6b DECISIONS 4 and
      7). Derived rather than picked: a campaign that has beaten everything should yield about one
-     full loadout of six maximum-quality potions a run, 6 x (100 / HealthPotionPercent 20) = 30, over
-     the 4 dungeons beside the tutorial = 7.5 -> 7. It is a rate, and nothing re-derives it for you:
-     a dungeon added to dungeons.json - the master or the copy beside the game - raises a full
-     clear's yield by 7 a dungeon with no warning, which settled.md's ruling to tune the total rules
-     against. When the dungeon count or HealthPotionPercent moves, re-derive it by hand. 0 means the
-     farm yields nothing. */
+     full loadout of six maximum-quality potions a run, each at the quality that restores a whole
+     pool, 100 / HealthPotionPercent 20 rounded up = 5, so 6 x 5 = 30, over the 4 dungeons beside
+     the tutorial = 7.5 -> 7. It is a rate, and nothing re-derives it for you: a dungeon added to
+     dungeons.json - the master or the copy beside the game - raises a full clear's yield by 7 a
+     dungeon with no warning, which settled.md's ruling to tune the total rules against. When the
+     dungeon count or HealthPotionPercent moves, re-derive it by hand. 0 means the farm yields
+     nothing. */
   "FarmYieldPerClear": 7,
 
   /* ---- Progression ---- */

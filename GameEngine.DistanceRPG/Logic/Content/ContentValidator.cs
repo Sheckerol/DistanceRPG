@@ -641,7 +641,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.8 checks on <c>dungeons.json</c> (S:390-399), run after the weapons
+    /// The §5.8 checks on <c>dungeons.json</c> (P5:429-438), run after the weapons
     /// and against the tables <paramref name="tables"/> computed from them —
     /// <see cref="DungeonCatalogue"/> calls this from its constructor, the way
     /// <see cref="EnchantmentCatalogue"/> validates what it builds. In a fixed
@@ -988,7 +988,7 @@ public static class ContentValidator
     /// tables (<see cref="EnchantmentBehaviours.AppliesStatus"/>,
     /// <see cref="EnchantmentBehaviours.LingersAnElement"/>), so a new kind
     /// is a row there and never an edit here. With the first rule, the
-    /// second makes every unique magnitude quote no flat trigger (S:296): it
+    /// second makes every unique magnitude quote no flat trigger (P5:331): it
     /// applies a status, so its price is the ladder over what it lands.
     /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
     /// <para>
@@ -1093,7 +1093,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// §1.4's chart as content (S:353): four types, two pairs, every type opposed
+    /// §1.4's chart as content (P5:392): four types, two pairs, every type opposed
     /// by exactly one. Each <see cref="DamageType"/> other than None is carried by
     /// exactly one elemental entry, and the exclusion groups of
     /// <paramref name="restricted"/> oppose every element to exactly one other,
@@ -1143,7 +1143,7 @@ public static class ContentValidator
     }
 
     /// <summary>
-    /// The §5.6 checks on <c>weapons.json</c> (S:283-297). The class rows first,
+    /// The §5.6 checks on <c>weapons.json</c> (P5:317-332). The class rows first,
     /// in <see cref="WeaponClass"/> order, each failure's entry the class
     /// (<see cref="ValidateClasses"/>): one row a class, a kind that casts exactly
     /// for the Staff and the Wand, the stats it levels on, a signature no other
@@ -1213,7 +1213,7 @@ public static class ContentValidator
     /// </para>
     /// <para>
     /// <strong>A relations edit that makes a weapon illegal names both</strong>
-    /// (§5.5, S:260-264): the weapon is the entry (or its class, where the
+    /// (§5.5, P5:294-298): the weapon is the entry (or its class, where the
     /// relation refuses the class's baseline: the class row alone writes it and
     /// every weapon of the class is forged with it, so the entry named is the one
     /// of the two to change), and the detail ends with the
@@ -1261,7 +1261,7 @@ public static class ContentValidator
             // One hit cannot be two contradictory things: an entry's enchantments
             // never include a pair the relations exclude, in attachment order so
             // the pair reported is the same one every run — naming the
-            // restricted.json group that excludes them (S:260-264: "naming both").
+            // restricted.json group that excludes them (P5:294-298: "naming both").
             // The pair is the catalogue's question, the one the enchanter asks of
             // what it would attach beside the weapon's entries (Phase 6a.3b).
             for (int i = 0; i < def.Enchantments.Count; i++)
@@ -1457,7 +1457,7 @@ public static class ContentValidator
     /// Why <see cref="ModifierRules.Allowed"/> refuses <paramref name="t"/> on a
     /// weapon of <paramref name="kind"/> carrying <paramref name="present"/> — the
     /// relation that refused it, as <c>restricted.json</c> writes it — or null when
-    /// it is allowed (S:260-264, PHASE5-122: a relations edit that makes a weapon
+    /// it is allowed (P5:294-298, PHASE5-122: a relations edit that makes a weapon
     /// illegal names "the weapon that is now illegal <em>and</em> the rule that
     /// made it so").
     /// <para>
@@ -1750,7 +1750,7 @@ public static class ContentValidator
             .ToList();
 
     /// <summary>
-    /// The derivation rule (§1.5, S:293-295), checked over the whole unique
+    /// The derivation rule (§1.5, P5:328-330), checked over the whole unique
     /// table (K:179-182): a unique names the variant it derives from, and
     /// nothing else does; it keeps that variant's class, statline and shape —
     /// "everything else is unchanged". A martial unique is the variant with

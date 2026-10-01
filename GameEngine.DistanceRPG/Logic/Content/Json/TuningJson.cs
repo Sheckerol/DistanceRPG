@@ -26,7 +26,7 @@ public sealed record TuningRead(Tuning Tuning, IReadOnlyList<string> Warnings, I
 /// a number it can take — a gap is refused (the game stops, naming the key),
 /// because there is no number under it.</item>
 /// <item><strong>Then the copy beside the game, leniently, because a human
-/// edits it</strong> (S:62-74; <see cref="Read"/>): comments and trailing commas
+/// edits it</strong> (P5:89-101; <see cref="Read"/>): comments and trailing commas
 /// are allowed; a missing key keeps the built-in copy's number, so a partial file
 /// is valid; a table merges per entry onto the built-in one; an unknown key or
 /// table member warns and is ignored, so a constant added later never
@@ -107,7 +107,7 @@ public static class TuningJson
     internal const string EmptyWarning = Prefix + "the file is empty - the built-in numbers are playing";
 
     /// <summary>
-    /// Whether two tunings are the same numbers (S:99-107): the first 16 lowercase
+    /// Whether two tunings are the same numbers (P5:126-134): the first 16 lowercase
     /// hex digits of SHA-256 over the effective values as canonical text — one
     /// <c>Key=value</c> line per scalar and per table entry (every member of an
     /// enum table, every id <c>ApplyPercent</c> names), invariant integers,

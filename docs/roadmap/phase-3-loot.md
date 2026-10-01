@@ -1242,6 +1242,7 @@ locks leave spendable: DECISION 3 — and no quality is capped. Health goes thro
 the heal every source uses, so it restores what was missing and teaches exactly
 that as HP XP, a full-HP drink restoring and teaching nothing, and the overshoot
 is lost unless Overheal banks it as Ward; mana is a refund that teaches nothing.
+The three DECISIONS are each provisional and the user's to rule, and
 settled.md's Phase 6b implementation pass records each.)
 
 ## 3.5 Code impact
@@ -1302,14 +1303,15 @@ first-cleared dungeon ids and the current batch. **The batch is not saved
 between runs** — it spoils (§6.6), so it is computed at the hub and discarded,
 which means the only thing persisted is the clear set.
 
-(Built in Phase 6b, and bent once — PHASE 6b DECISION 6 in open-questions.md: the
-run's yield is saved as a fact of its result, beside the clear set, so a quit
-and a load never refill the batch. The batch itself is still never saved, nor a
-field of `CampaignState`: it is worked out at the hub from that yield and the
-bags, and what is left unmixed spoils as the party descends. `Logic/Farm.cs`
-holds the farm, `Potion` lives in `Logic/Items.cs` beside `IItem`, what a bag
-slot holds, `Logic/Alchemist.cs` holds what a potion restores and the mixing,
-and the consumable path is `TurnSystem.TryDrink`.)
+(Built in Phase 6b, and bent once — PHASE 6b DECISION 6 in open-questions.md,
+provisional and the user's to rule: the run's yield is saved as a fact of its
+result, beside the clear set, so a quit and a load never refill the batch. The
+batch itself is still never saved, nor a field of `CampaignState`: it is worked
+out at the hub from that yield and the bags, and what is left unmixed spoils as
+the party descends. `Logic/Farm.cs` holds the farm, `Potion` lives in
+`Logic/Items.cs` beside `IItem`, what a bag slot holds, `Logic/Alchemist.cs`
+holds what a potion restores and the mixing, and the consumable path is
+`TurnSystem.TryDrink`.)
 
 `TurnSystem` needs a consumable-use path costing `PotionUseCost` movement. It
 routes healing through the **same** call `TickStatusEffects` uses, so the

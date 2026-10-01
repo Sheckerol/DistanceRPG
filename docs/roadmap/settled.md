@@ -208,7 +208,7 @@
   adjusting the existing `bossFloor`-based lockout formula the way 10 would invite.
   `FarmYieldPerClear` (§6.6) is defined in terms of the count so a 7th dungeon added
   later does not silently inflate the system. (Built in Phase 6b as a per-clear key,
-  re-derived by hand, which a dungeon added does inflate: PHASE 6b DECISION 7.)
+  which a dungeon added does inflate: PHASE 6b DECISION 7, the user's to rule.)
 - **A run has three outcomes: boss kill, retreat, death** — not two. Boss kill
   collects the run's loot and keeps its XP. A fighting retreat (leaving alive
   without the boss, including declining a found boss floor) keeps the run's
@@ -1047,11 +1047,11 @@
   hardest gate in the game — hands over a whole category instead of a number.
 - **The farm's target is stated as a total, not a rate**, because the dungeon count is
   an unmade content decision and a per-clear number would inflate silently with every
-  dungeon added. The rule: *a campaign that has cleared everything produces about one
-  full loadout of maximum-quality potions per run*, with `FarmYieldPerClear` derived by
-  dividing by however many dungeons end up existing. Same move as `MovementUnitsPerMana`
-  (§1.3) — state the rule so it re-derives when its inputs move. (Built in Phase 6b as the
-  hand-off's per-clear key, re-derived by hand: PHASE 6b DECISION 7 says what that costs.)
+  dungeon added. The rule: *a campaign that has cleared everything produces about one full
+  loadout of maximum-quality potions per run*, with `FarmYieldPerClear` derived by dividing
+  by however many dungeons end up existing. Same move as `MovementUnitsPerMana` (§1.3) —
+  state the rule so it re-derives when its inputs move. (Built in Phase 6b as the hand-off's
+  per-clear key, re-derived by hand, at a cost — PHASE 6b DECISION 7, the user's to rule.)
 - **`HealthPotionPercent` sets the span rather than the height.** It decides how
   many units a maximum potion costs and therefore how much of a campaign passes
   before the farm stops mattering.
@@ -1432,10 +1432,10 @@ four as shipped.
   this run and still carries. Gear carried in is never taken, and a weapon put
   down in the dungeon is lost with it either way.
 - **Four dungeons ship beside the tutorial, not the six above — provisional.**
-  The missing two need content that does not exist yet (a Great Axe unique,
-  or a repeated theme), and Phase 6b completes the roster (deferred in
-  Phase 6b: PHASE 6b DECISION 8). The four's names, bosses and statlines are
-  provisional, and so is `DeathXpLossPercent` at 50: the entry above leaves it
+  The missing two need content that does not exist yet (a Great Axe unique, or a
+  repeated theme), and Phase 6b completes the roster (deferred in Phase 6b:
+  PHASE 6b DECISION 8, the user's to rule). The four's names, bosses and statlines
+  are provisional, and so is `DeathXpLossPercent` at 50: the entry above leaves it
   unfixed, and §4.4 asks only that it be data rather than a hardcoded 100%.
 - **The hub's dungeon list is the screen between runs.** The game opens on it.
   Before the tutorial is beaten it offers the tutorial alone and says under it,
@@ -1923,9 +1923,10 @@ makes false is marked where it stands.
   `WearCapacityPerBar`'s clamp ceiling, `MostCapacityPerBar` — and the enchanter's
   shop brings two ceilings of its own, a service's runs to 11 (`MostServiceRuns`, the
   most enchantments plus one) and a run's end's worked reports to 10 (`MostWorked`,
-  `EnchanterWorksOn`'s clamp ceiling); the row of a weapon's enchantments is what check
-  29 holds a deposit to, and check 28 holds a take-back to the wear ceiling — the Phase
-  6a pass, below. And in Phase 6b: a run's yield to `MostYieldPerClear` a clear.)
+  `EnchanterWorksOn`'s clamp ceiling); the row of a weapon's enchantments is what
+  check 29 holds a deposit to, and check 28 holds a take-back to the wear ceiling —
+  the Phase 6a pass, below. And in Phase 6b, a run's yield and the potions spoiled to
+  `MostYieldPerClear` a clear — the Phase 6b pass, below.)
 
   - **The tier's ceiling is a sanity bound, and is recorded as one.** Tier is
     uncapped by design (§3.3, "the pool is the cap"), and 2147 is only where the
@@ -3779,7 +3780,7 @@ its number, and this pass records the ruling when it is made.
   what a bag holds: an emptied hand takes the first *weapon* in its bag,
   passing a potion over, every rule that keeps a member armed counts the weapons
   it carries and never its full slots, and the stable holds weapons alone — the
-  Phase 6b pass, below, and PHASE 6b DECISION 1.)
+  Phase 6b pass, below, and PHASE 6b DECISION 1, the user's to rule.)
 - **PHASE 6a DECISION 8 — taking a weapon back early (§6.2).** Any deposit,
   worked or stalled, can be taken back between runs, to the stable's end, a
   transfer's two weapons together: its service is forfeit, nothing attached and
@@ -3807,7 +3808,7 @@ its number, and this pass records the ruling when it is made.
   between runs was always a safe point. (Grown in Phase 6b: a potion mixed at
   the alchemist and one poured back are saved the same way, under the same log
   line, so a quit and a load bring the potion back and never refill the batch —
-  PHASE 6b DECISION 6.)
+  PHASE 6b DECISION 6, the user's to rule.)
 - **PHASE 6a DECISION 11 — reordering a weapon's own enchantments (§6.5).** A
   reorder is a transfer whose source is the weapon itself: it takes the count in
   runs, attaching the soul again as the last of the same count — "one
@@ -3912,15 +3913,16 @@ marked where it stands: the run's yield saved with its result, the batch worked
 out from it (DECISION 6, **bends §3.5**'s "The batch is not saved between runs",
 and keeps §6.7's "the batch must never reach `CampaignState`"); the hand-off's
 per-clear key, re-derived by hand (DECISION 7, which **does not keep** the
-ruling's "a per-clear number would inflate silently with every dungeon added",
-above, for a dungeon added outside a test run — the entry says so plainly); and
-the roster left at four (DECISION 8, **bends the hand-off**'s "Phase 6b
-completes the roster", above). PHASE 6a DECISIONS 7, 10 and 14 are extended,
-never re-decided — their entries above say how — and nothing here touches USER
-DECISION 1, the Phase 3 questions in open-questions.md, or the REWORK and SLOT
-DECISIONS. Nothing here draws a die: the farm, the alchemist and a drink roll
-nothing, so no stream is new, no RNG call moves, and the golden tests are as
-they were.
+six-dungeon entry's "does not silently inflate the system", above: a per-clear
+number "would inflate silently with every dungeon added", as the farm's ruling
+says, and does for a dungeon added outside a test run — the entry says so
+plainly); and the roster left at four (DECISION 8, **bends the hand-off**'s
+"Phase 6b completes the roster", above). PHASE 6a DECISIONS 7, 10 and 14 are
+extended, never re-decided — their entries above say how — and nothing here
+touches USER DECISION 1, the Phase 3 questions in open-questions.md, or the
+REWORK and SLOT DECISIONS. Nothing here draws a die: the farm, the alchemist
+and a drink roll nothing, so no stream is new, no RNG call moves, and the
+golden tests are as they were.
 
 ### The potion and the slot
 
@@ -4235,17 +4237,17 @@ they were.
   a potion — the alchemist arrives with the first clear of a dungeon besides the
   tutorial — asked of the retired list alone, never of today's
   `retiresOnClear`, as check 30 asks it; (32) every potion carried was mixed from
-  the last run's batch: the qualities every bag holds, summed in roster then slot
+  the last run's yield: the qualities every bag holds, summed in roster then slot
   order, are at most the last run's yield, refused at the potion where the sum
-  first passes it — between runs that is the batch less what is unmixed, and in a
-  visit less what was drunk or poured out — so no potion is carried before a run
-  has ended, and on a save with no real clear 31, which runs first, is the
-  refusal; (33) a yield needs a run that counted and a clear, and is at most
-  `MostYieldPerClear` a clear; (34) the farm counted no more clears than the
-  campaign holds cleared and not retired, a first clear has the boss down, and a
-  first clear of a dungeon the run did not retire counts a worker at least — a
-  first clear's dungeon being cleared is checks 13's and 2's, which run first;
-  (35) the potions that spoiled fit the party's bag slots, one a slot, were
+  first passes it — between runs they are that yield less what is left unmixed
+  (the batch), and in a visit less what was drunk or poured out too — so no potion
+  is carried before a run has ended, and on a save with no real clear 31, which
+  runs first, is the refusal; (33) a yield needs a run that counted and a clear,
+  and is at most `MostYieldPerClear` a clear; (34) the farm counted no more clears
+  than the campaign holds cleared and not retired, a first clear has the boss
+  down, and a first clear of a dungeon the run did not retire counts a worker at
+  least — a first clear's dungeon being cleared is checks 13's and 2's, which run
+  first; (35) the potions that spoiled fit the party's bag slots, one a slot, were
   carried in after the alchemist arrived — the farm had a worker as the run
   began — and add up to no more than `MostYieldPerClear` for each of those
   workers. The workers as the run began are the clears it ended with, less its
@@ -4309,19 +4311,24 @@ they were.
   `ContentBounds.MostOverflow` the sanity bound on a potion's overshoot (Drinking,
   above).
 - **`FarmYieldPerClear` is derived by hand, and pinned in the master.** Its
-  comment carries the derivation — a loadout of six maximum-quality potions, 6 ×
-  (100 ÷ `HealthPotionPercent` 20) = 30 units, over the four dungeons beside the
-  tutorial, 7.5, rounded down to 7 — and says to re-derive it when the count or
-  the percent moves (DECISION 7). `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`
-  holds the master's rate to exactly that rounding down, so a fifth dungeon in the
-  master, a moved percent, or a rate of 6 or 8 fails the suite, saying to
-  re-derive it; `ShippedDataTests` lists it among the numbers a design doc fixes.
-  **What it does not do**: it sees only the master, and only when the suite runs.
-  A dungeon added to the copy beside the game in a playtest, or to the master
-  without a test run, raises a full clear's yield by 7 a dungeon with no warning
-  — "a dungeon is an edit here, never a rebuild" (`dungeons.json`'s header) — so
-  the per-clear key does not keep "would inflate silently", and DECISION 7 says
-  so, with the form that would among its alternatives.
+  comment carries the derivation — a loadout of six maximum-quality potions, each
+  at the quality that restores a whole pool (`Alchemist.QualityForAll`, 100 ÷
+  `HealthPotionPercent` rounded up: 5 at 20), 6 × 5 = 30 units, over the four
+  dungeons beside the tutorial, 7.5, rounded down to 7 — and says to re-derive it
+  when the count or the percent moves (DECISION 7).
+  `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions` works the same
+  derivation out from the master and holds the master's rate to exactly that
+  rounding down, so the suite fails whenever re-deriving would give a rate other
+  than the master's — a fifth dungeon in the master, a percent that moves the
+  quality for a whole pool (21 to 24 still ask 5, and fail nothing), or a rate
+  of 6 or 8 — saying to re-derive it; `ShippedDataTests` lists it among the
+  numbers a design doc fixes. **What it does not do**: it sees only the master,
+  and only when the suite runs. A dungeon added to the copy beside the game in a
+  playtest, or to the master without a test run, raises a full clear's yield by 7
+  a dungeon with no warning — "a dungeon is an edit here, never a rebuild"
+  (`dungeons.json`'s header) — so the per-clear key does not keep the six-dungeon
+  entry's "does not silently inflate the system", and DECISION 7 says so, with
+  the form that would among its alternatives.
 
 ### PHASE 6b DECISIONS, shipped provisionally
 

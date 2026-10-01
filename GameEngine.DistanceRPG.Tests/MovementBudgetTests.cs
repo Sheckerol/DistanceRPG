@@ -3,7 +3,7 @@ using GameEngine.DistanceRPG.Logic;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// <see cref="Tuning.MovementBudget"/>, §5.3's one new key (S:82; settled.md's
+/// <see cref="Tuning.MovementBudget"/>, §5.3's one new key (P5:109; settled.md's
 /// Phase 2 pass: "the caster's 160 is MovementBudget"): the whole a party member
 /// moves in a turn, read from the tuning wherever the constant was read — a new
 /// member's budget, a turn's refill before Mire's cut, the bank's cap, the

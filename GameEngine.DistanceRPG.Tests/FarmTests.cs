@@ -337,12 +337,14 @@ public sealed class FarmTests : IDisposable
         // has cleared everything should produce about one full loadout of
         // maximum-quality potions per run". The master's FarmYieldPerClear is that
         // loadout — six potions at the quality that restores a whole pool from 1 HP,
-        // 6 x 5 = 30 at HealthPotionPercent 20 — over the dungeons that do not retire
-        // on their clear, rounded down, as tuning.json's comment derives it: 7.5 -> 7,
-        // so a full clear yields the target or less, short of it by less than a unit
-        // a dungeon. A fifth dungeon in the master, a moved percent, or a rate that is
-        // not that rounding — 6, or DECISION 7's rounded-up 8 — fails here, saying
-        // re-derive it.
+        // 100 / HealthPotionPercent rounded up (Alchemist.QualityForAll), 6 x 5 = 30
+        // at 20 — over the dungeons that do not retire on their clear, rounded down,
+        // as tuning.json's comment derives it: 7.5 -> 7, so a full clear yields the
+        // target or less, short of it by less than a unit a dungeon. Whatever would
+        // re-derive another rate fails here, saying re-derive it: a fifth dungeon in
+        // the master, a percent that moves the quality for a whole pool (21 to 24
+        // still ask 5; 25 asks 4), or a rate that is not that rounding — 6, or
+        // DECISION 7's rounded-up 8.
         //
         // What this pins, and all it pins: the master copy, when the suite runs. A
         // dungeon added to the copy beside the game in a playtest, or to the master

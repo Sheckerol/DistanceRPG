@@ -889,18 +889,19 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   is the best potion there is. They play since Phase 6b's drink reads them, and
   turning one says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other
   number resumes — never to a save from before Phase 6b, whose record covers only
-  the keys played then; while Phase 6b was being built, a save an earlier step's
-  build wrote said it once, though no number moved, since the drink's three and
+  the keys played then; while Phase 6b is being built, a save an earlier step's
+  build wrote says it once, though no number moved, since the drink's three and
   then the farm's joined version 3's record. The group's fourth, `FarmYieldPerClear`, is the units the
   farm yields a worker on every run that counts (0 to 1000; 0 yields nothing;
   provisional — PHASE 6b DECISIONS 4 and 7), played since Phase 6b's farm reads it.
   It is derived by hand, not picked: a campaign that has beaten everything should
-  yield about one full loadout of six maximum-quality potions a run, 6 × (100 /
-  `HealthPotionPercent` 20) = 30, over the four dungeons beside the tutorial, 7.5 →
-  7. It is a rate, and nothing re-derives it for you: a dungeon added to
-  `dungeons.json` — the master or the copy beside the game — raises a full clear's
-  yield by 7 with no warning, so re-derive it by hand when the roster or
-  `HealthPotionPercent` moves (the suite says so of the master copy, and only when
+  yield about one full loadout of six maximum-quality potions a run, each at the
+  quality that restores a whole pool — 100 ÷ `HealthPotionPercent` 20, rounded up,
+  5 — so 6 × 5 = 30, over the four dungeons beside the tutorial, 7.5 → 7. It is a
+  rate, and nothing re-derives it for you: a dungeon added to `dungeons.json` —
+  the master or the copy beside the game — raises a full clear's yield by 7 with
+  no warning, so re-derive it by hand when the roster or `HealthPotionPercent`
+  moves (the suite says so of the master copy, and only when
   it runs). No key is still to come: every key of §5.3's set has its reader.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
@@ -944,9 +945,11 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `ImprovementRollTests.TheOddsAreTheRulings`, the 6, 7 and 9 in 100 the ruling
   works out from it; and `FarmYieldPerClear` 7, derived from `HealthPotionPercent`
   20 and the four dungeons beside the tutorial as §6.6's loadout rule states it,
-  fails `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions` whenever one of
-  the three moves without the rate being re-derived — a fifth dungeon in the master
-  `dungeons.json` included. Every other number in it fails nothing: the tests read it from the master, or stand
+  fails `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions` whenever
+  re-deriving it would give a rate other than the master's — a fifth dungeon in
+  the master `dungeons.json`, a `HealthPotionPercent` that moves the quality for a
+  whole pool (21 to 24 still ask 5, and fail nothing), or a rate other than 7 with
+  neither moved. Every other number in it fails nothing: the tests read it from the master, or stand
   on numbers of their own (`Premise`, in the test project: the numbers the
   worked examples were written against, which most scenario suites play instead
   of the master's) — give `PerStack`'s `Block` 4, rebuild and run the suite, and

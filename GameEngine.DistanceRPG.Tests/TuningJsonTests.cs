@@ -468,7 +468,7 @@ public class TuningJsonTests
     [Fact]
     public void AHandEditedFileMayCommentAndTrailAComma()
     {
-        // A human edits it (S:73-74): line and block comments anywhere, and the
+        // A human edits it (P5:100-101): line and block comments anywhere, and the
         // trailing comma an edit leaves behind, are no mistake.
         string file = $$"""
             // the numbers for tonight's playtest
@@ -526,7 +526,7 @@ public class TuningJsonTests
         // PHASE5-080: every knob "gathered in one place ... seeing them on one
         // screen is how those get resolved". The shipped file — the master copy,
         // hand-kept — names every key once, under §5.3's ten groups in §5.3's
-        // order (S:80-91) — a group with keys still to come under a heading naming
+        // order (P5:107-118) — a group with keys still to come under a heading naming
         // them, none since the farm's yield arrived (Phase 6b.3) — then the four
         // beside it, each key under the
         // comment that says what it is; and it reads, strictly, with nothing to
@@ -565,7 +565,7 @@ public class TuningJsonTests
             Assert.True(comments[key.Name].Length > 20, $"{key.Name} has no comment saying what it is");
         }
 
-        // The comparisons §5.3 wants on one screen (S:93-97): the mana divisor
+        // The comparisons §5.3 wants on one screen (P5:120-124): the mana divisor
         // against the budget and the cast costs, re-derived by hand; the farm
         // allowance against forged + 5; Searing's decay against the fight.
         const string derivation = "(MovementBudget 160 - a staff's 40) / (8 + 3 at Resonant x6) = 10.9 -> 10";
@@ -577,11 +577,13 @@ public class TuningJsonTests
         Assert.Contains("forged + AcquiredHeadroom", comments[nameof(Tuning.AcquiredHeadroom)]);
 
         // And the farm's yield against the loadout it is derived from (S:1048-1054,
-        // PHASE 6b DECISION 7): a rate re-derived by hand, which says so, and says
-        // that a dungeon added raises the yield with no warning — what the test of
-        // the derivation (FarmTests) catches in the master alone.
+        // PHASE 6b DECISION 7): a rate re-derived by hand, which says so — a potion
+        // at the quality for a whole pool, 100 over the percent rounded up, as
+        // Alchemist.QualityForAll and the test of the derivation (FarmTests) work
+        // it out — and says that a dungeon added raises the yield with no warning,
+        // what that test catches in the master alone.
         string farm = comments[nameof(Tuning.FarmYieldPerClear)];
-        Assert.Contains("6 x (100 / HealthPotionPercent 20) = 30, over the 4 dungeons beside the tutorial = 7.5 -> 7", farm);
+        Assert.Contains("each at the quality that restores a whole pool, 100 / HealthPotionPercent 20 rounded up = 5, so 6 x 5 = 30, over the 4 dungeons beside the tutorial = 7.5 -> 7", farm);
         Assert.Contains("re-derive", farm);
         Assert.Contains("a dungeon added to dungeons.json", farm);
         Assert.Contains("raises a full clear's yield", farm);

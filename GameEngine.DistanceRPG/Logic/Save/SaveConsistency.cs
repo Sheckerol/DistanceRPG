@@ -126,15 +126,15 @@ internal static class SaveConsistency
     }
 
     /// <summary>
-    /// 32. Every potion carried was mixed from the last run's batch (Phase 6b.3): a
+    /// 32. Every potion carried was mixed from the last run's yield (Phase 6b.3): a
     /// quality of <c>q</c> is <c>q</c> units of it, and the batch is what the last
     /// run's end yielded less what is mixed (<see cref="Farm.Batch"/>), so the
     /// qualities every bag holds, summed in roster then slot order, are no more than
-    /// that yield — between runs, the batch less what is left unmixed, and during a
-    /// visit, less what was drunk or poured out. Refused at the potion where the sum
-    /// first passes it. It holds no potion before any run has ended, and none before
-    /// the alchemist (31's, which runs first: a save with no real clear is refused
-    /// there).
+    /// that yield — between runs, the yield less what is left unmixed (the batch),
+    /// and during a visit, less what was drunk or poured out too. Refused at the
+    /// potion where the sum first passes it. It holds no potion before any run has
+    /// ended, and none before the alchemist (31's, which runs first: a save with no
+    /// real clear is refused there).
     /// </summary>
     private static void Batch(CampaignDto campaign)
     {

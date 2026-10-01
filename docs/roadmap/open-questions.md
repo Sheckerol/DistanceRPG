@@ -1175,13 +1175,15 @@ thirty units"); `PartyCarrySlots` is 24. And the hand-off names the key
 `FarmYieldPerClear` (settled.md's Phase 5 hand-off; phase-5-save.md §5.3's table).
 
 **Shipped provisionally (Phase 6b.3): the hand-off's per-clear key, re-derived by
-hand.** A loadout is six maximum potions, 6 × 5 = 30 units at `HealthPotionPercent`
-20, over the four dungeons beside the tutorial that ship: 7.5, rounded down to 7,
-so a full clear yields 28 a run. Its comment in `tuning.json` carries the
-derivation and says to re-derive it, and the suite fails when the master's roster
-or `HealthPotionPercent` moves without it being re-derived, or when the rate is not
-that rounding down, 6 or 8 at four dungeons
-(`FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`).
+hand.** A loadout is six maximum potions, each at the quality that restores a
+whole pool — 100 ÷ `HealthPotionPercent` rounded up, 5 at 20 — so 6 × 5 = 30
+units, over the four dungeons beside the tutorial that ship: 7.5, rounded down to
+7, so a full clear yields 28 a run. Its comment in `tuning.json` carries the
+derivation and says to re-derive it, and the suite fails whenever re-deriving
+would give a rate other than the master's — the master's roster moved, or
+`HealthPotionPercent` moved far enough to change the quality for a whole pool (21
+to 24 still ask 5) — or when the rate is not that rounding down, 6 or 8 at four
+dungeons (`FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`).
 
 **What the pick costs, plainly.** It is a rate. A dungeon added through
 `dungeons.json` — beside the game in a playtest, or in the master without a test
