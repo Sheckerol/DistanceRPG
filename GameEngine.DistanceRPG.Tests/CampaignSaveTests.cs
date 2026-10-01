@@ -269,8 +269,8 @@ public sealed class CampaignSaveTests : IDisposable
         }
 
         Differs(c => c.Party[2].X = BitConverter.Int32BitsToSingle(BitConverter.SingleToInt32Bits(c.Party[2].X) + 1), "campaign.Party[2].X");
-        Differs(c => c.Party[0].Inventory[0]!.Acquire(ModifierType.CritWindow, 1), "campaign.Party[0].EquippedWeapon.Modifiers");
-        Differs(c => c.Party[3].Inventory[0]!.CreditEnchantment(0, 1, stat: 1), "campaign.Party[3].EquippedWeapon.Enchantments[0].Xp");
+        Differs(c => c.Party[0].WeaponIn(0)!.Acquire(ModifierType.CritWindow, 1), "campaign.Party[0].EquippedWeapon.Modifiers");
+        Differs(c => c.Party[3].WeaponIn(0)!.CreditEnchantment(0, 1, stat: 1), "campaign.Party[3].EquippedWeapon.Enchantments[0].Xp");
         Differs(c => c.Party[1].ApplyStatus(StatusEffectType.Poison, null, 1), "campaign.Party[1].StatusEffects");
         Differs(c => c.Party[1].BudgetBeforeMire = 161f, "campaign.Party[1].BudgetBeforeMire");
         Differs(c => c.Party[1].HpXp = 30, "campaign.Party[1].HealthPool");
@@ -278,7 +278,7 @@ public sealed class CampaignSaveTests : IDisposable
         var catalogue = GameContent.Current.Enchantments;
         Differs(c =>
         {
-            var staff = c.Party[3].Inventory[0]!;
+            var staff = c.Party[3].WeaponIn(0)!;
             var copy = catalogue["regeneration"] with { };   // reads alike, and is not the catalogue's row
             c.Party[3].Inventory[0] = new Weapon(GameContent.Current.Weapons[staff.Id], staff.Forged, staff.Modifiers,
                 [new Enchantment(copy, staff.Enchantments[0].Tier)], staff.ForgedEnchantmentCount);
@@ -298,7 +298,7 @@ public sealed class CampaignSaveTests : IDisposable
         drop.Acquire(ModifierType.Block, 1);
         campaign.Party[0].Inventory[2] = drop;
 
-        var restored = RoundTrip(campaign).Party[0].Inventory[2]!;
+        var restored = RoundTrip(campaign).Party[0].WeaponIn(2)!;
         Assert.NotSame(drop, restored);
         Assert.Equal(drop.Forged, restored.Forged);
         Assert.Equal(drop.Modifiers, restored.Modifiers);
@@ -417,16 +417,16 @@ public sealed class CampaignSaveTests : IDisposable
         var serviced = new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear: 17, wearCashed: 195);
         Assert.Equal((17, 195, 36), (serviced.Wear, serviced.WearCashed, serviced.WearCapacity));
         campaign.Party[0].Inventory[2] = serviced;
-        var hand = campaign.Party[1].Inventory[0]!;
+        var hand = campaign.Party[1].WeaponIn(0)!;
         for (int hit = 0; hit < 40; hit++)
             Wear.Accrue(hand);
         Assert.Equal((30, true), (hand.Wear, hand.WornFull));
 
         var restored = RoundTrip(campaign);
-        var back = restored.Party[0].Inventory[2]!;
+        var back = restored.Party[0].WeaponIn(2)!;
         Assert.NotSame(serviced, back);
         Assert.Equal((17, 195, 36, serviced.WearPool), (back.Wear, back.WearCashed, back.WearCapacity, back.WearPool));
-        Assert.Equal((30, 0, true), (restored.Party[1].Inventory[0]!.Wear, restored.Party[1].Inventory[0]!.WearCashed, restored.Party[1].Inventory[0]!.WornFull));
+        Assert.Equal((30, 0, true), (restored.Party[1].WeaponIn(0)!.Wear, restored.Party[1].WeaponIn(0)!.WearCashed, restored.Party[1].WeaponIn(0)!.WornFull));
 
         // The document holds the two counts and no capacity.
         var row = Party(JsonNode.Parse(Save(campaign))!.AsObject(), 0)["inventory"]![2]!.AsObject();
@@ -440,10 +440,10 @@ public sealed class CampaignSaveTests : IDisposable
         {
             var loaded = Load(text);
             Assert.True(loaded.TuningChanged);
-            var under = loaded.Campaign.Party[0].Inventory[2]!;
+            var under = loaded.Campaign.Party[0].WeaponIn(2)!;
             Assert.Equal((17, 195, Wear.Capacity(195).Max), (under.Wear, under.WearCashed, under.WearCapacity));
             Assert.Equal(48, under.WearCapacity);   // bars of 40, 42, 44 and 46 of the 195 cashed: 40 + 2 x 4, and 23 toward the next
-            Assert.False(loaded.Campaign.Party[1].Inventory[0]!.WornFull);
+            Assert.False(loaded.Campaign.Party[1].WeaponIn(0)!.WornFull);
         }
 
         // A negative count is none play reaches: the restore door refuses it, whoever calls it.
@@ -510,7 +510,7 @@ public sealed class CampaignSaveTests : IDisposable
         campaign.Party[3].Inventory[2] = wand;
 
         var restored = RoundTrip(campaign);
-        foreach (var (was, now) in new[] { (knife, restored.Party[0].Inventory[2]!), (sword, restored.Party[0].Inventory[3]!), (wand, restored.Party[3].Inventory[2]!) })
+        foreach (var (was, now) in new[] { (knife, restored.Party[0].WeaponIn(2)!), (sword, restored.Party[0].WeaponIn(3)!), (wand, restored.Party[3].WeaponIn(2)!) })
         {
             Assert.Equal(was.Enchantments.Select(e => (e.Id, e.Tier, e.Xp)), now.Enchantments.Select(e => (e.Id, e.Tier, e.Xp)));
             Assert.Equal(was.ForgedEnchantmentCount, now.ForgedEnchantmentCount);
@@ -519,7 +519,7 @@ public sealed class CampaignSaveTests : IDisposable
 
         // Never sorted: the sword's entries come back in the order they were
         // attached, the forged one first and two acquired behind it.
-        var restoredSword = restored.Party[0].Inventory[3]!;
+        var restoredSword = restored.Party[0].WeaponIn(3)!;
         Assert.Equal(["vampiric", "shattering", "arcane"], restoredSword.Enchantments.Select(e => e.Id));
         Assert.Equal([true, false, false], Enumerable.Range(0, 3).Select(restoredSword.IsForged));
         Assert.Equal(sword.TotalLock, restoredSword.TotalLock);
@@ -530,7 +530,7 @@ public sealed class CampaignSaveTests : IDisposable
         var tree = JsonNode.Parse(text)!.AsObject();
         Party(tree, 0)["inventory"]![2]!["enchantments"]![0]!["tier"] = 3;   // serrated, a unique soul
         var pinned = SaveGame.Restore(SaveCodec.Read(tree.ToJsonString()), GameContent.Current).Campaign;
-        Assert.Equal(Enchantment.UniqueTier, pinned.Party[0].Inventory[2]!.Enchantments[0].Tier);
+        Assert.Equal(Enchantment.UniqueTier, pinned.Party[0].WeaponIn(2)!.Enchantments[0].Tier);
     }
 
     [Fact]
@@ -633,6 +633,52 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Equal("campaign.party[1].inventory", RefusedAfter(six, tree => Party(tree, 1)["inventory"] = new JsonArray()).Where);
         Assert.Equal("campaign.party[1].inventory", RefusedAfter(six, tree =>
             Party(tree, 1)["inventory"] = new JsonArray(Enumerable.Range(0, GameConstants.MaxInventorySlots + 1).Select(_ => (JsonNode?)null).ToArray())).Where);
+    }
+
+    [Fact]
+    public void APotionInABagRoundTrips_BetweenRunsAndMidRun()
+    {
+        // Phase 6b.1 (§3.4, §5.1): a potion in a bag is saved with its member — its
+        // slot, its type by name and its quality — listed by slot, and comes back
+        // field for field. The inventory stays a list of weapon rows, null at a
+        // potion's slot, so it reads as a version-2 bag with the potions laid into it.
+        var campaign = NewCampaign();
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (4, TestPotions.Mana(1)));
+        TestPotions.Carrying(campaign, "D", (5, TestPotions.Health(7)));
+        var restored = RoundTrip(campaign);
+        Assert.Equal([(2, TestPotions.Health(2)), (4, TestPotions.Mana(1))], restored.Party[0].Potions.ToArray());
+        Assert.Equal([(5, TestPotions.Health(7))], restored.Party[3].Potions.ToArray());
+        Assert.Empty(restored.Party[1].Potions);
+
+        var tree = JsonNode.Parse(Save(campaign))!.AsObject();
+        Assert.Equal("""[{"slot":2,"type":"Health","quality":2},{"slot":4,"type":"Mana","quality":1}]""", Party(tree, 0)["potions"]!.ToJsonString());
+        Assert.Null(Party(tree, 0)["inventory"]![2]);
+        Assert.Null(Party(tree, 0)["inventory"]![4]);
+        Assert.Equal("staff_of_renewal", Party(tree, 0)["inventory"]![1]!["id"]!.GetValue<string>());
+
+        // A member carrying none is written null, as an empty stable is; and null and
+        // [] read alike, as none, which writes null again.
+        Assert.True(Party(tree, 1).AsObject().ContainsKey("potions"));
+        Assert.Null(Party(tree, 1)["potions"]);
+        Party(tree, 1)["potions"] = new JsonArray();
+        var empty = Load(tree.ToJsonString()).Campaign;
+        Assert.Empty(empty.Party[1].Potions);
+        Assert.Equal(Save(campaign), Save(empty));
+
+        // Mid-run: carried into a dungeon, one poured out on the floor, and saved at
+        // the party's turn — the rest come back where they lie, and the one poured out
+        // is in no bag and on no floor.
+        var visit = In(campaign, campaign.DefaultNext(), FiveDeep);
+        Assert.Equal(TestPotions.Health(2), campaign.Party[0].TakePotion(2));
+        string midText = Save(campaign);
+        var midRun = Load(midText).Campaign;
+        Assert.Equal(visit.Def.Id, midRun.Visit!.Def.Id);
+        StateAssert.Equivalent(campaign.Party, midRun.Party, "party");
+        Assert.Equal([(4, TestPotions.Mana(1))], midRun.Party[0].Potions.ToArray());
+        Assert.Equal([(5, TestPotions.Health(7))], midRun.Party[3].Potions.ToArray());
+        midRun.Visit.OpenTurns(midRun.Party);   // opened as the game's resume opens it
+        Assert.Empty(midRun.Visit.Current.LooseItems);
+        Assert.Equal(midText, Save(midRun));
     }
 
     [Fact]
@@ -917,8 +963,8 @@ public sealed class CampaignSaveTests : IDisposable
             var loaded = Load(text);
             Assert.False(loaded.TuningChanged);
             Assert.Equal(text, Save(loaded.Campaign));
-            Assert.Equal("flensing_knife_unique", loaded.Campaign.Party[0].Inventory[2]!.Id);
-            Assert.Equal(["shocking"], loaded.Campaign.Party[2].Inventory[2]!.Enchantments.Select(e => e.Id));
+            Assert.Equal("flensing_knife_unique", loaded.Campaign.Party[0].WeaponIn(2)!.Id);
+            Assert.Equal(["shocking"], loaded.Campaign.Party[2].WeaponIn(2)!.Enchantments.Select(e => e.Id));
         }
     }
 

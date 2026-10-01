@@ -31,9 +31,11 @@ public static class Pickup
     /// <summary>
     /// The slot a picked-up weapon lands in — the first empty one, so a member
     /// with an empty hand equips what they take and a member who is carrying
-    /// stows it — or <see cref="BagFull"/> when there is none.
+    /// stows it — or <see cref="BagFull"/> when there is none. A slot holding a
+    /// potion is full (§3.4: a potion occupies a slot), so a bag of weapons and
+    /// potions with no slot empty refuses the pickup like a bag of weapons.
     /// </summary>
-    public static int FirstEmptySlot(IReadOnlyList<Weapon?> inventory)
+    public static int FirstEmptySlot(IReadOnlyList<IItem?> inventory)
     {
         ArgumentNullException.ThrowIfNull(inventory);
         for (int slot = 0; slot < inventory.Count; slot++)

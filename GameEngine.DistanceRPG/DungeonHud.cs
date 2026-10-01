@@ -1407,7 +1407,9 @@ public sealed class DungeonHud
     /// down (<see cref="LeaveHint"/>) instead of naming the equip keys. When it is
     /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
     /// wherever X would arm it: in the party's phase, with a bag to put a weapon
-    /// down from.
+    /// down from. A potion's slot names the potion in its colour
+    /// (<see cref="SlotName"/>), and while the bag holds one both hints say it is
+    /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1).
     /// </summary>
     private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
     {
@@ -1425,8 +1427,9 @@ public sealed class DungeonHud
         // room right of its slot's number: a slot grows by the lines it wraps to.
         int attacks = turns.AttacksThisTurn(active);
         var details = active.Inventory
-            .Select((weapon, slot) => weapon is null ? [] : SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)))
+            .Select((item, slot) => item is Weapon weapon ? SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)) : [])
             .ToArray();
+        bool potions = active.Potions.Any();
         int wrapped = details.Sum(lines => Math.Max(0, lines.Count - 1));
 
         var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped);
@@ -1438,23 +1441,25 @@ public sealed class DungeonHud
         if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
         {
             // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
-            float width = LeaveKeyHint.Length * GlyphAdvance * 1.2f;
-            _text.DrawText(LeaveKeyHint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
+            string hint = potions ? PourKeyHint : LeaveKeyHint;
+            float width = hint.Length * GlyphAdvance * 1.2f;
+            _text.DrawText(hint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
         }
 
         float y = top + InventorySlotsTop;
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
-            var weapon = active.Inventory[slot];
-            if (weapon == null)
+            var item = active.Inventory[slot];
+            if (item == null)
             {
                 _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
                 y += InventorySlotPitch;
                 continue;
             }
 
-            // The name, then the statline and modifiers under it as they read in this member's hands.
-            _text.DrawText($"{slot + 1}  {weapon.ShownName}", left, y, 2f, weapon.Unique ? Orange : WeaponLineColor(slot));
+            // The name, then a weapon's statline and modifiers under it as they read in this member's hands.
+            var name = SlotName(slot, item);
+            _text.DrawText(name.Text, left, y, 2f, name.Color);
             for (int line = 0; line < details[slot].Count; line++)
                 DrawRuns(left + InventoryDetailIndent, y + InventoryDetailDrop + line * InventoryDetailPitch, InventoryDetailScale, details[slot][line]);
             y += InventorySlotPitch + Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch;
@@ -1480,10 +1485,34 @@ public sealed class DungeonHud
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
         if (leaving)
-            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length), 1.5f, Yellow);
+            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
         else
             DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
     }
+
+    /// <summary>
+    /// What the bag panel prints for a slot that holds something: its number — the
+    /// key that reaches it, so the hand is 1 — and the item's name, in the item's
+    /// colour. A weapon is orange when it is a unique and otherwise in its line's
+    /// colour (<see cref="WeaponLineColor"/>); a potion is green for health and cyan
+    /// for mana (<see cref="PotionColor"/>): <c>3  HEALTH POTION Q2</c>.
+    /// </summary>
+    /// <param name="slot">The slot, 0 being the hand.</param>
+    /// <param name="item">What lies there.</param>
+    internal static Run SlotName(int slot, IItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var color = item switch
+        {
+            Weapon weapon => weapon.Unique ? Orange : WeaponLineColor(slot),
+            Potion potion => PotionColor(potion.Type),
+            _ => White,
+        };
+        return new Run($"{slot + 1}  {item.ShownName}", color);
+    }
+
+    /// <summary>A potion's colour wherever the dungeon names it: green for health, cyan for mana, the colours of the two pools it fills.</summary>
+    internal static Vector4 PotionColor(PotionType type) => type == PotionType.Health ? Green : Cyan;
 
     /// <summary>
     /// The inventory panel's key hint: the number keys that equip a bag slot —
@@ -1522,11 +1551,17 @@ public sealed class DungeonHud
     /// by the same number keys that equip, and how to back out. For six slots it
     /// is <c>LEAVE WHICH? 2-6 - X CANCELS</c>. It replaces <see cref="EquipHint"/>
     /// on the panel for as long as X is armed. It names no key for the hand,
-    /// because the weapon in hand is never put down this way.
+    /// because the weapon in hand is never put down this way. While the bag holds
+    /// a potion (<paramref name="potion"/>) it says the same keys pour one out —
+    /// <c>LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS</c> — since a potion is never
+    /// left (PHASE 6b DECISION 1).
     /// </summary>
     /// <param name="slots">The member's slots, the hand among them.</param>
-    internal static string LeaveHint(int slots)
-        => BagKeys(slots) is { } keys ? $"LEAVE WHICH? {keys} - X CANCELS" : "NOTHING TO LEAVE - X CANCELS";
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string LeaveHint(int slots, bool potion = false)
+        => BagKeys(slots) is { } keys
+            ? $"{(potion ? "LEAVE OR POUR OUT WHICH?" : "LEAVE WHICH?")} {keys} - X CANCELS"
+            : "NOTHING TO LEAVE - X CANCELS";
 
     /// <summary>
     /// What the panel's header row says while X is not armed, so the key can be
@@ -1534,6 +1569,20 @@ public sealed class DungeonHud
     /// the way a full bag makes room.
     /// </summary>
     internal const string LeaveKeyHint = "X TO LEAVE ONE HERE";
+
+    /// <summary>
+    /// <see cref="LeaveKeyHint"/> while the bag holds a potion: X puts a weapon
+    /// down, or pours a potion out — gone, never left on the floor (PHASE 6b
+    /// DECISION 1) — and either makes room.
+    /// </summary>
+    internal const string PourKeyHint = "X TO LEAVE OR POUR ONE OUT";
+
+    /// <summary>The beat over a member who has just poured a potion out: <c>POURED OUT THE HEALTH POTION Q2</c>. It is gone: nothing lies on the floor, and nothing comes back.</summary>
+    internal static string PouredBeat(Potion potion)
+    {
+        ArgumentNullException.ThrowIfNull(potion);
+        return $"POURED OUT THE {potion.ShownName}";
+    }
 
     /// <summary>
     /// What an armed bag number says when its slot holds nothing: <c>SLOT 3 IS
@@ -1909,7 +1958,7 @@ public sealed class DungeonHud
 
     /// <summary>True when a weapon of <paramref name="cls"/> sits in one of the member's slots: a class in hand or in the bag is listed before it has earned anything.</summary>
     private static bool Holds(PartyMemberState member, WeaponClass cls)
-        => member.Inventory.Any(w => w?.Class == cls);
+        => member.Inventory.Any(item => item is Weapon weapon && weapon.Class == cls);
 
     private static string ClassName(WeaponClass cls) => cls.ToString().ToUpperInvariant();
 

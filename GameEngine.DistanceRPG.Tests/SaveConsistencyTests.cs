@@ -34,7 +34,8 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>The HUD's glyphs, upper-cased: what the notice of a save set aside can draw — no apostrophe, quote, brace, backslash or semicolon.</summary>
     private const string Font = @"^[A-Z0-9 .,:\-_!?()/<>\[\]+=#*]+$";
 
-    private static readonly string[] Fixtures = ["pre-rework-mid-run.json", "pre-rework-between-runs.json"];
+    /// <summary>The saves earlier builds wrote: the two the pre-rework code wrote, and the one the Phase 6a build wrote (version 2).</summary>
+    private static readonly string[] Fixtures = ["pre-rework-mid-run.json", "pre-rework-between-runs.json", "phase-6a-between-runs.json"];
 
     /// <summary>Why the run counter stops below <see cref="ContentBounds.MostRuns"/>: what its refusal says after the value and the ceiling.</summary>
     private const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
@@ -194,7 +195,8 @@ public sealed class SaveConsistencyTests : IDisposable
     [Fact]
     public void WhatPlayCanWriteAlwaysLoads()
     {
-        // Both saves the pre-rework code wrote hold every ceiling and every check.
+        // The saves earlier builds wrote — both the pre-rework code's, and the Phase 6a
+        // build's — hold every ceiling and every check.
         foreach (string name in Fixtures)
             Restores(FixtureText(name), name);
 
@@ -283,13 +285,13 @@ public sealed class SaveConsistencyTests : IDisposable
         // since: each is what play writes, and each loads.
         var worn = NewCampaign();
         CampaignRuns.Clear(worn, "tutorial", GoldenSeed);
-        Worn(worn.Party[0].Inventory[0]!, 12);
-        Assert.True(Worn(worn.Party[1].Inventory[0]!, 40).WornFull);
+        Worn(worn.Party[0].WeaponIn(0)!, 12);
+        Assert.True(Worn(worn.Party[1].WeaponIn(0)!, 40).WornFull);
         Loads(worn, "worn weapons in hand, one full");
 
         var visit = worn.Enter("spear_hall", FiveDeep);
         visit.OpenTurns(worn.Party, CampaignRuns.Ten);
-        var gear = Worn(worn.Party[3].Inventory[1]!, 7);   // D's second staff, cast with before it went back in the bag
+        var gear = Worn(worn.Party[3].WeaponIn(1)!, 7);   // D's second staff, cast with before it went back in the bag
         Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
         Loads(worn, "a worn weapon put down on a floor, mid-run");
         var kept = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
@@ -310,7 +312,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
         {
-            Assert.True(worn.Party[1].Inventory[0]!.Wear > worn.Party[1].Inventory[0]!.WearCapacity);
+            Assert.True(worn.Party[1].WeaponIn(0)!.Wear > worn.Party[1].WeaponIn(0)!.WearCapacity);
             Loads(worn, "wear over a capacity a tuning lowered since");
         }
 
@@ -357,6 +359,32 @@ public sealed class SaveConsistencyTests : IDisposable
             TestShop.Counted(moved);
             Loads(moved, "a shop worked after retiresOnClear moved");
         }
+
+        // Potions (Phase 6b.1), once a dungeon besides the tutorial is cleared: in two
+        // bags between runs, one of the most quality a save holds; carried into a
+        // dungeon, one poured out; in the bag of a member whose hand a wipe emptied —
+        // it held a spoil — between runs; and in the bag of a member who is down mid-run.
+        var potions = NewCampaign();
+        TestPotions.Carrying(potions, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        TestPotions.Carrying(potions, "C", (5, TestPotions.Health(ContentBounds.MostCount)));
+        Loads(potions, "potions in two bags between runs, one of the most quality");
+        var carriedIn = potions.Enter(potions.DefaultNext(), FiveDeep);
+        var potionTurns = carriedIn.OpenTurns(potions.Party, CampaignRuns.Ten);
+        potions.Party[0].TakePotion(3);
+        Loads(potions, "potions carried into a dungeon, one poured out");
+        var heldSpoil = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        int spoilSlot = Pickup.Take(potions, carriedIn.Current.Enemies[0], heldSpoil, potions.Party[2], carriedIn);
+        Assert.True(potionTurns.TrySwap(potions.Party[2], spoilSlot));
+        Assert.Same(heldSpoil.Weapon, potions.Party[2].EquippedWeapon);
+        CampaignRuns.Wipe(potions, potionTurns);
+        Assert.Null(potions.Party[2].Inventory[0]);
+        Assert.NotEmpty(potions.Party[2].Potions);
+        Loads(potions, "potions in the bag of a member whose hand a wipe emptied");
+        potions.Enter(potions.DefaultNext(), FiveDeep).OpenTurns(potions.Party, CampaignRuns.Ten);
+        potions.Party[0].Hp = 0;
+        potions.Party[0].Alive = false;
+        Assert.NotEmpty(potions.Party[0].Potions);
+        Loads(potions, "potions in the bag of a member who is down mid-run");
 
         // Transfers (Phase 6a.6): a move and a reorder in the shop, the source held
         // there with its wear, and a finished move reported — and the same after a
@@ -759,7 +787,7 @@ public sealed class SaveConsistencyTests : IDisposable
         RefusedAt(Halberd(bar + 8), "campaign.visit.floors[3].enemies[0].body.hp",
             $"{bar + 8} is above {bar + 7}: a row holds no more hit points than the largest bar a pool opens on, {bar} (StartingPool at its most), plus what its revivals added");
 
-        // Both saves the pre-rework code wrote lie under every ceiling.
+        // The saves earlier builds wrote lie under every ceiling.
         foreach (string name in Fixtures)
             Restores(FixtureText(name), name);
 
@@ -1201,6 +1229,115 @@ public sealed class SaveConsistencyTests : IDisposable
     }
 
     [Fact]
+    public void APotionRowIsReadOnItsOwn()
+    {
+        // Phase 6b.1 (R3(b)): a potion row is read field by field, each refused at its
+        // own path — its slot a bag slot, 1 to the bag's last, since the hand keeps a
+        // weapon, and one no weapon fills, since a slot holds one thing; the rows in
+        // strictly ascending slot order, so no two share one (one potion a slot, no
+        // stacking) and one campaign is one text; its type a potion type's name; and
+        // its quality 1 to the sanity bound, a count of units.
+        var campaign = NewCampaign();
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (4, TestPotions.Mana(1)));
+        string text = Save(campaign);
+        Restores(text, "two potions in A's bag");
+        static JsonObject Row(JsonObject tree, int i) => MemberNode(tree, 0)["potions"]![i]!.AsObject();
+        const string quality = "one unit makes an ordinary potion, and a quality is a count of units";
+        (Action<JsonObject> Edit, string Where, string Problem)[] refusals =
+        [
+            (tree => Row(tree, 0)["slot"] = 0, "campaign.party[0].potions[0].slot", "0 is the hand: the hand keeps a weapon, and a bag runs from slot 1"),
+            (tree => Row(tree, 1)["slot"] = 6, "campaign.party[0].potions[1].slot", "6 is no bag slot of member A: the bag runs 1 to 5"),
+            (tree => Row(tree, 0)["slot"] = -1, "campaign.party[0].potions[0].slot", "-1 is no bag slot of member A: the bag runs 1 to 5"),
+            (tree => Row(tree, 0)["slot"] = 1, "campaign.party[0].potions[0].slot", "slot 1 holds a weapon, staff_of_renewal: a slot holds one thing"),
+            (tree => Row(tree, 1)["slot"] = 2, "campaign.party[0].potions[1].slot", "2 is not after slot 2: the potions are listed by slot, one a slot, no stacking"),
+            (tree => { Row(tree, 0)["slot"] = 4; Row(tree, 1)["slot"] = 2; }, "campaign.party[0].potions[1].slot", "2 is not after slot 4: the potions are listed by slot, one a slot, no stacking"),
+            (tree => Row(tree, 0)["quality"] = 0, "campaign.party[0].potions[0].quality", $"0 is below 1: {quality}"),
+            (tree => Row(tree, 1)["quality"] = -5, "campaign.party[0].potions[1].quality", $"-5 is below 1: {quality}"),
+            (tree => Row(tree, 0)["quality"] = ContentBounds.MostCount + 1L, "campaign.party[0].potions[0].quality", $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {quality}"),
+            (tree => MemberNode(tree, 0)["potions"]![0] = null, "campaign.party[0].potions[0]", "null where a potion belongs"),
+        ];
+        foreach (var (edit, where, problem) in refusals)
+            RefusedAt(Edited(text, edit), where, problem);
+
+        // A type is a potion type's exact name, never another case nor another word.
+        foreach (string type in new[] { "Elixir", "health", "Health ", "1" })
+        {
+            var refused = Refused(Edited(text, tree => Row(tree, 0)["type"] = type));
+            Assert.Equal(("campaign.party[0].potions[0].type", $"'{type}' is no potion type"), (refused.Where, refused.Problem));
+        }
+
+        // At its ceiling, a quality loads; and a bag's last slot is a bag slot.
+        Restores(Edited(text, tree => Row(tree, 0)["quality"] = ContentBounds.MostCount), "a potion of the most quality");
+        Restores(Edited(text, tree => Row(tree, 1)["slot"] = 5), "a potion in the bag's last slot");
+    }
+
+    [Fact]
+    public void APotionBeforeTheAlchemistIsRefused()
+    {
+        // Check 31: the alchemist arrives with the first clear of a dungeon besides the
+        // tutorial (§6.6), and mixes nothing before — so a potion carried while every
+        // dungeon the campaign has cleared is retired is none play wrote, refused at
+        // the first potion it finds. Asked of the retired list alone, never of which
+        // dungeon today's dungeons.json retires on its clear: a copy beside the game
+        // may move that flag, and a save play wrote still loads.
+        string why = "a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before";
+        var potion = JsonNode.Parse("""[{ "slot": 2, "type": "Health", "quality": 1 }]""")!;
+
+        // A new campaign, nothing cleared; and the tutorial beaten and retired, nothing else.
+        var fresh = NewCampaign();
+        RefusedAt(Edited(Save(fresh), tree => MemberNode(tree, 1)["potions"] = potion.DeepClone()), "campaign.party[1].potions[0]", why);
+        CampaignRuns.Clear(fresh, "tutorial", GoldenSeed);
+        string tutorial = Save(fresh);
+        Restores(tutorial, "the tutorial beaten, carrying nothing");
+        RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", why);
+
+        // The first member found carrying one is named, the roster's order.
+        RefusedAt(Edited(tutorial, tree =>
+        {
+            MemberNode(tree, 2)["potions"] = potion.DeepClone();
+            MemberNode(tree, 3)["potions"] = potion.DeepClone();
+        }), "campaign.party[2].potions[0]", why);
+
+        // Once a dungeon besides the tutorial is cleared — the Spear Hall, as the potion
+        // fixtures clear one (TestPotions) — a potion loads; and under a dungeons.json
+        // that moves retiresOnClear onto the Spear Hall since, it still does — the save
+        // says the Spear Hall is not retired — while the tutorial's save, whose clear is
+        // retired, is still refused though today's content would not retire it.
+        TestPotions.Carrying(fresh, "B", (2, TestPotions.Health(1)));
+        Assert.Equal(["spear_hall", "tutorial"], fresh.ClearedInOrder);
+        string hall = Save(fresh);
+        Assert.Equal(TestPotions.Health(1), Restores(hall, "a potion once the Spear Hall is cleared").Campaign.Party[1].PotionIn(2));
+        using (TestContent.UsePremise(dungeons: TestShop.TutorialMoved))
+        {
+            Restores(hall, "a potion, retiresOnClear moved since onto the dungeon cleared");
+            RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", why);
+        }
+
+        // An empty list is none, and null is none, before the alchemist as after.
+        Restores(Edited(tutorial, tree => MemberNode(tree, 0)["potions"] = new JsonArray()), "no potions, written []");
+    }
+
+    [Fact]
+    public void ASpoilAtAPotionsSlotIsRefused()
+    {
+        // A spoil is a weapon taken off a corpse this visit, carried or lying
+        // somewhere (§4.4): a spoil's locator that names a slot a potion lies in names
+        // no weapon, and is refused there. The Flagship carries the boss's own drop,
+        // a spoil, in a bag.
+        string text = Save(VisitSaveTests.Flagship().Campaign);
+        var locator = VisitNode(JsonNode.Parse(text)!.AsObject())["spoils"]!.AsArray()
+            .Select((spoil, i) => (Index: i, Member: spoil!["member"]?.GetValue<string>(), Slot: spoil["slot"]?.GetValue<int>()))
+            .First(spoil => spoil.Member is not null);
+        int member = JsonNode.Parse(text)!["campaign"]!["party"]!.AsArray().Select(row => row!["id"]!.GetValue<string>()).ToList().IndexOf(locator.Member!);
+        int slot = locator.Slot!.Value;
+        RefusedAt(Edited(text, tree =>
+        {
+            MemberNode(tree, member)["inventory"]![slot] = null;
+            MemberNode(tree, member)["potions"] = JsonNode.Parse($$"""[{ "slot": {{slot}}, "type": "Mana", "quality": 1 }]""");
+        }), $"campaign.visit.spoils[{locator.Index}].slot", $"slot {slot} of member {locator.Member} holds a potion: a spoil is a weapon");
+    }
+
+    [Fact]
     public void AReportNamingNoWeaponIsRefused()
     {
         // A report names its weapon and its enchantment by id, and the summary names
@@ -1414,7 +1551,7 @@ public sealed class SaveConsistencyTests : IDisposable
         foreach (int cashed in new[] { 0, 1, 7, 1335 })
         {
             long ceiling = bar + (long)perBar * cashed;
-            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].Inventory[0]!;
+            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].WeaponIn(0)!;
             Assert.Equal(((int)ceiling, cashed), (loaded.Wear, loaded.WearCashed));
             RefusedAt(Wearing((int)ceiling + 1, cashed), "campaign.party[0].inventory[0].wear", $"{ceiling + 1} is above {ceiling}: {WearWhy}");
         }
@@ -1422,7 +1559,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         // Summed as a long: wear cashed at its own ceiling cannot wrap the wear's,
         // and the weapon it loads replays its capacity from the most a count holds.
-        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].Inventory[0]!;
+        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].WeaponIn(0)!;
         Assert.Equal(Wear.Capacity(ContentBounds.MostCount).Max, most.WearCapacity);
         Assert.True(most.WornFull);
 

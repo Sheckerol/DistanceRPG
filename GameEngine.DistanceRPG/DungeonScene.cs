@@ -1623,6 +1623,8 @@ public class DungeonScene : Scene
             {
                 if (LeaveArmed)
                     LeaveSlot(slot);
+                else if (ActiveCharacter.State.PotionIn(slot) is not null)
+                    Log.Info($"[Potion] {ActiveCharacter.State.Id} cannot equip slot {slot + 1}: a potion is drunk, never held");   // the hand keeps a weapon (PHASE 6b DECISION 1)
                 else
                     EquipSlot(slot);
             }
@@ -1737,6 +1739,13 @@ public class DungeonScene : Scene
     /// over the member in place of any answer still rising there, such as that
     /// <c>SLOT 3 IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
     /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack on the open panel.
+    /// <para>
+    /// <strong>A potion is poured out, never left</strong> (PHASE 6b DECISION 1):
+    /// out of the bag through its one door (<see cref="PartyMemberState.TakePotion"/>)
+    /// and gone — nothing lies on the floor and nothing comes back — for nothing, as
+    /// leaving a weapon is free. It disarms X too, and says so over the member:
+    /// <c>POURED OUT THE HEALTH POTION Q2</c>.
+    /// </para>
     /// </summary>
     private void LeaveSlot(int slot)
     {
@@ -1745,6 +1754,14 @@ public class DungeonScene : Scene
         if (member.Inventory[slot] is null)
         {
             SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.EmptySlotCue(slot), false));
+            return;
+        }
+        if (member.PotionIn(slot) is not null)
+        {
+            var potion = member.TakePotion(slot);
+            _leaveArmed = false;
+            Log.Info($"[Potion] {member.Id} pours out a {potion.Type} potion (quality {potion.Quality}) from slot {slot + 1} on floor {_floor.Index + 1}");
+            _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, DungeonHud.PouredBeat(potion), DungeonHud.PotionColor(potion.Type), -52f);
             return;
         }
 

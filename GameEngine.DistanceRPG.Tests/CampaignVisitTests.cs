@@ -96,7 +96,7 @@ public class CampaignVisitTests
             var (member, def) = (campaign.Party[i], roster[i]);
             Assert.Equal((def.Id, i, def.Stats), (member.Id, member.ColorIndex, member.Stats));
             Assert.Equal(def.StartingWeaponId, member.EquippedWeapon!.Id);
-            Assert.Equal(def.BagWeaponIds, member.Inventory.Skip(1).Take(def.BagWeaponIds.Count).Select(w => w!.Id));
+            Assert.Equal(def.BagWeaponIds, member.Inventory.Skip(1).Take(def.BagWeaponIds.Count).Select(w => ((Weapon)w!).Id));
             Assert.All(member.Inventory.Skip(1 + def.BagWeaponIds.Count), Assert.Null);
             Assert.Equal((content.Tuning.StartingPool, 0, 0), (member.MaxHp, member.HpXp, member.ManaXp));   // nothing earned yet
         }
@@ -299,7 +299,7 @@ public class CampaignVisitTests
         Leave(campaign);
         Assert.Equal((12, false), (a.Hp, b.Alive));
 
-        var kept = campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => w?.Id)))).ToArray();
+        var kept = campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => (w as Weapon)?.Id)))).ToArray();
         campaign.Enter("tutorial", 1);
 
         Assert.All(campaign.Party, m =>
@@ -311,7 +311,7 @@ public class CampaignVisitTests
             Assert.Equal((ShippedContent.Budget, ShippedContent.Budget, 0f, 0), (m.DistLeft, m.EffectiveMax, m.SavedMovement, m.HeldShots));
         });
         Assert.Equal(TestPools.FixtureHp, a.Hp);
-        Assert.Equal(kept, campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => w?.Id)))));
+        Assert.Equal(kept, campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => (w as Weapon)?.Id)))));
     }
 
     [Fact]

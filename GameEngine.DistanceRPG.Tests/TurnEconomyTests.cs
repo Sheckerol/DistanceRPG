@@ -44,7 +44,7 @@ public sealed class TurnEconomyTests : IDisposable
         Assert.True(turns.CanSwap(a, 1));
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("weakspot_stiletto", a.EquippedWeapon!.Id);
-        Assert.Equal("longbow", a.Inventory[1]!.Id);
+        Assert.Equal("longbow", a.WeaponIn(1)!.Id);
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("longbow", a.EquippedWeapon!.Id);
         Assert.Equal(Premise.Budget, a.DistLeft);

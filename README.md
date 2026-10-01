@@ -80,7 +80,7 @@ the title.
 
 | Between runs: WEAPONS | Action |
 | --- | --- |
-| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
+| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped, and so is a potion in a bag, listed grey under its member as `  BAG   HEALTH POTION Q2`: a potion is never moved here, and its slot is no room — PHASE 6b DECISION 1). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
 | Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
 | D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
 | T | On a weapon in the shop (`WORKING` or `STALLED`), or a transfer's source held there (`HELD`): ask whether to take it back (below) — a transfer's two weapons together |
@@ -136,8 +136,8 @@ bag.
 | Space / Enter | End turn (banks half your unspent movement) |
 | E | Take the stairs the active character stands on: down, up, or out by the first floor's way out. Every living member must be within 3 tiles; the way out asks first, and E or Enter says yes |
 | G | Pick up what the active character stands on: a drop, or a weapon the party left there |
-| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
-| X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
+| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot's weapon into the hand). A slot can hold a potion instead of a weapon — `3  HEALTH POTION Q2` in green, `4  MANA POTION Q1` in cyan — which fills it (a pickup finds no room there) and is never taken into the hand |
+| X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free — or, on a potion's slot, pours the potion out, free: `POURED OUT THE HEALTH POTION Q2`, and it is gone, nothing left on the floor (PHASE 6b DECISION 1). The keys say so while the bag holds a potion: `X TO LEAVE OR POUR ONE OUT`, then `LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS`. X again cancels; G takes a weapon back |
 | Scroll wheel | Zoom |
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
@@ -451,7 +451,7 @@ back to it, and the game quits from it.
   asks nothing: LOAD GAME's keys line says it, `PLAY SAVES INTO THE SLOT YOU
   LOAD`. A slot you kept as a checkpoint is played forward from its first load,
   its save before one save deep as the backup, then gone.
-- **The format is version 2** (Phase 6a): every weapon in a save carries its
+- **Version 2** (Phase 6a): every weapon in a save carries its
   wear (`"wear"`) and the wear it has ever cashed at the enchanter
   (`"wearCashed"` — its capacity is worked out afresh from that under the
   `tuning.json` loaded now, never stored), and the save names which version's
@@ -479,7 +479,7 @@ back to it, and the game quits from it.
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
-  or the shop, and saved as version 2 from then on. It says `THE NUMBERS HAVE
+  or the shop, and on to version 3 (below), and saved as version 3 from then on. It says `THE NUMBERS HAVE
   CHANGED` only if a number it was played under moved: the ones Phase 6a began to
   play (the Enchanter group's) are none it was played under (PHASE 6a DECISION 9).
   **Do not open a slot this build has saved with an older checkout.** A Phase 5
@@ -499,6 +499,28 @@ back to it, and the game quits from it.
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
   version 2's record. A released version 2 never does.
+- **The format is version 3** (Phase 6b): a member carries potions in its bag
+  (`"potions"`: each with its bag slot, counted from 0 as the inventory is, its
+  type, `"Health"` or `"Mana"`, and its quality, the units it was mixed from;
+  `null` while it carries none). The inventory stays a list of weapon rows, `null`
+  at a potion's slot. A potion row that cannot be — in the hand, past the bag, on
+  a slot a weapon fills, two on one slot or listed out of slot order, a type that
+  is neither, a quality below 1 or past the sanity bound — is refused as one that
+  cannot be read, naming where (`campaign.party[0].potions[0].slot`), and so is a
+  potion carried before the alchemist could have mixed one: while every dungeon
+  the campaign has cleared is retired — before a dungeon besides the tutorial is
+  beaten (§6.6). A version-2 save — Phase 6a's — loads as ever: it is lifted to
+  version 3 as it is read by a step that writes nothing (a stray `"potions"` a
+  hand gave it is removed, since version 2 knew none), and saved as version 3 from
+  then on. **Do not open a Phase 6b slot with an older checkout.** A Phase 6a
+  checkout reads version 3 as a newer build's save and sets it aside, kept and
+  never deleted, and loads nothing in its place. While Phase 6b is being built,
+  every 6b step reads version 3 as its own, as every 6a step read version 2: an
+  earlier step's build loads a save a later step wrote, passes over what it does
+  not know of, and its next save drops it (PHASE 6a DECISION 14, extended); and a
+  save an earlier 6b step wrote may say `THE NUMBERS HAVE CHANGED` once when a
+  later step loads it, though no number moved, since the steps add the numbers
+  they play to version 3's record. A released version 3 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with

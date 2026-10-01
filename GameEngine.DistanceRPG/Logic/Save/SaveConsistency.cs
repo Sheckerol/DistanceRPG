@@ -52,7 +52,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// content's to say, <c>restricted.json</c>'s or <c>weapons.json</c>'s, which an
 /// edit beside the game may move since the deposit was made; and a transfer's
 /// report whose soul is not among the seen: the soul was the party's own weapon's,
-/// and nothing asks that every entry a weapon carries was met.
+/// and nothing asks that every entry a weapon carries was met. And of a potion
+/// (Phase 6b.1): its quality, which has no ceiling but the sanity bound — past a
+/// whole pool more quality is overshoot, never refused (§6.6); a potion in the bag
+/// of a member whose hand is empty, or who is down in a visit, both of which play
+/// writes; and which dungeon is retired when one is carried — check 31 asks the
+/// retired list alone, as check 30 does.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -108,6 +113,27 @@ internal static class SaveConsistency
             Visit(campaign, visit, retired, locks);
 
         Shop(campaign);
+        Potions(campaign, cleared, retired);
+    }
+
+    /// <summary>
+    /// 31. The potions carried (Phase 6b.1). The alchemist arrives with the first
+    /// clear of a dungeon besides the tutorial (§6.6), and nothing mixes a potion
+    /// before: so a potion in any bag needs a dungeon cleared that is not retired.
+    /// The tutorial retires on its clear and retired is never undone, so a campaign
+    /// every one of whose clears is retired has cleared nothing beyond the tutorial.
+    /// Asked of the retired list alone, never of which dungeon today's
+    /// <c>dungeons.json</c> retires on its clear (check 30's reason): a copy beside
+    /// the game may move that flag, and a save play wrote still loads.
+    /// </summary>
+    private static void Potions(CampaignDto campaign, HashSet<string> cleared, HashSet<string> retired)
+    {
+        if (cleared.Any(id => !retired.Contains(id)))
+            return;
+        for (int i = 0; i < campaign.Party.Count; i++)
+            if (campaign.Party[i].Potions is { Count: > 0 })
+                throw new SaveFormatException($"{At}.party[{i}].potions[0]",
+                    $"a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before");
     }
 
     /// <summary>4. No run has ended: only a run's end moves the counter or clears a dungeon, and it always writes the summary.</summary>

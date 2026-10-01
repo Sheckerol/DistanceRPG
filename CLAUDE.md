@@ -76,6 +76,8 @@ GameEngine.DistanceRPG/         # Game executable
     Enchanter.cs                # The enchanter (§6.2–§6.5): a deposit or a transfer, its gates, the
                                 # service clock every run's end ticks, the improvement roll (its own
                                 # stream), a take-back — the one place wear is spent
+    Items.cs                    # What a bag slot holds (IItem): a weapon, or a potion — a value, its
+                                # type and quality (§3.4) — one a slot; the hand keeps a weapon
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -123,11 +125,15 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   that fails is set aside, never restored. A new field of the save gets its
   checks in the same change, and everything play writes must still load
   (`SaveConsistencyTests`).
-- The save is versioned (`SaveCodec.CurrentVersion`: 2 since Phase 6a), and
-  every older save must still load. A member appended with a default needs no
-  step (`Logic/Save/SaveFile.cs`' header rule; a list written `null` while
-  empty); a member every document must carry bumps the version, with a step in
-  `SaveCodec.Migrations` that writes it into every older document — pure,
-  walking the document by name, never throwing on a hand edit — pinned by the
-  two saves the pre-rework code wrote (`PreReworkSaveTests`; their
-  `TestData/saves` are never edited).
+- The save is versioned (`SaveCodec.CurrentVersion`: 3 since Phase 6b, 2 since
+  Phase 6a), and every older save must still load. A member appended with a
+  default needs no step (`Logic/Save/SaveFile.cs`' header rule; a list written
+  `null` while empty); a member every document must carry bumps the version, with
+  a step in `SaveCodec.Migrations` that writes it into every older document —
+  pure, walking the document by name, never throwing on a hand edit, removing a
+  stray of a later version's member a hand gave an older document. Version 3's
+  step writes nothing but the version, so a Phase 6a build refuses a Phase 6b save
+  rather than drop its potions (PHASE 6a DECISION 14). Pinned by the two saves the
+  pre-rework code wrote (`PreReworkSaveTests`) and the one the Phase 6a build wrote,
+  with the tuning it was played under frozen beside it (`Phase6aSaveTests`); their
+  `TestData/saves` are never edited.

@@ -17,6 +17,14 @@ namespace GameEngine.DistanceRPG.Logic;
 // members — the stable (6a.2), the enchanter's queue and its count, and a run's
 // service reports (6a.3a) — the migration writes none of; it removes a stray one a
 // hand gave a version-1 document, which meant nothing to version 1.
+//
+// Version 3 (Phase 6b) has no required member: every member it adds is appended
+// with its default — a member's potions (6b.1) — so its step writes nothing, and
+// exists so that a Phase 6a build, which reads version 2 and no further, refuses a
+// version-3 save as a newer build's rather than dropping its potions (PHASE 6a
+// DECISION 14). Like version 2's, it removes a stray member a hand gave an older
+// document, which the older reader ignored: a version-2 member's `potions` would
+// otherwise read as potions the campaign never mixed.
 
 /// <summary>
 /// One campaign, saved (§5.1): the version of this format it was written in,
@@ -159,9 +167,25 @@ public sealed record LockDto(string DungeonId, int LockedUntilRun);
 /// <param name="EffectiveMax">This turn's cap.</param>
 /// <param name="SavedMovement">What the last turn's end banked.</param>
 /// <param name="BudgetBeforeMire">The whole this turn's cap was cut from (<see cref="PartyMemberState.BudgetBeforeMire"/>).</param>
+/// <param name="Potions">
+/// The potions in the bag (§3.4), each with its slot, in slot order — or null for
+/// none, which is what a capture writes; null and <c>[]</c> read alike. A potion's
+/// slot is null in <paramref name="Inventory"/>, which stays a list of weapon rows,
+/// so a version-3 bag reads as a version-2 one with these laid into it. Appended
+/// by Phase 6b.1, with its default: a document written before it carries none.
+/// </param>
 public sealed record MemberDto(string Id, int ColorIndex, StatsDto Stats, IReadOnlyDictionary<string, int> WeaponXp, int HpXp, int ManaXp,
     IReadOnlyDictionary<string, int> Innate, string? Attunement, ActorDto Body, IReadOnlyList<WeaponDto?> Inventory,
-    float DistLeft, float EffectiveMax, float SavedMovement, float BudgetBeforeMire);
+    float DistLeft, float EffectiveMax, float SavedMovement, float BudgetBeforeMire, IReadOnlyList<PotionDto>? Potions = null);
+
+/// <summary>
+/// A potion in a bag (<see cref="Potion"/>, §3.5: its type and its quality, and
+/// nothing else), and the slot it lies in.
+/// </summary>
+/// <param name="Slot">The bag slot, 0-based as <see cref="SpoilDto.Slot"/> is: 1 at least, since the hand keeps a weapon.</param>
+/// <param name="Type">Health or mana, by <see cref="PotionType"/> name.</param>
+/// <param name="Quality">The units it was mixed from: 1 at least.</param>
+public sealed record PotionDto(int Slot, string Type, int Quality);
 
 /// <summary>An innate spread (§2.1), each stat by name.</summary>
 public sealed record StatsDto(int Str, int Dex, int Con, int Int);

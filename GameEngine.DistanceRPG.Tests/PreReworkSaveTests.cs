@@ -13,7 +13,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// with the tutorial retired, the Spear Hall locked, and in B's bag the unique,
 /// wand and caster unique the rework's weapon rows touch). Each reads at version 1,
 /// migrated to 2 (Phase 6a.1: every weapon row unworn, and its hash of version 1's
-/// keys), restores whole under the current content — every id and name it holds
+/// keys) and on to 3 (Phase 6b.1, a step that writes nothing), restores whole under
+/// the current content — every id and name it holds
 /// resolves — and, opened as a resume opens it, writes back the same document as
 /// the migration writes it, the tuning hash and its version aside; its tuning hash
 /// is the hash of the tuning it was played under, on version 1's keys, read by the
@@ -50,22 +51,34 @@ public class PreReworkSaveTests
     /// header rule of <c>SaveFile.cs</c>), each by the object it sits in: the
     /// migration writes none of them, and a capture writes each empty one as its
     /// default — the stable (Phase 6a.2), and the enchanter's queue and a run's
-    /// service reports (Phase 6a.3a) null, and the count of deposits made 0 — so
-    /// the saves have none and the capture of one restored from them has each at
-    /// its default. Set aside there, and only at its default: a capture that wrote
-    /// one with anything in it differs.
+    /// service reports (Phase 6a.3a) null, the count of deposits made 0, and every
+    /// member's potions (Phase 6b.1) null — so the saves have none and the capture
+    /// of one restored from them has each at its default. Set aside there, and only
+    /// at its default: a capture that wrote one with anything in it differs. A place
+    /// ending <c>[*]</c> is every row of that list: <c>$.campaign.party[*]</c> is each
+    /// member's row.
     /// </summary>
-    private static readonly (string At, string Member, int? Default)[] Appended =
+    private static readonly (string At, string Member, JsonNode? Default)[] Appended =
     [
         ("$.campaign", "stable", null),
         ("$.campaign", "enchanter", null),
-        ("$.campaign", "depositsMade", 0),
+        ("$.campaign", "depositsMade", JsonValue.Create(0)),
         ("$.campaign.lastResult", "services", null),
+        ("$.campaign.party[*]", "potions", null),
     ];
 
-    /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it: null, or the number.</summary>
-    private static bool IsDefault(JsonNode? value, int? expected)
-        => expected is { } number ? value is JsonValue v && v.TryGetValue(out int read) && read == number : value is null;
+    /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it, compared as JSON: null, a number, a word.</summary>
+    private static bool IsDefault(JsonNode? value, JsonNode? expected) => JsonNode.DeepEquals(value, expected);
+
+    /// <summary>Whether the object at <paramref name="path"/> is the place <paramref name="at"/> names: its end, and for a place ending <c>[*]</c>, any row of that list.</summary>
+    private static bool IsAt(string path, string at)
+    {
+        if (!at.EndsWith("[*]", StringComparison.Ordinal))
+            return path.EndsWith(at, StringComparison.Ordinal);
+        int open = path.LastIndexOf('[');
+        return open >= 0 && path.EndsWith(']') && path[(open + 1)..^1].All(char.IsAsciiDigit) && path[(open + 1)..^1].Length > 0
+            && path[..open].EndsWith(at[..^"[*]".Length], StringComparison.Ordinal);
+    }
 
     private static readonly string[] Saves = [MidRun, BetweenRuns];
 
@@ -140,7 +153,7 @@ public class PreReworkSaveTests
             case (JsonObject was, JsonObject now):
             {
                 bool Compared(string name) => !(root && name is TuningHashMember or TuningHashVersionMember or SavedAtMember)
-                    && !Appended.Any(appended => path.EndsWith(appended.At, StringComparison.Ordinal) && appended.Member == name
+                    && !Appended.Any(appended => IsAt(path, appended.At) && appended.Member == name
                         && !was.ContainsKey(name) && IsDefault(now[name], appended.Default));
                 var wasNames = was.Select(member => member.Key).Where(Compared).ToList();
                 var nowNames = now.Select(member => member.Key).Where(Compared).ToList();
@@ -231,15 +244,16 @@ public class PreReworkSaveTests
     {
         foreach (string name in Saves)
         {
-            // The save's text is version 1, and it reads at version 2, lifted by the
-            // one step this build ships (Phase 6a.1): every member of the saved tree
-            // kept at its value and in its order, and exactly two things added — an
-            // unworn wear on every weapon row, wherever it sits, and the root's hash
-            // version 1, since its hash was taken on version 1's keys.
+            // The save's text is version 1, and it reads at version 3, lifted by the
+            // two steps this build ships (Phase 6a.1's, and Phase 6b.1's, which writes
+            // nothing): every member of the saved tree kept at its value and in its
+            // order, and exactly two things added — an unworn wear on every weapon
+            // row, wherever it sits, and the root's hash version 1, since its hash
+            // was taken on version 1's keys.
             string text = TextOf(name);
             var saved = JsonNode.Parse(text)!.AsObject();
             Assert.Equal(1, saved["version"]!.GetValue<int>());
-            var lifted = SaveCodec.LiftToVersion2(saved.DeepClone().AsObject());
+            var lifted = SaveCodec.LiftToVersion3(SaveCodec.LiftToVersion2(saved.DeepClone().AsObject()));
             var rows = WeaponRows(saved, "$").Select(row => row.Path).ToList();
             Assert.NotEmpty(rows);
             Assert.Equal(rows, WeaponRows(lifted, "$").Select(row => row.Path));
@@ -283,23 +297,37 @@ public class PreReworkSaveTests
 
             // The members appended since are in the capture, at their defaults: the
             // stable, written null (Phase 6a.2); the enchanter's queue null and its
-            // count 0, and the last run's service reports null (Phase 6a.3a) — which the
-            // migrated save reads as the same, nothing having been in any stable or
-            // shop before there was one. Where the save has no last result, its
+            // count 0, and the last run's service reports null (Phase 6a.3a); and
+            // every member's potions null (Phase 6b.1) — which the migrated save
+            // reads as the same, nothing having been in any stable, shop or bag of
+            // potions before there was one. Where the save has no last result, its
             // reports have nowhere to be.
             var captured = JsonNode.Parse(again)!.AsObject();
-            JsonObject? At(JsonObject tree, string at) => at == "$.campaign" ? tree["campaign"]?.AsObject() : tree["campaign"]?["lastResult"] as JsonObject;
+            IReadOnlyList<JsonObject?> At(JsonObject tree, string at) => at switch
+            {
+                "$.campaign" => [tree["campaign"] as JsonObject],
+                "$.campaign.lastResult" => [tree["campaign"]?["lastResult"] as JsonObject],
+                "$.campaign.party[*]" => (tree["campaign"]?["party"] as JsonArray ?? []).Select(row => row as JsonObject).ToList(),
+                _ => throw new ArgumentOutOfRangeException(nameof(at), at, "a place the test does not walk"),
+            };
             foreach (var (at, member, defaulted) in Appended)
             {
-                if (At(lifted, at) is not { } migratedAt)
+                var migratedRows = At(lifted, at);
+                var capturedRows = At(captured, at);
+                Assert.Equal(migratedRows.Count, capturedRows.Count);
+                Assert.NotEmpty(migratedRows);
+                for (int i = 0; i < migratedRows.Count; i++)
                 {
-                    Assert.Null(At(captured, at));
-                    continue;
+                    if (migratedRows[i] is not { } migratedAt)
+                    {
+                        Assert.Null(capturedRows[i]);
+                        continue;
+                    }
+                    var capturedAt = capturedRows[i]!;
+                    Assert.True(capturedAt.ContainsKey(member), $"{name}: the capture has no {at}.{member}");
+                    Assert.True(IsDefault(capturedAt[member], defaulted), $"{name}: the capture wrote {at}.{member} as {capturedAt[member]?.ToJsonString() ?? "null"}");
+                    Assert.False(migratedAt.ContainsKey(member), $"{name}: the migration wrote {at}.{member}");
                 }
-                var capturedAt = At(captured, at)!;
-                Assert.True(capturedAt.ContainsKey(member), $"{name}: the capture has no {at}.{member}");
-                Assert.True(IsDefault(capturedAt[member], defaulted), $"{name}: the capture wrote {at}.{member} as {capturedAt[member]?.ToJsonString() ?? "null"}");
-                Assert.False(migratedAt.ContainsKey(member), $"{name}: the migration wrote {at}.{member}");
             }
             Assert.Empty(campaign.Stable);
             Assert.Null(file.Campaign.Stable);

@@ -915,11 +915,11 @@ public sealed class HudTextTests : IDisposable
             // lines the slots wrap to — clear of the top readouts and the help line.
             for (int slot = 1; slot < member.Inventory.Length; slot++)
                 member.Inventory[slot] = Widest(def);
-            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines(carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
+            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines((Weapon)carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
             for (int slot = 0; slot < slots.Length; slot++)
             {
                 Assert.All(slots[slot], line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= bag, $"{def.Id}: bag slot {slot + 1} runs off the window"));
-                Assert.Equal(DungeonHud.WeaponRuns("", member.Inventory[slot]!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
+                Assert.Equal(DungeonHud.WeaponRuns("", member.WeaponIn(slot)!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
                     slots[slot].SelectMany(line => line).Select(run => run.Text));
             }
             Assert.Contains(slots[0].SelectMany(line => line), run => run.Text.Contains(" LOCK ", StringComparison.Ordinal));
@@ -999,6 +999,52 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", full);
         Assert.Contains("X", full.Split(' '));
         Assert.Contains("I", full.Split(' '));
+    }
+
+    [Fact]
+    public void APotionsSlotNamesIt()
+    {
+        // Phase 6b.1: the bag panel names a potion's slot by its number and the
+        // potion, in the colour of the pool it fills — green for health, cyan for
+        // mana — and a weapon's as it always has: its line's colour, a unique's
+        // orange. The widest a save may load runs inside the window from the slot's
+        // place, in the HUD's font.
+        Assert.Equal(new DungeonHud.Run("3  HEALTH POTION Q2", DungeonHud.Green), DungeonHud.SlotName(2, TestPotions.Health(2)));
+        Assert.Equal(new DungeonHud.Run("4  MANA POTION Q1", DungeonHud.Cyan), DungeonHud.SlotName(3, TestPotions.Mana(1)));
+        Assert.Equal((DungeonHud.Green, DungeonHud.Cyan), (DungeonHud.PotionColor(PotionType.Health), DungeonHud.PotionColor(PotionType.Mana)));
+        Assert.Equal(new DungeonHud.Run("1  HATCHET", DungeonHud.WeaponLineColor(0)), DungeonHud.SlotName(0, TestWeapons.Get("hatchet")));
+        Assert.Equal(new DungeonHud.Run("2  HATCHET", DungeonHud.WeaponLineColor(1)), DungeonHud.SlotName(1, TestWeapons.Get("hatchet")));
+        var unique = GameContent.Current.Weapons.All.First(def => def.Unique);
+        Assert.Equal(DungeonHud.Orange, DungeonHud.SlotName(1, TestWeapons.Get(unique.Id, unique.Class == WeaponClass.Wand ? DamageType.Cold : null)).Color);
+
+        string widest = DungeonHud.SlotName(GameConstants.MaxInventorySlots - 1, TestPotions.Health(ContentBounds.MostCount)).Text;
+        Assert.True(widest.Length * 6f * 2f <= DungeonHud.InventoryDetailWidth(1280f), $"'{widest}' runs off the window");
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+    }
+
+    [Fact]
+    public void TheLeaveHintSaysPourWhenTheBagHoldsAPotion()
+    {
+        // While the bag holds a potion, X's keys put a weapon down or pour a potion
+        // out (PHASE 6b DECISION 1): both hints say so, by the same keys. A bag of
+        // weapons says what it always said. The pour says what it did over the
+        // member, and nothing of it lies on the floor to take back.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: true));
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: false));
+        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12, potion: true));
+        Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1, potion: true));
+        Assert.Equal("X TO LEAVE OR POUR ONE OUT", DungeonHud.PourKeyHint);
+        Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
+        Assert.Equal("POURED OUT THE HEALTH POTION Q2", DungeonHud.PouredBeat(TestPotions.Health(2)));
+        Assert.Equal("POURED OUT THE MANA POTION Q1", DungeonHud.PouredBeat(TestPotions.Mana(1)));
+
+        // Each in the HUD's font; the armed hint across the window at its 1.5, and the
+        // header row's hint at its 1.2 beside EQUIPPED inside the panel's 380.
+        foreach (string text in new[] { DungeonHud.LeaveHint(12, potion: true), DungeonHud.PourKeyHint, DungeonHud.PouredBeat(TestPotions.Health(ContentBounds.MostCount)) })
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
+        Assert.True(DungeonHud.LeaveHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
+        Assert.True(("EQUIPPED".Length + 1 + DungeonHud.PourKeyHint.Length) * 6f * 1.2f <= 380f);
     }
 
     [Fact]

@@ -68,7 +68,7 @@ public class SaveInventoryTests
             new("WeaponXp", Kept.Saved, "weaponXp by class name, zeros left out — never by position"),
             new("HpXp", Kept.Saved, "hpXp"),
             new("ManaXp", Kept.Saved, "manaXp"),
-            new("Inventory", Kept.Saved, "inventory[], its length the count the member was built with"),
+            new("Inventory", Kept.Saved, "inventory[], its length the count the member was built with: a weapon row, or null at a potion's slot; the potions in potions[], each with its slot (Phase 6b.1)"),
             new("DistLeft", Kept.Saved, "distLeft: a save mid-turn resumes mid-turn"),
             new("EffectiveMax", Kept.Saved, "effectiveMax"),
             new("SavedMovement", Kept.Saved, "savedMovement"),
@@ -95,6 +95,11 @@ public class SaveInventoryTests
             new("Unique", Kept.Derived, "the row's, by id"),
             new("ResolvedCost", Kept.Derived, "Resolve(): the cost less Light's discount on the live spread"),
             new("ResolvedManaCost", Kept.Derived, "Resolve(): the mana cost less Resonant's"),
+        ],
+        [typeof(Potion)] =
+        [
+            new("Type", Kept.Saved, "potions[].type, by name (Phase 6b.1)"),
+            new("Quality", Kept.Saved, "potions[].quality: the units it was mixed from (Phase 6b.1)"),
         ],
         [typeof(Enchantment)] =
         [

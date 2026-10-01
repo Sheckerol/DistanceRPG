@@ -470,7 +470,7 @@ public sealed class BetweenRunsHudTests : IDisposable
     }
 
     /// <summary>Every member's slots, as they stand: what a carry must leave alone.</summary>
-    private static Weapon?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
+    private static IItem?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
 
     /// <summary>The chosen row's text on the page.</summary>
     private static string ChosenText(BetweenRunsScene scene) => scene.Weapons.ChosenRow.Text;
@@ -737,7 +737,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             b.Inventory[slot] = TestWeapons.Get("darts");
         var a = campaign.Party[0];
         var def = GameContent.Current.Weapons["weakspot_stiletto"];
-        var full = new Weapon(def, a.Inventory[0]!.Forged, a.Inventory[0]!.Modifiers, [], 0, wear: 30);
+        var full = new Weapon(def, a.WeaponIn(0)!.Forged, a.WeaponIn(0)!.Modifiers, [], 0, wear: 30);
         a.Inventory[0] = null;
         a.Inventory[2] = full;
         var rows = HubWeapons.Rows(campaign);
@@ -835,6 +835,55 @@ public sealed class BetweenRunsHudTests : IDisposable
         // A readout's entries wrap to the column, never split, the rest indented.
         Assert.Equal(new[] { "* AAAA  BBBB", "  CCCC  DD" }, BetweenRunsHud.Listed("* ", "AAAA  BBBB  CCCC  DD", 12));
         Assert.Empty(BetweenRunsHud.Listed("* ", "", 12));
+    }
+
+    [Fact]
+    public void TheWeaponsPageListsAPotionAsARowItNeverChooses()
+    {
+        // Phase 6b.1: a potion in a bag is a row of the page under its member, in
+        // its slot's order — grey, read and never chosen, never put down on (PHASE
+        // 6b DECISION 1) — and the bag's room counts its empty slots alone. It says
+        // nothing on the right, since it is never the choice.
+        var campaign = CampaignState.Start(GameContent.Current);
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        var (scene, host) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        var rows = scene.Weapons.Rows();
+        var texts = rows.Select(row => row.Text).ToList();
+        int at = texts.IndexOf("  BAG   HEALTH POTION Q2");
+        Assert.Equal(["  BAG   STAFF OF RENEWAL - WEAR 0/30", "  BAG   HEALTH POTION Q2", "  BAG   MANA POTION Q1", HubWeapons.BagRoom(2), "[B]"],
+            texts.Skip(at - 1).Take(5));
+        Assert.All(HubWeapons.Runs(rows[at]), run => Assert.Equal(DungeonHud.Grey, run.Color));
+        Assert.Empty(BetweenRunsHud.DetailRows(rows[at]));
+
+        // W/S stop on every weapon and room, round the page, and never on a potion.
+        int choosable = rows.Count(row => row.Choosable);
+        for (int step = 0; step < 2 * choosable; step++)
+        {
+            scene.OnKey(Keys.S);
+            Assert.True(scene.Weapons.ChosenRow.Choosable, $"the choice stopped on '{ChosenText(scene)}'");
+        }
+
+        // Carrying A's staff, every stop is a place to put it down — never a potion's
+        // slot — and ESC puts it back with nothing moved and nothing saved.
+        ChooseRow(scene, "  BAG   STAFF OF RENEWAL - WEAR 0/30");
+        var bags = Bags(campaign);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        for (int step = 0; step < 2 * rows.Count; step++)
+        {
+            scene.OnKey(Keys.W);
+            Assert.True(scene.Weapons.ChosenRow.Target, $"carrying, the choice stopped on '{ChosenText(scene)}'");
+        }
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(0, host.HubSavesAsked);
+
+        // The widest potion row the save may load fits its column, in the HUD's font.
+        var widest = new HubWeapons.Row(HubWeapons.RowKind.Potion, HubWeapons.BagLabel, new WeaponPlace("A", GameConstants.MaxInventorySlots - 1),
+            Potion: TestPotions.Health(ContentBounds.MostCount));
+        Assert.True(widest.Text.Length * 6f * BetweenRunsHud.WeaponRowScale <= BetweenRunsHud.ColumnWidth, $"'{widest.Text}' is past the column");
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]*$", widest.Text);
     }
 
     [Fact]
@@ -960,7 +1009,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.S);
         Assert.Equal("  BAG   STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         scene.OnKey(Keys.Enter);
         Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
         Assert.Equal((new WeaponPlace("A", 1), staff), scene.Weapons.Carried);
@@ -1185,7 +1234,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         {
             Assert.False(campaign.IsRetired(GameContent.Current.Dungeons.Tutorial.Id));
             Assert.Equal(rows.TakeLast(4).Select(row => row.Text), HubWeapons.Rows(campaign).TakeLast(4).Select(row => row.Text));
-            Assert.Equal(Enchanter.Closed(GameContent.Current.Dungeons.Tutorial), Enchanter.Refusal(campaign, campaign.Party[0].Inventory[0]!, Service.Refine));
+            Assert.Equal(Enchanter.Closed(GameContent.Current.Dungeons.Tutorial), Enchanter.Refusal(campaign, campaign.Party[0].WeaponIn(0)!, Service.Refine));
         }
 
         // Drawn: a worked row cyan, a stalled one yellow, a unique's name orange;

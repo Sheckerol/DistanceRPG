@@ -59,14 +59,14 @@ public class SaveCodecTests
     public void TheDocumentCarriesItsVersion()
     {
         // PHASE5-027: System.Text.Json "with an explicit version field". This build
-        // writes version 2 (Phase 6a: a weapon's wear), first in the document, and
-        // reads it back.
-        Assert.Equal(2, SaveCodec.CurrentVersion);
+        // writes version 3 (Phase 6b: a member's potions; version 2 was Phase 6a's,
+        // a weapon's wear), first in the document, and reads it back.
+        Assert.Equal(3, SaveCodec.CurrentVersion);
         string text = SaveCodec.Write(Sample());
         using (var document = JsonDocument.Parse(text))
         {
             var first = document.RootElement.EnumerateObject().First();
-            Assert.Equal(("version", 2), (first.Name, first.Value.GetInt32()));
+            Assert.Equal(("version", 3), (first.Name, first.Value.GetInt32()));
         }
         Assert.Equal(SaveCodec.CurrentVersion, SaveCodec.Read(text).Version);
 
@@ -113,16 +113,17 @@ public class SaveCodecTests
         campaign["runs"] = campaign["runCounter"]!.DeepClone();
         campaign.Remove("runCounter");
         string versionZero = old.ToJsonString();
-        var shipped = Assert.Single(SaveCodec.Migrations);   // version 1 is the first: this build ships the one step, 1 to 2 (Phase 6a)
-        Assert.Equal(1, shipped.From);
+        // Version 1 is the first: this build ships a step from each version since,
+        // 1 to 2 (Phase 6a) and 2 to 3 (Phase 6b), and none from 0.
+        Assert.Equal([1, 2], SaveCodec.Migrations.Select(step => step.From));
         var unlifted = Refused(versionZero);
         Assert.Equal("version", unlifted.Where);
         Assert.Contains("no migration", unlifted.Problem, StringComparison.Ordinal);
 
-        // ...and a step that renames the member lifts it to 1, and the real step
-        // on to 2: the document reads at the current version. The real step writes
-        // an unworn weapon row and version 1's hash, which the sample holds, so the
-        // text is the sample's again.
+        // ...and a step that renames the member lifts it to 1, and the real steps
+        // on to 3: the document reads at the current version. The real steps write
+        // an unworn weapon row and version 1's hash, which the sample holds, and
+        // nothing else, so the text is the sample's again.
         static SaveMigration Rename(int from, string was, string now, List<int> ran) => new(from, document =>
         {
             ran.Add(document["version"]!.GetValue<int>());   // what the step was handed says the version it reads
@@ -138,7 +139,7 @@ public class SaveCodecTests
         Assert.Equal(text, SaveCodec.Write(lifted));   // the same document it started as, before version 0 was made of it
 
         // Step by step, in version order whatever order the table lists them in:
-        // a version -1 that also called the seen set "met" runs -1 → 0 → 1 → 2,
+        // a version -1 that also called the seen set "met" runs -1 → 0 → 1 → 2 → 3,
         // each step handed the document at its own version.
         var older = Tree(versionZero);
         older["version"] = -1;
@@ -345,6 +346,115 @@ public class SaveCodecTests
         Assert.Equal(Refused(twoNothing.ToJsonString()).Where, Refused(nothing.ToJsonString()).Where);
     }
 
+    /// <summary>A member's potions as a document spells them: one at a bag slot, or a stray a hand wrote, whatever it is.</summary>
+    private static readonly string[] StrayPotions =
+    [
+        """[{ "slot": 1, "type": "Health", "quality": 2 }]""",
+        "{}",
+        "\"x\"",
+        "4",
+        "null",
+        "[]",
+    ];
+
+    [Fact]
+    public void TheVersion2StepWritesOnlyTheVersion_AndRemovesAStrayPotions()
+    {
+        // Version 3's one member, a member's potions (Phase 6b.1), is appended with
+        // its default, none: so the step that lifts a version-2 document writes
+        // nothing — the codec stamps the version — and a version-2 document reads as
+        // the version-3 one the campaign writes today, its hash version as written
+        // (1 on the sample, as on a lifted version-1 document; 2 on a version-2 one).
+        string text = SaveCodec.Write(Sample());
+        var v2 = Tree(text);
+        v2["version"] = 2;
+        Assert.True(FirstMember(v2).Remove("potions"));   // a version-2 member has none: the capture writes it null, version 3's
+        var stepped = SaveCodec.LiftToVersion3(v2.DeepClone().AsObject());
+        Assert.True(JsonNode.DeepEquals(v2, stepped), "the step writes nothing: the codec stamps the version");
+        var read = SaveCodec.Read(v2.ToJsonString());
+        Assert.Equal((3, 1), (read.Version, read.TuningHashVersion));
+        Assert.Equal(text, SaveCodec.Write(read));
+        v2["tuningHashVersion"] = 2;
+        Assert.Equal(2, SaveCodec.Read(v2.ToJsonString()).TuningHashVersion);
+        v2["tuningHashVersion"] = 1;
+
+        // A potions member a hand gave a version-2 member meant nothing to the
+        // version-2 reader, which ignored it: so the step removes it, whatever kind
+        // of thing it is — never read as potions the campaign never mixed, never
+        // refused as a member version 2 did not know.
+        foreach (string stray in StrayPotions)
+        {
+            var hand = v2.DeepClone().AsObject();
+            FirstMember(hand)["potions"] = JsonNode.Parse(stray);
+            Assert.False(FirstMember(SaveCodec.LiftToVersion3(hand.DeepClone().AsObject())).ContainsKey("potions"), stray);
+            var loaded = SaveCodec.Read(hand.ToJsonString());
+            Assert.Null(loaded.Campaign.Party[0].Potions);
+            Assert.Equal(text, SaveCodec.Write(loaded));
+        }
+
+        // A version-1 document is lifted through both steps, and a stray potions on
+        // it goes the same way: version 1 knew it no better.
+        var v1 = Tree(text);
+        v1["version"] = 1;
+        v1.Remove("tuningHashVersion");
+        FirstMember(v1)["potions"] = JsonNode.Parse(StrayPotions[0]);
+        Assert.Equal(text, SaveCodec.Write(SaveCodec.Read(v1.ToJsonString())));
+
+        // At version 3 the member is the document's own, read as written.
+        var v3 = Tree(text);
+        FirstMember(v3)["potions"] = JsonNode.Parse(StrayPotions[0]);
+        var carried = Assert.Single(SaveCodec.Read(v3.ToJsonString()).Campaign.Party[0].Potions!);
+        Assert.Equal(new PotionDto(1, "Health", 2), carried);
+    }
+
+    [Fact]
+    public void TheVersion2StepPassesOverWhatItCannotRead()
+    {
+        // As the version-1 step never throws on a hand-edited document, nor does
+        // this one: a campaign, a party or a member row that is missing or the wrong
+        // kind of thing is passed over, and the reader then refuses the document by
+        // the path it names at version 3 — never an exception that says nothing of
+        // where.
+        string text = SaveCodec.Write(Sample());
+        (Action<JsonObject> Spoil, string Where)[] wrong =
+        [
+            (tree => tree["campaign"] = 4, "campaign"),
+            (tree => Campaign(tree)["party"] = 4, "campaign.party"),
+            (tree => Campaign(tree)["party"] = new JsonObject(), "campaign.party"),
+            (tree => Campaign(tree)["party"]![0] = "A", "campaign.party[0]"),
+            (tree => Campaign(tree)["party"]![0] = 7, "campaign.party[0]"),
+        ];
+        foreach (var (spoil, where) in wrong)
+        {
+            var three = Tree(text);
+            spoil(three);
+            var two = Tree(text);
+            two["version"] = 2;
+            spoil(two);
+            Assert.Equal(where, Refused(three.ToJsonString()).Where);
+            Assert.Equal(where, Refused(two.ToJsonString()).Where);   // a SaveFormatException, exactly: never the step's own exception
+            SaveCodec.LiftToVersion3(two);   // and the step alone passes over it
+        }
+        // And a null where a campaign belongs: the step has nothing to walk, and the
+        // reader says so where the campaign is missing, at either version.
+        var nothing = Tree(text);
+        nothing["version"] = 2;
+        nothing["campaign"] = null;
+        Assert.Null(SaveCodec.LiftToVersion3(nothing.DeepClone().AsObject())["campaign"]);
+        var threeNothing = Tree(text);
+        threeNothing["campaign"] = null;
+        Assert.Equal(Refused(threeNothing.ToJsonString()).Where, Refused(nothing.ToJsonString()).Where);
+
+        // No step runs on a version-3 document: a potions that is no list is refused
+        // where it is, as any member of the wrong kind is.
+        foreach (string notAList in new[] { "{}", "\"x\"", "4" })
+        {
+            var three = Tree(text);
+            FirstMember(three)["potions"] = JsonNode.Parse(notAList);
+            Assert.Equal("campaign.party[0].potions", Refused(three.ToJsonString()).Where);
+        }
+    }
+
     [Fact]
     public void UnknownMembersAreIgnored_MissingOnesAreNot()
     {
@@ -520,6 +630,8 @@ public class SaveCodecTests
             typeof(ReactionUseDto), typeof(ActorRefDto), typeof(FloorDto), typeof(EnemyDto), typeof(DropDto), typeof(LooseItemDto),
             // Phase 6a: the enchanter.
             typeof(DepositDto), typeof(ServiceDto),
+            // Phase 6b: the potions.
+            typeof(PotionDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

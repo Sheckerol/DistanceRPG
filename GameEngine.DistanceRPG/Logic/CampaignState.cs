@@ -809,14 +809,14 @@ public sealed class CampaignState
     /// Efficiency dagger would reach §6.2's enchanter to be told it cannot offer
     /// <c>regeneration</c>, an element or <c>vampiric</c> — entries it has been
     /// carrying since turn 0. They are in a bag; how they got there is not this
-    /// set's question.
+    /// set's question. A potion carries no entry, and is met by nothing.
     /// </para>
     /// </summary>
     public void See(PartyMemberState member)
     {
         ArgumentNullException.ThrowIfNull(member);
-        foreach (var weapon in member.Inventory)
-            if (weapon is not null)
+        foreach (var item in member.Inventory)
+            if (item is Weapon weapon)
                 See(weapon);
     }
 
@@ -832,7 +832,8 @@ public sealed class CampaignState
 
     /// <summary>
     /// The weapon at <paramref name="place"/>: a member's slot's, which may be
-    /// empty (null), or the stable's — its end holding nothing.
+    /// empty or hold a potion (null either way), or the stable's — its end holding
+    /// nothing. What lies there, a potion included, is <see cref="ItemAt"/>.
     /// </summary>
     /// <exception cref="ArgumentException">No member of the party has the id.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The slot is not one the member has, or the place is past the stable's end.</exception>
@@ -844,6 +845,23 @@ public sealed class CampaignState
             ArgumentOutOfRangeException.ThrowIfGreaterThan(place.Index, _stable.Count, nameof(place));
             return place.Index < _stable.Count ? _stable[place.Index] : null;
         }
+        return SlotAt(place) as Weapon;
+    }
+
+    /// <summary>
+    /// What lies at <paramref name="place"/>: a member's slot's weapon or potion,
+    /// or nothing; or the stable's weapon (<see cref="WeaponAt"/>) — the stable
+    /// holds weapons only (PHASE 6b DECISION 1), and its end holds nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The slot is not one the member has, or the place is past the stable's end.</exception>
+    public IItem? ItemAt(WeaponPlace place) => place.IsStable ? WeaponAt(place) : SlotAt(place);
+
+    /// <summary>What a member's slot holds, the place naming the member and the slot.</summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The slot is not one the member has.</exception>
+    private IItem? SlotAt(WeaponPlace place)
+    {
         var bag = MemberOf(place).Inventory;
         ArgumentOutOfRangeException.ThrowIfNegative(place.Index, nameof(place));
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(place.Index, bag.Length, nameof(place));
@@ -858,7 +876,8 @@ public sealed class CampaignState
     /// — the weapon put down where nothing lies, in another member's bag or at
     /// the stable's end — and it was the one weapon that member carried. A swap
     /// always hands one back, and a weapon put down in its own member's bag stays
-    /// carried.
+    /// carried. The weapons are counted, never the slots: a member carrying one
+    /// weapon and a bag of potions carries one weapon.
     /// </summary>
     /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
@@ -869,7 +888,7 @@ public sealed class CampaignState
         if (!to.IsStable && to.MemberId == from.MemberId)
             return null;
         var member = MemberOf(from);
-        return member.Inventory.Count(carried => carried is not null) == 1 ? member : null;
+        return member.WeaponsCarried == 1 ? member : null;
     }
 
     /// <summary>
@@ -878,21 +897,22 @@ public sealed class CampaignState
     /// put down where nothing lies in its own member's bag, ahead of every weapon
     /// that bag carries, which the emptied hand takes up again at once — it takes the
     /// first weapon in the bag (<see cref="PartyMemberState.ArmFromBag"/>, the rule
-    /// <see cref="Move"/> keeps). A member's only weapon put in its own bag always
-    /// does. The hub asks first and says why, as it asks <see cref="WouldDisarm"/>,
-    /// so no move, log line or save is made of a change that changes nothing.
+    /// <see cref="Move"/> keeps), passing over any potion ahead of it. A member's
+    /// only weapon put in its own bag always does. The hub asks first and says why,
+    /// as it asks <see cref="WouldDisarm"/>, so no move, log line or save is made
+    /// of a change that changes nothing.
     /// </summary>
     /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
     public bool ComesStraightBack(WeaponPlace from, WeaponPlace to)
     {
         if (from.IsStable || from.Index != 0 || to.IsStable || to.MemberId != from.MemberId || to.Index == 0
-            || WeaponAt(from) is null || WeaponAt(to) is not null)
+            || WeaponAt(from) is null || ItemAt(to) is not null)
             return false;
         var bag = MemberOf(from).Inventory;
         for (int slot = 1; slot < to.Index; slot++)
-            if (bag[slot] is not null)
-                return false;   // the hand would take up this one instead
+            if (bag[slot] is Weapon)
+                return false;   // the hand would take up this one instead; a potion it passes over
         return true;
     }
 
@@ -910,13 +930,16 @@ public sealed class CampaignState
     /// own place moves nothing.
     /// <para>
     /// Refused, and nothing moves: during a visit — the stable and the bags are
-    /// changed by hand only between runs — and a move that would leave a member
+    /// changed by hand only between runs — a move that would leave a member
     /// carrying no weapon (<see cref="WouldDisarm"/>), which the hub asks first and
-    /// says why. Nothing is met: every weapon moved was the party's already.
+    /// says why, and a move from or onto a slot a potion lies in: a potion is never
+    /// moved by hand, and a slot holds one thing (PHASE 6b DECISION 1). The hub
+    /// never offers a potion's place. Nothing is met: every weapon moved was the
+    /// party's already.
     /// </para>
     /// </summary>
     /// <returns>The weapon moved; the weapon it was swapped with, or null; and the weapon a hand the move emptied took up from the bag, or null.</returns>
-    /// <exception cref="InvalidOperationException">A visit is in progress, <paramref name="from"/> holds no weapon, or the move would leave a member carrying none.</exception>
+    /// <exception cref="InvalidOperationException">A visit is in progress, <paramref name="from"/> holds no weapon, a potion lies at either place, or the move would leave a member carrying none.</exception>
     /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
     internal (Weapon Moved, Weapon? Swapped, Weapon? Armed) Move(WeaponPlace from, WeaponPlace to)
@@ -924,7 +947,11 @@ public sealed class CampaignState
         if (Visit is { } visit)
             throw new InvalidOperationException(
                 $"A visit to '{visit.Def.Id}' is in progress: the stable and the bags are changed by hand only between runs.");
+        if (ItemAt(from) is Potion taken)
+            throw new InvalidOperationException($"A {taken.Type} potion lies at {from}: a potion is never moved by hand (PHASE 6b DECISION 1).");
         var moved = WeaponAt(from) ?? throw new InvalidOperationException($"Nothing lies at {from} to move.");
+        if (ItemAt(to) is Potion lying)
+            throw new InvalidOperationException($"A {lying.Type} potion lies at {to}: a slot holds one thing, and a potion is never moved by hand (PHASE 6b DECISION 1).");
         var swapped = WeaponAt(to);
         if (WouldDisarm(from, to) is { } unarmed)
             throw new InvalidOperationException($"The move would leave {unarmed.Id} carrying no weapon (PHASE 6a DECISION 7).");
@@ -1019,7 +1046,7 @@ public sealed class CampaignState
             throw new ArgumentException($"Deposit {entry.Ordinal} is not the next: {DepositsMade} deposits have been made.", nameof(entry));
         WeaponPlace[] places = source is { } given ? [from, given] : [from];
         foreach (var member in places.Where(place => !place.IsStable).Select(MemberOf).Distinct())
-            if (member.Inventory.Count(carried => carried is not null) == places.Count(place => place.MemberId == member.Id))
+            if (member.WeaponsCarried == places.Count(place => place.MemberId == member.Id))
                 throw new InvalidOperationException($"The deposit would leave {member.Id} carrying no weapon (PHASE 6a DECISION 7).");
 
         foreach (var place in places.OrderByDescending(place => place.IsStable ? place.Index : -1))

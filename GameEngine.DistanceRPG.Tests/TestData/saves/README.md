@@ -52,3 +52,40 @@ the worked examples were written against. A suite whose scenarios stand on the
 tuning — a push that moves a tile, three Block a stack, a dummy back up in nine
 turns — reads this file over the master copy and makes it current, so a
 designer's edit to `tuning.json` moves the game and fails none of them.
+
+# A save from Phase 6a
+
+The same proof one version on: a campaign the Phase 6a build saved (version 2)
+still loads after Phase 6b lifts the save to version 3, and at every 6b step.
+
+| File | What it is |
+| --- | --- |
+| `phase-6a-between-runs.json` | A campaign saved between runs, version 2, its `tuningHash` of version 2's keys: `pre-rework-between-runs.json` played on — the Spear Hall and the tutorial cleared, the tutorial retired — with the Riposte Blade moved from B's bag to the stable, B's Wand of the Cone deposited at the enchanter to be refined (an unworn Refine, 0 of 2 runs), and so one deposit made. |
+| `phase-6a-tuning.json` | `GameEngine.DistanceRPG/Data/tuning.json` at commit `69d7bee`, byte for byte: the tuning the save was played under. Its hash on version 2's keys is the save's `tuningHash`. |
+
+## Where they came from
+
+The Phase 6a build itself wrote the save, by play, never a test and never a
+hand: the untouched tree at `69d7bee` built in place (a worktree does not build:
+the engine is a sibling checkout), its `tuning.json` beside the exe checked to be
+the master's byte for byte, and launched on a scratch save folder
+(`DISTANCERPG_SAVE_DIR`) holding `pre-rework-between-runs.json` as slot 1. LOAD
+GAME 1, TAB to WEAPONS, B's Riposte Blade taken up and put down at the stable's
+end; then D on B's Wand of the Cone, 2 (REFINE — every weapon a version-1 save
+lifts is unworn, so ENCHANT is refused for want of wear, and a refine is not),
+ENTER; ESC, QUIT TO TITLE. The slot's `campaign.json` is this file, as written —
+each change on the hub saves the campaign at once (PHASE 6a DECISION 10), and the
+quit found the slot already holding it, so its `savedAt` is the deposit's. The
+tuning is the master at that commit, `git show 69d7bee:GameEngine.DistanceRPG/Data/tuning.json`.
+
+## What reads them
+
+`Phase6aSaveTests`: the save is read at version 2 and lifted to 3 by a step that
+writes nothing, restores whole under `phase-6a-tuning.json` with nothing to say,
+and captured again is the document it was — every member at its value and in its
+order — but for the tuning hash and its version, the time, and each member's
+potions, written `null` (Phase 6b.1). Its hash is the frozen tuning's on version
+2's keys, read by the current reader over the master copy, as a copy beside the
+game is read; and the game says the numbers have changed exactly when a number
+version 2 hashes differs from that file's — so a later retune of `tuning.json`
+fails nothing.

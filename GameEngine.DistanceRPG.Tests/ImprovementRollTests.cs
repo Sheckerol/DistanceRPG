@@ -111,7 +111,7 @@ public sealed class ImprovementRollTests : IDisposable
 
         // Through the shop: A's Staff of Renewal, refined unworn, two runs.
         var campaign = TestShop.Opened();
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         Assert.Equal((0, "staff_of_renewal"), (staff.Wear, staff.Id));
         var before = staff.Modifiers;
         Enchanter.Deposit(campaign, new WeaponPlace("A", 1), Service.Refine);

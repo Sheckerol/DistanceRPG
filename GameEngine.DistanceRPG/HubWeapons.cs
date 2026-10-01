@@ -48,6 +48,9 @@ internal sealed class HubWeapons
 
         /// <summary>A weapon in the enchanter's shop, its deposit working or stalled (Phase 6a.3a) — or held there as a transfer's source (Phase 6a.6): chosen, to be read and taken back (T, Phase 6a.5), but neither taken up nor put down on — it is out of the party's hands.</summary>
         Shop,
+
+        /// <summary>A potion in a member's bag (Phase 6b.1): read, never chosen and never put down on — a potion is never moved by hand, and its slot is full (PHASE 6b DECISION 1).</summary>
+        Potion,
     }
 
     /// <summary>
@@ -57,26 +60,28 @@ internal sealed class HubWeapons
     /// </summary>
     /// <param name="Kind">What the row is.</param>
     /// <param name="Label">A heading's, a member's or a room's whole text; a weapon row's text before the weapon's name, its indent and its slot, or on a shop row whether it is worked.</param>
-    /// <param name="Place">Where a weapon or a room is — what a weapon carried is put down on — or null for a heading, a member or the shop.</param>
+    /// <param name="Place">Where a weapon or a room is — what a weapon carried is put down on — or where a potion lies, which nothing is put down on; null for a heading, a member or the shop.</param>
     /// <param name="Weapon">The weapon on a weapon row or a shop row, or null.</param>
     /// <param name="Deposit">The deposit on a shop row, or null.</param>
     /// <param name="Ahead">On a shop row, how many newer deposits are in the shop: a stalled one waits on them.</param>
     /// <param name="Stalled">Whether this shop row's deposit waits: the next run that counts leaves it unworked. Set with its label (<see cref="StalledLabel"/>), never read back off it.</param>
     /// <param name="Held">Whether this shop row's weapon is a transfer's source, held in the shop beside the weapon its soul goes to, as the same deposit (Phase 6a.6): <see cref="HeldLabel"/>.</param>
+    /// <param name="Potion">The potion on a potion row (Phase 6b.1), or null.</param>
     internal sealed record Row(RowKind Kind, string Label, WeaponPlace? Place = null, Weapon? Weapon = null, Deposit? Deposit = null, int Ahead = 0, bool Stalled = false,
-        bool Held = false)
+        bool Held = false, Potion? Potion = null)
     {
         /// <summary>
         /// The row's text: the label, and on a weapon row the weapon's name and its
         /// wear (<see cref="DungeonHud.WearReadout"/>), on a shop row its name and its
         /// runs (<see cref="ShopRuns"/>) — a transfer's source its name alone, its
-        /// runs the row over it's.
+        /// runs the row over it's — and on a potion row the potion's name.
         /// </summary>
-        public string Text => (Weapon, Deposit) switch
+        public string Text => (Weapon, Deposit, Potion) switch
         {
-            ({ } weapon, not null) when Held => $"{Label}{Name(weapon)}",
-            ({ } weapon, { } deposit) => $"{Label}{Name(weapon)} - {ShopRuns(deposit)}",
-            ({ } weapon, null) => $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}",
+            (_, _, { } potion) => $"{Label}{potion.ShownName}",
+            ({ } weapon, not null, _) when Held => $"{Label}{Name(weapon)}",
+            ({ } weapon, { } deposit, _) => $"{Label}{Name(weapon)} - {ShopRuns(deposit)}",
+            ({ } weapon, null, _) => $"{Label}{Name(weapon)} - {DungeonHud.WearReadout(weapon)}",
             _ => Label,
         };
 
@@ -190,8 +195,9 @@ internal sealed class HubWeapons
 
     /// <summary>
     /// The page's rows, top to bottom (§6.2): the party's heading, then each member
-    /// in roster order — its name, its hand, each weapon in its bag in slot order,
-    /// and one row for the room its bag has left, or none when it is full — then
+    /// in roster order — its name, its hand, each weapon or potion in its bag in
+    /// slot order, and one row for the room its bag has left, or none when it is
+    /// full: a potion's slot is no room (Phase 6b.1) — then
     /// the stable's heading, each weapon in the stable in its order, and the
     /// stable's room, which is always there: the stable is unbounded (PHASE 6a
     /// DECISION 7). An empty hand is a row of its own, somewhere a weapon can go.
@@ -221,15 +227,20 @@ internal sealed class HubWeapons
         {
             rows.Add(new Row(RowKind.Member, MemberLine(member.Id)));
             var bag = member.Inventory;
-            rows.Add(bag[0] is { } hand
+            rows.Add(member.EquippedWeapon is { } hand
                 ? new Row(RowKind.Weapon, HandLabel, new WeaponPlace(member.Id, 0), hand)
-                : new Row(RowKind.Room, EmptyHand, new WeaponPlace(member.Id, 0)));
+                : new Row(RowKind.Room, EmptyHand, new WeaponPlace(member.Id, 0)));   // the hand keeps a weapon: nothing else lies there
             int firstEmpty = -1, empty = 0;
             for (int slot = 1; slot < bag.Length; slot++)
             {
-                if (bag[slot] is { } carried)
+                if (bag[slot] is Weapon carried)
                 {
                     rows.Add(new Row(RowKind.Weapon, BagLabel, new WeaponPlace(member.Id, slot), carried));
+                    continue;
+                }
+                if (bag[slot] is Potion potion)
+                {
+                    rows.Add(new Row(RowKind.Potion, BagLabel, new WeaponPlace(member.Id, slot), Potion: potion));   // read, never chosen: its slot is full
                     continue;
                 }
                 empty++;
@@ -286,7 +297,7 @@ internal sealed class HubWeapons
     }
 
     /// <summary>
-    /// A row as the page draws it, in its colours: a heading and a member in grey,
+    /// A row as the page draws it, in its colours: a heading, a member and a potion in grey,
     /// a room in dark grey, a weapon in white — its name in a unique's orange, its
     /// wear green once full (<see cref="DungeonHud.WearColor"/>), as on every
     /// weapon line — and a weapon taken up, where it still lies, in cyan. A weapon
@@ -309,6 +320,9 @@ internal sealed class HubWeapons
             case RowKind.Heading:
             case RowKind.Member:
                 return [new Run(row.Label, DungeonHud.Grey)];
+
+            case RowKind.Potion:
+                return [new Run(row.Text, DungeonHud.Grey)];   // read, never chosen: grey as a heading is
 
             case RowKind.Room:
                 return [chosen ? new Run(Marked(row.Label) + ChosenEnd, DungeonHud.Yellow) : new Run(row.Label, DungeonHud.DarkGrey)];

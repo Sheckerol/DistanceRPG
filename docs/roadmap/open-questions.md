@@ -527,6 +527,13 @@ when that bag is full; or (c) a member may be left unarmed, as a wipe that takes
 every spoil it held already can leave one. settled.md's Phase 6a implementation
 pass records the ruling.
 
+From Phase 6b.1 a bag slot can hold a potion, which is no weapon: a hand a move,
+a deposit or the rest before a dungeon empties takes the first *weapon* in the bag,
+passing a potion over; every rule that keeps a member armed counts the weapons it
+carries, never its full slots, so a member with one weapon and a bag of potions
+carries one weapon; and the stable holds weapons alone — no potion is ever put
+there (PHASE 6b DECISION 1, below).
+
 ## Autosaving between runs (§5.1's safe points) — PHASE 6a DECISION 10
 
 A save is taken only at a safe point, and between runs is always one (settled.md,
@@ -661,6 +668,19 @@ no service it knows, so it refuses a save with a transfer in either and sets it
 aside, kept and never deleted. A 6a.1 or 6a.2 build passes over the shop unread,
 as above, and its next save loses both of a transfer's weapons with the rest of
 the shop.
+
+Phase 6b lifts the save to version 3 from its first step, 6b.1, which gives a
+member potions in its bag (a member's `potions`, appended with its default). The
+step from version 2 writes nothing but the version — the reader stamps it — and
+removes a stray `potions` a hand gave a version-2 member, which the version-2
+reader ignored; the tuning hash's version stays as the save wrote it. So a Phase
+6a build sets every Phase 6b save aside as a newer build's, kept and never
+deleted, rather than reading it and saving it again without its potions: do not
+open a Phase 6b slot with a Phase 6a checkout. Within Phase 6b the version stays
+3 at every step, as it stayed 2 within Phase 6a, so this entry's question asks
+itself again there: a later 6b step that appends members (the farm's, at 6b.3) is
+read by an earlier 6b build that passes over them, and that build's next save
+drops them.
 
 ## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
 
@@ -957,3 +977,36 @@ holds two of the worked places, since §6.2 works "the two most recently deposit
 weapons" and a transfer deposits two; (e) a transfer rolls nothing; or (f) the
 source's wear is cashed too, growing its capacity as any deposit does.
 settled.md's Phase 6a implementation pass records the ruling.
+
+## Where a potion may be (§3.4, §6.6) — PHASE 6b DECISION 1
+
+§3.5 puts a potion in a bag slot: "Potions live in inventory slots as ordinary
+items, one per slot, so `PartyMemberState.Inventory` needs to hold something
+other than a `Weapon`" (phase-3-loot.md). Nothing says whether a potion may sit in
+the hand, go to the stable, be put down on a floor, or move from one member's bag
+to another's; the hand keeps a weapon (PHASE 6a DECISION 7), and the farm's batch
+is "a flow, not a stock" (settled.md).
+
+**Shipped provisionally (Phase 6b.1): a potion lies only in a member's bag — slots
+2 to 6, as the bag panel numbers them — never in the hand**, one a slot. It is
+never in the stable, and never moved between bags: the WEAPONS page lists it
+under its member, grey, and never chooses it nor puts a weapon down on it, and the
+campaign's door for a move refuses a potion's slot either way. The alchemist
+(Phase 6b's later steps) mixes one into the first empty bag slot of the member
+chosen, and a potion in the wrong bag is poured back there and mixed again. In a
+dungeon, X then a potion's number pours it out — `POURED OUT THE HEALTH POTION
+Q2` over the member — and it is gone, not laid on the floor, so a floor and its
+save hold weapons alone; it costs nothing, as putting a weapon down costs nothing.
+A slot a potion fills is full: a pickup finds no room there, and a bag of weapons
+and potions refuses a drop as a bag of weapons does.
+
+**What the pick lets a player do.** Make room in a full bag in the dungeon by
+pouring a potion out, as a weapon is put down to make room; and never lose a
+potion to a move between runs, since none is made.
+
+**This decides where a potion can be carried and how one is got rid of, so it is
+the user's to decide.** The alternatives: (a) the WEAPONS page may move a potion
+between bags, as it moves a weapon; (b) a potion is put down on a floor as a
+weapon is, and taken back with G (a floor's `LooseItem` and its save row would
+hold either); or (c) a potion cannot be put down at all, only drunk. settled.md's
+Phase 6b implementation pass records the ruling.

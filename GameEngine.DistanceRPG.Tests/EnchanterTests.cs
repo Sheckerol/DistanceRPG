@@ -289,7 +289,7 @@ public sealed class EnchanterTests : IDisposable
         // accepted, costs its count plus one runs, grows nothing, and comes back as it
         // went — never refused.
         var campaign = Opened();
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         Assert.Equal((0, 0, 1), (staff.Wear, staff.WearCashed, staff.Enchantments.Count));
         var enchantments = staff.Enchantments.ToArray();
 
@@ -579,7 +579,7 @@ public sealed class EnchanterTests : IDisposable
         Assert.Equal(new Offer("regeneration", null, "NEVER FIRES ON A SWORD"), OfferOf(campaign, guard, "regeneration"));
         Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, guard, "vampiric"));
         Assert.Equal(new Offer("regeneration", null, null), OfferOf(campaign, Carrying("staff_of_renewal", ["regeneration"]), "regeneration"));
-        Assert.Equal("NEVER FIRES ON AN AXE", OfferOf(campaign, campaign.Party[2].Inventory[0]!, "mire").Note);
+        Assert.Equal("NEVER FIRES ON AN AXE", OfferOf(campaign, campaign.Party[2].WeaponIn(0)!, "mire").Note);
 
         Assert.Null(Enchanter.Refusal(campaign, guard, Service.Enchant, "regeneration"));
         Enchanter.Deposit(campaign, at, Service.Enchant, "regeneration");
@@ -815,7 +815,7 @@ public sealed class EnchanterTests : IDisposable
         // runs each: the first counted run works the second and third, the first
         // stalls; the next brings those two back, and only then is the first worked.
         var campaign = Opened();
-        var staves = new[] { ("A", 1), ("B", 1), ("C", 1) }.Select(place => campaign.Party.Single(m => m.Id == place.Item1).Inventory[place.Item2]!).ToArray();
+        var staves = new[] { ("A", 1), ("B", 1), ("C", 1) }.Select(place => campaign.Party.Single(m => m.Id == place.Item1).WeaponIn(place.Item2)!).ToArray();
         foreach (var (member, slot) in new[] { ("A", 1), ("B", 1), ("C", 1) })
             Enchanter.Deposit(campaign, new WeaponPlace(member, slot), Service.Refine);
         Assert.Equal([0, 1, 2], campaign.AtTheEnchanter.Select(deposit => deposit.Ordinal));
@@ -851,7 +851,7 @@ public sealed class EnchanterTests : IDisposable
         // that does not count reports every deposit stalled with its runs as they
         // were — a fresh one at 0 — and moves nothing.
         var campaign = Opened();
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         var guard = Worn("tower_guard", wear: 30);
         Enchanter.Deposit(campaign, new WeaponPlace("A", 1), Service.Refine);
         Enchanter.Deposit(campaign, Give(campaign, "B", 2, guard), Service.Enchant, "vampiric");
@@ -904,7 +904,7 @@ public sealed class EnchanterTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, new WeaponPlace("B", 1), Service.Refine));
         Assert.Throws<InvalidOperationException>(() => Enchanter.TakeBack(campaign, shop));
         Assert.Throws<InvalidOperationException>(() => campaign.Move(WeaponPlace.InTheStable(0), new WeaponPlace("A", 1)));
-        var bStaff = campaign.Party[1].Inventory[1]!;   // the hub's door itself, handed a deposit it would take between runs
+        var bStaff = campaign.Party[1].WeaponIn(1)!;   // the hub's door itself, handed a deposit it would take between runs
         Assert.Throws<InvalidOperationException>(() => campaign.Enqueue(new WeaponPlace("B", 1), new Deposit(campaign.DepositsMade, bStaff, Service.Refine, 0, 2)));
         Assert.Same(bStaff, campaign.Party[1].Inventory[1]);
         Assert.Equal((1, 1), (campaign.AtTheEnchanter.Count, campaign.DepositsMade));
@@ -1037,7 +1037,7 @@ public sealed class EnchanterTests : IDisposable
         // no deposit is taken before then — for any service — and the refusal names
         // the tutorial as the hub's gate does.
         var campaign = CampaignState.Start(GameContent.Current);
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         const string closed = "THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN";
         Assert.Equal(closed, Enchanter.Closed(GameContent.Current.Dungeons.Tutorial));
         Assert.Equal(closed, Enchanter.Refusal(campaign, staff, Service.Refine));
@@ -1081,7 +1081,7 @@ public sealed class EnchanterTests : IDisposable
         }
 
         // Mid-run, the shop is shut: nothing is taken back.
-        var aStaff = campaign.Party[0].Inventory[1]!;
+        var aStaff = campaign.Party[0].WeaponIn(1)!;
         var entry = Enchanter.Deposit(campaign, new WeaponPlace("A", 1), Service.Refine).Entry;
         campaign.Enter("long_gallery", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
         Assert.Throws<InvalidOperationException>(() => Enchanter.TakeBack(campaign, entry));
@@ -1105,7 +1105,7 @@ public sealed class EnchanterTests : IDisposable
         Assert.Same(stiletto, campaign.Party[0].EquippedWeapon);
 
         // B carries two: its hand in, and its staff taken up into the hand.
-        var (guard, bStaff) = (campaign.Party[1].Inventory[0]!, campaign.Party[1].Inventory[1]!);
+        var (guard, bStaff) = (campaign.Party[1].WeaponIn(0)!, campaign.Party[1].WeaponIn(1)!);
         var made = Enchanter.Deposit(campaign, new WeaponPlace("B", 0), Service.Refine);
         Assert.Same(bStaff, made.Armed);
         Assert.Same(bStaff, campaign.Party[1].EquippedWeapon);
@@ -1133,14 +1133,14 @@ public sealed class EnchanterTests : IDisposable
         // nothing; handed a deposit whole, it takes it — that deposit, by reference.
         // (Its mid-run gate is AFinishedEnchantAttachesLast_AtTier1_AndReturnsToTheStable's.)
         var campaign = Opened();
-        var (bGuard, bStaff) = (campaign.Party[1].Inventory[0]!, campaign.Party[1].Inventory[1]!);
+        var (bGuard, bStaff) = (campaign.Party[1].WeaponIn(0)!, campaign.Party[1].WeaponIn(1)!);
         var at = new WeaponPlace("B", 1);
         Deposit Of(Weapon weapon, int ordinal) => new(ordinal, weapon, Service.Refine, 0, Wear.ServiceRuns(weapon.Enchantments.Count));
 
         Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, Of(bGuard, 0)));   // the weapon at the place is another
         Assert.Throws<ArgumentException>(() => campaign.Enqueue(at, Of(bStaff, 1)));   // not the next ordinal
         campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
-        var stiletto = campaign.Party[0].Inventory[0]!;
+        var stiletto = campaign.Party[0].WeaponIn(0)!;
         Assert.Throws<InvalidOperationException>(() => campaign.Enqueue(new WeaponPlace("A", 0), Of(stiletto, 0)));   // A's last weapon
         Assert.Empty(campaign.AtTheEnchanter);
         Assert.Equal(0, campaign.DepositsMade);
@@ -1240,12 +1240,8 @@ public sealed class EnchanterTests : IDisposable
         // and the clock is asked by the run's end alone — after the visit is gone.
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
-        string[] CallersOf(Type type, string name) => Calls(typeof(CampaignState).Assembly)
-            .Where(call => Same(call.Target, type.GetMethod(name, Declared)!))
-            .Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}")
-            .Distinct().Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(["Enchanter.Deposit"], CallersOf(typeof(Weapon), "CashWear"));
+        Assert.Equal(["Enchanter.Deposit"], CallersOf(typeof(Weapon), "CashWear"));   // TestIl.CallersOf: the callers, charged to the class that wrote each
         Assert.Equal(["Enchanter.TakeBack"], CallersOf(typeof(Weapon), "RefundWear"));
         Assert.Equal(["Enchanter.Complete"], CallersOf(typeof(Weapon), "Attach"));
         Assert.Equal(["Enchanter.Deposit"], CallersOf(typeof(CampaignState), "Enqueue"));

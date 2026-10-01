@@ -42,11 +42,14 @@ public sealed record SaveMigration(int From, Func<JsonObject, JsonObject> Apply)
 public static class SaveCodec
 {
     /// <summary>
-    /// The version this build writes, and the newest it reads. 2 since Phase 6a
-    /// (a weapon's wear, and the version its tuning hash is of); a version-1
-    /// document is lifted to it (<see cref="LiftToVersion2"/>).
+    /// The version this build writes, and the newest it reads. 3 since Phase 6b
+    /// (a member's potions, appended: <see cref="LiftToVersion3"/> writes nothing,
+    /// and is there so a Phase 6a build refuses a version-3 save rather than drop
+    /// its potions). Version 2 was Phase 6a's: a weapon's wear, and the version its
+    /// tuning hash is of. A version-1 document is lifted through both steps
+    /// (<see cref="LiftToVersion2"/>, then <see cref="LiftToVersion3"/>).
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>The member every version of the document carries its version in.</summary>
     internal const string VersionMember = "version";
@@ -72,6 +75,9 @@ public static class SaveCodec
     /// <summary>A run's end's service reports (<see cref="RunResultDto.Services"/>), in the campaign's last result: version 2's, from Phase 6a.3a.</summary>
     internal const string ServicesMember = "services";
 
+    /// <summary>A member's potions (<see cref="MemberDto.Potions"/>): version 3's, from Phase 6b.1.</summary>
+    internal const string PotionsMember = "potions";
+
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
 
@@ -82,10 +88,12 @@ public static class SaveCodec
     private static readonly Regex TimeLine = new("""\A,\n  "savedAt": (?:null|"(?:[^"\\\r\n]|\\[^\r\n])*")\n}\n?\z""", RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// The migrations this build ships, one per version it can lift: version 1,
-    /// the first, to 2 (<see cref="LiftToVersion2"/>), Phase 6a's.
+    /// The migrations this build ships, one per version it can lift, in order:
+    /// version 1, the first, to 2 (<see cref="LiftToVersion2"/>), Phase 6a's; and
+    /// version 2 to 3 (<see cref="LiftToVersion3"/>), Phase 6b's.
     /// </summary>
-    public static IReadOnlyList<SaveMigration> Migrations { get; } = [new SaveMigration(From: 1, LiftToVersion2)];
+    public static IReadOnlyList<SaveMigration> Migrations { get; } =
+        [new SaveMigration(From: 1, LiftToVersion2), new SaveMigration(From: 2, LiftToVersion3)];
 
     /// <summary>
     /// Version 1 to 2 (Phase 6a.1; the v2 hand-off, settled.md): a weapon wears
@@ -179,6 +187,43 @@ public static class SaveCodec
                         Unworn(loose["weapon"]);
             }
         }
+        return document;
+    }
+
+    /// <summary>
+    /// Version 2 to 3 (Phase 6b.1): a member carries potions from version 3
+    /// (<see cref="MemberDto.Potions"/>), appended with its default, none. So the
+    /// step <strong>writes nothing</strong>: a version-2 document already means
+    /// what version 3 means by every member it holds, and the codec stamps the new
+    /// version on it. It exists because a Phase 6a build reads version 2 and no
+    /// further, so it refuses a version-3 save as a newer build's — kept, never
+    /// deleted — rather than reading it and writing the next save without its
+    /// potions (PHASE 6a DECISION 14, extended in Phase 6b). The root's
+    /// <c>tuningHashVersion</c> is left as written — 1 on a lifted version-1
+    /// document, 2 on a version-2 one — since the hash was taken on that version's
+    /// keys. Pure: it reads no content and no tuning.
+    /// <para>
+    /// <strong>It removes the strays.</strong> A <c>potions</c> a hand gave a
+    /// version-2 member meant nothing to version 2, whose reader ignored it; read at
+    /// version 3 it would be potions the campaign never mixed. So it is removed from
+    /// every party row that is an object, whatever kind of thing it is.
+    /// </para>
+    /// <para>
+    /// <strong>It never throws on a hand-edited document</strong>, as
+    /// <see cref="LiftToVersion2"/> never does: a campaign, a party or a party row
+    /// that is missing or the wrong kind of thing is passed over, and the reader
+    /// then refuses the document where it is wrong, by its path, as it would at
+    /// version 3.
+    /// </para>
+    /// </summary>
+    internal static JsonObject LiftToVersion3(JsonObject document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (document["campaign"] is not JsonObject campaign || campaign["party"] is not JsonArray party)
+            return document;
+        foreach (var member in party)
+            if (member is JsonObject row)
+                row.Remove(PotionsMember);   // version 2 had none: one a hand put there meant nothing to it
         return document;
     }
 

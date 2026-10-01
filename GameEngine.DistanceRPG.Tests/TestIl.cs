@@ -24,6 +24,26 @@ internal static class TestIl
     internal static string Describe((MethodBase From, MethodBase Target, OpCode Op) call)
         => $"{call.From.DeclaringType?.FullName}.{call.From.Name}";
 
+    /// <summary>
+    /// Every method in <paramref name="type"/>'s assembly that calls its method
+    /// <paramref name="name"/> (<see cref="Calls"/>: a call, callvirt or newobj), as
+    /// <c>Class.Method</c> — the class the outermost type, so a lambda's call is
+    /// charged to the class that wrote it (<see cref="Root"/>) — each once, in
+    /// ordinal order: the one door a guard pins a move to. Lifted out of
+    /// <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c> (Phase 6b.1), so the
+    /// potion's one door (<c>PotionSlotTests</c>) reads the same walker.
+    /// </summary>
+    /// <exception cref="System.Reflection.AmbiguousMatchException"><paramref name="name"/> names more than one method of the type.</exception>
+    internal static string[] CallersOf(Type type, string name)
+    {
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        var target = type.GetMethod(name, Declared) ?? throw new ArgumentException($"{type.Name} declares no method {name}.", nameof(name));
+        return Calls(type.Assembly)
+            .Where(call => call.Target.Module == target.Module && call.Target.MetadataToken == target.MetadataToken)
+            .Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}")
+            .Distinct().Order(StringComparer.Ordinal).ToArray();
+    }
+
     /// <summary>Every call, callvirt and newobj in <paramref name="assembly"/>, with the method it sits in.</summary>
     internal static IEnumerable<(MethodBase From, MethodBase Target, OpCode Op)> Calls(Assembly assembly)
     {

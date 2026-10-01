@@ -273,11 +273,19 @@ internal static class SaveMapper
         Table(member.Innate.Entries),
         member.Attunement is { } attunement ? Name(attunement) : null,
         Body(member),
-        member.Inventory.Select(carried => carried is null ? null : Weapon(carried)).ToArray(),
+        member.Inventory.Select(carried => carried is Weapon weapon ? Weapon(weapon) : null).ToArray(),   // a potion's slot null here, the potion below
         member.DistLeft,
         member.EffectiveMax,
         member.SavedMovement,
-        member.BudgetBeforeMire);
+        member.BudgetBeforeMire,
+        Potions(member));
+
+    /// <summary>The potions in a member's bag, each with its slot, in slot order — or null for none, as an empty stable is written.</summary>
+    private static PotionDto[]? Potions(PartyMemberState member)
+    {
+        var potions = member.Potions.Select(carried => new PotionDto(carried.Slot, Name(carried.Potion.Type), carried.Potion.Quality)).ToArray();
+        return potions.Length > 0 ? potions : null;
+    }
 
     internal static ActorDto Body(ActorState actor) => new(
         actor.X,
@@ -581,6 +589,8 @@ internal static class SaveMapper
 
         for (int slot = 0; slot < bag.Count; slot++)
             member.Inventory[slot] = bag[slot] is { } carried ? Weapon(carried, content, $"{at}.inventory[{slot}]") : null;
+        if (row.Potions is { } potions)   // null and [] alike: none
+            Potions(member, potions, $"{at}.potions");
 
         // A turn's start cashes the bank into the whole (the budget plus up to half
         // of it again), Mire cuts the cap from the whole and never adds, and moving
@@ -594,6 +604,44 @@ internal static class SaveMapper
             "movement left is what is left of the cap this turn (effectiveMax)");
         member.SavedMovement = Movement(row.SavedMovement, ContentBounds.Distance / 2f, $"{at}.savedMovement", SavedMovementWhy);
         return member;
+    }
+
+    /// <summary>
+    /// A member's potions laid into its bag (§3.4), each on its own: its slot a bag
+    /// slot, 1 to the bag's last — the hand keeps a weapon — and one the bag's
+    /// weapon rows leave empty, since a slot holds one thing; the rows in strictly
+    /// ascending slot order, so no two share a slot (one potion a slot, no
+    /// stacking) and one campaign is one text; its type a <see cref="PotionType"/>'s
+    /// name; and its quality 1 at least — one unit makes an ordinary potion — and no
+    /// more than <see cref="ContentBounds.MostCount"/>, a count of units. That it was
+    /// mixed at all is asked of the fields together (<see cref="SaveConsistency"/>,
+    /// check 31).
+    /// </summary>
+    private static void Potions(PartyMemberState member, IReadOnlyList<PotionDto> dtos, string at)
+    {
+        var rows = Rows(dtos, at, "potion");
+        int last = member.Inventory.Length - 1;
+        int previous = 0;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var row = rows[i];
+            if (row.Slot < 1 || row.Slot > last)
+                throw new SaveFormatException($"{where}.slot", row.Slot == 0
+                    ? "0 is the hand: the hand keeps a weapon, and a bag runs from slot 1"
+                    : $"{row.Slot} is no bag slot of member {member.Id}: the bag runs 1 to {last}");
+            if (row.Slot <= previous)
+                throw new SaveFormatException($"{where}.slot",
+                    $"{row.Slot} is not after slot {previous}: the potions are listed by slot, one a slot, no stacking");
+            if (member.Inventory[row.Slot] is Weapon weapon)
+                throw new SaveFormatException($"{where}.slot", $"slot {row.Slot} holds a weapon, {weapon.Id}: a slot holds one thing");
+            var type = EnumOf<PotionType>(row.Type, $"{where}.type", "potion type");
+            if (row.Quality < 1)
+                throw new SaveFormatException($"{where}.quality", $"{row.Quality} is below 1: {QualityWhy}");
+            int quality = AtMost(row.Quality, ContentBounds.MostCount, $"{where}.quality", QualityWhy);
+            member.Inventory[row.Slot] = new Potion(type, quality);
+            previous = row.Slot;
+        }
     }
 
     /// <summary>A spread as saved: every stat a divisor the §2.1 table can use, and never re-asked the permutation rule, which is the roster's.</summary>
@@ -1056,8 +1104,12 @@ internal static class SaveMapper
                     ?? throw new SaveFormatException($"{where}.member", $"'{id}' is no member of the party");
                 if (slot < 0 || slot >= member.Inventory.Length)
                     throw new SaveFormatException($"{where}.slot", $"{slot} is no slot of member '{id}', who carries 0 to {member.Inventory.Length - 1}");
-                found = member.Inventory[slot]
-                    ?? throw new SaveFormatException($"{where}.slot", $"slot {slot} of member '{id}' is empty: a spoil is a weapon, carried or lying somewhere");
+                found = member.Inventory[slot] switch
+                {
+                    Weapon weapon => weapon,
+                    Potion => throw new SaveFormatException($"{where}.slot", $"slot {slot} of member {id} holds a potion: a spoil is a weapon"),
+                    _ => throw new SaveFormatException($"{where}.slot", $"slot {slot} of member '{id}' is empty: a spoil is a weapon, carried or lying somewhere"),
+                };
             }
             else
             {
@@ -1250,6 +1302,8 @@ internal static class SaveMapper
     private const string DeepestStackWhy = "no stack grows deeper than the deepest forge plus the most headroom (MaxForged and AcquiredHeadroom at their most)";
 
     private const string CountWhy = "a count play grows a turn or a gain at a time never nears it, and past it the next step would pass the largest whole number";
+
+    private const string QualityWhy = "one unit makes an ordinary potion, and a quality is a count of units";
 
     private const string LevelsWhy = "levels are uncapped and land a hit at a time, but past it the levels times their largest effect (EffectPerLevel at its most) would pass the largest whole number";
 

@@ -586,8 +586,8 @@ public static class Enchanter
 
         if (InShop(campaign, weapon))
             return InTheShop(weapon);
-        if (Carrier(campaign, weapon) is { } carrier && carrier.Inventory.Count(carried => carried is not null) == 1)
-            return WouldCarryNone(carrier.Id);
+        if (Carrier(campaign, weapon) is { } carrier && carrier.WeaponsCarried == 1)
+            return WouldCarryNone(carrier.Id);   // the weapons counted, never the slots: a potion is no weapon to carry
 
         return service == Service.Enchant ? Attaching(weapon, weapon.Enchantments.Count + 1) : null;
     }
@@ -679,8 +679,8 @@ public static class Enchanter
 
         foreach (var member in campaign.Party)
             for (int slot = 0; slot < member.Inventory.Length; slot++)
-                if (member.Inventory[slot] is { } carried && !ReferenceEquals(carried, weapon))
-                    Each(new WeaponPlace(member.Id, slot), carried);
+                if (member.Inventory[slot] is Weapon carried && !ReferenceEquals(carried, weapon))
+                    Each(new WeaponPlace(member.Id, slot), carried);   // a potion carries no soul to move
         for (int i = 0; i < campaign.Stable.Count; i++)
             if (!ReferenceEquals(campaign.Stable[i], weapon))
                 Each(WeaponPlace.InTheStable(i), campaign.Stable[i]);
@@ -772,8 +772,8 @@ public static class Enchanter
             return InTheShop(source);
         PartyMemberState?[] carriers = [Carrier(campaign, weapon), source is null ? null : Carrier(campaign, source)];
         foreach (var member in carriers.OfType<PartyMemberState>().Distinct())
-            if (member.Inventory.All(carried => carried is null || ReferenceEquals(carried, weapon) || ReferenceEquals(carried, source)))
-                return WouldCarryNone(member.Id);
+            if (member.Inventory.All(carried => carried is not Weapon || ReferenceEquals(carried, weapon) || ReferenceEquals(carried, source)))
+                return WouldCarryNone(member.Id);   // a potion left behind is no weapon carried
 
         bool reorder = source is null;
         int count = weapon.Enchantments.Count;

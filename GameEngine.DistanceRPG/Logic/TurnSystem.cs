@@ -597,13 +597,14 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Can the member swap the weapon in <paramref name="slot"/> for the
-    /// equipped one? The slot must hold a weapon — a swap equips something —
-    /// and the member must have the swap's movement to spare.
+    /// equipped one? The slot must hold a weapon — a swap equips something, and a
+    /// potion is never held: the hand keeps a weapon (PHASE 6b DECISION 1) — and
+    /// the member must have the swap's movement to spare.
     /// </summary>
     public bool CanSwap(PartyMemberState c, int slot)
     {
         if (Phase != TurnPhase.Player || !c.Alive) return false;
-        if (slot <= 0 || slot >= c.Inventory.Length || c.Inventory[slot] == null) return false;
+        if (slot <= 0 || slot >= c.Inventory.Length || c.Inventory[slot] is not Weapon) return false;
         return c.DistLeft >= SwapCost;
     }
 

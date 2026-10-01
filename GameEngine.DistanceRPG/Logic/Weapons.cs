@@ -23,8 +23,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// arrive at 0 of <see cref="Tuning.StartingPool"/>. Nothing in combat reads
 /// either, so a full weapon plays as a fresh one does.
 /// </para>
+/// <para>
+/// It is one of the two things a slot holds (<see cref="IItem"/>, Phase 6b), and
+/// the only one a hand does.
+/// </para>
 /// </summary>
-public sealed class Weapon
+public sealed class Weapon : IItem
 {
     /// <summary>Percentages are integers out of this.</summary>
     private const int Percent = 100;

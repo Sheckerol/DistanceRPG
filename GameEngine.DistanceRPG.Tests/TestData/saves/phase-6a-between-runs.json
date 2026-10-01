@@ -1,0 +1,455 @@
+{
+  "version": 2,
+  "tuningHash": "3195baae2f2f1ba6",
+  "tuningHashVersion": 2,
+  "campaign": {
+    "party": [
+      {
+        "id": "A",
+        "colorIndex": 0,
+        "stats": {
+          "str": 1,
+          "dex": 4,
+          "con": 2,
+          "int": 3
+        },
+        "weaponXp": {
+          "Dagger": 140,
+          "Staff": 3
+        },
+        "hpXp": 0,
+        "manaXp": 0,
+        "innate": {},
+        "attunement": null,
+        "body": {
+          "x": 464,
+          "y": 272,
+          "hp": 30,
+          "mana": 30,
+          "alive": true,
+          "heldShots": 0,
+          "statuses": []
+        },
+        "inventory": [
+          {
+            "id": "weakspot_stiletto",
+            "forged": {
+              "CritWindow": 1,
+              "CritMultiplier": 1,
+              "CritSunder": 1
+            },
+            "modifiers": {
+              "CritWindow": 1,
+              "CritMultiplier": 1,
+              "CritSunder": 1
+            },
+            "enchantments": [],
+            "forgedEnchantments": 0,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          {
+            "id": "staff_of_renewal",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "regeneration",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          null,
+          null,
+          null,
+          null
+        ],
+        "distLeft": 160,
+        "effectiveMax": 160,
+        "savedMovement": 0,
+        "budgetBeforeMire": 160
+      },
+      {
+        "id": "B",
+        "colorIndex": 1,
+        "stats": {
+          "str": 3,
+          "dex": 1,
+          "con": 4,
+          "int": 2
+        },
+        "weaponXp": {},
+        "hpXp": 0,
+        "manaXp": 0,
+        "innate": {},
+        "attunement": null,
+        "body": {
+          "x": 432,
+          "y": 240,
+          "hp": 30,
+          "mana": 30,
+          "alive": true,
+          "heldShots": 0,
+          "statuses": []
+        },
+        "inventory": [
+          {
+            "id": "tower_guard",
+            "forged": {
+              "Block": 2,
+              "Push": 1
+            },
+            "modifiers": {
+              "Block": 2,
+              "Push": 1
+            },
+            "enchantments": [],
+            "forgedEnchantments": 0,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          {
+            "id": "staff_of_renewal",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "regeneration",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          null,
+          {
+            "id": "flensing_knife_unique",
+            "forged": {
+              "CritWindow": 2,
+              "CritMultiplier": 1,
+              "Light": 1
+            },
+            "modifiers": {
+              "CritWindow": 2,
+              "CritMultiplier": 1,
+              "Light": 1
+            },
+            "enchantments": [
+              {
+                "id": "serrated",
+                "tier": 1,
+                "xp": 0
+              },
+              {
+                "id": "vampiric",
+                "tier": 3,
+                "xp": 0
+              },
+              {
+                "id": "overheal",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 3,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          null,
+          {
+            "id": "rotwood",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "poison",
+                "tier": 3,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          }
+        ],
+        "distLeft": 160,
+        "effectiveMax": 160,
+        "savedMovement": 0,
+        "budgetBeforeMire": 160
+      },
+      {
+        "id": "C",
+        "colorIndex": 2,
+        "stats": {
+          "str": 4,
+          "dex": 2,
+          "con": 3,
+          "int": 1
+        },
+        "weaponXp": {},
+        "hpXp": 0,
+        "manaXp": 0,
+        "innate": {},
+        "attunement": null,
+        "body": {
+          "x": 464,
+          "y": 240,
+          "hp": 30,
+          "mana": 30,
+          "alive": true,
+          "heldShots": 0,
+          "statuses": []
+        },
+        "inventory": [
+          {
+            "id": "great_axe",
+            "forged": {
+              "Cleave": 2,
+              "Opportunist": 1
+            },
+            "modifiers": {
+              "Cleave": 2,
+              "Opportunist": 1
+            },
+            "enchantments": [],
+            "forgedEnchantments": 0,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          {
+            "id": "staff_of_renewal",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "regeneration",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          null,
+          null,
+          null,
+          null
+        ],
+        "distLeft": 160,
+        "effectiveMax": 160,
+        "savedMovement": 0,
+        "budgetBeforeMire": 160
+      },
+      {
+        "id": "D",
+        "colorIndex": 3,
+        "stats": {
+          "str": 2,
+          "dex": 3,
+          "con": 1,
+          "int": 4
+        },
+        "weaponXp": {},
+        "hpXp": 0,
+        "manaXp": 0,
+        "innate": {},
+        "attunement": null,
+        "body": {
+          "x": 496,
+          "y": 240,
+          "hp": 30,
+          "mana": 15,
+          "alive": true,
+          "heldShots": 0,
+          "statuses": []
+        },
+        "inventory": [
+          {
+            "id": "staff_of_renewal",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "regeneration",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          {
+            "id": "staff_of_mire",
+            "forged": {
+              "Resonant": 1
+            },
+            "modifiers": {
+              "Resonant": 1
+            },
+            "enchantments": [
+              {
+                "id": "mire",
+                "tier": 1,
+                "xp": 0
+              }
+            ],
+            "forgedEnchantments": 1,
+            "wear": 0,
+            "wearCashed": 0
+          },
+          null,
+          null,
+          null,
+          null
+        ],
+        "distLeft": 160,
+        "effectiveMax": 160,
+        "savedMovement": 0,
+        "budgetBeforeMire": 160
+      }
+    ],
+    "seen": [
+      "cold",
+      "mire",
+      "overheal",
+      "poison",
+      "regeneration",
+      "serrated",
+      "vampiric"
+    ],
+    "runCounter": 2,
+    "locks": [
+      {
+        "dungeonId": "spear_hall",
+        "lockedUntilRun": 7
+      }
+    ],
+    "cleared": [
+      "spear_hall",
+      "tutorial"
+    ],
+    "retired": [
+      "tutorial"
+    ],
+    "lastResult": {
+      "dungeonId": "spear_hall",
+      "outcome": "BossKill",
+      "bossDefeated": true,
+      "deepestFloor": 5,
+      "bossFloorRevealed": 5,
+      "serviceTick": true,
+      "mercyTick": false,
+      "runCounter": 2,
+      "lockedUntilRun": 7,
+      "retired": false,
+      "spoilsKept": [
+        {
+          "id": "riposte_blade",
+          "forged": {
+            "Brace": 1,
+            "Block": 1,
+            "Riposte": 1,
+            "Push": 1
+          },
+          "modifiers": {
+            "Brace": 1,
+            "Block": 1,
+            "Riposte": 1,
+            "Push": 2
+          },
+          "enchantments": [],
+          "forgedEnchantments": 0,
+          "wear": 0,
+          "wearCashed": 0
+        }
+      ],
+      "spoilsLost": [],
+      "clawbacks": [],
+      "services": null
+    },
+    "visit": null,
+    "stable": [
+      {
+        "id": "riposte_blade",
+        "forged": {
+          "Brace": 1,
+          "Block": 1,
+          "Riposte": 1,
+          "Push": 1
+        },
+        "modifiers": {
+          "Brace": 1,
+          "Block": 1,
+          "Riposte": 1,
+          "Push": 2
+        },
+        "enchantments": [],
+        "forgedEnchantments": 0,
+        "wear": 0,
+        "wearCashed": 0
+      }
+    ],
+    "enchanter": [
+      {
+        "ordinal": 0,
+        "service": "Refine",
+        "weapon": {
+          "id": "wand_of_the_cone",
+          "forged": {
+            "Resonant": 1
+          },
+          "modifiers": {
+            "Resonant": 1
+          },
+          "enchantments": [
+            {
+              "id": "cold",
+              "tier": 1,
+              "xp": 0
+            }
+          ],
+          "forgedEnchantments": 1,
+          "wear": 0,
+          "wearCashed": 0
+        },
+        "wearAtDeposit": 0,
+        "runs": 2,
+        "runsWorked": 0,
+        "enchantment": null,
+        "source": null,
+        "sourceIndex": null
+      }
+    ],
+    "depositsMade": 1
+  },
+  "view": null,
+  "savedAt": "2026-10-01T02:28:38.0958849Z"
+}
