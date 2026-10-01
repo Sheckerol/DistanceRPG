@@ -4,8 +4,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The groups <c>tuning.json</c> is laid out under: §5.3's ten, in §5.3's order
 /// (S:80-91), then the four groups of keys its starting set does not list, which
 /// sit beside it. <see cref="Consumables"/> holds what a drink costs and what a
-/// potion restores, each arrived with the drink that reads it (Phase 6b.2); the
-/// farm's yield arrives with the farm (<see cref="TuningSchema.Deferred"/>).
+/// potion restores, each arrived with the drink that reads it (Phase 6b.2), and
+/// the farm's yield, arrived with the farm (Phase 6b.3).
 /// <see cref="Enchanter"/> holds what a hit wears and what a deposit costs, the
 /// user's ruling of 2026-09-25, whose keys were declared ahead of Phase 6a's
 /// enchanter and are played since its rules read them
@@ -135,13 +135,12 @@ public static class TuningSchema
     /// <c>WearPerHit</c>, <c>EnchanterWorksOn</c> and the improvement roll's
     /// <c>GraftBaseChance</c> — which waited here until Phase 6a.4 — arrived with
     /// their readers, and so did the Consumables' first three with the drink
-    /// (Phase 6b.2), so only the farm's yield waits now.
+    /// (Phase 6b.2) and the farm's yield with the farm (Phase 6b.3), so no key
+    /// waits now: every key has its reader. The dictionary is kept, empty, with the
+    /// headings it names, for the next key that is promised before its reader.
     /// </summary>
     public static IReadOnlyDictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)> Deferred { get; } =
-        new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>
-        {
-            [TuningGroup.Consumables] = ("Phase 6b", ["FarmYieldPerClear"]),
-        };
+        new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>();
 
     private static readonly IReadOnlyDictionary<string, TuningKey> ByName =
         Keys.ToDictionary(k => k.Name, StringComparer.Ordinal);
@@ -341,15 +340,19 @@ public static class TuningSchema
 
         // Consumables (§3.4, §6.6) — what a drink costs and what a potion restores,
         // each played, hashed from the save's version 3, since Phase 6b.2's drink
-        // reads it; the farm's yield waits for the farm (Deferred). A drink's cost
-        // clamps as a swap's does, whose principle it shares (§3.4): 0 makes it
-        // free, and 10000 is MovementBudget's ceiling — no rule ties it to the
-        // budget, as none ties the swap's. A share is a percentage a unit of
+        // reads it, and what the farm yields, since Phase 6b.3's farm reads it. A
+        // drink's cost clamps as a swap's does, whose principle it shares (§3.4): 0
+        // makes it free, and 10000 is MovementBudget's ceiling — no rule ties it to
+        // the budget, as none ties the swap's. A share is a percentage a unit of
         // quality: 1 at least, since it divides the quality that restores a whole
-        // pool (Alchemist.QualityForAll), and 100 makes one unit a whole pool.
+        // pool (Alchemist.QualityForAll), and 100 makes one unit a whole pool. The
+        // farm's yield a clear is a count of units: 0 is a dial (the farm yields
+        // nothing), and 1000 is where the file's magnitudes clamp — the ceiling a
+        // saved yield is held to, a clear at a time (ContentBounds.MostYieldPerClear).
         PlayedFrom3(Int(nameof(Tuning.PotionUseCost), TuningGroup.Consumables, 0, 10000, t => t.PotionUseCost, (t, v) => t with { PotionUseCost = v })),
         PlayedFrom3(Int(nameof(Tuning.HealthPotionPercent), TuningGroup.Consumables, 1, 100, t => t.HealthPotionPercent, (t, v) => t with { HealthPotionPercent = v })),
         PlayedFrom3(Int(nameof(Tuning.ManaPotionPercent), TuningGroup.Consumables, 1, 100, t => t.ManaPotionPercent, (t, v) => t with { ManaPotionPercent = v })),
+        PlayedFrom3(Int(nameof(Tuning.FarmYieldPerClear), TuningGroup.Consumables, 0, 1000, t => t.FarmYieldPerClear, (t, v) => t with { FarmYieldPerClear = v })),
 
         // Progression (§2.2) — not in §5.3's list
         Int(nameof(Tuning.WeaponXpPerLevel), TuningGroup.Progression, 1, 100000, t => t.WeaponXpPerLevel, (t, v) => t with { WeaponXpPerLevel = v }),

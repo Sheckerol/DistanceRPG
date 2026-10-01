@@ -59,6 +59,14 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>StartingPool</c> when it refines: 6 in 100 on a fresh full bar, 7 at capacity 40 and
 /// 9 at capacity 60 — phase-6-between-runs.md §6.4 and settled.md L1149-1154 and R4's
 /// consequence 2, L1699-1703: <see cref="ImprovementRollTests.TheOddsAreTheRulings"/>.</item>
+/// <item>The farm's yield a clear, as the rule §6.6 states it rather than a number:
+/// "about one full loadout of maximum-quality potions per run" — six potions at the
+/// quality that restores a whole pool from 1 HP, off the master's own
+/// <c>HealthPotionPercent</c> — over the dungeons that do not retire on their clear,
+/// rounded down (phase-6-between-runs.md §6.6, settled.md L1048-1054; PHASE 6b
+/// DECISION 7). No literal: the master's rate, percent and roster are read together,
+/// so moving one without re-deriving the rate fails, by name, and only when the suite
+/// runs: <see cref="FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

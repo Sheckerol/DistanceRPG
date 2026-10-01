@@ -16,7 +16,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// cleared, the tutorial retired. It reads at version 3 through a step that writes
 /// nothing, restores whole under the tuning it was played under — frozen beside it,
 /// <c>phase-6a-tuning.json</c>, as <c>pre-rework-tuning.json</c> is the earlier
-/// saves' — and captured again is the document it was, a member's potions aside.
+/// saves' — and captured again is the document it was, a member's potions and what
+/// the farm did at the last run's end aside.
 /// Its hash is that tuning's on version 2's keys, and the game says the numbers have
 /// changed exactly when a number version 2 hashes differs from that file's: so a
 /// later retune of <c>tuning.json</c>, a data edit, fails nothing here. In the
@@ -140,15 +141,18 @@ public class Phase6aSaveTests
             // version the reader stamped, and every member at its value and in its
             // order — but for the tuning hash and its version, the current version's
             // keys where the save's are version 2's, the time, which a capture handed
-            // none writes null, and each member's potions, appended by Phase 6b.1 and
-            // written null for none.
+            // none writes null, each member's potions, appended by Phase 6b.1 and
+            // written null for none, and what the farm did at the last run's end,
+            // appended by Phase 6b.3 and written at its defaults: nothing yielded at no
+            // clears, no first clear, nothing spoiled — a run of version 2 made no batch.
             var again = SaveGame.Capture(campaign, loaded.View);
             Assert.Equal((TuningJson.Hash(played), SaveCodec.CurrentVersion), (again.TuningHash, again.TuningHashVersion));
             var captured = JsonNode.Parse(SaveCodec.Write(again))!.AsObject();
             var migrated = lifted.DeepClone().AsObject();
             migrated["version"] = SaveCodec.CurrentVersion;
             static bool SetAside(string path, string name) => (path == "$" && name is "tuningHash" or "tuningHashVersion" or "savedAt")
-                || (Regex.IsMatch(path, @"^\$\.campaign\.party\[[0-9]+\]$") && name == "potions");
+                || (Regex.IsMatch(path, @"^\$\.campaign\.party\[[0-9]+\]$") && name == "potions")
+                || (path == "$.campaign.lastResult" && SaveCodec.FarmMembers.Contains(name));
             if (FirstDifference(migrated, captured, "$", SetAside) is { } difference)
                 Assert.Fail($"captured again, the document is not the migrated save: {difference}");
             var rows = captured["campaign"]!["party"]!.AsArray();
@@ -159,6 +163,10 @@ public class Phase6aSaveTests
                 Assert.Null(row["potions"]);
             });
             Assert.All(migrated["campaign"]!["party"]!.AsArray(), row => Assert.False(row!.AsObject().ContainsKey("potions")));
+            var last = captured["campaign"]!["lastResult"]!.AsObject();
+            Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{ "farmYield": 0, "farmClears": 0, "firstClear": false, "spoiled": null }"""),
+                new JsonObject(SaveCodec.FarmMembers.Select(name => KeyValuePair.Create(name, last[name]?.DeepClone())))));
+            Assert.All(SaveCodec.FarmMembers, name => Assert.False(migrated["campaign"]!["lastResult"]!.AsObject().ContainsKey(name)));
         }
     }
 

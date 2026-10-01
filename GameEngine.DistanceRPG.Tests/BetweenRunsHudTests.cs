@@ -1,4 +1,5 @@
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using static GameEngine.DistanceRPG.Tests.TestSlots;
 
@@ -197,6 +198,23 @@ public sealed class BetweenRunsHudTests : IDisposable
             "XP KEPT",
             "RUN COUNTED - 1 RUN SO FAR",
             "THE TUTORIAL IS CLOSED FOR GOOD",
+        }, Texts(BetweenRunsHud.SummaryLines(campaign.LastResult!)));
+
+        // The first real clear brings the alchemist, and its summary says so after
+        // whether the run counted and before the lock (Phase 6b.3), at the farm's rate
+        // stated here.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        Assert.Equal(new[]
+        {
+            "CLEARED",
+            "THE SPEAR HALL - DEEPEST FLOOR 5",
+            "THE SPEAR WARDEN FELL ON FLOOR 5",
+            "NO SPOILS CARRIED",
+            "XP KEPT",
+            "RUN COUNTED - 2 RUNS SO FAR",
+            "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS",
+            "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
         }, Texts(BetweenRunsHud.SummaryLines(campaign.LastResult!)));
     }
 
@@ -1416,6 +1434,94 @@ public sealed class BetweenRunsHudTests : IDisposable
         // named by its id, never a throw while the screen draws.
         var gone = back with { Services = [new ServiceReport("gone_weapon", Service.Enchant, 1, 1, EnchantmentId: "gone_soul")] };
         Assert.Contains("GONE_WEAPON IS BACK FROM THE ENCHANTER - ATTACHED GONE_SOUL - NO CHANGE", Texts(BetweenRunsHud.SummaryLines(gone)));
+    }
+
+    [Fact]
+    public void TheSummarySaysWhatTheFarmYielded()
+    {
+        // §6.6, Phase 6b.3: once the farm has a worker, the run's summary says what it
+        // yielded, a line of its own right after whether the run counted — before the
+        // enchanter's lines, so the hub's cut of a long summary takes theirs first.
+        // The first real clear brings the alchemist; a later first clear grows the
+        // farm; any other run that counted says what it yielded and at how many
+        // dungeons; one that did not count yields nothing and says why — and each has
+        // its zero form, a rate of 0 yielding nothing. Before the alchemist, no line.
+        // At the farm's rate stated here.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = CampaignRuns.Campaign();
+        Assert.Null(BetweenRunsHud.FarmLine(CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed)));
+        Assert.Null(BetweenRunsHud.FarmLine(CampaignRuns.DeepRetreat(campaign, "spear_hall")));
+
+        var arrival = CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        var grows = CampaignRuns.Clear(campaign, "long_gallery", CampaignRuns.FiveDeep);
+        var mercy = CampaignRuns.DeepRetreat(campaign, "knife_warrens");
+        var idle = CampaignRuns.ShallowRetreat(campaign, "knife_warrens");
+        (RunResult Result, string Text, Vector4 Color)[] forms =
+        [
+            (arrival, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS", DungeonHud.Green),
+            (arrival with { FarmYield = 0 }, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED NOTHING", DungeonHud.Green),
+            (grows, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS", DungeonHud.Green),
+            (grows with { FarmYield = 0 }, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS - IT YIELDED NOTHING", DungeonHud.Green),
+            (mercy, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS BEATEN", DungeonHud.Cyan),
+            (mercy with { FarmYield = 1, FarmClears = 1 }, "THE FARM YIELDED 1 UNIT - 1 DUNGEON BEATEN", DungeonHud.Cyan),
+            (mercy with { FarmYield = 0 }, "THE FARM YIELDED NOTHING", DungeonHud.Grey),
+            (idle, "THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey),
+        ];
+        foreach (var (result, text, color) in forms)
+        {
+            Assert.Equal(new DungeonHud.Run(text, color), BetweenRunsHud.FarmLine(result));
+            var lines = BetweenRunsHud.SummaryLines(result);
+            int counted = Array.FindIndex(Texts(lines), line => line.StartsWith("RUN COUNTED", StringComparison.Ordinal) || line.StartsWith("RUN NOT COUNTED", StringComparison.Ordinal));
+            Assert.Equal(text, lines[counted + 1].Text);
+            Assert.Equal(lines, BetweenRunsHud.HubSummaryLines(result));
+        }
+
+        // The tutorial's own first clear retires it, and is no worker: on a farm that
+        // has one, its run says what the farm yielded as any counted run does.
+        Assert.Equal(new DungeonHud.Run("THE FARM YIELDED 7 UNITS - 1 DUNGEON BEATEN", DungeonHud.Cyan),
+            BetweenRunsHud.FarmLine(arrival with { DungeonId = "tutorial", Retired = true, LockedUntilRun = null }));
+
+        // Before the enchanter's lines: a run that worked a deposit says the farm first.
+        var worked = mercy with { Services = [new ServiceReport("tower_guard", Service.Refine, 1, 2)] };
+        var told = Texts(BetweenRunsHud.SummaryLines(worked));
+        Assert.Equal(Array.IndexOf(told, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS BEATEN") + 1,
+            Array.FindIndex(told, line => line.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+
+        // Each in the font, and a summary line at its widest numbers.
+        foreach (var result in new[] { arrival, grows, mercy, idle }.Select(r => r with { FarmYield = ContentBounds.MostCount, FarmClears = r.FarmClears == 1 ? 1 : 99 }))
+        {
+            string widest = BetweenRunsHud.FarmLine(result)!.Value.Text;
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+            Assert.True(widest.Length * 6f * 2f <= 1240f, $"'{widest}' runs off the window");
+        }
+    }
+
+    [Fact]
+    public void TheSummarySaysWhatSpoiled()
+    {
+        // §6.6, Phase 6b.3: "a mixed potion keeps exactly as long as the trip it was
+        // mixed for", so a run's summary says how many spoiled, in yellow, right after
+        // the spoils — on the way out and on a wipe alike — and nothing when none was
+        // carried.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = CampaignRuns.Campaign();
+        CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+        CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        var walked = BetweenRunsHud.SummaryLines(CampaignRuns.ShallowRetreat(campaign, "long_gallery"));
+        Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP", "XP KEPT" },
+            Texts(walked).Skip(3).Take(3));
+        Assert.Equal(DungeonHud.Yellow, walked[4].Color);
+
+        CampaignRuns.DeepRetreat(campaign, "long_gallery");
+        TestPotions.Carrying(campaign, "C", (4, TestPotions.Health(1)));
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var wiped = BetweenRunsHud.SummaryLines(CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)));
+        Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "1 POTION SPOILED - A POTION KEEPS FOR ONE TRIP" }, Texts(wiped).Skip(3).Take(2));
+        Assert.Equal(DungeonHud.Yellow, wiped[4].Color);
+
+        Assert.DoesNotContain(Texts(BetweenRunsHud.SummaryLines(CampaignRuns.ShallowRetreat(campaign, "long_gallery"))), line => line.Contains("SPOILED", StringComparison.Ordinal));
+        Assert.Equal("24 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP", BetweenRunsHud.SpoiledLine(24));
     }
 
     [Fact]

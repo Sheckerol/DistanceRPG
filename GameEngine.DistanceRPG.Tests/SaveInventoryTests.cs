@@ -45,6 +45,10 @@ public class SaveInventoryTests
             new("_stable", Kept.Saved, "campaign.stable[], each weapon whole, in the order they were put there — null for an empty stable (Phase 6a.2)"),
             new("_enchanter", Kept.Saved, "campaign.enchanter[], each deposit whole, in deposit order — null for an empty shop (Phase 6a.3a)"),
             new("DepositsMade", Kept.Saved, "campaign.depositsMade: the next deposit's ordinal (Phase 6a.3a)"),
+            // No farm and no batch (Phase 6b.3): what the farm yielded is a fact of the
+            // run, saved with it (lastResult.farmYield), and the batch is that less the
+            // potions the bags hold, worked out (Farm.Batch) — never a field here
+            // (PHASE 6b DECISION 6; §6.7: "the batch must never reach CampaignState").
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],

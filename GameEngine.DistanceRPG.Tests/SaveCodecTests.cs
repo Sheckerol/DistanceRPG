@@ -424,6 +424,86 @@ public class SaveCodecTests
         Assert.Equal(new PotionDto(1, "Health", 2), carried);
     }
 
+    /// <summary><see cref="Sample"/>, its last run the Spear Hall's first clear: the farm's members a capture writes, and a version-2 document lacks.</summary>
+    private static SaveFile Ended() => Sample() with
+    {
+        Campaign = Sample().Campaign with
+        {
+            LastResult = new RunResultDto("spear_hall", "BossKill", true, 5, 5, true, false, 2, 8, false, [], [], [],
+                FarmYield: 7, FarmClears: 1, FirstClear: true, Spoiled: [new SpoiledPotionDto("Health", 2)]),
+        },
+    };
+
+    /// <summary>What the farm did, as a hand might give a version-2 last result: each member, as anything.</summary>
+    private static readonly (string Member, string Stray)[] StrayFarm =
+    [
+        ("farmYield", "7"), ("farmYield", "\"x\""), ("farmClears", "1"), ("farmClears", "{}"),
+        ("firstClear", "true"), ("firstClear", "4"), ("spoiled", """[{ "type": "Health", "quality": 2 }]"""), ("spoiled", "{}"), ("spoiled", "null"),
+    ];
+
+    [Fact]
+    public void TheVersion2StepRemovesAStrayFarm()
+    {
+        // What the farm did at a run's end (Phase 6b.3) is appended to version 3's
+        // last result with its defaults — nothing yielded at no clears, no first clear
+        // and nothing spoiled — so a version-2 document's result reads as one that made
+        // no batch, and the step writes nothing for it. A farm member a hand gave a
+        // version-2 last result meant nothing to the version-2 reader, which ignored
+        // it: so the step removes it, whatever kind of thing it is — never read as a
+        // batch no run made, or potions spoiled that none carried.
+        string text = SaveCodec.Write(Ended());
+        var v2 = Tree(text);
+        v2["version"] = 2;
+        Assert.True(FirstMember(v2).Remove("potions"));   // a version-2 member has none either
+        var last = Campaign(v2)["lastResult"]!.AsObject();
+        Assert.Equal(SaveCodec.FarmMembers, last.Select(member => member.Key).Where(SaveCodec.FarmMembers.Contains));
+        foreach (string member in SaveCodec.FarmMembers)
+            last.Remove(member);
+        var stepped = SaveCodec.LiftToVersion3(v2.DeepClone().AsObject());
+        Assert.True(JsonNode.DeepEquals(v2, stepped), "the step writes nothing: the codec stamps the version");
+        var read = SaveCodec.Read(v2.ToJsonString());
+        Assert.Equal((0, 0, false), (read.Campaign.LastResult!.FarmYield, read.Campaign.LastResult.FarmClears, read.Campaign.LastResult.FirstClear));
+        Assert.Null(read.Campaign.LastResult.Spoiled);
+        string unfarmed = SaveCodec.Write(read);
+
+        foreach (var (member, stray) in StrayFarm)
+        {
+            var hand = v2.DeepClone().AsObject();
+            Campaign(hand)["lastResult"]![member] = JsonNode.Parse(stray);
+            Assert.False(Campaign(SaveCodec.LiftToVersion3(hand.DeepClone().AsObject()))["lastResult"]!.AsObject().ContainsKey(member), $"{member}: {stray}");
+            Assert.Equal(unfarmed, SaveCodec.Write(SaveCodec.Read(hand.ToJsonString())));
+        }
+
+        // Every one at once, and on a document whose party the step cannot read: the
+        // result is walked on its own, and the reader then refuses the party by its path.
+        var all = v2.DeepClone().AsObject();
+        foreach (var (member, stray) in StrayFarm.DistinctBy(entry => entry.Member))
+            Campaign(all)["lastResult"]![member] = JsonNode.Parse(stray);
+        Campaign(all)["party"] = 4;
+        var walked = Campaign(SaveCodec.LiftToVersion3(all.DeepClone().AsObject()))["lastResult"]!.AsObject();
+        Assert.All(SaveCodec.FarmMembers, member => Assert.False(walked.ContainsKey(member)));
+        Assert.Equal("campaign.party", Refused(all.ToJsonString()).Where);
+
+        // A last result that is no object is passed over by the step and refused where
+        // it is, at either version.
+        var notAResult = v2.DeepClone().AsObject();
+        Campaign(notAResult)["lastResult"] = 4;
+        SaveCodec.LiftToVersion3(notAResult.DeepClone().AsObject());
+        Assert.Equal("campaign.lastResult", Refused(notAResult.ToJsonString()).Where);
+
+        // At version 3 they are the document's own, read as written; and one of the
+        // wrong kind is refused where it is, as any member of the wrong kind is.
+        var own = SaveCodec.Read(text).Campaign.LastResult!;
+        Assert.Equal((7, 1, true), (own.FarmYield, own.FarmClears, own.FirstClear));
+        Assert.Equal(new SpoiledPotionDto("Health", 2), Assert.Single(own.Spoiled!));
+        foreach (var (member, wrong) in new[] { ("farmYield", "\"x\""), ("farmClears", "{}"), ("firstClear", "4"), ("spoiled", "{}") })
+        {
+            var three = Tree(text);
+            Campaign(three)["lastResult"]![member] = JsonNode.Parse(wrong);
+            Assert.Equal($"campaign.lastResult.{member}", Refused(three.ToJsonString()).Where);
+        }
+    }
+
     [Fact]
     public void TheVersion2StepPassesOverWhatItCannotRead()
     {
@@ -662,8 +742,8 @@ public class SaveCodecTests
             typeof(ReactionUseDto), typeof(ActorRefDto), typeof(FloorDto), typeof(EnemyDto), typeof(DropDto), typeof(LooseItemDto),
             // Phase 6a: the enchanter.
             typeof(DepositDto), typeof(ServiceDto),
-            // Phase 6b: the potions.
-            typeof(PotionDto),
+            // Phase 6b: the potions, and those that spoiled at a run's end.
+            typeof(PotionDto), typeof(SpoiledPotionDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

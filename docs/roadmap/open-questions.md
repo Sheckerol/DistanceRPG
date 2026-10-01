@@ -680,7 +680,12 @@ open a Phase 6b slot with a Phase 6a checkout. Within Phase 6b the version stays
 3 at every step, as it stayed 2 within Phase 6a, so this entry's question asks
 itself again there: a later 6b step that appends members (the farm's, at 6b.3) is
 read by an earlier 6b build that passes over them, and that build's next save
-drops them.
+drops them. Phase 6b.3 appends the farm's four to the last run's record
+(`farmYield`, `farmClears`, `firstClear` and `spoiled`), so a 6b.1 or 6b.2 build
+passes over them and its next save drops them; if that save holds potions, a
+6b.3-or-later build then refuses it — the potions carried are more than the yield
+the dropped record says the last run made (check 32) — and sets it aside, kept and
+never deleted.
 
 ## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
 
@@ -1071,3 +1076,143 @@ decide.** The alternatives: (a) round to the nearest, or up, or restore at least
 potion is a share of `UsableMaxMana`, so a heavily locked caster's potion restores
 less, and quality 5 still refills exactly what is spendable. settled.md's Phase 6b
 implementation pass records the ruling.
+
+## Which runs yield a batch (§6.6, §6.3) — PHASE 6b DECISION 4
+
+§6.6 has the farm tick per run, with the enchanter: "Production ticks per run ...
+the farm and the enchanter tick together. A run advances your weapons and stocks
+your shelf in one event" (phase-6-between-runs.md). But the enchanter's clock does
+not tick on every run: a run counts for its boss, or for §6.3's mercy — "a mercy
+tick advances the service clock and nothing else" — and "Entering the dungeon ticks
+nothing".
+Nothing says whether "per run" is every run that counts, or every run's end, or the
+boss kills alone.
+
+**Shipped provisionally (Phase 6b.3): every run that counts yields — a boss kill,
+or §6.3's mercy for failing deep — exactly the runs that tick the enchanter**, in
+the same event at the run's end (`CampaignState.EndRun`, `Farm.Yield`). A run that
+does not count yields nothing, and the run's summary says so: `THE FARM YIELDED
+NOTHING - THE RUN DID NOT COUNT`. A boss killed and then a wipe is a clear, and
+counts, so it yields (settled.md's "killed the boss, died on the way out").
+
+**What the pick lets a player do.** A losing streak deep in a dungeon still sends
+the party down with potions, as it still works the enchanter's shop; a run in and
+straight out again stocks nothing.
+
+**This decides how often the shelf is stocked, so it is the user's to decide.**
+The alternatives: (a) only a boss kill yields — the mercy tick "advances the
+service clock and nothing else", read literally; or (b) every run's end yields,
+counted or not — since the batch never banks (DECISION 6), a twenty-second entry
+gains nothing there but a fresh batch to mix. settled.md's Phase 6b implementation
+pass records the ruling.
+
+## When the first batch comes (§6.6) — PHASE 6b DECISION 5
+
+§6.6 has the first real clear "hand over an entire category rather than a number
+going up", and the hub "makes potions while you are away" (phase-6-between-runs.md).
+A run's end records the clear and makes the farm's yield in one event: nothing says
+which comes first — whether the dungeon a run beats for the first time is already a
+worker when that run's yield is made.
+
+**Shipped provisionally (Phase 6b.3): the clearing run's own end yields at the new
+count.** The clear is recorded first, then the yield is worked out, so the first
+clear of a dungeon besides the tutorial brings the alchemist and a batch at once —
+`A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` — even on a
+wipe after the boss fell, and each later first clear yields at the count it brings.
+
+**This decides whether the first real clear pays at once, so it is the user's to
+decide.** The alternative: a new worker produces from the next run on, so the
+first batch comes a counted run after the first real clear, and the run that beat
+a dungeon yields at the count it began with. settled.md's Phase 6b implementation
+pass records the ruling.
+
+## Where the batch lives, and what is saved (§6.6, §6.7, §3.5) — PHASE 6b DECISION 6
+
+§6.7 says "the batch must never reach `CampaignState`"; §3.5 says "The batch is not
+saved between runs ... computed at the hub and discarded" (phase-3-loot.md); and
+§6.7 also has the campaign hold "the farm's stock". The hub saves every change
+(PHASE 6a DECISION 10), and the user's ruling R1 says a bad roll is never reloaded
+away: a batch recomputed on every load would be mixed again after a quit and a load.
+
+**Shipped provisionally (Phase 6b.3): the run's yield is saved as a fact of the
+run's result** (`lastResult.farmYield`, beside the clears it was made at, whether
+the run was a first clear, and the potions that spoiled as it ended). **The batch is
+that yield less every potion's quality the bags hold, worked out (`Farm.Batch`),
+never a field of the campaign.** A mix (Phase 6b's next step) writes only a potion
+into a bag, which is saved; so quitting and loading never refills the batch, a held
+visit reads it as 0, and the units left unmixed spoil on the descent with no code to
+spoil them. The next run's end replaces the result, and the yield with it: nothing
+is ever added to a batch. The save refuses bags holding more units than the last
+run yielded (check 32).
+
+**This bends §3.5**, whose batch is not saved at all, **and keeps §6.7**: no batch
+in `CampaignState` (pinned: `FarmTests.TheBatchNeverReachesCampaignState`).
+
+**This decides what a reload can do to the batch, so it is the user's to decide.**
+The alternatives: (a) §3.5 as written — nothing saved, the batch recomputed at the
+hub from the clear set — where a mix, a quit and a load mixes it again; or (b) the
+units left as a campaign field, set at the run's end, spent by mixing and zeroed on
+entry — which bends §6.7's "never reach `CampaignState`". settled.md's Phase 6b
+implementation pass records the ruling.
+
+## `FarmYieldPerClear` and "tune the total" (§6.6) — PHASE 6b DECISION 7
+
+The user's ruling states the farm's target "as a total, not a rate, because the
+dungeon count is an unmade content decision and a per-clear number would inflate
+silently with every dungeon added" (settled.md), and §6.6 adds "Then the count can
+change without retuning". The target: "a campaign that has cleared everything
+should produce about one full loadout of maximum-quality potions per run", by
+`FarmYieldPerClear = (PartyCarrySlots-worth of potions ÷ HealthPotionPercent) ÷
+number of non-tutorial dungeons` — stated "the way §1.3 states
+`MovementUnitsPerMana`", a key "re-derived by hand, never computed from the budget"
+(settled.md). A loadout is "six" elsewhere in
+§6.6 ("it carries the same six", "a full loadout of six maximum-value potions costs
+thirty units"); `PartyCarrySlots` is 24. And the hand-off names the key
+`FarmYieldPerClear` (settled.md's Phase 5 hand-off; phase-5-save.md §5.3's table).
+
+**Shipped provisionally (Phase 6b.3): the hand-off's per-clear key, re-derived by
+hand.** A loadout is six maximum potions, 6 × 5 = 30 units at `HealthPotionPercent`
+20, over the four dungeons beside the tutorial that ship: 7.5, rounded down to 7,
+so a full clear yields 28 a run. Its comment in `tuning.json` carries the
+derivation and says to re-derive it, and the suite fails when the master's roster
+or `HealthPotionPercent` moves without it being re-derived
+(`FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`).
+
+**What the pick costs, plainly.** It is a rate. A dungeon added through
+`dungeons.json` — beside the game in a playtest, or in the master without a test
+run — raises a full clear's yield by 7 a dungeon with no test and no warning: the
+silent inflation the ruling rules against. The test catches it only in the master,
+and only when the suite runs.
+
+**This decides how the farm's number is kept, so it is the user's to decide.** The
+alternatives: (a) a loadout read as `PartyCarrySlots`-worth — 24 × 5 = 120 units,
+30 a dungeon, the ceiling arriving after the second clear; (b) **the form that
+keeps both rules**: a `tuning.json` key for the total — the full-clear yield, 30,
+or the loadout, 6 — with the per-clear yield computed as the content loads, from the
+loaded count of dungeons that do not retire on their clear, so a dungeon added
+anywhere re-derives it and the number is still tuned without a rebuild; its cost is
+the hand-off's key name, since the key would not be `FarmYieldPerClear`, and
+settled.md's hand-off and §5.3's table would move with it; or (c) rounded up to 8,
+32 a run. Whatever the form, the six-or-24 reading of "a loadout" and the 7-or-8
+rounding are this decision's too. settled.md's Phase 6b implementation pass records
+the ruling.
+
+## The roster stays at four (§6.6; settled.md's "Phase 6b completes the roster") — PHASE 6b DECISION 8
+
+settled.md has the first playable hub ship "6 non-tutorial dungeons", then records
+"Four dungeons ship beside the tutorial, not the six above — provisional. The
+missing two need content that does not exist yet (a Great Axe unique, or a repeated
+theme), and Phase 6b completes the roster." A dungeon's name and its boss are
+setting, which is kept outside this repository, and the Great Axe unique for Cleave
+does not exist.
+
+**Shipped provisionally (Phase 6b.3): deferred.** No dungeon is added, and
+`FarmYieldPerClear` is derived against the four that ship (DECISION 7).
+`dungeons.json`'s header, which said "Phase 6b completes the roster", now says the
+roster stays at four for now, deferred here, and that `FarmYieldPerClear` is
+re-derived by hand when a dungeon is added. **This bends the settled hand-off.**
+
+**This decides how much hub Phase 6b leaves, so it is the user's to decide.** The
+alternative: two placeholder rows, each a repeated theme with provisional names,
+marked `/* provisional */` as the four are, and `FarmYieldPerClear` re-derived to 5
+(30 over six). settled.md's Phase 6b implementation pass records the ruling.

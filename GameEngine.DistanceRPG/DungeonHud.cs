@@ -478,7 +478,7 @@ public sealed class DungeonHud
             DrawMenu(w, h, scene);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
-            DrawConfirmLeave(w, h, scene.Visit);
+            DrawConfirmLeave(w, h, scene.Visit, scene.Party.Sum(member => member.State.Potions.Count()));
 
         if (ended is not null)
         {
@@ -859,12 +859,12 @@ public sealed class DungeonHud
         }
     }
 
-    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>) — the last line, what it costs whatever else it means, in grey.</summary>
-    private void DrawConfirmLeave(int w, int h, DungeonState visit)
+    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>), the party's <paramref name="potionsCarried"/> among it — the last line, what it costs whatever else it means, in grey.</summary>
+    private void DrawConfirmLeave(int w, int h, DungeonState visit, int potionsCarried)
     {
         float top = h / 2f - 60f;
         DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
-        var lines = LeavePreview(visit);
+        var lines = LeavePreview(visit, potionsCarried);
         float y = top + 44f;
         for (int i = 0; i < lines.Count; i++)
         {
@@ -887,33 +887,43 @@ public sealed class DungeonHud
     /// tutorial, two floors on every visit, says <c>NO BOSS - A RETREAT: XP
     /// KEPT</c> (<see cref="DungeonCatalogue.HasFixedDepth"/>) — and whether the
     /// party got deep enough for the run to count (§6.3's mercy, from
-    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. And either
-    /// way, the whole visit (<see cref="ResetLine"/>), last.
+    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. Then, when the
+    /// party carries any, that its potions spoil on the way out (§6.6, Phase 6b.3:
+    /// <see cref="PotionsSpoilLine"/>). And either way, the whole visit
+    /// (<see cref="ResetLine"/>), last.
     /// </summary>
-    internal static IReadOnlyList<string> LeavePreview(DungeonState visit)
+    /// <param name="visit">The visit the party is leaving.</param>
+    /// <param name="potionsCarried">How many potions the party's bags hold: each spoils as the run ends, so the prompt warns while one is left to drink.</param>
+    internal static IReadOnlyList<string> LeavePreview(DungeonState visit, int potionsCarried = 0)
     {
         ArgumentNullException.ThrowIfNull(visit);
         string dungeon = visit.Def.Name.ToUpperInvariant();
+        var lines = new List<string>();
         if (visit.BossDefeated)
         {
             string clear = visit.Def.RetiresOnClear
                 ? $"{dungeon} CLOSES FOR GOOD"
                 : $"{dungeon} LOCKS FOR {Runs(visit.LockRuns)}";
-            return ["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear, ResetLine];
+            lines.AddRange(["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear]);
         }
-
-        var content = GameContent.Current;
-        string retreat = content.Dungeons.HasFixedDepth(visit.Def)
-            ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
-            : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
-        bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
-        return
-        [
-            retreat,
-            counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN",
-            ResetLine,
-        ];
+        else
+        {
+            var content = GameContent.Current;
+            string retreat = content.Dungeons.HasFixedDepth(visit.Def)
+                ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
+                : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
+            bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
+            lines.AddRange([retreat, counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN"]);
+        }
+        if (potionsCarried > 0)
+            lines.Add(PotionsSpoilLine(potionsCarried));
+        lines.Add(ResetLine);
+        return lines;
     }
+
+    /// <summary>What leaving does to the potions carried (§6.6): <c>THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT</c>, or <c>THE POTION CARRIED SPOILS ON THE WAY OUT</c>.</summary>
+    internal static string PotionsSpoilLine(int carried)
+        => carried == 1 ? "THE POTION CARRIED SPOILS ON THE WAY OUT" : $"THE {carried} POTIONS CARRIED SPOIL ON THE WAY OUT";
 
     /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
     internal static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";

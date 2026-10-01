@@ -197,7 +197,10 @@ public sealed class BetweenRunsHud : IDisposable
     /// what the wipe clawed back, member by member. Then whether the run counted
     /// and the counter it stands at (§6.3), and the lock or the closing a clear
     /// wrote. These are the run's own numbers, off its <see cref="RunResult"/> and
-    /// nothing else. The dungeon shows them at the run's end, with its key under
+    /// nothing else — the farm's among them (§6.6, Phase 6b.3): after the spoils,
+    /// the potions that spoiled (<see cref="SpoiledLine"/>), and after whether the
+    /// run counted, what the farm yielded (<see cref="FarmLine"/>). The dungeon
+    /// shows them at the run's end, with its key under
     /// them (<see cref="DungeonHud.RunSummaryLines"/>). The between-runs screen
     /// shows them again above the list, where they are the context the next
     /// choice is made in.
@@ -255,6 +258,10 @@ public sealed class BetweenRunsHud : IDisposable
         if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
             lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", DungeonHud.Grey));
 
+        // The potions carried out, spoiled (§6.6), whichever way the run ended.
+        if (result.Spoiled is { Count: > 0 } spoiled)
+            lines.Add(new Run(SpoiledLine(spoiled.Count), DungeonHud.Yellow));
+
         // The XP: kept, or the share of each pool's gain a wipe took back, member by member.
         if (result.Outcome != RunOutcome.Death)
             lines.Add(new Run("XP KEPT", DungeonHud.Green));
@@ -278,6 +285,11 @@ public sealed class BetweenRunsHud : IDisposable
             : mercyReachable ? $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}" : "RUN NOT COUNTED";
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
+        // What the farm yielded, which the count decided too — before the enchanter,
+        // so a summary the hub cuts short never cuts it.
+        if (FarmLine(result) is { } farm)
+            lines.Add(farm);
+
         // What the enchanter did on the run's end, which the count decided.
         lines.AddRange(ServiceLines(result, mostServiceLines, moreTail));
 
@@ -289,6 +301,45 @@ public sealed class BetweenRunsHud : IDisposable
 
         return lines;
     }
+
+    /// <summary>
+    /// The summary's line for the potions a run's end spoiled (§6.6), in yellow:
+    /// <c>2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP</c>, or <c>1 POTION
+    /// SPOILED - …</c>.
+    /// </summary>
+    internal static string SpoiledLine(int count) => $"{count} {(count == 1 ? "POTION" : "POTIONS")} SPOILED - A POTION KEEPS FOR ONE TRIP";
+
+    /// <summary>
+    /// The summary's line for the farm (§6.6), off the run's result, once the farm
+    /// has a worker (<see cref="RunResult.FarmClears"/> at least 1), and none before:
+    /// the run that brought the alchemist — the first clear of a dungeon besides the
+    /// tutorial — <c>A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7
+    /// UNITS</c>; a later first clear, <c>A FIRST CLEAR - THE FARM GROWS TO 3
+    /// DUNGEONS - IT YIELDED 21 UNITS</c> — both green, and <c>… YIELDED NOTHING</c>
+    /// at a yield of 0; any other run that counted, <c>THE FARM YIELDED 14 UNITS - 2
+    /// DUNGEONS BEATEN</c> in cyan, or <c>THE FARM YIELDED NOTHING</c> in grey at a
+    /// yield of 0; and a run that did not count, <c>THE FARM YIELDED NOTHING - THE
+    /// RUN DID NOT COUNT</c>, grey (PHASE 6b DECISION 4).
+    /// </summary>
+    internal static Run? FarmLine(RunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.FarmClears < 1)
+            return null;   // before the alchemist: no farm to speak of
+        string yielded = result.FarmYield > 0 ? Units(result.FarmYield) : "NOTHING";
+        if (result.FirstClear && !result.Retired)
+            return new Run(result.FarmClears == 1
+                ? $"A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED {yielded}"
+                : $"A FIRST CLEAR - THE FARM GROWS TO {result.FarmClears} DUNGEONS - IT YIELDED {yielded}", DungeonHud.Green);
+        if (!result.ServiceTick)
+            return new Run("THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey);
+        return result.FarmYield > 0
+            ? new Run($"THE FARM YIELDED {yielded} - {result.FarmClears} {(result.FarmClears == 1 ? "DUNGEON" : "DUNGEONS")} BEATEN", DungeonHud.Cyan)
+            : new Run("THE FARM YIELDED NOTHING", DungeonHud.Grey);
+    }
+
+    /// <summary>A number of units of the farm's yield as the HUD says it: <c>1 UNIT</c>, <c>7 UNITS</c>.</summary>
+    internal static string Units(int n) => $"{n} {(n == 1 ? "UNIT" : "UNITS")}";
 
     /// <summary>
     /// The summary's lines for the enchanter (§6.2, §6.3), off the run's reports

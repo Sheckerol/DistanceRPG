@@ -1226,7 +1226,7 @@ public sealed class EnchanterTests : IDisposable
         Assert.Contains(CallsIn(handler), called => called.DeclaringType?.Name == "Log" && called.Name == "Info");
         Assert.Contains(CallsIn(handler), called => Same(called, game.GetMethod(nameof(DistanceRpgGame.EnchanterLines), Declared)!));
         var adopt = CallsIn(game.GetMethod("Adopt", Declared)!).Select(called => called.Name).ToList();
-        Assert.Equal(2, adopt.Count(name => name == "add_RunEnded"));   // the save request and the log, each once
+        Assert.Equal(3, adopt.Count(name => name == "add_RunEnded"));   // the save request, the enchanter's log and the farm's log, each once
     }
 
     [Fact]

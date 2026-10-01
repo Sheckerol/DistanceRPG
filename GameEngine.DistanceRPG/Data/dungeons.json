@@ -39,10 +39,13 @@
      (phase-5-save.md). Everything else here - the four dungeons, their names, their bosses' names
      and statlines - is provisional: picked so the hub has somewhere to go, and expected to move
      after play. settled.md's first playable hub has six; the two missing need content that does
-     not exist yet (a Great Axe unique for Cleave, or a repeated theme), and Phase 6b completes the
-     roster. No dungeon here is attuned: attunement is its own field, and none is set yet. A floor
-     range left null reads tuning.json's; the tutorial pins both ends to 2 and is the one dungeon
-     that retires on its clear. */
+     not exist yet (a Great Axe unique for Cleave, or a repeated theme), so the roster stays at
+     four for now - deferred in Phase 6b (open-questions.md, PHASE 6b DECISION 8). tuning.json's
+     FarmYieldPerClear is derived for these four: a dungeon added here raises what a campaign that
+     has beaten everything yields a run, so re-derive it by hand when one is. No dungeon here is
+     attuned: attunement is its own field, and none is set yet. A floor range left null reads
+     tuning.json's; the tutorial pins both ends to 2 and is the one dungeon that retires on its
+     clear. */
   "dungeons": [
     {
       "id": "tutorial",

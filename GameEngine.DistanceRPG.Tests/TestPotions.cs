@@ -6,27 +6,31 @@ namespace GameEngine.DistanceRPG.Tests;
 /// Potions in a bag the way play leaves them (Phase 6b): the one door every potion
 /// fixture of the suite goes through, so a rule that ties a carried potion to the
 /// rest of the campaign is taught here once and never hunted for through the suite.
-/// A potion is mixed between runs, so one is laid only while no visit is held; and
-/// it is carried only once a dungeon besides the tutorial has been cleared — the
+/// A potion is mixed between runs, so one is laid only while no visit is held; it
+/// is carried only once a dungeon besides the tutorial has been cleared — the
 /// alchemist arrives with that clear (§6.6), and the save refuses a potion before
-/// it (<c>SaveConsistency</c>, check 31) — so a campaign with no such clear is
-/// first given one, as play gives it: a whole run to the bottom of a dungeon that
-/// does not retire on its clear and out again (<see cref="CampaignRuns.Clear"/>),
-/// on the premise's numbers its depth stands on.
+/// it (<c>SaveConsistency</c>, check 31); and it is mixed from what the last run's
+/// end yielded, so the potions every bag holds add up to no more than that yield
+/// (check 32, Phase 6b.3).
 /// <para>
-/// <strong>What a fixture keeps, so the farm's checks are one edit here.</strong>
-/// From Phase 6b's farm on, a potion is mixed from what the last run's end yielded,
-/// the potions every bag holds are checked against that yield, and every potion
-/// spoils at a run's end, a wipe's included. So a potion fixture describes what
-/// play writes under those rules too: it asserts no potion outlives a run's end —
-/// a potion wanted after a run is laid after it — and it keeps to qualities a
-/// run's yield could give, a few units, never the sanity bound. Then, once the farm
-/// lands, this helper gives the campaign a last result that counted and whose yield
-/// covers every potion the bags hold once these are laid: when the last result
-/// already does, it plays nothing; when it does not, it lifts what the bags hold,
-/// plays one run that counts on a premise whose yield covers the lot, and lays
-/// everything back, so a second call on one campaign never spoils what the first
-/// laid. A run arms every empty hand from its bag
+/// <strong>So a fixture is given the run that makes its potions possible</strong>,
+/// as play gives it. When the last run's end already yielded enough for every
+/// potion the bags hold once these are laid, nothing is played. When it did not,
+/// the potions the bags hold are lifted out, one run that counts is played — the
+/// first clear of a dungeon besides the tutorial when the campaign has none, a
+/// whole run to the bottom of a dungeon that does not retire on its clear and out
+/// again (<see cref="CampaignRuns.Clear"/>), and otherwise a deep retreat, a mercy
+/// (<see cref="CampaignRuns.DeepRetreat"/>) — on the premise's numbers, with a
+/// <see cref="Tuning.FarmYieldPerClear"/> stated here that makes its yield cover the
+/// lot, and everything is laid back. So a second call on one campaign never spoils
+/// what the first laid: the run that covers it never sees a potion.
+/// </para>
+/// <para>
+/// <strong>What a fixture keeps.</strong> It asserts no potion outlives a run's end
+/// — every potion carried spoils as a run ends, a wipe's included, so a potion
+/// wanted after a run is laid after it — and it keeps to qualities a run's yield
+/// could give, a few units, never the sanity bound: a yield of a thousand a clear at
+/// most (check 33). A run arms every empty hand from its bag
 /// (<see cref="PartyMemberState.Rest"/>), so a fixture that needs a hand left empty
 /// lays its potions after a run that counted and yields enough, where this helper
 /// plays nothing.
@@ -37,22 +41,18 @@ internal static class TestPotions
     /// <summary>
     /// <paramref name="campaign"/>, between its runs, with <paramref name="potions"/>
     /// laid in <paramref name="memberId"/>'s bag: each in a bag slot, 1 and up, where
-    /// nothing lies — a slot holds one thing, and the hand keeps a weapon. A campaign
-    /// that has cleared nothing beyond the tutorial clears a dungeon first.
+    /// nothing lies — a slot holds one thing, and the hand keeps a weapon — after the
+    /// run that yields enough for them, when the last one did not.
     /// </summary>
     /// <returns>The member carrying them.</returns>
     public static PartyMemberState Carrying(CampaignState campaign, string memberId, params (int Slot, Potion Potion)[] potions)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         Assert.True(campaign.Visit is null, "a potion is mixed between runs: give the campaign its potions before the visit");
-        if (!campaign.ClearedInOrder.Except(campaign.RetiredInOrder, StringComparer.Ordinal).Any())
-        {
-            using (TestContent.UsePremise())
-            {
-                var dungeon = GameContent.Current.Dungeons.All.First(def => !def.RetiresOnClear && campaign.IsSelectable(def));
-                CampaignRuns.Clear(campaign, dungeon.Id, CampaignRuns.FiveDeep);
-            }
-        }
+
+        long total = Farm.Mixed(campaign) + potions.Sum(laid => (long)laid.Potion.Quality);
+        if (!Farm.AlchemistHasArrived(campaign) || (campaign.LastResult?.FarmYield ?? 0) < total)
+            YieldEnough(campaign, total);
 
         var member = campaign.Party.Single(m => m.Id == memberId);
         foreach (var (slot, potion) in potions)
@@ -62,6 +62,36 @@ internal static class TestPotions
             member.Inventory[slot] = potion;
         }
         return member;
+    }
+
+    /// <summary>
+    /// Play the one run that brings the alchemist when the campaign has no real clear,
+    /// or a mercy otherwise, at a yield a clear that covers <paramref name="total"/>
+    /// units — the bags' potions lifted out first, so it spoils none, and laid back.
+    /// </summary>
+    private static void YieldEnough(CampaignState campaign, long total)
+    {
+        var held = campaign.Party.SelectMany(member => member.Potions.Select(carried => (Member: member, carried.Slot))).ToArray()
+            .Select(at => (at.Member, at.Slot, Potion: at.Member.TakePotion(at.Slot))).ToArray();
+
+        bool arrives = !Farm.AlchemistHasArrived(campaign);
+        int clears = Farm.Clears(campaign) + (arrives ? 1 : 0);
+        long perClear = (total + clears - 1) / clears;
+        Assert.True(perClear <= ContentBounds.MostYieldPerClear,
+            $"{total} units over {clears} clears is more than any tuning yields a clear: a potion fixture keeps to qualities a run could give");
+        using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = (int)perClear }))
+        {
+            var dungeon = GameContent.Current.Dungeons.All.First(def => !def.RetiresOnClear && campaign.IsSelectable(def));
+            var ran = arrives ? CampaignRuns.Clear(campaign, dungeon.Id, CampaignRuns.FiveDeep) : CampaignRuns.DeepRetreat(campaign, dungeon.Id);
+            Assert.True(ran.FarmYield >= total, $"the run yielded {ran.FarmYield} for {total} units");
+            Assert.Null(ran.Spoiled);   // nothing was carried through it
+        }
+
+        foreach (var (member, slot, potion) in held)
+        {
+            Assert.Null(member.Inventory[slot]);
+            member.Inventory[slot] = potion;
+        }
     }
 
     /// <summary>A health potion of <paramref name="quality"/>.</summary>

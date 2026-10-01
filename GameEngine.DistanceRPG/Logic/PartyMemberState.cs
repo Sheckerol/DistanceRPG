@@ -299,9 +299,10 @@ public sealed class PartyMemberState : ActorState
     /// potion back: <strong>the one way a potion leaves a bag</strong>. Its callers
     /// are pinned (<c>PotionSlotTests.APotionLeavesABagThroughOneDoor</c>): the
     /// pour-out in a dungeon (<c>DungeonScene.LeaveSlot</c>, PHASE 6b DECISION 1),
-    /// the drink (<see cref="TurnSystem.TryDrink"/>, Phase 6b.2), and from Phase
-    /// 6b's later steps the run's end and a pour-back at the alchemist. A potion is
-    /// never put down on a floor, moved to the stable or carried into another bag.
+    /// the drink (<see cref="TurnSystem.TryDrink"/>, Phase 6b.2), the run's end,
+    /// which spoils every potion carried (<see cref="Farm.Spoil"/>, Phase 6b.3), and
+    /// from Phase 6b's next step a pour-back at the alchemist. A potion is never put
+    /// down on a floor, moved to the stable or carried into another bag.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is the hand (0), which keeps a weapon, or no slot the member carries.</exception>
     /// <exception cref="ArgumentException">The slot holds no potion: it is empty or holds a weapon.</exception>

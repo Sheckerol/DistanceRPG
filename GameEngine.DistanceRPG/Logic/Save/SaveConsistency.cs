@@ -57,7 +57,13 @@ namespace GameEngine.DistanceRPG.Logic;
 /// whole pool more quality is overshoot, never refused (§6.6); a potion in the bag
 /// of a member whose hand is empty, or who is down in a visit, both of which play
 /// writes; and which dungeon is retired when one is carried — check 31 asks the
-/// retired list alone, as check 30 does.
+/// retired list alone, as check 30 does. And of the farm (Phase 6b.3): a yield
+/// today's <c>FarmYieldPerClear</c> times the clears would not give — the yield
+/// was the run's, under the tuning it ended under, and is held only to the
+/// key's clamp ceiling a clear (<see cref="ContentBounds.MostYieldPerClear"/>);
+/// a potion's quality above today's quality for a whole pool, since there is no
+/// cap; and which dungeon is retired when the farm counts its clears, the
+/// retired list alone again.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -114,6 +120,108 @@ internal static class SaveConsistency
 
         Shop(campaign);
         Potions(campaign, cleared, retired);
+        Batch(campaign);
+        if (campaign.LastResult is { } ended)
+            FarmYield(campaign, ended, cleared, retired);
+    }
+
+    /// <summary>
+    /// 32. Every potion carried was mixed from the last run's batch (Phase 6b.3): a
+    /// quality of <c>q</c> is <c>q</c> units of it, and the batch is what the last
+    /// run's end yielded less what is mixed (<see cref="Farm.Batch"/>), so the
+    /// qualities every bag holds, summed in roster then slot order, are no more than
+    /// that yield — between runs, the batch less what is left unmixed, and during a
+    /// visit, less what was drunk or poured out. Refused at the potion where the sum
+    /// first passes it. It holds no potion before any run has ended, and none before
+    /// the alchemist (31's, which runs first: a save with no real clear is refused
+    /// there).
+    /// </summary>
+    private static void Batch(CampaignDto campaign)
+    {
+        int yielded = campaign.LastResult?.FarmYield ?? 0;
+        long mixed = 0;
+        for (int i = 0; i < campaign.Party.Count; i++)
+        {
+            var potions = campaign.Party[i].Potions ?? [];
+            for (int j = 0; j < potions.Count; j++)
+            {
+                mixed += potions[j].Quality;
+                if (mixed > yielded)
+                    throw new SaveFormatException($"{At}.party[{i}].potions[{j}]",
+                        $"{mixed} units of quality carried by here, more than the {yielded} {(campaign.LastResult is null ? "yielded with no run ended" : "the last run yielded")}: every potion is mixed from the batch the last run yielded, a unit of quality a unit of it");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 33–35. What the farm did at the last run's end (Phase 6b.3), against the rest
+    /// of the result and the campaign it ended: <see cref="CampaignState.EndRun"/>
+    /// writes it with the clear, at the clears the campaign holds as the run ends,
+    /// and nothing moves either before the next run's end. A result lifted from
+    /// version 2 yielded nothing at no clears, cleared nothing for the first time and
+    /// spoiled nothing, so none of these refuses a migrated save.
+    /// </summary>
+    private static void FarmYield(CampaignDto campaign, RunResultDto last, HashSet<string> cleared, HashSet<string> retired)
+    {
+        const string at = $"{At}.lastResult";
+
+        // 33. The farm yields at the end of a run that counted, for each dungeon
+        // besides the tutorial beaten (PHASE 6b DECISION 4), and no tuning in range
+        // yields more than FarmYieldPerClear's ceiling a clear.
+        if (last.FarmYield > 0 && !last.ServiceTick)
+            throw new SaveFormatException($"{at}.farmYield",
+                $"{last.FarmYield} yielded on a run that did not count: the farm yields at the end of a run that counts, and nothing at one that did not");
+        if (last.FarmYield > 0 && last.FarmClears < 1)
+            throw new SaveFormatException($"{at}.farmYield",
+                $"{last.FarmYield} yielded at no clears: the farm yields for each dungeon besides the tutorial beaten, and had none");
+        long most = (long)ContentBounds.MostYieldPerClear * last.FarmClears;
+        if (last.FarmYield > most)
+            throw new SaveFormatException($"{at}.farmYield",
+                $"{last.FarmYield} is above {most}, the most {ClearsYield(last.FarmClears)}: no tuning yields more than {ContentBounds.MostYieldPerClear} a clear (FarmYieldPerClear at its most)");
+
+        // 34. The farm counted the cleared set as the run ended — every dungeon cleared
+        // and not retired — and nothing undoes a clear before the next run's end (a
+        // result lifted from version 2 counted none). A first clear is a clear (13
+        // holds its dungeon cleared), and one that did not retire its dungeon is a
+        // dungeon the farm counts.
+        int workers = cleared.Count(id => !retired.Contains(id));
+        if (last.FarmClears > workers)
+            throw new SaveFormatException($"{at}.farmClears",
+                $"{last.FarmClears} where the campaign has {workers} cleared and not retired: the farm counts the cleared set as the run ends, and no clear is undone");
+        if (last.FirstClear && !last.BossDefeated)
+            throw new SaveFormatException($"{at}.firstClear",
+                "true with the boss standing: a first clear is a clear, and a clear downs the boss");
+        if (last.FirstClear && !last.Retired && last.FarmClears < 1)
+            throw new SaveFormatException($"{at}.farmClears",
+                $"{last.FarmClears} on the first clear of {last.DungeonId}, which did not retire: a dungeon besides the tutorial beaten is one the farm counts");
+
+        // 35. The potions that spoiled lay in the bags as the run ended, one a slot;
+        // they were carried in, so the alchemist had arrived before the run — the farm
+        // had a worker as it began: the clears it ended with, less this run's own first
+        // clear of a dungeon it did not retire, and plus a dungeon beaten before that
+        // this run's clear retired, which a dungeons.json beside the game may do by
+        // moving retiresOnClear onto it (3's withdrawal); and they were mixed from the
+        // previous run's yield, made at those clears, which no tuning in range makes
+        // larger than FarmYieldPerClear's ceiling a clear.
+        var spoiled = last.Spoiled ?? [];
+        if (spoiled.Count == 0)
+            return;
+        long slots = campaign.Party.Sum(member => (long)Math.Max(0, member.Inventory.Count - 1));
+        if (spoiled.Count > slots)
+            throw new SaveFormatException($"{at}.spoiled",
+                $"{spoiled.Count} spoiled and the bags hold {slots} slots: a potion lay in a bag slot, one a slot");
+        long before = (long)last.FarmClears - (last.FirstClear && !last.Retired ? 1 : 0) + (!last.FirstClear && last.Retired ? 1 : 0);
+        if (before < 1)
+            throw new SaveFormatException($"{at}.spoiled[0]",
+                $"spoiled on a run the farm had no clear as it began: the alchemist arrives with the first clear of a dungeon besides the tutorial, and the potions carried into a run were mixed before it");
+        long units = 0, mostMixed = (long)ContentBounds.MostYieldPerClear * before;
+        for (int i = 0; i < spoiled.Count; i++)
+        {
+            units += spoiled[i].Quality;
+            if (units > mostMixed)
+                throw new SaveFormatException($"{at}.spoiled[{i}]",
+                    $"{units} units of quality spoiled by here, above {mostMixed}, the most {ClearsYield(before)}: a potion is mixed from the yield of the run before, and no tuning yields more than {ContentBounds.MostYieldPerClear} a clear (FarmYieldPerClear at its most)");
+        }
     }
 
     /// <summary>
@@ -573,6 +681,9 @@ internal static class SaveConsistency
                 throw new SaveFormatException($"{At}.depositsMade", $"{campaign.DepositsMade} made and no dungeon is retired: {why}");
         }
     }
+
+    /// <summary>What a number of the farm's clears yields at most, as 33 and 35 say it: <c>1 clear yields</c>, <c>2 clears yield</c>.</summary>
+    private static string ClearsYield(long clears) => clears == 1 ? "1 clear yields" : $"{clears} clears yield";
 
     /// <summary>A service by the name the save gives it, with its article: <c>an Enchant</c>, <c>a Refine</c>.</summary>
     private static string A(string service) => service == nameof(Service.Enchant) ? $"an {service}" : $"a {service}";

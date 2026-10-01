@@ -1310,4 +1310,36 @@ public sealed class RunOutcomeTests : IDisposable
             Assert.Same(gear, party[3].Inventory[1]);
         }
     }
+
+    [Fact]
+    public void TheResultSaysWhatTheFarmDid()
+    {
+        // Phase 6b.3 (§6.6): a run's end carries out what the farm did with the rest
+        // of its result — the one the campaign keeps as its last and RunEnded hands
+        // whoever plays the run — whether the run was a first clear, the farm's
+        // workers as it ended, what they yielded, and the potions that spoiled. On
+        // real floors, the golem and the Spear Hall's boss put down by A's sledge, at
+        // the farm's rate stated as this test's own.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = Campaign();
+        RunResult? heard = null;
+        campaign.RunEnded += result => heard = result;
+
+        var tutorial = Clear(campaign, "tutorial", GoldenSeed);
+        Assert.Equal((true, true, 0, 0), (tutorial.FirstClear, tutorial.Retired, tutorial.FarmClears, tutorial.FarmYield));
+        Assert.Null(tutorial.Spoiled);
+        var hall = Clear(campaign, "spear_hall", FiveDeep);
+        Assert.Equal((true, false, 1, 7), (hall.FirstClear, hall.Retired, hall.FarmClears, hall.FarmYield));
+        Assert.Same(hall, heard);
+        Assert.Same(hall, campaign.LastResult);
+
+        // Out again with a potion carried, the run counting nothing: no first clear,
+        // the farm's one worker yielding nothing, and the potion spoiled.
+        TestPotions.Carrying(campaign, "B", (2, TestPotions.Health(3)));
+        var idle = ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal((false, 1, 0), (idle.FirstClear, idle.FarmClears, idle.FarmYield));
+        Assert.Equal([TestPotions.Health(3)], idle.Spoiled!);
+        Assert.Same(idle, heard);
+        Assert.Null(campaign.Party[1].PotionIn(2));
+    }
 }

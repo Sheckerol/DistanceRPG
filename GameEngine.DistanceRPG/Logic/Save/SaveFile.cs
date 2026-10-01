@@ -19,12 +19,14 @@ namespace GameEngine.DistanceRPG.Logic;
 // hand gave a version-1 document, which meant nothing to version 1.
 //
 // Version 3 (Phase 6b) has no required member: every member it adds is appended
-// with its default — a member's potions (6b.1) — so its step writes nothing, and
-// exists so that a Phase 6a build, which reads version 2 and no further, refuses a
-// version-3 save as a newer build's rather than dropping its potions (PHASE 6a
-// DECISION 14). Like version 2's, it removes a stray member a hand gave an older
-// document, which the older reader ignored: a version-2 member's `potions` would
-// otherwise read as potions the campaign never mixed.
+// with its default — a member's potions (6b.1), and what the farm did at a run's
+// end, in the last result (6b.3) — so its step writes nothing, and exists so that
+// a Phase 6a build, which reads version 2 and no further, refuses a version-3 save
+// as a newer build's rather than dropping its potions (PHASE 6a DECISION 14). Like
+// version 2's, it removes a stray member a hand gave an older document, which the
+// older reader ignored: a version-2 member's `potions` would otherwise read as
+// potions the campaign never mixed, and a version-2 last result's `farmYield` as a
+// batch no run made.
 
 /// <summary>
 /// One campaign, saved (§5.1): the version of this format it was written in,
@@ -245,11 +247,22 @@ public sealed record EnchantmentDto(string Id, int Tier, int Xp);
 /// copies, since only what they are is read, never where they went — and what
 /// the enchanter did on it: a report a deposit in the shop, or null for an empty
 /// shop, which is what a capture writes; null and <c>[]</c> read alike (appended
-/// by Phase 6a.3a, with its default).
+/// by Phase 6a.3a, with its default). And what the farm did on it (appended by
+/// Phase 6b.3, with their defaults: a result written before yielded nothing, at no
+/// clears, cleared nothing for the first time and spoiled nothing): the units it
+/// yielded — what the alchemist mixes from until the next run's end, the batch
+/// being this less what the bags hold (PHASE 6b DECISION 6) — the clears it
+/// yielded at, whether it was a first clear, and the potions that spoiled as it
+/// ended, or null for none, which is what a capture writes; null and <c>[]</c>
+/// read alike.
 /// </summary>
 public sealed record RunResultDto(string DungeonId, string Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed, bool ServiceTick,
     bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired, IReadOnlyList<WeaponDto> SpoilsKept, IReadOnlyList<WeaponDto> SpoilsLost,
-    IReadOnlyList<ClawbackDto> Clawbacks, IReadOnlyList<ServiceDto>? Services = null);
+    IReadOnlyList<ClawbackDto> Clawbacks, IReadOnlyList<ServiceDto>? Services = null, int FarmYield = 0, int FarmClears = 0, bool FirstClear = false,
+    IReadOnlyList<SpoiledPotionDto>? Spoiled = null);
+
+/// <summary>A potion that spoiled at a run's end (<see cref="RunResult.Spoiled"/>): its type by <see cref="PotionType"/> name, and its quality, 1 at least. Where it lay is gone with it.</summary>
+public sealed record SpoiledPotionDto(string Type, int Quality);
 
 /// <summary>
 /// What a run's end did with one deposit (<see cref="ServiceReport"/>): the weapon

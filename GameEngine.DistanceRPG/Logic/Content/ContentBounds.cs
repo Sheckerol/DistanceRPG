@@ -68,7 +68,8 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
 /// weapon holds (<see cref="MostEnchantments"/>), and with it the most runs a
 /// service takes (<see cref="MostServiceRuns"/>) and the most deposits a run's end
-/// works (<see cref="MostWorked"/>); and the save's sanity bounds,
+/// works (<see cref="MostWorked"/>) — and the most a run's end yields a dungeon
+/// cleared (<see cref="MostYieldPerClear"/>); and the save's sanity bounds,
 /// where a count's arithmetic stops being whole (<see cref="MostCount"/>,
 /// <see cref="MostLevels"/>, <see cref="MostHeldShots"/>) — with the overshoot a
 /// potion hands the heal applier, held where the levels it grants stop being
@@ -158,6 +159,16 @@ internal static class ContentBounds
     /// end reporting more worked is none play wrote.
     /// </summary>
     internal static int MostWorked { get; } = Int(nameof(Tuning.EnchanterWorksOn)).Max;
+
+    /// <summary>
+    /// The most units the farm yields a worker at a run's end (§6.6, Phase 6b.3):
+    /// <c>FarmYieldPerClear</c>'s clamp ceiling. A run's end yields that a dungeon
+    /// besides the tutorial ever cleared, and no tuning in range yields more, so a
+    /// saved yield above it times the clears it was made at — or potions spoiled
+    /// that add to more, which were mixed from a yield no larger and the clears only
+    /// grow — is none play wrote.
+    /// </summary>
+    internal static int MostYieldPerClear { get; } = Int(nameof(Tuning.FarmYieldPerClear)).Max;
 
     /// <summary>
     /// The largest count play grows a bounded step at a time, <strong>a sanity

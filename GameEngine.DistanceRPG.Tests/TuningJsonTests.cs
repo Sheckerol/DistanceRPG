@@ -144,10 +144,19 @@ public class TuningJsonTests
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");
 
-        // §5.3's one key still to come says which phase brings it (the farm's
-        // yield: the Consumables' other three are keys since the drink, 6b.2, and
-        // GraftBaseChance, the Enchanter's last, since 6a.4).
-        Ignored("""{ "FarmYieldPerClear": 7 }""", "FarmYieldPerClear is not a key yet", "Phase 6b");
+        // §5.3's keys still to come are all keys now — the farm's yield, the last
+        // that waited, since the farm (Phase 6b.3); the Consumables' other three
+        // since the drink, 6b.2; GraftBaseChance, the Enchanter's last, since 6a.4 —
+        // so none is told it is not a key yet: each of the four Consumables is read
+        // with nothing to say, and clamped and warned as every key is.
+        var consumables = TuningJson.Read("""{ "PotionUseCost": 30, "HealthPotionPercent": 25, "ManaPotionPercent": 15, "FarmYieldPerClear": 9 }""", BuiltIn);
+        Assert.Empty(consumables.Warnings);
+        Assert.Equal((30, 25, 15, 9),
+            (consumables.Tuning.PotionUseCost, consumables.Tuning.HealthPotionPercent, consumables.Tuning.ManaPotionPercent, consumables.Tuning.FarmYieldPerClear));
+        var clamped = TuningJson.Read("""{ "FarmYieldPerClear": 1001 }""", BuiltIn);
+        Assert.Equal(["tuning.json: FarmYieldPerClear 1001 is above 1000 - using 1000"], clamped.Warnings);
+        Assert.Equal(1000, clamped.Tuning.FarmYieldPerClear);
+        Assert.Null(TuningSchema.DeferredPhase(nameof(Tuning.FarmYieldPerClear)));
     }
 
     /// <summary>
@@ -517,8 +526,9 @@ public class TuningJsonTests
         // PHASE5-080: every knob "gathered in one place ... seeing them on one
         // screen is how those get resolved". The shipped file — the master copy,
         // hand-kept — names every key once, under §5.3's ten groups in §5.3's
-        // order (S:80-91) — the two with keys still to come in Phase 6 under
-        // headings naming them — then the four beside it, each key under the
+        // order (S:80-91) — a group with keys still to come under a heading naming
+        // them, none since the farm's yield arrived (Phase 6b.3) — then the four
+        // beside it, each key under the
         // comment that says what it is; and it reads, strictly, with nothing to
         // warn about.
         string text = ShippedData.Texts.Tuning!;
@@ -529,8 +539,8 @@ public class TuningJsonTests
         foreach (var key in TuningSchema.Keys)
             Assert.Single(Regex.Matches(text, $"\n  \"{key.Name}\":"));
 
-        // The groups in §5.3's order, then Progression, Combat, Drops, Saves; the
-        // two deferred ones naming their keys and the phase that brings them.
+        // The groups in §5.3's order, then Progression, Combat, Drops, Saves; a
+        // deferred one would name its keys and the phase that brings them.
         var headings = Enum.GetValues<TuningGroup>().Select(group => TuningSchema.Deferred.TryGetValue(group, out var deferred)
             ? $"/* ---- {group} - {deferred.Phase}: {string.Join(", ", deferred.Keys)} ---- */"
             : $"/* ---- {group} ---- */").ToArray();
@@ -538,7 +548,7 @@ public class TuningJsonTests
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
         Assert.Contains("/* ---- Enchanter ---- */", headings);   // its last key to come plays since Phase 6a.4
-        Assert.Contains("/* ---- Consumables - Phase 6b: FarmYieldPerClear ---- */", headings);   // the drink's three are keys since 6b.2
+        Assert.Contains("/* ---- Consumables ---- */", headings);   // the drink's three are keys since 6b.2, the farm's yield since 6b.3
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
         Assert.Equal(at.Order(), at);
@@ -565,16 +575,27 @@ public class TuningJsonTests
             Assert.Contains("re-derive", comments[name]);
         }
         Assert.Contains("forged + AcquiredHeadroom", comments[nameof(Tuning.AcquiredHeadroom)]);
+
+        // And the farm's yield against the loadout it is derived from (S:1048-1054,
+        // PHASE 6b DECISION 7): a rate re-derived by hand, which says so, and says
+        // that a dungeon added raises the yield with no warning — what the test of
+        // the derivation (FarmTests) catches in the master alone.
+        string farm = comments[nameof(Tuning.FarmYieldPerClear)];
+        Assert.Contains("6 x (100 / HealthPotionPercent 20) = 30, over the 4 dungeons beside the tutorial = 7.5 -> 7", farm);
+        Assert.Contains("re-derive", farm);
+        Assert.Contains("a dungeon added to dungeons.json", farm);
+        Assert.Contains("raises a full clear's yield", farm);
         Assert.Contains("Searing burns for its level, then loses one", comments[nameof(Tuning.EffectPerLevel)]);
 
-        // A provisional figure says so, and only a provisional one: the six keys —
+        // A provisional figure says so, and only a provisional one: the seven keys —
         // the improvement roll's graft share and signature weight among them, PHASE
-        // 6a DECISION 5's (Phase 6a.4) — and serrated's percentage, whose note sits
+        // 6a DECISION 5's (Phase 6a.4), and the farm's yield a clear, PHASE 6b
+        // DECISION 7's (Phase 6b.3) — and serrated's percentage, whose note sits
         // above its member.
         string[] provisional =
         [
             nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency),
-            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight), nameof(Tuning.FarmYieldPerClear),
         ];
         Assert.Equal(provisional.Order(StringComparer.Ordinal),
             comments.Where(c => c.Value.StartsWith("Provisional:", StringComparison.Ordinal)).Select(c => c.Key).Order(StringComparer.Ordinal));

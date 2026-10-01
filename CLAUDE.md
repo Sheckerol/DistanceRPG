@@ -81,6 +81,10 @@ GameEngine.DistanceRPG/         # Game executable
     Alchemist.cs                # What a potion restores (§3.4, §6.6): a share of the drinker's max,
                                 # rounded down and saturating, and the quality for a whole pool;
                                 # TurnSystem.TryDrink drinks one, through the heal and mana appliers
+    Farm.cs                     # The farm (§6.6): a worker a dungeon beaten besides the tutorial, a
+                                # yield every run that counts, the batch worked out from the last
+                                # result and the bags (never a field), and the spoilage rule's one
+                                # home — every potion carried spoils as the run ends (EndRun alone)
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is

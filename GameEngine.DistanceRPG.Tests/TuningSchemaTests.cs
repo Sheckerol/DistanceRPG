@@ -249,6 +249,7 @@ public class TuningSchemaTests
                 nameof(Tuning.CooldownRunsPerFloor), nameof(Tuning.MercyFloor), nameof(Tuning.DeathXpLossPercent)]),
             (TuningGroup.Enchanter, [nameof(Tuning.WearPerHit), .. RulingsEnchanterKeys]),
             (Inventory, [nameof(Tuning.PartyCarrySlots)]),
+            (Consumables, ConsumablesKeys),
         ];
         foreach (var (group, keys) in starting)
             foreach (string name in keys)
@@ -259,24 +260,20 @@ public class TuningSchemaTests
         var groups = TuningSchema.Keys.Select(k => k.Group).ToArray();
         Assert.Equal(groups.Order(), groups);   // the file's order is the groups' order
 
-        // The one 6b key still to come waits for its reader (bend (e)): no key
-        // and no property, listed under its group with the phase that brings it.
-        // The Consumables' first three — what a drink costs and what a potion
-        // restores — came with the drink in Phase 6b.2, and the farm's yield waits
-        // for the farm. WearPerHit came with its reader in Phase 6a.1,
-        // EnchanterWorksOn with its reader in 6a.3a, and GraftBaseChance — the last
-        // Enchanter key that waited — with the improvement roll in 6a.4, so no
-        // Enchanter key waits now. The Enchanter's six the ruling made keys ahead
+        // No key waits for its reader now (bend (e)): every key of §5.3's set is a
+        // key, with the property its rule reads. The Consumables' first three — what
+        // a drink costs and what a potion restores — came with the drink in Phase
+        // 6b.2, and the fourth, the farm's yield, with the farm in 6b.3, the last key
+        // that waited. WearPerHit came with its reader in Phase 6a.1,
+        // EnchanterWorksOn with its reader in 6a.3a, and GraftBaseChance with the
+        // improvement roll in 6a.4. The Enchanter's six the ruling made keys ahead
         // of their reader are each a property, and a rule plays each since Phase 6a
         // reads it: the capacity a bar adds from 6a.1, the other five from 6a.3a.
-        Assert.Equal("Phase 6b", TuningSchema.Deferred[Consumables].Phase);
-        Assert.Equal(["FarmYieldPerClear"], TuningSchema.Deferred[Consumables].Keys.ToArray());
-        Assert.Equal([Consumables], TuningSchema.Deferred.Keys.Order());
-        foreach (string name in TuningSchema.Deferred.Values.SelectMany(d => d.Keys))
-        {
-            Assert.Null(TuningSchema.Find(name));
-            Assert.Null(typeof(Tuning).GetProperty(name));
-        }
+        Assert.Empty(TuningSchema.Deferred);
+        Assert.Null(TuningSchema.DeferredPhase(nameof(Tuning.FarmYieldPerClear)));
+        foreach (var (_, keys) in starting)
+            foreach (string name in keys)
+                Assert.NotNull(typeof(Tuning).GetProperty(name));
         foreach (string name in RulingsEnchanterKeys)
         {
             Assert.NotNull(typeof(Tuning).GetProperty(name));
@@ -381,26 +378,26 @@ public class TuningSchemaTests
     }
 
     /// <summary>
-    /// The Consumables that are keys (Phase 6b.2), in the file's order: what a drink
-    /// costs, and the share of a pool a unit of quality restores, health and mana.
-    /// The farm's yield, the group's fourth, waits for the farm
-    /// (<see cref="TuningSchema.Deferred"/>).
+    /// The Consumables, in the file's order: what a drink costs, and the share of a
+    /// pool a unit of quality restores, health and mana (Phase 6b.2); and the units
+    /// the farm yields a clear (Phase 6b.3).
     /// </summary>
     private static readonly string[] ConsumablesKeys =
     [
-        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent),
+        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent), nameof(Tuning.FarmYieldPerClear),
     ];
 
     [Fact]
     public void TheConsumablesAreKeys_PlayedFromVersion3()
     {
-        // §3.4 and §5.3's Consumables row, arriving with the drink that reads them
-        // (Phase 6b.2): each a key of the group, in the file's order, after the
-        // carry — a property, the only number its Set moves, the master's number
-        // inside its clamp, and the clamp the plan's (1e). Each is played, and a
-        // save's hash covers each from version 3 (HashedFrom), so a campaign saved
-        // at version 1 or 2 is compared without them. What the master sets each to
-        // is its own to say, so no value is asserted here.
+        // §3.4 and §5.3's Consumables row, arriving with the drink that reads three
+        // of them (Phase 6b.2) and the farm that reads the fourth (Phase 6b.3): each a
+        // key of the group, in the file's order, after the carry — a property, the
+        // only number its Set moves, the master's number inside its clamp, and the
+        // clamp the plan's (1e). Each is played, and a save's hash covers each from
+        // version 3 (HashedFrom), so a campaign saved at version 1 or 2 is compared
+        // without them. What the master sets each to is its own to say, so no value
+        // is asserted here.
         var consumables = TuningSchema.Keys.Where(k => k.Group == Consumables).ToArray();
         Assert.Equal(ConsumablesKeys, consumables.Select(k => k.Name));
         var keys = TuningSchema.Keys.ToList();
@@ -410,6 +407,7 @@ public class TuningSchemaTests
             [nameof(Tuning.PotionUseCost)] = (0, 10000),   // as WeaponSwapCost, whose principle it shares: 0 is free; MovementBudget's ceiling
             [nameof(Tuning.HealthPotionPercent)] = (1, 100),   // it divides the quality for a whole pool; 100 makes one unit a whole pool
             [nameof(Tuning.ManaPotionPercent)] = (1, 100),
+            [nameof(Tuning.FarmYieldPerClear)] = (0, 1000),   // a count of units: 0 is a dial, the farm yielding nothing; 1000 where the magnitudes clamp
         };
         foreach (var key in consumables)
         {
@@ -424,6 +422,8 @@ public class TuningSchemaTests
         }
         Assert.Equal(((IntKey)Key(nameof(Tuning.WeaponSwapCost))).Max, ((IntKey)Key(nameof(Tuning.PotionUseCost))).Max);
         Assert.Equal(((IntKey)Key(nameof(Tuning.MovementBudget))).Max, ((IntKey)Key(nameof(Tuning.PotionUseCost))).Max);
+        Assert.Equal(ContentBounds.Magnitude, ((IntKey)Key(nameof(Tuning.FarmYieldPerClear))).Max);   // where the file's magnitudes clamp
+        Assert.Equal(((IntKey)Key(nameof(Tuning.FarmYieldPerClear))).Max, ContentBounds.MostYieldPerClear);   // the ceiling a saved yield is held to, read off the clamp
 
         // And they are all version 3's hash adds: each moves it, and leaves the
         // hashes of versions 1 and 2 where they were (TuningJsonTests'
@@ -437,9 +437,16 @@ public class TuningSchemaTests
         var refused = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(BuiltIn with { PotionUseCost = -1 }));
         Assert.Equal((nameof(Tuning.PotionUseCost), ContentValidator.RuleCountIsNeverNegative), (refused.EntryId, refused.Rule));
         ContentValidator.ValidateTuning(BuiltIn with { PotionUseCost = 0 });
-        var read = TuningJson.Read("""{ "PotionUseCost": -5, "HealthPotionPercent": 0, "ManaPotionPercent": 250 }""", BuiltIn);
-        Assert.Equal((0, 1, 100), (read.Tuning.PotionUseCost, read.Tuning.HealthPotionPercent, read.Tuning.ManaPotionPercent));
-        Assert.Equal(3, read.Warnings.Count);
+
+        // The farm's yield a clear is a count of units too: a negative one would
+        // take units away, while 0, a farm that yields nothing, is a dial.
+        var unyielding = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(BuiltIn with { FarmYieldPerClear = -1 }));
+        Assert.Equal((nameof(Tuning.FarmYieldPerClear), ContentValidator.RuleCountIsNeverNegative), (unyielding.EntryId, unyielding.Rule));
+        ContentValidator.ValidateTuning(BuiltIn with { FarmYieldPerClear = 0 });
+
+        var read = TuningJson.Read("""{ "PotionUseCost": -5, "HealthPotionPercent": 0, "ManaPotionPercent": 250, "FarmYieldPerClear": 5000 }""", BuiltIn);
+        Assert.Equal((0, 1, 100, 1000), (read.Tuning.PotionUseCost, read.Tuning.HealthPotionPercent, read.Tuning.ManaPotionPercent, read.Tuning.FarmYieldPerClear));
+        Assert.Equal(4, read.Warnings.Count);
         ContentValidator.ValidateTuning(read.Tuning);
     }
 

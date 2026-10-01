@@ -385,7 +385,9 @@ public static class ContentValidator
     /// (<see cref="GameConstants.MaxInventorySlots"/>, nine a member), or loot
     /// lands in a slot no key can reach; and the stairs gather from at least a
     /// tile away. So is §3.4's: a drink's cost (<see cref="Tuning.PotionUseCost"/>)
-    /// is a count, movement spent or none, never movement handed back.
+    /// is a count, movement spent or none, never movement handed back; and §6.6's:
+    /// the farm's yield a clear (<see cref="Tuning.FarmYieldPerClear"/>) is a count
+    /// of units, some or none, never units taken away.
     /// How far short of the farm a boss should stop, and every other judgement
     /// between these numbers, is a test on the shipped values, never a refusal
     /// here.
@@ -466,6 +468,7 @@ public static class ContentValidator
         if (tuning.StairGatherTiles < 1)
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");
         RequireCount(tuning.PotionUseCost, nameof(Tuning.PotionUseCost));
+        RequireCount(tuning.FarmYieldPerClear, nameof(Tuning.FarmYieldPerClear));
     }
 
     /// <summary>

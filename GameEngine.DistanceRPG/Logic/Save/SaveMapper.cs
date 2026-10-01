@@ -323,6 +323,12 @@ internal static class SaveMapper
         result.Services is { Count: > 0 } services   // null for an empty shop, as the queue is
             ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId,
                 r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null, r.Tier, r.SourceId)).ToArray()   // the roll as drawn is the log's
+            : null,
+        result.FarmYield,
+        result.FarmClears,
+        result.FirstClear,
+        result.Spoiled is { Count: > 0 } spoiled   // null for none, as a bag's potions are
+            ? spoiled.Select(potion => new SpoiledPotionDto(Name(potion.Type), potion.Quality)).ToArray()
             : null);
 
     /// <summary>An enum-keyed count table by member name, in the enum's order — the order its entries come in.</summary>
@@ -852,9 +858,40 @@ internal static class SaveMapper
         // What the enchanter did on the run's end: null and [] alike, read as none.
         var services = row.Services is { Count: > 0 } reports ? Services(reports, content, $"{at}.services") : null;
 
+        // What the farm did (Phase 6b.3): the yield and the clears it was made at are
+        // counts, and each potion that spoiled a potion — its type a name, its quality
+        // a count of units, 1 at least. Null and [] alike, read as none. How each
+        // stands against the rest of the campaign is asked with the other
+        // cross-checks (SaveConsistency, checks 32 to 35).
+        int farmYield = Count(row.FarmYield, $"{at}.farmYield");
+        int farmClears = Count(row.FarmClears, $"{at}.farmClears");
+        var spoiled = row.Spoiled is { Count: > 0 } gone ? Spoiled(gone, $"{at}.spoiled") : null;
+
         return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
             runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken,
-            services);
+            services, farmYield, farmClears, row.FirstClear, spoiled);
+    }
+
+    /// <summary>
+    /// The potions a run's end spoiled (<see cref="RunResult.Spoiled"/>), each read
+    /// on its own: its type a <see cref="PotionType"/>'s name, and its quality 1 at
+    /// least — one unit makes an ordinary potion — and no more than
+    /// <see cref="ContentBounds.MostCount"/>, a count of units, as a potion in a bag
+    /// is held. The tighter bounds are the cross-checks' (check 35).
+    /// </summary>
+    private static Potion[] Spoiled(IReadOnlyList<SpoiledPotionDto> dtos, string at)
+    {
+        var rows = Rows(dtos, at, "potion");
+        var potions = new Potion[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var type = EnumOf<PotionType>(rows[i].Type, $"{where}.type", "potion type");
+            if (rows[i].Quality < 1)
+                throw new SaveFormatException($"{where}.quality", $"{rows[i].Quality} is below 1: {QualityWhy}");
+            potions[i] = new Potion(type, AtMost(rows[i].Quality, ContentBounds.MostCount, $"{where}.quality", QualityWhy));
+        }
+        return potions;
     }
 
     // ── Restore: the visit in progress ───────────────────────────────────────

@@ -51,8 +51,10 @@ public class PreReworkSaveTests
     /// header rule of <c>SaveFile.cs</c>), each by the object it sits in: the
     /// migration writes none of them, and a capture writes each empty one as its
     /// default — the stable (Phase 6a.2), and the enchanter's queue and a run's
-    /// service reports (Phase 6a.3a) null, the count of deposits made 0, and every
-    /// member's potions (Phase 6b.1) null — so the saves have none and the capture
+    /// service reports (Phase 6a.3a) null, the count of deposits made 0, every
+    /// member's potions (Phase 6b.1) null, and what the farm did at the last run's
+    /// end (Phase 6b.3): nothing yielded at no clears, no first clear and nothing
+    /// spoiled — so the saves have none and the capture
     /// of one restored from them has each at its default. Set aside there, and only
     /// at its default: a capture that wrote one with anything in it differs. A place
     /// ending <c>[*]</c> is every row of that list: <c>$.campaign.party[*]</c> is each
@@ -65,6 +67,10 @@ public class PreReworkSaveTests
         ("$.campaign", "depositsMade", JsonValue.Create(0)),
         ("$.campaign.lastResult", "services", null),
         ("$.campaign.party[*]", "potions", null),
+        ("$.campaign.lastResult", "farmYield", JsonValue.Create(0)),
+        ("$.campaign.lastResult", "farmClears", JsonValue.Create(0)),
+        ("$.campaign.lastResult", "firstClear", JsonValue.Create(false)),
+        ("$.campaign.lastResult", "spoiled", null),
     ];
 
     /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it, compared as JSON: null, a number, a word.</summary>
@@ -95,7 +101,8 @@ public class PreReworkSaveTests
     /// 2 as it reads each (<see cref="TuningKey.HashedFrom"/>), and how many
     /// deposits the enchanter works on (Phase 6a.3a) and the improvement roll's
     /// odds and split (6a.4), played from version 2 too; what a drink costs and
-    /// what a potion restores (Phase 6b.2), played from version 3; and how many
+    /// what a potion restores (Phase 6b.2) and what the farm yields (6b.3), played
+    /// from version 3; and how many
     /// save slots there are, the ruling of the same day on the save model, the
     /// launcher's.
     /// </summary>
@@ -105,7 +112,7 @@ public class PreReworkSaveTests
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
         nameof(Tuning.EnchanterWorksOn), nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
-        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent),
+        nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent), nameof(Tuning.FarmYieldPerClear),
         nameof(Tuning.SaveSlots),
     ];
 

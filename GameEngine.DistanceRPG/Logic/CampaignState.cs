@@ -452,6 +452,16 @@ public sealed class CampaignState
     /// (<see cref="RunResult.Services"/>).
     /// </para>
     /// <para>
+    /// <strong>The farm</strong> (§6.6, Phase 6b.3), in the same event: a run that
+    /// counted yields <see cref="Tuning.FarmYieldPerClear"/> for every dungeon
+    /// besides the tutorial ever cleared, the run's own first clear among them
+    /// (<see cref="Farm.Yield"/>, PHASE 6b DECISIONS 4 and 5), and one that did not
+    /// yields nothing. The result says what it yielded, at how many clears, and
+    /// whether the run was a first clear (<see cref="RunResult.FarmYield"/>), and
+    /// every potion carried spoils on every ending
+    /// (<see cref="RunResult.Spoiled"/>, <see cref="Farm.Spoil"/>).
+    /// </para>
+    /// <para>
     /// <strong>Spoils, not gear</strong> (§4.4): only the run's spoils
     /// (<see cref="DungeonState.Spoils"/>) still in some member's bag count,
     /// found by reference — what the party carried in is never taken, and a spoil
@@ -483,12 +493,14 @@ public sealed class CampaignState
         if (tick)
             RunCounter++;
 
-        // Then the clear, on the counter the tick has already moved.
+        // Then the clear, on the counter the tick has already moved — a first clear
+        // when the dungeon was not in the set before.
         int? lockedUntil = null;
         bool retired = false;
+        bool firstClear = false;
         if (bossDown)
         {
-            _cleared.Add(def.Id);
+            firstClear = _cleared.Add(def.Id);
             if (def.RetiresOnClear)
             {
                 Retire(def.Id);
@@ -515,6 +527,11 @@ public sealed class CampaignState
             lost = carried.Select(c => c.Spoil).ToArray();
         }
 
+        // Every potion carried spoils (§6.6), on every ending, a wipe's included: a
+        // potion keeps as long as the trip it was mixed for. A consumable, not gear,
+        // so no weapon carried in is taken.
+        var spoiled = Farm.Spoil(this);
+
         IReadOnlyList<XpClawback> clawbacks = ending == RunEnding.Wiped
             ? visit.EntrySnapshot.ClawBack(_party, tuning.DeathXpLossPercent)
             : [];
@@ -533,11 +550,18 @@ public sealed class CampaignState
         // not works nothing, and says so.
         var services = Enchanter.Tick(this, mapSeed, counted: tick);
 
+        // And the farm beside it (§6.6: "the farm and the enchanter tick together"):
+        // a run that counted yields a batch at the workers it ends with, this run's
+        // own first clear among them (PHASE 6b DECISIONS 4 and 5).
+        int clears = Farm.Clears(this);
+        int yielded = Farm.Yield(clears, tick);
+
         var result = new RunResult(def.Id,
             ending == RunEnding.Wiped ? RunOutcome.Death : bossDown ? RunOutcome.BossKill : RunOutcome.Retreat,
             bossDown, deepest, deepest >= visit.BossFloor ? visit.BossFloor : null,
             ServiceTick: tick, MercyTick: mercy, RunCounter, lockedUntil, retired,
-            kept, lost, clawbacks, services.Count > 0 ? services : null);
+            kept, lost, clawbacks, services.Count > 0 ? services : null,
+            FarmYield: yielded, FarmClears: clears, FirstClear: firstClear, Spoiled: spoiled.Count > 0 ? spoiled : null);
         LastResult = result;
         RunEnded?.Invoke(result);
         return result;

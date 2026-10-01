@@ -683,6 +683,45 @@ public sealed class CampaignSaveTests : IDisposable
     }
 
     [Fact]
+    public void TheFarmsWordRoundTrips()
+    {
+        // Phase 6b.3 (§6.6, §5.1): what the farm did at a run's end is saved with the
+        // result — the units it yielded, the clears it yielded at, whether the run was
+        // a first clear, and the potions that spoiled as it ended, each its type by
+        // name and its quality — and comes back field for field, so the summary a
+        // relaunch shows and the batch it mixes from are the ones the run's end wrote.
+        // Nothing spoiled is written null, and null and [] read alike. On the farm's
+        // rate stated as this test's own.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = NewCampaign();
+        Clear(campaign, "tutorial");
+        Clear(campaign, "spear_hall");
+        var restored = RoundTrip(campaign);
+        Assert.Equal((7, 1, true), (restored.LastResult!.FarmYield, restored.LastResult.FarmClears, restored.LastResult.FirstClear));
+        Assert.Null(restored.LastResult.Spoiled);
+        Assert.Equal(7, Farm.Batch(restored));
+
+        var tree = JsonNode.Parse(Save(campaign))!.AsObject();
+        var last = tree["campaign"]!["lastResult"]!.AsObject();
+        Assert.Equal(("7", "1", "true"), (last["farmYield"]!.ToJsonString(), last["farmClears"]!.ToJsonString(), last["firstClear"]!.ToJsonString()));
+        Assert.True(last.ContainsKey("spoiled"));
+        Assert.Null(last["spoiled"]);
+        last["spoiled"] = new JsonArray();
+        Assert.Equal(Save(campaign), Save(Load(tree.ToJsonString()).Campaign));
+
+        // A mercy that carried potions in: both spoiled, listed in roster then slot
+        // order, and the farm's word on that run comes back whole.
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        Retreat(campaign, "long_gallery", floors: 3);
+        var spoiled = RoundTrip(campaign);
+        Assert.Equal((7, 1, false), (spoiled.LastResult!.FarmYield, spoiled.LastResult.FarmClears, spoiled.LastResult.FirstClear));
+        Assert.Equal([TestPotions.Health(2), TestPotions.Mana(1)], spoiled.LastResult.Spoiled!);
+        Assert.Equal("""[{"type":"Health","quality":2},{"type":"Mana","quality":1}]""",
+            JsonNode.Parse(Save(campaign))!["campaign"]!["lastResult"]!["spoiled"]!.ToJsonString());
+        Assert.Equal(BetweenRunsHud.SummaryLines(campaign.LastResult!), BetweenRunsHud.SummaryLines(spoiled.LastResult));
+    }
+
+    [Fact]
     public void TheSeenSetIsSavedAsIdsInOrder()
     {
         // PHASE5-149: "the enchanter's catalogue is a HashSet of enchantment ids in

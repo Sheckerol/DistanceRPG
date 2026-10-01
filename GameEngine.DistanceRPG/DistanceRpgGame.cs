@@ -671,6 +671,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         {
             dropped.RunEnded -= SaveAtTheRunsEnd;
             dropped.RunEnded -= LogTheEnchanter;
+            dropped.RunEnded -= LogTheFarm;
         }
         _campaign = null;
         _slot = null;
@@ -685,8 +686,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <paramref name="slot"/> (the user's ruling of 2026-09-25 on the save slots,
     /// R5): every save of it goes there, and nothing rebinds it — this is the one
     /// place a campaign's slot is set. Its run's end is a save request, and what
-    /// the enchanter did on it a few lines of the log; the campaign it replaces
-    /// keeps no wire to the game.
+    /// the enchanter and the farm did on it a few lines of the log; the campaign it
+    /// replaces keeps no wire to the game.
     /// </summary>
     private void Adopt(CampaignState campaign, SaveSlot slot)
     {
@@ -694,12 +695,14 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         {
             replaced.RunEnded -= SaveAtTheRunsEnd;
             replaced.RunEnded -= LogTheEnchanter;
+            replaced.RunEnded -= LogTheFarm;
         }
         _campaign = campaign;
         _slot = slot;
         _runsEndAsked = false;
         campaign.RunEnded += SaveAtTheRunsEnd;
         campaign.RunEnded += LogTheEnchanter;
+        campaign.RunEnded += LogTheFarm;
     }
 
     /// <summary>
@@ -774,6 +777,54 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
                     _ => "refined",
                 }
                 + RollSaid(report));
+        return lines;
+    }
+
+    /// <summary>
+    /// A run has ended: what the farm did on it, in the log (§6.6; Phase 6b.3) —
+    /// handed over in the result, as the enchanter's reports are, and written here
+    /// (<see cref="FarmLines"/>).
+    /// </summary>
+    private void LogTheFarm(RunResult result)
+    {
+        foreach (string line in FarmLines(result))
+            Log.Info(line);
+    }
+
+    /// <summary>
+    /// The log's lines for what a run's end did at the farm, off its result: the
+    /// alchemist's arrival on the first clear of a dungeon besides the tutorial —
+    /// <c>[Farm] The alchemist has arrived: The Spear Hall is the first dungeon
+    /// beaten besides the tutorial</c> — then, once the farm has a worker, what it
+    /// yielded — <c>[Farm] The run counted: 2 dungeons beaten yield a batch of 14
+    /// units</c>, or <c>[Farm] The run did not count: no batch</c> (PHASE 6b
+    /// DECISION 4) — and the potions that spoiled as the run ended, whenever any
+    /// did: <c>[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1</c>.
+    /// Nothing before the alchemist, unless potions spoiled. The playtests read the
+    /// yield here run by run. A dungeon by its content row's name, and its id where
+    /// the content has none.
+    /// </summary>
+    internal static IReadOnlyList<string> FarmLines(RunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var lines = new List<string>();
+        if (result.FirstClear && !result.Retired && result.FarmClears == 1)
+        {
+            string dungeon = GameContent.Current.Dungeons.TryGet(result.DungeonId, out var def) ? def.Name : result.DungeonId;
+            lines.Add($"[Farm] The alchemist has arrived: {dungeon} is the first dungeon beaten besides the tutorial");
+        }
+        if (result.FarmClears >= 1)
+        {
+            string beaten = $"{result.FarmClears} {(result.FarmClears == 1 ? "dungeon beaten yields" : "dungeons beaten yield")}";
+            lines.Add(!result.ServiceTick
+                ? "[Farm] The run did not count: no batch"
+                : result.FarmYield > 0
+                    ? $"[Farm] The run counted: {beaten} a batch of {result.FarmYield} {(result.FarmYield == 1 ? "unit" : "units")}"
+                    : $"[Farm] The run counted: {beaten} nothing");
+        }
+        if (result.Spoiled is { Count: > 0 } spoiled)
+            lines.Add($"[Farm] {spoiled.Count} {(spoiled.Count == 1 ? "potion" : "potions")} spoiled at the run's end: "
+                + string.Join(", ", spoiled.Select(potion => $"{potion.Type} Q{potion.Quality}")));
         return lines;
     }
 

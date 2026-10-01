@@ -525,10 +525,9 @@ public sealed record Tuning
     public int PartyCarrySlots { get; init; }
 
     // ---- Consumables (§3.4, §6.6) ----
-    // What a drink costs and what a potion restores (Phase 6b.2), each arriving
-    // with the rule that reads it and played from the save's version 3
-    // (TuningKey.HashedFrom). The farm's yield, the group's fourth, comes with the
-    // farm that reads it (TuningSchema.Deferred).
+    // What a drink costs and what a potion restores (Phase 6b.2), and what the farm
+    // yields (Phase 6b.3), each arriving with the rule that reads it and played from
+    // the save's version 3 (TuningKey.HashedFrom).
 
     /// <summary>
     /// The movement a member spends to drink a potion from its own bag (§3.4: "on
@@ -559,6 +558,22 @@ public sealed record Tuning
     /// <see cref="Alchemist.Share(PotionType, int, int)"/>.
     /// </summary>
     public int ManaPotionPercent { get; init; }
+
+    /// <summary>
+    /// The units of yield the farm makes at the end of every run that counts, for
+    /// each dungeon besides the tutorial beaten at least once (§6.6, PHASE 6b
+    /// DECISIONS 4 and 7) — a provisional rate, derived by hand rather than picked:
+    /// a campaign that has beaten everything should yield about one full loadout of
+    /// six maximum-quality potions a run, so this is that loadout's units
+    /// (<see cref="Alchemist.QualityForAll"/> each) over the dungeons beside the
+    /// tutorial, rounded down. Nothing re-derives it: a dungeon added to
+    /// <c>dungeons.json</c> raises a full clear's yield by this much with no
+    /// warning, which settled.md's ruling to tune the total rules against (PHASE 6b
+    /// DECISION 7 says so), so it is re-derived by hand when the dungeon count or
+    /// <see cref="HealthPotionPercent"/> moves. 0 means the farm yields nothing.
+    /// Read by <see cref="Farm.Yield"/>.
+    /// </summary>
+    public int FarmYieldPerClear { get; init; }
 
     // ---- Saves (the user's ruling of 2026-09-25 on the save model) ----
 

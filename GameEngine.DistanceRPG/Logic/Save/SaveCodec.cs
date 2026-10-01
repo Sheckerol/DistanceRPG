@@ -43,9 +43,9 @@ public static class SaveCodec
 {
     /// <summary>
     /// The version this build writes, and the newest it reads. 3 since Phase 6b
-    /// (a member's potions, appended: <see cref="LiftToVersion3"/> writes nothing,
-    /// and is there so a Phase 6a build refuses a version-3 save rather than drop
-    /// its potions). Version 2 was Phase 6a's: a weapon's wear, and the version its
+    /// (a member's potions, and what the farm did at a run's end, appended:
+    /// <see cref="LiftToVersion3"/> writes nothing, and is there so a Phase 6a build
+    /// refuses a version-3 save rather than drop its potions). Version 2 was Phase 6a's: a weapon's wear, and the version its
     /// tuning hash is of. A version-1 document is lifted through both steps
     /// (<see cref="LiftToVersion2"/>, then <see cref="LiftToVersion3"/>).
     /// </summary>
@@ -77,6 +77,14 @@ public static class SaveCodec
 
     /// <summary>A member's potions (<see cref="MemberDto.Potions"/>): version 3's, from Phase 6b.1.</summary>
     internal const string PotionsMember = "potions";
+
+    /// <summary>
+    /// What the farm did at a run's end, in the campaign's last result
+    /// (<see cref="RunResultDto.FarmYield"/>, <see cref="RunResultDto.FarmClears"/>,
+    /// <see cref="RunResultDto.FirstClear"/>, <see cref="RunResultDto.Spoiled"/>):
+    /// version 3's, from Phase 6b.3.
+    /// </summary>
+    internal static readonly IReadOnlyList<string> FarmMembers = ["farmYield", "farmClears", "firstClear", "spoiled"];
 
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
@@ -192,9 +200,11 @@ public static class SaveCodec
 
     /// <summary>
     /// Version 2 to 3 (Phase 6b.1): a member carries potions from version 3
-    /// (<see cref="MemberDto.Potions"/>), appended with its default, none. So the
-    /// step <strong>writes nothing</strong>: a version-2 document already means
-    /// what version 3 means by every member it holds, and the codec stamps the new
+    /// (<see cref="MemberDto.Potions"/>), and the last result says what the farm did
+    /// at the run's end (Phase 6b.3: <see cref="FarmMembers"/>), each appended with
+    /// its default — no potions, and a run that yielded nothing. So the step
+    /// <strong>writes nothing</strong>: a version-2 document already means what
+    /// version 3 means by every member it holds, and the codec stamps the new
     /// version on it. It exists because a Phase 6a build reads version 2 and no
     /// further, so it refuses a version-3 save as a newer build's — kept, never
     /// deleted — rather than reading it and writing the next save without its
@@ -206,7 +216,10 @@ public static class SaveCodec
     /// <strong>It removes the strays.</strong> A <c>potions</c> a hand gave a
     /// version-2 member meant nothing to version 2, whose reader ignored it; read at
     /// version 3 it would be potions the campaign never mixed. So it is removed from
-    /// every party row that is an object, whatever kind of thing it is.
+    /// every party row that is an object, whatever kind of thing it is — and so is
+    /// each of the farm's members a hand gave a version-2 last result that is an
+    /// object, which read at version 3 would be a batch no run made, or potions
+    /// spoiled that none carried.
     /// </para>
     /// <para>
     /// <strong>It never throws on a hand-edited document</strong>, as
@@ -219,11 +232,15 @@ public static class SaveCodec
     internal static JsonObject LiftToVersion3(JsonObject document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        if (document["campaign"] is not JsonObject campaign || campaign["party"] is not JsonArray party)
+        if (document["campaign"] is not JsonObject campaign)
             return document;
-        foreach (var member in party)
-            if (member is JsonObject row)
-                row.Remove(PotionsMember);   // version 2 had none: one a hand put there meant nothing to it
+        if (campaign["party"] is JsonArray party)
+            foreach (var member in party)
+                if (member is JsonObject row)
+                    row.Remove(PotionsMember);   // version 2 had none: one a hand put there meant nothing to it
+        if (campaign["lastResult"] is JsonObject last)
+            foreach (string farm in FarmMembers)
+                last.Remove(farm);   // nor a farm: to version 2 a run's end yielded nothing and spoiled nothing
         return document;
     }
 

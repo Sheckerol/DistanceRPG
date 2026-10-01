@@ -1359,6 +1359,34 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void TheWayOutWarnsThatPotionsSpoil()
+    {
+        // §6.6, Phase 6b.3: every potion carried spoils as the run ends, so the way
+        // out's question says so while one is left to drink — a line of its own,
+        // before what every leave costs, the boss down or standing — and says nothing
+        // when the bags hold none. In the HUD's font, at the most a party carries.
+        const string reset = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", "THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 2));
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", "THE POTION CARRIED SPOILS ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 1));
+        Assert.Equal(DungeonHud.LeavePreview(tutorial), DungeonHud.LeavePreview(tutorial, potionsCarried: 0));
+        Assert.DoesNotContain(DungeonHud.LeavePreview(tutorial), line => line.Contains("POTION", StringComparison.Ordinal));
+        tutorial.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE TUTORIAL CLOSES FOR GOOD", "THE 3 POTIONS CARRIED SPOIL ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 3));
+
+        // The widest, a bag slot each for the most a party carries, at the panel's 1.5.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PartyCarrySlots))!).Max;
+        string widest = DungeonHud.PotionsSpoilLine(most);
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+        Assert.True(widest.Length * 6f * 1.5f <= 1240f, $"'{widest}' runs off the window");
+    }
+
+    [Fact]
     public void TheRunSummaryNamesTheOutcome()
     {
         // 4.4's three outcomes, as the run's end shows them: what the run was, where
@@ -1520,10 +1548,26 @@ public sealed class HudTextTests : IDisposable
             .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id, Improved: improved))
             .Concat(Enumerable.Range(0, ContentBounds.MostWorked - 1).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id)))
             .ToArray();
-        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, members.SelectMany(Pools).ToArray(), reports);
+        // And the farm's two lines (Phase 6b.3), each at its widest: every potion a
+        // party carries spoiled, and the alchemist's arrival on a yield at the count's
+        // ceiling — the longest of the farm's forms.
+        var spoiled = Enumerable.Range(0, GameContent.Current.Tuning.PartyCarrySlots).Select(_ => TestPotions.Health(ContentBounds.MostCount)).ToArray();
+        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, members.SelectMany(Pools).ToArray(), reports,
+            FarmYield: ContentBounds.MostCount, FarmClears: 1, FirstClear: true, Spoiled: spoiled);
 
         var lines = DungeonHud.RunSummaryLines(worst);
         var texts = lines.Select(line => line.Text).ToArray();
+        Assert.Contains(BetweenRunsHud.SpoiledLine(spoiled.Length), texts);
+        Assert.Contains($"A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED {ContentBounds.MostCount} UNITS", texts);
+        var farmForms = new[] { worst, worst with { FarmClears = 99 }, worst with { FirstClear = false, FarmClears = 99 }, worst with { FarmYield = 0 } }
+            .Select(form => BetweenRunsHud.FarmLine(form)!.Value.Text).ToArray();
+        Assert.True(farmForms.Max(form => form.Length) == farmForms[0].Length, $"the arrival is not the farm's widest line: {string.Join(" / ", farmForms)}");
+        Assert.All(farmForms, form => Assert.True(form.Length * 6f * 2f <= 1240f, $"'{form}' runs off the window"));
+
+        // Every line the panel is handed is drawn, and a 720 window holds this many
+        // at the least step: the panel is full. A line added anywhere in the summary
+        // now has to be paid for — by a cap, a shorter list, or a smaller step.
+        Assert.True(lines.Count == 35, $"the worst summary is {lines.Count} lines: the run's end panel is full at 35, the most a 720 window holds at the least step");
         string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()} - DEEPENED {DungeonHud.ModifierName(deepest)}";
         Assert.Equal(new[] { back, $"THE ENCHANTER WORKED THE {longest.Name.ToUpperInvariant()} - 1 OF {ContentBounds.MostServiceRuns} RUNS" }.Take(DungeonHud.DungeonServiceLines),
             texts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
@@ -1559,8 +1603,13 @@ public sealed class HudTextTests : IDisposable
         Assert.All(movedTexts, text => Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window"));
 
         // A long summary the lift alone fits keeps the full step: a member clawed
-        // back in one weapon's class, and in HP and mana, one line a member.
-        var lifted = DungeonHud.RunSummaryLines(worst with { Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray() });
+        // back in one weapon's class, and in HP and mana, one line a member — with
+        // nothing spoiled and no farm yet, the two lines the farm added (Phase 6b.3)
+        // being what the worst case closes up for.
+        var lifted = DungeonHud.RunSummaryLines(worst with
+        {
+            Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray(), Spoiled = null, FarmClears = 0, FarmYield = 0, FirstClear = false,
+        });
         Assert.Equal(22f, DungeonHud.RunSummaryStep(h, lifted.Count));
         Assert.True(DungeonHud.RunSummaryTop(h, lifted.Count) < h / 2f - 170f, "the lifted summary sits above the ordinary anchor");
 

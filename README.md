@@ -191,8 +191,37 @@ ladder's, not counted as the drink's (so `+12 HP of 12 offered (28/31)` can
 follow a drink at 15/30). A drink refused short of its cost logs the movement left
 rounded down — `39 movement left, a drink costs 40` at 39.6 — while the MOVE
 readout rounds up, as it always has, and reads 40: the bag's red `- NOT ENOUGH
-LEFT` is the one to trust. Nothing makes a potion yet: the farm and the alchemist
-that mix them come in Phase 6b's later steps.
+LEFT` is the one to trust. The farm (below) yields the units a potion is mixed
+from; the alchemist who mixes them comes in Phase 6b's next step.
+
+**The farm** (Phase 6b): every dungeon besides the tutorial beaten once is one of
+the farm's workers, and every run that counts — a boss kill, or a mercy for
+failing deep, the runs that tick the enchanter — yields `FarmYieldPerClear` (7)
+units a worker as it ends (PHASE 6b DECISION 4), the run that beats a dungeon for
+the first time at the count it brings (DECISION 5). So the first clear of a
+dungeon besides the tutorial brings the alchemist and a batch of 7 at once, a
+boss killed and then a wipe included, and a full clear of the four that ship
+yields 28 a run; a run that does not count yields nothing, and the tutorial never
+counts. What a run yielded is kept with its result, and the batch is that less
+what the bags hold, never a number of its own (DECISION 6): quitting and loading
+never refills it, and it is gone the moment the party descends — what is left
+unmixed spoils, and the next run that counts brings a fresh one, never added to
+the last. Every potion carried spoils as the run ends, on the way out or by a
+wipe — a potion keeps for one trip — and the way out's question says so first:
+`THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT`. The run's summary, at its end and on
+the hub, says what the farm did right after whether the run counted — `A FIRST
+CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` and `A FIRST CLEAR -
+THE FARM GROWS TO 2 DUNGEONS - IT YIELDED 14 UNITS` in green, `THE FARM YIELDED 14
+UNITS - 2 DUNGEONS BEATEN` in cyan, `THE FARM YIELDED NOTHING - THE RUN DID NOT
+COUNT` in grey, and nothing before the alchemist — and after the spoils, `2
+POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow. The log says it too:
+`[Farm] The alchemist has arrived: The Spear Hall is the first dungeon beaten
+besides the tutorial`, `[Farm] The run counted: 2 dungeons beaten yield a batch of
+14 units`, `[Farm] 2 potions spoiled at the run's end: Health Q2, Mana Q1`. Mixing
+— how many potions of which type, at what quality — is the alchemist's, Phase 6b's
+next step: until then the batch is shown in the summary alone. The roster stays at
+the four dungeons that ship (DECISION 8), and `FarmYieldPerClear` is derived for
+them by hand (DECISION 7; see [Tuning the numbers](#tuning-the-numbers-tuningjson)).
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The
@@ -542,16 +571,26 @@ back to it, and the game quits from it.
   cannot be read, naming where (`campaign.party[0].potions[0].slot`), and so is a
   potion carried before the alchemist could have mixed one: while every dungeon
   the campaign has cleared is retired — before a dungeon besides the tutorial is
-  beaten (§6.6). A version-2 save — Phase 6a's — loads as ever: it is lifted to
-  version 3 as it is read by a step that writes nothing (a stray `"potions"` a
-  hand gave it is removed, since version 2 knew none), and saved as version 3 from
-  then on. **Do not open a Phase 6b slot with an older checkout.** A Phase 6a
+  beaten (§6.6). From Phase 6b.3 the last run's record says what the farm did —
+  `"farmYield"`, the units it yielded; `"farmClears"`, the dungeons besides the
+  tutorial beaten as it ended; `"firstClear"`; and `"spoiled"`, the potions that
+  spoiled as it ended, each its type and quality, `null` for none — and the potions
+  carried are checked against it: bags holding more units of quality than the last
+  run yielded are refused, naming the potion where the sum passes it, and so are a
+  yield on a run that did not count or past any tuning's, more clears than the
+  campaign holds, and potions spoiled that the bags could not hold or before the
+  alchemist had arrived. A version-2 save — Phase 6a's — loads as ever: it is
+  lifted to version 3 as it is read by a step that writes nothing (a stray
+  `"potions"`, or a stray farm member on the last run's record, a hand gave it is
+  removed, since version 2 knew none), its last run read as one that yielded
+  nothing — so it carries no batch until its next run that counts — and saved as
+  version 3 from then on. **Do not open a Phase 6b slot with an older checkout.** A Phase 6a
   checkout reads version 3 as a newer build's save and sets it aside, kept and
   never deleted, and loads nothing in its place. While Phase 6b is being built,
   every 6b step reads version 3 as its own, as every 6a step read version 2: an
   earlier step's build loads a save a later step wrote, passes over what it does
-  not know of, and its next save drops it (PHASE 6a DECISION 14, extended). From
-  6b.3 that costs more: the last run's record gains what the farm yielded, and
+  not know of, and its next save drops it (PHASE 6a DECISION 14, extended). Since
+  6b.3 that costs more: the last run's record holds what the farm yielded, and
   every potion carried is checked against it, so a slot a 6b.3-or-later build
   saved and a 6b.1 or 6b.2 build then saved again with potions in its bags is
   refused by a 6b.3-or-later build — the yield it was mixed from is gone — and set
@@ -795,8 +834,17 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   is the best potion there is. They play since Phase 6b's drink reads them, and
   turning one says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other
   number resumes — never to a save from before Phase 6b, whose record covers only
-  the keys played then. The group's fourth, `FarmYieldPerClear`, arrives with the
-  farm that reads it; a file naming it is told so.
+  the keys played then. The group's fourth, `FarmYieldPerClear`, is the units the
+  farm yields a worker on every run that counts (0 to 1000; 0 yields nothing;
+  provisional — PHASE 6b DECISIONS 4 and 7), played since Phase 6b's farm reads it.
+  It is derived by hand, not picked: a campaign that has beaten everything should
+  yield about one full loadout of six maximum-quality potions a run, 6 × (100 /
+  `HealthPotionPercent` 20) = 30, over the four dungeons beside the tutorial, 7.5 →
+  7. It is a rate, and nothing re-derives it for you: a dungeon added to
+  `dungeons.json` — the master or the copy beside the game — raises a full clear's
+  yield by 7 with no warning, so re-derive it by hand when the roster or
+  `HealthPotionPercent` moves (the suite says so of the master copy, and only when
+  it runs). No key is still to come: every key of §5.3's set has its reader.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at
