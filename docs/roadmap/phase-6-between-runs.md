@@ -708,6 +708,17 @@ than two. §3.4 makes a potion cost an inventory slot against weapons and haul;
 now that trade is decided at the moment the potions are handed to you, with the
 run's whole supply in front of you and nothing recoverable afterwards.
 
+(Built in Phase 6b: the run's yield is saved as a fact of its result, and the
+batch is that yield less what the bags hold, worked out and never a field, so a
+quit and a load never refill it — PHASE 6b DECISION 6 in open-questions.md, which
+bends §3.5's "not saved" and keeps §6.7's "never reach `CampaignState`". What is
+left unmixed spoils as the party descends, and every potion carried spoils as the
+run ends, a wipe's included: a consumable, lost by its lifetime, never gear a wipe
+forfeits. The split is made a potion at a time on the ALCHEMIST page, and each can
+be poured back, its units back in the batch, until the descent — DECISION 9, with
+this paragraph's single hand-over among its alternatives. settled.md's Phase 6b
+implementation pass records each.)
+
 ### The alchemist arrives with the first real clear, and the tutorial does not count
 
 **Nobody mixes potions until you have beaten a dungeon that is not the
@@ -732,6 +743,14 @@ and the movement budget before it ever learns to drink, so first aid arrives as
 a thing that changes how you fight rather than as a thing you always had. And
 the first real clear — already the hardest gate in the game — hands over an
 entire category rather than a number going up.
+
+(Built in Phase 6b: his arrival is derived from the campaign's cleared and
+retired sets — a dungeon cleared and not retired, the farm's first worker — and
+never saved, so the tutorial, which retires on its clear, never counts. The
+ALCHEMIST page is the hub's third, there from the start and saying when he
+arrives — PHASE 6b DECISION 10 — and under a `dungeons.json` that moves
+`retiresOnClear` onto the farm's one worker he goes with it until the next first
+clear — DECISION 11.)
 
 ### It pays for the one thing nothing else pays for
 
@@ -776,6 +795,12 @@ paid for by playing.
 It also means the farm and the enchanter tick together. A run advances your
 weapons and stocks your shelf in one event, which is one fewer clock for a
 player to hold.
+
+(Built in Phase 6b: every run that counts yields — a boss kill, or §6.3's mercy,
+the runs that tick the enchanter, in the same event at the run's end — and one
+that does not yields nothing, PHASE 6b DECISION 4; the run that beats a dungeon
+for the first time yields at the count it brings, so the first real clear brings
+the alchemist and a batch at once, DECISION 5.)
 
 ### Quality is what surplus yield buys, so it does not saturate
 
@@ -867,6 +892,18 @@ passes before the farm stops mattering. Low, and early potions feel like
 nothing; high, and the ceiling arrives while there are still dungeons left to
 find.
 
+(Built in Phase 6b as the hand-off's per-clear key, `FarmYieldPerClear`,
+re-derived by hand: a loadout read as six maximum-quality potions, 6 × 5 = 30
+units at 20 percent, over the four dungeons that ship beside the tutorial — the
+roster left at four, PHASE 6b DECISION 8 — is 7.5, rounded down to 7, and its
+comment in `tuning.json` carries the derivation. What that costs, plainly: it is
+a rate, and a dungeon added to `dungeons.json` outside a test run raises a full
+clear's yield by 7 with no warning, so it does not keep this section's "does not
+silently inflate"; the suite catches it in the master copy only, and only when it
+runs. PHASE 6b DECISION 7 sets that out, with the form that keeps both rules — a
+key for the total, the rate computed as the content loads — among its
+alternatives.)
+
 ### Mana and health are equivalent until play says otherwise
 
 `ManaPotionPercent` starts **equal** to `HealthPotionPercent` — one unit of yield
@@ -897,7 +934,9 @@ New `Logic/Wear.cs`, `Logic/Enchanter.cs`, and a `CampaignState` that lives
 *outside* `DungeonState` (§4.3) — party, stable, enchanter queue, run counter,
 the set of dungeons cleared at least once, and the farm's stock.
 The existing distinction does the work for us: `DungeonState` is discarded on
-leaving, `CampaignState` is not.
+leaving, `CampaignState` is not. (Built in Phase 6b, in the farm's stock: the
+campaign keeps no stock of its own — the run's yield is a fact of its result,
+and the batch is worked out from it and the bags, PHASE 6b DECISION 6.)
 
 `Weapon` gains `Wear` and `WearCapacity`; the unified attack resolver from Phase 0 is the single
 place it accrues, and `Enchanter` is the single place it is spent (§6.4) — a
@@ -939,6 +978,14 @@ yield computed from its count, and a split the player chooses. It earns one
 anyway, because the *spoilage* rule (§6.6) is the kind of thing that gets
 quietly broken by a later change unless there is somewhere obvious for it to
 live — the batch must never reach `CampaignState`.
+
+(Built in Phase 6b: `Logic/Farm.cs` counts the workers — the cleared set less
+the retired — makes a run's yield, works the batch out from the last result and
+the bags, and spoils every potion carried at the run's end, its one caller.
+The batch is derived, never a field — PHASE 6b DECISION 6 — and a test holds
+that `CampaignState` declares no batch, farm or yield of its own, and that a
+save and a load leave the batch as it was. The split the player chooses is the
+alchemist's, `Logic/Alchemist.cs`, beside what a potion restores.)
 
 Phase 5's save format grows a campaign section, and it becomes the *outer*
 document — a save with no dungeon in progress is now a valid state, which it

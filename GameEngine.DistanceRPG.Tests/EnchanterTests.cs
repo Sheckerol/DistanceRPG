@@ -1232,7 +1232,7 @@ public sealed class EnchanterTests : IDisposable
     [Fact]
     public void WearIsSpentAndReturnedInOnePlace()
     {
-        // The enchanter is the single place wear is spent (P6:902–903), and the one
+        // The enchanter is the single place wear is spent (P6:941–942), and the one
         // door each of its moves goes through, read off the IL: the pool is cashed by
         // a deposit alone and refunded by a take-back alone; a deposit enters the
         // shop by the hub's door and a take-back leaves it by another; a finished

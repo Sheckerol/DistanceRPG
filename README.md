@@ -623,7 +623,7 @@ back to it, and the game quits from it.
   cannot be read, naming where (`campaign.party[0].potions[0].slot`), and so is a
   potion carried before the alchemist could have mixed one: while every dungeon
   the campaign has cleared is retired — before a dungeon besides the tutorial is
-  beaten (§6.6). From Phase 6b.3 the last run's record says what the farm did —
+  beaten (§6.6). The last run's record says what the farm did —
   `"farmYield"`, the units it yielded; `"farmClears"`, the dungeons besides the
   tutorial beaten as it ended; `"firstClear"`; and `"spoiled"`, the potions that
   spoiled as it ended, each its type and quality, `null` for none — and the potions
@@ -732,11 +732,14 @@ back to it, and the game quits from it.
   counter in the billions, hit points past the largest bar plus what was earned,
   a weapon's wear past any capacity any `tuning.json` could give it (10000 plus
   1000 for each wear it has cashed), a service at the enchanter taking more than
-  11 runs, a run's end working more than 10 of them — and then against the rest:
+  11 runs, a run's end working more than 10 of them, a potion's quality in the
+  billions, a run's yield past 1000 units for each dungeon the farm counted (the
+  most any `tuning.json` yields) — and then against the rest:
   a retired dungeon never cleared, a last run's summary that disagrees with the
   campaign (its run count, its lock, the dungeon it cleared), a run in progress
   in a dungeon the list could not have offered, a boss standing that the run has
-  down, an enemy's weapon or a drop carrying wear, a shop that contradicts itself
+  down, an enemy's weapon or a drop carrying wear, a shop that contradicts itself,
+  potions carried past what the last run yielded or before the alchemist
   (above). Wear above the capacity today's
   `tuning.json` gives is no fault: lower `StartingPool` and a full weapon keeps
   its wear, reading `WEAR 30/20 FULL`. A save that fails any of it is set
@@ -886,7 +889,9 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   is the best potion there is. They play since Phase 6b's drink reads them, and
   turning one says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other
   number resumes — never to a save from before Phase 6b, whose record covers only
-  the keys played then. The group's fourth, `FarmYieldPerClear`, is the units the
+  the keys played then; while Phase 6b was being built, a save an earlier step's
+  build wrote said it once, though no number moved, since the drink's three and
+  then the farm's joined version 3's record. The group's fourth, `FarmYieldPerClear`, is the units the
   farm yields a worker on every run that counts (0 to 1000; 0 yields nothing;
   provisional — PHASE 6b DECISIONS 4 and 7), played since Phase 6b's farm reads it.
   It is derived by hand, not picked: a campaign that has beaten everything should
@@ -937,7 +942,11 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   fail `EnchanterTests.TheRulingsClimb_WearDepositsAndRuns`, the ruling's worked
   climb; and `GraftBaseChance` 3, §6.4's, which fails
   `ImprovementRollTests.TheOddsAreTheRulings`, the 6, 7 and 9 in 100 the ruling
-  works out from it. Every other number in it fails nothing: the tests read it from the master, or stand
+  works out from it; and `FarmYieldPerClear` 7, derived from `HealthPotionPercent`
+  20 and the four dungeons beside the tutorial as §6.6's loadout rule states it,
+  fails `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions` whenever one of
+  the three moves without the rate being re-derived — a fifth dungeon in the master
+  `dungeons.json` included. Every other number in it fails nothing: the tests read it from the master, or stand
   on numbers of their own (`Premise`, in the test project: the numbers the
   worked examples were written against, which most scenario suites play instead
   of the master's) — give `PerStack`'s `Block` 4, rebuild and run the suite, and
@@ -1040,7 +1049,12 @@ everything in them is named by a stable string id.
   and `retiresOnClear`, the tutorial's alone. Moved onto another dungeon once a
   campaign has deposits at the enchanter, it refuses no save and hides nothing in
   the shop: the enchanter takes no new deposit until that dungeon is beaten, and
-  what is in the shop is listed and worked as ever. There is no drop table: what a boss
+  what is in the shop is listed and worked as ever. Moved onto the farm's one
+  worker, its next clear retires it, and the alchemist goes with it until the next
+  first clear (PHASE 6b DECISION 11). A dungeon added here raises what the farm
+  yields a full clear, since `FarmYieldPerClear` is a rate derived for the four
+  that ship (PHASE 6b DECISIONS 7 and 8): re-derive it by hand when one is.
+  There is no drop table: what a boss
   drops is computed from its theme and `restricted.json`, so taking `Brace` out
   of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
   with no edit to this file.

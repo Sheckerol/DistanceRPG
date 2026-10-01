@@ -1229,6 +1229,21 @@ of four in one slot means it costs nothing to be prepared.
 
 It is the harsher reading and it is the one that keeps the extraction tense.
 
+(Built in Phase 6b. A potion lies in a member's bag, slots 2 to 6, never the
+hand, one a slot, and is drunk by its number with the bag open, from the
+drinker's own bag — self-only. Where else it may be is PHASE 6b DECISION 1 in
+open-questions.md: never the stable, a floor or another bag, and poured out in a
+dungeon, free. A drink costs `PotionUseCost`, 40, in combat and out — DECISION 2
+— paid whole or refused, as a swap short of its cost is; no cooldown and no limit
+a turn. What it restores is worked out as it is drunk, `HealthPotionPercent` or
+`ManaPotionPercent` (20 each) of the drinker's maximum for each unit of quality,
+rounded down — health of max HP, mana of the earned pool, never past what the
+locks leave spendable: DECISION 3 — and no quality is capped. Health goes through
+the heal every source uses, so it restores what was missing and teaches exactly
+that as HP XP, a full-HP drink restoring and teaching nothing, and the overshoot
+is lost unless Overheal banks it as Ward; mana is a refund that teaches nothing.
+settled.md's Phase 6b implementation pass records each.)
+
 ## 3.5 Code impact
 
 New `Logic/Enchantment.cs` and `Logic/LootTable.cs` (own RNG stream:
@@ -1286,6 +1301,15 @@ The farm belongs to `CampaignState` (§6.7), not here: a `HashSet` of
 first-cleared dungeon ids and the current batch. **The batch is not saved
 between runs** — it spoils (§6.6), so it is computed at the hub and discarded,
 which means the only thing persisted is the clear set.
+
+(Built in Phase 6b, and bent once — PHASE 6b DECISION 6 in open-questions.md: the
+run's yield is saved as a fact of its result, beside the clear set, so a quit
+and a load never refill the batch. The batch itself is still never saved, nor a
+field of `CampaignState`: it is worked out at the hub from that yield and the
+bags, and what is left unmixed spoils as the party descends. `Logic/Farm.cs`
+holds the farm, `Potion` lives in `Logic/Items.cs` beside `IItem`, what a bag
+slot holds, `Logic/Alchemist.cs` holds what a potion restores and the mixing,
+and the consumable path is `TurnSystem.TryDrink`.)
 
 `TurnSystem` needs a consumable-use path costing `PotionUseCost` movement. It
 routes healing through the **same** call `TickStatusEffects` uses, so the

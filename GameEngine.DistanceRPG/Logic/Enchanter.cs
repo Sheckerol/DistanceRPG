@@ -180,7 +180,7 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// The enchanter (§6.2–§6.4, §6.7; Phase 6a.3a): where wear is spent, a weapon's
 /// capacity grows, and enchantments are bought — slowly, in runs that count.
 /// Engine-free and deterministic, like everything under <c>Logic/</c>, and the one
-/// place wear is spent (P6:902–903).
+/// place wear is spent (P6:941–942).
 /// <list type="bullet">
 /// <item><strong>The offer</strong> (<see cref="Offers"/>, Phase 6a.3b) is what an
 /// Enchant may buy: what the campaign has met, less the unique souls and the

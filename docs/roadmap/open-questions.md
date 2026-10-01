@@ -1096,7 +1096,8 @@ or §6.3's mercy for failing deep — exactly the runs that tick the enchanter**
 the same event at the run's end (`CampaignState.EndRun`, `Farm.Yield`). A run that
 does not count yields nothing, and the run's summary says so: `THE FARM YIELDED
 NOTHING - THE RUN DID NOT COUNT`. A boss killed and then a wipe is a clear, and
-counts, so it yields (settled.md's "killed the boss, died on the way out").
+counts, so it yields (§6.3's "Killed the boss, died on the way out", a run that
+ticks; settled.md's "Every boss kill adds its dungeon").
 
 **What the pick lets a player do.** A losing streak deep in a dungeon still sends
 the party down with potions, as it still works the enchanter's shop; a run in and

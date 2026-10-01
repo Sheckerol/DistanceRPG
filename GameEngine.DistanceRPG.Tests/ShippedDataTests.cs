@@ -40,7 +40,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The unique table — phase-1-weapons.md L1075-1083 (§1.5):
 /// <c>UniqueContentTests</c>' <c>Table</c>.</item>
 /// <item>The tutorial's row: its boss pinned to floor 2, and its golem's 80 HP,
-/// movement budget of 40 and Block x3 — phase-5-save.md L376 and L377 (§5.8):
+/// movement budget of 40 and Block x3 — phase-5-save.md L415 and L416 (§5.8):
 /// <see cref="DungeonContentTests.TheTutorialIsTheShippedDungeon"/>.</item>
 /// <item>A weapon's wear capacity: <c>StartingPool</c> 30, the capacity it opens
 /// on, and <c>WearCapacityPerBar</c> 1, a point for every full bar cashed — the

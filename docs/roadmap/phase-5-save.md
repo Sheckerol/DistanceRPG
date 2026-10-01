@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity` — built in Phase 6a as `wear` and `wearCashed`, the wear ever cashed, from which the capacity and its progress are replayed as HP is from its XP: settled.md's Phase 6a pass, PHASE 6a DECISION 2), active status effects, the hidden `Overheal` remainder, carried consumables |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity` — built in Phase 6a as `wear` and `wearCashed`, the wear ever cashed, from which the capacity and its progress are replayed as HP is from its XP: settled.md's Phase 6a pass, PHASE 6a DECISION 2), active status effects, the hidden `Overheal` remainder, carried consumables — built in Phase 6b as a member's `potions`, each its bag slot, type and quality, in the save's version 3, and the last run's result saying what the farm yielded and what spoiled (settled.md's Phase 6b pass; PHASE 6b DECISION 6) |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -19,11 +19,15 @@ restore saved states afterwards.
 
 `System.Text.Json` with an explicit version field and a DTO layer in
 `Logic/Save/` — the gameplay types must not carry serialization attributes, or
-`Logic/` stops being clean. Version 1 was Phase 5's; **version 2 is Phase 6a's**
+`Logic/` stops being clean. Version 1 was Phase 5's; version 2 was Phase 6a's
 (a weapon's `wear` and `wearCashed`, and the root's `tuningHashVersion`, the
-version whose played keys the tuning hash covers: PHASE 6a DECISION 9), and a
-version-1 document is lifted to it as it is read — every weapon unworn, its hash
-of version 1's keys — by the one migration step the codec ships.
+version whose played keys the tuning hash covers: PHASE 6a DECISION 9); and
+**version 3 is Phase 6b's** (a member's `potions`, and what the farm did at a
+run's end in the last run's result, each appended with its default). An older
+document is lifted as it is read, a step a version: from 1, every weapon
+unworn, its hash of version 1's keys; from 2, nothing but the version, a step
+that exists so a Phase 6a build refuses a version-3 save rather than drop its
+potions (PHASE 6a DECISION 14).
 
 Where the saves live, how many there are, when one is taken and how a player
 gets back to one is settled.md's (the user's rulings of 2026-09-25 on the save
@@ -111,7 +115,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
 | Enchanter | `WearPerHit`, `GraftBaseChance`, and what a deposit costs by the user's ruling of 2026-09-25 (settled.md): `WearCapacityPerBar`, `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`, `FirstEnchantmentWear`, `EnchantmentWearStep` — superseding `WearCapacityLadder` (30/40/55) and `EnchantmentWearCost` |
 | Inventory | `PartyCarrySlots` |
-| Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
+| Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` — played since Phase 6b, each with its reader, and hashed from the save's version 3 (settled.md's Phase 6b pass; `FarmYieldPerClear` is PHASE 6b DECISION 7) |
 
 Collecting them is worth as much as making them editable. Half the open
 questions in these documents are "this number, against that number" — the mana
