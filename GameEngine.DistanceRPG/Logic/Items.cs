@@ -73,6 +73,6 @@ public sealed record Potion(PotionType Type, int Quality) : IItem
 /// <param name="Potion">The potion, gone from the bag.</param>
 /// <param name="Slot">The bag slot it was drunk from, 0 being the hand.</param>
 /// <param name="Share">What it offered the drinker's pool: the share of its maximum, overshoot and all (<see cref="Alchemist.Share(Potion, ActorState)"/>).</param>
-/// <param name="Restored">What the pool gained: HP after less HP before, or the mana the pool took — never the overshoot, whatever Overheal banked of it.</param>
+/// <param name="Restored">What the pool gained: the HP the heal applied — the share up to what was missing, the HP XP it credits and the heal's own +N, never the point that credit may buy, which arrives filled and is the ladder's — or the mana the pool took; never the overshoot, whatever Overheal banked of it.</param>
 /// <param name="Cost">The movement it cost (<see cref="TurnSystem.PotionUseCost"/>).</param>
 public sealed record PotionDrink(Potion Potion, int Slot, int Share, int Restored, int Cost);

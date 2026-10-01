@@ -172,20 +172,27 @@ short, `DRINKING IS FREE` at 0 — and under each potion what it restores now: a
 share of the member's maximum, `HealthPotionPercent` (20) of max HP or
 `ManaPotionPercent` (20) of max mana for each unit of quality it was mixed at,
 rounded down (PHASE 6b DECISION 3) — `RESTORES 12 OF 30 HP` for quality 2 at 30,
-`RESTORES ALL 30 HP - 6 OVER` once it is a whole pool and more. So a potion rides
-the ladder its member climbs, and quality 5 is the best there is at 20: it heals
-completely from 1 HP. No cooldown and no limit a turn: several drinks while the
-movement lasts. A health potion heals through the same applier every heal does —
-never past full, and the HP it restored is HP XP, so a drink at full restores and
-teaches nothing (allowed, and wasted) — and what lands past full is lost, unless
-the member holds Overheal, which banks it as Ward. A mana potion fills the pool up
-to what the equipped locks leave spendable, and teaches nothing: mana XP is mana
-spent. What was drunk rises over the member in the potion's colour —
-`DRANK HEALTH POTION Q2 - +12 HP`, `DRANK MANA POTION Q1 - +6 MANA`, or `... -
-NOTHING TO RESTORE` at full — and the log says it whole: `[Potion] A drinks a
-Health potion (quality 2) from slot 3: +12 HP of 12 offered (30/30), 40
-movement`. Nothing makes a potion yet: the farm and the alchemist that mix them
-come in Phase 6b's later steps.
+`RESTORES ALL 30 HP` when it is exactly a whole pool, `RESTORES ALL 30 HP - 6 OVER`
+once it is a whole pool and more. So a potion rides the ladder its member climbs,
+and quality 5 is the best there is at 20: it heals completely from 1 HP. No
+cooldown and no limit a turn: several drinks while the movement lasts. A health
+potion heals through the same applier every heal does — never past full, and the
+HP it restored is HP XP, so a drink at full restores and teaches nothing (allowed,
+and wasted) — and what lands past full is lost, unless the member holds Overheal,
+which banks it as Ward. A mana potion fills the pool up to what the equipped locks
+leave spendable, and teaches nothing: mana XP is mana spent. What was drunk rises
+over the member in the potion's colour — `DRANK HEALTH POTION Q2 - +12 HP`,
+`DRANK MANA POTION Q1 - +6 MANA`, or `... - NOTHING TO RESTORE` at full — and the
+log says it whole: `[Potion] A drinks a Health potion (quality 2) from slot 3: +12
+HP of 12 offered (30/30), 40 movement`. The `+12` is the heal the drink applied,
+the same number the heal floats and the HP XP it teaches: when that XP buys a point
+of max HP, the point arrives filled, as it does after any heal, and is the
+ladder's, not counted as the drink's (so `+12 HP of 12 offered (28/31)` can
+follow a drink at 15/30). A drink refused short of its cost logs the movement left
+rounded down — `39 movement left, a drink costs 40` at 39.6 — while the MOVE
+readout rounds up, as it always has, and reads 40: the bag's red `- NOT ENOUGH
+LEFT` is the one to trust. Nothing makes a potion yet: the farm and the alchemist
+that mix them come in Phase 6b's later steps.
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The

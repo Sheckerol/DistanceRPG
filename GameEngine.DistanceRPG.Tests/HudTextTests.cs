@@ -1168,6 +1168,20 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void ADrinkRefusedShortOfItsCostNeverLogsTheCostAsWhatIsLeft()
+    {
+        // The 6b.2 review: movement left after walking is a fraction, and the gate
+        // pays a whole cost only from the whole of it. The log rounds down, so a
+        // member at 39.6 of a 40 drink reads 39 — never 40, the cost it is refused —
+        // and a whole number reads as itself. Rounded down, the whole movement left
+        // is at least the cost exactly when the gate would pay it.
+        Assert.Equal("[Potion] A cannot drink from slot 2: 39 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 1, 39.6f, 40));
+        Assert.Equal("[Potion] D cannot drink from slot 6: 39 movement left, a drink costs 40", DungeonScene.DrinkShortLine("D", 5, 39.999f, 40));
+        Assert.Equal("[Potion] A cannot drink from slot 3: 10 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 2, 10f, 40));
+        Assert.Equal("[Potion] A cannot drink from slot 2: 0 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 1, 0.5f, 40));
+    }
+
+    [Fact]
     public void TheFloorLineNamesTheFloorAndNeverTheDepth()
     {
         // PHASE4-024: the boss floor is rolled at entry and not disclosed - the

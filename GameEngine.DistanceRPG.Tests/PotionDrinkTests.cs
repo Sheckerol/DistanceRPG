@@ -180,6 +180,34 @@ public sealed class PotionDrinkTests : IDisposable
     }
 
     [Fact]
+    public void ADrinkReportsTheHealItApplied_NotThePointItsXpBuys()
+    {
+        // The 6b.2 review: the HP XP a drink credits can buy a point of max HP, and
+        // that point arrives filled (PartyMemberState.Credit) — HP the ladder gives,
+        // not the drink. What the drink reports is what the heal applied: the HP XP
+        // it credited and the +20 every heal floats, so its beat and its log line
+        // never say more than the potion offered. Five XP short of the next point,
+        // a quality-1 drink at 75 of 100 heals 20, and the point it buys makes 96 of 101.
+        var a = Member();
+        a.Hp = 75;
+        a.Credit(new XpCredit(XpPool.Health, null, a.HealthPool.XpToNext - 5));
+        a.Inventory[1] = Health(1);
+        var (turns, _, _) = Turns(a);
+        var healed = new List<int>();
+        turns.CharacterHealed += (_, amount) => healed.Add(amount);
+        int hpXp = a.HpXp;
+        Assert.Equal(TestPools.FixtureHp, a.MaxHp);
+
+        var drink = turns.TryDrink(a, 1)!;
+
+        Assert.Equal((TestPools.FixtureHp + 1, 96), (a.MaxHp, a.Hp));   // the point bought, and filled
+        Assert.Equal(hpXp + 20, a.HpXp);
+        Assert.Equal([20], healed);
+        Assert.Equal(new PotionDrink(Health(1), 1, 20, 20, Cost), drink);
+        Assert.Equal("DRANK HEALTH POTION Q1 - +20 HP", DungeonHud.DrankBeat(drink));
+    }
+
+    [Fact]
     public void AFullHpDrinkRestoresNothing_LearnsNothing_AndIsAllowed()
     {
         // §3.4: "a character at full health who drinks restores nothing and therefore
@@ -396,60 +424,78 @@ public sealed class PotionDrinkTests : IDisposable
         // range, and the campaign saves and restores whole. The potions are laid in
         // the bags mid-run, in place: no run's yield gives the sanity bound, so none
         // goes through TestPotions, and each is drunk before the save is written.
-        using var ceiling = TestContent.UsePremise(tuning: t => Drinks(t) with { HealthPotionPercent = 100, ManaPotionPercent = 100 });
-        var campaign = CampaignState.Start(GameContent.Current);
-        var (a, b) = (campaign.Party[0], campaign.Party[1]);
-        var carried = TestWeapons.Get("flensing_knife_unique");
-        var overheal = carried.Enchantments.Single(entry => entry.Def.Effect == EffectKind.Overheal);
-        a.Inventory[0] = carried;
-        campaign.See(carried);
-        Assert.DoesNotContain(b.EquippedWeapon!.Enchantments, entry => entry.Def.Effect == EffectKind.Overheal);
-        foreach (var member in new[] { a, b })
+        // Twice: at the premise's fold, and at the clamps' extreme one — the hidden
+        // pool's EffectPerLevel at its ceiling over one point a Ward — where the
+        // overshoot's levels would fold into more Ward than a save reads back, so the
+        // fold is held at MostLevels (the 6b.2 review).
+        var folds = new (Func<Tuning, Tuning> Fold, bool Held)[]
         {
-            member.HpXp = ContentBounds.MostCount;
-            member.HpXp = ContentBounds.MostCount - member.MaxHp;
-            member.ManaXp = ContentBounds.MostCount - 1000;   // the triggers Overheal pays are credited as spent
-        }
-        var visit = campaign.Enter(campaign.DefaultNext(), CampaignRuns.FiveDeep);
-        var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
-
-        foreach (var member in new[] { a, b })
+            (t => t, false),
+            (t => t with { EffectPerLevel = new Dictionary<StatusEffectType, int>(t.EffectPerLevel) { [OverhealPool] = effectCeiling }, OverhealPerWard = 1 }, true),
+        };
+        foreach (var (fold, held) in folds)
         {
-            Assert.True(member.MaxHp > 10_000, $"{member.Id}: {member.MaxHp} is no pool at the ceiling");
-            int health = Array.IndexOf(member.Inventory, null, 1);
-            member.Inventory[health] = Health(ContentBounds.MostCount);
-            int mana = Array.IndexOf(member.Inventory, null, health + 1);
-            member.Inventory[mana] = Mana(ContentBounds.MostCount);
-            member.Hp = 1;
-            member.Mana = 0;
+            using var ceiling = TestContent.UsePremise(tuning: t => fold(Drinks(t) with { HealthPotionPercent = 100, ManaPotionPercent = 100 }));
+            var campaign = CampaignState.Start(GameContent.Current);
+            var (a, b) = (campaign.Party[0], campaign.Party[1]);
+            var carried = TestWeapons.Get("flensing_knife_unique");
+            var overheal = carried.Enchantments.Single(entry => entry.Def.Effect == EffectKind.Overheal);
+            a.Inventory[0] = carried;
+            campaign.See(carried);
+            Assert.DoesNotContain(b.EquippedWeapon!.Enchantments, entry => entry.Def.Effect == EffectKind.Overheal);
+            foreach (var member in new[] { a, b })
+            {
+                member.HpXp = ContentBounds.MostCount;
+                int ceilingHp = member.MaxHp;   // the max HP the save's ceiling grows: the drink credits less than that
+                member.HpXp = ContentBounds.MostCount - ceilingHp;
+                member.ManaXp = ContentBounds.MostCount - 1000;   // the triggers Overheal pays are credited as spent
+            }
+            var visit = campaign.Enter(campaign.DefaultNext(), CampaignRuns.FiveDeep);
+            var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
 
-            var refill = turns.TryDrink(member, mana)!;
-            Assert.Equal((int.MaxValue, member.UsableMaxMana), (refill.Share, refill.Restored));
-            Assert.Equal(member.UsableMaxMana, member.Mana);
+            foreach (var member in new[] { a, b })
+            {
+                Assert.True(member.MaxHp > 10_000, $"{member.Id}: {member.MaxHp} is no pool at the ceiling");
+                int health = Array.IndexOf(member.Inventory, null, 1);
+                member.Inventory[health] = Health(ContentBounds.MostCount);
+                int mana = Array.IndexOf(member.Inventory, null, health + 1);
+                member.Inventory[mana] = Mana(ContentBounds.MostCount);
+                member.Hp = 1;
+                member.Mana = 0;
 
-            var heal = turns.TryDrink(member, health)!;
-            Assert.Equal(int.MaxValue, heal.Share);
-            Assert.Equal(member.MaxHp, member.Hp);
-            Assert.Equal(member.MaxHp - 1, heal.Restored);
-            Assert.InRange(member.Mana, 0, member.UsableMaxMana);
-            Assert.InRange(member.HpXp, 0, ContentBounds.MostCount);
-            Assert.InRange(member.ManaXp, 0, ContentBounds.MostCount);
-            Assert.InRange(member.StatusLevel(Ward), 0, ContentBounds.MostLevels);
-            Assert.InRange(member.StatusLevel(OverhealPool), 0, ContentBounds.MostLevels);
+                var refill = turns.TryDrink(member, mana)!;
+                Assert.Equal((int.MaxValue, member.UsableMaxMana), (refill.Share, refill.Restored));
+                Assert.Equal(member.UsableMaxMana, member.Mana);
+
+                int maxHp = member.MaxHp;   // read before the drink: a point its credit buys is the ladder's, not the drink's
+                var heal = turns.TryDrink(member, health)!;
+                Assert.Equal(int.MaxValue, heal.Share);
+                Assert.Equal(member.MaxHp, member.Hp);
+                Assert.Equal(maxHp - 1, heal.Restored);
+                Assert.InRange(member.Mana, 0, member.UsableMaxMana);
+                Assert.InRange(member.HpXp, 0, ContentBounds.MostCount);
+                Assert.InRange(member.ManaXp, 0, ContentBounds.MostCount);
+                Assert.InRange(member.StatusLevel(Ward), 0, ContentBounds.MostLevels);
+                Assert.InRange(member.StatusLevel(OverhealPool), 0, ContentBounds.MostLevels);
+            }
+
+            // A banks the overshoot the drink handed it, MostOverflow, as Ward: its
+            // levels at Overheal's percentage, folded at OverhealPerWard to one — held
+            // at MostLevels at the extreme fold, which would make a thousand a level.
+            // B's is lost.
+            long levels = overheal.LevelsFor((int)ContentBounds.MostOverflow);
+            long ward = levels * GameContent.Current.Tuning.EffectPerLevel[OverhealPool] / GameContent.Current.Tuning.OverhealPerWard;
+            Assert.Equal(held, ward > ContentBounds.MostLevels);
+            Assert.Equal(Math.Min(ward, ContentBounds.MostLevels), a.StatusLevel(Ward));
+            Assert.True(a.StatusLevel(Ward) > 0);
+            Assert.Equal((0, 0), (b.StatusLevel(Ward), b.StatusLevel(OverhealPool)));
+
+            string text = SaveCodec.Write(SaveGame.Capture(campaign));
+            var restored = SaveGame.Restore(SaveCodec.Read(text), GameContent.Current).Campaign;
+            StateAssert.Equivalent(campaign.Party, restored.Party, "party");
+            restored.Visit!.OpenTurns(restored.Party);   // opened as the game's resume opens it
+            Assert.Equal(text, SaveCodec.Write(SaveGame.Capture(restored)));
         }
-
-        // A banks the overshoot the drink handed it, MostOverflow, as Ward: its
-        // levels at Overheal's percentage, folded at OverhealPerWard to one. B's is lost.
-        long levels = overheal.LevelsFor((int)ContentBounds.MostOverflow);
-        Assert.Equal(levels * GameContent.Current.Tuning.EffectPerLevel[OverhealPool] / GameContent.Current.Tuning.OverhealPerWard, a.StatusLevel(Ward));
-        Assert.True(a.StatusLevel(Ward) > 0);
-        Assert.Equal((0, 0), (b.StatusLevel(Ward), b.StatusLevel(OverhealPool)));
-
-        string text = SaveCodec.Write(SaveGame.Capture(campaign));
-        var restored = SaveGame.Restore(SaveCodec.Read(text), GameContent.Current).Campaign;
-        StateAssert.Equivalent(campaign.Party, restored.Party, "party");
-        restored.Visit!.OpenTurns(restored.Party);   // opened as the game's resume opens it
-        Assert.Equal(text, SaveCodec.Write(SaveGame.Capture(restored)));
     }
 
     [Fact]

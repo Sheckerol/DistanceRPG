@@ -1743,12 +1743,23 @@ public class DungeonScene : Scene
         int cost = _turns.PotionUseCost;
         if (_turns.Phase == TurnPhase.Player && member.Alive && member.DistLeft < cost)
         {
-            Log.Info($"[Potion] {member.Id} cannot drink from slot {slot + 1}: {member.DistLeft:0} movement left, a drink costs {cost}");
+            Log.Info(DrinkShortLine(member.Id, slot, member.DistLeft, cost));
             SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.DrinkShortCue(cost), false));
         }
         else
             Log.Info($"[Potion] {member.Id} cannot drink from slot {slot + 1}: a drink is the party's own, in its turn and alive");
     }
+
+    /// <summary>
+    /// The log's line for a drink refused short of its cost, the bag slot by the
+    /// number its key bears: <c>[Potion] A cannot drink from slot 2: 39 movement
+    /// left, a drink costs 40</c>. The movement left is rounded down to the whole,
+    /// since a whole cost is paid from the whole movement exactly when the gate
+    /// pays it from the fraction (<see cref="TurnSystem.CanDrink"/>): so 39.6 reads
+    /// 39, never the 40 it falls short of.
+    /// </summary>
+    internal static string DrinkShortLine(string id, int slot, float distLeft, int cost)
+        => $"[Potion] {id} cannot drink from slot {slot + 1}: {MathF.Floor(distLeft):0} movement left, a drink costs {cost}";
 
     /// <summary>
     /// X, in the bag (§4.4): arm "leave", so the next bag number puts that slot's

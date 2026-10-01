@@ -697,11 +697,14 @@ public sealed class TurnSystem
         int restored;
         if (potion.Type == PotionType.Health)
         {
-            int before = c.Hp;
             long missing = Math.Max(0L, (long)c.MaxHp - c.Hp);
             int handed = (int)Math.Min(share, missing + ContentBounds.MostOverflow);
+            // What the heal applies, read before it lands: CapToMissingHp's Applied,
+            // the HP XP credited and the +N the heal floats. Not HP after less HP
+            // before: a point that credit buys arrives filled
+            // (PartyMemberState.Credit), and that HP is the ladder's, not the drink's.
+            restored = (int)Math.Min(handed, missing);
             _events.Raise(GameEvent.HealingReceived, new HealPayload(handed, Applied: 0, Overflow: 0, HealthPotionSource), c, c);
-            restored = c.Hp - before;
         }
         else
         {

@@ -182,14 +182,6 @@ public class TuningJsonTests
             """{ "ApplyPercent": { "frost_rune": 30 } }""",
         ]).ToList();
 
-        // Exactly one file a name the schema holds, and the seven the sweep adds:
-        // proof it reads the schema, which a floor (once "more than 20") stopped
-        // being as the keys still to come arrived with their readers — 21 files
-        // before the drink, 18 after it, 17 once the farm's yield is a key.
-        int deferred = TuningSchema.Deferred.Values.Sum(d => d.Keys.Count);
-        Assert.Equal(deferred + TuningSchema.Aliases.Count + 3 + 4, files.Count);
-        Assert.True(deferred + TuningSchema.Aliases.Count > 0, "the sweep is not reading the schema");
-
         var said = new List<string>();
         foreach (string file in files)
         {
@@ -201,6 +193,14 @@ public class TuningJsonTests
             Assert.All(NoticeText.Wrap(notice), row => Assert.Matches(HudFontRow, row));
             said.Add(notice);
         }
+
+        // Every name the schema holds was swept, each answered by a warning that
+        // names it — the keys still to come (none once the farm's yield is a key)
+        // and every doc spelling — and the doc spelling likeliest typed, the ladder,
+        // is read by name below: proof the sweep reads the schema, which a floor of
+        // files (once "more than 20") stopped being as the keys to come arrived.
+        Assert.All(TuningSchema.Deferred.Values.SelectMany(deferred => deferred.Keys).Concat(TuningSchema.Aliases.Keys),
+            name => Assert.Contains(said, notice => notice.StartsWith($"tuning.json: {name} ", StringComparison.Ordinal)));
 
         // Each pointer is there, after its dash: at the key a doc spells otherwise,
         // with its why; at the key, or the member or id, a typo is nearest.
@@ -812,13 +812,15 @@ public class TuningJsonTests
     public void AVersion2SaveIsHashedOnVersion2sKeys()
     {
         // PHASE 6a DECISION 9 again, a version on: a key a rule began to play with
-        // version 3 — what a drink costs and what a potion restores, from Phase
-        // 6b.2 — is in version 3's hash and not in version 2's or version 1's, so
+        // version 3 — Phase 6b's Consumables, each arriving with its reader (which
+        // they are, TuningSchemaTests.TheConsumablesAreKeys_PlayedFromVersion3 pins)
+        // — is in version 3's hash and not in version 2's or version 1's, so
         // moving it moves the one and leaves the others where they were; a key
         // played since version 2 moves versions 2 and 3, and one played since
         // version 1 moves all three. The current version's is the default.
         var v3Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name).ToArray();
-        Assert.Equal([nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent)], v3Keys);
+        Assert.NotEmpty(v3Keys);
+        Assert.Equal(TuningSchema.Keys.Where(k => k.Group == TuningGroup.Consumables).Select(k => k.Name), v3Keys);
         Assert.Equal(3, SaveCodec.CurrentVersion);
         Assert.Equal(TuningJson.Hash(BuiltIn, version: 3), TuningJson.Hash(BuiltIn));
         string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2), three = TuningJson.Hash(BuiltIn, version: 3);

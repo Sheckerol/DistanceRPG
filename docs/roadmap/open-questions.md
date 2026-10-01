@@ -1027,7 +1027,13 @@ budget each time, as it would in one. The cost is paid whole or the drink is
 refused, as a swap short of its cost is, and the bag says which before the key is
 pressed — `A DRINK COSTS 40 MOVE`, or `... - NOT ENOUGH LEFT` in red — while a
 potion's number short of it says `NOT ENOUGH MOVE TO DRINK - IT COSTS 40` over
-the member and drinks nothing.
+the member and drinks nothing. One thing the drink makes easier to meet, and this
+entry does not change: the MOVE readout rounds the movement left up, as the
+prototype's did (`Math.ceil`), so after walking it can read `MOVE: 40` at 39.6,
+where a 40 drink is refused (and a 20 swap at 19.6, the same way). The bag's red
+line and the log, which rounds down (`39 movement left, a drink costs 40`), say the
+truth; whether the readout should round down too is a question of the readout's,
+asked here so it is not lost.
 
 **This decides whether a potion is cheaper outside a fight, so it is the user's to
 decide.** The alternative: free out of combat, priced as a swap is — the cost only
@@ -1054,8 +1060,10 @@ percent or more. **Health is a share of `MaxHp`; mana is a share of `MaxMana`, t
 earned pool, and what it restores is capped at `UsableMaxMana`**, as Siphon's
 refund is: so at quality 5 a mana potion refills the spendable pool whatever the
 locks reserve. The bag says what a potion offers of the member's maximum as it
-stands — `RESTORES 12 OF 30 HP`, `RESTORES ALL 30 HP - 6 OVER` — and a drink
-reports what the pool took.
+stands — `RESTORES 12 OF 30 HP`, `RESTORES ALL 30 HP` at exactly a whole pool,
+`RESTORES ALL 30 HP - 6 OVER` past it — and a drink reports what the pool took:
+for health the heal it applied, the HP XP it teaches, never the point of max HP
+that XP may buy, which arrives filled as it does after any heal.
 
 **This decides how much a potion restores at the margins, so it is the user's to
 decide.** The alternatives: (a) round to the nearest, or up, or restore at least

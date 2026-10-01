@@ -261,16 +261,25 @@ public static class StatusBehaviours
 
             int banked = self.StatusLevel(type);
             int granted = ticks.Where(t => t.Type == type).Sum(t => t.LevelsDelta);
-            if (banked + granted <= 0) continue;
-            if (granted > 0 && (banked + granted) * StatusRules.EffectPerLevel(type) < perWard)
+            long pooled = (long)banked + granted;
+            if (pooled <= 0) continue;
+            if (granted > 0 && pooled * StatusRules.EffectPerLevel(type) < perWard)
                 continue;   // short of a Ward: the grant's ticks stand, and the applier banks them
 
             var builder = ticks.RemoveAll(t => t.Type == type).ToBuilder();
             if (banked > 0)
                 builder.Add(new StatusTick(type, null, Damage: 0, Healing: 0, LevelsDelta: -banked));
-            int ward = (banked + granted) * StatusRules.EffectPerLevel(type) / perWard;
-            if (ward > 0)
-                builder.Add(new StatusTick(StatusEffectType.Ward, null, Damage: 0, Healing: 0, LevelsDelta: ward));
+            // Worked out in long and held where a saved status stops being whole
+            // (ContentBounds.MostLevels), less the Ward already held or on its way
+            // in this chain: a potion's overshoot is uncapped (§6.6), and at the
+            // clamps' extreme fold — EffectPerLevel's ceiling over one point a Ward —
+            // its levels would make more Ward than a save reads back. Every Ward
+            // play reaches converts whole.
+            long ward = pooled * StatusRules.EffectPerLevel(type) / perWard;
+            long held = self.StatusLevel(StatusEffectType.Ward) + ticks.Where(t => t.Type == StatusEffectType.Ward).Sum(t => (long)t.LevelsDelta);
+            int warded = (int)Math.Min(ward, Math.Max(0L, ContentBounds.MostLevels - held));
+            if (warded > 0)
+                builder.Add(new StatusTick(StatusEffectType.Ward, null, Damage: 0, Healing: 0, LevelsDelta: warded));
             ticks = builder.ToImmutable();
         }
 

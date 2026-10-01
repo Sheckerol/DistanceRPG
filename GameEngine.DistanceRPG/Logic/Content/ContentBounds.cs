@@ -194,8 +194,12 @@ internal static class ContentBounds
     /// trigger it scales (<see cref="EnchantmentBehaviours.PartialFire"/>: the
     /// levels times a flat trigger of a few mana) and the hidden pool it feeds
     /// (the levels banked and granted, times <c>EffectPerLevel</c> at its clamp
-    /// ceiling) stay inside an int. It is about 107,000 points: no play nears it,
-    /// and every overshoot play reaches is handed whole.
+    /// ceiling) stay inside an int. The Ward that pool folds into is not this
+    /// bound's: at the clamps' extreme fold, <c>EffectPerLevel</c>'s ceiling over
+    /// one point a Ward, far less overshoot than this makes more Ward than a save
+    /// reads back, so the fold itself is held at <see cref="MostLevels"/>
+    /// (<see cref="StatusBehaviours.OverhealPool"/>). It is about 107,000 points:
+    /// no play nears it, and every overshoot play reaches is handed whole.
     /// </summary>
     internal static long MostOverflow { get; } = (long)MostLevels * FullPercent / Table(nameof(Tuning.ApplyPercent)).Max;
 
