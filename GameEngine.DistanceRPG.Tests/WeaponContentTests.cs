@@ -192,7 +192,7 @@ public class WeaponContentTests
             Assert.Equal(1, innate.Tier);
             Assert.Throws<ArgumentException>(() => TestWeapons.Get(def.Id, DamageType.Flaming));   // a staff takes no element
         }
-        Assert.Equal(("regeneration", StatusEffectType.Regeneration, TargetSide.Ally, 1), StaffInnate("staff_of_renewal"));
+        Assert.Equal(("regeneration", StatusEffectType.Regeneration, TargetSide.Ally, 2), StaffInnate("staff_of_renewal"));
         Assert.Equal(("ward", StatusEffectType.Ward, TargetSide.Ally, 5), StaffInnate("staff_of_warding"));
         Assert.Equal(("poison", StatusEffectType.Poison, TargetSide.Enemy, 3), StaffInnate("staff_of_blight"));
         Assert.Equal(("mire", StatusEffectType.Mire, TargetSide.Enemy, 2), StaffInnate("staff_of_mire"));

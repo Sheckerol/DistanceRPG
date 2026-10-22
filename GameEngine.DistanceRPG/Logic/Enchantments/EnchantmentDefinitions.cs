@@ -57,7 +57,7 @@ public static class EnchantmentDefinitions
     /// <summary>The §5.7 catalogue: the eight innates, Vampiric, the rest of §3.3's starting set, and the nine unique souls, in the catalogue's order.</summary>
     public static EnchantmentsData Data { get; } = new(
     [
-        Innate("regeneration", "Regeneration", TargetSide.Ally, @lock: 15, potency: 1, StatusEffectType.Regeneration),
+        Innate("regeneration", "Regeneration", TargetSide.Ally, @lock: 15, potency: 2, StatusEffectType.Regeneration),   // two levels a cast (buffed after play, 2026-10)
         Innate("ward", "Ward", TargetSide.Ally, @lock: 20, potency: 5, StatusEffectType.Ward),
         Innate("poison", "Poison", TargetSide.Enemy, @lock: 20, potency: 3, StatusEffectType.Poison),
         Innate("mire", "Mire", TargetSide.Enemy, @lock: 25, potency: 2, StatusEffectType.Mire),

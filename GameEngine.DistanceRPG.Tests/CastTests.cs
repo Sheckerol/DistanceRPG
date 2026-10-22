@@ -81,11 +81,11 @@ public sealed class CastTests : IDisposable
     // ── The four staves ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Renewal_AppliesOneLevel_AtCost40Movement_13Plus1Mana()
+    public void Renewal_AppliesTwoLevels_AtCost40Movement_13Plus1Mana()
     {
         // Parity statline: today's shipped Staff, Range 100 / Cost 40 / Mana 15, Regeneration on an ally.
         // Resonant x1 resolves the 15 to 13, and the innate's trigger (the DoT ladder over the one level it
-        // applies, floored at 1, discounted by the same 10%) is 1: fourteen from the pool, in one record.
+        // applies, floored at 1, discounted by the same 10%) is 1 for its two levels: fourteen from the pool, in one record.
         var (turns, a, b, _) = Scene("staff_of_renewal");
         var staff = a.EquippedWeapon!;
         var regeneration = staff.Innate!;
@@ -101,20 +101,20 @@ public sealed class CastTests : IDisposable
         Assert.True(turns.CanCast(a, b));
         Assert.True(turns.TryCast(a, b));
 
-        Assert.Equal(1, b.StatusLevel(Regeneration));
+        Assert.Equal(2, b.StatusLevel(Regeneration));
         Assert.Equal(Premise.Budget - 40, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - 13 - 1, a.Mana);
         Assert.Equal(((ActorState)a, 14, 14, "staff_of_renewal"), Assert.Single(spent));
-        Assert.Equal(new StatusEffect(Regeneration, null, 1), buffed);
-        Assert.Equal(((ActorState)b, new StatusEffect(Regeneration, null, 1), (ActorState)a), Assert.Single(applied));
+        Assert.Equal(new StatusEffect(Regeneration, null, 2), buffed);
+        Assert.Equal(((ActorState)b, new StatusEffect(Regeneration, null, 2), (ActorState)a), Assert.Single(applied));
         Assert.Equal(0, turns.AttacksThisTurn(a));   // a cast is no chosen attack: Charges never counts it
 
-        // The settled payload: the roll, no crit, the innate's one level, the cast's 13, the trigger's 1, one application.
+        // The settled payload: the roll, no crit, the innate's two levels, the cast's 13, the trigger's 1, one application.
         var cast = Assert.Single(casts);
-        Assert.Equal((10, false, false, 1, 13, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
+        Assert.Equal((10, false, false, 2, 13, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
         Assert.Same(staff, cast.Weapon);
         Assert.Same(b, cast.Target);
-        Assert.Equal(new StatusApplication(Regeneration, null, 1), Assert.Single(cast.ApplyToTarget));
+        Assert.Equal(new StatusApplication(Regeneration, null, 2), Assert.Single(cast.ApplyToTarget));
     }
 
     [Fact]
@@ -211,15 +211,15 @@ public sealed class CastTests : IDisposable
     {
         // A natural 20 (staves roll d20 like attacks, in the caster's own window) doubles the effect
         // level and halves the cast's mana, floored: a critical Renewal stacks twice the regeneration
-        // for 6 (13 / 2) plus the trigger for two levels (1); a critical Staff of Mire strips twice the
+        // for 6 (13 / 2) plus the trigger for four levels (2); a critical Staff of Mire strips twice the
         // movement, four levels for 11 (22 / 2) plus 2 (10 / 3 = 3, less 10%).
         var (turns, a, b, _) = Scene("staff_of_renewal", () => 20);
         var casts = CastProbe(turns);
         Assert.True(turns.TryCast(a, b));
-        Assert.Equal(2, b.StatusLevel(Regeneration));
-        Assert.Equal(TestPools.FixtureMana - 6 - 1, a.Mana);
+        Assert.Equal(4, b.StatusLevel(Regeneration));
+        Assert.Equal(TestPools.FixtureMana - 6 - 2, a.Mana);
         var cast = Assert.Single(casts);
-        Assert.Equal((20, true, false, 2, 6, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
+        Assert.Equal((20, true, false, 4, 6, 2), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
 
         var (turns2, a2, _, enemy) = Scene("staff_of_mire", () => 20);
         Assert.True(turns2.TryCast(a2, enemy));
@@ -231,10 +231,10 @@ public sealed class CastTests : IDisposable
         var (turns3, a3, b3, _) = Scene("staff_of_renewal", () => 19);
         a3.Innate = ModifierSet.Of((CritWindow, 1));
         Assert.True(turns3.TryCast(a3, b3));
-        Assert.Equal(2, b3.StatusLevel(Regeneration));
+        Assert.Equal(4, b3.StatusLevel(Regeneration));
         var (turns4, a4, b4, _) = Scene("staff_of_renewal", () => 19);
         Assert.True(turns4.TryCast(a4, b4));
-        Assert.Equal(1, b4.StatusLevel(Regeneration));
+        Assert.Equal(2, b4.StatusLevel(Regeneration));
 
         // The roll's consequences as a pure function of its inputs, like the swing's.
         Assert.Equal(new CastRoll(20, true, false, 10, 9), CombatRules.RollToCast(20, 20, 5, 18));
@@ -245,15 +245,15 @@ public sealed class CastTests : IDisposable
     [Fact]
     public void Fumble_DoublesMana_KeepsLevels()
     {
-        // A natural 1 doubles the cast's mana and leaves the effect: Renewal at 26 (13 x 2) plus the 1 trigger, one level.
+        // A natural 1 doubles the cast's mana and leaves the effect: Renewal at 26 (13 x 2) plus the 1 trigger, two levels.
         var (turns, a, b, _) = Scene("staff_of_renewal", () => 1);
         var casts = CastProbe(turns);
         var spent = ManaProbe(turns);
         Assert.True(turns.TryCast(a, b));
-        Assert.Equal(1, b.StatusLevel(Regeneration));
+        Assert.Equal(2, b.StatusLevel(Regeneration));
         Assert.Equal(TestPools.FixtureMana - 26 - 1, a.Mana);
         var cast = Assert.Single(casts);
-        Assert.Equal((1, false, true, 1, 26, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
+        Assert.Equal((1, false, true, 2, 26, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
         Assert.Equal(((ActorState)a, 27, 27, "staff_of_renewal"), Assert.Single(spent));
 
         // The gate is the resolved cost and the roll comes after it: a fumble at exactly 13 in the pool
@@ -403,8 +403,8 @@ public sealed class CastTests : IDisposable
     public void EnemyHealer_StillMendsWounded()
     {
         // The healer keeps its meaning: a support staff mends the most-wounded ally in reach, one cast a
-        // beat, now paying 14 a cast (13 plus the 1 trigger) from its own pool; the four levels tick at
-        // the ally's turn end, 4 HP back and one level off.
+        // beat, now paying 14 a cast (13 plus the 1 trigger) from its own pool; four casts of two levels
+        // tick at the ally's turn end, 8 HP back and one level off.
         var grid = new int[30, 30];
         var healer = Enemy(5 * Tile + 16, 5 * Tile + 16, "staff_of_renewal");
         var ally = Enemy(healer.X + 60f, healer.Y);
@@ -419,9 +419,9 @@ public sealed class CastTests : IDisposable
         Advance(turns, 8f);
 
         Assert.Equal(TurnPhase.Player, turns.Phase);
-        Assert.Equal(new[] { (ally, 1), (ally, 2), (ally, 3), (ally, 4) }, buffed);
-        Assert.Equal(14, ally.Hp);
-        Assert.Equal(3, ally.StatusLevel(Regeneration));
+        Assert.Equal(new[] { (ally, 2), (ally, 4), (ally, 6), (ally, 8) }, buffed);
+        Assert.Equal(18, ally.Hp);   // eight levels at the premise's 1 HP each
+        Assert.Equal(7, ally.StatusLevel(Regeneration));
         Assert.Equal(healer.UsableMaxMana - 4 * 14, healer.Mana);   // its budget is spent: nothing left to bank, out of the 85 a Renewal staff's lock leaves
     }
 
