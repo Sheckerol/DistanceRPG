@@ -71,7 +71,7 @@ public sealed class SaveMenuTests : IDisposable
     private static CampaignState Entered()
     {
         var campaign = NewCampaign();
-        campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+        campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         return campaign;
     }
 

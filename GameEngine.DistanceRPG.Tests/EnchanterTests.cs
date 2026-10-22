@@ -856,7 +856,7 @@ public sealed class EnchanterTests : IDisposable
         Enchanter.Deposit(campaign, new WeaponPlace("A", 1), Service.Refine);
         Enchanter.Deposit(campaign, Give(campaign, "B", 2, guard), Service.Enchant, "vampiric");
 
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal([0, 0], campaign.AtTheEnchanter.Select(deposit => deposit.RunsWorked));
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var shallow = CampaignRuns.Exit(campaign);
@@ -867,7 +867,7 @@ public sealed class EnchanterTests : IDisposable
         Assert.Empty(guard.Enchantments);
 
         // A wipe shallow is a failure that counts nothing too.
-        var wiping = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var wiping = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         var wiped = CampaignRuns.Wipe(campaign, wiping.OpenTurns(campaign.Party, CampaignRuns.Ten));
         Assert.False(wiped.ServiceTick);
         Assert.All(wiped.Services!, report => Assert.Equal((true, 0), (report.Stalled, report.RunsWorked)));
@@ -898,7 +898,7 @@ public sealed class EnchanterTests : IDisposable
         Enchanter.Deposit(campaign, Give(campaign, "D", 2, staff), Service.Enchant, "vampiric");
         campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
 
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var shop = Queued(campaign, staff);
         Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, new WeaponPlace("B", 1), Service.Refine));
@@ -941,7 +941,7 @@ public sealed class EnchanterTests : IDisposable
         Counted(campaign);
         Assert.Equal((1, 2), (Queued(campaign, staff).RunsWorked, Queued(campaign, staff).Runs));
 
-        var visit = campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         string text = SaveCodec.Write(SaveGame.Capture(campaign));
         var loaded = SaveGame.Restore(SaveCodec.Read(text), GameContent.Current).Campaign;
@@ -1083,7 +1083,7 @@ public sealed class EnchanterTests : IDisposable
         // Mid-run, the shop is shut: nothing is taken back.
         var aStaff = campaign.Party[0].WeaponIn(1)!;
         var entry = Enchanter.Deposit(campaign, new WeaponPlace("A", 1), Service.Refine).Entry;
-        campaign.Enter("long_gallery", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+        campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, CampaignRuns.Ten);
         Assert.Throws<InvalidOperationException>(() => Enchanter.TakeBack(campaign, entry));
         Assert.Same(entry, Queued(campaign, aStaff));
     }

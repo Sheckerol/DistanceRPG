@@ -434,7 +434,7 @@ public sealed class WearTests : IDisposable
         // party wiped with come out of the dungeon as worn as they went down
         // (PHASE 6a DECISION 1).
         var campaign = CampaignRuns.Campaign();
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var a = campaign.Party[0];
         var knife = a.EquippedWeapon!;
@@ -509,7 +509,7 @@ public sealed class WearTests : IDisposable
             foreach (var weapon in member.Inventory.OfType<Weapon>())
                 Unworn(weapon, "the starting kit");
 
-        var visit = start.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = start.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         foreach (var floor in visit.Floors)
             foreach (var row in floor.Enemies)
             {

@@ -559,7 +559,7 @@ public class ContentBoundsTests
         // path before a load builds a floor of it; one at the ceiling loads, every
         // floor below the party generated from the seed.
         var campaign = CampaignState.Start(GameContent.Current);
-        campaign.Enter("spear_hall", mapSeed: 4);
+        campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         string text = SaveCodec.Write(SaveGame.Capture(campaign));
         SaveFile BossOn(int floor)
         {

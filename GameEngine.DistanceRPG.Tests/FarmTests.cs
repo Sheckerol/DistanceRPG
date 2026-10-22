@@ -54,7 +54,7 @@ public sealed class FarmTests : IDisposable
     /// <summary>A wipe at the bottom of <paramref name="dungeonId"/> with its boss down — killed the boss, died on the way out.</summary>
     private static RunResult WipeWithTheBossDown(CampaignState campaign, string dungeonId)
     {
-        var visit = campaign.Enter(dungeonId, FiveDeep);
+        var visit = campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         while (visit.Current.DownStairs is not null)
             turns = CampaignRuns.Down(visit, campaign.Party);
@@ -200,7 +200,7 @@ public sealed class FarmTests : IDisposable
         Carrying(campaign, "A", (2, Health(2)), (3, Mana(1)));
         Assert.Equal((3L, PerClear - 3), (Farm.Mixed(campaign), Farm.Batch(campaign)));
 
-        campaign.Enter("long_gallery", FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+        campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, CampaignRuns.Ten);
         Assert.Equal(0, Farm.Batch(campaign));
         Assert.Equal(3L, Farm.Mixed(campaign));   // carried in: what was mixed rides with the party
         var visit = campaign.Visit!;
@@ -240,7 +240,7 @@ public sealed class FarmTests : IDisposable
         Assert.Null(none.Spoiled);
         Carrying(campaign, "B", (2, Mana(2)));
         Carrying(campaign, "D", (3, Health(1)));
-        var wiping = campaign.Enter("long_gallery", FiveDeep);
+        var wiping = campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected);
         var wiped = CampaignRuns.Wipe(campaign, wiping.OpenTurns(campaign.Party, CampaignRuns.Ten));
         Assert.Equal(RunOutcome.Death, wiped.Outcome);
         Assert.Equal([Mana(2), Health(1)], wiped.Spoiled!);

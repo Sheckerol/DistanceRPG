@@ -715,7 +715,7 @@ public sealed class BossTests : IDisposable
         // through the first floor.
         var party = Party(Sledge());
         var campaign = new CampaignState(party);
-        var visit = campaign.Enter(Tutorial.Id, GoldenSeed);
+        var visit = campaign.Enter(Tutorial.Id, GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         var bottom = Down(visit, party);
         int gameOvers = 0;

@@ -137,7 +137,7 @@ public class TuningSchemaTests
         "Pathfinder", "Dirs", "DiagonalCost",
         "SeedSalt", "FloorSalt", "StairSalt", "BossSalt", "LootSalt", "ReviveSalt", "BossDropSalt", "DiceSalt", "ServiceSalt",
         "SpawnMix", "CycleMix", "DiceMix", "ServiceMix",
-        "EnemyPlacer", "MaxEnemiesPerRoom", "PlacedClasses", "VariantsPerClass", "HealerWeaponId",
+        "EnemyPlacer", "MaxEnemiesPerRoom", "Unprotected", "PlacedClasses", "VariantsPerClass", "HealerWeaponId",
         "StairPlacer", "MilliStepsPerCardinal", "MilliStepsPerDiagonal",
         "MaxBossClassDraws", "MaxClassDraws",
         "Tile", "LogicUnitsPerTile",

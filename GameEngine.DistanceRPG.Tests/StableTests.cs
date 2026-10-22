@@ -196,7 +196,7 @@ public sealed class StableTests : IDisposable
         // the door refuses, and nothing moves.
         var campaign = NewCampaign();
         campaign.Move(Slot("A", 1), Stable(0));
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         var bags = campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
         var refused = Assert.Throws<InvalidOperationException>(() => campaign.Move(Stable(0), Slot("A", 1)));
         Assert.Contains("between runs", refused.Message, StringComparison.Ordinal);
@@ -423,7 +423,7 @@ public sealed class StableTests : IDisposable
         var campaign = NewCampaign();
         campaign.Move(Slot("A", 1), Stable(0));
         campaign.Move(Slot("D", 1), Stable(1));
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
 
         string text = Save(campaign);

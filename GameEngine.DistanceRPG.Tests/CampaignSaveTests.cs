@@ -72,7 +72,7 @@ public sealed class CampaignSaveTests : IDisposable
 
     private static DungeonState In(CampaignState campaign, string dungeonId, long seed)
     {
-        var visit = campaign.Enter(dungeonId, seed);
+        var visit = campaign.Enter(dungeonId, seed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, Ten);
         return visit;
     }

@@ -150,7 +150,7 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>A wipe on the first floor of <paramref name="dungeonId"/>, the boss standing: a weapon taken off a corpse into B's bag, XP gained in two pools, and every member down.</summary>
     private static RunResult WipeWithASpoil(CampaignState campaign, string dungeonId)
     {
-        var visit = campaign.Enter(dungeonId, FiveDeep);
+        var visit = campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var corpse = visit.Current.Enemies[0];
         var spoil = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
@@ -173,7 +173,7 @@ public sealed class SaveConsistencyTests : IDisposable
     /// </summary>
     private static RunResult WipeWithTheBossDown(CampaignState campaign, string dungeonId)
     {
-        var visit = campaign.Enter(dungeonId, FiveDeep);
+        var visit = campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         while (visit.Current.DownStairs is not null)
             turns = CampaignRuns.Down(visit, campaign.Party);
@@ -253,7 +253,7 @@ public sealed class SaveConsistencyTests : IDisposable
         var retreat = CampaignRuns.ShallowRetreat(lifted, "spear_hall");
         Assert.Equal(("spear_hall", (int?)null), (retreat.DungeonId, retreat.LockedUntilRun));
         Loads(lifted, "a retreat from a dungeon whose lock has lifted");
-        var wipe = CampaignRuns.Wipe(lifted, lifted.Enter("spear_hall", FiveDeep).OpenTurns(lifted.Party, CampaignRuns.Ten));
+        var wipe = CampaignRuns.Wipe(lifted, lifted.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected).OpenTurns(lifted.Party, CampaignRuns.Ten));
         Assert.Equal(("spear_hall", false, (int?)null), (wipe.DungeonId, wipe.BossDefeated, wipe.LockedUntilRun));
         Assert.True(lifted.LockedUntilRun("spear_hall") < lifted.RunCounter);
         Loads(lifted, "a wipe with the boss standing in a dungeon whose lock has lifted");
@@ -299,7 +299,7 @@ public sealed class SaveConsistencyTests : IDisposable
             var cleared = CampaignRuns.Clear(early, "spear_hall", FiveDeep);
             Assert.Equal("spear_hall", early.EarlyOffer());
             var script = new VisitScript(early);
-            early.Enter("spear_hall", FiveDeep);
+            early.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
             Assert.Equal(early.RunCounter, early.LockedUntilRun("spear_hall"));
             Assert.NotEqual(cleared.LockedUntilRun, early.LockedUntilRun("spear_hall"));
             Assert.Equal(cleared.LockedUntilRun, early.LastResult!.LockedUntilRun);
@@ -319,7 +319,7 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.True(Worn(worn.Party[1].WeaponIn(0)!, 40).WornFull);
         Loads(worn, "worn weapons in hand, one full");
 
-        var visit = worn.Enter("spear_hall", FiveDeep);
+        var visit = worn.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(worn.Party, CampaignRuns.Ten);
         var gear = Worn(worn.Party[3].WeaponIn(1)!, 7);   // D's second staff, cast with before it went back in the bag
         Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
@@ -331,7 +331,7 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal(5, Assert.Single(exited.SpoilsKept).Wear);
         Loads(worn, "a worn spoil kept");
 
-        var wiping = worn.Enter("knife_warrens", FiveDeep);
+        var wiping = worn.Enter("knife_warrens", FiveDeep, EnemyPlacer.Unprotected);
         var wipeTurns = wiping.OpenTurns(worn.Party, CampaignRuns.Ten);
         var lost = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
         Assert.NotEqual(Pickup.BagFull, Pickup.Take(worn, wiping.Current.Enemies[0], lost, worn.Party[1], wiping));
@@ -676,7 +676,7 @@ public sealed class SaveConsistencyTests : IDisposable
         // Flagship, saved on floor 4 with the boss down.
         var entry = NewCampaign();
         CampaignRuns.Clear(entry, "tutorial", GoldenSeed);
-        entry.Enter("spear_hall", FiveDeep);
+        entry.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         string entered = Save(entry);
         int counter = entry.RunCounter;
         Restores(entered, "the Spear Hall entered");
@@ -1506,7 +1506,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         // During a visit, the potions carried in less what was poured out or drunk:
         // still within the batch they were mixed from.
-        campaign.Enter("long_gallery", FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+        campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, CampaignRuns.Ten);
         campaign.Party[0].TakePotion(2);
         string inside = Save(campaign);
         Restores(inside, "potions carried into a run, one poured out");

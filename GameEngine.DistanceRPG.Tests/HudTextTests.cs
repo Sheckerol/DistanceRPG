@@ -1780,7 +1780,7 @@ public sealed class HudTextTests : IDisposable
         // touches a window or a camera, so these are built with neither, over a
         // real campaign with a real visit entered.
         var campaign = CampaignState.Start(GameContent.Current);
-        campaign.Enter(GameContent.Current.Dungeons.Tutorial.Id, mapSeed: 7);
+        campaign.Enter(GameContent.Current.Dungeons.Tutorial.Id, mapSeed: 7, EnemyPlacer.Unprotected);
         var booted = new DungeonScene(camera: null!, game: null!, campaign, new NoRunHost(), load.Notices);
         Assert.Equal(NoticeText.Rows(load.Notices), booted.NoticeRows);
         Assert.Equal("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1", booted.NoticeRows[0]);
@@ -1844,7 +1844,7 @@ public sealed class HudTextTests : IDisposable
         // death turns it, and as a fallen enemy is built — and the scene builds its
         // party through that alone.
         var campaign = CampaignState.Start(GameContent.Current);
-        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, () => 10);
         (campaign.Party[0].Hp, campaign.Party[0].Alive) = (0, false);
         var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign, new ViewDto("B", MarchingThisTurn: true)))), GameContent.Current);
@@ -1877,7 +1877,7 @@ public sealed class HudTextTests : IDisposable
         // twice; resumed from the backup, the notice says so. Built with no window,
         // as a scene is read.
         var campaign = CampaignState.Start(GameContent.Current);
-        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         Assert.Equal(5, visit.BossFloor);   // seed 4 rolls the Spear Hall five deep
         visit.OpenTurns(campaign.Party, () => 10);
         GoDown(visit, campaign.Party);
@@ -1948,7 +1948,7 @@ public sealed class HudTextTests : IDisposable
         // On the boss floor the trade stays under it; a floor entered fresh has no
         // RESUMED over its banner. The banner is up long enough to read, then gone.
         var bottom = CampaignState.Start(GameContent.Current);
-        var deep = bottom.Enter("spear_hall", mapSeed: 4);
+        var deep = bottom.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         deep.OpenTurns(bottom.Party, () => 10);
         while (deep.Current.DownStairs is not null)
             GoDown(deep, bottom.Party);
@@ -1975,7 +1975,7 @@ public sealed class HudTextTests : IDisposable
         // and how to try it again. Only what the data files raised after it is
         // capped. Built with no window, as a scene is read.
         var campaign = CampaignState.Start(GameContent.Current);
-        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, () => 10);
         GoDown(visit, campaign.Party);
         var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign, new ViewDto("B")))), GameContent.Current);
@@ -2070,7 +2070,7 @@ public sealed class HudTextTests : IDisposable
         // scene is read.
         string held = CampaignBoot.NotSaved(Named(SaveSlots.OldAutosave), "another program has it open");
         var campaign = CampaignState.Start(GameContent.Current);
-        var visit = campaign.Enter("spear_hall", mapSeed: 4);
+        var visit = campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, () => 10);
         var scene = new DungeonScene(camera: null!, game: null!, campaign, new NoRunHost());
         Assert.Empty(scene.NoticeRows);

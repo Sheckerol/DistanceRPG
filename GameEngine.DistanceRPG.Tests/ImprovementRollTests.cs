@@ -455,7 +455,7 @@ public sealed class ImprovementRollTests : IDisposable
         var campaign = TestShop.Opened();
         var guard = TestShop.Worn("tower_guard", wear: 30);
         Enchanter.Deposit(campaign, TestShop.Give(campaign, "C", 2, guard), Service.Refine);
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         string text = SaveCodec.Write(SaveGame.Capture(campaign));
         var loaded = SaveGame.Restore(SaveCodec.Read(text), GameContent.Current).Campaign;

@@ -1866,7 +1866,7 @@ public sealed class BetweenRunsHudTests : IDisposable
 
         CampaignRuns.DeepRetreat(campaign, "long_gallery");
         TestPotions.Carrying(campaign, "C", (4, TestPotions.Health(1)));
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         var wiped = BetweenRunsHud.SummaryLines(CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)));
         Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "1 POTION SPOILED - A POTION KEEPS FOR ONE TRIP" }, Texts(wiped).Skip(3).Take(2));
         Assert.Equal(DungeonHud.Yellow, wiped[4].Color);

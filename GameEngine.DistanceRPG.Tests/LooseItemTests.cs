@@ -46,7 +46,7 @@ public sealed class LooseItemTests : IDisposable
     private static (CampaignState Campaign, DungeonState Visit) Enter(PartyMemberState[] party)
     {
         var campaign = new CampaignState(party);
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Equal(2, visit.BossFloor);
         visit.OpenTurns(party, Ten);
         return (campaign, visit);
@@ -316,7 +316,7 @@ public sealed class LooseItemTests : IDisposable
         Assert.DoesNotContain(bow, Carried(party));
         Assert.Null(party[3].Inventory[1]);
 
-        var again = campaign.Enter("tutorial", GoldenSeed);
+        var again = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Empty(again.Floors.Intersect(visit.Floors));
         Assert.All(again.Floors, floor => Assert.Empty(floor.LooseItems));
         Assert.DoesNotContain(bow, Carried(party));   // nothing brings it back

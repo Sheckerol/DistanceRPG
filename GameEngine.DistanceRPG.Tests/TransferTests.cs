@@ -872,7 +872,7 @@ public sealed class TransferTests : IDisposable
 
         // A mid-run save holds the shop too, the source with it, and the run's end
         // that finishes both moves the same souls.
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var midRun = Load(Save(campaign));
         midRun.Visit!.OpenTurns(midRun.Party, CampaignRuns.Ten);

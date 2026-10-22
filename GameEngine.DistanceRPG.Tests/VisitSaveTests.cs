@@ -974,7 +974,7 @@ public sealed class VisitSaveTests : IDisposable
         // turn, its banner included: the save holds none of their working state.
         var campaign = NewCampaign();
         Assert.True(SaveGame.IsSafePoint(campaign));
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Null(visit.Turns);
         Assert.True(SaveGame.IsSafePoint(campaign));
         Assert.NotNull(SaveGame.Capture(campaign).Campaign.Visit);

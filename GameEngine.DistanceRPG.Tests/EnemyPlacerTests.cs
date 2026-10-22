@@ -82,6 +82,109 @@ public class EnemyPlacerTests
         }
     }
 
+    [Theory]
+    [InlineData(1, 0, 1)]   // the tutorial's first floor: one a room at most
+    [InlineData(2, 0, 2)]
+    [InlineData(3, 0, 3)]
+    [InlineData(5, 0, 4)]   // the ceiling holds however deep
+    [InlineData(1, 1, 2)]   // the second dungeon's first floor
+    [InlineData(3, 1, 4)]
+    [InlineData(4, 1, 4)]
+    [InlineData(1, 3, 4)]
+    [InlineData(int.MaxValue, int.MaxValue, 4)]
+    public void RoomCap_IsFloorNumberPlusClears_NeverAboveFour(int floorNumber, int cleared, int cap)
+        => Assert.Equal(cap, EnemyPlacer.RoomCap(floorNumber, cleared));
+
+    [Fact]
+    public void RoomCap_RefusesFloorZero_FloorsCountFromOne()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => EnemyPlacer.RoomCap(0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EnemyPlacer.RoomCap(1, -1));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void PlaceEnemies_HoldsEveryRoomToTheCap(int cap)
+    {
+        int most = 0;
+        for (long seed = 1; seed <= 40; seed++)
+        {
+            var map = MapGenerator.Generate(new Mulberry32(seed));
+            var tiles = EnemyPlacer.PlaceEnemies(map, seed, cap)
+                .Select(p => ((int)(p.Y / GameConstants.Tile), (int)(p.X / GameConstants.Tile)))
+                .ToList();
+            foreach (var room in map.DebugRooms)
+            {
+                int inRoom = tiles.Count(t =>
+                    t.Item2 >= room.X && t.Item2 < room.X + room.W &&
+                    t.Item1 >= room.Y && t.Item1 < room.Y + room.H);
+                Assert.InRange(inRoom, 0, cap);
+                most = Math.Max(most, inRoom);
+            }
+        }
+        Assert.Equal(cap, most);   // the cap is reached, not just respected
+    }
+
+    [Fact]
+    public void PlaceEnemies_LeftUncapped_IsThePlacementItAlwaysWas()
+        => Assert.Equal(EnemyPlacer.PlaceEnemies(Map(), Seed, EnemyPlacer.MaxEnemiesPerRoom), EnemyPlacer.PlaceEnemies(Map(), Seed));
+
+    [Fact]
+    public void ANewCampaignsTutorial_HoldsOneARoomOnItsFirstFloor_TwoOnItsSecond()
+    {
+        for (long seed = 1; seed <= 20; seed++)
+        {
+            var campaign = CampaignState.Start(GameContent.Current);
+            var visit = campaign.Enter("tutorial", seed);
+            for (int n = 0; n < visit.Floors.Length; n++)
+                Assert.InRange(MostInARoom(visit.Floors[n]), 0, EnemyPlacer.RoomCap(n + 1, 0));
+        }
+    }
+
+    [Fact]
+    public void EachClear_RaisesTheFirstFloorsCap_UpToFour()
+    {
+        var hall = GameContent.Current.Dungeons["spear_hall"];
+        var party = CampaignState.Start(GameContent.Current).Party;
+        for (int cleared = 0; cleared <= 4; cleared++)
+        {
+            int most = 0;
+            for (long seed = 1; seed <= 20; seed++)
+                most = Math.Max(most, MostInARoom(DungeonState.Enter(hall, seed, party, cleared).Floors[0]));
+            Assert.Equal(EnemyPlacer.RoomCap(1, cleared), most);
+        }
+    }
+
+    [Fact]
+    public void AReloadPlacesTheFloorsNobodyStoodOn_UnderTheCapTheEntrySaw()
+    {
+        // The tutorial's second floor is never stood on before the save, so the
+        // load generates it fresh: it must come back under the entry's cap, not
+        // the full four — whatever the campaign's clears say by then.
+        var campaign = CampaignState.Start(GameContent.Current);
+        var visit = campaign.Enter("tutorial", 1);
+        visit.OpenTurns(campaign.Party);
+        var before = visit.Floors[1].Enemies.Select(e => (e.X, e.Y, e.Weapon.Id)).ToList();
+
+        var loaded = SaveGame.Restore(SaveCodec.Read(SaveCodec.Write(SaveGame.Capture(campaign, null))), GameContent.Current).Campaign.Visit!;
+        Assert.Equal(0, loaded.DungeonsCleared);
+        Assert.Equal(before, loaded.Floors[1].Enemies.Select(e => (e.X, e.Y, e.Weapon.Id)).ToList());
+    }
+
+    /// <summary>The most placed dummies standing in any one room of <paramref name="floor"/> — the boss left out, who is no room's roll.</summary>
+    private static int MostInARoom(Floor floor)
+    {
+        var tiles = floor.Enemies.Where(e => !ReferenceEquals(e, floor.Boss))
+            .Select(e => ((int)(e.Y / GameConstants.Tile), (int)(e.X / GameConstants.Tile)))
+            .ToList();
+        return floor.Map.DebugRooms.Select(room => tiles.Count(t =>
+            t.Item2 >= room.X && t.Item2 < room.X + room.W &&
+            t.Item1 >= room.Y && t.Item1 < room.Y + room.H)).DefaultIfEmpty(0).Max();
+    }
+
     [Fact]
     public void PlaceEnemies_AssignsResolvableWeaponIds()
     {

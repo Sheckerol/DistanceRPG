@@ -85,14 +85,14 @@ public sealed class DungeonListingTests : IDisposable
         CampaignRuns.ShallowRetreat(campaign, "tutorial");
         Assert.Equal(new[] { "tutorial" }, IdsOf(Listed(campaign)));
 
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Equal(2, visit.BossFloor);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         CampaignRuns.Down(visit, campaign.Party);
         Assert.Equal(RunOutcome.Retreat, CampaignRuns.Exit(campaign).Outcome);
         Assert.Equal(new[] { "tutorial" }, IdsOf(Listed(campaign)));
 
-        visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Equal(RunOutcome.Death, CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)).Outcome);
         Assert.Equal(new DungeonListing(tutorial, true, 0, false), Assert.Single(Listed(campaign)));
 
@@ -144,12 +144,12 @@ public sealed class DungeonListingTests : IDisposable
             CampaignRuns.DeepRetreat(campaign, "knife_warrens");   // a mercy: counts
             var hall = Hall();
             Assert.Equal((false, left), (hall.Selectable, hall.RunsUntilAvailable));
-            Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", CampaignRuns.SixDeep));
+            Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", CampaignRuns.SixDeep, EnemyPlacer.Unprotected));
         }
 
         CampaignRuns.DeepRetreat(campaign, "knife_warrens");
         Assert.Equal(new DungeonListing(SpearHall, true, 0, false), Hall());   // lifted: 7 runs counted
-        Assert.Same(campaign.Enter("spear_hall", CampaignRuns.SixDeep), campaign.Visit);
+        Assert.Same(campaign.Enter("spear_hall", CampaignRuns.SixDeep, EnemyPlacer.Unprotected), campaign.Visit);
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public sealed class DungeonListingTests : IDisposable
             CampaignRuns.Clear(campaign, id, seed);
         Assert.NotNull(campaign.EarlyOffer());   // every dungeon locked: one is offered early, and it is not the tutorial
         Assert.DoesNotContain("tutorial", IdsOf(Listed(campaign)));
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", CampaignRuns.GoldenSeed));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected));
     }
 
     [Fact]
@@ -217,13 +217,13 @@ public sealed class DungeonListingTests : IDisposable
         // A line can be entered exactly when the campaign would enter it: every
         // counting line is refused, and entering nothing rests nobody.
         foreach (var line in locked.Where(line => !line.Selectable))
-            Assert.Throws<InvalidOperationException>(() => campaign.Enter(line.Def.Id, CampaignRuns.FiveDeep));
+            Assert.Throws<InvalidOperationException>(() => campaign.Enter(line.Def.Id, CampaignRuns.FiveDeep, EnemyPlacer.Unprotected));
         Assert.Null(campaign.Visit);
 
         // The early line is entered, and left at once (a run that counts nothing).
         // Its lock now stands at the counter, so it is an ordinary open line, not
         // an early one, and the rest have not moved.
-        var visit = campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         Assert.False(CampaignRuns.Exit(campaign).ServiceTick);
         Assert.Equal(new[]
@@ -301,7 +301,7 @@ internal static class CampaignRuns
     /// <summary>Enter <paramref name="dungeonId"/> on <paramref name="seed"/>, go down to the bottom, see its boss fall, and walk out: a clear.</summary>
     public static RunResult Clear(CampaignState campaign, string dungeonId, long seed)
     {
-        var visit = campaign.Enter(dungeonId, seed);
+        var visit = campaign.Enter(dungeonId, seed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, Ten);
         while (visit.Current.DownStairs is not null)
             Down(visit, campaign.Party);
@@ -314,7 +314,7 @@ internal static class CampaignRuns
     /// <summary>Enter <paramref name="dungeonId"/> five floors deep, go three floors down and walk back out: a retreat that counts, as a mercy.</summary>
     public static RunResult DeepRetreat(CampaignState campaign, string dungeonId)
     {
-        var visit = campaign.Enter(dungeonId, FiveDeep);
+        var visit = campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, visit.BossFloor);
         visit.OpenTurns(campaign.Party, Ten);
         Down(visit, campaign.Party);
@@ -327,7 +327,7 @@ internal static class CampaignRuns
     /// <summary>Enter <paramref name="dungeonId"/> and walk straight back out of the first floor: a retreat that counts nothing.</summary>
     public static RunResult ShallowRetreat(CampaignState campaign, string dungeonId)
     {
-        campaign.Enter(dungeonId, FiveDeep).OpenTurns(campaign.Party, Ten);
+        campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, Ten);
         var result = Exit(campaign);
         Assert.Equal((RunOutcome.Retreat, 1, false), (result.Outcome, result.DeepestFloor, result.ServiceTick));
         return result;
