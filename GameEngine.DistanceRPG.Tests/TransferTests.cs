@@ -66,8 +66,8 @@ public sealed class TransferTests : IDisposable
         // first enchantment, and both weapons back in the stable when it is done.
         var campaign = Opened();
         var knife = Knife();
-        knife.CreditEnchantment(0, 5, 1);   // Serrated banks what it spends, and buys nothing with it
-        knife.CreditEnchantment(1, 7, 1);   // Vampiric T3, part of the way to T4
+        knife.CreditEnchantment(0, 5);   // Serrated banks what it spends, and buys nothing with it
+        knife.CreditEnchantment(1, 7);   // Vampiric T3, part of the way to T4
         Assert.Equal((3, 7), (knife.Enchantments[1].Tier, knife.Enchantments[1].Xp));
         var blade = Worn("riposte_blade", wear: 30);
         var made = Enchanter.Deposit(campaign, Give(campaign, "B", 2, blade), Service.Transfer, source: Give(campaign, "C", 2, knife), sourceIndex: 1);
@@ -99,7 +99,7 @@ public sealed class TransferTests : IDisposable
 
         // Tier 1 travels intact, XP and all — the very entry, since nothing about it changes.
         var sword = Souled("arming_sword", 0, 0, ("flaming", 1));
-        sword.CreditEnchantment(0, 3, 1);
+        sword.CreditEnchantment(0, 3);
         var flaming = sword.Enchantments[0];
         Assert.Same(flaming, flaming.Transferred());
         Assert.Equal(3, flaming.Transferred().Xp);

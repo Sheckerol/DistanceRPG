@@ -198,28 +198,22 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     public Enchantment Transferred() => Tier > 1 ? new Enchantment(Def, Tier - 1) : this;
 
     /// <summary>
-    /// What leaving this tier costs (§3.3): <c>xpToNextTier = currentTierCost /
-    /// INT</c>, where "the tier's current cost" is the pool it locks — the only
-    /// cost a tier has. It is <see cref="Progression.XpToNext"/> again, a fifth
-    /// application of the one threshold function, so INT divides a threshold and
-    /// never multiplies a credit (§2.3: "there is no rate multiplier anywhere").
-    /// A wizard therefore tiers an entry roughly four times as fast as a fighter,
-    /// and the tier is what lifts lock and potency.
+    /// What leaving this tier costs: <c>Lock x Tier x EnchantmentTierScale</c> mana
+    /// spent through the entry — the pool it locks, scaled. The wielder's INT plays
+    /// no part (ruled after play, 2026-10): INT grows the character's mana pool,
+    /// never the weapon's ladder, so a soul climbs at one rate in any hands — and
+    /// §3.3's <c>/ INT</c>, which tiered a staff of renewal after two casts in a
+    /// wizard's hands, is gone. The scale is <see cref="Tuning.EnchantmentTierScale"/>.
     /// <para>
-    /// It carries no floor, exactly as <see cref="Progression.XpToNext"/> carries
-    /// none: the guard lives in <see cref="TierCost"/>, which is this member
-    /// floored at 1 and is what the climb charges <em>and</em> what a readout
-    /// prints — one expression, so a tier can never be shown at one price and
-    /// charged at another. This member is the doc's line and what a caller asking
-    /// the unfloored arithmetic (the farm's grant of one tier's bar) reads; the
-    /// two part company only where the floor bites (<c>Lock x Tier</c> below the
-    /// wielder's INT), which <see cref="ContentValidator.ValidateEnchantments"/>'
-    /// lock rule and a catalogue whose smallest lock is 15 both keep out of
-    /// reach.
+    /// It carries no floor: the guard lives in <see cref="TierCost"/>, which is
+    /// this member floored at 1 and is what the climb charges <em>and</em> what a
+    /// readout prints — one expression, so a tier can never be shown at one price
+    /// and charged at another. This member is what a caller asking the unfloored
+    /// arithmetic (the farm's grant of one tier's bar) reads.
     /// </para>
     /// </summary>
-    /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
-    public int XpToNextTier(int stat) => Progression.XpToNext(EffectiveLock, stat);
+    public int XpToNextTier()
+        => (int)Math.Min(int.MaxValue, (long)EffectiveLock * GameContent.Current.Tuning.EnchantmentTierScale);
 
     /// <summary>
     /// This entry after <paramref name="manaSpent"/> more mana has gone through
@@ -236,28 +230,24 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// </para>
     /// </summary>
     /// <param name="manaSpent">Mana this entry actually paid; never negative.</param>
-    /// <param name="stat">The INT that was doing the spending, 1..4; a flat 1 for a thing with no nature, which is what the farm's grant and an enemy's spend both use.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="manaSpent"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
-    public Enchantment WithXp(int manaSpent, int stat)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="manaSpent"/> is negative.</exception>
+    public Enchantment WithXp(int manaSpent)
     {
         if (manaSpent < 0)
             throw new ArgumentOutOfRangeException(nameof(manaSpent), manaSpent,
                 "Mana spent is never negative: an enchantment's ladder is only ever credited.");
-        if (stat < InnateStats.Low || stat > InnateStats.High)
-            throw new ArgumentOutOfRangeException(nameof(stat), stat,
-                $"A governing stat runs {InnateStats.Low}..{InnateStats.High}; a thing with no nature divides by {InnateStats.Low}.");
 
         if (Unique)
             return this with { Xp = Xp + manaSpent };
 
         var grown = this;
         int xp = Xp + manaSpent;
-        int cost = grown.TierCost(stat);
+        int cost = grown.TierCost();
         while (xp >= cost)
         {
             xp -= cost;
             grown = grown with { Tier = grown.Tier + 1 };
-            cost = grown.TierCost(stat);
+            cost = grown.TierCost();
         }
         return grown with { Xp = xp };
     }
@@ -265,18 +255,14 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// <summary>
     /// What leaving the tier this entry is on actually costs:
     /// <see cref="XpToNextTier"/>, floored at 1. The floor lives here and never
-    /// inside that member, which stays the doc's line — the same split
-    /// <see cref="Progression"/> already makes between <c>XpToNext</c> and its own
-    /// private step, for the same reason: <see cref="WithXp"/>'s loop is the one
-    /// caller a free step could hang. It is public because the price a readout
-    /// prints is the price the climb charges (§3.3: a bar is what it costs to
-    /// leave the tier), and a HUD restating <c>Math.Max(1, …)</c> for itself
-    /// would be the second expression this split exists to avoid.
+    /// inside that member, for the same reason <see cref="Progression"/> splits
+    /// <c>XpToNext</c> from its own private step: <see cref="WithXp"/>'s loop is
+    /// the one caller a free step could hang. It is public because the price a
+    /// readout prints is the price the climb charges.
     /// <see cref="ContentValidator.ValidateEnchantments"/> refuses a lock below 1
     /// at load, so the floor is a second door on a closed one.
     /// </summary>
-    /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
-    public int TierCost(int stat) => Math.Max(1, XpToNextTier(stat));
+    public int TierCost() => Math.Max(1, XpToNextTier());
 
     /// <summary>
     /// Levels one application grants from <paramref name="sourceNumber"/> —

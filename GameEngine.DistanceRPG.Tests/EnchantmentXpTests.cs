@@ -133,7 +133,7 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal((1, 13), Entry(knife, 0));
         Assert.Equal(new[] { 4, 2 }, hits.Select(h => h.EnchantmentShare));   // 4 x 5 / 8
-        Assert.Equal(30, knife.Enchantments[0].XpToNextTier(InnateStats.Low));
+        Assert.Equal(30, knife.Enchantments[0].XpToNextTier());
         Assert.Equal(new[] { 8, 5 }, spent.Select(s => s.Spent).ToArray());
 
         // Nothing at all: a pool that cannot buy a scrap of the effect is the
@@ -176,7 +176,7 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(28, a.ManaXp - manaXp);
         Assert.Equal((1, 2), Entry(staff, 0));
-        Assert.Equal(15, staff.Enchantments[0].XpToNextTier(InnateStats.Low));
+        Assert.Equal(15, staff.Enchantments[0].XpToNextTier());
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public sealed class EnchantmentXpTests : IDisposable
         int manaXp = caster.ManaXp;
 
         Assert.Equal(13, staff.ResolvedManaCost);
-        Assert.Equal(15, staff.Enchantments[0].TierCost(InnateStats.Low));
+        Assert.Equal(15, staff.Enchantments[0].TierCost());
         for (int cast = 0; cast < 14; cast++)
         {
             caster.Mana = caster.UsableMaxMana;
@@ -390,7 +390,7 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.True(spent.Count > 0, $"'{id}' fired without paying anything.");
         Assert.All(spent, s => Assert.True(s.Spent > 0, $"'{id}' fired free."));
         Assert.True(weapon.Enchantments[0].Tier > 1, $"'{id}' never left tier 1.");
-        Assert.Equal(spent.Sum(s => s.Spent), TotalCredited(weapon.Enchantments[0], InnateStats.Low));
+        Assert.Equal(spent.Sum(s => s.Spent), TotalCredited(weapon.Enchantments[0]));
     }
 
     /// <summary>
@@ -420,13 +420,13 @@ public sealed class EnchantmentXpTests : IDisposable
     /// than counted at the call sites, so the theory compares what was spent
     /// against what the ladder actually banked.
     /// </summary>
-    private static int TotalCredited(Enchantment entry, int stat)
+    private static int TotalCredited(Enchantment entry)
     {
         int total = entry.Xp;
         var walk = new Enchantment(entry.Def, Tier: 1);
         while (walk.Tier < entry.Tier)
         {
-            total += walk.TierCost(stat);
+            total += walk.TierCost();
             walk = walk with { Tier = walk.Tier + 1 };
         }
         return total;
@@ -485,13 +485,12 @@ public sealed class EnchantmentXpTests : IDisposable
     }
 
     [Fact]
-    public void IntScalesPotencyThroughTheLadder()
+    public void IntDoesNotScaleTheLadder()
     {
-        // Section 3.3 says enchantment potency scales with INT; section 2.1 says
-        // a stat divides a threshold and never multiplies a value. Both hold at
-        // once because INT divides the tier's bar: the same spend buys a wizard
-        // more depth, and depth is what lifts potency. No rate multiplier exists
-        // anywhere -- the two wielders are credited the identical mana.
+        // Ruled after play (2026-10): INT grows the character's mana pool and
+        // never the weapon's ladder. A wizard and a fighter credited the
+        // identical mana climb to the identical tier — the bar is the lock times
+        // EnchantmentTierScale (1 under the premise) and no stat divides it.
         var grid = new int[20, 20];
         var wizardKnife = Souled("Leech", ("vampiric", 1));
         var fighterKnife = Souled("Leech", ("vampiric", 1));
@@ -516,17 +515,10 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.Equal(20, spent.Where(s => s.Self == wizard).Sum(s => s.Spent));
         Assert.Equal(20, spent.Where(s => s.Self == fighter).Sum(s => s.Spent));
 
-        // The wizard's bars were 5, 10 and 15; the fighter's first was 20.
-        Assert.Equal((3, 5), Entry(wizardKnife, 0));
+        // The bars are 20 and then 40, whoever holds the knife.
+        Assert.Equal((2, 0), Entry(wizardKnife, 0));
         Assert.Equal((2, 0), Entry(fighterKnife, 0));
-
-        // And so the same entry, fired the same number of times, is a deeper
-        // circle in one hand than the other -- which is the whole of "potency
-        // scales with INT", with the scaling living in the ladder.
-        var deep = wizardKnife.Enchantments[0];
-        var shallow = fighterKnife.Enchantments[0];
-        Assert.Equal((3, 60), (deep.LevelsFor(deep.Def.Potency), deep.EffectiveLock));
-        Assert.Equal((2, 40), (shallow.LevelsFor(shallow.Def.Potency), shallow.EffectiveLock));
+        Assert.Equal(wizardKnife.Enchantments[0].EffectiveLock, fighterKnife.Enchantments[0].EffectiveLock);
     }
 
     [Fact]

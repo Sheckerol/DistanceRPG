@@ -883,7 +883,10 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `StartingPool` when it refines), and two provisional numbers,
   `GraftSharePercent`, how many of the rolls that land graft (0 to 100; 25), and
   `DeepenSignatureWeight`, how many times likelier a deepen lands on the class's
-  signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. Turning any says
+  signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. And
+  `EnchantmentTierScale` (1 to 1000; 5, after play): leaving an enchantment's tier
+  costs its lock × tier × this in mana spent through it — no stat divides it, INT
+  growing the mana pool and never the ladder. Hashed from version 3. Turning any says
   `THE NUMBERS HAVE CHANGED` when a campaign saved under the other number resumes —
   but never to a save from before Phase 6a, whose record of its numbers covers
   only the keys played then; while Phase 6a is being built, a save an earlier

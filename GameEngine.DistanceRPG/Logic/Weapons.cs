@@ -496,13 +496,12 @@ public sealed class Weapon : IItem
     /// </summary>
     /// <param name="index">The entry's position in <see cref="Enchantments"/>.</param>
     /// <param name="xp">Mana that entry paid; never negative.</param>
-    /// <param name="stat">The INT that was doing the spending, 1..4; a flat 1 for a thing with no nature.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, <paramref name="xp"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
-    public void CreditEnchantment(int index, int xp, int stat)
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, or <paramref name="xp"/> is negative.</exception>
+    public void CreditEnchantment(int index, int xp)
     {
         if ((uint)index >= (uint)_enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Count} enchantments.");
-        _enchantments[index] = _enchantments[index].WithXp(xp, stat);
+        _enchantments[index] = _enchantments[index].WithXp(xp);
     }
 
     public int Stacks(ModifierType t) => Modifiers.Stacks(t);

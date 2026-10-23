@@ -2017,7 +2017,6 @@ public sealed class TurnSystem
         var weapon = payer.EquippedWeapon;
         if (weapon == null) return;
 
-        int stat = (payer as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
         int paid = 0;
         foreach (var payment in payments)
             paid += payment.Paid;
@@ -2037,7 +2036,7 @@ public sealed class TurnSystem
 
             int index = payments[i].Index;
             int before = weapon.Enchantments[index].Tier;
-            weapon.CreditEnchantment(index, credit, stat);
+            weapon.CreditEnchantment(index, credit);
             var entry = weapon.Enchantments[index];
             if (entry.Tier > before)
             {

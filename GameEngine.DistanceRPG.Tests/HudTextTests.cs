@@ -212,8 +212,8 @@ public sealed class HudTextTests : IDisposable
     {
         // Tier is earned by use (section 3.3), and the bar is the only thing
         // that says a swing is buying anything: an equipped entry reads XP n/m
-        // beside its lock, where m is that tier's own cost over the wielder's INT
-        // -- the same number the climb charges, TierCost, so the row and the
+        // beside its lock, where m is that tier's own cost (its lock times the
+        // tier scale, 1 under the premise) -- the same number the climb charges, TierCost, so the row and the
         // ladder cannot state two prices.
         var knife = TestWeapons.Get("flensing_knife_unique");
         var member = TestPools.Char("A");
@@ -232,20 +232,20 @@ public sealed class HudTextTests : IDisposable
         // One swing's worth of triggers: Serrated and Overheal are uniques, so
         // they bank a figure and print no bar -- there is no next tier to be
         // partway to -- while Vampiric is climbing its tier-3 bar of sixty.
-        knife.CreditEnchantment(0, 2, InnateStats.Low);
-        knife.CreditEnchantment(1, 2, InnateStats.Low);
-        knife.CreditEnchantment(2, 8, InnateStats.Low);
+        knife.CreditEnchantment(0, 2);
+        knife.CreditEnchantment(1, 2);
+        knife.CreditEnchantment(2, 8);
         Assert.Equal("SERRATED LOCK 20 XP 2  VAMPIRIC T3 LOCK 60 XP 2/60  OVERHEAL LOCK 25 XP 8",
             DungeonHud.EnchantmentReadout(knife, member));
 
-        // The bar is the wielder's INT dividing the tier's cost, so it is the
-        // wielder's number: a wizard holding the same knife is a quarter of the
-        // way where a member with no nature is a thirtieth.
+        // The bar is the entry's, not the wielder's (after play, 2026-10: INT
+        // grows the mana pool, never the ladder): a wizard holding the same knife
+        // reads the same bar.
         var wizard = TestPools.Char("B", stats: new InnateStats(STR: 1, DEX: 2, CON: 3, INT: 4));
         wizard.Inventory[0] = knife;
         while (wizard.IsDormant(2))
             wizard.Credit(new XpCredit(XpPool.Mana, null, wizard.ManaPool.XpToNext));
-        Assert.Contains("VAMPIRIC T3 LOCK 60 XP 2/15", DungeonHud.EnchantmentReadout(knife, wizard));
+        Assert.Contains("VAMPIRIC T3 LOCK 60 XP 2/60", DungeonHud.EnchantmentReadout(knife, wizard));
 
         // Like the lock, progress reads only where there is a wielder: in the
         // bag or asked about with none, the row is the entry's name and tier.
@@ -991,7 +991,7 @@ public sealed class HudTextTests : IDisposable
                 made.Acquire(graft, 1);
             while (Enchanter.DeepenCandidates(made) is [var (deepen, _), ..])
                 made.Acquire(deepen, 1);
-            var enchantments = souls.Select(soul => new Enchantment(soul, 99) { Xp = new Enchantment(soul, 99).TierCost(InnateStats.Low) - 1 }).ToArray();
+            var enchantments = souls.Select(soul => new Enchantment(soul, 99) { Xp = new Enchantment(soul, 99).TierCost() - 1 }).ToArray();
             const int cashed = 36_270;   // nine bars, 30 to 8030: a capacity of 9030
             return new Weapon(def, made.Forged, made.Modifiers, enchantments, 0, wear: 9030, wearCashed: cashed);
         }

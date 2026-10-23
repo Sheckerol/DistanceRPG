@@ -323,6 +323,14 @@
      none (open-questions.md, PHASE 6a DECISION 5). */
   "DeepenSignatureWeight": 3,
 
+  /* How many times the mana an enchantment reserves is the spend that takes it up a tier: leaving a
+     tier costs lock x tier x this in mana spent through the entry, every enchantment alike. INT plays
+     no part - it grows a character's mana pool, never a weapon's ladder. The old bar, lock x tier /
+     INT, tiered a staff of renewal in a wizard's hands after two casts - and a tier doubles the
+     lock, which left it no pool to cast from. 5 makes a tier a long spend: 75 trigger mana to that
+     staff's second tier, in anyone's hands (after play, 2026-10). */
+  "EnchantmentTierScale": 5,
+
   /* ---- Inventory ---- */
 
   /* The party's whole carry in weapon slots, shared evenly by its four members - 6 each at 24: slot

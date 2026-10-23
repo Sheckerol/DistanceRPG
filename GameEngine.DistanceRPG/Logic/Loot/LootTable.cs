@@ -503,7 +503,7 @@ public static class LootTable
         }
 
         var innate = weapon.Enchantments[InnateIndex];
-        weapon.CreditEnchantment(InnateIndex, innate.XpToNextTier(NoNature), NoNature);
+        weapon.CreditEnchantment(InnateIndex, innate.XpToNextTier());
     }
 
     /// <summary>

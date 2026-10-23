@@ -779,7 +779,7 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal("THE NAMELESS KNIFE HAS MOVED - NOTHING DEPOSITED", scene.Refusal);
         campaign.Move(TestShop.InTheStable(campaign, knife), from);
         Confirm();
-        knife.CreditEnchantment(1, 1, 1);   // a new entry where the list found the old
+        knife.CreditEnchantment(1, 1);   // a new entry where the list found the old
         scene.OnKey(Keys.Enter);
         Assert.Equal("VAMPIRIC IS NOT ON THE NAMELESS KNIFE NOW - NOTHING DEPOSITED", scene.Refusal);
         Confirm();

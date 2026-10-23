@@ -34,7 +34,10 @@ namespace GameEngine.DistanceRPG.Tests;
 internal static class Premise
 {
     private static readonly Lazy<Tuning> TuningHolder = new(() =>
-        TuningJson.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "pre-rework-tuning.json")), ShippedContent.Tuning).Tuning);
+        TuningJson.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "pre-rework-tuning.json")), ShippedContent.Tuning).Tuning
+            // The file predates EnchantmentTierScale (2026-10), and a key it lacks would read the shipped
+            // number: 1 is the scale its tiers were climbed at - lock x tier, as at INT 1 when INT still divided.
+            with { EnchantmentTierScale = 1 });
 
     private static readonly Lazy<WeaponsData> WeaponsHolder = new(() => Set(ShippedContent.Weapons,
     [

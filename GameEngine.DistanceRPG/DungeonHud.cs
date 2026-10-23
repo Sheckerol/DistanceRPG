@@ -2248,7 +2248,6 @@ public sealed class DungeonHud
     {
         ArgumentNullException.ThrowIfNull(weapon);
         bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
-        int stat = (wielder as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
         var parts = new List<string>();
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
@@ -2259,7 +2258,7 @@ public sealed class DungeonHud
             {
                 text += $" LOCK {entry.EffectiveLock}";
                 if (!entry.Unique)
-                    text += $" XP {entry.Xp}/{entry.TierCost(stat)}";
+                    text += $" XP {entry.Xp}/{entry.TierCost()}";
                 else if (entry.Xp > 0)
                     text += $" XP {entry.Xp}";
                 if (wielder!.IsDormant(i)) text += " (ASLEEP)";
