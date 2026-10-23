@@ -38,7 +38,7 @@ public sealed class LooseItemTests : IDisposable
     /// <summary>A roll that neither crits nor fumbles.</summary>
     private static int Ten() => 10;
 
-    /// <summary>Four fixture members in roster order, each holding a Weakspot Stiletto, their bags empty.</summary>
+    /// <summary>Four fixture members in roster order, each holding a Rondel, their bags empty.</summary>
     private static PartyMemberState[] Party()
         => Ids.Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i)).ToArray();
 
@@ -93,7 +93,7 @@ public sealed class LooseItemTests : IDisposable
         var party = Party();
         var tower = TestWeapons.Get("tower_guard");
         var bow = TestWeapons.Get("longbow");
-        party[1].Inventory[2] = tower;   // B's bag: a Tower Guard in its second slot
+        party[1].Inventory[2] = tower;   // B's bag: a Scutum and Gladius in its second slot
         party[2].Inventory[1] = bow;     // C's: a Longbow in its first
         var (_, visit) = Enter(party);
         var first = visit.Current;
@@ -123,7 +123,7 @@ public sealed class LooseItemTests : IDisposable
         var below = bottom.Leave(party[2], 1);
         Assert.Equal(Displacer.TileOf(party[2]), below.Tile);
 
-        // Back up: the first floor holds its Tower Guard where B put it, and the
+        // Back up: the first floor holds its Scutum and Gladius where B put it, and the
         // bottom floor its longbow. Each floor keeps its own, and nobody carries either.
         Up(visit, party);
         Assert.Same(first, visit.Current);

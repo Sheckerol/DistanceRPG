@@ -169,7 +169,7 @@ public sealed class EnchanterTests : IDisposable
     {
         // R4: "capacity above the price is breathing room: at capacity 35 with no
         // enchantment, cashing 30 buys the first". A deposit still spends the whole
-        // pool, so a Tower Guard at capacity 35 holding 30 cashes all 30.
+        // pool, so a Scutum and Gladius at capacity 35 holding 30 cashes all 30.
         var campaign = Opened();
         var guard = Worn("tower_guard", wear: 30, cashed: 160);
         Assert.Equal((35, 0), (guard.WearCapacity, guard.Enchantments.Count));
@@ -334,7 +334,7 @@ public sealed class EnchanterTests : IDisposable
         // souls as shipped, "transferable but never catalogued") and the kinds that do
         // nothing yet: the drop pool's own live-behaviour test (LootTable.IsInert), so
         // Echoing is never offered (open-questions.md, the Echoing entry). Nothing
-        // else is left out: on a bare Tower Guard, nothing is refused.
+        // else is left out: on a bare Scutum and Gladius, nothing is refused.
         var campaign = Opened();
         campaign.See(TestWeapons.Get("flensing_knife_unique"));   // Overheal, Serrated, Vampiric
         campaign.See(TestWeapons.Enchanted("Echo", 40, 10, 30, "echoing"));
@@ -439,7 +439,7 @@ public sealed class EnchanterTests : IDisposable
             Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(met, at, Service.Enchant, "burning"));
 
             // The first to apply is the one said, the exclusion before the
-            // prerequisite: under a group pairing the burn with Vampiric, a Tower Guard
+            // prerequisite: under a group pairing the burn with Vampiric, a Scutum and Gladius
             // carrying Vampiric and no Flaming is refused beside Vampiric.
             using (TestContent.UsePremise(tuning: Ruled, restricted: BurningOffered() with
             {
@@ -449,7 +449,7 @@ public sealed class EnchanterTests : IDisposable
         }
 
         // A lock the wielder cannot afford is never a refusal (S:41–42): the entry is
-        // dormant. B holds a Tower Guard whose four souls already reserve more than its
+        // dormant. B holds a Scutum and Gladius whose four souls already reserve more than its
         // mana, and Arcane's 30 more is offered and bought all the same; the offer is
         // the weapon's alone, and reads the same in the stable.
         campaign.See(TestWeapons.Enchanted("Arc", 40, 10, 30, "arcane"));
@@ -570,7 +570,7 @@ public sealed class EnchanterTests : IDisposable
     {
         // PHASE 6a DECISION 12: everything else attaches, an entry that can never fire
         // on the weapon included. A staff's status fires on a cast, which no sword
-        // raises — the drop pool's own test (LootTable.RaisedBy) — so on a Tower Guard
+        // raises — the drop pool's own test (LootTable.RaisedBy) — so on a Scutum and Gladius
         // Regeneration is offered with a note rather than refused, and it attaches. On
         // a staff it casts, and there is no note.
         var campaign = Opened();
@@ -1119,8 +1119,8 @@ public sealed class EnchanterTests : IDisposable
         Assert.Empty(campaign.Stable);
 
         // A weapon in the shop already is refused as such, before anything else.
-        Assert.Equal("TOWER GUARD IS IN THE SHOP ALREADY", Enchanter.Refusal(campaign, guard, Service.Refine));
-        Assert.Equal("TOWER GUARD IS IN THE SHOP ALREADY", Enchanter.InTheShop(guard));
+        Assert.Equal("SCUTUM AND GLADIUS IS IN THE SHOP ALREADY", Enchanter.Refusal(campaign, guard, Service.Refine));
+        Assert.Equal("SCUTUM AND GLADIUS IS IN THE SHOP ALREADY", Enchanter.InTheShop(guard));
     }
 
     [Fact]
@@ -1187,14 +1187,14 @@ public sealed class EnchanterTests : IDisposable
         // that one is and let go where it is, read off the IL.
         var campaign = TestShop.Shop();
         var idle = TestShop.NotCounted(campaign);
-        Assert.Equal(["[Enchanter] Run not counted: nothing worked; stalled Staff of Renewal 1/2, Staff of Renewal 1/2, Tower Guard 0/1"],
+        Assert.Equal(["[Enchanter] Run not counted: nothing worked; stalled Staff of Renewal 1/2, Staff of Renewal 1/2, Scutum and Gladius 0/1"],
             DistanceRpgGame.EnchanterLines(idle));
         var back = Counted(campaign);
         Assert.Equal(new[]
         {
-            "[Enchanter] Run counted: worked Staff of Renewal 2/2, Tower Guard 1/1; stalled Staff of Renewal 1/2",
+            "[Enchanter] Run counted: worked Staff of Renewal 2/2, Scutum and Gladius 1/1; stalled Staff of Renewal 1/2",
             "[Enchanter] Staff of Renewal finished: attached vampiric; improvement roll 1073 of 3000 against 90: no change",
-            "[Enchanter] Tower Guard finished: refined; improvement roll 2815 of 3000 against 180: no change",
+            "[Enchanter] Scutum and Gladius finished: refined; improvement roll 2815 of 3000 against 180: no change",
         }, DistanceRpgGame.EnchanterLines(back));
         Assert.Equal(new[]
         {
@@ -1210,11 +1210,11 @@ public sealed class EnchanterTests : IDisposable
         {
             Services = [new ServiceReport("tower_guard", Service.Refine, 1, 1, Improved: improved, Roll: roll)],
         })[^1];
-        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: grafted Riposte",
+        Assert.Equal("[Enchanter] Scutum and Gladius finished: refined; improvement roll 12 of 3000 against 180: grafted Riposte",
             Finished(new Improvement(ImprovementKind.Graft, ModifierType.Riposte), landed));
-        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: deepened Block",
+        Assert.Equal("[Enchanter] Scutum and Gladius finished: refined; improvement roll 12 of 3000 against 180: deepened Block",
             Finished(new Improvement(ImprovementKind.Deepen, ModifierType.Block), landed));
-        Assert.Equal("[Enchanter] Tower Guard finished: refined; improvement roll 12 of 3000 against 180: landed, nothing to deepen or graft",
+        Assert.Equal("[Enchanter] Scutum and Gladius finished: refined; improvement roll 12 of 3000 against 180: landed, nothing to deepen or graft",
             Finished(null, landed));
 
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
@@ -1291,7 +1291,7 @@ internal static class TestShop
     /// <summary><see cref="Ruled"/>, with the improvement roll landing every time: <c>GraftBaseChance</c> at its most, 100 in 100 when enchanting and past it when refining.</summary>
     public static Tuning Landing(Tuning t) => Ruled(t) with { GraftBaseChance = 100 };
 
-    /// <summary>The game's own party — A a Weakspot Stiletto and a Staff of Renewal, B a Tower Guard and one, C a Great Axe and one, D a Staff of Renewal and a Staff of Mire — with the tutorial beaten, so the enchanter is open, and Vampiric, Flaming and Cold met.</summary>
+    /// <summary>The game's own party — A a Rondel and a Staff of Renewal, B a Scutum and Gladius and one, C a Dane Axe and one, D a Staff of Renewal and a Staff of Mire — with the tutorial beaten, so the enchanter is open, and Vampiric, Flaming and Cold met.</summary>
     public static CampaignState Opened()
     {
         var campaign = CampaignState.Start(GameContent.Current);
@@ -1361,7 +1361,7 @@ internal static class TestShop
     /// <see cref="Opened"/>, with three deposits in the shop, as play makes them:
     /// A's Staff of Renewal refined unworn (0: two runs), B's second Staff of Renewal
     /// enchanted Vampiric at capacity 35 (1: two runs, its wear cashed 160 before and
-    /// 195 after), a counted run working both a run on, and then C's Tower Guard
+    /// 195 after), a counted run working both a run on, and then C's Scutum and Gladius
     /// refined with 30 worn (2: one run, fresh). The last result reports 0 and 1
     /// worked; the next counted run works 1 and 2 and stalls 0.
     /// </summary>
@@ -1378,11 +1378,11 @@ internal static class TestShop
 
     /// <summary>
     /// <see cref="Opened"/>, with transfers made as play makes them (Phase 6a.6): B's
-    /// Riposte Blade, worn full, takes Vampiric T3 off C's Nameless Knife (0: one
+    /// Rapier and Dagger, worn full, takes Vampiric T3 off C's Nameless Knife (0: one
     /// run), and a counted run brings both back to the stable — the blade carrying it
     /// at T2, the knife without it — the last result reporting it; then D's Tower
     /// Guard, worn full, takes the knife's Serrated from the stable (1: one run,
-    /// fresh), the knife held beside it; and A's Arming Sword, carrying Flaming and
+    /// fresh), the knife held beside it; and A's Buckler and Sword, carrying Flaming and
     /// Vampiric at capacity 35 and full, moves its Flaming to its end (2: a reorder,
     /// two runs, fresh).
     /// </summary>

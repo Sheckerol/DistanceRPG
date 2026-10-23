@@ -173,11 +173,11 @@ public static class BossLoot
     /// authored from <paramref name="variant"/>, when the graft took
     /// <paramref name="theme"/> to <see cref="ModifierRules.MaxForged"/> — "a unique
     /// is a variant with one modifier at ×3" — and that unique's forged spread
-    /// equals the grafted one. Tower Guard's <c>Block ×2, Push ×1</c> and the
+    /// equals the grafted one. Scutum and Gladius's <c>Block ×2, Push ×1</c> and the
     /// golem's Block are The Bulwark's <c>Block ×3, Push ×1</c>.
     /// <para>
     /// <strong>Both halves are load-bearing.</strong> Spread equality alone admits
-    /// the Light shape: a Flensing Knife grafted with CritWindow reaches
+    /// the Light shape: a Seax grafted with CritWindow reaches
     /// <c>CritWindow ×2, CritMultiplier ×1, Light ×1</c>, which is exactly the
     /// Nameless Knife's forged spread — and a dungeon holding two uniques would
     /// break "each themed dungeon can drop exactly one" (PHASE4-067). The ×3 is

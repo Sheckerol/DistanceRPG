@@ -35,7 +35,7 @@ public sealed class HudTextTests : IDisposable
 
     private static string[] Item(Drop drop) => DungeonHud.GroundItemRuns(drop).Select(r => r.Text).ToArray();
 
-    /// <summary>Four fixture members in roster order, a Weakspot Stiletto each: a party to walk a real visit's floors with.</summary>
+    /// <summary>Four fixture members in roster order, a Rondel each: a party to walk a real visit's floors with.</summary>
     private static PartyMemberState[] Party()
         => new[] { "A", "B", "C", "D" }
             .Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
@@ -327,20 +327,20 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(new[] { "80/80", "BLOCK 15" }, Plate(DungeonState.BossRow(tutorial, TestWeapons.Get("tower_guard"))));
 
         // Another dungeon's boss reads its own theme in the readout's own words:
-        // the Knife Mother's CritWindow x3 on a Weakspot Stiletto's x1 is 16+.
+        // the Knife Mother's CritWindow x3 on a Rondel's x1 is 16+.
         var warrens = GameContent.Current.Dungeons["knife_warrens"];
         var mother = DungeonState.BossRow(warrens, TestWeapons.Get("weakspot_stiletto"));
-        Assert.Equal("KNIFE MOTHER [WEAKSPOT STILETTO]", DungeonHud.EnemyTitle(mother));
+        Assert.Equal("KNIFE MOTHER [RONDEL]", DungeonHud.EnemyTitle(mother));
         Assert.Equal("CRIT 16+ x3", DungeonHud.InnateReadout(mother));
 
         // The golem the shipped seed's tutorial generates.
         var bottom = Floor.Generate(2762136374, 1, bottom: true, tutorial);
-        Assert.Equal("STONE GOLEM [PINNING LANCE]", DungeonHud.EnemyTitle(bottom.Boss!));
+        Assert.Equal("STONE GOLEM [RANSEUR]", DungeonHud.EnemyTitle(bottom.Boss!));
         Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(bottom.Boss!));
 
         // Rank and file are named by what they hold, as they always were, and
         // carry nothing on themselves to print.
-        Assert.Equal("DUMMY [ARMING SWORD]", DungeonHud.EnemyTitle(new EnemyState()));
+        Assert.Equal("DUMMY [BUCKLER AND SWORD]", DungeonHud.EnemyTitle(new EnemyState()));
         Assert.Equal("HEALER [STAFF OF RENEWAL]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_renewal") }));
         Assert.Equal("CASTER [STAFF OF MIRE]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_mire") }));
         Assert.Equal("", DungeonHud.InnateReadout(new EnemyState()));
@@ -544,11 +544,11 @@ public sealed class HudTextTests : IDisposable
         Assert.Null(DungeonHud.UniqueBeat(new Drop(TestWeapons.Get("tower_guard"), 7, WasUniqueRoll: false)));
 
         var bow = new Drop(GameContent.Current.Weapons.Instantiate("hunting_bow", forgedGraft: Block), DefeatCount: 0, WasUniqueRoll: false);
-        Assert.Equal("DROPPED: HUNTING BOW - FORGED WITH BLOCK", DungeonHud.BossDropLine(bow, Block));
+        Assert.Equal("DROPPED: SHORTBOW - FORGED WITH BLOCK", DungeonHud.BossDropLine(bow, Block));
         Assert.Equal("DROPPED: THE BULWARK - UNIQUE", DungeonHud.BossDropLine(bulwark, Block));
         var knife = new Drop(GameContent.Current.Weapons.Instantiate("flensing_knife", forgedGraft: CritWindow), 0, false);
-        Assert.Equal("DROPPED: FLENSING KNIFE - FORGED WITH CRIT WINDOW", DungeonHud.BossDropLine(knife, CritWindow));
-        Assert.Equal("DROPPED: FLENSING KNIFE", DungeonHud.BossDropLine(knife, null));
+        Assert.Equal("DROPPED: SEAX - FORGED WITH CRIT WINDOW", DungeonHud.BossDropLine(knife, CritWindow));
+        Assert.Equal("DROPPED: SEAX", DungeonHud.BossDropLine(knife, null));
 
         // Every name the HUD gives a theme is the modifier's own words, in capitals.
         Assert.Equal(new[] { "BLOCK", "BRACE", "LONGSHOT", "CRIT WINDOW", "CHARGES" },
@@ -556,7 +556,7 @@ public sealed class HudTextTests : IDisposable
 
         // On the floor, the boss's drop is a weapon like any other: its name - a
         // unique's in gold - and no count, since nobody farmed it.
-        Assert.Equal(new[] { "HUNTING BOW" }, Item(bow));
+        Assert.Equal(new[] { "SHORTBOW" }, Item(bow));
         Assert.Equal(new[] { "THE BULWARK" }, Item(bulwark));
     }
 
@@ -570,10 +570,10 @@ public sealed class HudTextTests : IDisposable
         // extracted it, so it is one higher than the last plate the player read
         // over the living dummy; a dead one draws no plate to disagree with.
         var plain = new Drop(TestWeapons.Get("arming_sword"), DefeatCount: 0, WasUniqueRoll: false);
-        Assert.Equal(new[] { "ARMING SWORD" }, Item(plain));   // nothing farmed it: no quality to print
+        Assert.Equal(new[] { "BUCKLER AND SWORD" }, Item(plain));   // nothing farmed it: no quality to print
 
         var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
-        Assert.Equal(new[] { "TOWER GUARD", "x7" }, Item(farmed));
+        Assert.Equal(new[] { "SCUTUM AND GLADIUS", "x7" }, Item(farmed));
 
         // A unique is named in the gold every other readout gives it, rather than
         // by a word the label would have to find room for.
@@ -593,8 +593,8 @@ public sealed class HudTextTests : IDisposable
         static string[] Loose(LooseItem item) => DungeonHud.LooseItemRuns(item).Select(r => r.Text).ToArray();
 
         var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
-        Assert.Equal(new[] { "TOWER GUARD", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
-        Assert.Equal(new[] { "TOWER GUARD" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
+        Assert.Equal(new[] { "SCUTUM AND GLADIUS", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
+        Assert.Equal(new[] { "SCUTUM AND GLADIUS" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
 
         var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
         var unique = DungeonHud.LooseItemRuns(new LooseItem(won.Weapon, (5, 5)));
@@ -612,7 +612,7 @@ public sealed class HudTextTests : IDisposable
         var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
         visit.OpenTurns(party, () => 10);
         var left = visit.Current.Leave(party[0], 1);
-        Assert.Equal(new[] { "TOWER GUARD" }, Loose(left));
+        Assert.Equal(new[] { "SCUTUM AND GLADIUS" }, Loose(left));
         Assert.DoesNotContain(Loose(left), text => text.StartsWith('x'));
     }
 
@@ -924,27 +924,27 @@ public sealed class HudTextTests : IDisposable
     [Fact]
     public void AWeaponIsNamedOnScreenWithNoApostrophe()
     {
-        // The HUD's font has no apostrophe: drawn, Skirmisher's Pike read SKIRMISHER
-        // S PIKE on every line that names it — the weapon line and the bag, a plate
+        // The HUD's font has no apostrophe: drawn, Hoplite's Wall read HOPLITE
+        // S WALL on every line that names it — the weapon line and the bag, a plate
         // and what lies on the floor, the WEAPONS page, the deposit panel and its
         // reasons, the run's summary (the audit of Phase 6a). Every name takes one
         // door onto the screen (Weapon.Shown): capitals, the apostrophe dropped. The
         // log keeps the name as the content spells it.
-        var pike = TestWeapons.Get("skirmishers_pike");
-        Assert.Equal("Skirmisher's Pike", pike.Name);
-        Assert.Equal("SKIRMISHERS PIKE", pike.ShownName);
-        Assert.Equal(["SKIRMISHERS PIKE", "WARDENS SHIELD", "HOPLITES WALL", "ASSASSINS FANG"],
+        var wall = TestWeapons.Get("hoplites_wall");
+        Assert.Equal("Hoplite's Wall", wall.Name);
+        Assert.Equal("HOPLITES WALL", wall.ShownName);
+        Assert.Equal(["HASTA", "TARGE AND CLAYMORE", "HOPLITES WALL", "STILETTO"],
             new[] { "skirmishers_pike", "wardens_shield", "hoplites_wall", "assassins_fang" }.Select(id => Weapon.Shown(GameContent.Current.Weapons[id].Name)));
         Assert.All(GameContent.Current.Weapons.All, def => Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", Weapon.Shown(def.Name)));
 
-        Assert.Equal("[A] SKIRMISHERS PIKE", DungeonHud.WeaponRuns("[A] ", pike, null, 0, DungeonHud.Yellow)[0].Text);
-        Assert.Equal("DUMMY [SKIRMISHERS PIKE]", DungeonHud.EnemyTitle(new EnemyState { Weapon = pike }));
-        Assert.Equal("LEFT SKIRMISHERS PIKE HERE", DungeonHud.LeftBeat(pike));
-        Assert.Equal("SKIRMISHERS PIKE", DungeonHud.LooseItemRuns(new LooseItem(pike, (5, 5)))[0].Text);
-        Assert.Equal(("SKIRMISHERS PIKE", "THE SKIRMISHERS PIKE"), (HubWeapons.Name(pike), HubWeapons.The(pike)));
-        Assert.Equal("SKIRMISHERS PIKE IS IN THE SHOP ALREADY", Enchanter.InTheShop(pike));
-        Assert.StartsWith("SKIRMISHERS PIKE IS BACK FROM THE ENCHANTER - ", BetweenRunsHud.BackFromTheEnchanter(new ServiceReport(pike.Id, Service.Refine, 1, 1)), StringComparison.Ordinal);
-        Assert.Equal("DEPOSIT THE SKIRMISHERS PIKE", DepositPanel.Heading(pike));
+        Assert.Equal("[A] HOPLITES WALL", DungeonHud.WeaponRuns("[A] ", wall, null, 0, DungeonHud.Yellow)[0].Text);
+        Assert.Equal("DUMMY [HOPLITES WALL]", DungeonHud.EnemyTitle(new EnemyState { Weapon = wall }));
+        Assert.Equal("LEFT HOPLITES WALL HERE", DungeonHud.LeftBeat(wall));
+        Assert.Equal("HOPLITES WALL", DungeonHud.LooseItemRuns(new LooseItem(wall, (5, 5)))[0].Text);
+        Assert.Equal(("HOPLITES WALL", "THE HOPLITES WALL"), (HubWeapons.Name(wall), HubWeapons.The(wall)));
+        Assert.Equal("HOPLITES WALL IS IN THE SHOP ALREADY", Enchanter.InTheShop(wall));
+        Assert.StartsWith("HOPLITES WALL IS BACK FROM THE ENCHANTER - ", BetweenRunsHud.BackFromTheEnchanter(new ServiceReport(wall.Id, Service.Refine, 1, 1)), StringComparison.Ordinal);
+        Assert.Equal("DEPOSIT THE HOPLITES WALL", DepositPanel.Heading(wall));
     }
 
     [Fact]
@@ -1529,7 +1529,7 @@ public sealed class HudTextTests : IDisposable
             "CLEARED",
             "THE TUTORIAL - DEEPEST FLOOR 2",
             "THE STONE GOLEM FELL ON FLOOR 2",
-            "SPOILS KEPT: THE BULWARK, TOWER GUARD",
+            "SPOILS KEPT: THE BULWARK, SCUTUM AND GLADIUS",
             "XP KEPT",
             "RUN COUNTED - 1 RUN SO FAR",
             "THE TUTORIAL IS CLOSED FOR GOOD",
@@ -1560,7 +1560,7 @@ public sealed class HudTextTests : IDisposable
             DungeonHud.DefeatHeadline,
             "THE SPEAR HALL - DEEPEST FLOOR 5",
             "THE SPEAR WARDEN FELL ON FLOOR 5",
-            "SPOILS LOST: TOWER GUARD",
+            "SPOILS LOST: SCUTUM AND GLADIUS",
             "XP CLAWED BACK:",
             "A: DAGGER -22, HP -6",
             "C: AXE -15",
@@ -1621,7 +1621,7 @@ public sealed class HudTextTests : IDisposable
         var spoils = hauled.SkipWhile(l => !l.StartsWith("SPOILS KEPT:", StringComparison.Ordinal)).TakeWhile(l => l != "XP KEPT").ToArray();
         Assert.True(spoils.Length > 1);
         Assert.All(hauled, line => Assert.True(line.Length <= 70, $"'{line}' runs off the panel"));
-        Assert.Equal(12, spoils.Sum(l => l.Split("WEAKSPOT STILETTO").Length - 1));
+        Assert.Equal(12, spoils.Sum(l => l.Split("RONDEL").Length - 1));
         Assert.Single(spoils, l => l.Contains("THE BULWARK"));
 
         // ENTER is the one way on, on every ending: never ESC, never a quit.

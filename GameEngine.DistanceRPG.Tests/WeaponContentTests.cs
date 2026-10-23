@@ -174,7 +174,7 @@ public class WeaponContentTests
             }
         }
 
-        // The one spread with a x2 addition: the Reaver forges Splitting x2 (settled).
+        // The one spread with a x2 addition: the Pollaxe forges Splitting x2 (settled).
         Assert.Equal(2, TestWeapons.Get("reaver").Stacks(Splitting));
     }
 
@@ -228,30 +228,30 @@ public class WeaponContentTests
     }
 
     [Theory]
-    [InlineData("flensing_knife", "Flensing Knife", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
-    [InlineData("assassins_fang", "Assassin's Fang", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
-    [InlineData("disarming_kris", "Disarming Kris", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
-    [InlineData("weakspot_stiletto", "Weakspot Stiletto", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
-    [InlineData("arming_sword", "Arming Sword", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
-    [InlineData("tower_guard", "Tower Guard", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x2, Push x1")]
-    [InlineData("riposte_blade", "Riposte Blade", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
-    [InlineData("wardens_shield", "Warden's Shield", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
-    [InlineData("skirmishers_pike", "Skirmisher's Pike", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
-    [InlineData("phalanx_spear", "Phalanx Spear", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x2, Longshot x1")]
+    [InlineData("flensing_knife", "Seax", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
+    [InlineData("assassins_fang", "Stiletto", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
+    [InlineData("disarming_kris", "Kris", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
+    [InlineData("weakspot_stiletto", "Rondel", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
+    [InlineData("arming_sword", "Buckler and Sword", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
+    [InlineData("tower_guard", "Scutum and Gladius", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x2, Push x1")]
+    [InlineData("riposte_blade", "Rapier and Dagger", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
+    [InlineData("wardens_shield", "Targe and Claymore", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
+    [InlineData("skirmishers_pike", "Hasta", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
+    [InlineData("phalanx_spear", "Sarissa", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x2, Longshot x1")]
     [InlineData("halberd", "Halberd", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Push x1")]
-    [InlineData("pinning_lance", "Pinning Lance", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
+    [InlineData("pinning_lance", "Ranseur", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
     [InlineData("hatchet", "Hatchet", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Light x1, Opportunist x1")]
-    [InlineData("great_axe", "Great Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
-    [InlineData("reaver", "Reaver", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
-    [InlineData("routing_axe", "Routing Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
-    [InlineData("hunting_bow", "Hunting Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
+    [InlineData("great_axe", "Dane Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
+    [InlineData("reaver", "Pollaxe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
+    [InlineData("routing_axe", "Bardiche", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
+    [InlineData("hunting_bow", "Shortbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
     [InlineData("longbow", "Longbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x2")]
-    [InlineData("pinning_bow", "Pinning Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
+    [InlineData("pinning_bow", "Composite Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
     [InlineData("crossbow", "Crossbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Overwatch x1")]
     [InlineData("darts", "Darts", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Light x1")]
-    [InlineData("bandolier", "Bandolier", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
+    [InlineData("bandolier", "Throwing Knives", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
     [InlineData("harpoon", "Harpoon", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Drag x1")]
-    [InlineData("softening_javelins", "Softening Javelins", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
+    [InlineData("softening_javelins", "Pila", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
     [InlineData("staff_of_renewal", "Staff of Renewal", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 15, "Resonant x1")]
     [InlineData("staff_of_warding", "Staff of Warding", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
     [InlineData("staff_of_blight", "Staff of Blight", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
@@ -412,7 +412,7 @@ public class WeaponContentTests
         Assert.Throws<InvalidOperationException>(() => guard.Acquire(Rout, 1));
         Assert.Equal(guard.Forged, guard.Modifiers);
 
-        // Deepening what a weapon holds passes — the Bandolier's forged Charges — and a prerequisite, once
+        // Deepening what a weapon holds passes — the Throwing Knives' forged Charges — and a prerequisite, once
         // grafted, opens what it gates: a dagger is never offered Riposte until it holds a Block.
         var bandolier = TestWeapons.Get("bandolier");
         bandolier.Acquire(Charges, 1);
@@ -460,7 +460,7 @@ public class WeaponContentTests
     [Fact]
     public void Catalogue_LooksUpByStableId_NeverByIndex()
     {
-        Assert.Equal("Tower Guard", Catalogue["tower_guard"].Name);
+        Assert.Equal("Scutum and Gladius", Catalogue["tower_guard"].Name);
         Assert.True(Catalogue.TryGet("harpoon", out var harpoon));
         Assert.Equal(VariantRole.Control, harpoon.Role);
         Assert.False(Catalogue.TryGet("nope", out _));
@@ -715,6 +715,49 @@ public class WeaponContentTests
         return Assert.Throws<ContentException>(() =>
             TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, enchantments, ShippedContent.Weapons));
     }
+
+    [Theory]
+    [InlineData("arming_sword", "Buckler and Sword")]
+    [InlineData("tower_guard", "Scutum and Gladius")]
+    [InlineData("riposte_blade", "Rapier and Dagger")]
+    [InlineData("wardens_shield", "Targe and Claymore")]
+    [InlineData("flensing_knife", "Seax")]
+    [InlineData("assassins_fang", "Stiletto")]
+    [InlineData("disarming_kris", "Kris")]
+    [InlineData("weakspot_stiletto", "Rondel")]
+    [InlineData("skirmishers_pike", "Hasta")]
+    [InlineData("phalanx_spear", "Sarissa")]
+    [InlineData("halberd", "Halberd")]
+    [InlineData("pinning_lance", "Ranseur")]
+    [InlineData("hatchet", "Hatchet")]
+    [InlineData("great_axe", "Dane Axe")]
+    [InlineData("reaver", "Pollaxe")]
+    [InlineData("routing_axe", "Bardiche")]
+    [InlineData("hunting_bow", "Shortbow")]
+    [InlineData("longbow", "Longbow")]
+    [InlineData("pinning_bow", "Composite Bow")]
+    [InlineData("crossbow", "Crossbow")]
+    [InlineData("darts", "Darts")]
+    [InlineData("bandolier", "Throwing Knives")]
+    [InlineData("harpoon", "Harpoon")]
+    [InlineData("softening_javelins", "Pila")]
+    public void AMartialVariantIsNamedForItsType_UnderTheIdASaveKeeps(string id, string name)
+    {
+        // Renamed after play (2026-10): a weapon is called what it is - a Scutum and
+        // Gladius, a Rondel - and its model will be drawn from that type. The id is
+        // what a save, a drop and the starting party name it by, and stays.
+        Assert.Equal(name, Catalogue[id].Name);
+    }
+
+    [Fact]
+    public void NoWeaponNameOutrunsTheRunsEndPanel()
+    {
+        // The run's end panel is sized for the longest name (HudTextTests'
+        // TheRunSummaryFitsA720Window_ServicesIncluded): 18 characters fill it, and a
+        // Heater Shield and Longsword ran it over. Pinned here so a rename says why.
+        Assert.All(Catalogue.All, def => Assert.True(def.Name.Length <= 18, $"{def.Name} is {def.Name.Length} characters, over 18"));
+    }
+
 
     private static IReadOnlyDictionary<ModifierType, int> Spread(params (ModifierType Type, int Stacks)[] forged)
         => forged.ToDictionary(f => f.Type, f => f.Stacks);

@@ -91,10 +91,10 @@ public sealed class TransferTests : IDisposable
 
         // The summary says where it went, and where from, a line a weapon.
         var lines = BetweenRunsHud.HubSummaryLines(result).Select(line => line.Text).ToArray();
-        Assert.Contains("RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE", lines);
+        Assert.Contains("RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE", lines);
         Assert.Contains("NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF", lines);
-        Assert.Equal(1, Array.IndexOf(lines, "NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF") - Array.IndexOf(lines, "RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE"));
-        Assert.StartsWith("[Enchanter] Riposte Blade finished: vampiric moved on at T2 from Nameless Knife; improvement roll ",
+        Assert.Equal(1, Array.IndexOf(lines, "NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF") - Array.IndexOf(lines, "RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE"));
+        Assert.StartsWith("[Enchanter] Rapier and Dagger finished: vampiric moved on at T2 from Nameless Knife; improvement roll ",
             DistanceRpgGame.EnchanterLines(result)[1], StringComparison.Ordinal);
 
         // Tier 1 travels intact, XP and all — the very entry, since nothing about it changes.
@@ -107,7 +107,7 @@ public sealed class TransferTests : IDisposable
         Assert.Equal((3, 0), (deep.Transferred().Tier, deep.Transferred().Xp));
 
         // A unique soul, pinned at tier 1, moves intact with what it banked: the
-        // knife's Serrated onto a Tower Guard, from the stable.
+        // knife's Serrated onto a Scutum and Gladius, from the stable.
         var guard = Worn("tower_guard", wear: 30);
         Enchanter.Deposit(campaign, Give(campaign, "D", 2, guard), Service.Transfer, source: TestShop.InTheStable(campaign, knife), sourceIndex: 0);
         var serrated = knife.Enchantments[0];
@@ -302,13 +302,13 @@ public sealed class TransferTests : IDisposable
         Assert.DoesNotContain(Enchanter.TransferOffers(campaign, other), move => ReferenceEquals(move.Source, knife));   // the list is of what the party holds
 
         var shop = HubWeapons.Rows(campaign).SkipWhile(row => row.Kind != HubWeapons.RowKind.Shop).ToArray();
-        Assert.Equal(["  WORKING  RIPOSTE BLADE - 0 OF 1 RUN", "  HELD     NAMELESS KNIFE"], shop.Select(row => row.Text));
+        Assert.Equal(["  WORKING  RAPIER AND DAGGER - 0 OF 1 RUN", "  HELD     NAMELESS KNIFE"], shop.Select(row => row.Text));
         Assert.All(shop, row => Assert.Same(deposit, row.Deposit));
         Assert.Equal((false, true), (shop[0].Held, shop[1].Held));
         Assert.Equal([DungeonHud.Grey, DungeonHud.Orange], HubWeapons.Runs(shop[1]).Select(run => run.Color));   // held, grey; a unique's name orange
         Assert.Equal([DungeonHud.Grey, DungeonHud.Orange, DungeonHud.Grey], HubWeapons.Runs(shop[1], chosen: true).Select(run => run.Color));   // chosen, marked alone
         Assert.Equal("TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 1 RUN", BetweenRunsHud.DetailRows(shop[0])[2].Text);
-        Assert.Equal("HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE", BetweenRunsHud.DetailRows(shop[1])[2].Text);
+        Assert.Equal("HELD - GIVING VAMPIRIC TO THE RAPIER AND DAGGER", BetweenRunsHud.DetailRows(shop[1])[2].Text);
         Assert.Equal("WORKING - BACK AFTER 1 MORE RUN THAT COUNTS", BetweenRunsHud.DetailRows(shop[1])[3].Text);
 
         // The source's wear is left in its pool (PHASE 6a DECISION 13): short of full
@@ -323,7 +323,7 @@ public sealed class TransferTests : IDisposable
         Assert.Equal("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(worn));
         Assert.Contains("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP",
             BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, "  BAG   NAMELESS KNIFE", Place: new WeaponPlace("C", 2), Weapon: worn)).Select(row => row.Text));
-        Assert.Equal("TAKE BACK THE RIPOSTE BLADE AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 30 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
+        Assert.Equal("TAKE BACK THE RAPIER AND DAGGER AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 30 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
 
         // Walked: T on the HELD row, ENTER.
         var host = new RecordingHost();
@@ -341,7 +341,7 @@ public sealed class TransferTests : IDisposable
         Assert.Equal(3, knife.ForgedEnchantmentCount);
         Assert.Equal(1, host.HubSavesAsked);
         Assert.Same(blade, scene.Weapons.ChosenRow.Weapon);
-        Assert.Contains("[Enchanter] Took back Riposte Blade (riposte_blade) and Nameless Knife (flensing_knife_unique) to the stable's end:"
+        Assert.Contains("[Enchanter] Took back Rapier and Dagger (riposte_blade) and Nameless Knife (flensing_knife_unique) to the stable's end:"
             + " Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique) forfeited, 0 of 1 run worked lost, 30 wear returned (capacity 31 -> 30), deposit #0",
             GameEngine.Core.Diagnostics.Log.RecentEntries.Select(entry => entry.Message));
     }
@@ -716,7 +716,7 @@ public sealed class TransferTests : IDisposable
             var host = new RecordingHost();
             var scene = new BetweenRunsScene(game: null!, campaign, host, shownWhole: 0);
             scene.OnKey(Keys.Tab);
-            ChooseRow(scene, "  RIPOSTE BLADE - WEAR 30/30 FULL");
+            ChooseRow(scene, "  RAPIER AND DAGGER - WEAR 30/30 FULL");
             foreach (var key in new[] { Keys.D, Keys.D3, Keys.S, Keys.Enter })
                 scene.OnKey(key);
             Assert.Equal((knife, 1), (scene.Panel!.ChosenMove!.Source, scene.Panel.ChosenMove.Index));
@@ -725,7 +725,7 @@ public sealed class TransferTests : IDisposable
             Assert.Equal((blade, knife), (deposit.Weapon, deposit.Source));
             Assert.Equal([x, y, z], campaign.Stable);
             var (weaponAt, sourceAt) = weaponFirst ? ("2 of 5", "4 of 5") : ("4 of 5", "2 of 5");
-            Assert.Contains($"[Enchanter] Deposited Riposte Blade (riposte_blade) from the stable ({weaponAt}): Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique)"
+            Assert.Contains($"[Enchanter] Deposited Rapier and Dagger (riposte_blade) from the stable ({weaponAt}): Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique)"
                 + $" in the stable ({sourceAt}), 30 wear cashed (capacity 30 -> 31), 1 run, deposit #0", Logged());
 
             foreach (var key in new[] { Keys.T, Keys.Enter })
@@ -762,7 +762,7 @@ public sealed class TransferTests : IDisposable
         var host = new RecordingHost();
         var scene = new BetweenRunsScene(game: null!, campaign, host, shownWhole: 0);
         scene.OnKey(Keys.Tab);
-        ChooseRow(scene, "  BAG   ARMING SWORD - WEAR 35/35 FULL");
+        ChooseRow(scene, "  BAG   BUCKLER AND SWORD - WEAR 35/35 FULL");
         scene.OnKey(Keys.D);
         scene.OnKey(Keys.D3);
         var panel = scene.Panel!;
@@ -771,19 +771,19 @@ public sealed class TransferTests : IDisposable
         Assert.Equal("> FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS <", Assert.Single(rows, row => row.StartsWith('>')));
         Assert.Contains("VAMPIRIC - ITS OWN - IT IS LAST ALREADY", rows);
         scene.OnKey(Keys.Enter);
-        Assert.Equal("DEPOSIT THE ARMING SWORD TO MOVE FLAMING TO THE END - 2 RUNS - ITS 35 WEAR IS SPENT", scene.Panel!.Ask);
+        Assert.Equal("DEPOSIT THE BUCKLER AND SWORD TO MOVE FLAMING TO THE END - 2 RUNS - ITS 35 WEAR IS SPENT", scene.Panel!.Ask);
         scene.OnKey(Keys.Enter);
         var deposit = Assert.Single(campaign.AtTheEnchanter);
         Assert.Equal(((Weapon?)null, (int?)0, 2), (deposit.Source, deposit.SourceIndex, deposit.Runs));
-        Assert.Equal("  WORKING  ARMING SWORD - 0 OF 2 RUNS", scene.Weapons.ChosenRow.Text);
+        Assert.Equal("  WORKING  BUCKLER AND SWORD - 0 OF 2 RUNS", scene.Weapons.ChosenRow.Text);
         Assert.DoesNotContain(scene.Weapons.Rows(), row => row.Held);
         Assert.Equal("MOVE FLAMING TO THE END - 0 OF 2 RUNS", BetweenRunsHud.ServiceLine(deposit));
-        Assert.Equal("TAKE BACK THE ARMING SWORD - THE MOVE IS LOST - ITS 35 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
-        Assert.Contains("[Enchanter] Deposited Arming Sword (arming_sword) from B's bag slot 3: Transfer flaming (T1) from its own place 1 to its end,"
+        Assert.Equal("TAKE BACK THE BUCKLER AND SWORD - THE MOVE IS LOST - ITS 35 WEAR COMES BACK", DepositPanel.TakeBackAsk(deposit));
+        Assert.Contains("[Enchanter] Deposited Buckler and Sword (arming_sword) from B's bag slot 3: Transfer flaming (T1) from its own place 1 to its end,"
             + " 35 wear cashed (capacity 35 -> 36), 2 runs, deposit #0", Logged());
         foreach (var key in new[] { Keys.T, Keys.Enter })
             scene.OnKey(key);
-        Assert.Contains("[Enchanter] Took back Arming Sword (arming_sword) to the stable's end: Transfer flaming (T1) from its own place 1 to its end forfeited,"
+        Assert.Contains("[Enchanter] Took back Buckler and Sword (arming_sword) to the stable's end: Transfer flaming (T1) from its own place 1 to its end forfeited,"
             + " 0 of 2 runs worked lost, 35 wear returned (capacity 36 -> 35), deposit #0", Logged());
         Assert.Equal(2, host.HubSavesAsked);
 
@@ -795,8 +795,8 @@ public sealed class TransferTests : IDisposable
         Assert.Null(BetweenRunsHud.SourceBack(report));
         var lines = BetweenRunsHud.HubSummaryLines(result).Select(line => line.Text).ToArray();
         var back = Assert.Single(lines, line => line.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal));
-        Assert.Equal($"ARMING SWORD IS BACK FROM THE ENCHANTER - FLAMING NOW LAST AT T1 - {BetweenRunsHud.Outcome(report.Improved)}", back);
-        Assert.StartsWith("[Enchanter] Arming Sword finished: flaming moved to the end at T1; improvement roll ",
+        Assert.Equal($"BUCKLER AND SWORD IS BACK FROM THE ENCHANTER - FLAMING NOW LAST AT T1 - {BetweenRunsHud.Outcome(report.Improved)}", back);
+        Assert.StartsWith("[Enchanter] Buckler and Sword finished: flaming moved to the end at T1; improvement roll ",
             DistanceRpgGame.EnchanterLines(result)[1], StringComparison.Ordinal);
 
         static IEnumerable<string> Logged() => GameEngine.Core.Diagnostics.Log.RecentEntries.Select(entry => entry.Message);

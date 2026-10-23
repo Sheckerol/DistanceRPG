@@ -231,7 +231,7 @@ public sealed class OverwatchTests : IDisposable
     {
         // Forced movement triggers the zones (settled), and on the enemy turn
         // a held shot answers a shove as it answers a walk. The dummy swings at
-        // R's Riposte Blade from just outside the Crossbow's reach; the block
+        // R's Rapier and Dagger from just outside the Crossbow's reach; the block
         // earns R's counter, whose shove carries the dummy a tile toward A —
         // into the reach, on the enemy's turn — and the held shot goes.
         var grid = new int[20, 20];

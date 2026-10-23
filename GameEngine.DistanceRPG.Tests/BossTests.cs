@@ -13,7 +13,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// a finite clear the party fights its way back out of (§4.4).
 /// <para>
 /// The scenarios run on real floors, on the shipped seed's tutorial — whose
-/// golem holds a Pinning Lance in its lair at (59, 41) — and every fact a test
+/// golem holds a Ranseur in its lair at (59, 41) — and every fact a test
 /// leans on is pinned by an assertion before it is used. Every scenario stands
 /// on the numbers it was written against — the golem's statline, the weapons'
 /// damage, the modifier table, the farm's clock, the boss floor range
@@ -30,7 +30,7 @@ public sealed class BossTests : IDisposable
 
     public void Dispose() => _premise.Dispose();
 
-    /// <summary>The shipped seed: its tutorial golem holds a Pinning Lance in the lair at (59, 41).</summary>
+    /// <summary>The shipped seed: its tutorial golem holds a Ranseur in the lair at (59, 41).</summary>
     private const long GoldenSeed = 2762136374;
 
     /// <summary>A tutorial seed whose bottom floor has a thrower (spawn 15, <c>bandolier</c>) standing in the lair at (58, 28).</summary>
@@ -56,7 +56,7 @@ public sealed class BossTests : IDisposable
     /// <summary>A blow that never clears a dummy's constitution, so every kill with it is worth exactly one cycle.</summary>
     private static Weapon Chisel() => TestWeapons.Make("Chisel", range: 60, damage: 30, cost: 10);
 
-    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Weakspot Stiletto where none is named.</summary>
+    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Rondel where none is named.</summary>
     private static PartyMemberState[] Party(params Weapon[] held)
         => Ids.Select((id, i) => TestPools.Holding(id, i < held.Length ? held[i] : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();
@@ -215,16 +215,16 @@ public sealed class BossTests : IDisposable
     public void AGolemHoldingASwordStandsBehindTwelve_ATowerGuardFifteen()
     {
         // Weapon plus innate is literal: a golem that rolled a sword stands behind
-        // its sword's Block and its own. An Arming Sword is Block x1 — with the
-        // golem's x3, 12 — and a Tower Guard x2 — 15. The teaching numbers hold
+        // its sword's Block and its own. A Buckler and Sword is Block x1 — with the
+        // golem's x3, 12 — and a Scutum and Gladius x2 — 15. The teaching numbers hold
         // on the four fieldable classes that forge no Block.
         var armed = DungeonState.BossRow(Tutorial, TestWeapons.Get("arming_sword"));
         Assert.Equal((1, 3, 4, 12), (armed.Weapon.Modifiers.Stacks(Block), armed.Innate.Stacks(Block), armed.Stacks(Block), armed.Value(Block)));
         var guarded = DungeonState.BossRow(Tutorial, TestWeapons.Get("tower_guard"));
         Assert.Equal((2, 3, 5, 15), (guarded.Weapon.Modifiers.Stacks(Block), guarded.Innate.Stacks(Block), guarded.Stacks(Block), guarded.Value(Block)));
 
-        // The dagger's 15 into each: 3 through the Arming Sword's 12, and the
-        // floor of 1 through the Tower Guard's 15.
+        // The dagger's 15 into each: 3 through the Buckler and Sword's 12, and the
+        // floor of 1 through the Scutum and Gladius's 15.
         var dagger = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
         Assert.Equal(3, CombatRules.ResolveAttack(dagger, armed, dagger.EquippedWeapon!, 0, Ten).Taken);
         Assert.Equal(1, CombatRules.ResolveAttack(dagger, guarded, dagger.EquippedWeapon!, 0, Ten).Taken);
@@ -232,7 +232,7 @@ public sealed class BossTests : IDisposable
         foreach (var id in new[] { "flensing_knife", "halberd", "hatchet", "darts" })
             Assert.Equal(9, DungeonState.BossRow(Tutorial, TestWeapons.Get(id)).Value(Block));
 
-        // In play: a tutorial seed whose golem rolled an Arming Sword stands behind 12.
+        // In play: a tutorial seed whose golem rolled a Buckler and Sword stands behind 12.
         const long SwordSeed = 2084311110;
         var roll = DungeonState.RollBoss(SwordSeed, Tutorial);
         Assert.Equal((Sword, VariantRole.Efficiency), (roll.Class, roll.Role));

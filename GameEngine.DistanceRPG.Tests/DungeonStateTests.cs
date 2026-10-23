@@ -35,7 +35,7 @@ public sealed class DungeonStateTests : IDisposable
     /// <summary>The shipped seed: its first floor is the golden dungeon, and the Spear Hall rolls five floors on it.</summary>
     private const long GoldenSeed = 2762136374;
 
-    /// <summary>A tutorial seed whose first floor has a Phalanx Spear dummy (spawn 9) standing on its down-stairs at (19, 4), pinned where it is used.</summary>
+    /// <summary>A tutorial seed whose first floor has a Sarissa dummy (spawn 9) standing on its down-stairs at (19, 4), pinned where it is used.</summary>
     private const long GuardedStairsSeed = 2084311110;
 
     private static readonly string[] Ids = ["A", "B", "C", "D"];
@@ -50,7 +50,7 @@ public sealed class DungeonStateTests : IDisposable
     /// <summary>A blow that clears a fresh dummy's whole 50 through any Block a dummy holds: one swing, a clean kill, two cycles owing.</summary>
     private static Weapon Maul() => TestWeapons.Make("Maul", range: 60, damage: 60, cost: 30);
 
-    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Weakspot Stiletto where none is named.</summary>
+    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Rondel where none is named.</summary>
     private static PartyMemberState[] Party(params Weapon[] held)
         => Ids.Select((id, i) => TestPools.Holding(id, i < held.Length ? held[i] : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();
@@ -996,7 +996,7 @@ public sealed class DungeonStateTests : IDisposable
 
         // Two of the first floor's dummies, stood in its arrival room (moved rows:
         // stored state): a pike, Brace x1, in the room's top-left corner, and a
-        // Riposte Blade two tiles below the thrower.
+        // Rapier and Dagger two tiles below the thrower.
         Assert.Equal((37, 30), first.UpStairs);
         Assert.Equal((37, 30), TileOf(thrower));
         var pike = first.Enemies.First(e => e.Weapon.Id == "skirmishers_pike");

@@ -178,7 +178,7 @@ public sealed class ImprovementRollTests : IDisposable
         // §6.4: a deepen is +1 on a modifier the weapon carries, "biased toward the
         // class signature" — the signature weighs DeepenSignatureWeight, the rest 1
         // (PHASE 6a DECISION 5) — and §1.1's ceiling binds it: forged plus the
-        // acquired headroom, the one budget farming spends too. A Tower Guard, a
+        // acquired headroom, the one budget farming spends too. A Scutum and Gladius, a
         // Sword forged Block x2 and Push x1, Block its class's signature.
         var guard = Fresh("tower_guard");
         Assert.Equal(Block, GameContent.Current.Weapons.Class(WeaponClass.Sword).Signature);
@@ -275,7 +275,7 @@ public sealed class ImprovementRollTests : IDisposable
         // every modifier capped rolls nothing at all" (P6:610–611), read as every
         // modifier it may hold, since a weapon with every modifier it carries capped
         // "can still gain breadth through grafts" (P6:616–618).
-        // Always deepening, a Tower Guard with Block and Push at their ceilings grafts.
+        // Always deepening, a Scutum and Gladius with Block and Push at their ceilings grafts.
         using (TestContent.UsePremise(tuning: Landing(0)))
         {
             var capped = Fresh("tower_guard");
@@ -383,7 +383,7 @@ public sealed class ImprovementRollTests : IDisposable
             var decreases = offered.Where(graft => Decrease(graft.Id, graft.Modifier) is not null).ToArray();
             Assert.Equal(offered.Where(graft => graft.Modifier == Charges), decreases);
             Assert.Equal(GameContent.Current.Weapons.All.Count(def => def.Forged.GetValueOrDefault(Charges) == 0), decreases.Length);
-            Assert.Equal("Charges grafted onto Hunting Bow: no limit -> 2", Decrease("hunting_bow", Charges));
+            Assert.Equal("Charges grafted onto Shortbow: no limit -> 2", Decrease("hunting_bow", Charges));
             Assert.All(decreases, decrease => Assert.Contains(decrease.Modifier, forgedOnly));
         }
     }
@@ -496,7 +496,7 @@ public sealed class ImprovementRollTests : IDisposable
         // of deposits as it went in, never reused — not where the deposit stands in
         // the shop as the run ends. Every other pinned roll comes off a deposit whose
         // ordinal is its place. TestShop's shop with deposit 0 taken back: the
-        // staff's Vampiric (ordinal 1) and the Tower Guard's refinement (ordinal 2)
+        // staff's Vampiric (ordinal 1) and the Scutum and Gladius's refinement (ordinal 2)
         // now stand first and second, and each rolls on its own ordinal's stream —
         // the draws 1073 and 2815 TheReportCarriesTheDrawForTheLog pins — and lands
         // on what that stream draws next. A tick keyed by the place would draw 232,
@@ -525,7 +525,7 @@ public sealed class ImprovementRollTests : IDisposable
         // ratio tests would pass a reorder of the second and third draws, a walk
         // from the other end or another index, and each moves what a seed and an
         // ordinal land on — a mid-run save resumed on a later build included — so
-        // the outcomes are pinned: a Tower Guard (Block x2, the signature, weighing
+        // the outcomes are pinned: a Scutum and Gladius (Block x2, the signature, weighing
         // 3; Push x1) refined on a full bar of 30 at odds that always land, a
         // quarter grafting, over the shipped seed's first twelve ordinals. The
         // shop's, through the tick, are TheRollIsKeyedByTheOrdinal_NeverThePlaceInTheShop's.
@@ -622,7 +622,7 @@ public sealed class ImprovementRollTests : IDisposable
         // keeps what the roll did, never the roll: a report a load brings back has
         // none, and the document names no roll. TestShop's shop, worked home on a
         // run entered on FiveDeep: B's staff enchanted Vampiric (deposit 1, 35
-        // cashed) and C's Tower Guard refined (deposit 2, 30 cashed).
+        // cashed) and C's Scutum and Gladius refined (deposit 2, 30 cashed).
         var campaign = TestShop.Shop();
         var back = TestShop.Counted(campaign);
         var (enchant, refine) = (back.Services![1], back.Services[2]);

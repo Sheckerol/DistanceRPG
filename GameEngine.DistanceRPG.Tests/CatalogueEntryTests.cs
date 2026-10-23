@@ -173,7 +173,7 @@ public sealed class CatalogueEntryTests : IDisposable
     public void Shattering_LandsTheRidersOneLevelDeeper()
     {
         // "Crit riders (§1.6) land one level deeper", one level per tier: a
-        // Disarming Kris's CritWeaken lands two levels with it and one without.
+        // Kris's CritWeaken lands two levels with it and one without.
         // It fires at step 4 of the hit rather than on Crit, because the riders
         // settle at step 7 of that same chain and a Crit handler would arrive
         // after they had landed.

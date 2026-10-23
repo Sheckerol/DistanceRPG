@@ -27,22 +27,22 @@ public sealed class BossLootTests : IDisposable
 
     public void Dispose() => _premise.Dispose();
 
-    /// <summary>The shipped seed: its tutorial golem holds a Pinning Lance and drops an Assassin's Fang forged with Block.</summary>
+    /// <summary>The shipped seed: its tutorial golem holds a Ranseur and drops a Stiletto forged with Block.</summary>
     private const long GoldenSeed = 2762136374;
 
-    /// <summary>A tutorial seed whose golem (holding a Harpoon) drops a Tower Guard: The Bulwark. What <c>DISTANCERPG_SEED=7</c> boots.</summary>
+    /// <summary>A tutorial seed whose golem (holding a Harpoon) drops a Scutum and Gladius: The Bulwark. What <c>DISTANCERPG_SEED=7</c> boots.</summary>
     private const long BulwarkSeed = 7;
 
-    /// <summary>A tutorial seed whose golem drops a Riposte Blade, carrying no entry.</summary>
+    /// <summary>A tutorial seed whose golem drops a Rapier and Dagger, carrying no entry.</summary>
     private const long RiposteSeed = 19;
 
     /// <summary>A tutorial seed whose golem drops a Halberd, carrying no entry.</summary>
     private const long HalberdSeed = 134;
 
-    /// <summary>A tutorial seed whose golem drops a Hunting Bow, carrying no entry: Block on a bow.</summary>
+    /// <summary>A tutorial seed whose golem drops a Shortbow, carrying no entry: Block on a bow.</summary>
     private const long BowSeed = 18;
 
-    /// <summary>A Knife Warrens seed five floors deep whose Knife Mother drops a Flensing Knife.</summary>
+    /// <summary>A Knife Warrens seed five floors deep whose Knife Mother drops a Seax.</summary>
     private const long FlensingSeed = 49;
 
     private static DungeonCatalogue Dungeons => GameContent.Current.Dungeons;
@@ -121,8 +121,8 @@ public sealed class BossLootTests : IDisposable
         // PHASE4-034, -062: the boss drop is the rolled variant plus one forged
         // stack of the theme - on top of whatever the weapon's own class
         // modifier is, which stays exactly where the variant had it. On the
-        // shipped tutorial the golem holds a Pinning Lance and drops an
-        // Assassin's Fang: its CritWindow x2 and CritMultiplier x1 untouched, and
+        // shipped tutorial the golem holds a Ranseur and drops an
+        // Stiletto: its CritWindow x2 and CritMultiplier x1 untouched, and
         // Block forged beside them.
         var golden = DungeonState.Enter(Tutorial, GoldenSeed, Party()).Floors[^1];
         var golem = golden.Boss!;
@@ -278,7 +278,7 @@ public sealed class BossLootTests : IDisposable
     [Fact]
     public void TowerGuardAndTheGolemsBlockAreTheBulwark()
     {
-        // PHASE4-063, -064: "Tower Guard (Block x2) + golem's Block graft ->
+        // PHASE4-063, -064: "Scutum and Gladius (Block x2) + golem's Block graft ->
         // Block x3 = The Bulwark." Nothing special-cased it: the graft took the
         // Purity variant of Block's own class to x3, and a variant with its
         // signature at x3 is that class's unique. It arrives as The Bulwark in
@@ -288,7 +288,7 @@ public sealed class BossLootTests : IDisposable
         var golem = bottom.Boss!;
         Assert.Equal("harpoon", golem.Weapon.Id);   // whatever it holds
 
-        // The seed's draws: a sword, then the Purity variant - the Tower Guard.
+        // The seed's draws: a sword, then the Purity variant - the Scutum and Gladius.
         var rng = BossLoot.StreamFor(bottom.Seed);
         Assert.Equal(Sword, AllEight[rng.NextInt(0, 7)]);
         Assert.Equal(VariantRole.Purity, (VariantRole)rng.NextInt(0, 3));
@@ -301,20 +301,20 @@ public sealed class BossLootTests : IDisposable
         Assert.Equal("sturdy", Assert.Single(drop.Weapon.Enchantments).Id);
         Assert.Equal(ModifierSet.Of((Block, 3), (Push, 1)), drop.Weapon.Forged);
 
-        // The arithmetic, in the open: the Tower Guard's spread and the golem's
+        // The arithmetic, in the open: the Scutum and Gladius's spread and the golem's
         // graft are the unique's spread, and the graft took Block to its limit.
         Assert.Equal(ModifierSet.Of((Block, 2), (Push, 1)), TestWeapons.Get("tower_guard").Forged);
         var grafted = Weapons.Instantiate("tower_guard", forgedGraft: Block);
         Assert.Equal(Spread(Weapons["the_bulwark"]), grafted.Forged);
         Assert.Equal(Rules.MaxForged(Block), grafted.Forged.Stacks(Block));
-        Assert.False(grafted.Unique);   // the graft alone is a Tower Guard; the drop is the unique because the two rules met
+        Assert.False(grafted.Unique);   // the graft alone is a Scutum and Gladius; the drop is the unique because the two rules met
         Assert.Same(Weapons["the_bulwark"], BossLoot.UniqueByArithmetic(Weapons, Weapons["tower_guard"], grafted, Block));
     }
 
     [Fact]
     public void ARiposteBladeAndASpearComeOutGraftedButOrdinary()
     {
-        // PHASE4-065: any other roll is an ordinary themed drop. A Riposte Blade
+        // PHASE4-065: any other roll is an ordinary themed drop. A Rapier and Dagger
         // becomes Block x2, Push x1, Riposte x1 - excellent, and not a unique.
         // The doc's spear, "Brace x1, Block x1", predates the spear's second
         // baseline modifier (settled: every class baseline carries one): a
@@ -338,7 +338,7 @@ public sealed class BossLootTests : IDisposable
     [Fact]
     public void TheLightShapeIsNotReachedByAGraft()
     {
-        // PHASE4-066, -067: a Flensing Knife is its DaggerBaseline (CritWindow x1,
+        // PHASE4-066, -067: a Seax is its DaggerBaseline (CritWindow x1,
         // CritMultiplier x1) and Light x1; the Knife Mother's CritWindow takes it to
         // CritWindow x2, CritMultiplier x1, Light x1 - which IS the Nameless
         // Knife's forged spread (the Light shape: its signature at x2, paid for in

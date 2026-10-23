@@ -46,11 +46,11 @@ public sealed class RiposteTests : IDisposable
     [Fact]
     public void CounterOnSuccessfulBlock_NotOnCrit_UsesPerTurn()
     {
-        // The Riposte Blade: a blocked hit is answered with a free counter-swing,
+        // The Rapier and Dagger: a blocked hit is answered with a free counter-swing,
         // once per stack per turn; a crit is never blocked, so it is never answered.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "riposte_blade");   // Block x1, Riposte x1, Push x1
-        var enemy = Enemy(5, 6);                    // Arming Sword: Block x1, Push x1
+        var enemy = Enemy(5, 6);                    // Buckler and Sword: Block x1, Push x1
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
         var countered = new List<ActorState>();
         turns.RiposteTriggered += r => countered.Add(r);
@@ -108,7 +108,7 @@ public sealed class RiposteTests : IDisposable
     [Fact]
     public void EnemyRiposte_CountersAPartyMember()
     {
-        // Same handler, other side: a Riposte Blade dummy blocks A's sword and counters.
+        // Same handler, other side: a Rapier and Dagger dummy blocks A's sword and counters.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "tower_guard");          // Block x2: absorbs 6
         var enemy = Enemy(5, 6, "riposte_blade");
@@ -123,6 +123,6 @@ public sealed class RiposteTests : IDisposable
         Assert.Equal(200 - 7, enemy.Hp);                   // 10 into Block 3
         Assert.Same(enemy, Assert.Single(countered));
         Assert.Equal(1, characterHits);
-        Assert.Equal(TestPools.FixtureHp - 4, a.Hp);   // the counter's 10 into the Tower Guard's 6 — and no counter to the counter: A holds no Riposte
+        Assert.Equal(TestPools.FixtureHp - 4, a.Hp);   // the counter's 10 into the Scutum and Gladius's 6 — and no counter to the counter: A holds no Riposte
     }
 }

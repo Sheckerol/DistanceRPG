@@ -261,7 +261,7 @@ internal static class CampaignRuns
     /// <summary>A roll that neither crits nor fumbles.</summary>
     public static int Ten() => 10;
 
-    /// <summary>A campaign of four fixture members in roster order, each holding a Weakspot Stiletto.</summary>
+    /// <summary>A campaign of four fixture members in roster order, each holding a Rondel.</summary>
     public static CampaignState Campaign()
         => new(Ids.Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i)).ToArray());
 

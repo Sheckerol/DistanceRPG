@@ -794,7 +794,7 @@ public sealed class DungeonHud
 
     /// <summary>
     /// What the boss left on the floor, as its fall states it (§4.3): the weapon,
-    /// and what makes it the boss's — <c>DROPPED: HUNTING BOW - FORGED WITH
+    /// and what makes it the boss's — <c>DROPPED: SHORTBOW - FORGED WITH
     /// BLOCK</c>, the theme forged onto whatever class it came as. When the graft
     /// made it its class's unique the line says that instead — <c>DROPPED: THE
     /// BULWARK - UNIQUE</c> — the unique being the theme at its deepest.
@@ -1265,7 +1265,7 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The title line over an enemy's plate: what it is, and what it is holding
-    /// in brackets — <c>DUMMY [Arming Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
+    /// in brackets — <c>DUMMY [Buckler and Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
     /// and a boss by its own name, <c>STONE GOLEM [Hatchet]</c> (§4.3: it wields
     /// a weapon like a dummy does). HEALER is what mends (the innate's status
     /// restores HP); every other caster, warding or debuffing, is CASTER.
@@ -2436,7 +2436,7 @@ public sealed class DungeonHud
     /// What an actor carries on itself whatever it holds (§4.3's innate
     /// modifiers — the golem's Block), resolved as a hit meets it: weapon plus
     /// innate, in the readout's own words, so a golem holding a hatchet reads
-    /// <c>BLOCK 9</c> and one holding a Tower Guard <c>BLOCK 15</c> — the Block its
+    /// <c>BLOCK 9</c> and one holding a Scutum and Gladius <c>BLOCK 15</c> — the Block its
     /// blows are absorbed by, never its innate stacks alone. Empty for an actor
     /// with nothing innate, which is every dummy.
     /// </summary>

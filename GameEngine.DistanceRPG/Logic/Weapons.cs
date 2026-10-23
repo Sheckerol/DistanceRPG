@@ -166,14 +166,14 @@ public sealed class Weapon : IItem
     public string Id { get; }
     public string Name { get; }
 
-    /// <summary>The name as the screen says it (<see cref="Shown"/>): <c>SKIRMISHERS PIKE</c>. The log keeps <see cref="Name"/>.</summary>
+    /// <summary>The name as the screen says it (<see cref="Shown"/>): <c>HOPLITES WALL</c>. The log keeps <see cref="Name"/>.</summary>
     public string ShownName => Shown(Name);
 
     /// <summary>
     /// A weapon's name as every screen says it: in capitals, as the HUD's font draws
     /// them, and with no apostrophe, which the font has no glyph for — drawn, the gap
-    /// read <c>SKIRMISHER S PIKE</c>. <c>Skirmisher's Pike</c> reads <c>SKIRMISHERS
-    /// PIKE</c>. The one door every weapon name takes onto the screen, as a save's
+    /// read <c>HOPLITE S WALL</c>. <c>Hoplite's Wall</c> reads <c>HOPLITES
+    /// WALL</c>. The one door every weapon name takes onto the screen, as a save's
     /// notice names an id bare.
     /// </summary>
     public static string Shown(string name)

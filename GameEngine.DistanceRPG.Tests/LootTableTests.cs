@@ -517,7 +517,7 @@ public sealed class LootTableTests : IDisposable
         Assert.Equal(1, onTheEnchantment.Weapon.Stacks(ModifierType.Resonant));   // index 1: the entry, appended last
         Assert.Equal(2, onTheEnchantment.Weapon.Enchantments[0].Tier);
 
-        // And the Disarming Kris pins the modifiers' own order, which one
+        // And the Kris pins the modifiers' own order, which one
         // forged modifier cannot: it carries three — CritWindow, CritMultiplier
         // and CritWeaken, which ModifierSet.Entries yields in ModifierType enum
         // order — and each seed below lands its single stack on a different

@@ -1109,7 +1109,7 @@ public sealed class SaveConsistencyTests : IDisposable
         // than the enchanter works on; and no more reports than deposits made. The
         // shop: A's staff refined
         // unworn (0, a run worked of 2), B's staff enchanted Vampiric (1, a run worked
-        // of 2), C's Tower Guard refined (2, fresh); the last run worked 0 and 1.
+        // of 2), C's Scutum and Gladius refined (2, fresh); the last run worked 0 and 1.
         using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
         string shop = Save(TestShop.Shop());
         Restores(shop, "the shop");
@@ -1227,9 +1227,9 @@ public sealed class SaveConsistencyTests : IDisposable
         // reorder; only a transfer holds a source or names a soul's place; a report of
         // one names its soul, its source only if it had one, and the tier it landed at
         // exactly as it came back; and a weapon that takes a soul from another has room
-        // for it. The shop: B's Riposte Blade took Vampiric off the Nameless Knife and
-        // came back (reported); D's Tower Guard takes the knife's Serrated (0, the
-        // knife held with it), and an Arming Sword moves its Flaming to its end (1).
+        // for it. The shop: B's Rapier and Dagger took Vampiric off the Nameless Knife and
+        // came back (reported); D's Scutum and Gladius takes the knife's Serrated (0, the
+        // knife held with it), and a Buckler and Sword moves its Flaming to its end (1).
         using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
         string moves = Save(TestShop.Transfers());
         Restores(moves, "the transfers");

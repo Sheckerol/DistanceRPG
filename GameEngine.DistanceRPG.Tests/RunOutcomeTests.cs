@@ -34,7 +34,7 @@ public sealed class RunOutcomeTests : IDisposable
 
     public void Dispose() => _premise.Dispose();
 
-    /// <summary>The shipped seed: the tutorial's golem holds a Pinning Lance on floor 2, and floor 1's spawn 23 is a hatchet dummy.</summary>
+    /// <summary>The shipped seed: the tutorial's golem holds a Ranseur on floor 2, and floor 1's spawn 23 is a hatchet dummy.</summary>
     private const long GoldenSeed = 2762136374;
 
     /// <summary>Seeds a dungeon on the tuning's 5–10 range rolls five, six, seven and ten floors on — every such dungeon alike, since the roll reads only the seed and the range.</summary>
@@ -55,7 +55,7 @@ public sealed class RunOutcomeTests : IDisposable
     /// <summary>A blow that goes through any Block a boss stands behind: a dummy in one swing, any boss in two.</summary>
     private static Weapon Sledge() => TestWeapons.Make("Sledge", range: 60, damage: 120, cost: 30);
 
-    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Weakspot Stiletto where none is named.</summary>
+    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Rondel where none is named.</summary>
     private static PartyMemberState[] Party(params Weapon[] held)
         => Ids.Select((id, i) => TestPools.Holding(id, i < held.Length ? held[i] : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();
@@ -335,7 +335,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Equal(50, GameContent.Current.Tuning.DeathXpLossPercent);
         var tower = TestWeapons.Get("tower_guard");
         var party = Party(Sledge());
-        party[3].Inventory[1] = tower;          // D carries a Tower Guard in: gear, never a spoil
+        party[3].Inventory[1] = tower;          // D carries a Scutum and Gladius in: gear, never a spoil
         party[2].WeaponXp[Axe] = 200;           // and C has swung an axe before this run
         var campaign = new CampaignState(party);
         var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
@@ -398,7 +398,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Contains(new XpClawback("D", XpSnapshot.ManaPool, entry.Members[3].ManaXp + 7, entry.Members[3].ManaXp + 7 - 3), result.Clawbacks);
 
         // The run's end rests nobody; the next entry does, and it arms the hand the
-        // wipe emptied from the bag: D walks into the next dungeon holding its Tower Guard.
+        // wipe emptied from the bag: D walks into the next dungeon holding its Scutum and Gladius.
         Assert.All(party, m => Assert.False(m.Alive));
         campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Same(tower, party[3].Inventory[0]);
@@ -1270,7 +1270,7 @@ public sealed class RunOutcomeTests : IDisposable
             Assert.Equal(new Weapon?[] { kept, dropped, retaken }, party[1].Inventory[1..4]);
             Assert.Equal(new[] { kept, dropped, retaken }, visit.Spoils);
 
-            // B puts two down: the sword stays down, and the Tower Guard B takes
+            // B puts two down: the sword stays down, and the Scutum and Gladius B takes
             // back, into slot 2, the first empty. D puts its own longbow down and
             // takes it back. The spoils are the three they were: taking a weapon
             // back records nothing.

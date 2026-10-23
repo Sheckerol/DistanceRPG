@@ -686,7 +686,7 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// A deposit, as the log says it (the plan's 1h), from what the enchanter handed
     /// back (<see cref="DepositMade"/>; Logic never logs): <c>[Enchanter] Deposited
-    /// Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+    /// Scutum and Gladius (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
     /// (capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of
     /// Renewal from the bag</c>. The ordinal is named here, in the session that made
     /// the deposit, so a finished service's improvement roll, which the run's end
@@ -710,12 +710,12 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// A take-back, as the log says it (the plan's 1h), from what the enchanter
-    /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Tower Guard
+    /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Scutum and Gladius
     /// (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run
     /// worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c> — the
     /// capacity after as it was before the deposit. A transfer's names its source
     /// too, back at the stable's end after it, its wear never cashed: <c>[Enchanter]
-    /// Took back Riposte Blade (riposte_blade) and Nameless Knife
+    /// Took back Rapier and Dagger (riposte_blade) and Nameless Knife
     /// (flensing_knife_unique) to the stable's end: Transfer vampiric (T3) from Nameless
     /// Knife forfeited, …</c>.
     /// </summary>

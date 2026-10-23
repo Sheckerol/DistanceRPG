@@ -110,13 +110,13 @@ only other keys (PHASE 6b DECISION 10).
 | 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
 | 3 | `3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE`: the source list, every soul on the party's other weapons and then the weapon's own. Dimmed with its reason as ENCHANT is, or `NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT` |
 | W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul, the weapon it is on and whose hand or bag that is, or the stable: `VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T2 - 2 RUNS`, or on a sword carrying Flaming and Vampiric `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS`; a soul that does nothing yet moves all the same, noted `DOES NOTHING YET`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD IN THE STABLE - THE ROTWOOD WOULD CAST NOTHING`), and chosen a line at a time like the rest, so every line of a long list comes into view. Each list opens on the first that can be chosen and scrolls with the choice |
-| Enter | On either list, choose it: the confirm — or, on a refused one, say why over the keys and choose nothing. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
+| Enter | On either list, choose it: the confirm — or, on a refused one, say why over the keys and choose nothing. On the confirm — `DEPOSIT THE BUCKLER AND SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE BUCKLER AND SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
 | Esc | Back a step: from the confirm to the list it came from (or the services), from either list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
 | Tab, D, T | Nothing |
 
 | Between runs: the take-back ask (T) | Action |
 | --- | --- |
-| Enter | `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once. A transfer's — `TAKE BACK THE ARMING SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36 WEAR COMES BACK` — returns both, the source's souls and wear as they went in |
+| Enter | `TAKE BACK THE BUCKLER AND SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once. A transfer's — `TAKE BACK THE BUCKLER AND SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36 WEAR COMES BACK` — returns both, the source's souls and wear as they went in |
 | Esc | No: it stays in the shop |
 | Tab, D, T | Nothing |
 
@@ -175,7 +175,7 @@ weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on th
 dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
 hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
-`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter spends it
+`[Wear] A's Rondel is full: wear 30 of 30`. The enchanter spends it
 and grows a weapon's capacity (below).
 
 **Potions** (Phase 6b): a potion in a member's bag is drunk by its number with the
@@ -304,13 +304,13 @@ own bag ahead of every weapon there would come straight back, and is refused as
 changing nothing: `AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A] WOULD TAKE
 IT STRAIGHT BACK`. The log says each move: `[Hub] Moved Staff of Renewal from A's
 bag slot 2 to the stable's end`. On screen a name is drawn without its apostrophe,
-which the font lacks: `SKIRMISHERS PIKE`.
+which the font lacks: `HASTA`.
 
 **The enchanter** (Phase 6a): the WEAPONS page ends with the enchanter's
 shop — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` until the tutorial is
 beaten, and then `THE ENCHANTER - WORKS ON THE 2 NEWEST` over each weapon in it,
 the newest first: `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan for the two the next
-run that counts works (`EnchanterWorksOn`), `STALLED  RIPOSTE BLADE - 0 OF 1 RUN`
+run that counts works (`EnchanterWorksOn`), `STALLED  RAPIER AND DAGGER - 0 OF 1 RUN`
 in yellow for the rest — or `THE ENCHANTER - NOTHING IN THE SHOP`; chosen, a row
 keeps its colour, marked `> <`. A weapon in the
 shop is chosen to be read, never taken up; its detail says what its deposit bought
@@ -354,9 +354,9 @@ nothing to take, and the relations bind both, so `Charges` is never grafted (PHA
 6a DECISION 5). The roll is keyed to the run's map seed and the deposit's ordinal,
 both saved, so a reload never rerolls it. The run's summary says so after whether
 the run counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC -
-NO CHANGE`, `TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - DEEPENED BLOCK`,
+NO CHANGE`, `SCUTUM AND GLADIUS IS BACK FROM THE ENCHANTER - REFINED - DEEPENED BLOCK`,
 `… - GRAFTED RIPOSTE` on a green line, `THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`,
-`STALLED AT THE ENCHANTER: RIPOSTE BLADE`, or `THE ENCHANTER WORKED NOTHING - THE
+`STALLED AT THE ENCHANTER: RAPIER AND DAGGER`, or `THE ENCHANTER WORKED NOTHING - THE
 RUN DID NOT COUNT` — and past three lines of services on the screen between runs
 (two over the floor, a transfer's two lines told together),
 `AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. The log says it too:
@@ -368,10 +368,10 @@ no wear, no roll`). A weapon taken back early (T on its row in the shop, and Ent
 on the ask) comes back to the end of the stable with its wear and its capacity as they
 were before it went in, its service lost (PHASE 6a DECISION 8). A deposit and a
 take-back are each saved at once (PHASE 6a DECISION 10), and logged: `[Enchanter]
-Deposited Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+Deposited Scutum and Gladius (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
 (capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of Renewal
 from the bag` — the deposit's number, with the run's map seed, is what a finished
-service's improvement roll is keyed by — and `[Enchanter] Took back Tower Guard
+service's improvement roll is keyed by — and `[Enchanter] Took back Scutum and Gladius
 (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked
 lost, 30 wear returned (capacity 31 -> 30), deposit #0`.
 
@@ -387,10 +387,10 @@ tier from no XP; one at tier 1, and every unique soul, moves intact with its XP.
 lands last, acquired: the forged mark stays with the weapon forged with it. Both
 weapons wait in the shop as one deposit, one of the two the enchanter works on, the
 source's wear left in its pool: the WEAPONS page lists the source `HELD     NAMELESS
-KNIFE` under `WORKING  RIPOSTE BLADE - 0 OF 1 RUN`, its detail `HELD - GIVING
-VAMPIRIC TO THE RIPOSTE BLADE` (a full one's wear `WEAR 40 OF 40 - FULL - THE MOVE
+KNIFE` under `WORKING  RAPIER AND DAGGER - 0 OF 1 RUN`, its detail `HELD - GIVING
+VAMPIRIC TO THE RAPIER AND DAGGER` (a full one's wear `WEAR 40 OF 40 - FULL - THE MOVE
 LEAVES IT UNSPENT`), and T on either takes both back. The summary says
-`RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
+`RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
 under it, `NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF`. Moving a
 weapon's own soul to its end is a reorder: it takes the weapon's count in runs
 rather than the count plus one, and it is allowed with every slot filled — `ALL 5
@@ -409,10 +409,10 @@ first enchantment a move changes must be left casting a status a staff casts —
 Serrated, whose Bleeding rides a strike — and landing each status it keeps on the
 side it landed it before (`THE STAFF OF RENEWAL WOULD CAST WARD ON AN ENEMY`; PHASE
 6a DECISION 12). A lock the new wielder cannot pay is no refusal: the soul sleeps
-there. The log names both: `[Enchanter] Deposited Riposte Blade
+there. The log names both: `[Enchanter] Deposited Rapier and Dagger
 (riposte_blade) from B's bag slot 3: Transfer vampiric (T3) from Nameless Knife
 (flensing_knife_unique) in B's bag slot 4, 30 wear cashed (capacity 30 -> 31), 1
-run, deposit #0`, and `[Enchanter] Riposte Blade finished: vampiric moved on at T2
+run, deposit #0`, and `[Enchanter] Rapier and Dagger finished: vampiric moved on at T2
 from Nameless Knife; improvement roll …`.
 
 Outside combat the rest of the party marches behind the active character in a
@@ -1038,7 +1038,7 @@ everything in them is named by a stable string id.
     the enchantments it arrives with (`{ "id": "vampiric", "tier": 3 }`, the tier
     left out when it is 1) and a wand's `shape`. A variant may name its own
     `range`, `damage`, `cost` or `manaCost`, which then plays for it alone — the
-    Staff of Renewal's and the Staff of Mire's mana do. Give the Weakspot Stiletto
+    Staff of Renewal's and the Staff of Mire's mana do. Give the Rondel
     `"damage": 25` and restart, and A hits harder while the other daggers do not.
   - `uniques` lists the artifacts, each as the variant it is `derivedFrom` —
     whose class, statline and shape it takes — the modifiers it `raises` (set to
@@ -1134,7 +1134,7 @@ everything in them is named by a stable string id.
   | a class row's `cost`, and a variant's own | 1–10000 | movement is charged a unit at least, so a smaller cost would be one the game never charges, and the HUD's COST would show it |
   | a class row's `manaCost`, and a variant's own | 0–1000 | a martial class casts for 0; below 0 a cast would open on an empty pool |
   | a class row's `baseline` stack, a unique's `raises`, and every weapon's spread as the game composes it | 1 to the modifier's `MaxForged` (3 at most) | the forge's own rules, as before: a stack is one at least, and nothing is forged past its limit |
-  | a variant's `adds` stack | 1–3 | an add adds a stack at least, and none is deeper than any forge goes (`MaxForged` at its most). Checked as the file is read, before it is added to the class's baseline, so the refusal names the number written and its path — `"adds": { "Light": 0 }` on the Flensing Knife shows `WEAPONS.JSON: VARIANTS[0].ADDS.LIGHT: 0 IS OUTSIDE 1 TO 3` |
+  | a variant's `adds` stack | 1–3 | an add adds a stack at least, and none is deeper than any forge goes (`MaxForged` at its most). Checked as the file is read, before it is added to the class's baseline, so the refusal names the number written and its path — `"adds": { "Light": 0 }` on the Seax shows `WEAPONS.JSON: VARIANTS[0].ADDS.LIGHT: 0 IS OUTSIDE 1 TO 3` |
   | an enchantment's `tier` | 1–3 | a weapon arrives at tier 1, and an artifact at 3 at most; tier grows in play, never in the file. A unique enchantment written above 1 plays at 1 |
   | a wand's `radius`, `length`, `width` and `targetReach`, each its shape measures | 1–10000 | a measured dimension of 0 covers nothing, and none is longer than the farthest the tuning measures. One its shape does not measure is 0, or refused, as before |
   | a Cone's `angleDegrees` | 1–360 | a cone of 0 degrees covers nothing, and none is wider than a full turn |

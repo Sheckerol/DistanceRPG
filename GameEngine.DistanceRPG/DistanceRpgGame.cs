@@ -733,7 +733,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// The log's lines for what a run's end did at the enchanter, off its reports
     /// (<see cref="RunResult.Services"/>): whether the run counted, what it worked
     /// with each one's runs and what it left stalled — <c>[Enchanter] Run counted:
-    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1</c>, or
+    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Rapier and Dagger 0/1</c>, or
     /// <c>[Enchanter] Run not counted: nothing worked; stalled …</c> — then a line
     /// for each service it finished, with its improvement roll as it was drawn
     /// (Phase 6a.4): <c>[Enchanter] Wand of the Cone finished: attached vampiric;

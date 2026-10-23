@@ -16,7 +16,7 @@ public class CampaignVisitTests
 
     private static readonly string[] Ids = ["A", "B", "C", "D"];
 
-    /// <summary>Four fixture members in roster order: the first holding <paramref name="first"/>, the rest a Weakspot Stiletto.</summary>
+    /// <summary>Four fixture members in roster order: the first holding <paramref name="first"/>, the rest a Rondel.</summary>
     private static PartyMemberState[] Party(Weapon? first = null)
         => Ids.Select((id, i) => TestPools.Holding(id, i == 0 && first is not null ? first : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();

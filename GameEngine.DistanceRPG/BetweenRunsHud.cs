@@ -91,7 +91,7 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
-    /// ARMING SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
+    /// BUCKLER AND SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
     /// TAB is not named: it does nothing while a weapon is carried.
     /// </summary>
     internal static string CarryingKeysLine(Weapon carried) => $"CARRYING {HubWeapons.The(carried)} - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK";
@@ -374,13 +374,13 @@ public sealed class BetweenRunsHud : IDisposable
     /// (<see cref="RunResult.Services"/>), none for an empty shop: on a run that
     /// counted, each finished service (cyan, and green when its improvement roll
     /// grafted) — <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC
-    /// - NO CHANGE</c>, <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - REFINED -
+    /// - NO CHANGE</c>, <c>RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - REFINED -
     /// GRAFTED BLOCK</c>, a transfer's source on a line of its own under the weapon
     /// its soul went to (<see cref="SourceBack"/>) — then each worked one — <c>THE
     /// ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/>
     /// lines of those together, a service never split, and then <c>AND 2 MORE AT THE
     /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then the stalled weapons
-    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
+    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RAPIER AND DAGGER</c>. On a run
     /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
     /// and an enchantment are named by the content's rows, and by the bare id where
     /// a row is gone, so the summary never throws while it draws.
@@ -435,7 +435,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// <c>… - GRAFTED BLOCK</c>, which the summary draws green. A weapon that came
     /// back as it went — a roll that missed, or found nothing to improve, or none
     /// made — says <c>NO CHANGE</c>. A transfer's weapon says where its soul landed
-    /// (Phase 6a.6): <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
+    /// (Phase 6a.6): <c>RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
     /// T2 - NO CHANGE</c>, or a reorder's <c>… - FLAMING NOW LAST AT T1 - …</c>, short
     /// enough that the widest names and a two-digit tier still fit the dungeon's end
     /// panel at its scale.
@@ -922,7 +922,7 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// A transfer's source held in the shop, over its detail (Phase 6a.6): what it
-    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE</c>. The soul is
+    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RAPIER AND DAGGER</c>. The soul is
     /// still on it until the service is done.
     /// </summary>
     internal static string HeldLine(Deposit deposit)

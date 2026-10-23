@@ -105,7 +105,7 @@ public sealed class OpportunistTests : IDisposable
     [Fact]
     public void RoutingAxe_NeverProvokesItself()
     {
-        // A Routing Axe (Rout x2 here) shoves what it hits out of its own
+        // A Bardiche (Rout x2 here) shoves what it hits out of its own
         // reach — a forced exit, which its own Opportunist never answers.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "routing_axe");

@@ -137,7 +137,7 @@ internal sealed class HubWeapons
         return weapon.ShownName;
     }
 
-    /// <summary>A weapon named with its article, once: <c>THE ARMING SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
+    /// <summary>A weapon named with its article, once: <c>THE BUCKLER AND SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
     internal static string The(Weapon weapon) => The(Name(weapon));
 
     /// <summary>A weapon's name, as the page says it, with its article once: <c>THE ROTWOOD</c>, and <c>THE BULWARK</c> as it is.</summary>
