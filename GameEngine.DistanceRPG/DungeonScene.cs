@@ -14,6 +14,13 @@ public enum GameMenu
     Inventory,
 
     /// <summary>
+    /// The character sheet (C, after play, 2026-10): the active member's stats,
+    /// pools in real numbers - mana current, spendable, reserved and max - and its
+    /// trained weapon classes. 1-4 switch the member shown; C or ESC close it.
+    /// </summary>
+    Character,
+
+    /// <summary>
     /// The pause menu (<see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign
     /// into its own slot on the party's own turn, asking nothing — and off it says
     /// why not — and 3 quits to the title, the campaign's slot written first. ESC
@@ -492,6 +499,9 @@ public class DungeonScene : Scene
     private GameMenu _activeMenu = GameMenu.None;
 
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+
+    /// <summary>Whether the character sheet is up (<see cref="GameMenu.Character"/>).</summary>
+    public bool CharacterOpen => ActiveMenu == GameMenu.Character;
 
     /// <summary>
     /// True while the bag's X has armed "leave" (§4.4): the next bag number puts
@@ -1490,6 +1500,7 @@ public class DungeonScene : Scene
         // yes to leaving when the way out has asked.
         input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
+        input.SubscribeToKeyPressed(_ => ToggleCharacter(), Keys.C);
         // X, in the bag, arms "leave": the next bag number puts that weapon down
         // where the active member stands, rather than equipping it (§4.4).
         input.SubscribeToKeyPressed(_ => LeaveKey(), Keys.X);
@@ -1649,9 +1660,9 @@ public class DungeonScene : Scene
                     EquipSlot(slot);
             }
         }
-        else if (!AnyMenuOpen)
+        else if (!AnyMenuOpen || CharacterOpen)
         {
-            SetActiveCharacter(digit - 1);   // a number past the party selects nobody
+            SetActiveCharacter(digit - 1);   // a number past the party selects nobody; on the sheet, it shows that member
         }
     }
 
@@ -1683,6 +1694,14 @@ public class DungeonScene : Scene
     /// fade or on the defeat screen. Closing it disarms its X
     /// (<see cref="ActiveMenu"/>).
     /// </summary>
+    /// <summary>C opens the character sheet over the floor, or closes it; nothing behind another menu, or once the run is lost.</summary>
+    internal void ToggleCharacter()
+    {
+        if (Transiting || _turns is { Phase: TurnPhase.GameOver }) return;   // no floor open yet is no game over
+        if (ActiveMenu is not (GameMenu.None or GameMenu.Character)) return;
+        ActiveMenu = CharacterOpen ? GameMenu.None : GameMenu.Character;
+    }
+
     private void ToggleInventory()
     {
         if (Transiting || _turns.Phase == TurnPhase.GameOver) return;

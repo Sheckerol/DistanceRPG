@@ -65,6 +65,7 @@ public sealed class DungeonHud
     private readonly Game _game;
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
+    private readonly HudRects _rects = new();
     private bool _glReady;
 
     /// <summary>One coloured piece of HUD text; runs drawn side by side read as one line.</summary>
@@ -488,6 +489,7 @@ public sealed class DungeonHud
         {
             _text.Initialize();
             _fade.Initialize();
+            _rects.Initialize();
             _glReady = true;
         }
 
@@ -541,6 +543,9 @@ public sealed class DungeonHud
 
         if (scene.PauseMenuOpen)
             DrawMenu(w, h, scene);
+
+        if (scene.CharacterOpen)
+            DrawCharacterSheet(w, active);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
             DrawConfirmLeave(w, h, scene.Visit, scene.Party.Sum(member => member.State.Potions.Count()));
@@ -1202,6 +1207,120 @@ public sealed class DungeonHud
         ];
     }
 
+    // The selector's bars: how far under a row's text they start, how tall each
+    // is, the gap between the two, and how long, in pixels.
+    private const float BarTop = 16f;
+    private const float BarHeight = 4f;
+    private const float BarGap = 2f;
+    internal const float BarLength = 120f;
+
+    /// <summary>What a bar has run out of: a dark, so the part left reads against the whole.</summary>
+    internal static readonly Vector4 BarEmpty = new(0.18f, 0.18f, 0.22f, 0.9f);
+
+    /// <summary>Spendable mana not yet regained: the mana colour, dimmed.</summary>
+    internal static readonly Vector4 ManaEmpty = new(0.08f, 0.22f, 0.32f, 0.9f);
+
+    /// <summary>Mana an equipped enchantment reserves (§3.3): no regen reaches it, so it reads apart from both.</summary>
+    internal static readonly Vector4 Reserved = new(0.45f, 0.38f, 0.6f, 0.9f);
+
+    /// <summary>One part of a bar, as shares of its length from the left.</summary>
+    internal readonly record struct BarPart(float From, float To, Vector4 Color);
+
+    /// <summary>HP left against the whole: green, then the dark it has lost. A dead member's bar is empty.</summary>
+    internal static IReadOnlyList<BarPart> HpBar(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        float left = Share(actor.Alive ? actor.Hp : 0, actor.MaxHp);
+        return [new(0f, left, Green), new(left, 1f, BarEmpty)];
+    }
+
+    /// <summary>
+    /// Mana against the whole pool (after play, 2026-10): what is in it, in cyan;
+    /// what a rest could still bring back, the cyan dimmed; and what the equipped
+    /// enchantments reserve, which no rest reaches (<see cref="ActorState.UsableMaxMana"/>),
+    /// in its own colour at the end - so a member capped by its staff reads capped,
+    /// not empty.
+    /// </summary>
+    internal static IReadOnlyList<BarPart> ManaBar(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        float current = Share(actor.Mana, actor.MaxMana);
+        float spendable = Math.Max(current, Share(actor.UsableMaxMana, actor.MaxMana));
+        return [new(0f, current, Cyan), new(current, spendable, ManaEmpty), new(spendable, 1f, Reserved)];
+    }
+
+    /// <summary><paramref name="part"/> of <paramref name="whole"/>, 0 to 1; nothing of an empty whole.</summary>
+    private static float Share(int part, int whole) => whole <= 0 ? 0f : Math.Clamp((float)part / whole, 0f, 1f);
+
+    private void DrawBar(float x, float y, IReadOnlyList<BarPart> parts)
+    {
+        foreach (var part in parts)
+            _rects.Fill(_game.ShaderManager, _game.ClientSize.X, _game.ClientSize.Y,
+                x + part.From * BarLength, y, (part.To - part.From) * BarLength, BarHeight, part.Color);
+    }
+
+    // ── The character sheet ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// The character sheet (C, after play, 2026-10): the active member's stats,
+    /// its pools as the real numbers - mana current, spendable, reserved and max,
+    /// and what reserves it - and every weapon class it has trained, with what
+    /// its level is worth. One line a list entry, each in its colour.
+    /// </summary>
+    internal static IReadOnlyList<Run> CharacterSheetLines(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var lines = new List<Run>
+        {
+            new($"[{member.Id}] CHARACTER", Yellow),
+            new($"STR {member.Stats.STR}   DEX {member.Stats.DEX}   CON {member.Stats.CON}   INT {member.Stats.INT}", White),
+            new("", White),
+        };
+
+        var health = member.HealthPool;
+        lines.Add(new($"HP {member.Hp} / {member.MaxHp}{Gap}NEXT MAX HP: XP {health.XpIntoNext}/{health.XpToNext}", Green));
+
+        var mana = member.ManaPool;
+        int reserved = member.MaxMana - member.UsableMaxMana;
+        lines.Add(new($"MANA {member.Mana} CURRENT - {member.UsableMaxMana} SPENDABLE - {reserved} RESERVED - {member.MaxMana} MAX", Cyan));
+        if (member.EquippedWeapon is { } weapon)
+            for (int i = 0; i < weapon.Enchantments.Count; i++)
+            {
+                var entry = weapon.Enchantments[i];
+                string name = entry.Def.Name.ToUpperInvariant() + (entry.Tier > 1 ? $" T{entry.Tier}" : "");
+                lines.Add(member.IsDormant(i)
+                    ? new($"  {name} ASLEEP - ITS {entry.EffectiveLock} DOES NOT FIT IN MAX MANA", Grey)
+                    : new($"  {name} RESERVES {entry.EffectiveLock}", Reserved));
+            }
+        lines.Add(new($"NEXT MAX MANA: XP {mana.XpIntoNext}/{mana.XpToNext}{Gap}MOVE {MathF.Ceiling(member.DistLeft)} / {member.EffectiveMax:0}", Cyan));
+
+        lines.Add(new("", White));
+        lines.Add(new("SKILLS", Yellow));
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            var level = member.Proficiency(cls);
+            if (level.Level <= Progression.StartingLevel && level.XpIntoNext == 0 && member.EquippedWeapon?.Class != cls)
+                continue;   // never trained, and not in hand: nothing to say
+            int damage = level.Level / Progression.DamagePerLevels;
+            int discount = level.Level / Progression.MovementDiscountPerLevels;
+            lines.Add(new($"{cls.ToString().ToUpperInvariant()} LV {level.Level}{Gap}XP {level.XpIntoNext}/{level.XpToNext}{Gap}+{damage} DMG{Gap}-{discount} MOVE COST", White));
+        }
+
+        lines.Add(new("", White));
+        lines.Add(new("1-4 SWITCH MEMBER - C OR ESC CLOSE", Grey));
+        return lines;
+    }
+
+    private void DrawCharacterSheet(int w, PartyMemberState member)
+    {
+        float y = InventoryTopMargin;
+        foreach (var line in CharacterSheetLines(member))
+        {
+            DrawCentered(w, y, line.Text, 2f, line.Color);
+            y += 20f;
+        }
+    }
+
     private void DrawPartySelector(DungeonScene scene)
     {
         int hovered = -1;
@@ -1225,6 +1344,10 @@ public sealed class DungeonHud
             if (state.HeldShots > 0)
                 badges.Add(new Run($"HOLD {state.HeldShots}", Cyan));
             DrawRuns(SelectorX + (rowLength + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
+
+            // Its HP and mana as bars under the row: what is left, against the whole.
+            DrawBar(SelectorX, y + BarTop, HpBar(state));
+            DrawBar(SelectorX, y + BarTop + BarHeight + BarGap, ManaBar(state));
         }
 
         // Hovering a member's row spells out what each of its statuses does to
@@ -2311,7 +2434,7 @@ public sealed class DungeonHud
             parts.Add("CLICK ENEMY: ATTACK");
         if (weapon is { Kind: WeaponKind.Ranged } && active.Value(ModifierType.Overwatch) > 0)
             parts.Add("O: HOLD FIRE");
-        parts.Add("SPACE END TURN - E STAIRS - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
+        parts.Add("SPACE END TURN - E STAIRS - I BAG - C CHARACTER - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
         return string.Join(" - ", parts);
     }
 
@@ -2611,5 +2734,6 @@ public sealed class DungeonHud
     {
         _text.Dispose();
         _fade.Dispose();
+        _rects.Dispose();
     }
 }
