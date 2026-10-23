@@ -465,6 +465,13 @@ internal sealed class DepositPanel
     /// its reorders, was never shown while the choice passed over them (PHASE 6a
     /// DECISION 12). Anywhere else, nothing.
     /// </summary>
+    /// <summary>A click on the offer list's or the source list's row <paramref name="index"/> (after play, 2026-10): the choice moved onto it, as W/S move it — a refused one among them, which ENTER then says why of.</summary>
+    public void Point(int index)
+    {
+        if (_step is Step.Offer or Step.Sources && index >= 0 && index < Listed)
+            _chosen = index;
+    }
+
     public void Move(int step)
     {
         int count = Listed;

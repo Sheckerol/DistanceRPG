@@ -2238,7 +2238,20 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (AnyMenuOpen || Transiting) return;
+        if (Transiting) return;
+
+        // The menus and the keys lines as last drawn come first (after play,
+        // 2026-10): a key's words click as the key, a bag slot as its number
+        // (ClickZones), so a click there does only what its key would. On the
+        // character sheet, a row of the party list shows that member, as its
+        // number does.
+        if (_hud.Clicks.Click(_mousePos)) return;
+        if (CharacterOpen && DungeonHud.HitPartySelector(_mousePos, _party.Count, out int shown))
+        {
+            SetActiveCharacter(shown);
+            return;
+        }
+        if (AnyMenuOpen) return;
 
         // The HUD party list doubles as buttons and wins over world picking.
         if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))

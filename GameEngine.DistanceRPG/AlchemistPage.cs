@@ -372,6 +372,14 @@ internal sealed class AlchemistPage
     }
 
     /// <summary>W/S: the choice to the next row up (<paramref name="step"/> −1) or down (+1), round the ends of the page — every row is a member or a potion, and each is chosen.</summary>
+    /// <summary>A click on row <paramref name="index"/> (after play, 2026-10): the choice moved onto it — a member or a potion, as W/S stop on each.</summary>
+    public void Point(int index)
+    {
+        var rows = Rows();
+        if (index >= 0 && index < rows.Count)
+            _chosen = rows[index].Place;
+    }
+
     public void Step(int step)
     {
         var rows = Rows();

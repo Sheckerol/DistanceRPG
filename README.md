@@ -159,6 +159,15 @@ bag.
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
 
+**Every menu takes the mouse too.** A key's own words on a keys line or a menu
+row click as that key — `ESC MENU`, `2  SAVE GAME`, `E OR ENTER: YES`,
+`SPACE END TURN` on the help line — and a pair, `W/S` or `A/D`, presses its first
+key on its left half and its second on its right. A bag slot clicks as its number;
+the title's options and slots take a click as ENTER on them; and the hub's lists —
+the dungeons, the WEAPONS rows, the alchemist's members and potions, the deposit
+panel's offers — move the choice on the first click and take it (ENTER) on a
+click on the row already chosen. What a click would take is lit under the mouse.
+
 **Wear** (Phase 6a): every weapon banks wear as it is used — `WearPerHit`
 (1) for every hit it lands: each body a swing, a cleave, a shot or a wand's cast
 strikes, each counter and each brace, and each landed cast of a staff, a heal or

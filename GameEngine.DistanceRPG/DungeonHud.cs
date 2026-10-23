@@ -2,6 +2,7 @@ using GameEngine.Core;
 using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
@@ -66,7 +67,11 @@ public sealed class DungeonHud
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
     private readonly HudRects _rects = new();
+    private readonly ClickZones _clicks = new();
     private bool _glReady;
+
+    /// <summary>Where a click lands on the menus and keys as they were last drawn (<see cref="ClickZones"/>): the scene asks it before the floor.</summary>
+    internal ClickZones Clicks => _clicks;
 
     /// <summary>One coloured piece of HUD text; runs drawn side by side read as one line.</summary>
     public readonly record struct Run(string Text, Vector4 Color);
@@ -495,6 +500,8 @@ public sealed class DungeonHud
 
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
+        _clicks.Mouse = scene.MousePos;
+        _clicks.BeginFrame(_game.ShaderManager, w, h);
         var turns = scene.Turns;
         var active = scene.ActiveCharacter.State;
         var ended = scene.ActiveMenu == GameMenu.RunSummary ? scene.EndedRun : null;
@@ -557,11 +564,11 @@ public sealed class DungeonHud
         else if (turns.Phase == TurnPhase.GameOver)
         {
             DrawCentered(w, h / 2f - 60f, DefeatHeadline, 6f, Red);
-            DrawCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
+            DrawKeysCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
         }
         else
         {
-            DrawCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
+            DrawKeysCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
         }
 
         _text.Flush(_game.ShaderManager);
@@ -933,7 +940,7 @@ public sealed class DungeonHud
     private void DrawConfirmLeave(int w, int h, DungeonState visit, int potionsCarried)
     {
         float top = h / 2f - 60f;
-        DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
+        DrawKeysCentered(w, top, LeavePrompt(), 2.5f, Yellow);
         var lines = LeavePreview(visit, potionsCarried);
         float y = top + 44f;
         for (int i = 0; i < lines.Count; i++)
@@ -1113,7 +1120,10 @@ public sealed class DungeonHud
         {
             bool last = i == lines.Count - 1;
             if (last) y += SummaryKeyGap;
-            DrawCentered(w, y, lines[i].Text, last ? SummaryKeyScale : SummaryLineScale, lines[i].Color);
+            if (last)
+                DrawKeysCentered(w, y, lines[i].Text, SummaryKeyScale, lines[i].Color);
+            else
+                DrawCentered(w, y, lines[i].Text, SummaryLineScale, lines[i].Color);
             y += step;
         }
     }
@@ -1314,9 +1324,13 @@ public sealed class DungeonHud
     private void DrawCharacterSheet(int w, PartyMemberState member)
     {
         float y = InventoryTopMargin;
-        foreach (var line in CharacterSheetLines(member))
+        var lines = CharacterSheetLines(member);
+        for (int i = 0; i < lines.Count; i++)
         {
-            DrawCentered(w, y, line.Text, 2f, line.Color);
+            if (i == lines.Count - 1)
+                DrawKeysCentered(w, y, lines[i].Text, 2f, lines[i].Color);   // its keys: C closes it
+            else
+                DrawCentered(w, y, lines[i].Text, 2f, lines[i].Color);
             y += 20f;
         }
     }
@@ -1707,12 +1721,20 @@ public sealed class DungeonHud
             string hint = potions ? PourKeyHint : LeaveKeyHint;
             float width = hint.Length * GlyphAdvance * InventoryHeaderScale;
             _text.DrawText(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
+            _clicks.AddKeys(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale);
         }
 
         float y = top + InventorySlotsTop;
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
             var item = active.Inventory[slot];
+            float height = InventorySlotPitch + (item == null ? 0 : Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch);
+            if (slot > 0 && slot < DungeonScene.HighestSlotKey)
+            {
+                // The whole slot, its statline under its name with it, clicks as its number: equip, drink, or with X armed, leave.
+                var key = Keys.D1 + slot;
+                _clicks.Add(left - ClickZones.Pad, y - ClickZones.Pad, 2f * InventoryHalfWidth + 2f * ClickZones.Pad, height, () => ClickZones.Press(key));
+            }
             if (item == null)
             {
                 _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
@@ -1757,9 +1779,9 @@ public sealed class DungeonHud
         }
 
         if (leaving)
-            DrawCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
+            DrawKeysCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
         else
-            DrawCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
+            DrawKeysCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
     }
 
     /// <summary>
@@ -2084,7 +2106,15 @@ public sealed class DungeonHud
     private void DrawMenu(int w, int h, DungeonScene scene)
     {
         foreach (var row in PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), scene.CanSaveNow, PauseSavesLine(scene.SavesInto), scene.MenuAnswer))
-            _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+            DrawMenuRow(_text, _clicks, w, row);
+    }
+
+    /// <summary>A pause-menu row, centred, its key's words clicking as the key (<see cref="ClickZones.AddKeys"/>): an option as its number, ESC TO CLOSE as ESC. The hub's menu is drawn through it too.</summary>
+    internal static void DrawMenuRow(TextRenderer text, ClickZones clicks, int w, MenuRow row)
+    {
+        float x = w / 2f - row.Width / 2f;
+        text.DrawText(row.Text, x, row.Y, row.Scale, row.Color);
+        clicks.AddKeys(row.Text, x, row.Y, row.Scale, leadOnly: true);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────
@@ -2695,6 +2725,13 @@ public sealed class DungeonHud
     private void DrawCentered(int viewportW, float y, string text, float scale, Vector4 color)
         => DrawCenteredAt(viewportW / 2f, y, text, scale, color);
 
+    /// <summary>A keys line, centred, its keys' words clicking as their keys (<see cref="ClickZones.AddKeys"/>).</summary>
+    private void DrawKeysCentered(int viewportW, float y, string text, float scale, Vector4 color)
+    {
+        DrawCentered(viewportW, y, text, scale, color);
+        _clicks.AddKeys(text, viewportW / 2f - text.Length * GlyphAdvance * scale / 2f, y, scale);
+    }
+
     private void DrawCenteredAt(float cx, float y, string text, float scale, Vector4 color)
     {
         float width = text.Length * GlyphAdvance * scale;
@@ -2735,5 +2772,6 @@ public sealed class DungeonHud
         _text.Dispose();
         _fade.Dispose();
         _rects.Dispose();
+        _clicks.Dispose();
     }
 }

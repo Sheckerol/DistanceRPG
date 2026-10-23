@@ -116,7 +116,11 @@ public sealed class BetweenRunsHud : IDisposable
     private readonly Game _game;
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
+    private readonly ClickZones _clicks = new();
     private bool _glReady;
+
+    /// <summary>Where a click lands on the screen as it was last drawn (<see cref="ClickZones"/>), and the mouse it lights under.</summary>
+    internal ClickZones Clicks => _clicks;
 
     /// <summary>How far the hub dims under the menu: further than the dungeon's floor does under its pause menu (0.65), since the hub is text on black, and its rows would otherwise read through the menu's.</summary>
     private const float MenuDim = 0.88f;
@@ -526,7 +530,7 @@ public sealed class BetweenRunsHud : IDisposable
     // ── The list, row by row ─────────────────────────────────────────────────
 
     /// <summary>One row of the list as the screen draws it: the text, its colour, its scale, and the height it takes before the next row.</summary>
-    internal readonly record struct ListRow(string Text, Vector4 Color, float Scale, float Pitch);
+    internal readonly record struct ListRow(string Text, Vector4 Color, float Scale, float Pitch, int? Choice = null);
 
     // A listing's row, and the smaller rows said under it or under the list.
     private const float ListingScale = 1.8f;
@@ -569,9 +573,9 @@ public sealed class BetweenRunsHud : IDisposable
                 : !listing.Selectable ? DungeonHud.DarkGrey
                 : listing.Early ? DungeonHud.Orange
                 : DungeonHud.White;
-            rows.Add(new ListRow(i == chosen ? $"> {line} <" : line, color, ListingScale, ListingPitch));
+            rows.Add(new ListRow(i == chosen ? $"> {line} <" : line, color, ListingScale, ListingPitch, i));
             if (listing.Def.RetiresOnClear)
-                rows.Add(new ListRow(TutorialWarning(listing.Def), DungeonHud.Orange, NoteScale, NotePitch));
+                rows.Add(new ListRow(TutorialWarning(listing.Def), DungeonHud.Orange, NoteScale, NotePitch, i));
         }
 
         var content = GameContent.Current;
@@ -1131,7 +1135,7 @@ public sealed class BetweenRunsHud : IDisposable
                     var offer = panel.Offers[i];
                     string line = DepositPanel.OfferLine(offer);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch, i));
                 }
                 break;
             }
@@ -1146,7 +1150,7 @@ public sealed class BetweenRunsHud : IDisposable
                     var move = panel.Moves[i];
                     string line = DepositPanel.MoveLine(move);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch, i));
                 }
                 break;
             }
@@ -1223,6 +1227,7 @@ public sealed class BetweenRunsHud : IDisposable
 
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
+        _clicks.BeginFrame(_game.ShaderManager, w, h);
 
         DrawCentered(w, TitleY, Title, TitleScale, DungeonHud.Cyan);
 
@@ -1251,7 +1256,7 @@ public sealed class BetweenRunsHud : IDisposable
             _fade.Draw(_game.ShaderManager, MenuDim);
             foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
                          scene.MenuAnswer))
-                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+                DungeonHud.DrawMenuRow(_text, _clicks, w, row);
         }
         else
         {
@@ -1270,6 +1275,11 @@ public sealed class BetweenRunsHud : IDisposable
                 foreach (var row in panelRows)
                 {
                     DrawCentered(w, y, row.Text, row.Scale, row.Color);
+                    float x = w / 2f - row.Text.Length * GlyphAdvance * row.Scale / 2f;
+                    if (row.Choice is { } offer)
+                        _clicks.AddText(x, y, row.Text.Length, row.Scale, () => scene.ClickOffer(offer));
+                    else
+                        _clicks.AddKeys(row.Text, x, y, row.Scale, leadOnly: true);   // a service, by its number
                     y += row.Pitch;
                 }
             }
@@ -1279,6 +1289,7 @@ public sealed class BetweenRunsHud : IDisposable
 
         var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel, scene.Alchemist.Open);
         DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
+        _clicks.AddKeys(bottom, w / 2f - bottom.Length * GlyphAdvance * KeysLineScale / 2f, h - KeysLineFromBottom, KeysLineScale);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -1308,6 +1319,8 @@ public sealed class BetweenRunsHud : IDisposable
         foreach (var row in rows)
         {
             DrawCentered(w, rowY, row.Text, row.Scale, row.Color);
+            if (row.Choice is { } listing && scene.Mode == BetweenRunsScene.HubMode.Dungeons)
+                _clicks.AddText(w / 2f - row.Text.Length * GlyphAdvance * row.Scale / 2f, rowY, row.Text.Length, row.Scale, () => scene.ClickDungeon(listing));
             rowY += row.Pitch;
         }
     }
@@ -1330,7 +1343,14 @@ public sealed class BetweenRunsHud : IDisposable
         {
             var row = rows[i];
             bool isCarried = carried is not null && ReferenceEquals(row.Weapon, carried);
-            DrawRuns(left, layout.Top + (i - top) * WeaponRowPitch, WeaponRowScale, HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried));
+            float rowY = layout.Top + (i - top) * WeaponRowPitch;
+            var runs = HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried);
+            DrawRuns(left, rowY, WeaponRowScale, runs);
+            if (scene.Mode is BetweenRunsScene.HubMode.Weapons or BetweenRunsScene.HubMode.Carrying)
+            {
+                int index = i;
+                _clicks.AddText(left, rowY, runs.Sum(run => run.Text.Length), WeaponRowScale, () => scene.ClickWeapon(index));
+            }
         }
 
         float right = w / 2f + RightColumn;
@@ -1371,7 +1391,16 @@ public sealed class BetweenRunsHud : IDisposable
         int top = page.Window(layout.Rows);
         int chosen = page.Chosen;
         for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
-            DrawRuns(left, layout.RowsTop + (i - top) * WeaponRowPitch, WeaponRowScale, AlchemistPage.Runs(rows[i], chosen: i == chosen));
+        {
+            float rowY = layout.RowsTop + (i - top) * WeaponRowPitch;
+            var runs = AlchemistPage.Runs(rows[i], chosen: i == chosen);
+            DrawRuns(left, rowY, WeaponRowScale, runs);
+            if (scene.Mode == BetweenRunsScene.HubMode.Alchemist)
+            {
+                int index = i;
+                _clicks.AddText(left, rowY, runs.Sum(run => run.Text.Length), WeaponRowScale, () => scene.ClickAlchemist(index));
+            }
+        }
 
         float right = w / 2f + RightColumn;
         y = layout.Top;
@@ -1425,5 +1454,6 @@ public sealed class BetweenRunsHud : IDisposable
     {
         _text.Dispose();
         _fade.Dispose();
+        _clicks.Dispose();
     }
 }

@@ -185,6 +185,27 @@ internal sealed class SlotMenu
     /// player, and the engine names the physical key, so a keypad 2 meant as down
     /// would otherwise load slot 2.
     /// </summary>
+    /// <summary>
+    /// A click on row <paramref name="row"/> (after play, 2026-10): taken as its
+    /// slot's number key takes it — loading, an empty slot says so and loads nothing;
+    /// beginning, a slot that holds anything asks first — and so for a slot past
+    /// 9, which no key reaches. With an ask up, a click is not ENTER: it says no, and
+    /// is spent, as every other key does (<see cref="Press"/>).
+    /// </summary>
+    public SlotStep PressRow(int row)
+    {
+        Said = null;
+        Chosen = null;
+        if (Asking is not null)
+        {
+            Asking = null;
+            return SlotStep.None;   // no, and spent
+        }
+        if (row < 0 || row >= Rows.Count)
+            return SlotStep.None;
+        return Choosable(Rows[row]) ? Take(row) : Refuse(SlotText.IsEmpty(Rows[row].Number));
+    }
+
     internal static int? Digit(Keys key) => key is >= Keys.D0 and <= Keys.D9 ? key - Keys.D0 : null;
 
     /// <summary>Whether a key can take <paramref name="row"/>: loading, one that holds something; beginning a new campaign, every row there is. A row no key can take is drawn dimmed.</summary>
