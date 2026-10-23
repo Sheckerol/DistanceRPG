@@ -1167,7 +1167,7 @@ public sealed class DungeonHud
     private const float SelectorTop = 130f;
     private const float SelectorRowPitch = 30f;
     private const float SelectorRowBand = 26f; // clickable height within each row's pitch
-    private const float SelectorWidth = 150f;
+    private const float SelectorWidth = 216f; // the widest row, >1 A 999 HP 100 MP, at scale 2
 
     /// <summary>
     /// Hit-test the party selector rows against a mouse position in window
@@ -1185,6 +1185,23 @@ public sealed class DungeonHud
         return true;
     }
 
+    /// <summary>
+    /// A party selector row: <c>&gt;1 A 30 HP 13 MP</c> — the marker, the number
+    /// the key selects it by, the member, its HP in its own colour and its mana
+    /// in the casters' cyan, so a member short of a cast is seen without
+    /// selecting it (added after play, 2026-10). The dead row is grey throughout.
+    /// </summary>
+    internal static IReadOnlyList<Run> SelectorRowRuns(int index, PartyMemberState state, bool isActive, Vector4 color)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        string marker = isActive ? ">" : " ";
+        return
+        [
+            new Run($"{marker}{index + 1} {state.Id} {state.Hp} HP", color),
+            new Run($" {state.Mana} MP", state.Alive ? Cyan : color),
+        ];
+    }
+
     private void DrawPartySelector(DungeonScene scene)
     {
         int hovered = -1;
@@ -1198,16 +1215,16 @@ public sealed class DungeonHud
             var color = !state.Alive ? DarkGrey : scene.PartyColor(i);
             if (hasHover && hovered == i && state.Alive)
                 color = Vector4.Lerp(color, White, 0.5f);
-            string marker = isActive ? ">" : " ";
-            string row = $"{marker}{i + 1} {state.Id} {state.Hp}";
+            var row = SelectorRowRuns(i, state, isActive, color);
             float y = SelectorTop + i * SelectorRowPitch;
-            _text.DrawText(row, SelectorX, y, 2f, color);
+            DrawRuns(SelectorX, y, 2f, row);
+            int rowLength = row.Sum(run => run.Text.Length);
 
             // Its effect badges beside it, and a banked Overwatch shot, which fires on the enemy's turn.
             var badges = new List<Run>(StatusBadgeRuns(state));
             if (state.HeldShots > 0)
                 badges.Add(new Run($"HOLD {state.HeldShots}", Cyan));
-            DrawRuns(SelectorX + (row.Length + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
+            DrawRuns(SelectorX + (rowLength + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
         }
 
         // Hovering a member's row spells out what each of its statuses does to

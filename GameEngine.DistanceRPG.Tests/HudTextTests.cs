@@ -271,6 +271,20 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void PartySelectorRow_ShowsEveryMembersHpAndMana()
+    {
+        // After play (2026-10): a member short of a cast's mana was only seen by
+        // selecting it, the top line naming the active member's alone. Every row
+        // now says its mana beside its HP, in the casters' cyan.
+        var member = TestPools.Char("D");
+        member.Mana = 13;
+        var row = DungeonHud.SelectorRowRuns(3, member, isActive: true, DungeonHud.White);
+        Assert.Equal($">4 D {member.Hp} HP 13 MP", string.Concat(row.Select(r => r.Text)));
+        Assert.Equal(DungeonHud.Cyan, row[^1].Color);
+        Assert.Equal(" 1 A", DungeonHud.SelectorRowRuns(0, TestPools.Char("A"), isActive: false, DungeonHud.White)[0].Text[..4]);
+    }
+
+    [Fact]
     public void StatusBadges_NameALingeringElementByItsElement_HideThePool_AndLeadWithParalysis()
     {
         var enemy = new EnemyState();
