@@ -23,6 +23,8 @@ public sealed class FloorGenerationTests : IDisposable
 
     private static DungeonDef Tutorial => GameContent.Current.Dungeons.Tutorial;
 
+    private static (int X, int Y, int W, int H) Box(MapRect rect) => (rect.X, rect.Y, rect.W, rect.H);
+
     private static string GridText(int[,] grid)
     {
         var chars = new char[grid.Length];
@@ -59,12 +61,20 @@ public sealed class FloorGenerationTests : IDisposable
         Assert.Equal(golden.MapSeed, floor.Seed);
         Assert.Equal(0, floor.Index);
 
+        // The halls are wider than the JS original's (after play, 2026-10):
+        // every golden floor tile is still floor, and the rest is the generator's
+        // own at the game's width — its prototype width is golden in MapGeneratorTests.
+        var wide = MapGenerator.Generate(new Mulberry32(golden.MapSeed), MapGenerator.CorridorWidth);
+        var wideFog = FogBoxBuilder.Build(wide);
         for (int r = 0; r < MapGenerator.Rows; r++)
         {
             var row = new char[MapGenerator.Cols];
             for (int c = 0; c < MapGenerator.Cols; c++)
+            {
                 row[c] = map.Grid[r, c] == 1 ? '1' : '0';
-            Assert.Equal(golden.GridRows[r], new string(row));
+                if (golden.GridRows[r][c] == '0') Assert.Equal('0', row[c]);
+                Assert.Equal(wide.Grid[r, c], map.Grid[r, c]);
+            }
         }
 
         Assert.Equal(golden.Rooms.Length, map.DebugRooms.Count);
@@ -77,19 +87,14 @@ public sealed class FloorGenerationTests : IDisposable
         Assert.Equal((golden.PlayerStart[0], golden.PlayerStart[1]), map.PlayerStart);
         Assert.Equal((golden.EnemyStart[0], golden.EnemyStart[1]), map.EnemyStart);
 
-        Assert.Equal(golden.ExpandedCorridors.Length, map.Corridors.Count);
-        for (int i = 0; i < golden.ExpandedCorridors.Length; i++)
-            golden.ExpandedCorridors[i].AssertMatches(map.Corridors[i]);
-        Assert.Equal(golden.UnionFogBoxes.Length, floor.FogBoxes.UnionBoxes.Count);
-        for (int i = 0; i < golden.UnionFogBoxes.Length; i++)
-            golden.UnionFogBoxes[i].AssertMatches(floor.FogBoxes.UnionBoxes[i]);
-        Assert.Equal(golden.FogBoxes.Length, floor.FogBoxes.FogBoxes.Count);
-        for (int i = 0; i < golden.FogBoxes.Length; i++)
-            golden.FogBoxes[i].AssertMatches(floor.FogBoxes.FogBoxes[i]);
+        Assert.Equal(golden.ExpandedCorridors.Length, map.Corridors.Count);   // as many runs, each wider
+        Assert.Equal(wide.Corridors.Select(Box), map.Corridors.Select(Box));
+        Assert.Equal(wideFog.UnionBoxes.Select(Box), floor.FogBoxes.UnionBoxes.Select(Box));
+        Assert.Equal(wideFog.FogBoxes.Select(Box), floor.FogBoxes.FogBoxes.Select(Box));
 
         // The rows are exactly what the placer puts on a fresh golden map, in the
         // order it put them, each keeping that index: the one-floor game's spawn.
-        var fresh = MapGenerator.Generate(new Mulberry32(golden.MapSeed));
+        var fresh = MapGenerator.Generate(new Mulberry32(golden.MapSeed), MapGenerator.CorridorWidth);
         var spawns = EnemyPlacer.PlaceEnemies(fresh, golden.MapSeed);
         Assert.NotEmpty(spawns);
         Assert.Equal(
@@ -181,13 +186,13 @@ public sealed class FloorGenerationTests : IDisposable
         long floorSeed = DungeonState.FloorSeed(GoldenSeed, n);
 
         var stream = new Mulberry32(floorSeed);
-        var map = MapGenerator.Generate(stream);
+        var map = MapGenerator.Generate(stream, MapGenerator.CorridorWidth);
         var stairs = StairPlacer.Place(map, GoldenSeed, n);
         var spawns = EnemyPlacer.PlaceEnemies(map, floorSeed);
         double carriedOn = stream.NextDouble();
 
         var untouched = new Mulberry32(floorSeed);
-        var again = MapGenerator.Generate(untouched);
+        var again = MapGenerator.Generate(untouched, MapGenerator.CorridorWidth);
         Assert.Equal(untouched.NextDouble(), carriedOn);
         Assert.Equal(GridText(again.Grid), GridText(map.Grid));
         Assert.Equal(again.PlayerStart, map.PlayerStart);
@@ -195,7 +200,7 @@ public sealed class FloorGenerationTests : IDisposable
 
         // Stairs first or enemies first, each is the same: neither draws on
         // anything the other does.
-        var other = MapGenerator.Generate(new Mulberry32(floorSeed));
+        var other = MapGenerator.Generate(new Mulberry32(floorSeed), MapGenerator.CorridorWidth);
         var spawnsFirst = EnemyPlacer.PlaceEnemies(other, floorSeed);
         Assert.Equal(spawns, spawnsFirst);
         Assert.Equal(stairs, StairPlacer.Place(other, GoldenSeed, n));
@@ -412,7 +417,7 @@ public sealed class FloorGenerationTests : IDisposable
         // Neither moved for the other: the stairs are the stair stream's draw on
         // the bare map, and the dummy stands exactly where the placer put it.
         long floorSeed = DungeonState.FloorSeed(DownSeed, 0);
-        var bare = MapGenerator.Generate(new Mulberry32(floorSeed));
+        var bare = MapGenerator.Generate(new Mulberry32(floorSeed), MapGenerator.CorridorWidth);
         Assert.Equal(StairPlacer.Place(bare, DownSeed, 0).Far, first.DownStairs);
         var placed = EnemyPlacer.PlaceEnemies(bare, floorSeed)[guard.SpawnIndex];
         Assert.Equal((placed.X, placed.Y, placed.WeaponId), (guard.X, guard.Y, guard.Weapon.Id));
@@ -429,8 +434,9 @@ public sealed class FloorGenerationTests : IDisposable
 
         // Not a one-off. Over the stair tests' sweep — the golden seed, then 99
         // spread over the 32-bit range, ten floors each — 41 floors of the 1000
-        // have a dummy on the far tile, in 33 of the 100 ten-floor dungeons:
-        // about one floor in 25, a third of the deepest visits. Pinned as measured.
+        // have a dummy on the far tile, in 34 of the 100 ten-floor dungeons:
+        // about one floor in 25, a third of the deepest visits. Pinned as measured
+        // (33 dungeons with the prototype's two-wide halls; 34 at three, 2026-10).
         var perDungeon = new int[100];
         Parallel.For(0, perDungeon.Length, i =>
         {
@@ -443,6 +449,6 @@ public sealed class FloorGenerationTests : IDisposable
                     perDungeon[i]++;
             }
         });
-        Assert.Equal((41, 33), (perDungeon.Sum(), perDungeon.Count(hits => hits > 0)));
+        Assert.Equal((41, 34), (perDungeon.Sum(), perDungeon.Count(hits => hits > 0)));
     }
 }

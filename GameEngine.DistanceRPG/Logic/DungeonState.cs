@@ -331,7 +331,7 @@ public sealed class Floor
     private static (long Seed, MapData Map, FogBoxSet FogBoxes) Terrain(long mapSeed, int index)
     {
         long seed = DungeonState.FloorSeed(mapSeed, index);
-        var map = MapGenerator.Generate(new Mulberry32(seed));
+        var map = MapGenerator.Generate(new Mulberry32(seed), MapGenerator.CorridorWidth);   // the halls three wide (after play, 2026-10)
         var fogBoxes = FogBoxBuilder.Build(map);   // expands map.Corridors in place, exactly as the scene always has
         return (seed, map, fogBoxes);
     }

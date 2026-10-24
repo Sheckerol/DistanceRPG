@@ -26,19 +26,41 @@ public sealed class MapData
 /// candidate rooms with a 2-tile separation, then connects each room to its
 /// nearest already-connected neighbour with L-shaped 2-tile-wide corridors
 /// (greedy MST). RNG call order matches the JS exactly; do not reorder.
+/// <para>
+/// The corridors' width is the caller's (after play, 2026-10: "widen the halls
+/// ... to 3 tiles"): <see cref="PrototypeCorridorWidth"/> by default, the
+/// prototype's dungeon to the tile (the golden tests), and the game's floors
+/// <see cref="CorridorWidth"/>. The carving draws nothing, so every width
+/// places the same rooms off the same draws; a wider run keeps the prototype's
+/// two lanes and adds more beyond them — below a horizontal run, right of a
+/// vertical one, the L's corner moved to meet — so a wider map only ever adds
+/// floor, and a party saved on a narrower one still stands on floor.
+/// </para>
 /// </summary>
 public static class MapGenerator
 {
     public const int Cols = 50;
     public const int Rows = 70;
 
+    /// <summary>The prototype's corridors: two tiles wide.</summary>
+    public const int PrototypeCorridorWidth = 2;
+
+    /// <summary>
+    /// The game's corridors, in tiles. Code, not tuning: a saved floor is
+    /// regenerated from its seed (§5.1), so a number turned between a save and
+    /// its load would move the walls under the saved party.
+    /// </summary>
+    public const int CorridorWidth = 3;
+
     private const int MinRoom = 5;
     private const int MaxRoom = 12;
     private const int Attempts = 300;
 
-    public static MapData Generate(Mulberry32 rng)
+    public static MapData Generate(Mulberry32 rng, int corridorWidth = PrototypeCorridorWidth)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(corridorWidth, PrototypeCorridorWidth);
         int rows = Rows, cols = Cols;
+        int far = corridorWidth - 1;   // the lanes past a run's first: 1 in the prototype
 
         var grid = new int[rows, cols];
         for (int r = 0; r < rows; r++)
@@ -52,28 +74,24 @@ public static class MapGenerator
 
         var corridors = new List<Corridor>();
 
-        // Carve a 2-tile-wide horizontal run (stays inside border)
+        // Carve a corridorWidth-wide horizontal run, its lanes downward (stays inside border)
         void CarveH(int y, int x1, int x2)
         {
             var (xa, xb) = x1 <= x2 ? (x1, x2) : (x2, x1);
             for (int x = xa; x <= xb; x++)
-            {
-                if (y >= 1 && y < rows - 1 && x >= 1 && x < cols - 1) grid[y, x] = 0;
-                if (y + 1 >= 1 && y + 1 < rows - 1 && x >= 1 && x < cols - 1) grid[y + 1, x] = 0;
-            }
-            corridors.Add(new Corridor(xa, y, xb - xa + 1, 2, horizontal: true));
+                for (int lane = 0; lane < corridorWidth; lane++)
+                    if (y + lane >= 1 && y + lane < rows - 1 && x >= 1 && x < cols - 1) grid[y + lane, x] = 0;
+            corridors.Add(new Corridor(xa, y, xb - xa + 1, corridorWidth, horizontal: true));
         }
 
-        // Carve a 2-tile-wide vertical run (stays inside border)
+        // Carve a corridorWidth-wide vertical run, its lanes rightward (stays inside border)
         void CarveV(int x, int y1, int y2)
         {
             var (ya, yb) = y1 <= y2 ? (y1, y2) : (y2, y1);
             for (int y = ya; y <= yb; y++)
-            {
-                if (y >= 1 && y < rows - 1 && x >= 1 && x < cols - 1) grid[y, x] = 0;
-                if (y >= 1 && y < rows - 1 && x + 1 >= 1 && x + 1 < cols - 1) grid[y, x + 1] = 0;
-            }
-            corridors.Add(new Corridor(x, ya, 2, yb - ya + 1, horizontal: false));
+                for (int lane = 0; lane < corridorWidth; lane++)
+                    if (y >= 1 && y < rows - 1 && x + lane >= 1 && x + lane < cols - 1) grid[y, x + lane] = 0;
+            corridors.Add(new Corridor(x, ya, corridorWidth, yb - ya + 1, horizontal: false));
         }
 
         // Place rooms
@@ -122,16 +140,16 @@ public static class MapGenerator
             if (rng.NextDouble() < 0.5)
             {
                 // H first, V second
-                int vCol = a.Cx < nearest.Cx ? nearest.Cx - 1 : nearest.Cx;
-                int vRowEnd = nearest.Cy < a.Cy ? a.Cy + 1 : a.Cy;
+                int vCol = a.Cx < nearest.Cx ? nearest.Cx - far : nearest.Cx;
+                int vRowEnd = nearest.Cy < a.Cy ? a.Cy + far : a.Cy;
                 CarveH(a.Cy, a.Cx, nearest.Cx);
                 CarveV(vCol, vRowEnd, nearest.Cy);
             }
             else
             {
                 // V first, H second
-                int vCol = nearest.Cx < a.Cx ? a.Cx - 1 : a.Cx;
-                int vRowEnd = nearest.Cy > a.Cy ? nearest.Cy + 1 : nearest.Cy;
+                int vCol = nearest.Cx < a.Cx ? a.Cx - far : a.Cx;
+                int vRowEnd = nearest.Cy > a.Cy ? nearest.Cy + far : nearest.Cy;
                 CarveV(vCol, a.Cy, vRowEnd);
                 CarveH(nearest.Cy, a.Cx, nearest.Cx);
             }
@@ -164,8 +182,9 @@ public static class MapGenerator
     }
 
     /// <summary>
-    /// Expand each corridor segment outward along its axis as far as both lanes
-    /// remain open floor. Mutates corridor objects in place.
+    /// Expand each corridor segment outward along its axis as far as every lane
+    /// remains open floor — two, as generated; as many as
+    /// <see cref="CorridorWidener"/> left it. Mutates corridor objects in place.
     /// </summary>
     public static void ExpandCorridors(List<Corridor> corridors, int[,] grid)
     {
@@ -173,23 +192,17 @@ public static class MapGenerator
         {
             if (seg.Horizontal)
             {
-                while (seg.X > 0
-                       && grid[seg.Y, seg.X - 1] == 0
-                       && grid[seg.Y + 1, seg.X - 1] == 0) { seg.X--; seg.W++; }
+                bool Open(int x) => Enumerable.Range(seg.Y, seg.H).All(y => grid[y, x] == 0);
+                while (seg.X > 0 && Open(seg.X - 1)) { seg.X--; seg.W++; }
                 int xEnd = seg.X + seg.W;
-                while (xEnd < Cols
-                       && grid[seg.Y, xEnd] == 0
-                       && grid[seg.Y + 1, xEnd] == 0) { seg.W++; xEnd++; }
+                while (xEnd < Cols && Open(xEnd)) { seg.W++; xEnd++; }
             }
             else
             {
-                while (seg.Y > 0
-                       && grid[seg.Y - 1, seg.X] == 0
-                       && grid[seg.Y - 1, seg.X + 1] == 0) { seg.Y--; seg.H++; }
+                bool Open(int y) => Enumerable.Range(seg.X, seg.W).All(x => grid[y, x] == 0);
+                while (seg.Y > 0 && Open(seg.Y - 1)) { seg.Y--; seg.H++; }
                 int yEnd = seg.Y + seg.H;
-                while (yEnd < Rows
-                       && grid[yEnd, seg.X] == 0
-                       && grid[yEnd, seg.X + 1] == 0) { seg.H++; yEnd++; }
+                while (yEnd < Rows && Open(yEnd)) { seg.H++; yEnd++; }
             }
         }
     }

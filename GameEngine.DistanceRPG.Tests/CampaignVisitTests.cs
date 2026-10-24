@@ -343,17 +343,17 @@ public class CampaignVisitTests
         var other = new CampaignState(Party()).Enter("spear_hall", 7654321, EnemyPlacer.Unprotected);
         Assert.NotEqual(GridText(one.Floors[0].Map.Grid), GridText(other.Floors[0].Map.Grid));
 
-        // And the shipped seed's first floor is the golden dungeon, row for row.
+        // And the shipped seed's first floor is the golden dungeon with its halls
+        // widened (after play, 2026-10): every golden floor tile still floor, the
+        // golden rooms and start.
         var golden = GoldenData.Instance;
         var shipped = new CampaignState(Party()).Enter("tutorial", golden.MapSeed, EnemyPlacer.Unprotected);
         var map = shipped.Floors[0].Map;
         for (int r = 0; r < MapGenerator.Rows; r++)
-        {
-            var row = new char[MapGenerator.Cols];
             for (int c = 0; c < MapGenerator.Cols; c++)
-                row[c] = map.Grid[r, c] == 1 ? '1' : '0';
-            Assert.Equal(golden.GridRows[r], new string(row));
-        }
+                if (golden.GridRows[r][c] == '0')
+                    Assert.Equal(0, map.Grid[r, c]);
+        Assert.Equal(GridText(MapGenerator.Generate(new Mulberry32(golden.MapSeed), MapGenerator.CorridorWidth).Grid), GridText(map.Grid));
         Assert.Equal((golden.PlayerStart[0], golden.PlayerStart[1]), map.PlayerStart);
     }
 }

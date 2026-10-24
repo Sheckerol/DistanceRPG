@@ -132,7 +132,7 @@ public class TuningSchemaTests
     /// </summary>
     private static readonly string[] ParityNames =
     [
-        "MapGenerator", "Cols", "Rows", "MinRoom", "MaxRoom", "Attempts",
+        "MapGenerator", "Cols", "Rows", "MinRoom", "MaxRoom", "Attempts", "PrototypeCorridorWidth", "CorridorWidth",
         "Mulberry32",
         "Pathfinder", "Dirs", "DiagonalCost",
         "SeedSalt", "FloorSalt", "StairSalt", "BossSalt", "LootSalt", "ReviveSalt", "BossDropSalt", "DiceSalt", "ServiceSalt",
