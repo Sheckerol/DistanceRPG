@@ -1957,6 +1957,40 @@ public class DungeonScene : Scene
             BeginTransit(stair);
     }
 
+    /// <summary>
+    /// A click on the way out, its tile or its label (after play, 2026-10: "a
+    /// click on the way out opens the dialogue to retreat"): E for it, so the
+    /// same prompt asks first. The stair is taken by the member standing on it,
+    /// so a click with someone else leading hands the lead to whoever stands
+    /// there; with nobody on it, it says so over the leader. Nothing with a menu
+    /// open, during a fade, or outside the player phase, as E.
+    /// </summary>
+    internal void ClickWayOut()
+    {
+        if (Transiting || AnyMenuOpen || _turns.Phase != TurnPhase.Player) return;
+        if (WayOutLeader(_visit, _campaign.Party, _activeIdx) is not { } leader)
+        {
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.StandOnWayOut, false));
+            return;
+        }
+        SetActiveCharacter(leader);
+        StairKey();
+    }
+
+    /// <summary>Who takes the way out for a click on it (<see cref="ClickWayOut"/>): the leader <paramref name="active"/> when they stand on it, else the first member who does; null with nobody on it.</summary>
+    internal static int? WayOutLeader(DungeonState visit, IReadOnlyList<PartyMemberState> party, int active)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        ArgumentNullException.ThrowIfNull(party);
+        bool OnIt(int i) => visit.StairUnder(party[i]) is { Kind: Stair.Exit };
+        if (active >= 0 && active < party.Count && OnIt(active))
+            return active;
+        for (int i = 0; i < party.Count; i++)
+            if (OnIt(i))
+                return i;
+        return null;
+    }
+
     /// <summary>ENTER, routed by the menu that is open: on to the screen between runs from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
     private void EnterKey()
     {
@@ -2298,9 +2332,17 @@ public class DungeonScene : Scene
             return;
         }
 
+        // The way out under the cursor: its prompt, as E on it (ClickWayOut).
+        var floorPoint = FloorPointOf(origin, dir);
+        if (floorPoint is { } at && _visit.StairAt(at) is { Kind: Stair.Exit })
+        {
+            ClickWayOut();
+            return;
+        }
+
         // Nothing under the cursor: a wand aimed by a point (a Blast's centre,
         // a Cone's or Beam's direction) casts at the floor point the ray meets.
-        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && FloorPointOf(origin, dir) is { } aim)
+        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && floorPoint is { } aim)
             CastArea(caster, aim);
     }
 

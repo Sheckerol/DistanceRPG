@@ -166,7 +166,9 @@ key on its left half and its second on its right. A bag slot clicks as its numbe
 the title's options and slots take a click as ENTER on them; and the hub's lists —
 the dungeons, the WEAPONS rows, the alchemist's members and potions, the deposit
 panel's offers — move the choice on the first click and take it (ENTER) on a
-click on the row already chosen. What a click would take is lit under the mouse.
+click on the row already chosen. A click on the first floor's WAY OUT — its tile,
+its label or its cue — asks to leave as E on it would, handing the lead to whoever
+stands on it. What a click would take is lit under the mouse.
 
 **Wear** (Phase 6a): every weapon banks wear as it is used — `WearPerHit`
 (1) for every hit it lands: each body a swing, a cleave, a shot or a wand's cast

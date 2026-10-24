@@ -1071,6 +1071,16 @@ public sealed class DungeonState
         return null;
     }
 
+    /// <summary>The stair of the current floor whose tile holds <paramref name="point"/> (logic units), or null: where a click on the floor lands (after play, 2026-10).</summary>
+    public StairUse? StairAt((float X, float Y) point)
+    {
+        var tile = ((int)MathF.Floor(point.Y / GameConstants.LogicUnitsPerTile), (int)MathF.Floor(point.X / GameConstants.LogicUnitsPerTile));
+        foreach (var stair in StairsOf(Current))
+            if (stair.Tile == tile)
+                return stair;
+        return null;
+    }
+
     /// <summary>
     /// How many living members stand within <see cref="Tuning.StairGatherTiles"/>
     /// of <paramref name="stair"/> — centre to centre, the tiles converted to

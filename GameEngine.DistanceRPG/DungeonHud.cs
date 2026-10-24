@@ -904,6 +904,9 @@ public sealed class DungeonHud
     /// </summary>
     internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
 
+    /// <summary>What a click on the way out says with nobody standing on it: the stair is taken from its tile.</summary>
+    internal const string StandOnWayOut = "STAND ON THE WAY OUT TO LEAVE";
+
     // A stair's label and its cue hang under the near edge of its tile — the
     // edge toward the camera, which looks up the map (-Z) — so at any zoom they
     // clear the slab, whoever stands on it, the nameplate of a dummy standing
@@ -930,9 +933,22 @@ public sealed class DungeonHud
             var nearEdge = marker.Slab.Position + Vector3.UnitZ * (WorldSpace.UnitsPerTile / 2f);
             if (!WorldToScreen(camera, nearEdge, w, h, out var px)) continue;
 
-            DrawCenteredAt(px.X, px.Y + StairLabelOffset, StairLabel(marker.Stair.Kind), 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
-            if (prompt is { } p && p.Stair == marker.Stair)
-                DrawCenteredAt(px.X, px.Y + StairCueOffset, p.Cue, 1.4f, p.Ready ? White : Grey);
+            string label = StairLabel(marker.Stair.Kind);
+            DrawCenteredAt(px.X, px.Y + StairLabelOffset, label, 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
+            bool cued = prompt is { } p && p.Stair == marker.Stair;
+            if (cued)
+                DrawCenteredAt(px.X, px.Y + StairCueOffset, prompt!.Value.Cue, 1.4f, prompt.Value.Ready ? White : Grey);
+
+            // The way out's label and cue click as the way out (after play, 2026-10).
+            if (marker.Stair.Kind == Stair.Exit)
+            {
+                _clicks.AddText(px.X - label.Length * GlyphAdvance * 1.4f / 2f, px.Y + StairLabelOffset, label.Length, 1.4f, scene.ClickWayOut);
+                if (cued)
+                {
+                    string cue = prompt!.Value.Cue;
+                    _clicks.AddText(px.X - cue.Length * GlyphAdvance * 1.4f / 2f, px.Y + StairCueOffset, cue.Length, 1.4f, scene.ClickWayOut);
+                }
+            }
         }
     }
 

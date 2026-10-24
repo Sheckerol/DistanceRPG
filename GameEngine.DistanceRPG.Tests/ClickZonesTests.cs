@@ -101,6 +101,30 @@ public sealed class ClickZonesTests : IDisposable
         Assert.Equal(["down F12", "up F12"], heard);
     }
 
+    [Fact]
+    public void AClickOnTheWayOut_AsksToLeave_HandingTheLeadToWhoeverStandsOnIt()
+    {
+        var campaign = CampaignState.Start(GameContent.Current);
+        campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
+        var visit = campaign.Visit!;
+        var exit = DungeonState.StairsOf(visit.Current).Single(stair => stair.Kind == Stair.Exit);
+        var (x, y) = (exit.Tile.C * 32f + 16f, exit.Tile.R * 32f + 16f);
+        Assert.Equal(exit, visit.StairAt((x + 10f, y - 10f)));   // anywhere on its tile
+        Assert.Null(visit.StairAt((x + 32f, y)));
+
+        // Nobody on it: nobody to take it, and the click says so.
+        var party = campaign.Party;
+        foreach (var member in party)
+            (member.X, member.Y) = (x + 32f, y);
+        Assert.Null(DungeonScene.WayOutLeader(visit, party, active: 0));
+
+        // Another member on it: the lead goes to them; the leader on it keeps it.
+        (party[2].X, party[2].Y) = (x, y);
+        Assert.Equal(2, DungeonScene.WayOutLeader(visit, party, active: 0));
+        (party[0].X, party[0].Y) = (x + 5f, y);
+        Assert.Equal(0, DungeonScene.WayOutLeader(visit, party, active: 0));
+    }
+
     private static SaveListing Listing(params SlotEntry[] held)
     {
         var all = Enumerable.Range(1, 3)
