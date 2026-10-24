@@ -108,6 +108,26 @@ public class GridCollisionTests
     }
 
     [Fact]
+    public void ABlockerStackedOnACircleAtAWall_NeverShovesItIntoTheWall()
+    {
+        // After play (2026-10): two stacked on one spot against a wall, one went
+        // through it. The blocker's push-out (28) is most of the tile (32).
+        var grid = GridWithCenterWall();
+        float y = 1.5f * Tile;
+        float atWall = 2f * Tile - R;   // flush with the wall's left face
+        var stacked = new[] { new GridCollision.Circle(atWall, y, R) };
+
+        var (x, _) = GridCollision.Move(grid, atWall, y, R, dx: 1f, dy: 0f, stacked);
+        Assert.False(GridCollision.InWall(grid, x, y));
+        Assert.True(x <= atWall + 0.001f);   // walls win over the push: still this side
+
+        // Pushing on, frame after frame, never comes out the far side.
+        for (int frame = 0; frame < 60; frame++)
+            (x, _) = GridCollision.Move(grid, x, y, R, dx: 3f, dy: 0f, stacked);
+        Assert.True(x < 2f * Tile);
+    }
+
+    [Fact]
     public void DeadStop_ZeroDelta_StaysPut()
     {
         var grid = GridWithCenterWall();

@@ -1889,19 +1889,11 @@ public class DungeonScene : Scene
             dy *= scale;
         }
 
-        // Walls and live enemies always block. In combat the party body-blocks
-        // too — blockers are immovable circles here, so this is safe from the
-        // two-body wall shoves that made the prototype drop inter-party
-        // colliders. While marching, followers never block the leader, or
-        // reversing through your own line would deadlock it.
-        var blockers = LiveEnemyBlockers();
-        if (!Marching)
-        {
-            foreach (var member in _party)
-                if (member != ActiveCharacter && member.State.Alive)
-                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
-        }
-        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
+        // Walls and live enemies block; the party never blocks itself (after
+        // play, 2026-10: two members stacked on one spot shoved one through a
+        // wall — GridCollision now lets walls win, and members walk through each
+        // other in combat as they always did marching).
+        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, LiveEnemyBlockers());
 
         // Budget depletes by distance actually travelled, so pushing into a
         // wall costs nothing while sliding along it costs the slide.
