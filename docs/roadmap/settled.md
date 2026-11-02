@@ -206,14 +206,14 @@
   formula the way 10 would invite. `FarmYieldPerClear` (§6.6) is defined in
   terms of the count so a 7th dungeon added later does not silently inflate
   the system.
-- **A run has three outcomes: boss kill, retreat, death** — not two. Boss kill
+- **A run has three outcomes: boss kill, retreat, wipe** — not two. Boss kill
   collects the run's loot and keeps its XP. A fighting retreat (leaving alive
   without the boss, including declining a found boss floor) keeps the run's
-  XP but forfeits loot/`DefeatCount` progress. Death forfeits loot too, and
-  additionally claws back `DeathXpLossPercent` (§5.3, tunable) of the run's XP
-  gain, rolled back from a snapshot taken at dungeon entry. Retreat and death
-  already shared the mercy tick (§6.3, floor 3+); they no longer share an XP
-  outcome — surviving the climb out is what earns the difference. (§4.4, §5.1.)
+  XP but forfeits loot/`DefeatCount` progress. A wipe forfeits loot too, and
+  resets every member's XP to the snapshot taken at dungeon entry. Retreat and
+  wipe share the mercy tick (§6.3, floor 3+) but not an XP outcome — surviving
+  the climb out is what earns the difference. A single death is not an outcome;
+  see *Death, revives and the wipe* below. (§4.4, §5.1.)
 - **Finding a dungeon's boss floor does not commit you to fighting it.**
   Declining and retreating instead is a legitimate choice — it re-rolls the
   depth for next visit, accepted as part of the risk/reward rather than an
@@ -765,8 +765,8 @@
   because those were never two events.
 - **A fully worn weapon is not broken.** It swings identically; it simply stops
   banking, so further hits are work done for free. That is the entire penalty,
-  and it is the right one — this design has no punishment mechanics, and
-  degradation would be a death spiral in a game whose way out of trouble is to
+  and it is the right one — gear never punishes you (death costs run XP,
+  never equipment, §4.4), and degradation would be a death spiral in a game whose way out of trouble is to
   fight. It also supplies the bound on hoarding that §6.4's deposit-timing
   decision needed: you cannot wait past full.
 - **A currency modifier can never make a unique unique.** `Light` and `Resonant`
@@ -1207,3 +1207,38 @@
   number quietly having been smaller all along.
 - **This is also what keeps the arms race in the data files** (§5.5). A counter
   is an entry someone adds; a rebalance is a recompile and an argument.
+
+## Death, revives and the wipe
+
+Supersedes "dead for the rest of the run" and the earlier single
+`DeathXpLossPercent` clawback, which applied only to a party wipe. (§4.4.)
+
+- **A fallen member is down for the encounter, not the run.** Losing a body for
+  the rest of the dungeon was a death spiral: every later fight harder, the next
+  death likelier. A death still costs the fight you are in, which keeps it a
+  tactical event; it stops costing every fight after.
+- **An encounter ends on the switch from combat back to movement mode** — no
+  live enemy in view. Breaking line of sight counts, deliberately: escaping was
+  the hard part. The check moves into `Logic/` as `TurnSystem.CombatEnded` and
+  ignores the marching spacing test.
+- **Reviving costs half the member's XP gained since entering the dungeon**, in
+  every pool, levels recomputed. `DeathXpLossPercent` = 50, tunable (§5.3).
+  Pre-dungeon progress is never touched.
+- **Repeat deaths get cheaper, and that is accepted.** Each one halves what is
+  left, so the penalty shrinks with the reward for continuing. One character
+  spiralling back to baseline across a whole run is a visible, plannable
+  weakness, not a lost body, and is fine.
+- **A revived member gets up beside the leader, not where they fell** —
+  nearest free tile behind the leader along the march trail. Reviving in place
+  would put them back in a fight the party just escaped, and marching would drag
+  the other three after them.
+- **A wipe is the whole party down within one encounter.** It resets every
+  member's XP to the entry snapshot, levels included — fixed at 100%, not tuned —
+  and ejects the party from the dungeon, forfeiting loot and `DefeatCount` and
+  taking the mercy tick if deep enough. Deaths cannot accumulate across
+  encounters, so the existing all-dead check is the wipe check.
+- **Leaving the dungeon by any route sets the new baseline.** Whatever XP each
+  member walks out with, after penalties, is what the next entry snapshots.
+- **Gear never punishes you; death is the one thing that takes back, and it
+  takes run XP.** §6.1's "no punishment mechanics" is narrowed to equipment
+  accordingly.

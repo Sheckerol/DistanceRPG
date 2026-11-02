@@ -50,9 +50,9 @@ you like, because a cleared dungeon is locked and a failed one re-rolls.
 
 **Finding the boss floor does not commit you to fighting it.** Standing on it
 and choosing to retreat instead is a legitimate way to end the run — you keep
-the mercy tick and your run XP (§4.4's three outcomes) but forfeit the deep
-payout and re-roll the depth for next time, same as retreating from any other
-floor. That re-roll is accepted as part of the risk/reward rather than an
+the mercy tick and your run XP (§4.4's three outcomes, less any death penalties
+already paid) but forfeit the deep payout and re-roll the depth for next time,
+same as retreating from any other floor. That re-roll is accepted as part of the risk/reward rather than an
 exploit to close off: it costs the climb back out through the whole gauntlet
 either way, so declining a boss you cannot yet beat is a real decision, not a
 free peek.
@@ -502,31 +502,100 @@ happened:
 | --- | --- | --- | --- |
 | **Boss kill** | Collected on the way out | Kept | — (a win, not a mercy) |
 | **Retreat** (leave alive, boss unfought) | Forfeited | **Kept** | Yes |
-| **Death** (party wipe) | Forfeited | **Clawed back by `DeathXpLossPercent`** | Yes |
+| **Wipe** (whole party down in one encounter) | Forfeited | **Reset to the entry snapshot**, levels included | Yes |
 
-Retreating and dying already share the mercy tick (§6.3) — they should not
-also share an XP outcome. A fighting retreat means the party survived, so the
-progression earned along the way is real and stays real; that is the whole
-reward for climbing back out without the boss. A wipe takes some of that back,
-which is what makes death feel different from a bad extraction rather than the
-same shrug with worse flavour text.
+Every run-ending path is a way of **leaving the dungeon**, and leaving is what
+sets the next baseline: whatever XP each member walks out with — after any
+death penalties taken along the way — is what the next run's snapshot
+captures.
 
-**The loss is a tunable percentage, not a hard revert.** `DeathXpLossPercent`
-(§5.3, `tuning.json`) says how much of *this run's* gain in each XP pool is
-rolled back on `GameOver` (`TurnSystem.cs:620`) — at 100% death fully erases
-the run's progress, at 0% it is purely a loot/DefeatCount forfeiture with no
-XP penalty at all, and anything between is a partial clawback. Nobody can pick
-this number on paper (§5.3 already makes that argument for `DotManaPerDamage`;
-the same reasoning applies here), so it ships as data from the start rather
-than a hardcoded 100% that would need a recompile to soften.
+A single death does not end anything. **The run only ends on a wipe**, and a
+wipe is defined against one encounter (below), not against the run: four
+members who each fell once in four different fights have paid four death
+penalties and are still in the dungeon.
+
+### A fallen member gets back up when the fight ends
+
+A party member reduced to 0 HP is **down for the rest of the encounter** —
+out of the turn order, unable to act, a body on the floor. That keeps a death
+mid-fight a real tactical loss: the fight you are in has to be finished, or
+escaped, three-handed.
+
+**When the encounter ends, they revive** at full HP and pay for it in XP:
+
+```
+runGain    = currentXp − snapshotXp        # per pool, per member
+currentXp -= runGain × DeathXpLossPercent  # 50 by default
+```
+
+That is **half of what this member has gained since entering the dungeon**, in
+every pool — each weapon class's proficiency, max HP and max mana (§2.2) — with
+levels recomputed from the reduced XP, so a death visibly costs levels rather
+than an invisible number. Pre-dungeon progress is never touched; the snapshot
+is the floor. `DeathXpLossPercent` stays in `tuning.json` (§5.3).
+
+This replaces "dead for the rest of the run", which was a death spiral the
+player could not climb out of: one member down makes every later fight harder,
+which makes the next death likelier. A penalty in XP keeps the party at full
+strength and moves the cost to where §4.4 already puts its risk — the deeper
+and longer the run, the more a death costs, because there is more run gain to
+halve.
+
+**Repeat deaths get cheaper, and that is accepted.** Each death halves what is
+left, so a member who keeps dying converges on their entry baseline and each
+further death costs less. The reward for continuing has shrunk along with the
+penalty — a member with no run gain left is carrying no progress out of the
+dungeon either. It can spiral for one character, repeatedly knocked back to
+baseline across a whole run, and that is fine: it is a weakness the player can
+see and plan around, not one that takes a body out of the party.
+
+### An encounter is combat mode to movement mode
+
+**An encounter ends the moment the party drops out of combat and back into
+movement mode** — the same transition that today grants marching
+(`DungeonScene.EvaluateMarchingForTurn`): no live enemy in view. Revives fire
+on that transition.
+
+Breaking line of sight therefore counts. A party that runs, gets out of view
+and falls back into movement mode has ended the encounter, and its fallen
+members get up. That is deliberate rather than an exploit to close: escaping
+was the hard part, and the dungeon you escaped into is still full of the
+enemies you ran from.
+
+**A wipe is the whole party down within one encounter.** Deaths do not
+accumulate across encounters, because everyone is back up between them. A wipe
+**ejects the party from the dungeon**, which resets (§4.1), and resets every
+member's XP to the entry snapshot — the full run's gain, levels included, not
+the half a single death costs. That is the outcome table's third row, and it is
+what makes a wipe distinct from four unlucky deaths: it costs everything the run
+earned and the haul with it.
+
+### A revived member gets up beside the party
+
+**A revived member does not get up where they fell.** They appear on the
+nearest free tile beside the active character (the march leader), preferring a
+point *behind* the leader along the trail they just walked
+(`MarchingLine.PointBehind`), and spiralling out to the nearest tile that clears
+`GridCollision` if that is blocked.
+
+This matters most for the retreat case. If the party ran, the bodies are back in
+the fight it ran from — reviving in place would put a member there, and marching
+would then drag the other three back after them to keep the line. Reviving at
+the leader means the formation is whole the moment movement mode starts.
+
+They rejoin the line at their normal party-order rank. The marching trail is
+reset when movement mode begins, so nothing points back toward the fight, and
+the existing "tuck in behind the previous marcher" fallback covers a member who
+appears mid-line.
 
 **This needs a snapshot at dungeon entry.** Party XP pools (weapon
 proficiency, mana, HP/stat growth) are captured the moment the party steps
-into the dungeon; on a wipe, each pool is rolled back by `DeathXpLossPercent`
-of its gain since that snapshot, then the snapshot is discarded. Any other
-run-ending path — boss kill, retreat — discards the snapshot untouched.
-Innate stats never move (§2.1), so there is nothing to snapshot there. §5.1's
-save format needs this snapshot added to the `Run` group.
+into the dungeon. A death halves each pool's gain since that snapshot; a wipe
+rolls each pool all the way back to it. Any exit — boss kill, retreat, or the
+ejection a wipe causes — discards the snapshot, and the next entry takes a fresh
+one from wherever the party stands. Innate stats never move (§2.1), so there is
+nothing to snapshot there. §5.1's save format carries this snapshot in the `Run`
+group.
 
 ### You cannot carry it all
 
@@ -622,4 +691,29 @@ equipped weapon; the swap keys currently hardcode slots 2 and 3, so the input
 handling generalises.
 
 `Logic/FogState.cs` becomes per-floor rather than per-scene.
+
+**"The encounter ended" moves into `Logic/`.** Today the combat → movement
+decision lives in `DungeonScene.EvaluateMarchingForTurn`, which is presentation.
+Revives and death penalties are rules, so `TurnSystem` gains a `CombatEnded`
+event, raised on the turn-start check that finds no live enemy in view. It
+deliberately ignores the marching spacing test (every member within their own
+budget of the leader): that test decides whether the line can form, not whether
+the fight is over, and a revived member lands beside the leader anyway. The
+scene subscribes to `CombatEnded` to grant marching and to play the revive.
+
+On `CombatEnded`, every downed member revives: HP to full, status effects
+already shed at death (`TurnSystem.TickStatusEffects`), XP cut by
+`DeathXpLossPercent` of their gain since the entry snapshot, and position moved
+to the nearest free tile behind the leader (`MarchingLine.PointBehind`, checked
+with `GridCollision`). The HUD floats a `REVIVED` line with the levels lost.
+
+**`GameOver` stops being the end of the game.** The all-dead branch in
+`TurnSystem` (`TurnSystem.cs:751`) becomes the wipe: reset every member to the
+snapshot, then eject — the same leave-the-dungeon path a retreat takes, minus the
+loot. Since revives happen between encounters, "all party members dead" can
+only ever mean "all dead in this encounter", so the existing check needs no
+encounter bookkeeping of its own.
+
+The entry snapshot lives on `DungeonState` beside `BossFloor`: one copy of each
+member's XP pools, taken on entry, read by death and wipe, discarded on exit.
 

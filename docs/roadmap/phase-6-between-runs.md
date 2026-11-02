@@ -64,12 +64,15 @@ for identical damage, at identical range, with every stack and every enchantment
 intact. What it stops doing is *banking*: further hits accrue nothing, because
 there is nowhere to put them.
 
-That is the whole penalty, and it is the right one. This design does not have
-punishment mechanics — nothing in it makes you weaker for having played — and a
+That is the whole penalty, and it is the right one. **Gear never punishes you**
+— nothing about equipment makes you weaker for having played — and a
 degradation penalty would be a death spiral in a game where the way out of
-trouble is to fight (§4.3). So the cost of running a weapon dry is **the work
-you did for free**, which is a cost the player can choose to pay and can always
-see coming.
+trouble is to fight (§4.3). The one place the design does take something back is
+death, and it takes run XP, never gear: a fallen member pays half their gain
+since entering the dungeon, and a wipe pays all of it (§4.4).
+
+So the cost of running a weapon dry is **the work you did for free**, which is a
+cost the player can choose to pay and can always see coming.
 
 It also does something the design wanted anyway: **it is the bound on hoarding.**
 §6.4 makes waiting before a deposit genuinely worth it, and without a ceiling the
@@ -244,12 +247,12 @@ The tick and the spoils come apart, and they should:
 | Outcome | Service tick | Drops |
 | --- | --- | --- |
 | Failed above floor 3 | **None** | — |
-| **Failed at floor 3 or deeper** — died, or retreated | **1 (mercy)** | — |
-| Killed the boss, died on the way out | **1** | **None** |
+| **Failed at floor 3 or deeper** — wiped, or retreated | **1 (mercy)** | — |
+| Killed the boss, wiped on the way out | **1** | **None** |
 | Killed the boss and extracted | **1** | **Everything you killed climbing out** |
 
 The tick rewards the achievement; the drops require the extraction. Beating the
-boss and then dying in the stairwell still moves your weapons along at the
+boss and then wiping in the stairwell still moves your weapons along at the
 enchanter — you just walk away with nothing to put on them.
 
 The mercy tick exists for exactly one purpose: **a losing streak must not
@@ -263,7 +266,7 @@ better; failing merely is not compounding.
 ### The mercy tick is for failing deep, not for leaving early
 
 The bar is **three floors down, and the run is over without a boss kill** —
-however it ended. Dying on floor 6 earns it; so does turning around on floor 4
+however it ended. Wiping on floor 6 earns it; so does turning around on floor 4
 and getting home. What does *not* earn it is entering, seeing what is on the
 first floor, and walking back out.
 
@@ -284,7 +287,7 @@ So the three failure shapes are genuinely different, and none of them is free:
 | --- | --- |
 | **Turn back early** | The run, and you were never deep enough for the tick |
 | **Turn back deep** | A fighting retreat through everything you farmed |
-| **Die** | The run and the haul, but the attempt still counted |
+| **Wipe** | The run, the haul and the run's XP, but the attempt still counted |
 
 Three floors is the bar because it cannot be cleared by walking in and turning
 around, and because by the third floor a retreat is already a real fight rather
@@ -808,6 +811,7 @@ document — a save with no dungeon in progress is now a valid state, which it
 is not today.
 
 `TurnSystem` needs a run-outcome signal. `GameOver` already fires on a party
-wipe (`TurnSystem.cs:620`); leaving the dungeon and reaching a new floor are
-new events on the floor-transit path from Phase 4.
+wipe (`TurnSystem.cs:751`), and Phase 4 turns it into the wipe-and-eject path
+(§4.5); leaving the dungeon and reaching a new floor are new events on the
+floor-transit path from Phase 4.
 

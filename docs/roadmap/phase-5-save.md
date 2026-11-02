@@ -6,8 +6,8 @@ Lands last, once the state model above is final.
 
 | Group | Contents |
 | --- | --- |
-| Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder, carried consumables |
+| Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — each death removes `DeathXpLossPercent` of a member's gain since this snapshot, a wipe rolls every pool all the way back to it, and any exit discards it) |
+| Party | Position, HP, mana, **down or standing** (a save mid-encounter can hold a fallen member waiting on `CombatEnded`, §4.4), innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder, carried consumables |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -85,7 +85,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `ReviveStepPercent`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
-| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
+| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` (50 — the per-death cut; a wipe's full reset is fixed, not tuned) |
 | Enchanter | `WearPerHit`, `WearCapacityLadder` (25/30/40), `EnchantmentWearCost`, `GraftBaseChance` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
