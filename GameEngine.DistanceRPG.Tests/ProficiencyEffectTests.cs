@@ -31,11 +31,7 @@ public class ProficiencyEffectTests
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
     private static PartyMemberState Member(string weaponId, string id = "A")
-    {
-        var member = TestPools.Char(id);
-        member.Inventory[0] = TestWeapons.Get(weaponId);
-        return member;
-    }
+        => TestPools.Holding(id, TestWeapons.Get(weaponId));
 
     /// <summary>A member with nothing in hand and no Block: a body for a swing to land on.</summary>
     private static PartyMemberState Bare(string id = "B") => TestPools.Char(id);
@@ -43,9 +39,7 @@ public class ProficiencyEffectTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var member = TestPools.Char(id, x: x, y: y);
-        member.Inventory[0] = TestWeapons.Get(weaponId);
-        return member;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     /// <summary>A dummy on a tile's centre with fists — no Block, so a hit's own number is what lands — and enough HP that nothing here kills it.</summary>

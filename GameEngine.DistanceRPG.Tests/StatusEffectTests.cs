@@ -23,11 +23,7 @@ public class StatusEffectTests
     }
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
-    {
-        var c = TestPools.Char(id, x: x, y: y);
-        c.Inventory[0] = TestWeapons.Get(weaponId);
-        return c;
-    }
+        => TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
 
     private static (TurnSystem turns, PartyMemberState a, PartyMemberState b) Scene(float bOffsetX = 30f)
     {

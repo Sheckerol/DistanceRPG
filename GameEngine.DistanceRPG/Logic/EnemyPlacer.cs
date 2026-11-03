@@ -16,8 +16,14 @@ public static class EnemyPlacer
     /// <summary>The weapon a crowded room's healer is converted to.</summary>
     public const string HealerWeaponId = "staff_of_renewal";
 
-    /// <summary>Stream splitter so enemy placement never aliases the map stream.</summary>
-    private const long SeedSalt = 0x9E3779B9;
+    /// <summary>
+    /// Stream splitter so enemy placement never aliases the map stream. Internal
+    /// rather than private so a test asserting some new stream is not this one can
+    /// name the constant instead of restating its value: a restated literal goes
+    /// on passing if this splitter ever moves, which is the one thing such an
+    /// assertion exists to catch (§3.2's revival stream, <c>FarmLadderTests</c>).
+    /// </summary>
+    internal const long SeedSalt = 0x9E3779B9;
 
     /// <summary>
     /// The classes rank and file roll from: the five close-range martial

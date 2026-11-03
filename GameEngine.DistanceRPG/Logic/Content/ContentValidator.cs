@@ -26,7 +26,9 @@ public static class ContentValidator
     public const string RuleElementNamesType = "an elemental entry names the damage type it carries";
     public const string RuleOpposition = "damage-type opposition must be symmetric and total";
     public const string RuleLingerNamesElement = "a lingering element names an element that exists and the status it leaves";
+    public const string RuleMagnitudeNamesAPotency = "an enchantment whose effect is its potency names one of at least one";
     public const string RuleUniqueNeverRolled = "unique entries appear in neverRolled, and neverRolled names only unique entries";
+    public const string RuleDropPoolResolves = "every id the drop pool names resolves in the catalogue";
 
     public const string RuleEnchantmentsExcluded = "a weapon's enchantments never include two that exclude each other";
     public const string RuleEnchantmentDependency = "an enchantment with a dependency appears only after its prerequisites on the same weapon";
@@ -51,9 +53,17 @@ public static class ContentValidator
     public const string RulePartyHasACaster = "a roster always includes a caster";
 
     public const string RulePoolBarIsPositive = "a pool's bar is at least one";
+    public const string RuleChanceIsAPercentage = "a chance is a percentage, 0 to 100";
+    public const string RuleRevivalTakesATurn = "a revival takes at least one turn";
+    public const string RuleCurveMidpointIsACount = "the unique curve's midpoint is a DefeatCount, never negative";
+    public const string RuleKillCountsForSomething = "a kill always counts for at least one";
+    public const string RuleEnchantmentLockIsPositive = "an enchantment reserves at least one point of mana";
 
     /// <summary>The entry id a roster-wide failure is reported against: the file, since no one member broke it.</summary>
     private const string RosterId = "party";
+
+    /// <summary>The top of a percentage; the bottom is 0, since a chance of nothing is a legible way to switch a roll off.</summary>
+    private const int FullPercent = 100;
 
     /// <summary>What a unique raises its one modifier to: the forge limit, and why nothing is forged past it (§1.5).</summary>
     private const int UniqueRaise = 3;
@@ -102,6 +112,9 @@ public static class ContentValidator
     public const string RuleEfficiencyAddsLight = "an Efficiency variant adds Light x1";
     public const string RulePurityDeepensBaseline = "a Purity variant deepens the class signature";
     public const string RuleForgedOnlyUnused = "every forgedOnly id is forged on at least one weapon";
+    public const string RuleCasterVariantPool = "a caster class holds every variant a drop rolls between";
+    public const string RuleClassCarriesAUnique = "a class a drop can roll carries at least one unique";
+    public const string RuleMartialVariantNoEnchantment = "a martial variant arrives carrying no enchantment of its own";
 
     /// <summary>
     /// The "class feature" column of the §1.2 table (phase-1-modifiers.md:16-25):
@@ -127,6 +140,22 @@ public static class ContentValidator
     /// the doc's line and carries no guard of its own, so a bar of 0 would make
     /// every step free and the replay loop endless. Refusing it here turns a
     /// mistyped number into a named startup failure instead of a hang.
+    /// <para>
+    /// The §3.2 knobs are checked for the same reason and nothing more: a chance
+    /// is a percentage, a revival takes a turn — a
+    /// <see cref="Tuning.ResurrectTurnsFloor"/> of 0 lets
+    /// <see cref="FarmLadder.ResurrectTurns"/> return 0 and a dummy revive the
+    /// turn it died — a kill counts for at least one, since
+    /// <see cref="FarmLadder.DefeatAdvance"/> hands back
+    /// <see cref="Tuning.CleanKillBonus"/> verbatim and a 0 there would make the
+    /// blow that clears a dummy's whole constitution advance nothing at all,
+    /// inverting the rule the key exists to state — and the unique curve's
+    /// midpoint is a <c>DefeatCount</c>, which is a count. Nothing here has an
+    /// opinion about whether a number is well <em>tuned</em>; that is what
+    /// playtesting is for, and it is why a <see cref="Tuning.ResurrectTurnsBase"/>
+    /// under the floor is left alone: every revival then simply lands on the
+    /// floor, which is a choice rather than a knob that cannot mean anything.
+    /// </para>
     /// </summary>
     public static void ValidateTuning(Tuning tuning)
     {
@@ -136,6 +165,24 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.StartingPool), RulePoolBarIsPositive, $"{tuning.StartingPool}");
         if (tuning.WeaponXpPerLevel < 1)
             throw new ContentException(nameof(Tuning.WeaponXpPerLevel), RulePoolBarIsPositive, $"{tuning.WeaponXpPerLevel}");
+
+        RequirePercentage(tuning.DefeatStackChance, nameof(Tuning.DefeatStackChance));
+        RequirePercentage(tuning.DropEnchantChancePercent, nameof(Tuning.DropEnchantChancePercent));
+        RequirePercentage(tuning.UniqueChanceCeilingPercent, nameof(Tuning.UniqueChanceCeilingPercent));
+
+        if (tuning.ResurrectTurnsFloor < 1)
+            throw new ContentException(nameof(Tuning.ResurrectTurnsFloor), RuleRevivalTakesATurn, $"{tuning.ResurrectTurnsFloor}");
+        if (tuning.CleanKillBonus < 1)
+            throw new ContentException(nameof(Tuning.CleanKillBonus), RuleKillCountsForSomething, $"{tuning.CleanKillBonus}");
+        if (tuning.UniqueChanceMidpoint < 0)
+            throw new ContentException(nameof(Tuning.UniqueChanceMidpoint), RuleCurveMidpointIsACount, $"{tuning.UniqueChanceMidpoint}");
+    }
+
+    /// <summary>A knob rolled against a draw is a percentage, or the draw means nothing.</summary>
+    private static void RequirePercentage(int value, string key)
+    {
+        if (value < 0 || value > FullPercent)
+            throw new ContentException(key, RuleChanceIsAPercentage, $"{value}");
     }
 
     /// <summary>
@@ -306,6 +353,30 @@ public static class ContentValidator
     /// second makes every unique magnitude quote no flat trigger (S:239): it
     /// applies a status, so its price is the ladder over what it lands.
     /// <see cref="EnchantmentCatalogue"/> runs this itself as well.
+    /// <para>
+    /// The lock joins them here because §3.3 makes it load-bearing twice: it
+    /// reserves mana while equipped <em>and</em> it is the bar the tier ladder
+    /// divides (<see cref="Enchantment.XpToNextTier"/>). A row with
+    /// <c>Lock: 0</c> would price every tier at nothing for every stat, so it is
+    /// refused at load exactly the way a <see cref="Tuning.StartingPool"/> of 0
+    /// already is, rather than guarded inside the replay.
+    /// </para>
+    /// <para>
+    /// The potency rule is the same idea one column over, for the kinds whose
+    /// whole magnitude <em>is</em> their potency
+    /// (<see cref="EnchantmentBehaviours.SizedByPotency"/>: Arcane's damage,
+    /// Shattering's depth, Aegis's absorption). At zero such a row fires for
+    /// nothing while still reserving its lock and the slot it sits in — the one
+    /// shape §3.3 refuses everywhere else. Every other kind reads its magnitude
+    /// from somewhere the row does not carry — an element's typing, a rule that
+    /// fires once, a percentage of the blow — so none of them is asked. It is
+    /// the row that is checked, not what a §5.3 dial may lay over it
+    /// (<see cref="Tuning.ArcanePotency"/> does for the one id it names): a
+    /// file has to state the magnitude it ships with, or content and tuning
+    /// disagree silently about what an entry is worth. The dial being keyed by
+    /// id is what keeps this rule meaning something: every row it checks that no
+    /// dial names is a row the game reads the magnitude from.
+    /// </para>
     /// </summary>
     public static void ValidateEnchantments(EnchantmentsData data)
     {
@@ -316,6 +387,8 @@ public static class ContentValidator
         {
             if (!seen.Add(e.Id))
                 throw new ContentException(e.Id, RuleDuplicateId);
+            if (e.Lock < 1)
+                throw new ContentException(e.Id, RuleEnchantmentLockIsPositive, $"lock {e.Lock}");
             if (e.Trigger is <= 0)
                 throw new ContentException(e.Id, RuleZeroTrigger, $"trigger {e.Trigger}");
             if ((e.Trigger != null) == (e.Applies != null))
@@ -328,7 +401,18 @@ public static class ContentValidator
                 throw new ContentException(e.Id, RuleApplierNamesStatus);
             if (e.Effect == EffectKind.ElementalDamage && e.DamageType is null or DamageType.None)
                 throw new ContentException(e.Id, RuleElementNamesType);
+            if (EnchantmentBehaviours.SizedByPotency(e.Effect) && e.Potency < 1)
+                throw new ContentException(e.Id, RuleMagnitudeNamesAPotency, $"potency {e.Potency}");
         }
+
+        // The drop pool is an ordered id list held in code (§3.1), so that
+        // appending a catalogue entry cannot silently re-index what an
+        // already-saved dummy drops. The cost of holding it there is that it can
+        // name something the file does not: refused here, the way every other
+        // dangling reference is, rather than throwing at the first drop rolled.
+        foreach (var id in LootTable.DropPool)
+            if (!seen.Contains(id))
+                throw new ContentException(id, RuleDropPoolResolves);
     }
 
     /// <summary>
@@ -435,6 +519,16 @@ public static class ContentValidator
     /// the combo platform — while a unique enchantment arrives only on a
     /// unique, and nothing arrives carrying more than three enchantments.
     /// Unique derivation is checked with the uniques.
+    /// <para>
+    /// And three the drop leans on (§3.1, §3.2), each refusing at load what
+    /// would otherwise surface as a wrong weapon or an exception one collection
+    /// deep: a class with variants carries at least one unique, for a won roll
+    /// to land on; a caster class holds every variant
+    /// <see cref="LootTable.CasterVariants"/> names, since the drop's draw
+    /// indexes that rather than the file's order; and a martial variant carries
+    /// no enchantment of its own, so the one entry a drop attaches is the one it
+    /// rolled.
+    /// </para>
     /// </summary>
     public static void ValidateWeapons(WeaponsData data, ModifierRules rules, RestrictedData restricted, EnchantmentCatalogue enchantments)
     {
@@ -544,17 +638,55 @@ public static class ContentValidator
                     throw new ContentException(def.Id, RuleRoleOnMartialOnly, "a martial variant carries no role");
                 if (def.Unique && def.Role != null)
                     throw new ContentException(def.Id, RuleRoleOnMartialOnly, $"a unique carries the role {def.Role}");
+
+                // A martial drop carries the entry it rolled and nothing else
+                // (§3.1's "always exactly one"), and the farm banks its tiers
+                // through the first one attached — which is the rolled entry
+                // only because the variant lists none, since Instantiate appends
+                // what the drop rolled after whatever the def carries. A variant
+                // authored with an entry of its own would make a rolled drop
+                // carry two and land the farm's tiers on the wrong one, both
+                // silently. A unique is hand-placed rather than rolled and
+                // carries its souls; a caster's single innate is its identity
+                // and is RuleCasterInnate's.
+                if (!def.Unique && def.Enchantments.Count > 0)
+                    throw new ContentException(def.Id, RuleMartialVariantNoEnchantment,
+                        $"'{def.Enchantments[0].Id}' on a {def.Class} variant");
             }
         }
 
         var baselines = new Dictionary<WeaponClass, IReadOnlyDictionary<ModifierType, int>>();
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
-            if (Weapon.KindOf(cls) == WeaponKind.Caster)
-                continue;   // casters vary by effect and shape, not by role
             var variants = data.Weapons.Where(w => w.Class == cls && !w.Unique).ToList();
             if (variants.Count == 0)
                 continue;   // a class the file leaves out is not malformed, only absent
+
+            // A class with variants is a class a drop can roll (§3.1), and §3.2's
+            // unique roll is a ruling: a won draw always yields a unique of the
+            // dummy's class, re-steering over the class's own where the variant
+            // has none. A class carrying no unique at all would make that draw
+            // win and hand over nothing — reported as a lost roll rather than as
+            // broken content — so it is refused here instead.
+            if (!data.Weapons.Any(w => w.Unique && w.Class == cls))
+                throw new ContentException(cls.ToString(), RuleClassCarriesAUnique, $"{variants.Count} variants, no unique");
+
+            if (Weapon.KindOf(cls) == WeaponKind.Caster)
+            {
+                // Casters vary by effect and shape, not by role, so a drop's
+                // code-fixed draw indexes LootTable.CasterVariants rather than
+                // the file's order. Every id it names has to be here, or the
+                // draw lands on a row that does not exist: refused at load, the
+                // way the drop pool's ids already are, rather than throwing on
+                // one drop in four deep inside a collection.
+                if (!LootTable.CasterVariants.TryGetValue(cls, out var order))
+                    throw new ContentException(cls.ToString(), RuleCasterVariantPool, "the drop order names no variants for this class");
+                foreach (var id in order)
+                    if (!variants.Any(v => v.Id == id))
+                        throw new ContentException(id, RuleCasterVariantPool, $"named by the {cls} drop order");
+                continue;
+            }
+
             baselines[cls] = ValidateVariants(cls, variants);
         }
 

@@ -94,17 +94,29 @@ public static class StatusBehaviours
 
     /// <summary>
     /// Step 6: the defender's Ward takes what was dealt, one point a level, up
-    /// to its levels — temporary hit points, not armour, so a crit does not
-    /// skip it and it may take a hit all the way to zero. What it swallowed
-    /// was dealt; only the rest reaches HP, which the (6,9) divider closes.
-    /// The applier spends the levels.
+    /// to its levels and never the whole hit — temporary hit points, not armour,
+    /// so a crit does not skip it, but <strong>1 damage still gets through</strong>
+    /// (§3.3), which is <c>Block</c>'s floor (§1.1) applied once at the end of
+    /// the pipeline rather than a second rule. A 20-damage hit into 20 Ward
+    /// therefore leaves 1 through and 1 level standing — 19 absorbed, 19 spent —
+    /// and that last level decays at the end of the round like any other.
+    /// <para>
+    /// The floor is what keeps the pool from being immortality: a deep Ward buys
+    /// a long fight, not an unlosable one, which is the same reason
+    /// <c>Block</c> never reduces a hit to nothing and Weakened never divides a
+    /// swing below 1. Nothing in this game has a zero.
+    /// </para>
+    /// What it swallowed was dealt; only the rest reaches HP, which the (6,9)
+    /// divider closes. The applier spends the levels.
     /// </summary>
     public static DamagePayload Ward(DamagePayload payload, ActorState self, ActorState other)
     {
         int levels = other.StatusLevel(StatusEffectType.Ward);
         if (levels <= 0 || payload.Dealt <= 0) return payload;
         int capacity = levels * StatusRules.EffectPerLevel(StatusEffectType.Ward);
-        return payload with { WardSpent = Math.Min(capacity, payload.Dealt) };
+        // Dealt is at least 1 by the guard above, so the floor's subtraction
+        // never goes negative: what it can absorb is one short of the hit.
+        return payload with { WardSpent = Math.Min(capacity, payload.Dealt - 1) };
     }
 
     /// <summary>
@@ -112,15 +124,22 @@ public static class StatusBehaviours
     /// CritSunder stacks land as Weakened and Sundered levels on the defender,
     /// one per stack, whatever Ward swallowed. The riders ride: they change
     /// nothing about the hit that applied them.
+    /// <para>
+    /// Each lands <see cref="DamagePayload.RiderDepth"/> levels deeper than its
+    /// stacks — what an entry that deepens riders settled earlier in this chain
+    /// (§3.3's Shattering, at step 4). Depth deepens a rider; it never conjures
+    /// one, so an attacker carrying neither stack still lands nothing.
+    /// </para>
     /// </summary>
     public static DamagePayload CritRiders(DamagePayload payload, ActorState self, ActorState other)
     {
         if (!payload.IsCrit) return payload;
         var riders = OrEmpty(payload.ApplyToDefender);
+        int deeper = Math.Max(0, payload.RiderDepth);
         int weaken = self.Value(ModifierType.CritWeaken);
-        if (weaken > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Weakened, null, weaken));
+        if (weaken > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Weakened, null, weaken + deeper));
         int sunder = self.Value(ModifierType.CritSunder);
-        if (sunder > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Sundered, null, sunder));
+        if (sunder > 0) riders = riders.Add(new StatusApplication(StatusEffectType.Sundered, null, sunder + deeper));
         return payload with { ApplyToDefender = riders };
     }
 

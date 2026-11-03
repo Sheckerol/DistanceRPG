@@ -87,6 +87,24 @@ public abstract class ActorState
     }
 
     /// <summary>
+    /// Damage this actor adds to whatever it is holding, however it came by it:
+    /// a farmed dummy's accumulated revival bonus (§3.2). Zero for an actor with
+    /// no such history, which is everyone else.
+    /// <para>
+    /// <strong>It lands on the actor and never on the weapon</strong> — "a dummy
+    /// hitting for +15 does not drop a weapon with +15 on it; drop quality comes
+    /// from the ladder above and nothing else" (§3.2). Otherwise farming would
+    /// pay twice for one investment, and the bonus would leak into a modifier
+    /// system with no place to put it. Declared here and read in exactly one
+    /// place, <see cref="CombatRules.BaseDamage"/>, which is the one place a
+    /// wielder's base damage is computed: a bonus added at a swing's step 1
+    /// alone would be silently dropped by Longshot's retake and by a wand's
+    /// cast, both of which re-derive the base through that same call.
+    /// </para>
+    /// </summary>
+    public virtual int BonusDamage => 0;
+
+    /// <summary>
     /// The movement one swing or cast of <paramref name="weapon"/> costs this
     /// actor: the weapon's own resolved cost — Light's discount already in it —
     /// less the wielder's proficiency discount, never below
@@ -119,36 +137,158 @@ public abstract class ActorState
     /// <summary>
     /// Mana pool for casting. Every trigger costs mana on both sides, so an
     /// enemy caster carries one too; full at spawn — a pool nobody has written
-    /// reads as this actor's own <see cref="MaxMana"/>, so a kind that overrides
-    /// the maximum spawns full as well.
+    /// reads as this actor's own <see cref="UsableMaxMana"/>, so a kind that
+    /// overrides the maximum spawns full as well.
+    /// <para>
+    /// Full is the <em>spendable</em> ceiling and not the earned one (§3.3): a
+    /// wielder whose equipped entries reserve part of the pool never holds mana
+    /// it could not spend, so the very first cast of a freshly spawned caster
+    /// pays out of the same remainder every later one does.
+    /// </para>
+    /// <para>
+    /// <strong>And the ceiling holds on read, not at one seam.</strong>
+    /// <see cref="UsableMaxMana"/> is not monotonic in <see cref="MaxMana"/>:
+    /// the point that finally covers a sleeping entry's lock wakes it and takes
+    /// the whole lock at once, so a pool that fitted a moment ago can be over
+    /// the ceiling with nothing written to it — an earned mana point, a tier
+    /// credited to an equipped entry, any later path that deepens a lock. The
+    /// clamp therefore lives here rather than at each of those seams, which is
+    /// what makes "nobody ever holds mana the locks reserved" an invariant
+    /// instead of a list of call sites. What the clamp hides the next write
+    /// settles — every writer here reads the pool and writes back what it read
+    /// (<see cref="PartyMemberState.Credit"/>, the ManaSpent applier,
+    /// <see cref="RegenManaFromUnusedMovement"/>), and
+    /// <see cref="TurnSystem.NotifyWeaponChanged"/> stores it outright on a swap
+    /// so putting a weapon down is never a refill (§3.3). Mana taken back by a
+    /// reservation comes back the one way mana ever does, out of movement left
+    /// unspent.
+    /// </para>
     /// </summary>
     public int Mana
     {
-        get => _mana ?? MaxMana;
+        get => _mana is { } held ? Math.Min(held, UsableMaxMana) : UsableMaxMana;
         set => _mana = value;
     }
 
     private int? _mana;
 
+    /// <summary>
+    /// The pool this actor has earned (§2.2): what XP grows and what a save
+    /// stores. It is <em>not</em> what a spend reads — an equipped enchantment
+    /// reserves part of it (<see cref="PaidLocks"/>) and
+    /// <see cref="UsableMaxMana"/> is the remainder.
+    /// </summary>
     public virtual int MaxMana => GameConstants.MaxMana;
+
+    /// <summary>
+    /// Mana the equipped weapon's enchantments actually reserve (§3.3): the
+    /// entries are walked in attachment order and each lock is paid while it
+    /// fits, so the sum can never exceed <see cref="MaxMana"/> — which is the
+    /// whole of "the sum of equipped locks may not exceed max mana", enforced by
+    /// dormancy rather than by refusing to equip.
+    /// <para>
+    /// <strong>Locks are the wielder's, whoever the wielder is</strong>, so they
+    /// live here and not on <see cref="PartyMemberState"/>: an enemy healer
+    /// carrying a lock-15 staff has 85 usable of its flat 100, and no handler
+    /// asks an actor its kind. Nothing is stored — the walk is redone on read,
+    /// so growing the pool, crediting a tier or swapping the weapon re-prices
+    /// the reservation with no event to subscribe to (§3.5).
+    /// </para>
+    /// </summary>
+    public int PaidLocks => Locks().Paid;
+
+    /// <summary>
+    /// What every spend and every regen reads: <c>MaxMana − Σ paid locks</c>
+    /// (§3.5). Unequipping returns the ceiling in full and refunds no points,
+    /// because nothing was taken from the pool — only reserved out of it.
+    /// </summary>
+    public int UsableMaxMana => Math.Max(0, MaxMana - PaidLocks);
+
+    /// <summary>
+    /// Whether the entry at <paramref name="index"/> of the equipped weapon's
+    /// list is asleep: its lock went unpaid, so it does not fire and pays
+    /// nothing — the same non-event as a trigger this actor cannot afford
+    /// (§3.1). Derived, never stored: the same shared, immutable
+    /// <see cref="Enchantment"/> is dormant in one wielder's hands and awake in
+    /// another's, and wakes on its own the moment the pool grows to cover it.
+    /// <para>
+    /// The remainder after the first unaffordable entry sleeps <em>even if a
+    /// later one would fit</em> — the opposite of partial firing, which does
+    /// pass the remainder down the list. A lock is a reservation the whole list
+    /// competes for once; a trigger is a purchase each entry makes in turn.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is equipped, or nothing is attached at <paramref name="index"/>.</exception>
+    public bool IsDormant(int index)
+    {
+        var weapon = EquippedWeapon;
+        if (weapon == null || (uint)index >= (uint)weapon.Enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index,
+                $"The equipped weapon carries {weapon?.Enchantments.Count ?? 0} enchantments.");
+        return index >= AwakeCount;
+    }
+
+    /// <summary>
+    /// How many of the equipped weapon's entries are awake, counted from the
+    /// front: <see cref="IsDormant"/> for the whole list in one walk. The awake
+    /// entries are always a prefix — locks are paid in attachment order and the
+    /// remainder after the first that does not fit sleeps — so a count says
+    /// everything a set would, and an awake entry's position here is its
+    /// attachment index still.
+    /// <para>
+    /// This is what a loop over the entries reads. <see cref="IsDormant"/>
+    /// redoes the walk on every call, so asking it once per index is quadratic
+    /// in the attached count, and the five enchantment loops run on every hit,
+    /// cast, kill and overheal; they take this at the loop head and compare
+    /// against it instead. <see cref="IsDormant"/> stays the single-index
+    /// convenience the HUD and the compiled defender handlers ask.
+    /// </para>
+    /// </summary>
+    public int AwakeCount => Locks().Awake;
+
+    /// <summary>
+    /// The one walk the two members above read: pay each equipped entry's
+    /// <see cref="Enchantment.EffectiveLock"/> in attachment order while the
+    /// earned pool covers it, and stop at the first that does not fit. Returns
+    /// what was reserved and how many entries, from the front, are awake.
+    /// </summary>
+    private (int Paid, int Awake) Locks()
+    {
+        var weapon = EquippedWeapon;
+        if (weapon == null) return (0, 0);
+
+        int budget = MaxMana;
+        int paid = 0;
+        var entries = weapon.Enchantments;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            int reserved = entries[i].EffectiveLock;
+            if (paid + reserved > budget) return (paid, i);
+            paid += reserved;
+        }
+        return (paid, entries.Count);
+    }
 
     /// <summary>
     /// Convert movement left unspent at the end of the actor's action into
     /// mana, the only route mana comes back by (§1.3): every
     /// <see cref="Tuning.MovementUnitsPerMana"/> units bank one point, the
-    /// remainder is lost, and the pool never passes <see cref="MaxMana"/>. A
-    /// party member banks what is left of its budget at its turn's end, an
-    /// enemy what its action left; casting spends movement, so it eats into
-    /// this the same way walking does: the more you cast, the less mana you
+    /// remainder is lost, and the pool never passes
+    /// <see cref="UsableMaxMana"/> — the spendable ceiling, not the earned one,
+    /// so movement is never converted into mana the locks have already reserved
+    /// (§3.3). A party member banks what is left of its budget at its turn's
+    /// end, an enemy what its action left; casting spends movement, so it eats
+    /// into this the same way walking does: the more you cast, the less mana you
     /// can spend. Returns the mana actually regained; nothing for the dead.
     /// </summary>
     public int RegenManaFromUnusedMovement(float unspentMovement)
     {
-        if (!Alive || Mana >= MaxMana) return 0;
+        int ceiling = UsableMaxMana;
+        if (!Alive || Mana >= ceiling) return 0;
         int unitsPerMana = Math.Max(1, GameContent.Current.Tuning.MovementUnitsPerMana);
         int regained = (int)(MathF.Max(0f, unspentMovement) / unitsPerMana);
         int before = Mana;
-        Mana = Math.Min(MaxMana, Mana + regained);
+        Mana = Math.Min(ceiling, Mana + regained);
         return Mana - before;
     }
 

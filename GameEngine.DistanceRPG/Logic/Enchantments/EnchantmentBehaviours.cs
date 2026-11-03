@@ -20,14 +20,44 @@ namespace GameEngine.DistanceRPG.Logic;
 /// hit fire — Serrated's wound, Vampiric's drink, Piercing's continuation; on
 /// <see cref="GameEvent.Killed"/>, where Siphon refunds; and on
 /// <see cref="GameEvent.HealingAboveFull"/>, where Overheal banks the surplus.
-/// The two souls the <em>defender</em> carries — Sturdy, Immovable — are
-/// compiled handlers at their own pipeline steps, since the loop is the
+/// The three entries the <em>defender</em> carries — Aegis, Sturdy, Immovable —
+/// are compiled handlers at their own pipeline steps, since the loop is the
 /// attacker's; each reads its own kind off the defender's weapon and pays
-/// out of the defender's pool. A loop's step is its own on its event:
+/// out of the defender's pool. One rule of the attacker's is compiled too:
+/// <see cref="MartialElement"/> at (0,5), because an element on a martial
+/// weapon has to type the swing <em>before</em> the chart reads the type at
+/// (3,1), and step 4 is far too late for that. A loop's step is its own on its event:
 /// <see cref="EventTable.HandlersFor"/> prints the loop as one row per
 /// attached entry at (step, attachment index), so attachment order reads as
 /// the priority it is, and <see cref="EventTable.On{TPayload}"/> refuses a
 /// compiled handler beside it on the step.
+/// <para>
+/// <strong>A dormant entry is skipped everywhere</strong> (§3.1): every loop
+/// takes <see cref="ActorState.AwakeCount"/> at its head and skips the indices
+/// past it (<see cref="ActorState.IsDormant"/> for the whole list in one walk,
+/// since these loops run on every hit, cast, kill and overheal), the three
+/// compiled defender handlers ask <see cref="ActorState.IsDormant"/> of the
+/// index <see cref="DefenderSoul"/> found, <see cref="MartialElement"/> walks
+/// only the awake prefix, and <see cref="Attached"/> leaves a
+/// dormant entry out of the printed chain. An entry whose lock went unpaid does
+/// not fire and pays nothing — the same non-event as a trigger the wielder
+/// cannot afford — so the skip sits ahead of the table lookup rather than
+/// inside any behaviour, and a kind added to a table inherits it.
+/// </para>
+/// <para>
+/// <strong>What an entry pays is attributed to it as it fires</strong> (§3.3:
+/// mana spent is an enchantment's experience): every loop reads the movement of
+/// its payload's <c>ManaToSpend</c> across the one call and appends an
+/// <see cref="EnchantmentPayment"/> naming that entry's index, which the event's
+/// applier credits. The behaviours are untouched by it — <see cref="PartialFire"/>
+/// and <see cref="FireWhole"/> compute what is paid and have no index; the loop
+/// has the index and never computes a payment.
+/// <strong>The two souls a defender carries are deliberately outside this.</strong>
+/// They pay out of <c>DefenderManaToSpend</c>, which is the defender's record and
+/// not the attacker's <c>Payments</c>; both are unique souls, pinned at tier 1, so
+/// a credit would buy nothing, and a second defender-side payments list would be
+/// machinery with one implementer. They fire, they pay mana, and they do not tier.
+/// </para>
 /// </summary>
 public static class EnchantmentBehaviours
 {
@@ -40,10 +70,25 @@ public static class EnchantmentBehaviours
     /// <summary>On DamageTaken the loop is pipeline step 4: after the weapon's share is closed at (3,9), before Block at (5,0).</summary>
     public static readonly HandlerPriority DamageTakenLoopPriority = new(4, 0);
 
+    /// <summary>
+    /// MartialElement at (0,5): ahead of the whole pipeline, because the type it
+    /// settles is read by the chart at (3,1) and fixed into the weapon's share by
+    /// (3,9). Step 0 is free on DamageTaken and belongs to no loop.
+    /// </summary>
+    public static readonly HandlerPriority MartialElementPriority = new(0, 5);
+
     /// <summary>On DamageDealt, Killed and HealingAboveFull the loop is the front of the chain, ahead of the compiled steps that fold what it settled (the pool at (1,0)).</summary>
     public static readonly HandlerPriority DamageDealtLoopPriority = new(0, 0);
     public static readonly HandlerPriority KilledLoopPriority = new(0, 0);
     public static readonly HandlerPriority HealingAboveFullLoopPriority = new(0, 0);
+
+    /// <summary>
+    /// Aegis at (5,1): after Block at (5,0), which is the weapon share's armour
+    /// and fixes <see cref="DamagePayload.Dealt"/> — this is the enchantment
+    /// share's, and re-fixes it. Step 4 would be inside the attacker's loop,
+    /// which <see cref="EventTable.On{TPayload}"/> refuses outright.
+    /// </summary>
+    public static readonly HandlerPriority AegisPriority = new(5, 1);
 
     /// <summary>Sturdy at (6,1): after Ward at (6,0) has taken its share, before the (6,9) divider fixes what reaches HP.</summary>
     public static readonly HandlerPriority SturdyPriority = new(6, 1);
@@ -85,13 +130,17 @@ public static class EnchantmentBehaviours
 
     /// <summary>
     /// The per-kind behaviours at step 4 of a hit: the wands' element adds its
-    /// own contribution beside the weapon's share, the lingering element lands
-    /// its burn. A kind absent here adds nothing to a hit — the staff innates
-    /// cast, and the souls that ride a landed hit fire on DamageDealt.
+    /// own contribution beside the weapon's share, Arcane adds its untyped
+    /// damage, Shattering deepens the riders the hit is about to land, and the
+    /// lingering element lands its burn. A kind absent here adds nothing to a
+    /// hit — the staff innates cast, and the souls that ride a landed hit fire
+    /// on DamageDealt.
     /// </summary>
     private static readonly IReadOnlyDictionary<EffectKind, DamageBehaviour> OnDamageTaken = new Dictionary<EffectKind, DamageBehaviour>
     {
         [EffectKind.ElementalDamage] = ElementalDamage,
+        [EffectKind.BonusDamage] = BonusDamage,
+        [EffectKind.Shattering] = Shattering,
         [EffectKind.LingeringElement] = LingerOnHit,
     };
 
@@ -166,6 +215,27 @@ public static class EnchantmentBehaviours
     public static bool LingersAnElement(EffectKind kind) => ElementLingerers.Contains(kind);
 
     /// <summary>
+    /// The kinds whose whole magnitude is <see cref="EnchantmentDef.Potency"/>
+    /// read through <see cref="Enchantment.LevelsFor"/> — Arcane's damage,
+    /// Shattering's depth, Aegis's absorption — and so the kinds content must
+    /// name a potency of at least one for: a row at zero would reserve a lock
+    /// and a slot for an effect that can never scale to anything, which is the
+    /// no-spend-that-bought-nothing rule the catalogue is built on. A table
+    /// beside the behaviour tables, like the three above; a kind whose
+    /// magnitude comes from somewhere else (an element's typing, a rule that
+    /// fires once) is deliberately not here.
+    /// </summary>
+    private static readonly IReadOnlySet<EffectKind> PotencySized = new HashSet<EffectKind>
+    {
+        EffectKind.BonusDamage,
+        EffectKind.Shattering,
+        EffectKind.Shielding,
+    };
+
+    /// <summary>Whether <paramref name="kind"/>'s magnitude is its entry's potency and nothing else (<see cref="PotencySized"/>).</summary>
+    public static bool SizedByPotency(EffectKind kind) => PotencySized.Contains(kind);
+
+    /// <summary>
     /// Whether <paramref name="kind"/> has a behaviour in the loop's table for
     /// <paramref name="evt"/>: what content validation asks of an entry — does
     /// it convert healing above full, say — without naming the kind. False for
@@ -187,25 +257,42 @@ public static class EnchantmentBehaviours
     /// <summary>The one "level" the rules that fire once fire at: a shot carried on, a kill refunded, a life spared, a shove refused — whole or nothing, like a type. (Overheal, a rule too, grants levels and scales them to what it could pay.)</summary>
     private const int Once = 1;
 
-    /// <summary>Register the loops on <paramref name="table"/>, on each event they run on, expanded for printing into the actor's attached entries; and the defender's two souls at their steps.</summary>
+    /// <summary>Register the loops on <paramref name="table"/>, on each event they run on, expanded for printing into the actor's attached entries; the one attacker-side rule that must run ahead of the pipeline; and the defender's three entries at their steps.</summary>
     public static void Register(EventTable table)
     {
         ArgumentNullException.ThrowIfNull(table);
+        table.On<DamagePayload>(GameEvent.DamageTaken, MartialElementPriority, "MartialElement", MartialElement);
         table.On<CastPayload>(GameEvent.Cast, CastLoopPriority, LoopName, CastLoop, expand: Attached);
         table.On<DamagePayload>(GameEvent.DamageTaken, DamageTakenLoopPriority, LoopName, DamageTakenLoop, expand: Attached);
         table.On<DamagePayload>(GameEvent.DamageDealt, DamageDealtLoopPriority, LoopName, DamageDealtLoop, expand: Attached);
         table.On<KillPayload>(GameEvent.Killed, KilledLoopPriority, LoopName, KilledLoop, expand: Attached);
         table.On<HealPayload>(GameEvent.HealingAboveFull, HealingAboveFullLoopPriority, LoopName, HealingAboveFullLoop, expand: Attached);
 
+        table.On<DamagePayload>(GameEvent.DamageTaken, AegisPriority, "Aegis", Aegis);
         table.On<DamagePayload>(GameEvent.DamageTaken, SturdyPriority, "Sturdy", Sturdy);
         table.On<DamagePayload>(GameEvent.DamageTaken, ImmovablePriority, "Immovable", Immovable);
     }
 
-    /// <summary>The names the loop expands to for <paramref name="self"/>: its weapon's enchantments, in attachment order.</summary>
+    /// <summary>
+    /// The names the loop expands to for <paramref name="self"/>: the entries on
+    /// its weapon that it will actually run, in attachment order.
+    /// <para>
+    /// <strong>A dormant entry is not a row.</strong>
+    /// <see cref="EventTable.HandlersFor"/> lists an expanding handler as what
+    /// it will run for that actor, and the loops skip an entry whose lock went
+    /// unpaid (§3.1), so printing one would make the chain — the one
+    /// inspectable view of the firing order there is — over-report. Dormancy is
+    /// a tail, so what is left is a prefix and every row keeps its attachment
+    /// index: the index-is-priority contract still reads off the print. A
+    /// wielder whose whole list is asleep expands to nothing and prints as the
+    /// bare loop, the same row a wielder with nothing attached prints.
+    /// </para>
+    /// </summary>
     public static IEnumerable<string> Attached(ActorState self)
     {
         ArgumentNullException.ThrowIfNull(self);
-        return self.EquippedWeapon?.Enchantments.Select(e => e.Id) ?? [];
+        var entries = self.EquippedWeapon?.Enchantments;
+        return entries == null ? [] : entries.Take(self.AwakeCount).Select(e => e.Id);
     }
 
     // ── The loops ────────────────────────────────────────────────────────────
@@ -227,21 +314,37 @@ public static class EnchantmentBehaviours
     /// its total, or an entry that applied nothing would be charged with its
     /// neighbour's levels.
     /// </para>
+    /// <para>
+    /// Its <em>payment</em> is attributed the same way and in the same place
+    /// (§3.3): the movement of <see cref="CastPayload.ManaToSpend"/> across the
+    /// one call becomes an <see cref="EnchantmentPayment"/> naming the entry's
+    /// index, which is how the applier knows whose experience the mana was. The
+    /// loop never computes what an entry pays — that is
+    /// <see cref="PartialFire"/>'s and <see cref="FireWhole"/>'s, inside the
+    /// behaviour, which has no index — it only reads the difference off the
+    /// payload.
+    /// </para>
     /// </summary>
     public static CastPayload CastLoop(CastPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
             int before = AppliedLevels(payload);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
             int added = AppliedLevels(payload) - before;
             if (added > 0 && weapon.IsForged(i))
                 payload = payload with { ForgedLevels = payload.ForgedLevels + added };
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
@@ -263,21 +366,36 @@ public static class EnchantmentBehaviours
     /// payload rather than asked of the behaviour, so a kind added to the table
     /// is attributed without the loop knowing it exists.
     /// </para>
+    /// <para>
+    /// The same three lines attribute its payment (§3.3): the movement of
+    /// <see cref="DamagePayload.ManaToSpend"/> across the one call becomes an
+    /// <see cref="EnchantmentPayment"/> naming the entry's index, which is what
+    /// the applier credits the entry's own ladder with. No kind in this table
+    /// pays here today — an element's trigger is the cast's — so the list is
+    /// empty on every shipped hit; the attribution is the loop's all the same,
+    /// so a kind that does pay at step 4 needs no edit here.
+    /// </para>
     /// </summary>
     public static DamagePayload DamageTakenLoop(DamagePayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
+        int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
             var enchantment = weapon.Enchantments[i];
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
             int before = payload.EnchantmentShare;
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
             int added = payload.EnchantmentShare - before;
             if (added > 0 && weapon.IsForged(i))
                 payload = payload with { ForgedShare = payload.ForgedShare + added };
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
@@ -286,45 +404,68 @@ public static class EnchantmentBehaviours
     /// The loop on DamageDealt: <c>self</c> is the attacker whose hit landed,
     /// <c>other</c> the defender it landed on. The hit's own payments were
     /// taken before this event was drained, so each entry sees the pool as it
-    /// stands less what the entries before it settled here.
+    /// stands less what the entries before it settled here — and each one's
+    /// payment is attributed to it as it fires (§3.3), the delta off the
+    /// payload, exactly as <see cref="DamageTakenLoop"/> attributes a share.
     /// </summary>
     public static DamagePayload DamageDealtLoop(DamagePayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        int awake = self.AwakeCount;
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
+            var enchantment = weapon.Enchantments[i];
             if (!OnDamageDealt.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
 
-    /// <summary>The loop on Killed: <c>self</c> is the killer, <c>other</c> the dead — or both the corpse, for a tick death, which the entries read off the null weapon.</summary>
+    /// <summary>The loop on Killed: <c>self</c> is the killer, <c>other</c> the dead — or both the corpse, for a tick death, which the entries read off the null weapon. Each entry's payment is attributed to it as it fires (§3.3).</summary>
     public static KillPayload KilledLoop(KillPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        int awake = self.AwakeCount;
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
+            var enchantment = weapon.Enchantments[i];
             if (!OnKilled.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
 
-    /// <summary>The loop on HealingAboveFull: <c>self</c> is the actor healed past full, whose weapon's entries react to its surplus; <c>other</c> the source.</summary>
+    /// <summary>The loop on HealingAboveFull: <c>self</c> is the actor healed past full, whose weapon's entries react to its surplus; <c>other</c> the source. Each entry's payment is attributed to it as it fires (§3.3), and the applier credits them against <c>self</c>'s own weapon, since the payload names none.</summary>
     public static HealPayload HealingAboveFullLoop(HealPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        int awake = self.AwakeCount;
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            if (i >= awake) continue;   // dormant (ActorState.IsDormant), with its one walk hoisted out of the loop
+            var enchantment = weapon.Enchantments[i];
             if (!OnHealingAboveFull.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int paidBefore = payload.ManaToSpend;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int paid = payload.ManaToSpend - paidBefore;
+            if (paid > 0)
+                payload = payload with { Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)) };
         }
         return payload;
     }
@@ -412,6 +553,85 @@ public static class EnchantmentBehaviours
         };
     }
 
+    // ── DamageTaken, ahead of the pipeline ───────────────────────────────────
+
+    /// <summary>
+    /// Step 0.5: an element on a <em>martial</em> weapon types the swing it
+    /// rides (§3.3: an element "Fires on Hit"), paying its own trigger out of
+    /// the attacker's pool. A wand's element types its cast and this stands
+    /// aside; a rare drop putting Flaming on a dagger would otherwise be inert,
+    /// since <see cref="ElementalDamage"/> only fires for a cast that paid it.
+    /// <para>
+    /// <strong>It is a compiled step rather than a row in the step-4 table,
+    /// because the typing has to be in place before the chart reads it.</strong>
+    /// <see cref="DamagePayload.Type"/> is settled before the chain begins, the
+    /// chart is a compiled handler at (3,1), and (3,9) closes the weapon's share
+    /// over what the chart made of it — all of which is long past by step 4. So
+    /// the rule lives here, at a step nothing else owns, and the chart at (3,1)
+    /// then sees the type like any other.
+    /// </para>
+    /// <para>
+    /// What it does <em>not</em> do is add a share: the four elements carry
+    /// <c>Potency: 0</c> and the typing is the whole of their value on a martial
+    /// weapon — a wand's element does its damage by typing the weapon's own base
+    /// against the chart, not by adding beside it. A wielder who cannot pay the
+    /// trigger swings untyped and is charged nothing, the ordinary non-event.
+    /// The payment is attributed to the entry's attachment index, the same index
+    /// the loops use, so the applier credits the entry that paid (§3.3).
+    /// </para>
+    /// <para>
+    /// <strong>A cleave pays per body; a pierce is charged once.</strong> §3.3
+    /// prices an element per <em>hit</em>, and the "once per cast, not once per
+    /// target caught" rule is the cast's, settled for a shape that is one action
+    /// aimed at a point. A cleave is one swing landing several times, so every
+    /// body it fans out to is its own hit and pays its own trigger: a poor
+    /// wielder types the first body and swings plain through the rest — the same
+    /// running-out the whole list is built around. A shot carried on (Piercing)
+    /// is the other shape: the DamageDealt applier seeds the continuation with
+    /// the type the first hit settled, so the gate above stands aside and the
+    /// line stays typed for the one payment. One swing landing several times
+    /// pays several times; one hit continuing through a line pays once.
+    /// </para>
+    /// <para>
+    /// <strong>There is no <see cref="DamagePayload.OnAlly"/> gate, because no
+    /// swing can reach one.</strong> A cleave fans out over the far side's
+    /// roster alone, and the only hits marked <c>OnAlly</c> are an area cast's —
+    /// which this step already stands aside for twice over, the weapon being a
+    /// caster's and <see cref="DamagePayload.CastFired"/> non-empty. A gate here
+    /// would be a branch nothing can take. Whoever gives a martial weapon a way
+    /// to hit its own side decides then whether typing an ally's hit is worth a
+    /// trigger, with the friendly-fire scaling at (1,2) in front of them.
+    /// </para>
+    /// </summary>
+    public static DamagePayload MartialElement(DamagePayload payload, ActorState self, ActorState other)
+    {
+        if (payload.Type != DamageType.None || !payload.CastFired.IsDefaultOrEmpty) return payload;
+        var weapon = self.EquippedWeapon;
+        if (weapon == null || Weapon.KindOf(weapon.Class) == WeaponKind.Caster) return payload;
+
+        int awake = self.AwakeCount;
+        for (int i = 0; i < weapon.Enchantments.Count && i < awake; i++)
+        {
+            var entry = weapon.Enchantments[i];
+            if (entry.Def.Effect != EffectKind.ElementalDamage) continue;
+            var type = entry.Def.DamageType ?? DamageType.None;
+            if (type == DamageType.None) continue;
+
+            // A type is whole or nothing, exactly as it is on a cast — and an
+            // element that cannot be paid for is a non-event that passes the
+            // remainder down the list, so a second one still gets its chance.
+            var (fired, paid) = PartialFire(entry, weapon, OneType, Math.Max(0, self.Mana - payload.ManaToSpend));
+            if (fired <= 0) continue;
+            return payload with
+            {
+                Type = type,
+                ManaToSpend = payload.ManaToSpend + paid,
+                Payments = OrEmpty(payload.Payments).Add(new EnchantmentPayment(i, paid)),
+            };
+        }
+        return payload;
+    }
+
     // ── DamageTaken, step 4 ──────────────────────────────────────────────────
 
     /// <summary>
@@ -439,6 +659,55 @@ public static class EnchantmentBehaviours
         if (levels <= 0) return payload;
         int added = CombatBehaviours.AgainstAttunement(levels, enchantment.Def.DamageType ?? DamageType.None, other.Attunement);
         return added <= 0 ? payload : payload with { EnchantmentShare = payload.EnchantmentShare + added };
+    }
+
+    /// <summary>
+    /// Arcane's behaviour at step 4: its potency's levels as damage, untyped,
+    /// beside the weapon's share and never into it — scaled to what its flat
+    /// trigger of eight could pay, like everything else that fires here.
+    /// <para>
+    /// <strong>Nothing resolves it against the chart</strong>, which is the
+    /// entry's whole design (§3.3): "raw magical damage, no element, and
+    /// therefore nothing the type chart can resist or amplify. Arcane never gets
+    /// halved and never gets the x1.5." That makes it the safe damage entry and
+    /// the elements the situational ones, and it is why its magnitude sits in
+    /// <see cref="Tuning.ArcanePotency"/> rather than in the chart's arithmetic.
+    /// </para>
+    /// </summary>
+    public static DamagePayload BonusDamage(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
+    {
+        var (damage, paid) = PartialFire(enchantment, weapon, enchantment.LevelsFor(enchantment.Def.Potency), manaLeft);
+        if (damage <= 0) return payload;
+        return payload with
+        {
+            EnchantmentShare = payload.EnchantmentShare + damage,
+            ManaToSpend = payload.ManaToSpend + paid,
+        };
+    }
+
+    /// <summary>
+    /// Shattering's behaviour at step 4: on a crit — and only on a crit — every
+    /// rider this hit lands goes <see cref="Enchantment.LevelsFor"/> levels
+    /// deeper (§3.3: "crit riders land one level deeper", one per tier), settled
+    /// as <see cref="DamagePayload.RiderDepth"/> for the (7,0) step that lands
+    /// them. It pays its flat trigger of ten, scaled to what it could pay, so a
+    /// half-paid entry deepens by half as much.
+    /// <para>
+    /// It fires here rather than on <see cref="GameEvent.Crit"/> because the
+    /// riders settle at step 7 of this same chain: a Crit handler arrives after
+    /// they have landed, with nothing left to deepen.
+    /// </para>
+    /// </summary>
+    public static DamagePayload Shattering(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
+    {
+        if (!payload.IsCrit) return payload;
+        var (levels, paid) = PartialFire(enchantment, weapon, enchantment.LevelsFor(enchantment.Def.Potency), manaLeft);
+        if (levels <= 0) return payload;
+        return payload with
+        {
+            RiderDepth = payload.RiderDepth + levels,
+            ManaToSpend = payload.ManaToSpend + paid,
+        };
     }
 
     /// <summary>
@@ -605,7 +874,49 @@ public static class EnchantmentBehaviours
         return payload with { Ticks = ticks, ManaToSpend = payload.ManaToSpend + paid };
     }
 
-    // ── The defender's souls, compiled at their steps ────────────────────────
+    // ── The defender's entries, compiled at their steps ──────────────────────
+
+    /// <summary>
+    /// Step 5.1: Aegis on the defender absorbs the attacker's <em>enchantment</em>
+    /// damage, a point per level, for its trigger out of the defender's own pool,
+    /// and re-fixes <see cref="DamagePayload.Dealt"/> — Block at (5,0) is the
+    /// weapon share's armour and this is the enchantment share's, "sitting beside
+    /// Block as the second armour for the second damage source" (settled).
+    /// It answers a strong build with a counter rather than a nerf: enchantment
+    /// damage is slightly better into armour by construction, and a party leaning
+    /// on Arcane eventually meets dummies carrying this.
+    /// <para>
+    /// <strong><see cref="DamagePayload.ForgedShare"/> falls with the share it is
+    /// part of.</strong> The forged share rides down untouched by Block because
+    /// Block never takes it, and weapon XP is credited the weapon's damage
+    /// <em>plus</em> the forged share (§2.2) — so absorbing enchantment damage
+    /// without reducing it would let the attacker level a weapon on damage the
+    /// shield swallowed, and a wand, whose forged element is its whole damage,
+    /// would level in full against a target that took none of it. It falls in
+    /// proportion, since the absorption is off the share as a whole and the
+    /// payload does not say which entry contributed what.
+    /// </para>
+    /// </summary>
+    public static DamagePayload Aegis(DamagePayload payload, ActorState self, ActorState other)
+    {
+        if (payload.EnchantmentShare <= 0 || !other.Alive) return payload;
+        var (entry, weapon, index) = DefenderSoul(other, EffectKind.Shielding);
+        if (entry == null || weapon == null || other.IsDormant(index)) return payload;
+
+        int capacity = Math.Min(entry.LevelsFor(entry.Def.Potency), payload.EnchantmentShare);
+        var (absorbed, paid) = PartialFire(entry, weapon, capacity, Math.Max(0, other.Mana - payload.DefenderManaToSpend));
+        if (absorbed <= 0) return payload;
+
+        int remaining = payload.EnchantmentShare - absorbed;
+        int forged = payload.ForgedShare * remaining / payload.EnchantmentShare;
+        return payload with
+        {
+            EnchantmentShare = remaining,
+            ForgedShare = forged,
+            Dealt = payload.WeaponShare + remaining - payload.Absorbed,
+            DefenderManaToSpend = payload.DefenderManaToSpend + paid,
+        };
+    }
 
     /// <summary>
     /// Step 6.1: Sturdy on the defender refuses death. When what the hit would
@@ -620,8 +931,8 @@ public static class EnchantmentBehaviours
     public static DamagePayload Sturdy(DamagePayload payload, ActorState self, ActorState other)
     {
         if (!other.Alive) return payload;
-        var (entry, weapon) = DefenderSoul(other, EffectKind.Sturdy);
-        if (entry == null || weapon == null) return payload;
+        var (entry, weapon, index) = DefenderSoul(other, EffectKind.Sturdy);
+        if (entry == null || weapon == null || other.IsDormant(index)) return payload;
 
         int survivesAt = Math.Max(1, entry.LevelsFor(entry.Def.Potency));
         int wouldTake = payload.Dealt - payload.WardSpent - payload.Spared;
@@ -648,8 +959,8 @@ public static class EnchantmentBehaviours
     {
         if (payload.Displace is not { Tiles: > 0 } || payload.OnDefendersTurn) return payload;
         if (!other.Alive || other.Hp <= payload.Taken) return payload;
-        var (entry, weapon) = DefenderSoul(other, EffectKind.Immovable);
-        if (entry == null || weapon == null) return payload;
+        var (entry, weapon, index) = DefenderSoul(other, EffectKind.Immovable);
+        if (entry == null || weapon == null || other.IsDormant(index)) return payload;
 
         var (fired, paid) = PartialFire(entry, weapon, Once, Math.Max(0, other.Mana - payload.DefenderManaToSpend));
         if (fired <= 0) return payload;
@@ -733,12 +1044,26 @@ public static class EnchantmentBehaviours
         return typed + element.LevelsFor(element.Def.Potency);
     }
 
-    /// <summary>The soul of <paramref name="kind"/> the defender carries, and the weapon carrying it; nulls when it holds none.</summary>
-    private static (Enchantment? Entry, Weapon? Weapon) DefenderSoul(ActorState defender, EffectKind kind)
+    /// <summary>
+    /// The soul of <paramref name="kind"/> the defender carries, the weapon
+    /// carrying it, and its position in that weapon's attachment order; nulls
+    /// and -1 when it holds none.
+    /// <para>
+    /// The index is what the handlers that are <em>not</em> in a loop need to
+    /// obey dormancy (§3.1): these are exactly the entries with the largest
+    /// locks, so a dormant Sturdy sparing a life would break "a lock you cannot
+    /// afford leaves the enchantment dormant" where it matters most. The walk
+    /// was here already; it now says where it stopped.
+    /// </para>
+    /// </summary>
+    private static (Enchantment? Entry, Weapon? Weapon, int Index) DefenderSoul(ActorState defender, EffectKind kind)
     {
         var weapon = defender.EquippedWeapon;
-        var entry = weapon?.Enchantments.FirstOrDefault(e => e.Def.Effect == kind);
-        return (entry, weapon);
+        if (weapon == null) return (null, null, -1);
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
+            if (weapon.Enchantments[i].Def.Effect == kind)
+                return (weapon.Enchantments[i], weapon, i);
+        return (null, weapon, -1);
     }
 
     private static bool Fired(ImmutableArray<string> fired, string id)

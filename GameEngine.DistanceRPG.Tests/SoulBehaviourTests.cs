@@ -23,17 +23,13 @@ public class SoulBehaviourTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     private static PartyMemberState Holding(string id, int r, int c, Weapon weapon)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = weapon;
-        return ch;
+        return TestPools.Holding(id, weapon, x: x, y: y);
     }
 
     /// <summary>A dummy on a tile's centre with no Block (fists) unless told otherwise, and enough HP that nothing here kills it by accident.</summary>
@@ -143,7 +139,7 @@ public class SoulBehaviourTests
         var enemies = new TurnSystem(grid, new[] { b }, new[] { wall }, () => 10);
         Assert.True(enemies.TryAttack(b, wall));
         Assert.Equal(At(5, 6), (wall.X, wall.Y));
-        Assert.Equal(GameConstants.MaxMana - 10, wall.Mana);
+        Assert.Equal(wall.UsableMaxMana - 10, wall.Mana);   // the Wall's Immovable reserves 25 of the dummy's flat 100
         Assert.Equal(200 - 10, wall.Hp);
 
         // Through a real enemy phase: the dummy's three swings each shove at the line, and the line holds
@@ -299,10 +295,10 @@ public class SoulBehaviourTests
         var b = Holding("B", 5, 5, Souled("Deep Leech", 40, 15, 30, ("vampiric", 3)));
         b.Hp = 50;
         var warded = Enemy(5, 6);
-        warded.ApplyStatus(Ward, null, 50);   // the hit is dealt and swallowed whole: still an instance
+        warded.ApplyStatus(Ward, null, 50);   // the hit is dealt and all but the floor swallowed: still an instance
         var deep = new TurnSystem(grid, new[] { b }, new[] { warded }, () => 10);
         Assert.True(deep.TryAttack(b, warded));
-        Assert.Equal((53, TestPools.FixtureMana - 2, 200, 35), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
+        Assert.Equal((53, TestPools.FixtureMana - 2, 199, 36), (b.Hp, b.Mana, warded.Hp, warded.StatusLevel(Ward)));
 
         b.Mana = 1;
         Assert.True(deep.TryAttack(b, warded));
@@ -347,9 +343,10 @@ public class SoulBehaviourTests
         Assert.Equal(2, enemy.StatusLevel(Bleeding));
 
         // It reads Dealt — after Block, before Ward — and of that the blade's part: 15 into Block 3 is 12
-        // of the weapon's, two levels for one, however much of it Ward then swallowed.
+        // of the weapon's, two levels for one, however much of it Ward then swallowed (11 of the 12:
+        // the floor never lets it take the last point).
         var warded = table.Raise(GameEvent.DamageDealt,
-            DamagePayload.Initial(serrated.EquippedWeapon!, 10, 32) with { WeaponShare = 15, Absorbed = 3, Dealt = 12, WardSpent = 12, Taken = 0 },
+            DamagePayload.Initial(serrated.EquippedWeapon!, 10, 32) with { WeaponShare = 15, Absorbed = 3, Dealt = 12, WardSpent = 11, Taken = 1 },
             serrated, victim);
         Assert.Equal((12, new StatusApplication(Bleeding, null, 2), 1), (warded.WeaponDealt, Assert.Single(warded.ApplyToDefender), warded.ManaToSpend));
         var b = Holding("B", 5, 5, Souled("Saw", 40, 15, 30, ("serrated", 1)));
@@ -712,6 +709,34 @@ public class SoulBehaviourTests
         Assert.False(victim.Alive);
         Assert.Equal(GameConstants.MaxDistance - 60, b.DistLeft);
         Assert.Equal(TestPools.FixtureMana, b.Mana);
+        Assert.Empty(spent);
+    }
+
+    [Fact]
+    public void Echoing_IsTheThirdPlaceholder_AndHoldsNoTableRowAtAll()
+    {
+        // §3.3's Echoing is declared with no behaviour for the same reason as those two — "the weapon's class
+        // feature triggers once more" has no meaning for six of the eight classes — with one difference worth
+        // reading off the tables. Weightless and Momentum hold real rows, inert ones, so FiresOn answers true
+        // for both; Echoing holds no row on any event, and the event it names (AttackDeclared) has no chain
+        // because nothing raises it. Both halves are in open-questions.md rather than guessed at here.
+        //
+        // It still prints in the loops' chains like any attached entry: the chain lists what the loop will
+        // walk for this wielder, which is attachment order, and whether a walked entry does anything is the
+        // table's answer and not the chain's.
+        var grid = new int[20, 20];
+        var a = Holding("A", 5, 5, Souled("Echoing Knife", 40, 15, 30, ("echoing", 1)));
+        var target = Enemy(5, 6);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { target }, () => 10);
+        var spent = ManaProbe(turns);
+
+        foreach (var evt in Enum.GetValues<GameEvent>())
+            Assert.False(EnchantmentBehaviours.FiresOn(evt, EffectKind.Echoing), $"{evt} runs it");
+        Assert.Equal(new[] { "DamageDealt (0,0) echoing@0" }, turns.Events.HandlersFor(GameEvent.DamageDealt, a).Select(h => h.ToString()));
+        Assert.Empty(turns.Events.HandlersFor(GameEvent.AttackDeclared));
+
+        Assert.True(turns.TryAttack(a, target));
+        Assert.Equal(TestPools.FixtureMana, a.Mana);
         Assert.Empty(spent);
     }
 

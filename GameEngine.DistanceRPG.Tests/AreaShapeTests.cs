@@ -14,11 +14,7 @@ public class AreaShapeTests
     private static readonly int[,] Open = new int[20, 20];
 
     private static PartyMemberState Caster(float x, float y)
-    {
-        var c = TestPools.Char("A", x: x, y: y);
-        c.Inventory[0] = TestWeapons.Get("wand_of_the_blast", DamageType.Flaming);
-        return c;
-    }
+        => TestPools.Holding("A", TestWeapons.Get("wand_of_the_blast", DamageType.Flaming), x: x, y: y);
 
     private static EnemyState Dummy(float x, float y) => new() { X = x, Y = y };
 

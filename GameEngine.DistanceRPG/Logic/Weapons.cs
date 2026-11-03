@@ -17,6 +17,16 @@ public sealed class Weapon
     /// <summary>Percentages are integers out of this.</summary>
     private const int Percent = 100;
 
+    /// <summary>
+    /// The attached entries, in attachment order — the weapon's own copy of what
+    /// it was handed, and the only thing <see cref="CreditEnchantment"/> writes
+    /// to. Private, and <see cref="Enchantments"/> hands out a read-only view of
+    /// it rather than the array itself: attachment order is gameplay (§1.7) and
+    /// fixes the order entries fire in, so it is the weapon's to change and
+    /// nobody else's.
+    /// </summary>
+    private readonly Enchantment[] _enchantments;
+
     /// <param name="def">The row this item is stamped from.</param>
     /// <param name="enchantments">The entries attached, in attachment order: the forged ones first, anything acquired behind them.</param>
     /// <param name="forgedCount">
@@ -43,11 +53,12 @@ public sealed class Weapon
         ManaCost = def.ManaCost;
         Forged = ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
         Modifiers = Forged;
-        Enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
-        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, Enchantments.Count);
-        if (forged < 0 || forged > Enchantments.Count)
+        _enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
+        Enchantments = Array.AsReadOnly(_enchantments);   // a live view: a credited entry shows through, a write does not get in
+        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, _enchantments.Length);
+        if (forged < 0 || forged > _enchantments.Length)
             throw new ArgumentOutOfRangeException(nameof(forgedCount), forgedCount,
-                $"'{def.Id}' was handed {Enchantments.Count} entries; the forged ones are a prefix of them.");
+                $"'{def.Id}' was handed {_enchantments.Length} entries; the forged ones are a prefix of them.");
         ForgedEnchantmentCount = forged;
         AreaShape = def.Shape;
         Unique = def.Unique;
@@ -119,6 +130,29 @@ public sealed class Weapon
     public Enchantment? Innate => IsCaster && Enchantments.Count > 0 ? Enchantments[0] : null;
 
     /// <summary>
+    /// What this item would reserve of a wielder's pool if every entry fitted:
+    /// the sum of the attached entries' <see cref="Enchantment.EffectiveLock"/>
+    /// (§3.3). It is the item's own figure and knows no wielder, exactly as
+    /// <see cref="ResolvedCost"/> does; what is actually taken out of a pool is
+    /// <see cref="ActorState.PaidLocks"/>, which stops at the first entry that
+    /// does not fit and leaves the rest dormant.
+    /// <para>
+    /// Derived rather than cached, because a tier is: <see cref="CreditEnchantment"/>
+    /// replaces an entry and the deeper lock has to show through the same read.
+    /// </para>
+    /// </summary>
+    public int TotalLock
+    {
+        get
+        {
+            int total = 0;
+            foreach (var entry in _enchantments)
+                total += entry.EffectiveLock;
+            return total;
+        }
+    }
+
+    /// <summary>
     /// The movement a swing or cast costs after Light's discount:
     /// <c>Cost * (100 - Modifiers.Value(Light)) / 100</c>, truncated. Computed
     /// once and cached, so the HUD and the movement gate agree on one number.
@@ -153,6 +187,39 @@ public sealed class Weapon
                 $"{Name} ({Id}) cannot hold {t} beside {Modifiers}: the relations bind every source, so an offer is gated on ModifierRules.Allowed before it is made.");
         Modifiers = Modifiers.With(t, n, Forged);
         Resolve();
+    }
+
+    /// <summary>
+    /// The second mutator, and the only one that touches an entry: credit
+    /// <paramref name="xp"/> mana spent to the enchantment at
+    /// <paramref name="index"/>, at the INT that was spending it (§3.3). The
+    /// entry is a record and the climb is <see cref="Enchantment.WithXp"/>'s, so
+    /// this replaces the element rather than mutating one — attachment order,
+    /// the entry's identity and everything else about the weapon stay exactly
+    /// where they were.
+    /// <para>
+    /// Every source of enchantment XP comes through here and hands over the same
+    /// figure: the mana actually paid. A trigger the wielder paid for is one
+    /// (§3.3), and the farm's grant is another — "a plain XP grant instead of a
+    /// special case" (§3.5) — so the farm has no path of its own into a tier.
+    /// </para>
+    /// <para>
+    /// The trigger's callers are the five appliers that write a mana record: the
+    /// Cast, DamageTaken, DamageDealt, Killed and HealingAboveFull events each
+    /// credit the entries their loop attributed a payment to
+    /// (<see cref="EnchantmentPayment"/>). A handler never calls this — a handler
+    /// never writes — and neither does a behaviour, which has no index.
+    /// </para>
+    /// </summary>
+    /// <param name="index">The entry's position in <see cref="Enchantments"/>.</param>
+    /// <param name="xp">Mana that entry paid; never negative.</param>
+    /// <param name="stat">The INT that was doing the spending, 1..4; a flat 1 for a thing with no nature.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, <paramref name="xp"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
+    public void CreditEnchantment(int index, int xp, int stat)
+    {
+        if ((uint)index >= (uint)_enchantments.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Length} enchantments.");
+        _enchantments[index] = _enchantments[index].WithXp(xp, stat);
     }
 
     public int Stacks(ModifierType t) => Modifiers.Stacks(t);

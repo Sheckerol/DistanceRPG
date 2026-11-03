@@ -7,8 +7,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// (<see cref="ElementalDamage"/>); <see cref="Vampiric"/> is the catalogue
 /// entry the Efficiency dagger arrives with; the rest are the souls the
 /// uniques carry (§1.5). Each kind is an entry in the per-event tables of
-/// <see cref="EnchantmentBehaviours"/> — or, for the two a defender carries,
-/// a compiled step of the damage pipeline — never a branch in a loop.
+/// <see cref="EnchantmentBehaviours"/> — or, for the three a defender carries
+/// and for the element a martial swing types itself with, a compiled step of
+/// the damage pipeline — never a branch in a loop.
 /// </summary>
 public enum EffectKind
 {
@@ -47,6 +48,24 @@ public enum EffectKind
 
     /// <summary>A kill refunds part of the swing's movement — declared, inert until the fraction is fixed (§3.3).</summary>
     Momentum,
+
+    /// <summary>
+    /// On a hit, add <see cref="Enchantment.LevelsFor"/>(<see cref="EnchantmentDef.Potency"/>)
+    /// damage beside the weapon's share, untyped: Arcane. Untyped is the whole of
+    /// its pitch (§3.3) — "raw magical damage, no element, and therefore nothing
+    /// the type chart can resist or amplify" — which makes it the safe damage
+    /// entry and the four elements the situational ones.
+    /// </summary>
+    BonusDamage,
+
+    /// <summary>On a crit, the riders §1.6 lands (Weakened, Sundered) land that many levels deeper.</summary>
+    Shattering,
+
+    /// <summary>On a hit at the wielder, absorb a point of the attacker's <em>enchantment</em> damage per level — the second armour, beside Block, for the second damage source (a defender's soul, compiled at (5,1)).</summary>
+    Shielding,
+
+    /// <summary>The weapon's class feature triggers once more — declared, inert: the phrase has no definition for six of the eight classes, and <see cref="GameEvent.AttackDeclared"/>, the event it fires on, is raised nowhere (<c>docs/roadmap/open-questions.md</c>).</summary>
+    Echoing,
 }
 
 /// <summary>Who an enchantment's effect may land on.</summary>
@@ -116,6 +135,122 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
 
     /// <summary>Tier pinned at 1: a unique's magnitude reads off its source instead (§1.5).</summary>
     public bool Unique => Def.Unique;
+
+    /// <summary>
+    /// Mana this entry has spent into the tier it is on now — the remainder, not
+    /// a cumulative total (§3.3: "mana it spends is its XP").
+    /// <para>
+    /// <strong>Tier is stored and XP is the remainder into it, which is a ruling
+    /// against §3.5's wording rather than a reading of it.</strong> §3.5 says
+    /// "Tier is derived from XP, not stored", exactly as <c>WeaponXp</c>,
+    /// <c>HpXp</c> and <c>ManaXp</c> work. Those pools can replay from a
+    /// cumulative total because a member's stat never moves; an enchantment's
+    /// divisor is <em>whoever is holding it</em>, so replaying from cumulative XP
+    /// would read a wizard's tier-4 soul as tier 2 in a fighter's hand and back
+    /// again — depth would become a property of the wielder, which contradicts
+    /// depth being "the circle burned into this weapon". Storing the tier and
+    /// crediting at the stat that was actually spending keeps the ladder the
+    /// weapon's, and makes a saved instance two ints.
+    /// </para>
+    /// </summary>
+    public int Xp { get; init; }
+
+    /// <summary>
+    /// The mana this entry reserves while equipped: <c>Lock × Tier</c> (§3.3,
+    /// "lock and potency both scale linearly with tier", so a tier-3 Arcane locks
+    /// 90 and a tier-6 locks 180). Nothing clamps it — the tier needs no ceiling
+    /// because max mana already is one, continuously and painfully.
+    /// <para>
+    /// There is deliberately no <c>EffectivePotency</c> beside it. <c>Tier</c> is
+    /// already a factor inside <see cref="LevelsFor"/>, and every behaviour that
+    /// wants "this entry's potency at its tier" passes
+    /// <see cref="EnchantmentDef.Potency"/> through that one call; a second idiom
+    /// for the same idea would invite feeding one into the other and silently
+    /// squaring the tier.
+    /// </para>
+    /// </summary>
+    public int EffectiveLock => Def.Lock * Tier;
+
+    /// <summary>
+    /// What leaving this tier costs (§3.3): <c>xpToNextTier = currentTierCost /
+    /// INT</c>, where "the tier's current cost" is the pool it locks — the only
+    /// cost a tier has. It is <see cref="Progression.XpToNext"/> again, a fifth
+    /// application of the one threshold function, so INT divides a threshold and
+    /// never multiplies a credit (§2.3: "there is no rate multiplier anywhere").
+    /// A wizard therefore tiers an entry roughly four times as fast as a fighter,
+    /// and the tier is what lifts lock and potency.
+    /// <para>
+    /// It carries no floor, exactly as <see cref="Progression.XpToNext"/> carries
+    /// none: the guard lives in <see cref="TierCost"/>, which is this member
+    /// floored at 1 and is what the climb charges <em>and</em> what a readout
+    /// prints — one expression, so a tier can never be shown at one price and
+    /// charged at another. This member is the doc's line and what a caller asking
+    /// the unfloored arithmetic (the farm's grant of one tier's bar) reads; the
+    /// two part company only where the floor bites (<c>Lock x Tier</c> below the
+    /// wielder's INT), which <see cref="ContentValidator.ValidateEnchantments"/>'
+    /// lock rule and a catalogue whose smallest lock is 15 both keep out of
+    /// reach.
+    /// </para>
+    /// </summary>
+    /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
+    public int XpToNextTier(int stat) => Progression.XpToNext(EffectiveLock, stat);
+
+    /// <summary>
+    /// This entry after <paramref name="manaSpent"/> more mana has gone through
+    /// it (§3.3). The credit is the mana <em>spent</em> — the same figure §2.2
+    /// already credits to max mana, one number and two ladders — and the replay
+    /// is the definition: each tier costs the bar it just made, so the climb
+    /// self-slows with no curve authored anywhere, exactly as
+    /// <see cref="Progression.Pool"/> does.
+    /// <para>
+    /// A unique banks the spend and buys nothing (§3.3): it is pinned at tier 1,
+    /// "they still accrue mana spent, since every trigger still costs; it simply
+    /// buys nothing". It is not a dead stack, because the same spend still grows
+    /// the wielder's max mana.
+    /// </para>
+    /// </summary>
+    /// <param name="manaSpent">Mana this entry actually paid; never negative.</param>
+    /// <param name="stat">The INT that was doing the spending, 1..4; a flat 1 for a thing with no nature, which is what the farm's grant and an enemy's spend both use.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="manaSpent"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
+    public Enchantment WithXp(int manaSpent, int stat)
+    {
+        if (manaSpent < 0)
+            throw new ArgumentOutOfRangeException(nameof(manaSpent), manaSpent,
+                "Mana spent is never negative: an enchantment's ladder is only ever credited.");
+        if (stat < InnateStats.Low || stat > InnateStats.High)
+            throw new ArgumentOutOfRangeException(nameof(stat), stat,
+                $"A governing stat runs {InnateStats.Low}..{InnateStats.High}; a thing with no nature divides by {InnateStats.Low}.");
+
+        if (Unique)
+            return this with { Xp = Xp + manaSpent };
+
+        var grown = this;
+        int xp = Xp + manaSpent;
+        int cost = grown.TierCost(stat);
+        while (xp >= cost)
+        {
+            xp -= cost;
+            grown = grown with { Tier = grown.Tier + 1 };
+            cost = grown.TierCost(stat);
+        }
+        return grown with { Xp = xp };
+    }
+
+    /// <summary>
+    /// What leaving the tier this entry is on actually costs:
+    /// <see cref="XpToNextTier"/>, floored at 1. The floor lives here and never
+    /// inside that member, which stays the doc's line — the same split
+    /// <see cref="Progression"/> already makes between <c>XpToNext</c> and its own
+    /// private step, for the same reason: <see cref="WithXp"/>'s loop is the one
+    /// caller a free step could hang. It is public because the price a readout
+    /// prints is the price the climb charges (§3.3: a bar is what it costs to
+    /// leave the tier), and a HUD restating <c>Math.Max(1, …)</c> for itself
+    /// would be the second expression this split exists to avoid.
+    /// <see cref="ContentValidator.ValidateEnchantments"/> refuses a lock below 1
+    /// at load, so the floor is a second door on a closed one.
+    /// </summary>
+    /// <param name="stat">The wielder's INT, 1..4; a flat 1 for a thing with no nature.</param>
+    public int TierCost(int stat) => Math.Max(1, XpToNextTier(stat));
 
     /// <summary>
     /// Levels one application grants from <paramref name="sourceNumber"/> —

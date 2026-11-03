@@ -17,13 +17,13 @@ namespace GameEngine.DistanceRPG.Tests;
 public class HudTextTests
 {
     private static PartyMemberState Holding(string weaponId, DamageType? element = null)
-    {
-        var member = TestPools.Char("A");
-        member.Inventory[0] = TestWeapons.Get(weaponId, element);
-        return member;
-    }
+        => TestPools.Holding("A", TestWeapons.Get(weaponId, element));
 
     private static string[] Badges(ActorState actor) => DungeonHud.StatusBadgeRuns(actor).Select(r => r.Text).ToArray();
+
+    private static string[] Plate(EnemyState enemy) => DungeonHud.NameplateRuns(enemy).Select(r => r.Text).ToArray();
+
+    private static string[] Item(Drop drop) => DungeonHud.GroundItemRuns(drop).Select(r => r.Text).ToArray();
 
     [Fact]
     public void WeaponStats_ShowTheResolvedCosts_NeverAPercentage()
@@ -69,6 +69,100 @@ public class HudTextTests
         => Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(TestWeapons.Get("flensing_knife_unique")));
 
     [Fact]
+    public void EnchantmentReadout_MarksTheLockAndWhatIsAsleep()
+    {
+        // In a wielder's hands each entry names what it takes out of that
+        // wielder's pool, and one whose lock went unpaid says so: a dormant
+        // entry is a non-event the player has otherwise no way to see (section
+        // 3.1). The Nameless Knife is the case that bites -- 20 + 60 + 25 wanted
+        // of a hundred-point pool, so the last of the three sleeps.
+        var knife = TestWeapons.Get("flensing_knife_unique");
+        var member = TestPools.Char("A");
+        member.Inventory[0] = knife;
+
+        Assert.Equal((80, 20), (member.PaidLocks, member.UsableMaxMana));
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25 (ASLEEP)",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // Grown past all three, nothing is asleep and the locks still read.
+        while (member.IsDormant(2))
+            member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // A lock is a reservation out of a pool, so it reads only where there is
+        // one: the same item in the bag, or asked about with no wielder at all,
+        // prints its entries alone.
+        var bagged = TestPools.Char("B");
+        bagged.Inventory[1] = knife;
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife, bagged));
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife));
+    }
+
+    [Fact]
+    public void EnchantmentReadout_ShowsTheTierAndItsProgress()
+    {
+        // Tier is earned by use (section 3.3), and the bar is the only thing
+        // that says a swing is buying anything: an equipped entry reads XP n/m
+        // beside its lock, where m is that tier's own cost over the wielder's INT
+        // -- the same number the climb charges, TierCost, so the row and the
+        // ladder cannot state two prices.
+        var knife = TestWeapons.Get("flensing_knife_unique");
+        var member = TestPools.Char("A");
+        member.Inventory[0] = knife;
+        while (member.IsDormant(2))
+            member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
+
+        // Nothing spent yet, and the bar still reads: XP 0/60 is what says this
+        // circle can be deepened at all, and an entry that crosses its bar
+        // exactly lands back here rather than losing the row at the moment it has
+        // just earned a tier. A unique has no next tier, so it prints no bar --
+        // and with nothing banked, nothing at all.
+        Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // One swing's worth of triggers: Serrated and Overheal are uniques, so
+        // they bank a figure and print no bar -- there is no next tier to be
+        // partway to -- while Vampiric is climbing its tier-3 bar of sixty.
+        knife.CreditEnchantment(0, 2, InnateStats.Low);
+        knife.CreditEnchantment(1, 2, InnateStats.Low);
+        knife.CreditEnchantment(2, 8, InnateStats.Low);
+        Assert.Equal("SERRATED LOCK 20 XP 2  VAMPIRIC T3 LOCK 60 XP 2/60  OVERHEAL LOCK 25 XP 8",
+            DungeonHud.EnchantmentReadout(knife, member));
+
+        // The bar is the wielder's INT dividing the tier's cost, so it is the
+        // wielder's number: a wizard holding the same knife is a quarter of the
+        // way where a member with no nature is a thirtieth.
+        var wizard = TestPools.Char("B", stats: new InnateStats(STR: 1, DEX: 2, CON: 3, INT: 4));
+        wizard.Inventory[0] = knife;
+        while (wizard.IsDormant(2))
+            wizard.Credit(new XpCredit(XpPool.Mana, null, wizard.ManaPool.XpToNext));
+        Assert.Contains("VAMPIRIC T3 LOCK 60 XP 2/15", DungeonHud.EnchantmentReadout(knife, wizard));
+
+        // Like the lock, progress reads only where there is a wielder: in the
+        // bag or asked about with none, the row is the entry's name and tier.
+        Assert.Equal("SERRATED  VAMPIRIC T3  OVERHEAL", DungeonHud.EnchantmentReadout(knife));
+    }
+
+    [Fact]
+    public void ManaReadout_NamesTheSpendableCeilingWhereTheLocksTookThePool()
+    {
+        // The budget line is where a lock would otherwise be invisible: with the
+        // Nameless Knife in hand the bar tops out at 20 forever, and a reader
+        // told only "/ 100" has no way to see why. So where anything is reserved
+        // the spendable ceiling is the figure and the earned pool follows it;
+        // where nothing is, the line is the one it has always been.
+        var plain = TestPools.Char("A");
+        Assert.Equal((0, 100, 100), (plain.PaidLocks, plain.UsableMaxMana, plain.Mana));
+        Assert.Equal("MANA: 100 / 100", DungeonHud.ManaReadout(plain));
+
+        var locked = TestPools.Char("B");
+        locked.Inventory[0] = TestWeapons.Get("flensing_knife_unique");
+        Assert.Equal((80, 20, 20), (locked.PaidLocks, locked.UsableMaxMana, locked.Mana));
+        Assert.Equal("MANA: 20 / 20 (100)", DungeonHud.ManaReadout(locked));
+    }
+
+    [Fact]
     public void StatusBadges_NameALingeringElementByItsElement_HideThePool_AndLeadWithParalysis()
     {
         var enemy = new EnemyState();
@@ -82,6 +176,48 @@ public class HudTextTests
         enemy.ApplyStatus(Mire, null, 10);   // ten levels at 10% each: no budget left at all
         Assert.True(DungeonHud.IsParalysed(enemy));
         Assert.Equal(new[] { "PARA", "BURN 3", "FRST 2", "+4", "MIRE 10" }, Badges(enemy));
+    }
+
+    [Fact]
+    public void Nameplate_ReadsAsAThreatAndARewardAtOnce()
+    {
+        // A dummy nobody has put down yet reads as it always did.
+        Assert.Equal(new[] { "50/50" }, Plate(new EnemyState()));
+
+        // A farmed one carries its DefeatCount, and that one number is honest
+        // about being two things: the depth of the drop it is holding and how
+        // much harder it hits than the dummy beside it (3.2). The maximum it is
+        // read against is its own, revivals included.
+        var farmed = new EnemyState { DefeatCount = 4, RevivalMaxHp = 17, RevivalDamage = 6 };
+        Assert.Equal(new[] { "67/67", "x4" }, Plate(farmed));
+
+        // It sits between the pool and the badges, so what is left of it and how
+        // many times this has happened are adjacent.
+        farmed.Hp = 12;
+        farmed.ApplyStatus(Sundered, null, 2);
+        Assert.Equal(new[] { "12/67", "x4", "SUND 2" }, Plate(farmed));
+    }
+
+    [Fact]
+    public void AGroundItemNamesTheWeaponAndItsQuality()
+    {
+        // A weapon lying where its carrier fell says which weapon it is and the
+        // farm's depth it was collected at - xN, in the shape a dummy's plate
+        // wears it, so what the player farmed for and what they are being handed
+        // read as one thing (3.2, 3.5). The count includes the kill that
+        // extracted it, so it is one higher than the last plate the player read
+        // over the living dummy; a dead one draws no plate to disagree with.
+        var plain = new Drop(TestWeapons.Get("arming_sword"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Arming Sword" }, Item(plain));   // nothing farmed it: no quality to print
+
+        var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));
+
+        // A unique is named in the gold every other readout gives it, rather than
+        // by a word the label would have to find room for.
+        var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
+        Assert.Equal(new[] { "Widowmaker", "x22" }, Item(won));
+        Assert.NotEqual(DungeonHud.GroundItemRuns(farmed)[0].Color, DungeonHud.GroundItemRuns(won)[0].Color);
     }
 
     [Fact]

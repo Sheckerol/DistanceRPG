@@ -19,17 +19,11 @@ public class AttackShapeTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
-    {
-        var c = TestPools.Char(id);
-        c.Inventory[0] = weapon;
-        return c;
-    }
+        => TestPools.Holding(id, weapon);
 
     /// <summary>A dummy on a tile's centre, with enough HP that nothing here kills it by accident.</summary>
     private static EnemyState Enemy(int r, int c, string weaponId = "arming_sword", int hp = 200)

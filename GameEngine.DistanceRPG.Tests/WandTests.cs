@@ -23,9 +23,7 @@ public class WandTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId, DamageType? element = null)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId, element);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId, element), x: x, y: y);
     }
 
     /// <summary>A dummy on a tile's centre with no Block (fists) unless told otherwise, and enough HP that nothing here kills it by accident.</summary>

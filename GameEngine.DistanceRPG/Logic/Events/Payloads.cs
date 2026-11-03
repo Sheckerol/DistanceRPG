@@ -21,7 +21,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Amount">The running weapon figure through steps 1–3.</param>
 /// <param name="Type">The hit's damage type; <see cref="DamageType.None"/> for a martial swing.</param>
 /// <param name="IsCrit">The natural roll landed in the attacker's crit window.</param>
-/// <param name="Dealt">After mitigation, before absorption: what the attacker did, everything included. Serrated and the clean-kill test read this; weapon XP does not — it reads <see cref="WeaponDealt"/> + <see cref="ForgedShare"/>.</param>
+/// <param name="Dealt">After mitigation, before absorption: what the attacker did, everything included. The clean-kill test reads this — and only it: Serrated reads <see cref="WeaponDealt"/>, the weapon's own share, because an Arcane discharge riding the same swing did not cut anyone deeper; weapon XP reads <see cref="WeaponDealt"/> + <see cref="ForgedShare"/>.</param>
 /// <param name="Absorbed">What Block prevented — never dealt.</param>
 /// <param name="Taken">What reached hit points. Death and Sturdy read this.</param>
 /// <param name="WeaponShare">The weapon's own damage after step 3 — the part that teaches the weapon, with <see cref="ForgedShare"/> beside it.</param>
@@ -35,7 +35,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// dagger still levels daggers on the knife alone. Block never touches it —
 /// Block comes off the weapon's share — so it rides down whole.
 /// </param>
-/// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP.</param>
+/// <param name="WardSpent">What Ward swallowed at step 6, in points (one level each): dealt, but landed on a pool that is not HP. Never the whole hit — 1 always gets through, the same floor Block is held to.</param>
 /// <param name="Roll">The natural d20, rolled before the chain so step 1 is pure.</param>
 /// <param name="Outcome">Crit, Weak (a natural 1) or Normal, decided at step 1.</param>
 /// <param name="Weapon">The attacker's weapon.</param>
@@ -44,7 +44,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="ApplyToDefender">Statuses to land on the defender (crit riders, Pin, Softening), applied once by the applier.</param>
 /// <param name="ApplyToAttacker">Statuses to land on the attacker (BlockWeaken).</param>
 /// <param name="Displace">Push, Drag or Rout settled here, applied once at step 8.</param>
-/// <param name="ManaToSpend">The attacker's enchantment trigger payments accumulated in list order, spent once by the applier.</param>
+/// <param name="ManaToSpend">The attacker's enchantment trigger payments accumulated in list order, spent once by the applier — the total <see cref="Payments"/> attributes entry by entry.</param>
 /// <param name="FromCleave">True on a hit a cleave fanned out to beyond its primary target; Rout is Push applied to everything the cleave caught, the primary included, so it shoves either way.</param>
 /// <param name="OnAlly">True on a hit that landed on the attacker's own side — an area cast catching an ally, which only happens while friendly fire is on — priced at <see cref="Tuning.FriendlyFireAllyPercent"/> at (1,2).</param>
 /// <param name="DefenderManaToSpend">The defender's trigger payments — its Sturdy at (6,1), its Immovable at (8,3) — accumulated apart from the attacker's and spent once by the applier, off the defender's own pool.</param>
@@ -55,6 +55,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="CastFired">For a hit an area cast fanned out to: the ids of the cast's entries whose trigger the cast paid, in attachment order — what the hit-side halves of those entries (an element's share, a lingering element's burn) read to fire on the hit at no further cost. Default for a swing.</param>
 /// <param name="OnDefendersTurn">True when the hit lands in the defender's own side's phase — a counter to its swing, a brace it walked into, a shot it drew by moving: the defender is acting, not holding a line. The souls that answer the opponent's phase (Immovable) stand aside. Set by the turn system from whose phase it is; false by default, the opponent's phase.</param>
 /// <param name="NextInLine">On DamageDealt: the next body on the shot's line beyond the defender that the weapon reaches — the nearest living actor of the far side further along the attacker-to-defender ray, within a tile of it, in range and sight — read off the map by the DamageTaken applier at impact, before anything the hit sets off has moved. What an entry that carries the shot on (Piercing) reads before it pays; null when the line is clear, on a hit that was itself carried there, and throughout DamageTaken.</param>
+/// <param name="Payments">Which of the attacker's entries paid what of <see cref="ManaToSpend"/> (§3.3), appended by the loop as each entry fires. The defender's souls have none: they pay out of <see cref="DefenderManaToSpend"/>, which is the defender's record and not this list.</param>
+/// <param name="RiderDepth">
+/// Extra levels every crit rider this hit lands carries, settled at step 4 by
+/// the entries that deepen them (Shattering, §3.3) and read at (7,0), where the
+/// riders themselves are settled. It is a depth and not a rider of its own: an
+/// attacker forged with neither <c>CritWeaken</c> nor <c>CritSunder</c> lands
+/// nothing however deep this goes, because a rider that is not there cannot
+/// land deeper. It is why the entry fires at step 4 rather than on
+/// <see cref="GameEvent.Crit"/>, which arrives after the riders have landed.
+/// </param>
 public sealed record DamagePayload(
     int Amount, DamageType Type, bool IsCrit, int Dealt, int Absorbed,
     int Taken, int WeaponShare, int EnchantmentShare, int ForgedShare, int WardSpent,
@@ -73,7 +83,9 @@ public sealed record DamagePayload(
     bool FromPierce = false,
     ImmutableArray<string> CastFired = default,
     bool OnDefendersTurn = false,
-    ActorState? NextInLine = null)
+    ActorState? NextInLine = null,
+    ImmutableArray<EnchantmentPayment> Payments = default,
+    int RiderDepth = 0)
 {
     /// <summary>
     /// The payload as it enters the chain: only the inputs step 1 needs, with
@@ -104,7 +116,8 @@ public sealed record DamagePayload(
             OnAlly: onAlly,
             CastFired: castFired.IsDefault ? ImmutableArray<string>.Empty : castFired,
             FromPierce: fromPierce,
-            OnDefendersTurn: onDefendersTurn);
+            OnDefendersTurn: onDefendersTurn,
+            Payments: ImmutableArray<EnchantmentPayment>.Empty);
     }
 
     /// <summary>
@@ -124,6 +137,14 @@ public sealed record DamagePayload(
     /// it landed, the payments it took, the heal and the continuation nothing
     /// has settled yet — cleared, so the entries that fire on damage dealt
     /// accumulate their own and that event's applier writes them once.
+    /// <see cref="Payments"/> is cleared <em>with</em> <see cref="ManaToSpend"/>,
+    /// since it is that total attributed: carrying the hit's attributions on
+    /// would credit every step-4 entry a second time for mana it paid once.
+    /// <see cref="RiderDepth"/> goes with them for the same reason: a depth
+    /// settled at step 4 was consumed at (7,0) of this same chain, and a depth
+    /// already landed is not a depth the next event may read — an entry firing
+    /// on damage dealt that deepened something would otherwise be counting a
+    /// crit's depth twice.
     /// </summary>
     public DamagePayload AsDealt() => this with
     {
@@ -133,11 +154,31 @@ public sealed record DamagePayload(
         DefenderManaToSpend = 0,
         HealToAttacker = 0,
         Pierces = false,
+        Payments = ImmutableArray<EnchantmentPayment>.Empty,
+        RiderDepth = 0,
     };
 }
 
 /// <summary>A status to land on an actor once the chain settles: the type, its element (Searing keys on it) and the levels.</summary>
 public sealed record StatusApplication(StatusEffectType Type, DamageType? Element, int Levels);
+
+/// <summary>
+/// One entry's share of an event's trigger payments (§3.3): the enchantment at
+/// <paramref name="Index"/> of the wielder's attachment order paid
+/// <paramref name="Paid"/> mana of that event's <c>ManaToSpend</c>. Appended by
+/// the loop as each entry fires — the same delta idiom that attributes a hit's
+/// <see cref="DamagePayload.ForgedShare"/>, read off the payload rather than
+/// asked of the behaviour, so a kind added to a table is attributed without the
+/// loop knowing it exists.
+/// <para>
+/// It exists because mana spent is an enchantment's experience and the credit
+/// has to find <em>which</em> entry spent it: the payload carried a total and a
+/// total cannot be attributed. The index is a position in the weapon the loop
+/// walked (the wielder's equipped one), never an id — attachment order is
+/// gameplay (§1.7) and two copies of the same entry are two entries.
+/// </para>
+/// </summary>
+public sealed record EnchantmentPayment(int Index, int Paid);
 
 /// <summary>
 /// One status's settled outcome at a trigger, written once by the raising
@@ -171,9 +212,14 @@ public sealed record AttackPayload(Weapon Weapon, ActorState Target, int Distanc
 /// <paramref name="Ticks"/> holds the status changes the chain settled (the
 /// hidden pool's conversion, the levels Overheal grants it), applied once by
 /// the event's applier; <paramref name="ManaToSpend"/> the trigger payments
-/// the healed actor's entries accumulated on HealingAboveFull, spent once.
+/// the healed actor's entries accumulated on HealingAboveFull, spent once; and
+/// <paramref name="Payments"/> which of those entries paid what of it (§3.3).
+/// The record names no weapon, only a <paramref name="Source"/> string, so the
+/// applier credits the payments against the healed actor's own equipped weapon
+/// — whose entries are the ones the loop ran.
 /// </summary>
-public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source, ImmutableArray<StatusTick> Ticks = default, int ManaToSpend = 0);
+public sealed record HealPayload(int Amount, int Applied, int Overflow, string Source, ImmutableArray<StatusTick> Ticks = default, int ManaToSpend = 0,
+    ImmutableArray<EnchantmentPayment> Payments = default);
 
 /// <summary>
 /// <see cref="GameEvent.Killed"/>: the weapon that did it — null when a status
@@ -181,9 +227,11 @@ public sealed record HealPayload(int Amount, int Applied, int Overflow, string S
 /// and there is no wielder to reward — and the killing hit's two outputs.
 /// <paramref name="ManaToSpend"/> and <paramref name="ManaRestored"/> are what
 /// the killer's entries settled on the kill (Siphon's trigger and its refund),
-/// written once by the applier as one mana record.
+/// written once by the applier as one mana record; <paramref name="Payments"/>
+/// which of the killer's entries paid what of the trigger (§3.3).
 /// </summary>
-public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken, int ManaToSpend = 0, int ManaRestored = 0);
+public sealed record KillPayload(Weapon? Weapon, int Dealt, int Taken, int ManaToSpend = 0, int ManaRestored = 0,
+    ImmutableArray<EnchantmentPayment> Payments = default);
 
 /// <summary><see cref="GameEvent.Crit"/>.</summary>
 public sealed record CritPayload(Weapon Weapon, int Roll);
@@ -196,6 +244,11 @@ public sealed record CritPayload(Weapon Weapon, int Roll);
 /// the spend asked for; <paramref name="Spent"/> never exceeds the pool, so a
 /// fumble's doubled cost empties it rather than overdrawing it. Enchantment XP
 /// (§3.3) is counted on <paramref name="Spent"/>: the discounted mana actually paid.
+/// That is why a per-entry credit is scaled by <c>Spent / Wanted</c> before it is
+/// banked — the entries settled their triggers against the pool as it stood, and
+/// crediting each its full share of a record the pool came up short on would make
+/// the enchantment ladder and the max-mana ladder count two different numbers for
+/// one spend, which is the one thing this sentence forbids.
 /// <paramref name="Restored"/> is mana the same record hands back — Siphon's
 /// refund on a kill — taken after the spend and never past the pool, so one
 /// record says what a kill cost and what it returned.
@@ -293,10 +346,18 @@ public sealed record ThreatPayload(ActorState Mover, MoveKind Kind, ZoneEdge Edg
 /// Cast applier credits, exactly as a hit credits
 /// <see cref="DamagePayload.WeaponDealt"/> with the forged share beside it.
 /// </para>
+/// <para>
+/// <paramref name="Payments"/> is <paramref name="ManaToSpend"/> attributed:
+/// which entry paid what of it (§3.3), appended by the loop as each one fires.
+/// The cast's own <paramref name="ManaCost"/> belongs to no entry and is not in
+/// it, so a record the pool cannot cover is shared between the cast and the
+/// entries in proportion rather than charged to either.
+/// </para>
 /// </summary>
 public sealed record CastPayload(Weapon Weapon, ActorState Target, int Roll, bool IsCrit, bool IsFumble, int Levels, int ManaCost,
     ImmutableArray<StatusApplication> ApplyToTarget = default, int ManaToSpend = 0, DamageType Type = DamageType.None,
-    ImmutableArray<string> Fired = default, int ForgedLevels = 0);
+    ImmutableArray<string> Fired = default, int ForgedLevels = 0,
+    ImmutableArray<EnchantmentPayment> Payments = default);
 
 /// <summary>Whether a move was chosen: Brace fires on entry either way, Opportunist only on a voluntary exit (§1.2).</summary>
 public enum MoveKind { Voluntary, Forced }

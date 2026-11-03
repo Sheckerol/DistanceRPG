@@ -41,18 +41,12 @@ public class UniqueContentTests
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
-    {
-        var c = TestPools.Char(id);
-        c.Inventory[0] = weapon;
-        return c;
-    }
+        => TestPools.Holding(id, weapon);
 
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = TestWeapons.Get(weaponId);
-        return ch;
+        return TestPools.Holding(id, TestWeapons.Get(weaponId), x: x, y: y);
     }
 
     private static EnemyState Enemy(int r, int c, string weaponId = "arming_sword", int hp = 200)
@@ -269,12 +263,13 @@ public class UniqueContentTests
         // The unique flag gates two things and nothing else: the tier is pinned at 1, and no roll grants
         // the entry — the latter in restricted.json, cross-checked on load. Vampiric is the catalogue
         // entry the dagger arrives with at tier 3: not unique, rollable, its tier its own. The catalogue
-        // in file order: the eight innates, Vampiric, then the nine souls in the §3.3 table's order.
+        // in file order: the eight innates, then the ordinary entries of §3.3's starting set — Vampiric,
+        // Arcane, Shattering, the shielding entry and Echoing — then the nine souls in the table's order.
         Assert.Equal(
             new[]
             {
                 "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic",
-                "vampiric",
+                "vampiric", "arcane", "shattering", "aegis", "echoing",
                 "siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning",
             },
             Enchantments.All.Select(e => e.Id));
@@ -289,7 +284,7 @@ public class UniqueContentTests
             Assert.Equal(1, (new Enchantment(soul, 1) with { Tier = 3 }).Tier);   // no path lifts the pin, a copy included
         }
         Assert.Equal(Souls.Length, Enchantments.NeverRolled.Count);
-        Assert.Equal(8 + 1, Enchantments.Rollable.Count);
+        Assert.Equal(8 + 5, Enchantments.Rollable.Count);   // the eight innates and the starting set's five ordinary entries
         Assert.False(Enchantments["vampiric"].Unique);
         Assert.Contains(Enchantments.Rollable, e => e.Id == "vampiric");
         Assert.Equal(3, new Enchantment(Enchantments["vampiric"], 3).Tier);

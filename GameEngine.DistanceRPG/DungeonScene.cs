@@ -23,6 +23,29 @@ public enum GameMenu
 public readonly record struct ClickCue(string Label, bool Ready);
 
 /// <summary>
+/// A weapon lying where its carrier fell (§3.5): the corpse whose row fixes it,
+/// the drop itself, the marker drawn on its tile, and that tile.
+/// <para>
+/// <strong>The tile is on the record rather than read back off the corpse.</strong>
+/// The marker is fixed where the body lay when the item was laid down; a target
+/// test that re-read <c>Corpse.X/Y</c> every frame would agree with it only
+/// because nothing currently moves a corpse — an invariant held by two unrelated
+/// facts (displacement applies to the living, and the resurrection relocation
+/// cannot run while resurrection is stopped) rather than by the data. One source
+/// for the item's position means the cue the HUD draws and the tile <c>G</c>
+/// collects on cannot part company.
+/// </para>
+/// <para>
+/// Nothing here is saved. The drop is a pure function of the enemy row and the
+/// floor's seed, so a load re-derives it (<see cref="TurnSystem.GroundItemOf"/>)
+/// rather than restoring it, and picking it up sets
+/// <see cref="EnemyState.DropTaken"/> on that row, which is the one thing that
+/// retires the offer.
+/// </para>
+/// </summary>
+public sealed record GroundItem(EnemyState Corpse, Drop Drop, GameObject Marker, (int R, int C) Tile);
+
+/// <summary>
 /// The main gameplay scene: a procedurally generated dungeon explored by a
 /// four-character party in turn-based, distance-budgeted combat. The dungeon
 /// is the prototype's exact map (same seed, same generator), reinterpreted in
@@ -55,6 +78,7 @@ public class DungeonScene : Scene
     private static readonly Vector4 ReactionColor = Rgb(0x87ffff); // a reaction's callout, and a shot held for one
     private static readonly Vector4 CueColor = Rgb(0x9999a6);      // why a click or a key did nothing
     private static readonly Vector4 LevelUpColor = Rgb(0x8cff6b);  // a pool or a ladder crossing a bar (§2.2)
+    private static readonly Vector4 LootColor = Rgb(0xffcf5a);     // a weapon on the floor, and the beat when it is taken (§3.5)
 
     private static readonly Vector4[] PartyColors =
     {
@@ -107,6 +131,19 @@ public class DungeonScene : Scene
     private readonly Dictionary<EnemyObject, (int R, int C)> _lastEnemyTile = new();
     private int _activeIdx;
 
+    // What the permanent kills have left on the floor, and what the campaign has
+    // met (§3.3, §3.5). Neither is stored by the floor: the ground items are
+    // re-derived from the enemy rows on entry, and the seen set only ever grows —
+    // seeded from the starting loadout in SpawnParty and added to at every pickup.
+    //
+    // The seen set is campaign-wide by right and scene-wide in fact: one scene is
+    // one floor, so as written it starts empty on every floor. Nothing reads it
+    // before §6.4, so nothing is wrong today, but whoever builds §4.1's floor
+    // persistence owns lifting it out of the scene (and §5.1 owns saving it) —
+    // recorded in docs/roadmap/open-questions.md so the seam belongs to someone.
+    private readonly List<GroundItem> _groundItems = new();
+    private readonly CampaignState _campaign = new();
+
     // Held movement keys (arrows and WASD both drive the active character).
     private bool _up, _down, _left, _right;
 
@@ -135,6 +172,8 @@ public class DungeonScene : Scene
     public int ActiveIndex => _activeIdx;
     public TurnSystem Turns => _turns;
     public IReadOnlyList<EnemyObject> Enemies => _enemies;
+    public IReadOnlyList<GroundItem> GroundItems => _groundItems;
+    public CampaignState Campaign => _campaign;
     public GameMenu ActiveMenu { get; private set; } = GameMenu.None;
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
     public Vector2 MousePos => _mousePos;
@@ -239,6 +278,7 @@ public class DungeonScene : Scene
         BuildFogOverlay();   // after all geometry: its translucent pass blends over everything
         BuildFogParticles(); // after the fog overlay: mist blends over the shroud
         WireTurnSystem();
+        RederiveGroundItems();   // after the turn system: what a permanent kill left here is read back off the enemy rows (§3.5)
         WireInput();
 
         // Initial fog reveal around the party, and hide the enemy if fogged.
@@ -356,6 +396,12 @@ public class DungeonScene : Scene
                 tiles[i].C * GameConstants.Tile + GameConstants.Tile / 2f,
                 tiles[i].R * GameConstants.Tile + GameConstants.Tile / 2f);
 
+            // The loadout is met the moment it is handed over (§3.3): "whenever a
+            // weapon carrying one enters your inventory" is a rule about the bag,
+            // not about the floor, and a party that starts with a Renewal staff
+            // has met regeneration however it came by it.
+            _campaign.See(state);
+
             var character = new CharacterObject(state, PartyColors[i]);
             _party.Add(character);
             AddGameObject(character);
@@ -368,12 +414,25 @@ public class DungeonScene : Scene
     /// First-entry enemy population: EnemyPlacer decides positions from the
     /// map seed on its own RNG stream. When save games arrive, a loaded
     /// entry skips this and restores saved enemy states instead.
+    /// <para>
+    /// Each dummy keeps the index it was placed at (§3.2's
+    /// <see cref="EnemyState.SpawnIndex"/>): the revival ladder is seeded from
+    /// the map seed and that index, so it is the dummy's own rather than the
+    /// floor's, and a save restores it beside the accumulated values.
+    /// </para>
     /// </summary>
     private void SpawnEnemies()
     {
+        int spawnIndex = 0;
         foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(_map, MapSeed))
         {
-            var state = new EnemyState { X = x, Y = y, Weapon = GameContent.Current.Weapons.Instantiate(weaponId) };
+            var state = new EnemyState
+            {
+                X = x,
+                Y = y,
+                Weapon = GameContent.Current.Weapons.Instantiate(weaponId),
+                SpawnIndex = spawnIndex++,
+            };
             var enemy = new EnemyObject(state, EnemyColor);
             _enemies.Add(enemy);
             AddGameObject(enemy);
@@ -432,8 +491,11 @@ public class DungeonScene : Scene
 
     private void WireTurnSystem()
     {
+        // The floor's own generation seed goes in with the roster: the revival
+        // ladder (§3.2) is drawn off mapSeed ^ ReviveSalt, per enemy and per
+        // cycle, so a farm replays identically from a save that restored it.
         _turns = new TurnSystem(_map.Grid, _party.Select(p => p.State).ToList(),
-            _enemies.Select(e => e.State).ToList(), RollD20);
+            _enemies.Select(e => e.State).ToList(), RollD20, MapSeed);
 
         _turns.TurnEnded += saved =>
         {
@@ -484,6 +546,11 @@ public class DungeonScene : Scene
             _hud.AddFloatingText(obj.Position, "DEFEATED!", new Vector4(1f, 1f, 1f, 1f), -54f);
         };
 
+        // A defeat with resurrection stopped is the permanent kill (§3.2): the
+        // weapon the dummy was carrying is on the floor where it fell, and the
+        // turn system has already rolled it off the floor's own seed.
+        _turns.EnemyDropped += DropOnFloor;
+
         _turns.EnemyResurrected += enemy =>
         {
             Log.Info("[Combat] Enemy resurrected!");
@@ -520,6 +587,19 @@ public class DungeonScene : Scene
             Log.Info($"[Progress] {member.Id} {label} (+{gained})");
             if (TryObjectFor(member, out var obj) && obj.IsActive)
                 _hud.AddFloatingText(obj.Position, label, LevelUpColor, -64f);
+        };
+
+        // The mana an entry spent burned the circle a step deeper (§3.3). The
+        // same beat as a level-up and for the same reason: the applier settled
+        // it, and the label only states what the entry now reads. It is the
+        // wielder's beat whichever side is wielding -- an enemy healer's staff
+        // levels by casting too -- so a dummy's tier-up simply finds no object
+        // to float over.
+        _turns.EnchantmentTiered += (wielder, weapon, entry) =>
+        {
+            Log.Info($"[Progress] {weapon.Name}: {entry.Def.Name} reaches tier {entry.Tier}");
+            if (TryObjectFor(wielder, out var obj) && obj.IsActive)
+                _hud.AddFloatingText(obj.Position, $"{entry.Def.Name.ToUpperInvariant()} T{entry.Tier}!", LevelUpColor, -64f);
         };
 
         _turns.CharacterHealed += (c, amount) =>
@@ -640,14 +720,17 @@ public class DungeonScene : Scene
         }, Keys.D2);
         input.SubscribeToKeyPressed(_ =>
         {
-            if (InventoryOpen) EquipSlot(2);
-            else if (!AnyMenuOpen) SetActiveCharacter(2);
+            if (PauseMenuOpen) StopResurrection();
+            else if (InventoryOpen) EquipSlot(2);
+            else SetActiveCharacter(2);
         }, Keys.D3);
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) SetActiveCharacter(3); }, Keys.D4);
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) CycleActiveCharacter(); }, Keys.Tab);
 
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) _turns.EndTurn(); }, Keys.Space, Keys.Enter);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
+        // G takes what the active member is standing on (§3.5).
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen) PickUp(); }, Keys.G);
         // O holds fire: a ranged weapon with Overwatch banks its shot against
         // whatever walks into reach on the enemy turn. The member says so — the
         // readout then shows the shots held — or says why it cannot.
@@ -1292,6 +1375,132 @@ public class DungeonScene : Scene
         return (enemy, member);
     }
 
+    // ── Loot on the floor ────────────────────────────────────────────────────
+
+    /// <summary>The marker a dropped weapon is drawn as: a small plate on the tile, clearly walkable, clearly not a body.</summary>
+    private const float GroundItemWidth = 0.42f;
+    private const float GroundItemHeight = 0.14f;
+
+    /// <summary>What the HUD prints over the item the active member is standing on — the key, so the cue and the binding cannot drift apart.</summary>
+    public const string PickupHint = "PRESS G";
+
+    /// <summary>
+    /// The ground item the active member is standing on — what <c>G</c> would
+    /// take — or null: outside the player phase, with a menu open, or standing
+    /// anywhere else. Tile equality, not reach: you pick up what is under you.
+    /// </summary>
+    public GroundItem? PickupTarget
+    {
+        get
+        {
+            if (_turns.Phase != TurnPhase.Player || AnyMenuOpen) return null;
+            var tile = LogicTile(ActiveCharacter.State.X, ActiveCharacter.State.Y);
+            return _groundItems.FirstOrDefault(item => item.Tile == tile);
+        }
+    }
+
+    /// <summary>
+    /// Put a dropped weapon on the floor at the corpse it came off. The drop
+    /// itself was rolled by the turn system off the floor's seed (§3.5); the
+    /// scene supplies only what is the scene's — a marker on the tile, and the
+    /// log line.
+    /// <para>
+    /// Where it lands is decided once, here: the marker's position and the item's
+    /// tile are taken off the corpse in the same breath, so the cue and the key
+    /// read one fact rather than two that have to keep agreeing.
+    /// </para>
+    /// </summary>
+    private void DropOnFloor(EnemyState corpse, Drop drop)
+    {
+        Log.Info($"[Loot] Dropped {drop.Weapon.Name} (x{drop.DefeatCount}{(drop.WasUniqueRoll ? ", UNIQUE" : "")})");
+        var marker = new PrimitiveBoxObject(GroundItemWidth, GroundItemHeight, GroundItemWidth, LootColor)
+        {
+            Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
+        };
+        AddGameObject(marker);
+        _groundItems.Add(new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y)));
+        UpdateGroundItemVisibility();
+    }
+
+    /// <summary>
+    /// Every weapon this floor is holding that is not already on it (§3.5): a
+    /// dummy killed permanently and not picked up is lying on the weapon it
+    /// carried, and nothing stored that — the enemy row and the floor's seed
+    /// re-derive the identical item.
+    /// <para>
+    /// Read at floor entry, where on a first visit nothing is dead and it places
+    /// nothing (a loaded floor, §5.1, is what it is for), and again the moment
+    /// resurrection stops, because that is the other way a corpse becomes one
+    /// that is offering rather than one that is going to get up.
+    /// </para>
+    /// </summary>
+    private void RederiveGroundItems()
+    {
+        foreach (var enemy in _enemies)
+        {
+            if (_groundItems.Any(item => item.Corpse == enemy.State)) continue;
+            if (_turns.GroundItemOf(enemy.State) is { } drop)
+                DropOnFloor(enemy.State, drop);
+        }
+    }
+
+    /// <summary>
+    /// Take what the active member is standing on: the bag, the retired offer and
+    /// the met entries are <see cref="Pickup.Take"/>'s, which decides them without
+    /// a window and is tested that way; what is left here is the scene's — the
+    /// marker that goes, the reach that changed, the cue that says why a full bag
+    /// took nothing (a carry limit, not a fault: §4.4's 24 party-wide slots
+    /// replace Phase 3's three).
+    /// </summary>
+    private void PickUp()
+    {
+        if (PickupTarget is not { } item) return;
+
+        var member = ActiveCharacter.State;
+        int slot = Pickup.Take(_campaign, item.Corpse, item.Drop, member);
+        if (slot == Pickup.BagFull)
+        {
+            SayRefusal(ActiveCharacter, new ClickCue($"BAG FULL - {PartyMemberState.InventorySlots} CARRIED", false));
+            return;
+        }
+
+        _groundItems.Remove(item);
+        RemoveGameObject(item.Marker);
+        if (slot == 0)
+            _turns.NotifyWeaponChanged(member);   // an empty hand filled is a reach changed
+
+        Log.Info($"[Loot] {member.Id} picks up {item.Drop.Weapon.Name} into slot {slot + 1}");
+        _hud.AddFloatingText(ActiveCharacter.Position, $"TOOK {item.Drop.Weapon.Name.ToUpperInvariant()}", LootColor, -52f);
+    }
+
+    /// <summary>
+    /// Scaffolding (§3.5), and labelled as such where it is drawn: killing the
+    /// boss is what stops resurrection (§4.3), and until Phase 4 has one there is
+    /// no way to reach the drop path in play. One-way, like the boss kill it
+    /// stands in for, and it goes when the boss arrives.
+    /// </summary>
+    private void StopResurrection()
+    {
+        if (!_turns.ResurrectionActive) return;
+        _turns.ResurrectionActive = false;
+        ActiveMenu = GameMenu.None;
+        // Whatever was already down is now a corpse that stays down, and a corpse
+        // that stays down is carrying its weapon on the floor: the same rule the
+        // floor entry reads, applied the moment it starts being true.
+        RederiveGroundItems();
+        Log.Info("[Dev] Resurrection stopped: every defeat from here is permanent and hands over what the dummy was carrying");
+    }
+
+    /// <summary>A ground item is as visible as the tile it sits on, exactly as the corpse that left it was.</summary>
+    private void UpdateGroundItemVisibility()
+    {
+        foreach (var item in _groundItems)
+        {
+            var (r, c) = item.Tile;
+            item.Marker.IsActive = _fog.Visible[r, c];
+        }
+    }
+
     // ── Fog & enemy visibility ───────────────────────────────────────────────
 
     private void UpdateFogFor(CharacterObject member, bool animate = true)
@@ -1415,6 +1624,7 @@ public class DungeonScene : Scene
             enemy.SetVisible(visible); // hidden, a shove's slide ends where the logic put it
             _turns.NotifyEnemyVisible(enemy.State, visible);
         }
+        UpdateGroundItemVisibility();   // what a corpse left is lit by the same fog the corpse was
     }
 
     private EnemyObject EnemyObjectFor(EnemyState state) => _enemies.First(e => e.State == state);

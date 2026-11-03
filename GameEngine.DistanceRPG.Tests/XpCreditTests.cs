@@ -31,9 +31,7 @@ public class XpCreditTests
     private static PartyMemberState Char(string id, int r, int c, Weapon weapon)
     {
         var (x, y) = At(r, c);
-        var ch = TestPools.Char(id, x: x, y: y);
-        ch.Inventory[0] = weapon;
-        return ch;
+        return TestPools.Holding(id, weapon, x: x, y: y);
     }
 
     private static PartyMemberState Char(string id, int r, int c, string weaponId, DamageType? element = null)

@@ -47,6 +47,27 @@ public sealed class TurnSystem
     /// <summary>Completed turn count; increments when a new player turn starts.</summary>
     public int TurnCount { get; private set; }
 
+    /// <summary>
+    /// Whether a defeated dummy comes back (§3.2, §4.3). True for the whole of a
+    /// visit today: the dungeon is an infinite farm, the timer runs, and a defeat
+    /// writes nothing but <see cref="EnemyState.DefeatCount"/> — "nothing is
+    /// handed over at the time". Set false and the dungeon is finite: nothing
+    /// revives, and every defeat is the permanent kill that collects what the
+    /// dummy was carrying (<see cref="EnemyDropped"/>, <see cref="GroundItemOf"/>).
+    /// <para>
+    /// This is the seam Phase 4's boss takes over — killing the boss is what
+    /// stops resurrection (§4.3) — and nothing in the logic flips it on its own.
+    /// Until that boss exists the scene's pause menu carries a dev switch, so the
+    /// drop path can be played rather than only tested.
+    /// </para>
+    /// <para>
+    /// Stopping resurrection ends the ladder and refunds none of it: a floor
+    /// farmed deep is still standing there, stronger for every cycle, which is
+    /// exactly what makes the climb out the price of having farmed (§3.2).
+    /// </para>
+    /// </summary>
+    public bool ResurrectionActive { get; set; } = true;
+
     /// <summary>Enemies a party member has laid eyes on this turn (cleared each player turn).</summary>
     private readonly HashSet<EnemyState> _seenThisTurn = new();
 
@@ -60,6 +81,7 @@ public sealed class TurnSystem
     public event Action<PartyMemberState>? CharacterDied;
     public event Action<EnemyState, AttackResolution>? EnemyHit;
     public event Action<EnemyState>? EnemyDefeated;
+    public event Action<EnemyState, Drop>? EnemyDropped;                    // a permanent kill handed over what the dummy was carrying (§3.5): the corpse, and the weapon now lying on it
     public event Action<EnemyState>? EnemyResurrected;
     public event Action<PartyMemberState>? BraceTriggered;
     public event Action<EnemyState>? EnemyBraceTriggered;
@@ -75,6 +97,7 @@ public sealed class TurnSystem
     public event Action<ActorState>? OverwatchTriggered;                    // a held shot fired at a target entering reach
     public event Action<ActorState>? RiposteTriggered;                      // a successful block answered with a counter-swing
     public event Action<PartyMemberState, XpCredit, int>? XpCredited;       // a credit bought a member points or levels: the credit and how many (§2.2), for the level-up beat
+    public event Action<ActorState, Weapon, Enchantment>? EnchantmentTiered;   // mana an entry spent bought it a tier (§3.3): the wielder, the weapon the circle is cut into, and the entry as it now reads
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -160,6 +183,14 @@ public sealed class TurnSystem
     // enemies gain progression is the day this line changes and nothing else.
     private readonly Dictionary<ActorState, Action<XpCredit>> _xpFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for a defeat (§3.2): the Killed applier hands the blow's unclamped
+    // figure to the feed the roster fixed for whatever died, and a dummy's
+    // advances its DefeatCount by FarmLadder.DefeatAdvance. A party member's is
+    // a no-op, exactly as its XP feed is — nothing here asks an actor its kind,
+    // and the day a party member starts recording its own deaths is the day
+    // this one line changes.
+    private readonly Dictionary<ActorState, Action<int>> _defeatFeeds = new(ReferenceEqualityComparer.Instance);
+
     // ── Turn economy ─────────────────────────────────────────────────────────
     // Attacks each actor has chosen to make since its side's turn began — a
     // brace, a held shot, a counter or an opportunity attack is a reaction and
@@ -177,13 +208,28 @@ public sealed class TurnSystem
 
     private EnemyState ActingEnemy => _enemies[_enemyIdx];
 
+    // The floor's own generation seed — the value MapGenerator.Generate was
+    // given, which DungeonScene holds and hands over. The revival ladder (§3.2)
+    // is drawn on mapSeed ^ FarmLadder.ReviveSalt, per enemy and per cycle, so
+    // this is the one thing that makes a farm replay identically after a reload.
+    // It is NOT allowed to fall back to Random.Shared the way _rollD20 does: a
+    // die roll nobody saved may differ between a session and its reload, and a
+    // dummy's statline may not. A fixture that never revives anything can leave
+    // it at 0, which is a seed like any other.
+    private readonly long _mapSeed;
+
+    /// <param name="mapSeed">
+    /// The floor's generation seed, for the streams a save replays from (§3.2).
+    /// Defaults to 0 for fixtures that roll nothing off it.
+    /// </param>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
-        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null)
+        IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0)
     {
         _grid = grid;
         _party = party;
         _enemies = enemies;
         _rollD20 = rollD20 ?? (() => Random.Shared.Next(1, 21));
+        _mapSeed = mapSeed;
 
         Behaviours.RegisterAll(_events);
         _events.Applies<DamagePayload>(GameEvent.DamageTaken, ApplyDamage);
@@ -215,6 +261,7 @@ public sealed class TurnSystem
                 if (gained > 0)
                     XpCredited?.Invoke(member, credit, gained);
             };
+            _defeatFeeds[member] = static _ => { };                       // a member's defeats are not a ladder anyone farms
             _sides[member] = Side.Party;
             _mayReact[member] = static () => true;                       // the party's zones are always armed
         }
@@ -227,6 +274,9 @@ public sealed class TurnSystem
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
             _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
             _xpFeeds[enemy] = static _ => { };                           // an enemy carries no pools: the roster says so, never a type test
+            // The n-th defeat of this dummy deepens what it is carrying, and the
+            // bar is its own constitution: dealt >= MaxHp counts twice (§3.2).
+            _defeatFeeds[enemy] = dealt => enemy.DefeatCount += FarmLadder.DefeatAdvance(dealt, enemy.MaxHp);
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
@@ -291,6 +341,18 @@ public sealed class TurnSystem
     /// back, one now outside a shorter reach is released so a real entry
     /// counts again. A held shot lapses with the weapon that held it; the
     /// movement it cost is not refunded. Nothing fires: nobody moved.
+    /// <para>
+    /// The equipped set is also what prices the enchantment locks (§3.3), so
+    /// the pool is clamped to <see cref="ActorState.UsableMaxMana"/> here: a
+    /// wielder taking up a locked weapon cannot go on holding mana the new
+    /// reservation has taken. Putting one down returns the ceiling in full and
+    /// refunds nothing, which is what the clamp not being a refill says.
+    /// <see cref="ActorState.Mana"/> already reads through that ceiling, so
+    /// this changes no spend; what it changes is that the clamp is
+    /// <em>stored</em> — the mana a swap put out of reach does not read again
+    /// when the weapon is put down, which is what makes an equip the one place
+    /// a reservation is taken rather than only held.
+    /// </para>
     /// </summary>
     public void NotifyWeaponChanged(ActorState actor)
     {
@@ -298,6 +360,7 @@ public sealed class TurnSystem
         if (!_sides.ContainsKey(actor))
             throw new InvalidOperationException("Changed the weapon of an actor that is not on this turn system's roster.");
 
+        actor.Mana = Math.Min(actor.Mana, actor.UsableMaxMana);
         actor.HeldShots = 0;
         if (actor.Alive)
             RefreshZoneOf(actor);
@@ -1136,10 +1199,22 @@ public sealed class TurnSystem
         _seenThisTurn.Clear();
         TurnCount++;
 
+        // The resurrections, while the dungeon still runs them. Once the boss
+        // has stopped them (§4.3) a corpse stays a corpse and the timer is not
+        // consulted at all: what it was carrying is lying on it instead
+        // (GroundItemOf), and the floor the party farmed is the gauntlet it now
+        // walks back through — still stronger, just no longer replenishing.
         foreach (var enemy in _enemies)
         {
-            if (!enemy.Alive && TurnCount - enemy.DefeatedAtTurn >= GameConstants.DummyResurrectTurns)
+            if (ResurrectionActive && !enemy.Alive
+                && TurnCount - enemy.DefeatedAtTurn >= FarmLadder.ResurrectTurns(enemy.DefeatCount))
             {
+                // What comes back is stronger than what died (§3.2), and it is
+                // rolled here, BEFORE the HP is restored: a Health roll lifts the
+                // maximum this line then fills, so rolling after it would restore
+                // the old full and silently lose the cycle.
+                ApplyRevivalGains(enemy);
+
                 enemy.Hp = enemy.MaxHp;
                 enemy.Alive = true;
                 enemy.TurnsSinceSeen = 2;
@@ -1178,6 +1253,38 @@ public sealed class TurnSystem
 
         Phase = TurnPhase.Player;
         PlayerTurnStarted?.Invoke();
+    }
+
+    /// <summary>
+    /// Every revival cycle this dummy has earned and not yet been paid, resolved
+    /// one at a time and <strong>in order</strong> (§3.2): a clean kill leaves
+    /// two owing, and the second must read the statline the first produced
+    /// rather than the pre-kill one, or a Health roll's new maximum is invisible
+    /// to the Damage roll that follows it.
+    /// <para>
+    /// Each cycle is its own seeded draw — <c>ReviveStream(mapSeed, spawnIndex,
+    /// cycle)</c> — rather than a position in one running stream, which is what
+    /// lets a save store the accumulated values alone (§5.1) and what makes the
+    /// order the party kills two dummies in irrelevant to either one's ladder.
+    /// </para>
+    /// <para>
+    /// The step is a percentage of the dummy's <em>whole</em> current number —
+    /// its weapon's damage plus what it has already accumulated, or its current
+    /// maximum HP — never of the accumulated bonus alone, which would start at
+    /// zero, floor at 1 forever and never compound: the one shape §3.2 rules out.
+    /// </para>
+    /// </summary>
+    private void ApplyRevivalGains(EnemyState enemy)
+    {
+        while (enemy.RevivalsRolled < enemy.DefeatCount)
+        {
+            var gain = FarmLadder.RollRevival(FarmLadder.ReviveStream(_mapSeed, enemy.SpawnIndex, enemy.RevivalsRolled));
+            if (gain is RevivalGain.Damage or RevivalGain.Both)
+                enemy.RevivalDamage += FarmLadder.Step(enemy.Weapon.Damage + enemy.BonusDamage);
+            if (gain is RevivalGain.Health or RevivalGain.Both)
+                enemy.RevivalMaxHp += FarmLadder.Step(enemy.MaxHp);
+            enemy.RevivalsRolled++;
+        }
     }
 
     // ── Status ticks and healing ─────────────────────────────────────────────
@@ -1250,19 +1357,23 @@ public sealed class TurnSystem
         }
         ApplyTicks(settled.Ticks, self, table);
         if (settled.Overflow > 0)
-            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default, ManaToSpend = 0 }, self, other);
+            table.Enqueue(GameEvent.HealingAboveFull, settled with { Ticks = default, ManaToSpend = 0, Payments = default }, self, other);
     }
 
     /// <summary>
     /// The HealingAboveFull applier: the status changes the chain settled —
     /// the levels Overheal granted the hidden pool, the pool converting into
     /// Ward — and the one mana record of the triggers the healed actor's
-    /// entries paid for them.
+    /// entries paid for them, each credited what it paid (§3.3). The payload
+    /// carries no weapon, only a source string, so the credit goes against the
+    /// healed actor's own equipped weapon: whose entries the loop ran, and
+    /// therefore what the payments' indices mean.
     /// </summary>
     private void ApplyHealingAboveFull(HealPayload settled, ActorState self, ActorState other, EventTable table)
     {
         ApplyTicks(settled.Ticks, self, table);
-        SpendMana(table, self.EquippedWeapon?.Id ?? settled.Source, self, other, settled.ManaToSpend);
+        int spent = SpendMana(table, self.EquippedWeapon?.Id ?? settled.Source, self, other, settled.ManaToSpend);
+        CreditEnchantments(self, settled.Payments, settled.ManaToSpend, spent);
     }
 
     /// <summary>
@@ -1506,24 +1617,31 @@ public sealed class TurnSystem
         // nothing and its hits credit themselves, each with its own share.
         CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.ForgedLevels));
 
+        // One record for the cast and the triggers its entries paid, and one
+        // credit per entry out of the same record (§3.3): the cast's own mana is
+        // nobody's experience, so it is in the record and not in the payments.
         int wanted = settled.ManaCost + settled.ManaToSpend;
-        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, caster.Mana), settled.Weapon.Id), caster, target);
+        int spent = Math.Min(wanted, caster.Mana);
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, spent, settled.Weapon.Id), caster, target);
+        CreditEnchantments(caster, settled.Payments, wanted, spent);
     }
 
     /// <summary>
     /// The ManaSpent applier: take what the chain settled as spent off the
     /// actor's pool (every actor carries one, so no feed is needed), never
     /// below zero; then hand back what the record restores — Siphon's refund
-    /// — never past the pool; then credit what was spent to the payer's mana
-    /// pool (§2.2), the refund left out of it. Nothing for a record settled at
-    /// zero both ways.
+    /// — never past the pool, which is the <em>spendable</em> one
+    /// (<see cref="ActorState.UsableMaxMana"/>, §3.3): a refund fills what a
+    /// spend can empty and never the part the equipped locks have reserved.
+    /// Then credit what was spent to the payer's mana pool (§2.2), the refund
+    /// left out of it. Nothing for a record settled at zero both ways.
     /// </summary>
     private void ApplyManaSpent(ManaPayload settled, ActorState self, ActorState other, EventTable table)
     {
         if (settled.Spent <= 0 && settled.Restored <= 0) return;
         int after = Math.Max(0, self.Mana - settled.Spent);
         if (settled.Restored > 0)
-            after = Math.Min(self.MaxMana, after + settled.Restored);
+            after = Math.Min(self.UsableMaxMana, after + settled.Restored);
         self.Mana = after;
 
         // Mana actually spent (§2.2): what the pool paid, never what the spend
@@ -1540,10 +1658,99 @@ public sealed class TurnSystem
     /// through. Nothing for nothing. Queued, so it settles before anything the
     /// same applier queues after it reads the pool.
     /// </summary>
-    private static void SpendMana(EventTable table, string source, ActorState payer, ActorState other, int wanted)
+    /// <returns>What the pool can actually pay of <paramref name="wanted"/> — the record's <see cref="ManaPayload.Spent"/>, which is also what the enchantment credits are scaled by (§3.3).</returns>
+    private static int SpendMana(EventTable table, string source, ActorState payer, ActorState other, int wanted)
     {
-        if (wanted <= 0) return;
-        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, payer.Mana), source), payer, other);
+        if (wanted <= 0) return 0;
+        int spent = Math.Min(wanted, payer.Mana);
+        table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, spent, source), payer, other);
+        return spent;
+    }
+
+    /// <summary>
+    /// Credit the entries that paid for an event, out of the one mana record it
+    /// settled (§3.3: "mana is an enchantment's experience"). Each payment names
+    /// an index in the weapon the loop walked — <paramref name="payer"/>'s
+    /// equipped one, which is what every loop reads and therefore what every
+    /// index means, the healing appliers included, whose payload names no weapon
+    /// at all — and the credit is the mana that entry actually paid, at the INT
+    /// that was spending it. Nothing credits an entry that did not fire, which is
+    /// true by construction: the credit rides the payment.
+    /// <para>
+    /// <strong>Scaled by <c>spent / wanted</c>.</strong> The entries settled their
+    /// triggers against the pool as it stood, and the record never overdraws it,
+    /// so a record that came up short has to be shared rather than charged in
+    /// full: the same spend feeds max mana and the entries, and this is what keeps
+    /// the two figures one number (the rule <see cref="ManaPayload"/>'s own doc
+    /// comment states). Integer, with the rounding remainder going to the last
+    /// entry that paid, so the credits sum to the entries' share of
+    /// <paramref name="spent"/> exactly — and to the whole of it on the four
+    /// events where the record <em>is</em> the entries' payments. A cast's own
+    /// mana belongs to no entry and keeps its share.
+    /// </para>
+    /// <para>
+    /// The wielder's INT is the divisor and never a multiplier (§2.1, §3.3): a
+    /// wizard tiers an entry roughly four times as fast as a fighter off the same
+    /// spend, and an actor with no nature — an enemy healer, a dummy — divides by
+    /// <see cref="InnateStats.Low"/>, which is what its spend buys.
+    /// </para>
+    /// <para>
+    /// <strong>A tier bought here takes its own reservation at once.</strong> A
+    /// deepened circle locks more of the pool —
+    /// <see cref="Enchantment.EffectiveLock"/> is the tier's — so
+    /// <see cref="ActorState.UsableMaxMana"/> falls the moment an entry crosses
+    /// its bar, and §3.3's rule that the spendable pool is what every spend and
+    /// every regen reads holds only if the pool is clamped to it. So it is, with
+    /// the same clamp <see cref="NotifyWeaponChanged"/> takes when the equipped
+    /// set changes: a reservation the wielder's own use just bought is taken
+    /// where it was bought, rather than at whatever later swap happens to notice
+    /// it — which is what would otherwise leave mana above the ceiling spendable
+    /// while <see cref="ActorState.RegenManaFromUnusedMovement"/>, capped at the
+    /// ceiling, could never put it back. The record this event settled is
+    /// <em>queued</em>, so the reservation is taken first and the spend comes out
+    /// of what it leaves.
+    /// </para>
+    /// </summary>
+    private void CreditEnchantments(ActorState payer, ImmutableArray<EnchantmentPayment> payments, int wanted, int spent)
+    {
+        if (payments.IsDefaultOrEmpty || wanted <= 0 || spent <= 0) return;
+        var weapon = payer.EquippedWeapon;
+        if (weapon == null) return;
+
+        int stat = (payer as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
+        int paid = 0;
+        foreach (var payment in payments)
+            paid += payment.Paid;
+
+        // What the pool actually paid on the entries' behalf, and what their
+        // credits must add up to. Taken off the total rather than summed from the
+        // parts, so the truncation each part takes is handed back once, to the
+        // last entry that paid, instead of being lost a payment at a time.
+        int share = paid * spent / wanted;
+        int credited = 0;
+        bool tiered = false;
+        for (int i = 0; i < payments.Length; i++)
+        {
+            int credit = i == payments.Length - 1 ? share - credited : payments[i].Paid * spent / wanted;
+            credited += credit;
+            if (credit <= 0) continue;
+
+            int index = payments[i].Index;
+            int before = weapon.Enchantments[index].Tier;
+            weapon.CreditEnchantment(index, credit, stat);
+            var entry = weapon.Enchantments[index];
+            if (entry.Tier > before)
+            {
+                tiered = true;
+                EnchantmentTiered?.Invoke(payer, weapon, entry);
+            }
+        }
+
+        // A tier just raised a lock, so the ceiling is now under the pool the
+        // wielder is holding: clamp to it, exactly as taking up a locked weapon
+        // does. Nothing to do when nothing tiered, which is every other credit.
+        if (tiered)
+            payer.Mana = Math.Min(payer.Mana, payer.UsableMaxMana);
     }
 
     /// <summary>
@@ -1644,8 +1851,13 @@ public sealed class TurnSystem
         // The triggers the chain settled — the attacker's entries at step 4,
         // the defender's Sturdy and Immovable — are spent first, each side's
         // as one record, so everything queued after sees the pools as they stand.
-        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        // Then the attacker's entries are credited what they each paid of theirs
+        // (§3.3). The defender's two souls get no credit and that is deliberate:
+        // they pay out of their own record, are pinned at tier 1, and a credit
+        // would buy nothing.
+        int spent = SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
         SpendMana(table, target.EquippedWeapon?.Id ?? settled.Weapon.Id, target, attacker, settled.DefenderManaToSpend);
+        CreditEnchantments(attacker, settled.Payments, settled.ManaToSpend, spent);
 
         // The shot's line is read at impact, before the blow shoves anyone or a
         // counter moves the attacker: what DamageDealt's entries see when they
@@ -1696,7 +1908,8 @@ public sealed class TurnSystem
             foreach (var status in settled.ApplyToAttacker)
                 attacker.ApplyStatus(status.Type, status.Element, status.Levels);
 
-        SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        int spent = SpendMana(table, settled.Weapon.Id, attacker, target, settled.ManaToSpend);
+        CreditEnchantments(attacker, settled.Payments, settled.ManaToSpend, spent);
         if (settled.HealToAttacker > 0)
             table.Enqueue(GameEvent.HealingReceived,
                 new HealPayload(settled.HealToAttacker, Applied: 0, Overflow: 0, settled.Weapon.Id), attacker, attacker);
@@ -1708,19 +1921,36 @@ public sealed class TurnSystem
     }
 
     /// <summary>
-    /// The Killed applier: the mana the killer's entries settled on the kill —
-    /// Siphon's trigger and its refund — as one record, spent then restored,
-    /// never past the pool. Nothing for a tick death, which names no weapon
-    /// and no wielder, or for a killer already down.
+    /// The Killed applier, the one world-write of a defeat: what the death is
+    /// worth to whatever died — a dummy's <see cref="EnemyState.DefeatCount"/>,
+    /// §3.2 — and then the mana the killer's entries settled on the kill
+    /// (Siphon's trigger and its refund) as one record, spent then restored,
+    /// never past the pool. Nothing of the mana for a tick death, which names no
+    /// weapon and no wielder, or for a killer already down.
+    /// <para>
+    /// <strong>The count advances ahead of both of those guards</strong>, or an
+    /// ordinary kill — which settles no mana at all — would never count. It
+    /// reads <see cref="KillPayload.Dealt"/>, which is documented as never
+    /// clamped to remaining HP precisely because this comparison needs the
+    /// unclamped figure: a 40-damage crit into a 24-HP dummy has to read as 40.
+    /// A tick death carries the tick's own damage and no weapon, and counts the
+    /// same way — the dummy died, and nothing in §3.2 says by what.
+    /// </para>
     /// </summary>
     private void ApplyKilled(KillPayload settled, ActorState killer, ActorState dead, EventTable table)
     {
+        if (!_defeatFeeds.TryGetValue(dead, out var defeatFeed))
+            throw new InvalidOperationException("Killed an actor that is not on this turn system's roster.");
+        defeatFeed(settled.Dealt);
+
         if (settled.ManaToSpend <= 0 && settled.ManaRestored <= 0) return;
         if (!killer.Alive) return;
+        int spent = Math.Min(settled.ManaToSpend, killer.Mana);
         table.Enqueue(GameEvent.ManaSpent,
-            new ManaPayload(settled.ManaToSpend, Math.Min(settled.ManaToSpend, killer.Mana),
+            new ManaPayload(settled.ManaToSpend, spent,
                 settled.Weapon?.Id ?? nameof(GameEvent.Killed), settled.ManaRestored),
             killer, dead);
+        CreditEnchantments(killer, settled.Payments, settled.ManaToSpend, spent);
     }
 
     /// <summary>
@@ -1823,11 +2053,57 @@ public sealed class TurnSystem
         }
     }
 
-    /// <summary>What an enemy's death means, however it came: the defeat turn the resurrection timer counts from, and the scene is told.</summary>
+    /// <summary>
+    /// What an enemy's death means, however it came: the defeat turn the
+    /// resurrection timer counts from, the scene is told, and — once the dungeon
+    /// has stopped resurrecting — the weapon it was carrying is handed over
+    /// (§3.2, §3.5). The drop is raised from here rather than from the Killed
+    /// applier deliberately: this is the post-cascade side-consequence site
+    /// (<see cref="RunHeldDeaths"/>), so a tick death deep inside a chain drops
+    /// its weapon with the world settled, exactly as an ordinary kill does.
+    /// <para>
+    /// It therefore runs <em>after</em> <see cref="ApplyKilled"/> has advanced the
+    /// count, and the drop is rolled off the advanced figure: <strong>the
+    /// extraction kill is itself a cycle</strong>. A dummy farmed to 39 and then
+    /// put down for good yields a drop at 40, and its unique roll resolves at 40
+    /// — "kill it forty times" reads as a drop at forty, which is the reading this
+    /// phase decided on rather than a by-product of applier order. The cost of it
+    /// is that the number beside the item is one higher than the last plate the
+    /// player read over the living dummy, which the ground-item label carries the
+    /// note for (<c>DungeonHud.GroundItemRuns</c>).
+    /// </para>
+    /// </summary>
     private void OnEnemyDefeated(EnemyState target)
     {
         target.DefeatedAtTurn = TurnCount;
         EnemyDefeated?.Invoke(target);
+        if (GroundItemOf(target) is { } drop)
+            EnemyDropped?.Invoke(target, drop);
+    }
+
+    /// <summary>
+    /// The weapon lying on <paramref name="enemy"/> right now, or null when there
+    /// is none: while the dungeon still resurrects its dummies (§3.2) a defeat
+    /// hands nothing over, a dummy still standing is carrying rather than
+    /// offering, and a drop already picked up
+    /// (<see cref="EnemyState.DropTaken"/>) is not offered twice.
+    /// <para>
+    /// <strong>It is derived, never stored</strong>, which is the whole of §3.5's
+    /// answer to a save taken between the permanent kill and the pickup:
+    /// <see cref="LootTable.Roll"/> reads the enemy row and this system's map
+    /// seed and nothing else, so a floor re-entry re-derives the identical
+    /// weapon — same variant, same stacks, same tiers, same unique outcome —
+    /// rather than either re-rolling it (a different weapon) or forgetting it (a
+    /// lost one). Both the defeat above and the scene's floor entry read this one
+    /// method, so there is one rule rather than two that have to agree.
+    /// </para>
+    /// </summary>
+    /// <param name="enemy">The dummy, alive or dead; it need not be on this system's roster, since the answer is a function of its row.</param>
+    public Drop? GroundItemOf(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        if (ResurrectionActive || enemy.Alive || enemy.DropTaken) return null;
+        return LootTable.Roll(enemy, _mapSeed);
     }
 
     private static float Dist2(ActorState a, ActorState b)

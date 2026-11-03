@@ -103,6 +103,7 @@ public sealed class DungeonHud
         DrawTopReadouts(w, active, turns);
         DrawPartySelector(scene);
         DrawEnemyLabels(camera, scene, w, h);
+        DrawGroundItems(camera, scene, w, h);
         DrawAllyCue(camera, scene, w, h);
         DrawFloatingTexts(camera, w, h);
         DrawAimCue(scene);
@@ -118,7 +119,7 @@ public sealed class DungeonHud
             DrawInventory(w, h, active, turns);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h);
+            DrawMenu(w, h, turns.ResurrectionActive);
 
         if (turns.Phase == TurnPhase.GameOver)
         {
@@ -141,7 +142,7 @@ public sealed class DungeonHud
         var budget = new List<Run> { new($"[{active.Id}] MOVE: {MathF.Ceiling(active.DistLeft)} / {active.EffectiveMax:0}", White) };
         if (IsParalysed(active))
             budget.Add(new Run("PARALYSED", Red));
-        budget.Add(new Run($"  MANA: {active.Mana} / {active.MaxMana}", White));
+        budget.Add(new Run($"  {ManaReadout(active)}", White));
         DrawRunsCenteredAt(w / 2f, 14f, 2f, budget);
 
         var weapon = active.EquippedWeapon;
@@ -149,6 +150,24 @@ public sealed class DungeonHud
             DrawCentered(w, 42f, $"[{active.Id}] (NO WEAPON)", 1.5f, Yellow);
         else
             DrawRunsCenteredAt(w / 2f, 42f, 1.5f, WeaponRuns($"[{active.Id}] ", weapon, active, turns.AttacksThisTurn(active), Yellow));
+    }
+
+    /// <summary>
+    /// The budget line's mana: what is in the pool, over the ceiling a spend can
+    /// actually reach. Where nothing is reserved that ceiling is the earned pool
+    /// and the line reads as it always has. Where an equipped entry reserves
+    /// part of it (§3.3) the spendable ceiling is the figure and the earned pool
+    /// follows it — <c>MANA: 20 / 20 (100)</c> — because a bar that tops out at
+    /// 20 beside a printed 100 is the one place the locks are invisible to the
+    /// player; which entry took it is the <c>LOCK</c> the weapon line already
+    /// prints (<see cref="EnchantmentReadout"/>).
+    /// </summary>
+    internal static string ManaReadout(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        return actor.PaidLocks > 0
+            ? $"MANA: {actor.Mana} / {actor.UsableMaxMana} ({actor.MaxMana})"
+            : $"MANA: {actor.Mana} / {actor.MaxMana}";
     }
 
     // Party selector layout, shared between drawing and click hit-testing.
@@ -230,10 +249,7 @@ public sealed class DungeonHud
             else
                 DrawCenteredAt(px.X, px.Y - 18f, label, 1.5f, enemy.Weapon.IsCaster ? Cyan : Orange);
 
-            // Riders land on enemies too, so the nameplate carries the same effect badges as a party row.
-            var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
-            plate.AddRange(StatusBadgeRuns(enemy));
-            DrawRunsCenteredAt(px.X, px.Y, 1.5f, plate);
+            DrawRunsCenteredAt(px.X, px.Y, 1.5f, NameplateRuns(enemy));
 
             if (obj != scene.HoveredEnemy) continue;
 
@@ -250,6 +266,54 @@ public sealed class DungeonHud
                 y += 12f;
             }
         }
+    }
+
+    /// <summary>
+    /// What is lying on the floor: over each ground item in sight, the weapon it
+    /// is and the farm's depth it was collected at, and — on the one the active
+    /// member is standing on — the key that takes it. Nothing is drawn for an
+    /// item on a fogged tile: it is exactly as visible as the corpse it came off.
+    /// </summary>
+    private void DrawGroundItems(Camera camera, DungeonScene scene, int w, int h)
+    {
+        var target = scene.PickupTarget;
+        foreach (var item in scene.GroundItems)
+        {
+            if (!item.Marker.IsActive) continue;
+            if (!WorldToScreen(camera, item.Marker.Position + Vector3.UnitY * 0.5f, w, h, out var px)) continue;
+
+            DrawRunsCenteredAt(px.X, px.Y - 14f, 1.5f, GroundItemRuns(item.Drop));
+            if (item == target)
+                DrawCenteredAt(px.X, px.Y + 2f, DungeonScene.PickupHint, 1.4f, White);
+        }
+    }
+
+    /// <summary>
+    /// A weapon on the floor: its name — a unique's in the gold every other
+    /// readout gives it — and, beside it, <c>xN</c>, the farm's depth it was
+    /// collected at, in the same shape a dummy's plate wears it
+    /// (<see cref="NameplateRuns"/>), so what the player was farming for and what
+    /// they are being handed read as one thing (§3.2). A drop at zero shows no
+    /// quality, because there is none — it is simply the weapon the dummy had.
+    /// <para>
+    /// <strong>The number is one higher than the last plate the player saw, and
+    /// that is a decided reading rather than an accident of order.</strong> The
+    /// extraction kill is a defeat like every other: it advances
+    /// <see cref="EnemyState.DefeatCount"/> (the Killed applier, §3.2) before the
+    /// drop is rolled off it, so "kill it forty times" hands over a drop at 40 and
+    /// the unique roll resolves at 40. There is no plate on screen for it to
+    /// contradict — <see cref="DrawEnemyLabels"/> draws none for the dead — so
+    /// what the player last read over the living dummy was <c>x39</c>, and the
+    /// swing that put it down for good is the fortieth cycle.
+    /// </para>
+    /// </summary>
+    internal static IReadOnlyList<Run> GroundItemRuns(Drop drop)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        var runs = new List<Run> { new(drop.Weapon.Name, drop.Weapon.Unique ? Orange : White) };
+        if (drop.DefeatCount > 0)
+            runs.Add(new Run($"x{drop.DefeatCount}", Orange));
+        return runs;
     }
 
     /// <summary>A support staff's cue over the ally under the mouse: the cast a click would make, or why it would not.</summary>
@@ -399,13 +463,24 @@ public sealed class DungeonHud
         DrawCentered(w, swapY + InventoryHintGap, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
     }
 
-    private void DrawMenu(int w, int h)
+    /// <summary>
+    /// The pause menu, and one entry that is scaffolding: stopping resurrection
+    /// is Phase 4's boss's doing (§4.3), and until that boss exists there is no
+    /// way to reach the drop path in play at all. It is one-way, as the boss kill
+    /// it stands in for is, and it goes when the boss arrives — the line it
+    /// leaves behind says what the dungeon has become.
+    /// </summary>
+    private void DrawMenu(int w, int h, bool resurrectionActive)
     {
         float top = h / 2f - 90f;
         DrawCentered(w, top, "PAUSED", 4f, Cyan);
         DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
         DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
-        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
+        if (resurrectionActive)
+            DrawCentered(w, top + 146f, "3  STOP RESURRECTION", 2f, White);
+        else
+            DrawCentered(w, top + 146f, "RESURRECTION STOPPED - DEFEATS ARE PERMANENT", 1.5f, Orange);
+        DrawCentered(w, top + 196f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────
@@ -425,7 +500,7 @@ public sealed class DungeonHud
         string modifiers = ModifierReadout(weapon, wielder, attacksThisTurn);
         if (modifiers.Length > 0)
             runs.Add(new Run($"* {modifiers}", White));
-        string enchantments = EnchantmentReadout(weapon);
+        string enchantments = EnchantmentReadout(weapon, wielder);
         if (enchantments.Length > 0)
             runs.Add(new Run($"* {enchantments}", Cyan));
         return runs;
@@ -603,10 +678,60 @@ public sealed class DungeonHud
         };
     }
 
-    /// <summary>The weapon's enchantments in attachment order, the tier after any above 1 (<c>VAMPIRIC T3</c>). Empty for none.</summary>
-    internal static string EnchantmentReadout(Weapon weapon)
-        => string.Join("  ", weapon.Enchantments.Select(e =>
-            e.Tier > 1 ? $"{e.Def.Name.ToUpperInvariant()} T{e.Tier}" : e.Def.Name.ToUpperInvariant()));
+    /// <summary>
+    /// The weapon's enchantments in attachment order, the tier after any above
+    /// 1 (<c>VAMPIRIC T3</c>). Empty for none.
+    /// <para>
+    /// In <paramref name="wielder"/>'s hands each entry also names what it takes
+    /// out of that wielder's pool — <c>LOCK 60</c> — and an entry whose lock
+    /// went unpaid is marked <c>(ASLEEP)</c>, since a dormant entry is a
+    /// non-event the player has otherwise no way to see (§3.1). A lock is a
+    /// reservation out of a <em>pool</em>, so it reads only where there is one:
+    /// an item in the bag, or one asked about with no wielder, prints its
+    /// entries alone — the same split <see cref="ModifierReadout"/> makes
+    /// between a weapon in hand and a weapon in the bag.
+    /// </para>
+    /// <para>
+    /// An equipped entry also shows how far the mana in the tier it is on has got
+    /// it — <c>XP 9/20</c> — because tier is earned by use (§3.3) and the bar is
+    /// the only thing that says a swing is buying anything. <strong>It prints
+    /// from zero</strong>: <c>XP 0/20</c> is what says a weapon just taken up can
+    /// be deepened at all, and an entry that crosses its bar exactly would
+    /// otherwise lose the row at the one moment it has most to say. The bar is
+    /// <see cref="Enchantment.TierCost"/> at the <em>wielder's</em> INT — the
+    /// price the climb charges rather than the unfloored
+    /// <see cref="Enchantment.XpToNextTier"/>, so the readout and the ladder can
+    /// never state two figures — and like the lock it reads only where there is a
+    /// wielder. A unique prints what it has banked and no bar, since it is pinned
+    /// at tier 1 and the mana buys nothing; with nothing banked it prints
+    /// neither, there being no progress to state and no next tier to be partway
+    /// to.
+    /// </para>
+    /// </summary>
+    internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
+        int stat = (wielder as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
+        var parts = new List<string>();
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
+        {
+            var entry = weapon.Enchantments[i];
+            string text = entry.Def.Name.ToUpperInvariant();
+            if (entry.Tier > 1) text += $" T{entry.Tier}";
+            if (equipped)
+            {
+                text += $" LOCK {entry.EffectiveLock}";
+                if (!entry.Unique)
+                    text += $" XP {entry.Xp}/{entry.TierCost(stat)}";
+                else if (entry.Xp > 0)
+                    text += $" XP {entry.Xp}";
+                if (wielder!.IsDormant(i)) text += " (ASLEEP)";
+            }
+            parts.Add(text);
+        }
+        return string.Join("  ", parts);
+    }
 
     private static string ShapeName(AreaShape shape) => shape.Kind.ToString().ToUpperInvariant();
 
@@ -725,6 +850,35 @@ public sealed class DungeonHud
             [StatusEffectType.Weakened] = (_, _, e) => $"GETTING CRIT RATTLES YOUR SWING - DEALS -{EffectOf(e)} A HIT",
             [StatusEffectType.Softened] = (_, _, e) => $"BLOCK -{EffectOf(e)} UNTIL THE ROUND ENDS",
         };
+
+    /// <summary>
+    /// A dummy's plate: its hit points out of a maximum its revivals may have
+    /// raised, <c>xN</c> once it has been put down at least once, then the same
+    /// effect badges a party row carries — riders land on enemies too.
+    /// <para>
+    /// The count has to read as a threat level and a reward tier at once (§3.2),
+    /// "which is honest, because that is exactly what it is": one number saying
+    /// both how deep the drop it is carrying has grown and how much harder it
+    /// hits than the one beside it. It sits between the pool and the badges so
+    /// the two things a player reads before deciding to swing — what is left of
+    /// it, and how many times they have done this — are adjacent.
+    /// </para>
+    /// <para>
+    /// <c>xN</c> with an ASCII x, the <c>CRIT 19+ x3</c> convention this HUD
+    /// already uses: the 5x7 font carries no multiplication sign, and
+    /// <see cref="TextRenderer"/> skips a glyph it does not have, so a typographic
+    /// one would silently draw the bare number.
+    /// </para>
+    /// </summary>
+    internal static IReadOnlyList<Run> NameplateRuns(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
+        if (enemy.DefeatCount > 0)
+            plate.Add(new Run($"x{enemy.DefeatCount}", Orange));
+        plate.AddRange(StatusBadgeRuns(enemy));
+        return plate;
+    }
 
     /// <summary>
     /// The actor's statuses as coloured badges in the order they landed —
