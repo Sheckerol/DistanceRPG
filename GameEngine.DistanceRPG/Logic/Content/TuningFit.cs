@@ -2,7 +2,7 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// Where the tuning meets the content, the tuning bends — never the content,
-/// and never with an abort (1g; A3; S:73-74, "a typo should cost a log line, not
+/// and never with an abort (1g; A3; P5:100-101, "a typo should cost a log line, not
 /// a session"). Three keys are measured against the content as well as against
 /// themselves, and a value inside its own clamp range can still break content
 /// that is fine: a carry of 4 is one slot a member while every roster member

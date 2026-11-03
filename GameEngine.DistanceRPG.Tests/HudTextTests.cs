@@ -774,15 +774,24 @@ public sealed class HudTextTests : IDisposable
 
         // The invariant, over every window the settings allow (320 x 240 up) and
         // every row count a member can reach: what is drawn clears the help line
-        // at h - 24, or the panel has already dropped every row it could.
-        for (int h = 240; h <= 1600; h += 2)
-            for (int rows = 0; rows <= most; rows++)
-            {
-                var layout = DungeonHud.LayoutInventory(h, slots, rows);
-                Assert.InRange(layout.Rows, 0, rows);
-                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
-                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
-            }
+        // at h - 24, or the panel has already dropped every row it could. And the
+        // same with a potion in the bag (Phase 6b.2), whose line under the swap
+        // line — what a drink costs — the panel makes room for as it does a row.
+        foreach (bool drink in new[] { false, true })
+            for (int h = 240; h <= 1600; h += 2)
+                for (int rows = 0; rows <= most; rows++)
+                {
+                    var layout = DungeonHud.LayoutInventory(h, slots, rows, drinkLine: drink);
+                    Assert.InRange(layout.Rows, 0, rows);
+                    Assert.True(layout.Top >= 56f, $"h={h} rows={rows} drink={drink}: over the top readouts");
+                    Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows} drink={drink}: past the help line");
+                }
+
+        // The drink line takes its room below the swap line: the roomy panel opens
+        // where it did and ends lower.
+        var drinking = DungeonHud.LayoutInventory(720f, slots, most, drinkLine: true);
+        Assert.Equal((roomy.Top, most), (drinking.Top, drinking.Rows));
+        Assert.True(drinking.Bottom > roomy.Bottom);
     }
 
     [Fact]
@@ -797,27 +806,119 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(slots, TestPools.Char("A").Inventory.Length);
         const int most = 2 + 8;   // the two pools and every weapon class at once
 
-        for (int rows = 0; rows <= most; rows++)
-        {
-            var layout = DungeonHud.LayoutInventory(720f, slots, rows);
-            Assert.Equal(rows, layout.Rows);                          // every row printed
-            Assert.True(layout.Top >= 56f, $"rows={rows}: over the top readouts");
-            Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows}: past the help line");
-        }
+        // A bag of potions too (Phase 6b.2): each potion's slot says what it restores
+        // on one line, as an unwrapped weapon's does, and the drink line goes under
+        // the swap line — and every row is still printed.
+        foreach (bool drink in new[] { false, true })
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(720f, slots, rows, drinkLine: drink);
+                Assert.Equal(rows, layout.Rows);                          // every row printed
+                Assert.True(layout.Top >= 56f, $"rows={rows} drink={drink}: over the top readouts");
+                Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows} drink={drink}: past the help line");
+            }
+        Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Health(ContentBounds.MostCount), TestPools.Char("A")));
 
         var full = DungeonHud.LayoutInventory(720f, slots, most);
         Assert.True(full.Top < 720f / 2f - 150f);   // slid up from where the three-slot panel opened
 
         // And past 720 the invariant the three-slot panel keeps holds for six too:
         // what is drawn clears the help line, or every row it could drop has gone.
-        for (int h = 240; h <= 1600; h += 2)
-            for (int rows = 0; rows <= most; rows++)
-            {
-                var layout = DungeonHud.LayoutInventory(h, slots, rows);
-                Assert.InRange(layout.Rows, 0, rows);
-                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
-                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
-            }
+        foreach (bool drink in new[] { false, true })
+            for (int h = 240; h <= 1600; h += 2)
+                for (int rows = 0; rows <= most; rows++)
+                {
+                    var layout = DungeonHud.LayoutInventory(h, slots, rows, drinkLine: drink);
+                    Assert.InRange(layout.Rows, 0, rows);
+                    Assert.True(layout.Top >= 56f, $"h={h} rows={rows} drink={drink}: over the top readouts");
+                    Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows} drink={drink}: past the help line");
+                }
+    }
+
+    [Fact]
+    public void TheBagSaysItsAnswersInARowOfItsOwn()
+    {
+        // The audit of Phase 6b: a drink, a pour and their refusals are asked for with
+        // the bag open, and each was answered over the member — who stands under the
+        // middle of the screen, where the panel is — so the answer ran into the
+        // panel's EQUIPPED row and rose behind its title, and the level the drink
+        // bought landed on the same text. While the bag is open the answer, and any
+        // beat said of its member, is said in a row of the panel's own; nothing rises
+        // over the floor; and another member's answer is not the bag's to say.
+        var hud = new DungeonHud(game: null!);
+        object a = new(), b = new();
+        hud.AddFloatingText(default, "+18", DungeonHud.Green, 8f);                         // the heal, over the floor: the answer says it
+        hud.AddBeat(a, default, "MAX HP 31!", DungeonHud.Cyan, -64f);                       // the level the heal bought, raised first
+        hud.AddAnswer(a, default, "DRANK HEALTH POTION Q3 - +18 HP", DungeonHud.Green, -52f);
+        hud.AddAnswer(b, default, "SLOT 3 IS EMPTY", DungeonHud.Grey, -40f);
+        Assert.Equal(["DRANK HEALTH POTION Q3 - +18 HP", "MAX HP 31!"], hud.BagLine(a).Select(run => run.Text));
+        Assert.Equal([DungeonHud.Green, DungeonHud.Cyan], hud.BagLine(a).Select(run => run.Color));
+        Assert.Equal(["SLOT 3 IS EMPTY"], hud.BagLine(b).Select(run => run.Text));
+        Assert.Empty(hud.BagLine(new object()));
+        Assert.Empty(hud.RisingLines(bagOpen: true));
+        Assert.Equal(4, hud.RisingLines(bagOpen: false).Count);   // the bag closed, every line rises as it always has
+
+        // The next answer replaces the last and leaves the beat: one answer a speaker.
+        // Each fades as it would in the air, and is gone when it would be.
+        hud.AddAnswer(a, default, "POURED OUT THE HEALTH POTION Q1", DungeonHud.Green, -52f);
+        Assert.Equal(["POURED OUT THE HEALTH POTION Q1", "MAX HP 31!"], hud.BagLine(a).Select(run => run.Text));
+        hud.Update(0.6f);
+        Assert.All(hud.BagLine(a), run => Assert.InRange(run.Color.W, 0.5f, 0.9f));
+        hud.Update(0.7f);
+        Assert.Empty(hud.BagLine(a));
+        Assert.Empty(hud.RisingLines(bagOpen: false));
+
+        // The wiring a window is needed to draw, read off the IL: the frame draws the
+        // lines over the floor as the bag stands — the last thing worked out before
+        // the call is whether it is open — and hands the panel the bag's line; and
+        // the level a credit buys is said of its member (a beat), not over the floor.
+        var render = TestIl.CallsIn(typeof(DungeonHud).GetMethod(nameof(DungeonHud.Render))!).Select(method => method.Name).ToList();
+        int over = render.IndexOf("DrawFloatingTexts");
+        Assert.True(over > 0 && render[over - 1] == "get_" + nameof(DungeonScene.InventoryOpen), $"the floor's lines are not drawn as the bag stands: {string.Join(", ", render)}");
+        Assert.Contains(nameof(DungeonHud.BagLine), render);
+        string[] levels = TestIl.CallersOf(typeof(DungeonHud), nameof(DungeonHud.LevelUpLabel));
+        Assert.Single(levels);
+        Assert.Contains(levels[0], TestIl.CallersOf(typeof(DungeonHud), nameof(DungeonHud.AddBeat)));
+        Assert.DoesNotContain(levels[0], TestIl.CallersOf(typeof(DungeonHud), nameof(DungeonHud.AddFloatingText)));
+
+        // Where the row is drawn: centred, under the title's glyphs and over the header
+        // row's, clear of both and of the first slot, and whole inside a 1280 window —
+        // at the widest a bag's key can be answered, with the widest level beside it,
+        // at every top the panel opens at.
+        var vast = TestPools.Char("A");
+        vast.ManaXp = ContentBounds.MostCount;
+        string level = DungeonHud.LevelUpLabel(vast, new XpCredit(XpPool.Mana, null, 1));
+        const int Most = ContentBounds.MostCount;
+        var longest = GameContent.Current.Weapons.All.MaxBy(def => def.Name.Length)!;
+        string[] answers =
+        [
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(Most), 5, int.MaxValue, 0, 10_000)),
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(Most), 5, int.MaxValue, int.MaxValue, 10_000)),
+            DungeonHud.PouredBeat(TestPotions.Health(Most)),
+            DungeonHud.DrinkShortCue(10_000),
+            DungeonHud.LeftBeat(TestWeapons.Get(longest.Id, longest.Class == WeaponClass.Wand ? DamageType.Cold : null)),
+            DungeonHud.BagFullCue(GameConstants.MaxInventorySlots, potion: true),
+            DungeonHud.EmptySlotCue(GameConstants.MaxInventorySlots - 1),
+        ];
+        const float glyph = 7f, advance = 6f;
+        foreach (string answer in answers)
+        {
+            float width = (answer.Length + 2 + level.Length) * advance * DungeonHud.FloatingTextScale;   // the runs RunGap apart
+            Assert.True(width <= 1240f, $"'{answer}' with '{level}' runs off the window");
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", answer);
+        }
+        int slots = PartyMemberState.InventorySlots;
+        for (int h = 240; h <= 1600; h += 40)
+            foreach (bool drink in new[] { false, true })
+                for (int rows = 0; rows <= 10; rows++)
+                {
+                    float top = DungeonHud.LayoutInventory(h, slots, rows, drinkLine: drink).Top;
+                    float rowTop = top + DungeonHud.InventoryAnswerDrop, rowBottom = rowTop + glyph * DungeonHud.FloatingTextScale;
+                    Assert.True(rowTop > top + glyph * DungeonHud.InventoryTitleScale, $"h={h}: the answer row runs into the title");
+                    Assert.True(rowBottom < top + DungeonHud.InventoryHeaderDrop, $"h={h}: the answer row runs into the EQUIPPED row");
+                    Assert.True(rowBottom < top + DungeonHud.InventorySlotsTop, $"h={h}: the answer row runs into the first slot");
+                    Assert.True(rowTop >= 0f && rowBottom <= h, $"h={h}: the answer row is off the window");
+                }
     }
 
     [Fact]
@@ -915,11 +1016,11 @@ public sealed class HudTextTests : IDisposable
             // lines the slots wrap to — clear of the top readouts and the help line.
             for (int slot = 1; slot < member.Inventory.Length; slot++)
                 member.Inventory[slot] = Widest(def);
-            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines(carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
+            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines((Weapon)carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
             for (int slot = 0; slot < slots.Length; slot++)
             {
                 Assert.All(slots[slot], line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= bag, $"{def.Id}: bag slot {slot + 1} runs off the window"));
-                Assert.Equal(DungeonHud.WeaponRuns("", member.Inventory[slot]!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
+                Assert.Equal(DungeonHud.WeaponRuns("", member.WeaponIn(slot)!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
                     slots[slot].SelectMany(line => line).Select(run => run.Text));
             }
             Assert.Contains(slots[0].SelectMany(line => line), run => run.Text.Contains(" LOCK ", StringComparison.Ordinal));
@@ -999,6 +1100,201 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", full);
         Assert.Contains("X", full.Split(' '));
         Assert.Contains("I", full.Split(' '));
+    }
+
+    [Fact]
+    public void APotionsSlotNamesIt()
+    {
+        // Phase 6b.1: the bag panel names a potion's slot by its number and the
+        // potion, in the colour of the pool it fills — green for health, cyan for
+        // mana — and a weapon's as it always has: its line's colour, a unique's
+        // orange. The widest a save may load runs inside the window from the slot's
+        // place, in the HUD's font.
+        Assert.Equal(new DungeonHud.Run("3  HEALTH POTION Q2", DungeonHud.Green), DungeonHud.SlotName(2, TestPotions.Health(2)));
+        Assert.Equal(new DungeonHud.Run("4  MANA POTION Q1", DungeonHud.Cyan), DungeonHud.SlotName(3, TestPotions.Mana(1)));
+        Assert.Equal((DungeonHud.Green, DungeonHud.Cyan), (DungeonHud.PotionColor(PotionType.Health), DungeonHud.PotionColor(PotionType.Mana)));
+        Assert.Equal(new DungeonHud.Run("1  HATCHET", DungeonHud.WeaponLineColor(0)), DungeonHud.SlotName(0, TestWeapons.Get("hatchet")));
+        Assert.Equal(new DungeonHud.Run("2  HATCHET", DungeonHud.WeaponLineColor(1)), DungeonHud.SlotName(1, TestWeapons.Get("hatchet")));
+        var unique = GameContent.Current.Weapons.All.First(def => def.Unique);
+        Assert.Equal(DungeonHud.Orange, DungeonHud.SlotName(1, TestWeapons.Get(unique.Id, unique.Class == WeaponClass.Wand ? DamageType.Cold : null)).Color);
+
+        string widest = DungeonHud.SlotName(GameConstants.MaxInventorySlots - 1, TestPotions.Health(ContentBounds.MostCount)).Text;
+        Assert.True(widest.Length * 6f * 2f <= DungeonHud.InventoryDetailWidth(1280f), $"'{widest}' runs off the window");
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+    }
+
+    [Fact]
+    public void TheLeaveHintSaysPourWhenTheBagHoldsAPotion()
+    {
+        // While the bag holds a potion, X's keys put a weapon down or pour a potion
+        // out (PHASE 6b DECISION 1): both hints say so, by the same keys. A bag of
+        // weapons says what it always said. The pour says what it did over the
+        // member, and nothing of it lies on the floor to take back.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: true));
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: false));
+        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12, potion: true));
+        Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1, potion: true));
+        Assert.Equal("X TO LEAVE OR POUR ONE OUT", DungeonHud.PourKeyHint);
+        Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
+        Assert.Equal("POURED OUT THE HEALTH POTION Q2", DungeonHud.PouredBeat(TestPotions.Health(2)));
+        Assert.Equal("POURED OUT THE MANA POTION Q1", DungeonHud.PouredBeat(TestPotions.Mana(1)));
+
+        // And G's BAG FULL, which sends the player to the bag's X: with a potion in
+        // the bag the room is made by leaving a weapon or pouring a potion out, as the
+        // panel's own hints say (the audit of Phase 6b).
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES OR POURS ONE OUT", DungeonHud.BagFullCue(slots, potion: true));
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", DungeonHud.BagFullCue(slots, potion: false));
+        var full = TestPools.Holding("A", TestWeapons.Get("hatchet"));
+        for (int slot = 1; slot < full.Inventory.Length; slot++)
+            full.Inventory[slot] = TestWeapons.Get("hatchet");
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", DungeonHud.BagFullCue(full));   // what the scene's G says, off the member
+        full.Inventory[4] = TestPotions.Mana(1);
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES OR POURS ONE OUT", DungeonHud.BagFullCue(full));
+
+        // Each in the HUD's font; the armed hint and the cue across the window at their
+        // 1.5 and 2, and the header row's hint at its 1.2 beside EQUIPPED inside the
+        // panel's 380.
+        string fullCue = DungeonHud.BagFullCue(GameConstants.MaxInventorySlots, potion: true);
+        foreach (string text in new[] { DungeonHud.LeaveHint(12, potion: true), DungeonHud.PourKeyHint, DungeonHud.PouredBeat(TestPotions.Health(ContentBounds.MostCount)), fullCue })
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
+        Assert.True(DungeonHud.LeaveHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
+        Assert.True(fullCue.Length * 6f * 2f <= 1240f, $"'{fullCue}' runs off the window");
+        Assert.True(("EQUIPPED".Length + 1 + DungeonHud.PourKeyHint.Length) * 6f * 1.2f <= 380f);
+    }
+
+    /// <summary>The drink's numbers as this file states them, over the premise: §3.4's 20 a unit for both pools, and 40 a drink.</summary>
+    private static IDisposable Drinks() => TestContent.UsePremise(tuning: t => t with { HealthPotionPercent = 20, ManaPotionPercent = 20, PotionUseCost = 40 });
+
+    [Fact]
+    public void APotionsLineSaysWhatItRestoresNow()
+    {
+        // Phase 6b.2: under a potion's name, the bag says what it restores now — the
+        // share it offers of the member's maximum as it stands (PHASE 6b DECISION
+        // 3), rounded down — and, at a whole pool or past it, the overshoot, which
+        // only Overheal keeps. In the potion's colour, one line.
+        using var drinks = Drinks();
+        var a = Holding("arming_sword");
+        Assert.Equal((100, 100), (a.MaxHp, a.MaxMana));
+        Assert.Equal("RESTORES 20 OF 100 HP", DungeonHud.PotionDetail(TestPotions.Health(1), a));
+        Assert.Equal("RESTORES 80 OF 100 HP", DungeonHud.PotionDetail(TestPotions.Health(4), a));
+        Assert.Equal("RESTORES ALL 100 HP", DungeonHud.PotionDetail(TestPotions.Health(5), a));
+        Assert.Equal("RESTORES ALL 100 HP - 40 OVER", DungeonHud.PotionDetail(TestPotions.Health(7), a));
+        Assert.Equal("RESTORES 40 OF 100 MANA", DungeonHud.PotionDetail(TestPotions.Mana(2), a));
+        Assert.Equal("RESTORES ALL 100 MANA - 20 OVER", DungeonHud.PotionDetail(TestPotions.Mana(6), a));
+
+        // Now: the same potion says more once the member has grown. And a mana
+        // potion is a share of the earned pool, whatever the locks reserve — but
+        // what a drink can take is the spendable pool, so where the locks reserve
+        // some the line is said against that: the share, then the whole spendable
+        // pool, then the overshoot past it (the audit of Phase 6b, whose caster at
+        // MANA 17 / 17 (32) read RESTORES ALL 32 MANA on a potion that restores 17).
+        a.Grown(maxHp: 150);
+        Assert.Equal("RESTORES 30 OF 150 HP", DungeonHud.PotionDetail(TestPotions.Health(1), a));
+        var caster = Holding("staff_of_renewal");
+        Assert.Equal((115, 100), (caster.MaxMana, caster.UsableMaxMana));   // Regeneration's lock holds 15
+        Assert.Equal(["RESTORES 23 OF 100 SPENDABLE MANA", "RESTORES 92 OF 100 SPENDABLE MANA", "RESTORES ALL 100 SPENDABLE MANA - 15 OVER", "RESTORES ALL 100 SPENDABLE MANA - 38 OVER"],
+            new[] { 1, 4, 5, 6 }.Select(q => DungeonHud.PotionDetail(TestPotions.Mana(q), caster)));
+        Assert.Equal("RESTORES ALL 100 HP", DungeonHud.PotionDetail(TestPotions.Health(5), caster));   // health is never locked
+        Assert.Equal(["RESTORES 20 OF 100 MANA", "RESTORES ALL 100 MANA"], new[] { 1, 5 }.Select(q => DungeonHud.PotionDetail(TestPotions.Mana(q), a)));   // no locks: the pool it has always named
+
+        var line = Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Mana(2), a));
+        Assert.Equal([new DungeonHud.Run("RESTORES 40 OF 100 MANA", DungeonHud.Cyan)], line);
+        Assert.Equal(DungeonHud.Green, Assert.Single(Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Health(2), a))).Color);
+
+        // The widest a save may hold — the sanity bound's quality, saturating its
+        // share, on a pool at the save's ceiling — in the HUD's font, right of the
+        // slot's number inside a 1280 window at the statline's scale.
+        // So is a locked caster's at the same ceilings, the longest form.
+        a.HpXp = ContentBounds.MostCount;
+        caster.ManaXp = ContentBounds.MostCount;
+        Assert.True(caster.UsableMaxMana < caster.MaxMana);
+        string widest = DungeonHud.PotionDetail(TestPotions.Health(ContentBounds.MostCount), a);
+        Assert.Equal($"RESTORES ALL {a.MaxHp} HP - {int.MaxValue - a.MaxHp} OVER", widest);
+        string widestMana = DungeonHud.PotionDetail(TestPotions.Mana(ContentBounds.MostCount), caster);
+        Assert.Equal($"RESTORES ALL {caster.UsableMaxMana} SPENDABLE MANA - {int.MaxValue - caster.UsableMaxMana} OVER", widestMana);
+        foreach (string text in new[] { widest, widestMana })
+        {
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
+            Assert.True(text.Length * 6f * DungeonHud.InventoryDetailScale <= DungeonHud.InventoryDetailWidth(1280f), $"'{text}' runs off the window");
+        }
+    }
+
+    [Fact]
+    public void TheBagSaysWhatADrinkCosts()
+    {
+        // Phase 6b.2: under the swap line, while the bag holds a potion, what a drink
+        // costs — in combat and out alike (PHASE 6b DECISION 2) — and, red, when the
+        // member has less than the whole of it, since it is paid whole or refused.
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE", DungeonHud.Grey), DungeonHud.DrinkCostLine(40, 160f));
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE", DungeonHud.Grey), DungeonHud.DrinkCostLine(40, 40f));
+        Assert.Equal(new DungeonHud.Run("A DRINK COSTS 40 MOVE - NOT ENOUGH LEFT", DungeonHud.Red), DungeonHud.DrinkCostLine(40, 39.5f));
+        Assert.Equal(new DungeonHud.Run("DRINKING IS FREE", DungeonHud.Grey), DungeonHud.DrinkCostLine(0, 0f));
+
+        // At the clamp's ceiling it is one line across a 1280 window, in the font.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PotionUseCost))!).Max;
+        string widest = DungeonHud.DrinkCostLine(most, 0f).Text;
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+        Assert.True(widest.Length * 6f * 1.5f <= 1240f);
+    }
+
+    [Fact]
+    public void TheEquipHintSaysDrinkWhenTheBagHoldsAPotion()
+    {
+        // Phase 6b.2: a bag number on a potion's slot drinks it, so while the bag
+        // holds one the hint says the same keys equip or drink. A bag of weapons
+        // says what it always said; a hand and no bag has neither to offer.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(slots, potion: true));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots, potion: false));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots));
+        Assert.Equal("PRESS 2 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(2, potion: true));
+        Assert.Equal("PRESS 2-9 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(12, potion: true));
+        Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1, potion: true));
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", DungeonHud.EquipHint(12, potion: true));
+        Assert.True(DungeonHud.EquipHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
+    }
+
+    [Fact]
+    public void TheDrinkBeatsAndCueFitTheFont()
+    {
+        // Phase 6b.2: what rises over a member who drinks — the potion, and what the
+        // pool gained, or that a full pool took nothing — and what a potion's number
+        // says when the drink's whole cost is not left. Each in the HUD's font: the
+        // plus is a glyph, and there is no percent sign.
+        Assert.Equal("DRANK HEALTH POTION Q2 - +12 HP", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(2), 3, 12, 12, 40)));
+        Assert.Equal("DRANK MANA POTION Q1 - +6 MANA", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(1), 4, 6, 6, 40)));
+        Assert.Equal("DRANK HEALTH POTION Q2 - NOTHING TO RESTORE", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(2), 3, 12, 0, 40)));
+        Assert.Equal("DRANK MANA POTION Q3 - NOTHING TO RESTORE", DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(3), 1, 18, 0, 0)));
+        Assert.Equal("NOT ENOUGH MOVE TO DRINK - IT COSTS 40", DungeonHud.DrinkShortCue(40));
+
+        // The widest of each, at the numbers' ceilings, as floating text over the
+        // member (scale 2) inside a 1280 window.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PotionUseCost))!).Max;
+        foreach (string text in new[]
+        {
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Health(ContentBounds.MostCount), 8, int.MaxValue, int.MaxValue, most)),
+            DungeonHud.DrankBeat(new PotionDrink(TestPotions.Mana(ContentBounds.MostCount), 8, int.MaxValue, 0, most)),
+            DungeonHud.DrinkShortCue(most),
+        })
+        {
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
+            Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window");
+        }
+    }
+
+    [Fact]
+    public void ADrinkRefusedShortOfItsCostNeverLogsTheCostAsWhatIsLeft()
+    {
+        // The 6b.2 review: movement left after walking is a fraction, and the gate
+        // pays a whole cost only from the whole of it. The log rounds down, so a
+        // member at 39.6 of a 40 drink reads 39 — never 40, the cost it is refused —
+        // and a whole number reads as itself. Rounded down, the whole movement left
+        // is at least the cost exactly when the gate would pay it.
+        Assert.Equal("[Potion] A cannot drink from slot 2: 39 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 1, 39.6f, 40));
+        Assert.Equal("[Potion] D cannot drink from slot 6: 39 movement left, a drink costs 40", DungeonScene.DrinkShortLine("D", 5, 39.999f, 40));
+        Assert.Equal("[Potion] A cannot drink from slot 3: 10 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 2, 10f, 40));
+        Assert.Equal("[Potion] A cannot drink from slot 2: 0 movement left, a drink costs 40", DungeonScene.DrinkShortLine("A", 1, 0.5f, 40));
     }
 
     [Fact]
@@ -1179,6 +1475,41 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void TheWayOutWarnsThatPotionsSpoil()
+    {
+        // §6.6, Phase 6b.3: every potion carried spoils as the run ends, so the way
+        // out's question says so while one is left to drink — a line of its own,
+        // before what every leave costs, the boss down or standing — and says nothing
+        // when the bags hold none. In the HUD's font, at the most a party carries.
+        const string reset = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", "THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 2));
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", "THE POTION CARRIED SPOILS ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 1));
+        Assert.Equal(DungeonHud.LeavePreview(tutorial), DungeonHud.LeavePreview(tutorial, potionsCarried: 0));
+        Assert.DoesNotContain(DungeonHud.LeavePreview(tutorial), line => line.Contains("POTION", StringComparison.Ordinal));
+        // With the boss down the clear keeps what is carried, but not a potion: the
+        // first line narrows to the weapons while one is carried, so it never
+        // promises what the line under it says spoils (the audit of Phase 6b).
+        tutorial.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY", "THE TUTORIAL CLOSES FOR GOOD", "THE 3 POTIONS CARRIED SPOIL ON THE WAY OUT", reset },
+            DungeonHud.LeavePreview(tutorial, potionsCarried: 3));
+        Assert.Equal("THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY", DungeonHud.LeavePreview(tutorial, potionsCarried: 1)[0]);
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE TUTORIAL CLOSES FOR GOOD", reset }, DungeonHud.LeavePreview(tutorial));
+
+        // The widest, a bag slot each for the most a party carries, at the panel's 1.5.
+        int most = ((IntKey)TuningSchema.Find(nameof(Tuning.PartyCarrySlots))!).Max;
+        foreach (string widest in new[] { DungeonHud.PotionsSpoilLine(most), DungeonHud.ClearKeepsLine(most) })
+        {
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+            Assert.True(widest.Length * 6f * 1.5f <= 1240f, $"'{widest}' runs off the window");
+        }
+    }
+
+    [Fact]
     public void TheRunSummaryNamesTheOutcome()
     {
         // 4.4's three outcomes, as the run's end shows them: what the run was, where
@@ -1310,8 +1641,9 @@ public sealed class HudTextTests : IDisposable
     {
         // The run's end panel has no cut: every line of the summary is drawn, the
         // enchanter's among them (Phase 6a.3a). The worst a run's end can write — a
-        // wipe with the boss down, which counts and locks, losing a full haul of the
-        // longest name, clawing back every pool every member has at the widest
+        // wipe with the boss down, which counts and locks, losing a haul of the
+        // longest name in every slot of the carry a potion does not take (Phase
+        // 6b.3, below), clawing back every pool every member has at the widest
         // numbers (a member swaps weapons mid-run, and puts one down for another, so
         // it can gain in every class), then the enchanter's two lines — a finished
         // Enchant of the longest enchantment first, its improvement roll deepening the
@@ -1340,10 +1672,47 @@ public sealed class HudTextTests : IDisposable
             .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id, Improved: improved))
             .Concat(Enumerable.Range(0, ContentBounds.MostWorked - 1).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id)))
             .ToArray();
-        var worst = new RunResult("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul, members.SelectMany(Pools).ToArray(), reports);
+        // And the farm's two lines (Phase 6b.3), as a run's end writes them together:
+        // the first clear of a second dungeon besides the tutorial, at the most two
+        // clears yield — the farm grows, so it had a worker as the run began and the
+        // potions carried in could have been mixed (check 35) — and potions spoiled. A
+        // potion lies in a bag slot and a spoil in a slot of the carry, one thing a
+        // slot, so the potions spoiled and the haul lost share the party's slots: the
+        // worst is one potion spoiled and the rest of the carry lost, and no other
+        // split of the slots makes more lines.
+        int carry = GameContent.Current.Tuning.PartyCarrySlots;
+        int bagSlots = carry - members.Length;   // the hand keeps a weapon
+        RunResult Split(int potions) => new("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul[..(carry - potions)],
+            members.SelectMany(Pools).ToArray(), reports, FarmYield: 2 * ContentBounds.MostYieldPerClear, FarmClears: 2, FirstClear: true,
+            Spoiled: potions == 0 ? null : Enumerable.Repeat(TestPotions.Health(1), potions).ToArray());
+        var worst = Split(1);
 
         var lines = DungeonHud.RunSummaryLines(worst);
         var texts = lines.Select(line => line.Text).ToArray();
+        Assert.All(Enumerable.Range(0, bagSlots + 1), potions => Assert.True(DungeonHud.RunSummaryLines(Split(potions)).Count <= lines.Count,
+            $"{potions} potions spoiled beside {carry - potions} spoils lost make a longer summary than the worst"));
+        Assert.Contains(BetweenRunsHud.SpoiledLine(1), texts);
+        Assert.Contains($"A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED {2 * ContentBounds.MostYieldPerClear} UNITS", texts);
+
+        // Each stays one line at its widest — a bound on the numbers, not a result
+        // play writes: every bag slot's potion spoiled, and the farm's forms on a
+        // yield at the count's ceiling — the farm growing the widest of them, since the
+        // audit of Phase 6b had it say which dungeons it grows by.
+        var arrival = worst with { FarmYield = ContentBounds.MostCount, FarmClears = 1 };
+        var farmForms = new[] { arrival with { FarmClears = 99 }, arrival, arrival with { FirstClear = false, FarmClears = 99 }, arrival with { FarmYield = 0 } }
+            .Select(form => BetweenRunsHud.FarmLine(form)!.Value.Text).ToArray();
+        Assert.StartsWith("A FIRST CLEAR - THE FARM GROWS TO 99 DUNGEONS BEYOND THE TUTORIAL", farmForms[0], StringComparison.Ordinal);
+        Assert.True(farmForms.Max(form => form.Length) == farmForms[0].Length, $"the farm growing is not the farm's widest line: {string.Join(" / ", farmForms)}");
+        Assert.All(farmForms.Append(BetweenRunsHud.SpoiledLine(bagSlots)), form => Assert.True(form.Length * 6f * 2f <= 1240f, $"'{form}' runs off the window"));
+
+        // Every line the panel is handed is drawn. The worst a run's end can write is
+        // 34 lines, and a 720 window holds 35 at the least step and not 36: one line
+        // of room is left. A line added anywhere in the summary fails here by count,
+        // so the next one takes that room knowingly; past it, a line has to be paid
+        // for — by a cap, a shorter list, or a smaller step.
+        bool Fits(int count) => DungeonHud.RunSummaryTop(h, count) + DungeonHud.RunSummaryHeight(h, count) <= h - DungeonHud.SummaryBottomClearance;
+        Assert.True(lines.Count == 34, $"the worst summary is {lines.Count} lines, not 34: the run's end panel had one line of room left at 34, a 720 window holding 35 at the least step — say here what took it");
+        Assert.True(Fits(lines.Count + 1) && !Fits(lines.Count + 2), $"a 720 window no longer holds exactly {lines.Count + 1} lines at the least step");
         string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()} - DEEPENED {DungeonHud.ModifierName(deepest)}";
         Assert.Equal(new[] { back, $"THE ENCHANTER WORKED THE {longest.Name.ToUpperInvariant()} - 1 OF {ContentBounds.MostServiceRuns} RUNS" }.Take(DungeonHud.DungeonServiceLines),
             texts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
@@ -1379,8 +1748,13 @@ public sealed class HudTextTests : IDisposable
         Assert.All(movedTexts, text => Assert.True(text.Length * 6f * 2f <= 1240f, $"'{text}' runs off the window"));
 
         // A long summary the lift alone fits keeps the full step: a member clawed
-        // back in one weapon's class, and in HP and mana, one line a member.
-        var lifted = DungeonHud.RunSummaryLines(worst with { Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray() });
+        // back in one weapon's class, and in HP and mana, one line a member — with
+        // the whole carry lost, nothing spoiled and no farm yet, the two lines the
+        // farm added (Phase 6b.3) being what the worst case closes up for.
+        var lifted = DungeonHud.RunSummaryLines(worst with
+        {
+            SpoilsLost = haul, Clawbacks = members.SelectMany(member => Pools(member).Skip(pools - 3)).ToArray(), Spoiled = null, FarmClears = 0, FarmYield = 0, FirstClear = false,
+        });
         Assert.Equal(22f, DungeonHud.RunSummaryStep(h, lifted.Count));
         Assert.True(DungeonHud.RunSummaryTop(h, lifted.Count) < h / 2f - 170f, "the lifted summary sits above the ordinary anchor");
 

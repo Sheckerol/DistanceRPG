@@ -34,7 +34,8 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>The HUD's glyphs, upper-cased: what the notice of a save set aside can draw — no apostrophe, quote, brace, backslash or semicolon.</summary>
     private const string Font = @"^[A-Z0-9 .,:\-_!?()/<>\[\]+=#*]+$";
 
-    private static readonly string[] Fixtures = ["pre-rework-mid-run.json", "pre-rework-between-runs.json"];
+    /// <summary>The saves earlier builds wrote: the two the pre-rework code wrote, and the one the Phase 6a build wrote (version 2).</summary>
+    private static readonly string[] Fixtures = ["pre-rework-mid-run.json", "pre-rework-between-runs.json", "phase-6a-between-runs.json"];
 
     /// <summary>Why the run counter stops below <see cref="ContentBounds.MostRuns"/>: what its refusal says after the value and the ceiling.</summary>
     private const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
@@ -42,6 +43,9 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>Why a weapon's wear stops where it does: what its refusal says after the value and the ceiling.</summary>
     private static readonly string WearWhy =
         $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
+
+    /// <summary>Why a potion carried before the alchemist could have mixed one is refused: what check 31 says.</summary>
+    private const string AlchemistWhy = "a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before";
 
     private static string FixtureText(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name));
 
@@ -194,7 +198,8 @@ public sealed class SaveConsistencyTests : IDisposable
     [Fact]
     public void WhatPlayCanWriteAlwaysLoads()
     {
-        // Both saves the pre-rework code wrote hold every ceiling and every check.
+        // The saves earlier builds wrote — both the pre-rework code's, and the Phase 6a
+        // build's — hold every ceiling and every check.
         foreach (string name in Fixtures)
             Restores(FixtureText(name), name);
 
@@ -202,20 +207,37 @@ public sealed class SaveConsistencyTests : IDisposable
         // clear that retires; a clear that locks; a retreat that counts as a mercy,
         // and one that counts nothing; a wipe with the boss standing, a spoil lost
         // and XP clawed back; and a wipe with the boss down, which clears and locks.
+        // What the farm did on each (Phase 6b.3) is said where it is written: the
+        // tutorial's clear a first clear, retired, at no clears and no yield; the first
+        // real clear the farm's first worker; a retreat that counts nothing, with the
+        // alchemist there, no yield; and a first clear on a wipe, which yields.
         var campaign = NewCampaign();
         Loads(campaign, "a new campaign");
-        CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
+        var tutorial = CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
+        Assert.Equal((true, true, 0, 0), (tutorial.FirstClear, tutorial.Retired, tutorial.FarmClears, tutorial.FarmYield));
         Loads(campaign, "the tutorial retired");
-        CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
+        var hall = CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
+        Assert.Equal((true, false, 1), (hall.FirstClear, hall.Retired, hall.FarmClears));
         Loads(campaign, "the Spear Hall cleared and locked");
         CampaignRuns.DeepRetreat(campaign, "long_gallery");
         Loads(campaign, "a retreat that counts as a mercy");
-        CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        var unCounted = CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal((false, 1, 0), (unCounted.ServiceTick, unCounted.FarmClears, unCounted.FarmYield));
         Loads(campaign, "a retreat that counts nothing");
         WipeWithASpoil(campaign, "knife_warrens");
         Loads(campaign, "a wipe with the boss standing");
-        WipeWithTheBossDown(campaign, "quiver_pits");
+        var wipedClear = WipeWithTheBossDown(campaign, "quiver_pits");
+        Assert.Equal((true, 2), (wipedClear.FirstClear, wipedClear.FarmClears));
         Loads(campaign, "a wipe with the boss down");
+
+        // A version-2 save after a real clear (the Phase 6a build's): its last result
+        // lifted as one that yielded nothing at no clears, while the Spear Hall is a
+        // worker — so the batch is none, no potion is carried, and saved again at
+        // version 3 it loads.
+        var lifted6a = Restores(FixtureText("phase-6a-between-runs.json"), "the Phase 6a save").Campaign;
+        Assert.Equal((0, 0, 1), (lifted6a.LastResult!.FarmYield, lifted6a.LastResult.FarmClears, Farm.Clears(lifted6a)));
+        Assert.Equal(0, Farm.Batch(lifted6a));
+        Loads(lifted6a, "a version-2 save after a real clear, saved again");
 
         // Mid-run, the Flagship: the boss down and its drop taken, a dummy farmed,
         // drops lying and taken, spoils in a bag and on a floor, XP gained since the door.
@@ -239,8 +261,15 @@ public sealed class SaveConsistencyTests : IDisposable
         // Check 3, withdrawn: dungeons.json beside the exe may move retiresOnClear
         // onto a dungeon already cleared and locked (a retiring dungeon pins its
         // floor), and its next clear retires it and leaves the old lock where it was:
-        // retired and still locked, which play wrote, and which loads.
+        // retired and still locked, which play wrote, and which loads. The farm loses
+        // that worker with it (Phase 6b.3), and the potions carried into that clear
+        // spoil on a run that ends with no worker at all: they were mixed while the
+        // Spear Hall was one, which check 35 counts as the run began. They are mixed
+        // before the file is put beside the game, as play must mix them: under it the
+        // hub lists the Spear Hall alone — the content's tutorial now, not retired —
+        // so no run that yields comes before its re-clear.
         int oldLock = lifted.LockedUntilRun("spear_hall");
+        TestPotions.Carrying(lifted, "A", (2, TestPotions.Health(1)));
         using (TestContent.UsePremise(dungeons: data => new DungeonsData(data.Dungeons.Select(def => def.Id switch
                {
                    "spear_hall" => def with { RetiresOnClear = true, BossFloorMin = 5, BossFloorMax = 5 },
@@ -248,8 +277,11 @@ public sealed class SaveConsistencyTests : IDisposable
                    _ => def,
                }).ToArray())))
         {
+            Assert.Equal(["spear_hall"], lifted.Listings().Select(listing => listing.Def.Id));
             var retiring = CampaignRuns.Clear(lifted, "spear_hall", FiveDeep);
             Assert.Equal((true, (int?)null), (retiring.Retired, retiring.LockedUntilRun));
+            Assert.Equal((false, 0), (retiring.FirstClear, retiring.FarmClears));
+            Assert.Equal([TestPotions.Health(1)], retiring.Spoiled!);
             Assert.True(lifted.IsRetired("spear_hall"));
             Assert.Contains(("spear_hall", oldLock), lifted.LockedInOrder);
             Loads(lifted, "a dungeon retired with its old lock standing");
@@ -283,13 +315,13 @@ public sealed class SaveConsistencyTests : IDisposable
         // since: each is what play writes, and each loads.
         var worn = NewCampaign();
         CampaignRuns.Clear(worn, "tutorial", GoldenSeed);
-        Worn(worn.Party[0].Inventory[0]!, 12);
-        Assert.True(Worn(worn.Party[1].Inventory[0]!, 40).WornFull);
+        Worn(worn.Party[0].WeaponIn(0)!, 12);
+        Assert.True(Worn(worn.Party[1].WeaponIn(0)!, 40).WornFull);
         Loads(worn, "worn weapons in hand, one full");
 
         var visit = worn.Enter("spear_hall", FiveDeep);
         visit.OpenTurns(worn.Party, CampaignRuns.Ten);
-        var gear = Worn(worn.Party[3].Inventory[1]!, 7);   // D's second staff, cast with before it went back in the bag
+        var gear = Worn(worn.Party[3].WeaponIn(1)!, 7);   // D's second staff, cast with before it went back in the bag
         Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
         Loads(worn, "a worn weapon put down on a floor, mid-run");
         var kept = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
@@ -310,7 +342,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
         {
-            Assert.True(worn.Party[1].Inventory[0]!.Wear > worn.Party[1].Inventory[0]!.WearCapacity);
+            Assert.True(worn.Party[1].WeaponIn(0)!.Wear > worn.Party[1].WeaponIn(0)!.WearCapacity);
             Loads(worn, "wear over a capacity a tuning lowered since");
         }
 
@@ -357,6 +389,107 @@ public sealed class SaveConsistencyTests : IDisposable
             TestShop.Counted(moved);
             Loads(moved, "a shop worked after retiresOnClear moved");
         }
+
+        // Potions (Phase 6b.1), once a dungeon besides the tutorial is cleared, each
+        // laid between runs as a mix lays them (TestPotions), and none asked to
+        // outlive a run's end, which spoils them (Phase 6b.3): in two bags between
+        // runs; carried into a dungeon, one poured out, then one drunk (Phase 6b.2);
+        // in the bag of a member whose hand a wipe emptied — it held a spoil — laid
+        // after that wipe, which took the boss down first, a clear, so the run
+        // counted and yielded for them, and spoiled the one still carried; and in the
+        // bag of a member who is down mid-run, carried into that run.
+        var potions = NewCampaign();
+        TestPotions.Carrying(potions, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        TestPotions.Carrying(potions, "C", (5, TestPotions.Health(3)));
+        Loads(potions, "potions in two bags between runs");
+        var carriedIn = potions.Enter(potions.DefaultNext(), FiveDeep);
+        var potionTurns = carriedIn.OpenTurns(potions.Party, CampaignRuns.Ten);
+        potions.Party[0].TakePotion(3);
+        Loads(potions, "potions carried into a dungeon, one poured out");
+
+        // Drunk (Phase 6b.2): A, hurt, drinks the other, its HP and HP XP the drink's
+        // and its movement spent; C's is still carried. Saved at the party's turn, it
+        // loads. The drink's numbers are this case's own input — a share of 20 a unit
+        // and a drink at 40, as PotionDrinkTests states them — so a retune of the
+        // shipped file fails none of it (ShippedDataTests' R5).
+        using (TestContent.UsePremise(tuning: t => t with { HealthPotionPercent = 20, ManaPotionPercent = 20, PotionUseCost = 40 }))
+        {
+            potions.Party[0].Hp -= 5;
+            float before = potions.Party[0].DistLeft;
+            var drunk = potionTurns.TryDrink(potions.Party[0], 2);
+            Assert.Equal((5, before - 40), (drunk!.Restored, potions.Party[0].DistLeft));
+        }
+        Assert.Empty(potions.Party[0].Potions);
+        Assert.Equal(TestPotions.Health(3), potions.Party[2].PotionIn(5));
+        Loads(potions, "potions carried into a dungeon, one drunk and one still carried");
+        while (carriedIn.Current.DownStairs is not null)
+            potionTurns = CampaignRuns.Down(carriedIn, potions.Party);
+        var heldSpoil = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        int spoilSlot = Pickup.Take(potions, carriedIn.Current.Enemies[0], heldSpoil, potions.Party[2], carriedIn);
+        Assert.True(potionTurns.TrySwap(potions.Party[2], spoilSlot));
+        Assert.Same(heldSpoil.Weapon, potions.Party[2].EquippedWeapon);
+        carriedIn.Current.Boss!.Alive = false;
+        carriedIn.RecordBossDefeated();
+        RunResult potionWipe;
+        using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 }))   // the yield the potions laid after it are mixed from: this case's own number
+            potionWipe = CampaignRuns.Wipe(potions, potionTurns);
+        Assert.Equal((RunOutcome.Death, true, true), (potionWipe.Outcome, potionWipe.BossDefeated, potionWipe.ServiceTick));
+        Assert.Equal([TestPotions.Health(3)], potionWipe.Spoiled!);   // C's, still carried: spoiled by the wipe, never forfeited as gear
+        Assert.Equal(("long_gallery", true, 2, 14), (potionWipe.DungeonId, potionWipe.FirstClear, potionWipe.FarmClears, potionWipe.FarmYield));   // its first clear: the farm grows
+        Loads(potions, "a wipe that spoiled a potion");
+        Assert.Null(potions.Party[2].Inventory[0]);   // the spoil it held, lost
+        TestPotions.Carrying(potions, "C", (3, TestPotions.Health(2)));
+        TestPotions.Carrying(potions, "A", (4, TestPotions.Mana(1)));
+        Assert.Null(potions.Party[2].Inventory[0]);   // between runs: the next descent arms it
+        Loads(potions, "potions in the bag of a member whose hand a wipe emptied");
+        potions.Enter(potions.DefaultNext(), FiveDeep).OpenTurns(potions.Party, CampaignRuns.Ten);
+        potions.Party[0].Hp = 0;
+        potions.Party[0].Alive = false;
+        Assert.Equal(TestPotions.Mana(1), potions.Party[0].PotionIn(4));
+        Loads(potions, "potions in the bag of a member who is down mid-run");
+
+        // The farm's run's ends (Phase 6b.3): potions carried out the way out, on a run
+        // that did not count with the alchemist there — spoiled, and no yield; and
+        // potions carried into the first clear of a second dungeon besides the
+        // tutorial, which spoil on a run whose own clear the farm counts — the farm
+        // had one worker as it began, check 35's subtraction at its edge.
+        var farmed = NewCampaign();
+        TestPotions.Carrying(farmed, "B", (2, TestPotions.Mana(2)));
+        var walkedOut = CampaignRuns.ShallowRetreat(farmed, farmed.DefaultNext());
+        Assert.Equal((false, 1, 0), (walkedOut.ServiceTick, walkedOut.FarmClears, walkedOut.FarmYield));
+        Assert.Equal([TestPotions.Mana(2)], walkedOut.Spoiled!);
+        Assert.Empty(farmed.Party[1].Potions);
+        Loads(farmed, "potions spoiled on the way out of a run that did not count");
+        TestPotions.Carrying(farmed, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        string second = GameContent.Current.Dungeons.All.First(def => !def.RetiresOnClear && !farmed.HasCleared(def.Id) && farmed.IsSelectable(def)).Id;
+        var grown = CampaignRuns.Clear(farmed, second, FiveDeep);
+        Assert.Equal((true, false, 2, 2), (grown.FirstClear, grown.Retired, grown.FarmClears, grown.Spoiled!.Count));
+        Loads(farmed, "potions spoiled on the first clear of a second dungeon besides the tutorial");
+
+        // The alchemist's doors (Phase 6b.4): a batch mixed to its last unit, and then
+        // partly poured back, each saved between runs as the hub saves every change —
+        // the farm's rate this case's own input (7).
+        using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 }))
+        {
+            var mixing = NewCampaign();
+            CampaignRuns.Clear(mixing, "tutorial", GoldenSeed);
+            CampaignRuns.Clear(mixing, "spear_hall", FiveDeep);
+            Alchemist.Mix(mixing, "A", PotionType.Health, 5);
+            Alchemist.Mix(mixing, "D", PotionType.Mana, 2);
+            Assert.Equal(0, Farm.Batch(mixing));
+            Loads(mixing, "a batch mixed to its last unit");
+            Alchemist.PourBack(mixing, "A", 2);
+            Assert.Equal(5, Farm.Batch(mixing));
+            Loads(mixing, "a batch mixed and partly poured back");
+        }
+
+        // And the alchemist's arrival on a wipe: the first real clear, the boss killed
+        // and the party dead on the way out, which counts and yields.
+        var wipeArrival = NewCampaign();
+        CampaignRuns.Clear(wipeArrival, "tutorial", GoldenSeed);
+        var arrived = WipeWithTheBossDown(wipeArrival, "spear_hall");
+        Assert.Equal((true, false, 1), (arrived.FirstClear, arrived.Retired, arrived.FarmClears));
+        Loads(wipeArrival, "the first real clear on a wipe");
 
         // Transfers (Phase 6a.6): a move and a reorder in the shop, the source held
         // there with its wear, and a finished move reported — and the same after a
@@ -759,7 +892,7 @@ public sealed class SaveConsistencyTests : IDisposable
         RefusedAt(Halberd(bar + 8), "campaign.visit.floors[3].enemies[0].body.hp",
             $"{bar + 8} is above {bar + 7}: a row holds no more hit points than the largest bar a pool opens on, {bar} (StartingPool at its most), plus what its revivals added");
 
-        // Both saves the pre-rework code wrote lie under every ceiling.
+        // The saves earlier builds wrote lie under every ceiling.
         foreach (string name in Fixtures)
             Restores(FixtureText(name), name);
 
@@ -1201,6 +1334,376 @@ public sealed class SaveConsistencyTests : IDisposable
     }
 
     [Fact]
+    public void APotionRowIsReadOnItsOwn()
+    {
+        // Phase 6b.1 (R3(b)): a potion row is read field by field, each refused at its
+        // own path — its slot a bag slot, 1 to the bag's last, since the hand keeps a
+        // weapon, and one no weapon fills, since a slot holds one thing; the rows in
+        // strictly ascending slot order, so no two share one (one potion a slot, no
+        // stacking) and one campaign is one text; its type a potion type's name; and
+        // its quality 1 to the sanity bound, a count of units.
+        var campaign = NewCampaign();
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (4, TestPotions.Mana(1)));
+        string text = Save(campaign);
+        Restores(text, "two potions in A's bag");
+        static JsonObject Row(JsonObject tree, int i) => MemberNode(tree, 0)["potions"]![i]!.AsObject();
+        const string quality = "one unit makes an ordinary potion, and a quality is a count of units";
+        (Action<JsonObject> Edit, string Where, string Problem)[] refusals =
+        [
+            (tree => Row(tree, 0)["slot"] = 0, "campaign.party[0].potions[0].slot", "0 is the hand: the hand keeps a weapon, and a bag runs from slot 1"),
+            (tree => Row(tree, 1)["slot"] = 6, "campaign.party[0].potions[1].slot", "6 is no bag slot of member A: the bag runs 1 to 5"),
+            (tree => Row(tree, 0)["slot"] = -1, "campaign.party[0].potions[0].slot", "-1 is no bag slot of member A: the bag runs 1 to 5"),
+            (tree => Row(tree, 0)["slot"] = 1, "campaign.party[0].potions[0].slot", "slot 1 holds a weapon, staff_of_renewal: a slot holds one thing"),
+            (tree => Row(tree, 1)["slot"] = 2, "campaign.party[0].potions[1].slot", "2 is not after slot 2: the potions are listed by slot, one a slot, no stacking"),
+            (tree => { Row(tree, 0)["slot"] = 4; Row(tree, 1)["slot"] = 2; }, "campaign.party[0].potions[1].slot", "2 is not after slot 4: the potions are listed by slot, one a slot, no stacking"),
+            (tree => Row(tree, 0)["quality"] = 0, "campaign.party[0].potions[0].quality", $"0 is below 1: {quality}"),
+            (tree => Row(tree, 1)["quality"] = -5, "campaign.party[0].potions[1].quality", $"-5 is below 1: {quality}"),
+            (tree => Row(tree, 0)["quality"] = ContentBounds.MostCount + 1L, "campaign.party[0].potions[0].quality", $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {quality}"),
+            (tree => MemberNode(tree, 0)["potions"]![0] = null, "campaign.party[0].potions[0]", "null where a potion belongs"),
+        ];
+        foreach (var (edit, where, problem) in refusals)
+            RefusedAt(Edited(text, edit), where, problem);
+
+        // A type is a potion type's exact name, never another case nor another word.
+        foreach (string type in new[] { "Elixir", "health", "Health ", "1" })
+        {
+            var refused = Refused(Edited(text, tree => Row(tree, 0)["type"] = type));
+            Assert.Equal(("campaign.party[0].potions[0].type", $"'{type}' is no potion type"), (refused.Where, refused.Problem));
+        }
+
+        // A member whose bag is its hand alone — a save written under a PartyCarrySlots
+        // of one slot a member — has no slot a potion can lie in, and is told so.
+        RefusedAt(Edited(text, tree =>
+            {
+                var hand = MemberNode(tree, 0)["inventory"]![0]!.DeepClone();
+                MemberNode(tree, 0)["inventory"] = new JsonArray(hand);
+            }),
+            "campaign.party[0].potions[0].slot", "2 is no bag slot of member A: it carries a hand and no bag");
+
+        // At its ceiling a quality passes its own read. A whole save carrying one is
+        // none play will write — from Phase 6b's farm on, what the bags carry is
+        // checked against what the last run yielded, a few units — so the ceiling is
+        // asked where no such check reaches it: on a save check 31 refuses, the
+        // tutorial beaten and nothing besides. Every field is read on its own before
+        // the fields are checked together, so a potion of the most quality is refused
+        // by check 31 and never at its quality, while one past it is refused at its
+        // quality first.
+        var tutorial = NewCampaign();
+        CampaignRuns.Clear(tutorial, "tutorial", GoldenSeed);
+        string before = Save(tutorial);
+        static JsonNode Carried(long quality) => JsonNode.Parse($$"""[{ "slot": 2, "type": "Health", "quality": {{quality}} }]""")!;
+        RefusedAt(Edited(before, tree => MemberNode(tree, 0)["potions"] = Carried(ContentBounds.MostCount)), "campaign.party[0].potions[0]", AlchemistWhy);
+        RefusedAt(Edited(before, tree => MemberNode(tree, 0)["potions"] = Carried(ContentBounds.MostCount + 1L)),
+            "campaign.party[0].potions[0].quality", $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {quality}");
+
+        // And a bag's last slot is a bag slot.
+        Restores(Edited(text, tree => Row(tree, 1)["slot"] = 5), "a potion in the bag's last slot");
+    }
+
+    [Fact]
+    public void APotionBeforeTheAlchemistIsRefused()
+    {
+        // Check 31: the alchemist arrives with the first clear of a dungeon besides the
+        // tutorial (§6.6), and mixes nothing before — so a potion carried while every
+        // dungeon the campaign has cleared is retired is none play wrote, refused at
+        // the first potion it finds. Asked of the retired list alone, never of which
+        // dungeon today's dungeons.json retires on its clear: a copy beside the game
+        // may move that flag, and a save play wrote still loads.
+        var potion = JsonNode.Parse("""[{ "slot": 2, "type": "Health", "quality": 1 }]""")!;
+
+        // A new campaign, nothing cleared; and the tutorial beaten and retired, nothing else.
+        var fresh = NewCampaign();
+        RefusedAt(Edited(Save(fresh), tree => MemberNode(tree, 1)["potions"] = potion.DeepClone()), "campaign.party[1].potions[0]", AlchemistWhy);
+        CampaignRuns.Clear(fresh, "tutorial", GoldenSeed);
+        string tutorial = Save(fresh);
+        Restores(tutorial, "the tutorial beaten, carrying nothing");
+        RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", AlchemistWhy);
+
+        // The first member found carrying one is named, the roster's order.
+        RefusedAt(Edited(tutorial, tree =>
+        {
+            MemberNode(tree, 2)["potions"] = potion.DeepClone();
+            MemberNode(tree, 3)["potions"] = potion.DeepClone();
+        }), "campaign.party[2].potions[0]", AlchemistWhy);
+
+        // Once a dungeon besides the tutorial is cleared — the Spear Hall, as the potion
+        // fixtures clear one (TestPotions) — a potion loads; and under a dungeons.json
+        // that moves retiresOnClear onto the Spear Hall since, it still does — the save
+        // says the Spear Hall is not retired — while the tutorial's save, whose clear is
+        // retired, is still refused though today's content would not retire it.
+        TestPotions.Carrying(fresh, "B", (2, TestPotions.Health(1)));
+        Assert.Equal(["spear_hall", "tutorial"], fresh.ClearedInOrder);
+        string hall = Save(fresh);
+        Assert.Equal(TestPotions.Health(1), Restores(hall, "a potion once the Spear Hall is cleared").Campaign.Party[1].PotionIn(2));
+        using (TestContent.UsePremise(dungeons: TestShop.TutorialMoved))
+        {
+            Restores(hall, "a potion, retiresOnClear moved since onto the dungeon cleared");
+            RefusedAt(Edited(tutorial, tree => MemberNode(tree, 3)["potions"] = potion.DeepClone()), "campaign.party[3].potions[0]", AlchemistWhy);
+        }
+
+        // An empty list is none, and null is none, before the alchemist as after.
+        Restores(Edited(tutorial, tree => MemberNode(tree, 0)["potions"] = new JsonArray()), "no potions, written []");
+    }
+
+    [Fact]
+    public void ASpoilAtAPotionsSlotIsRefused()
+    {
+        // A spoil is a weapon taken off a corpse this visit, carried or lying
+        // somewhere (§4.4): a spoil's locator that names a slot a potion lies in names
+        // no weapon, and is refused there. The Flagship carries the boss's own drop,
+        // a spoil, in a bag.
+        string text = Save(VisitSaveTests.Flagship().Campaign);
+        var locator = VisitNode(JsonNode.Parse(text)!.AsObject())["spoils"]!.AsArray()
+            .Select((spoil, i) => (Index: i, Member: spoil!["member"]?.GetValue<string>(), Slot: spoil["slot"]?.GetValue<int>()))
+            .First(spoil => spoil.Member is not null);
+        int member = JsonNode.Parse(text)!["campaign"]!["party"]!.AsArray().Select(row => row!["id"]!.GetValue<string>()).ToList().IndexOf(locator.Member!);
+        int slot = locator.Slot!.Value;
+        RefusedAt(Edited(text, tree =>
+        {
+            MemberNode(tree, member)["inventory"]![slot] = null;
+            MemberNode(tree, member)["potions"] = JsonNode.Parse($$"""[{ "slot": {{slot}}, "type": "Mana", "quality": 1 }]""");
+        }), $"campaign.visit.spoils[{locator.Index}].slot", $"slot {slot} of member {locator.Member} holds a potion: a spoil is a weapon");
+    }
+
+    /// <summary>The farm's rate the farm's checks are written against: these tests' own number (ShippedDataTests' R5).</summary>
+    private static Tuning Farming(Tuning t) => t with { FarmYieldPerClear = 7 };
+
+    /// <summary>The tutorial beaten and retired, and the Spear Hall's first clear the last run: the alchemist there, and a batch of 7.</summary>
+    private static CampaignState AlchemistArrived()
+    {
+        var campaign = NewCampaign();
+        CampaignRuns.Clear(campaign, "tutorial", GoldenSeed);
+        var hall = CampaignRuns.Clear(campaign, "spear_hall", FiveDeep);
+        Assert.Equal((true, 1, 7), (hall.FirstClear, hall.FarmClears, hall.FarmYield));
+        return campaign;
+    }
+
+    /// <summary>A potion that spoiled, as a run's result writes it.</summary>
+    private static JsonNode Spoiled(string type, int quality) => JsonNode.Parse($$"""{ "type": "{{type}}", "quality": {{quality}} }""")!;
+
+    [Fact]
+    public void PotionsBeyondTheLastBatchAreRefused()
+    {
+        // Check 32 (Phase 6b.3): every potion carried was mixed from the last run's
+        // batch, a unit of quality a unit of it, so the qualities the bags hold —
+        // summed in roster then slot order — are no more than the last run's yield:
+        // between runs, and during a visit, less what was drunk or poured out. The
+        // first potion where the sum passes it is named.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistArrived();
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(3)), (3, TestPotions.Mana(2)));
+        TestPotions.Carrying(campaign, "C", (2, TestPotions.Health(2)));
+        Assert.Equal(0, Farm.Batch(campaign));
+        string text = Save(campaign);
+        Restores(text, "the batch mixed whole");
+        const string why = "every potion is mixed from the batch the last run yielded, a unit of quality a unit of it";
+        RefusedAt(Edited(text, tree => MemberNode(tree, 2)["potions"]![0]!["quality"] = 3), "campaign.party[2].potions[0]",
+            $"8 units of quality carried by here, more than the 7 the last run yielded: {why}");
+        RefusedAt(Edited(text, tree => MemberNode(tree, 0)["potions"]![0]!["quality"] = 6), "campaign.party[0].potions[1]",
+            $"8 units of quality carried by here, more than the 7 the last run yielded: {why}");
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = 6), "campaign.party[2].potions[0]",
+            $"7 units of quality carried by here, more than the 6 the last run yielded: {why}");
+
+        // During a visit, the potions carried in less what was poured out or drunk:
+        // still within the batch they were mixed from.
+        campaign.Enter("long_gallery", FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+        campaign.Party[0].TakePotion(2);
+        string inside = Save(campaign);
+        Restores(inside, "potions carried into a run, one poured out");
+        RefusedAt(Edited(inside, tree => MemberNode(tree, 2)["potions"]![0]!["quality"] = 6), "campaign.party[2].potions[0]",
+            $"8 units of quality carried by here, more than the 7 the last run yielded: {why}");
+
+        // A run that yielded nothing leaves nothing to mix — a version-2 save after a
+        // real clear among them, whose result is lifted as one that yielded nothing.
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = 0), "campaign.party[0].potions[0]",
+            $"3 units of quality carried by here, more than the 0 the last run yielded: {why}");
+    }
+
+    [Fact]
+    public void AYieldFromARunThatDidNotCountIsRefused()
+    {
+        // Check 33 (Phase 6b.3; PHASE 6b DECISION 4): the farm yields at the end of a
+        // run that counts, for each dungeon besides the tutorial beaten — so a yield
+        // on a run that did not count, or at no clears, is none play wrote. A run that
+        // counted and yielded nothing — a rate of 0, or a result lifted from version
+        // 2 — loads.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistArrived();
+        var idle = CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal((false, 1, 0), (idle.ServiceTick, idle.FarmClears, idle.FarmYield));
+        string text = Save(campaign);
+        Restores(text, "a run that did not count, the alchemist there");
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = 7), "campaign.lastResult.farmYield",
+            "7 yielded on a run that did not count: the farm yields at the end of a run that counts, and nothing at one that did not");
+
+        var tutorial = NewCampaign();
+        CampaignRuns.Clear(tutorial, "tutorial", GoldenSeed);
+        string beaten = Save(tutorial);
+        RefusedAt(Edited(beaten, tree => Last(tree)["farmYield"] = 7), "campaign.lastResult.farmYield",
+            "7 yielded at no clears: the farm yields for each dungeon besides the tutorial beaten, and had none");
+        Restores(Edited(Save(AlchemistArrived()), tree => Last(tree)["farmYield"] = 0), "a counted run that yielded nothing");
+    }
+
+    [Fact]
+    public void AYieldPastAnyTuningIsRefused()
+    {
+        // Check 33's ceiling: no tuning in range yields more than FarmYieldPerClear's
+        // clamp ceiling a clear (ContentBounds.MostYieldPerClear), so a yield past it
+        // times the clears it was made at is refused, and one at it loads. A yield
+        // today's rate would not give is the run's own, and loads: the tuning it was
+        // made under is the hash's to tell. And a yield or a count of clears is read on
+        // its own first, a count from 0 to the sanity bound.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        string text = Save(AlchemistArrived());
+        int most = ContentBounds.MostYieldPerClear;
+        Restores(Edited(text, tree => Last(tree)["farmYield"] = most), "a yield at the most a clear yields");
+        Restores(Edited(text, tree => Last(tree)["farmYield"] = 500), "a yield today's rate would not give");
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = most + 1), "campaign.lastResult.farmYield",
+            $"{most + 1} is above {most}, the most 1 clear yields: no tuning yields more than {most} a clear (FarmYieldPerClear at its most)");
+
+        const string countWhy = "a count play grows a turn or a gain at a time never nears it, and past it the next step would pass the largest whole number";
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = -1), "campaign.lastResult.farmYield", "-1 is below 0");
+        RefusedAt(Edited(text, tree => Last(tree)["farmClears"] = -1), "campaign.lastResult.farmClears", "-1 is below 0");
+        RefusedAt(Edited(text, tree => Last(tree)["farmYield"] = ContentBounds.MostCount + 1L), "campaign.lastResult.farmYield",
+            $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {countWhy}");
+    }
+
+    [Fact]
+    public void MoreClearsThanTheCampaignHasAreRefused()
+    {
+        // Check 34 (Phase 6b.3): the farm counts the dungeons cleared and not retired
+        // as the run ends, and nothing undoes a clear before the next run's end — so a
+        // count above them is refused. Below them is a result lifted from version 2,
+        // which counted none, and loads. A first clear of a dungeon that did not retire
+        // is a dungeon the farm counts.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        string text = Save(AlchemistArrived());
+        RefusedAt(Edited(text, tree => Last(tree)["farmClears"] = 2), "campaign.lastResult.farmClears",
+            "2 where the campaign has 1 cleared and not retired: the farm counts the cleared set as the run ends, and no clear is undone");
+        Restores(Edited(text, tree => { Last(tree)["farmClears"] = 0; Last(tree)["farmYield"] = 0; Last(tree)["firstClear"] = false; }),
+            "a result lifted from version 2 after a real clear");
+        RefusedAt(Edited(text, tree => { Last(tree)["farmClears"] = 0; Last(tree)["farmYield"] = 0; }), "campaign.lastResult.farmClears",
+            "0 on the first clear of spear_hall, which did not retire: a dungeon besides the tutorial beaten is one the farm counts");
+    }
+
+    [Fact]
+    public void AFirstClearOfADungeonNotClearedIsRefused()
+    {
+        // Check 34: a first clear is a clear — the boss down, and its dungeon in the
+        // cleared set (check 13 holds a clear's dungeon there, and 2 a locked one) —
+        // so a first clear with the boss standing is refused at it, and one whose
+        // dungeon the campaign does not hold cleared is refused where that first
+        // shows. The tutorial's first clear retires it, and the farm counts nothing.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistArrived();
+        string hall = Save(campaign);
+        CampaignRuns.DeepRetreat(campaign, "long_gallery");
+        string retreat = Save(campaign);
+        RefusedAt(Edited(retreat, tree => Last(tree)["firstClear"] = true), "campaign.lastResult.firstClear",
+            "true with the boss standing: a first clear is a clear, and a clear downs the boss");
+        RefusedAt(Edited(hall, tree => CampaignNode(tree)["cleared"] = new JsonArray("tutorial")), "campaign.locks[0].dungeonId",
+            "spear_hall is locked and was never cleared: only a clear writes a lock");
+        var tutorial = NewCampaign();
+        var beaten = CampaignRuns.Clear(tutorial, "tutorial", GoldenSeed);
+        Assert.Equal((true, true, 0), (beaten.FirstClear, beaten.Retired, beaten.FarmClears));
+        Restores(Save(tutorial), "the tutorial's first clear, retired, the farm counting nothing");
+    }
+
+    [Fact]
+    public void MoreSpoiledThanTheBagsHoldIsRefused()
+    {
+        // Check 35 (Phase 6b.3): the potions that spoiled lay in the bags as the run
+        // ended, one a slot — so no more than the party's bag slots. Each is read on
+        // its own first: a potion type's name, and a quality of 1 to the sanity bound.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistArrived();
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(1)));
+        var walked = CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal([TestPotions.Health(1)], walked.Spoiled!);
+        string text = Save(campaign);
+        Assert.Equal("""[{"type":"Health","quality":1}]""", Last(JsonNode.Parse(text)!.AsObject())["spoiled"]!.ToJsonString());
+        Restores(text, "a potion spoiled on the way out");
+        static JsonArray Many(int count) => new(Enumerable.Range(0, count).Select(_ => Spoiled("Mana", 1)).ToArray());
+        Restores(Edited(text, tree => Last(tree)["spoiled"] = Many(20)), "a potion spoiled in every bag slot");
+        RefusedAt(Edited(text, tree => Last(tree)["spoiled"] = Many(21)), "campaign.lastResult.spoiled",
+            "21 spoiled and the bags hold 20 slots: a potion lay in a bag slot, one a slot");
+
+        const string quality = "one unit makes an ordinary potion, and a quality is a count of units";
+        RefusedAt(Edited(text, tree => Last(tree)["spoiled"]![0]!["quality"] = 0), "campaign.lastResult.spoiled[0].quality", $"0 is below 1: {quality}");
+        RefusedAt(Edited(text, tree => Last(tree)["spoiled"]![0]!["quality"] = ContentBounds.MostCount + 1L), "campaign.lastResult.spoiled[0].quality",
+            $"{ContentBounds.MostCount + 1L} is above {ContentBounds.MostCount}: {quality}");
+        RefusedAt(Edited(text, tree => Last(tree)["spoiled"]![0] = null), "campaign.lastResult.spoiled[0]", "null where a potion belongs");
+        var type = Refused(Edited(text, tree => Last(tree)["spoiled"]![0]!["type"] = "Elixir"));
+        Assert.Equal(("campaign.lastResult.spoiled[0].type", "'Elixir' is no potion type"), (type.Where, type.Problem));
+        Restores(Edited(text, tree => Last(tree)["spoiled"] = new JsonArray()), "nothing spoiled, written []");
+    }
+
+    [Fact]
+    public void SpoiledPotionsBeforeTheAlchemistAreRefused()
+    {
+        // Check 35: potions that spoiled were carried into the run, so the alchemist
+        // had arrived before it — the farm had a worker as the run began: the clears
+        // it ended with, less the run's own first clear of a dungeon it did not
+        // retire, plus a dungeon beaten before that the run's clear retired (a
+        // dungeons.json beside the game moving retiresOnClear onto it, which
+        // WhatPlayCanWriteAlwaysLoads plays). Asked of the result's own fields.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        const string why = "spoiled on a run the farm had no clear as it began: the alchemist arrives with the first clear of a dungeon besides the tutorial, and the potions carried into a run were mixed before it";
+        JsonArray One() => new(Spoiled("Health", 2));
+
+        var tutorial = NewCampaign();
+        CampaignRuns.Clear(tutorial, "tutorial", GoldenSeed);
+        RefusedAt(Edited(Save(tutorial), tree => Last(tree)["spoiled"] = One()), "campaign.lastResult.spoiled[0]", why);
+        var campaign = AlchemistArrived();
+        string hall = Save(campaign);
+        RefusedAt(Edited(hall, tree => Last(tree)["spoiled"] = One()), "campaign.lastResult.spoiled[0]", why);
+
+        // The first clear of a second dungeon had the first's worker as it began; and
+        // a re-clear that retired the farm's one worker had it too.
+        CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
+        Restores(Edited(Save(campaign), tree => Last(tree)["spoiled"] = One()), "potions spoiled on the first clear of a second dungeon");
+        Restores(Edited(hall, tree =>
+            {
+                Last(tree)["firstClear"] = false;
+                Last(tree)["retired"] = true;
+                Last(tree)["lockedUntilRun"] = null;
+                Last(tree)["farmClears"] = 0;
+                Last(tree)["farmYield"] = 0;
+                Last(tree)["spoiled"] = One();
+                CampaignNode(tree)["retired"] = new JsonArray("spear_hall", "tutorial");
+                CampaignNode(tree)["locks"] = new JsonArray();
+            }), "potions spoiled on a re-clear that retired the farm's one worker");
+    }
+
+    [Fact]
+    public void MoreSpoiledThanAnyYieldIsRefused()
+    {
+        // Check 35's ceiling: the potions that spoiled were mixed from the run before's
+        // yield, made at the clears the farm had as this run began, and no tuning in
+        // range yields more than FarmYieldPerClear's ceiling a clear — so units past
+        // that are refused at the potion where the sum passes them, and at it they load.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistArrived();
+        CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        string text = Save(campaign);
+        int most = ContentBounds.MostYieldPerClear;
+        Restores(Edited(text, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 1))), "spoiled at the most a clear yields");
+        RefusedAt(Edited(text, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 2))), "campaign.lastResult.spoiled[1]",
+            $"{most + 1} units of quality spoiled by here, above {most}, the most 1 clear yields: a potion is mixed from the yield of the run before, and no tuning yields more than {most} a clear (FarmYieldPerClear at its most)");
+
+        // And on the first clear of a second dungeon besides the tutorial: the farm
+        // ends the run with two workers, but began it with one — the potions carried
+        // in were mixed before the Long Gallery was beaten — so the ceiling is still
+        // one clear's, never the two the run ends with.
+        var grown = CampaignRuns.Clear(campaign, "long_gallery", FiveDeep);
+        Assert.Equal((true, false, 2), (grown.FirstClear, grown.Retired, grown.FarmClears));
+        string grownText = Save(campaign);
+        Restores(Edited(grownText, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 1))), "spoiled on a first clear at the most the clear before it yields");
+        RefusedAt(Edited(grownText, tree => Last(tree)["spoiled"] = new JsonArray(Spoiled("Health", most - 1), Spoiled("Mana", 2))), "campaign.lastResult.spoiled[1]",
+            $"{most + 1} units of quality spoiled by here, above {most}, the most 1 clear yields: a potion is mixed from the yield of the run before, and no tuning yields more than {most} a clear (FarmYieldPerClear at its most)");
+    }
+
+    [Fact]
     public void AReportNamingNoWeaponIsRefused()
     {
         // A report names its weapon and its enchantment by id, and the summary names
@@ -1414,7 +1917,7 @@ public sealed class SaveConsistencyTests : IDisposable
         foreach (int cashed in new[] { 0, 1, 7, 1335 })
         {
             long ceiling = bar + (long)perBar * cashed;
-            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].Inventory[0]!;
+            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].WeaponIn(0)!;
             Assert.Equal(((int)ceiling, cashed), (loaded.Wear, loaded.WearCashed));
             RefusedAt(Wearing((int)ceiling + 1, cashed), "campaign.party[0].inventory[0].wear", $"{ceiling + 1} is above {ceiling}: {WearWhy}");
         }
@@ -1422,7 +1925,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         // Summed as a long: wear cashed at its own ceiling cannot wrap the wear's,
         // and the weapon it loads replays its capacity from the most a count holds.
-        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].Inventory[0]!;
+        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].WeaponIn(0)!;
         Assert.Equal(Wear.Capacity(ContentBounds.MostCount).Max, most.WearCapacity);
         Assert.True(most.WornFull);
 

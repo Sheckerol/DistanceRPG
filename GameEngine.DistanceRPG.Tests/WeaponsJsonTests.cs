@@ -236,7 +236,7 @@ public class WeaponsJsonTests
         // baseline, the class: its row is where the baseline is written, and every
         // weapon of it is forged with it, while a variant's row holds only what it
         // adds. The detail ends with the restricted.json relation that refused it,
-        // written as the file writes it (S:221: for modifiers and enchantments
+        // written as the file writes it (P5:255: for modifiers and enchantments
         // alike). Each edit passes every restricted and enchantment stage first, so
         // it is the weapons' stage that breaks.
         ContentException Broken(string restricted)
@@ -263,7 +263,7 @@ public class WeaponsJsonTests
         Assert.Equal(("Sword", ContentValidator.RuleForgedNotAllowed), (kind.EntryId, kind.Rule));
         Assert.Equal("baseline Push x1 on a Melee weapon beside Block x1, Push x1 - restricted.json kind Push: ranged", kind.Detail);
 
-        // And for enchantments (S:221): Regeneration and Overheal grouped, which
+        // And for enchantments (P5:255): Regeneration and Overheal grouped, which
         // the Nameless Renewal carries together...
         var souls = Broken(RegenerationExcludesOverheal);
         Assert.Equal(("staff_of_renewal_unique", ContentValidator.RuleEnchantmentsExcluded), (souls.EntryId, souls.Rule));

@@ -273,11 +273,19 @@ internal static class SaveMapper
         Table(member.Innate.Entries),
         member.Attunement is { } attunement ? Name(attunement) : null,
         Body(member),
-        member.Inventory.Select(carried => carried is null ? null : Weapon(carried)).ToArray(),
+        member.Inventory.Select(carried => carried is Weapon weapon ? Weapon(weapon) : null).ToArray(),   // a potion's slot null here, the potion below
         member.DistLeft,
         member.EffectiveMax,
         member.SavedMovement,
-        member.BudgetBeforeMire);
+        member.BudgetBeforeMire,
+        Potions(member));
+
+    /// <summary>The potions in a member's bag, each with its slot, in slot order — or null for none, as an empty stable is written.</summary>
+    private static PotionDto[]? Potions(PartyMemberState member)
+    {
+        var potions = member.Potions.Select(carried => new PotionDto(carried.Slot, Name(carried.Potion.Type), carried.Potion.Quality)).ToArray();
+        return potions.Length > 0 ? potions : null;
+    }
 
     internal static ActorDto Body(ActorState actor) => new(
         actor.X,
@@ -315,6 +323,12 @@ internal static class SaveMapper
         result.Services is { Count: > 0 } services   // null for an empty shop, as the queue is
             ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId,
                 r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null, r.Tier, r.SourceId)).ToArray()   // the roll as drawn is the log's
+            : null,
+        result.FarmYield,
+        result.FarmClears,
+        result.FirstClear,
+        result.Spoiled is { Count: > 0 } spoiled   // null for none, as a bag's potions are
+            ? spoiled.Select(potion => new SpoiledPotionDto(Name(potion.Type), potion.Quality)).ToArray()
             : null);
 
     /// <summary>An enum-keyed count table by member name, in the enum's order — the order its entries come in.</summary>
@@ -581,6 +595,8 @@ internal static class SaveMapper
 
         for (int slot = 0; slot < bag.Count; slot++)
             member.Inventory[slot] = bag[slot] is { } carried ? Weapon(carried, content, $"{at}.inventory[{slot}]") : null;
+        if (row.Potions is { } potions)   // null and [] alike: none
+            Potions(member, potions, $"{at}.potions");
 
         // A turn's start cashes the bank into the whole (the budget plus up to half
         // of it again), Mire cuts the cap from the whole and never adds, and moving
@@ -594,6 +610,46 @@ internal static class SaveMapper
             "movement left is what is left of the cap this turn (effectiveMax)");
         member.SavedMovement = Movement(row.SavedMovement, ContentBounds.Distance / 2f, $"{at}.savedMovement", SavedMovementWhy);
         return member;
+    }
+
+    /// <summary>
+    /// A member's potions laid into its bag (§3.4), each on its own: its slot a bag
+    /// slot, 1 to the bag's last — the hand keeps a weapon, and a member that carries
+    /// its hand alone has no slot for one — and one the bag's weapon rows leave
+    /// empty, since a slot holds one thing; the rows in strictly ascending slot
+    /// order, so no two share a slot (one potion a slot, no stacking) and one
+    /// campaign is one text; its type a <see cref="PotionType"/>'s name; and its
+    /// quality 1 at least — one unit makes an ordinary potion — and no more than
+    /// <see cref="ContentBounds.MostCount"/>, a count of units. That it was mixed at
+    /// all is asked of the fields together (<see cref="SaveConsistency"/>, check 31).
+    /// </summary>
+    private static void Potions(PartyMemberState member, IReadOnlyList<PotionDto> dtos, string at)
+    {
+        var rows = Rows(dtos, at, "potion");
+        int last = member.Inventory.Length - 1;
+        int previous = 0;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var row = rows[i];
+            if (row.Slot < 1 || row.Slot > last)
+                throw new SaveFormatException($"{where}.slot", row.Slot == 0
+                    ? "0 is the hand: the hand keeps a weapon, and a bag runs from slot 1"
+                    : last < 1   // a bag of the hand alone: PartyCarrySlots at one slot a member
+                        ? $"{row.Slot} is no bag slot of member {member.Id}: it carries a hand and no bag"
+                        : $"{row.Slot} is no bag slot of member {member.Id}: the bag runs 1 to {last}");
+            if (row.Slot <= previous)
+                throw new SaveFormatException($"{where}.slot",
+                    $"{row.Slot} is not after slot {previous}: the potions are listed by slot, one a slot, no stacking");
+            if (member.Inventory[row.Slot] is Weapon weapon)
+                throw new SaveFormatException($"{where}.slot", $"slot {row.Slot} holds a weapon, {weapon.Id}: a slot holds one thing");
+            var type = EnumOf<PotionType>(row.Type, $"{where}.type", "potion type");
+            if (row.Quality < 1)
+                throw new SaveFormatException($"{where}.quality", $"{row.Quality} is below 1: {QualityWhy}");
+            int quality = AtMost(row.Quality, ContentBounds.MostCount, $"{where}.quality", QualityWhy);
+            member.Inventory[row.Slot] = new Potion(type, quality);
+            previous = row.Slot;
+        }
     }
 
     /// <summary>A spread as saved: every stat a divisor the §2.1 table can use, and never re-asked the permutation rule, which is the roster's.</summary>
@@ -802,9 +858,40 @@ internal static class SaveMapper
         // What the enchanter did on the run's end: null and [] alike, read as none.
         var services = row.Services is { Count: > 0 } reports ? Services(reports, content, $"{at}.services") : null;
 
+        // What the farm did (Phase 6b.3): the yield and the clears it was made at are
+        // counts, and each potion that spoiled a potion — its type a name, its quality
+        // a count of units, 1 at least. Null and [] alike, read as none. How each
+        // stands against the rest of the campaign is asked with the other
+        // cross-checks (SaveConsistency, checks 32 to 35).
+        int farmYield = Count(row.FarmYield, $"{at}.farmYield");
+        int farmClears = Count(row.FarmClears, $"{at}.farmClears");
+        var spoiled = row.Spoiled is { Count: > 0 } gone ? Spoiled(gone, $"{at}.spoiled") : null;
+
         return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
             runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken,
-            services);
+            services, farmYield, farmClears, row.FirstClear, spoiled);
+    }
+
+    /// <summary>
+    /// The potions a run's end spoiled (<see cref="RunResult.Spoiled"/>), each read
+    /// on its own: its type a <see cref="PotionType"/>'s name, and its quality 1 at
+    /// least — one unit makes an ordinary potion — and no more than
+    /// <see cref="ContentBounds.MostCount"/>, a count of units, as a potion in a bag
+    /// is held. The tighter bounds are the cross-checks' (check 35).
+    /// </summary>
+    private static Potion[] Spoiled(IReadOnlyList<SpoiledPotionDto> dtos, string at)
+    {
+        var rows = Rows(dtos, at, "potion");
+        var potions = new Potion[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var type = EnumOf<PotionType>(rows[i].Type, $"{where}.type", "potion type");
+            if (rows[i].Quality < 1)
+                throw new SaveFormatException($"{where}.quality", $"{rows[i].Quality} is below 1: {QualityWhy}");
+            potions[i] = new Potion(type, AtMost(rows[i].Quality, ContentBounds.MostCount, $"{where}.quality", QualityWhy));
+        }
+        return potions;
     }
 
     // ── Restore: the visit in progress ───────────────────────────────────────
@@ -1056,8 +1143,12 @@ internal static class SaveMapper
                     ?? throw new SaveFormatException($"{where}.member", $"'{id}' is no member of the party");
                 if (slot < 0 || slot >= member.Inventory.Length)
                     throw new SaveFormatException($"{where}.slot", $"{slot} is no slot of member '{id}', who carries 0 to {member.Inventory.Length - 1}");
-                found = member.Inventory[slot]
-                    ?? throw new SaveFormatException($"{where}.slot", $"slot {slot} of member '{id}' is empty: a spoil is a weapon, carried or lying somewhere");
+                found = member.Inventory[slot] switch
+                {
+                    Weapon weapon => weapon,
+                    Potion => throw new SaveFormatException($"{where}.slot", $"slot {slot} of member {id} holds a potion: a spoil is a weapon"),
+                    _ => throw new SaveFormatException($"{where}.slot", $"slot {slot} of member '{id}' is empty: a spoil is a weapon, carried or lying somewhere"),
+                };
             }
             else
             {
@@ -1250,6 +1341,8 @@ internal static class SaveMapper
     private const string DeepestStackWhy = "no stack grows deeper than the deepest forge plus the most headroom (MaxForged and AcquiredHeadroom at their most)";
 
     private const string CountWhy = "a count play grows a turn or a gain at a time never nears it, and past it the next step would pass the largest whole number";
+
+    private const string QualityWhy = "one unit makes an ordinary potion, and a quality is a count of units";
 
     private const string LevelsWhy = "levels are uncapped and land a hit at a time, but past it the levels times their largest effect (EffectPerLevel at its most) would pass the largest whole number";
 

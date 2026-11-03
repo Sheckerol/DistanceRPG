@@ -144,9 +144,19 @@ public class TuningJsonTests
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");
 
-        // One of §5.3's keys still to come says which phase brings it (the
-        // Consumables': GraftBaseChance, the Enchanter's last, is a key since 6a.4).
-        Ignored("""{ "HealthPotionPercent": 20 }""", "HealthPotionPercent is not a key yet", "Phase 6b");
+        // §5.3's keys still to come are all keys now — the farm's yield, the last
+        // that waited, since the farm (Phase 6b.3); the Consumables' other three
+        // since the drink, 6b.2; GraftBaseChance, the Enchanter's last, since 6a.4 —
+        // so none is told it is not a key yet: each of the four Consumables is read
+        // with nothing to say, and clamped and warned as every key is.
+        var consumables = TuningJson.Read("""{ "PotionUseCost": 30, "HealthPotionPercent": 25, "ManaPotionPercent": 15, "FarmYieldPerClear": 9 }""", BuiltIn);
+        Assert.Empty(consumables.Warnings);
+        Assert.Equal((30, 25, 15, 9),
+            (consumables.Tuning.PotionUseCost, consumables.Tuning.HealthPotionPercent, consumables.Tuning.ManaPotionPercent, consumables.Tuning.FarmYieldPerClear));
+        var clamped = TuningJson.Read("""{ "FarmYieldPerClear": 1001 }""", BuiltIn);
+        Assert.Equal(["tuning.json: FarmYieldPerClear 1001 is above 1000 - using 1000"], clamped.Warnings);
+        Assert.Equal(1000, clamped.Tuning.FarmYieldPerClear);
+        Assert.Null(TuningSchema.DeferredPhase(nameof(Tuning.FarmYieldPerClear)));
     }
 
     /// <summary>
@@ -180,7 +190,6 @@ public class TuningJsonTests
             """{ "ApplyPercent": { "flamming": 30 } }""",
             """{ "ApplyPercent": { "frost_rune": 30 } }""",
         ]).ToList();
-        Assert.True(files.Count > 20, $"{files.Count} files: the sweep is not reading the schema");
 
         var said = new List<string>();
         foreach (string file in files)
@@ -193,6 +202,14 @@ public class TuningJsonTests
             Assert.All(NoticeText.Wrap(notice), row => Assert.Matches(HudFontRow, row));
             said.Add(notice);
         }
+
+        // Every name the schema holds was swept, each answered by a warning that
+        // names it — the keys still to come (none once the farm's yield is a key)
+        // and every doc spelling — and the doc spelling likeliest typed, the ladder,
+        // is read by name below: proof the sweep reads the schema, which a floor of
+        // files (once "more than 20") stopped being as the keys to come arrived.
+        Assert.All(TuningSchema.Deferred.Values.SelectMany(deferred => deferred.Keys).Concat(TuningSchema.Aliases.Keys),
+            name => Assert.Contains(said, notice => notice.StartsWith($"tuning.json: {name} ", StringComparison.Ordinal)));
 
         // Each pointer is there, after its dash: at the key a doc spells otherwise,
         // with its why; at the key, or the member or id, a typo is nearest.
@@ -451,7 +468,7 @@ public class TuningJsonTests
     [Fact]
     public void AHandEditedFileMayCommentAndTrailAComma()
     {
-        // A human edits it (S:73-74): line and block comments anywhere, and the
+        // A human edits it (P5:100-101): line and block comments anywhere, and the
         // trailing comma an edit leaves behind, are no mistake.
         string file = $$"""
             // the numbers for tonight's playtest
@@ -509,8 +526,9 @@ public class TuningJsonTests
         // PHASE5-080: every knob "gathered in one place ... seeing them on one
         // screen is how those get resolved". The shipped file — the master copy,
         // hand-kept — names every key once, under §5.3's ten groups in §5.3's
-        // order (S:80-91) — the two with keys still to come in Phase 6 under
-        // headings naming them — then the four beside it, each key under the
+        // order (P5:107-118) — a group with keys still to come under a heading naming
+        // them, none since the farm's yield arrived (Phase 6b.3) — then the four
+        // beside it, each key under the
         // comment that says what it is; and it reads, strictly, with nothing to
         // warn about.
         string text = ShippedData.Texts.Tuning!;
@@ -521,8 +539,8 @@ public class TuningJsonTests
         foreach (var key in TuningSchema.Keys)
             Assert.Single(Regex.Matches(text, $"\n  \"{key.Name}\":"));
 
-        // The groups in §5.3's order, then Progression, Combat, Drops, Saves; the
-        // two deferred ones naming their keys and the phase that brings them.
+        // The groups in §5.3's order, then Progression, Combat, Drops, Saves; a
+        // deferred one would name its keys and the phase that brings them.
         var headings = Enum.GetValues<TuningGroup>().Select(group => TuningSchema.Deferred.TryGetValue(group, out var deferred)
             ? $"/* ---- {group} - {deferred.Phase}: {string.Join(", ", deferred.Keys)} ---- */"
             : $"/* ---- {group} ---- */").ToArray();
@@ -530,7 +548,7 @@ public class TuningJsonTests
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
         Assert.Contains("/* ---- Enchanter ---- */", headings);   // its last key to come plays since Phase 6a.4
-        Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);
+        Assert.Contains("/* ---- Consumables ---- */", headings);   // the drink's three are keys since 6b.2, the farm's yield since 6b.3
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
         Assert.Equal(at.Order(), at);
@@ -547,7 +565,7 @@ public class TuningJsonTests
             Assert.True(comments[key.Name].Length > 20, $"{key.Name} has no comment saying what it is");
         }
 
-        // The comparisons §5.3 wants on one screen (S:93-97): the mana divisor
+        // The comparisons §5.3 wants on one screen (P5:120-124): the mana divisor
         // against the budget and the cast costs, re-derived by hand; the farm
         // allowance against forged + 5; Searing's decay against the fight.
         const string derivation = "(MovementBudget 160 - a staff's 40) / (8 + 3 at Resonant x6) = 10.9 -> 10";
@@ -557,16 +575,29 @@ public class TuningJsonTests
             Assert.Contains("re-derive", comments[name]);
         }
         Assert.Contains("forged + AcquiredHeadroom", comments[nameof(Tuning.AcquiredHeadroom)]);
+
+        // And the farm's yield against the loadout it is derived from (S:1048-1054,
+        // PHASE 6b DECISION 7): a rate re-derived by hand, which says so — a potion
+        // at the quality for a whole pool, 100 over the percent rounded up, as
+        // Alchemist.QualityForAll and the test of the derivation (FarmTests) work
+        // it out — and says that a dungeon added raises the yield with no warning,
+        // what that test catches in the master alone.
+        string farm = comments[nameof(Tuning.FarmYieldPerClear)];
+        Assert.Contains("each at the quality that restores a whole pool, 100 / HealthPotionPercent 20 rounded up = 5, so 6 x 5 = 30, over the 4 dungeons beside the tutorial = 7.5 -> 7", farm);
+        Assert.Contains("re-derive", farm);
+        Assert.Contains("a dungeon added to dungeons.json", farm);
+        Assert.Contains("raises a full clear's yield", farm);
         Assert.Contains("Searing burns for its level, then loses one", comments[nameof(Tuning.EffectPerLevel)]);
 
-        // A provisional figure says so, and only a provisional one: the six keys —
+        // A provisional figure says so, and only a provisional one: the seven keys —
         // the improvement roll's graft share and signature weight among them, PHASE
-        // 6a DECISION 5's (Phase 6a.4) — and serrated's percentage, whose note sits
+        // 6a DECISION 5's (Phase 6a.4), and the farm's yield a clear, PHASE 6b
+        // DECISION 7's (Phase 6b.3) — and serrated's percentage, whose note sits
         // above its member.
         string[] provisional =
         [
             nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency),
-            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight), nameof(Tuning.FarmYieldPerClear),
         ];
         Assert.Equal(provisional.Order(StringComparer.Ordinal),
             comments.Where(c => c.Value.StartsWith("Provisional:", StringComparison.Ordinal)).Select(c => c.Key).Order(StringComparer.Ordinal));
@@ -793,11 +824,74 @@ public class TuningJsonTests
         }
         using (TestContent.Use(tuning: wearMoved with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) }))
             Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
-        var ofVersion2 = saved with { TuningHash = TuningJson.Hash(BuiltIn), TuningHashVersion = 2 };
+        var ofVersion2 = saved with { TuningHash = TuningJson.Hash(BuiltIn, version: 2), TuningHashVersion = 2 };
         using (TestContent.Use())
             Assert.False(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
         using (TestContent.Use(tuning: wearMoved))
             Assert.True(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
+    }
+
+    [Fact]
+    public void AVersion2SaveIsHashedOnVersion2sKeys()
+    {
+        // PHASE 6a DECISION 9 again, a version on: a key a rule began to play with
+        // version 3 — Phase 6b's Consumables, each arriving with its reader (which
+        // they are, TuningSchemaTests.TheConsumablesAreKeys_PlayedFromVersion3 pins)
+        // — is in version 3's hash and not in version 2's or version 1's, so
+        // moving it moves the one and leaves the others where they were; a key
+        // played since version 2 moves versions 2 and 3, and one played since
+        // version 1 moves all three. The current version's is the default.
+        var v3Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name).ToArray();
+        Assert.NotEmpty(v3Keys);
+        Assert.Equal(TuningSchema.Keys.Where(k => k.Group == TuningGroup.Consumables).Select(k => k.Name), v3Keys);
+        Assert.Equal(3, SaveCodec.CurrentVersion);
+        Assert.Equal(TuningJson.Hash(BuiltIn, version: 3), TuningJson.Hash(BuiltIn));
+        string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2), three = TuningJson.Hash(BuiltIn, version: 3);
+        Assert.Equal(3, new[] { one, two, three }.Distinct().Count());
+        foreach (string name in v3Keys)
+        {
+            var k = Assert.IsType<IntKey>(TuningSchema.Find(name));
+            int value = k.Get(BuiltIn);
+            var moved = k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1);
+            Assert.Equal((one, two), (TuningJson.Hash(moved, version: 1), TuningJson.Hash(moved, version: 2)));
+            Assert.NotEqual(three, TuningJson.Hash(moved, version: 3));
+        }
+        var wear = BuiltIn with { WearPerHit = Step(BuiltIn.WearPerHit, 1000) };
+        Assert.Equal(one, TuningJson.Hash(wear, version: 1));
+        Assert.NotEqual(two, TuningJson.Hash(wear, version: 2));
+        Assert.NotEqual(three, TuningJson.Hash(wear, version: 3));
+
+        // So a campaign saved at version 2 — Phase 6a's, its hash of version 2's
+        // keys — resumes under a tuning that moved only what version 3 began to
+        // play with nothing to say, and says it the moment a number it was played
+        // under moves. Saved again, its hash is of version 3's keys, and a drink's
+        // number moved says so.
+        SaveFile saved;
+        using (TestContent.Use())
+        {
+            var current = SaveGame.Capture(CampaignState.Start(GameContent.Current));
+            saved = current with { TuningHash = TuningJson.Hash(GameContent.Current.Tuning, version: 2), TuningHashVersion = 2 };
+        }
+        var drinkMoved = BuiltIn with
+        {
+            PotionUseCost = Step(BuiltIn.PotionUseCost, 10000),
+            HealthPotionPercent = Step(BuiltIn.HealthPotionPercent, 100),
+            ManaPotionPercent = Step(BuiltIn.ManaPotionPercent, 100),
+        };
+        SaveFile again;
+        using (TestContent.Use(tuning: drinkMoved))
+        {
+            var loaded = SaveGame.Restore(saved, GameContent.Current);
+            Assert.False(loaded.TuningChanged);
+            again = SaveGame.Capture(loaded.Campaign);
+            Assert.Equal((SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning)), (again.TuningHashVersion, again.TuningHash));
+        }
+        using (TestContent.Use(tuning: drinkMoved with { WearPerHit = Step(BuiltIn.WearPerHit, 1000) }))
+            Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
+        using (TestContent.Use(tuning: drinkMoved))
+            Assert.False(SaveGame.Restore(again, GameContent.Current).TuningChanged);
+        using (TestContent.Use())
+            Assert.True(SaveGame.Restore(again, GameContent.Current).TuningChanged);
     }
 
     [Fact]

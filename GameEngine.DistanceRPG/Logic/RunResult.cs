@@ -149,7 +149,8 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 
 /// <summary>
 /// How a run ended, and everything it carried out to the campaign (§4.4, §4.5,
-/// §6.3), what the enchanter did on its end among it (§6.2): what
+/// §6.3), what the enchanter did on its end among it (§6.2), and what the farm
+/// made on it and what spoiled (§6.6): what
 /// <see cref="CampaignState.EndRun"/> returns and
 /// <see cref="CampaignState.RunEnded"/> raises, and what the run's summary
 /// reads. Nothing in it is dungeon state — the visit is gone by the time
@@ -176,10 +177,29 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 /// when the shop was empty, which is what a save writes and reads back. Appended,
 /// with its default, so a result built without it reads as one with an empty shop.
 /// </param>
+/// <param name="FarmYield">
+/// The units of yield the farm made at the run's end (§6.6; Phase 6b.3):
+/// <see cref="Farm.Yield"/> at <see cref="FarmClears"/> on a run that counted, and
+/// 0 on one that did not (PHASE 6b DECISION 4). The alchemist mixes from it until
+/// the next run's end replaces it: the batch is this less what the bags hold
+/// (<see cref="Farm.Batch"/>), never a number of its own (PHASE 6b DECISION 6).
+/// Appended, with its default: a result built without it, and a save from before
+/// Phase 6b's farm, yielded nothing.
+/// </param>
+/// <param name="FarmClears">The farm's workers as the run ended (<see cref="Farm.Clears"/>): the dungeons besides the tutorial ever cleared, this run's own first clear among them (PHASE 6b DECISION 5).</param>
+/// <param name="FirstClear">Whether the run cleared its dungeon for the first time: the boss fell, and the dungeon was not in the cleared set before — the tutorial's first clear included, which the farm never counts.</param>
+/// <param name="Spoiled">
+/// Every potion carried as the run ended, in roster then slot order, gone (§6.6:
+/// "a mixed potion keeps exactly as long as the trip it was mixed for") — on every
+/// ending, a wipe's included — or null when none was carried, which is what a save
+/// writes and reads back. A potion is a consumable, not gear: it is lost by its
+/// lifetime, never forfeited by a wipe, so a wipe still takes no gear carried in.
+/// </param>
 public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed,
     bool ServiceTick, bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired,
     IReadOnlyList<Weapon> SpoilsKept, IReadOnlyList<Weapon> SpoilsLost, IReadOnlyList<XpClawback> Clawbacks,
-    IReadOnlyList<ServiceReport>? Services = null);
+    IReadOnlyList<ServiceReport>? Services = null, int FarmYield = 0, int FarmClears = 0, bool FirstClear = false,
+    IReadOnlyList<Potion>? Spoiled = null);
 
 /// <summary>
 /// What one run's end did with one deposit at the enchanter (§6.2, §6.3; Phase

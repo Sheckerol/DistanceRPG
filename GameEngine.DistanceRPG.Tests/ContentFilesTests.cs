@@ -295,7 +295,7 @@ public class ContentFilesTests
         // The weapons and the dungeons follow the same rule: a later file's shape
         // never pre-empts an earlier file's semantics. A syntax error in
         // weapons.json beside restricted.json's own semantic error reports
-        // restricted.json, which is checked before anything reads it (S:247-249);
+        // restricted.json, which is checked before anything reads it (P5:281-283);
         // and a dungeons.json that is not JSON waits behind a weapon class the
         // relations refuse — the Sword, whose baseline forges Push beside Block.
         Assert.Equal((RestrictedJson.FileName, false, "Push", ContentValidator.RuleSelfExclusion),
@@ -521,7 +521,7 @@ public class ContentFilesTests
         foreach (var (texts, expected) in cases)
             Assert.Equal(expected, Stamp(Fails(texts)));
 
-        // The weapon an edit to the relations makes illegal names both (S:260-264):
+        // The weapon an edit to the relations makes illegal names both (P5:294-298):
         // the weapon is the entry, and the detail ends with the relation that
         // refused it, as restricted.json writes it.
         Assert.EndsWith("- restricted.json excludes [Push, Block]: Push is already forged here", Fails(Shipped with { Restricted = pushBlocks }).Detail);

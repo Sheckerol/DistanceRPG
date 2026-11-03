@@ -368,7 +368,7 @@ public sealed class ProgressionStateTests : IDisposable
         Assert.Equal(new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
             party.Select(m => m.EquippedWeapon!.Id));
         Assert.Equal(new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
-            party.Select(m => m.Inventory[1]!.Id));
+            party.Select(m => m.WeaponIn(1)!.Id));
         Assert.All(party, m => Assert.Null(m.Inventory[2]));
         Assert.Equal((0f, 64f), (party[0].X, party[0].Y));
         Assert.Equal((96f, 64f), (party[3].X, party[3].Y));
@@ -414,7 +414,7 @@ public sealed class ProgressionStateTests : IDisposable
         Assert.Equal(100, c.Proficiency(WeaponClass.Staff).XpToNext);
         Assert.Equal(0, Credit(c, WeaponClass.Staff, 25));
         Assert.Equal(1, Credit(d, WeaponClass.Staff, 25));
-        Assert.Equal(Progression.StartingLevel, c.WeaponLevel(c.Inventory[1]!));
+        Assert.Equal(Progression.StartingLevel, c.WeaponLevel(c.WeaponIn(1)!));
         Assert.Equal(Progression.StartingLevel + 1, d.WeaponLevel(d.EquippedWeapon!));
     }
 

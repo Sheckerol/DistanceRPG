@@ -45,15 +45,19 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
-  BetweenRunsScene.cs           # The screen between runs: DUNGEONS (the last run's summary, the list)
-                                # and WEAPONS (Tab); every change there asks the game for a save
-                                # (IBetweenRunsHost.RequestSave). BetweenRunsHud draws both pages
+  BetweenRunsScene.cs           # The screen between runs, three pages Tab goes round: DUNGEONS (the
+                                # last run's summary, the list), WEAPONS and ALCHEMIST; every change
+                                # there asks the game for a save (IBetweenRunsHost.RequestSave).
+                                # BetweenRunsHud draws all three
   HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
                                 # (CampaignState.Move, the one door) and the enchanter's shop, a carry
                                 # the page's alone
   DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT, REFINE or MOVE with their
                                 # odds or reasons, the offer list or the source list, the confirm; and
                                 # the take-back ask (T)
+  AlchemistPage.cs              # The ALCHEMIST page between runs: the farm, the batch, the quality, the
+                                # bags and their potions (H/M mix, T pours back, through Alchemist),
+                                # its choice kept by place; or, before he arrives, when he does
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
@@ -76,6 +80,17 @@ GameEngine.DistanceRPG/         # Game executable
     Enchanter.cs                # The enchanter (§6.2–§6.5): a deposit or a transfer, its gates, the
                                 # service clock every run's end ticks, the improvement roll (its own
                                 # stream), a take-back — the one place wear is spent
+    Items.cs                    # What a bag slot holds (IItem): a weapon, or a potion — a value, its
+                                # type and quality (§3.4) — one a slot; the hand keeps a weapon
+    Alchemist.cs                # What a potion restores (§3.4, §6.6): a share of the drinker's max,
+                                # rounded down and saturating, and the quality for a whole pool;
+                                # TurnSystem.TryDrink drinks one, through the heal and mana appliers.
+                                # And his doors between runs: Mix (its gates, MixRefusal) and PourBack,
+                                # through CampaignState.Stow/Unstow
+    Farm.cs                     # The farm (§6.6): a worker a dungeon beaten besides the tutorial, a
+                                # yield every run that counts, the batch worked out from the last
+                                # result and the bags (never a field), and the spoilage rule's one
+                                # home — every potion carried spoils as the run ends (EndRun alone)
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -107,10 +122,10 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   out of the save's tuning hash, so turning it never says the numbers changed.
   The change that gives a rule of play one to read sets it played. A key that
   starts to play with a save version is hashed from that version (`HashedFrom`:
-  Phase 5's are 1, Phase 6a's 2), so a save of an older version is compared on
-  its own version's keys and never told a number it was not played under has
-  changed. A key no rule of play reads at all — the launcher's `SaveSlots`, how
-  many save slots there are — is `Played = false` for good.
+  Phase 5's are 1, Phase 6a's 2, Phase 6b's 3), so a save of an older version is
+  compared on its own version's keys and never told a number it was not played
+  under has changed. A key no rule of play reads at all — the launcher's
+  `SaveSlots`, how many save slots there are — is `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric
@@ -123,11 +138,15 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   that fails is set aside, never restored. A new field of the save gets its
   checks in the same change, and everything play writes must still load
   (`SaveConsistencyTests`).
-- The save is versioned (`SaveCodec.CurrentVersion`: 2 since Phase 6a), and
-  every older save must still load. A member appended with a default needs no
-  step (`Logic/Save/SaveFile.cs`' header rule; a list written `null` while
-  empty); a member every document must carry bumps the version, with a step in
-  `SaveCodec.Migrations` that writes it into every older document — pure,
-  walking the document by name, never throwing on a hand edit — pinned by the
-  two saves the pre-rework code wrote (`PreReworkSaveTests`; their
-  `TestData/saves` are never edited).
+- The save is versioned (`SaveCodec.CurrentVersion`: 3 since Phase 6b, 2 since
+  Phase 6a), and every older save must still load. A member appended with a
+  default needs no step (`Logic/Save/SaveFile.cs`' header rule; a list written
+  `null` while empty); a member every document must carry bumps the version, with
+  a step in `SaveCodec.Migrations` that writes it into every older document —
+  pure, walking the document by name, never throwing on a hand edit, removing a
+  stray of a later version's member a hand gave an older document. Version 3's
+  step writes nothing but the version, so a Phase 6a build refuses a Phase 6b save
+  rather than drop its potions (PHASE 6a DECISION 14). Pinned by the two saves the
+  pre-rework code wrote (`PreReworkSaveTests`) and the one the Phase 6a build wrote,
+  with the tuning it was played under frozen beside it (`Phase6aSaveTests`); their
+  `TestData/saves` are never edited.

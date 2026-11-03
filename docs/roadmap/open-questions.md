@@ -527,6 +527,13 @@ when that bag is full; or (c) a member may be left unarmed, as a wipe that takes
 every spoil it held already can leave one. settled.md's Phase 6a implementation
 pass records the ruling.
 
+From Phase 6b.1 a bag slot can hold a potion, which is no weapon: a hand a move,
+a deposit or the rest before a dungeon empties takes the first *weapon* in the bag,
+passing a potion over; every rule that keeps a member armed counts the weapons it
+carries, never its full slots, so a member with one weapon and a bag of potions
+carries one weapon; and the stable holds weapons alone — no potion is ever put
+there (PHASE 6b DECISION 1, below).
+
 ## Autosaving between runs (§5.1's safe points) — PHASE 6a DECISION 10
 
 A save is taken only at a safe point, and between runs is always one (settled.md,
@@ -546,7 +553,10 @@ every save of the campaign goes through; the log says `Saving the campaign
 between runs, after a change on the hub`. A save that fails is said at once under
 the hub's title, in orange, as one over a floor is — but where a floor's notice
 goes after a few seconds, the hub's stays, and the next screen says it too, until
-a later save goes through, which takes it back from both.
+a later save goes through, which takes it back from both. Phase 6b.4 grows the
+list with the alchemist's two changes, a potion mixed into a bag and one poured
+back, each saved the same way, under the same log line; so a quit and a load after
+a mix bring the potion back and never refill the batch (PHASE 6b DECISION 6).
 
 **This decides whether a crash between runs can cost the changes made there, so
 it is the user's to decide.** The alternative: only the run's end, SAVE GAME and
@@ -661,6 +671,24 @@ no service it knows, so it refuses a save with a transfer in either and sets it
 aside, kept and never deleted. A 6a.1 or 6a.2 build passes over the shop unread,
 as above, and its next save loses both of a transfer's weapons with the rest of
 the shop.
+
+Phase 6b lifts the save to version 3 from its first step, 6b.1, which gives a
+member potions in its bag (a member's `potions`, appended with its default). The
+step from version 2 writes nothing but the version — the reader stamps it — and
+removes a stray `potions` a hand gave a version-2 member, which the version-2
+reader ignored; the tuning hash's version stays as the save wrote it. So a Phase
+6a build sets every Phase 6b save aside as a newer build's, kept and never
+deleted, rather than reading it and saving it again without its potions: do not
+open a Phase 6b slot with a Phase 6a checkout. Within Phase 6b the version stays
+3 at every step, as it stayed 2 within Phase 6a, so this entry's question asks
+itself again there: a later 6b step that appends members (the farm's, at 6b.3) is
+read by an earlier 6b build that passes over them, and that build's next save
+drops them. Phase 6b.3 appends the farm's four to the last run's record
+(`farmYield`, `farmClears`, `firstClear` and `spoiled`), so a 6b.1 or 6b.2 build
+passes over them and its next save drops them; if that save holds potions, a
+6b.3-or-later build then refuses it — the potions carried are more than the yield
+the dropped record says the last run made (check 32) — and sets it aside, kept and
+never deleted.
 
 ## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
 
@@ -957,3 +985,386 @@ holds two of the worked places, since §6.2 works "the two most recently deposit
 weapons" and a transfer deposits two; (e) a transfer rolls nothing; or (f) the
 source's wear is cashed too, growing its capacity as any deposit does.
 settled.md's Phase 6a implementation pass records the ruling.
+
+## Where a potion may be (§3.4, §6.6) — PHASE 6b DECISION 1
+
+§3.5 puts a potion in a bag slot: "Potions live in inventory slots as ordinary
+items, one per slot, so `PartyMemberState.Inventory` needs to hold something
+other than a `Weapon`" (phase-3-loot.md). Nothing says whether a potion may sit in
+the hand, go to the stable, be put down on a floor, or move from one member's bag
+to another's; the hand keeps a weapon (PHASE 6a DECISION 7), and the farm's batch
+is "a flow, not a stock" (settled.md).
+
+**Shipped provisionally (Phase 6b.1): a potion lies only in a member's bag — slots
+2 to 6, as the bag panel numbers them — never in the hand**, one a slot. It is
+never in the stable, and never moved between bags: the WEAPONS page lists it
+under its member, grey, and never chooses it nor puts a weapon down on it, and the
+campaign's door for a move refuses a potion's slot either way. The alchemist
+(Phase 6b.4) mixes one into the first empty bag slot of the member chosen, and a
+potion in the wrong bag is poured back there and mixed again (DECISION 9). In a
+dungeon, X then a potion's number pours it out — `POURED OUT THE HEALTH POTION
+Q2` over the member — and it is gone, not laid on the floor, so a floor and its
+save hold weapons alone; it costs nothing, as putting a weapon down costs nothing.
+A slot a potion fills is full: a pickup finds no room there, and a bag of weapons
+and potions refuses a drop as a bag of weapons does.
+
+**What the pick lets a player do.** Make room in a full bag in the dungeon by
+pouring a potion out, as a weapon is put down to make room; and never lose a
+potion to a move between runs, since none is made.
+
+**This decides where a potion can be carried and how one is got rid of, so it is
+the user's to decide.** The alternatives: (a) the WEAPONS page may move a potion
+between bags, as it moves a weapon; (b) a potion is put down on a floor as a
+weapon is, and taken back with G (a floor's `LooseItem` and its save row would
+hold either); or (c) a potion cannot be put down at all, only drunk. settled.md's
+Phase 6b implementation pass records the ruling.
+
+## What a drink costs out of combat (§3.4, §1.2) — PHASE 6b DECISION 2
+
+§3.4 prices a drink at `PotionUseCost`, 40, "on the same principle as swapping
+(§1.2): anything that changes your situation mid-turn comes out of the same
+budget as moving and swinging" (phase-3-loot.md). A swap is free out of combat —
+it costs `WeaponSwapCost` only once a live enemy has been seen this turn, so
+loadout management between fights stays free (settled.md) — and §3.4 states the
+drink's cost with no such condition.
+
+**Shipped provisionally (Phase 6b.2): a drink always costs `PotionUseCost`, in
+combat and out.** The rule is one line, and topping up after every fight still
+costs a turn's walking: a party that drinks between fights spends 40 of a 160
+budget each time, as it would in one. The cost is paid whole or the drink is
+refused, as a swap short of its cost is, and the bag says which before the key is
+pressed — `A DRINK COSTS 40 MOVE`, or `... - NOT ENOUGH LEFT` in red — while a
+potion's number short of it says `NOT ENOUGH MOVE TO DRINK - IT COSTS 40` over
+the member and drinks nothing. One thing the drink makes easier to meet, and this
+entry does not change: the MOVE readout rounds the movement left up, as the
+prototype's did (`Math.ceil`), so after walking it can read `MOVE: 40` at 39.6,
+where a 40 drink is refused (and a 20 swap at 19.6, the same way). The bag's red
+line and the log, which rounds down (`39 movement left, a drink costs 40`), say the
+truth; whether the readout should round down too is a question of the readout's,
+asked here so it is not lost.
+
+**This decides whether a potion is cheaper outside a fight, so it is the user's to
+decide.** The alternative: free out of combat, priced as a swap is — the cost only
+once a live enemy has been seen this turn (`TurnSystem.SwapCost`'s condition),
+so a party tops up for nothing between fights and pays 40 only when the drink is
+a mid-fight decision. settled.md's Phase 6b implementation pass records the ruling.
+
+## How a potion's share rounds, and of which pool (§3.4) — PHASE 6b DECISION 3
+
+§3.4 has a potion restore "a share of max HP" or "a share of max mana", per unit
+of quality (`HealthPotionPercent`, `ManaPotionPercent`, 20 each; §6.6's
+"healthRestored = HealthPotionPercent × quality × maxHp"). Nothing says how a
+share that is not whole rounds — 20 percent of 33 is 6.6 — or which maximum a
+mana potion is a share of: the pool the member has earned (`MaxMana`, what the
+ladder grows, "the mana pool" §3.4 names) or what a spend can reach
+(`UsableMaxMana`, the earned pool less what the equipped enchantments' locks
+reserve).
+
+**Shipped provisionally (Phase 6b.2): rounded down, the house's truncation, with
+no minimum**, so quality 1 on 33 HP restores 6, quality 3 restores 19, and quality
+5 restores all 33 — the ceiling §6.6 names, "a potion that heals you completely
+from 1 HP", which rounding down never weakens, since five units are then 100
+percent or more. **Health is a share of `MaxHp`; mana is a share of `MaxMana`, the
+earned pool, and what it restores is capped at `UsableMaxMana`**, as Siphon's
+refund is: so at quality 5 a mana potion refills the spendable pool whatever the
+locks reserve. The bag says what a potion offers of the member's maximum as it
+stands — `RESTORES 12 OF 30 HP`, `RESTORES ALL 30 HP` at exactly a whole pool,
+`RESTORES ALL 30 HP - 6 OVER` past it — and a drink reports what the pool took:
+for health the heal it applied, the HP XP it teaches, never the point of max HP
+that XP may buy, which arrives filled as it does after any heal. (Mended in Phase
+6b's audit, the arithmetic unchanged: what is shown is still the earned pool's
+share, but where the locks reserve some of the pool, the bag and the ALCHEMIST
+page say it against what the drink can fill — `RESTORES 12 OF 17 SPENDABLE MANA`,
+`RESTORES ALL 17 SPENDABLE MANA - 15 OVER` — so a locked caster sees the quality
+that fills it and the units wasted past it. A caster at `MANA 17 / 17 (32)` had
+read `RESTORES ALL 32 MANA` on a quality-5 potion that restores 17.)
+
+**This decides how much a potion restores at the margins, so it is the user's to
+decide.** The alternatives: (a) round to the nearest, or up, or restore at least
+1, so a quality-1 potion on a small pool always restores something; or (b) a mana
+potion is a share of `UsableMaxMana`, so a heavily locked caster's potion restores
+less, and quality 5 still refills exactly what is spendable. settled.md's Phase 6b
+implementation pass records the ruling.
+
+## Which runs yield a batch (§6.6, §6.3) — PHASE 6b DECISION 4
+
+§6.6 has the farm tick per run, with the enchanter: "Production ticks per run ...
+the farm and the enchanter tick together. A run advances your weapons and stocks
+your shelf in one event" (phase-6-between-runs.md). But the enchanter's clock does
+not tick on every run: a run counts for its boss, or for §6.3's mercy — "a mercy
+tick advances the service clock and nothing else" — and "Entering the dungeon ticks
+nothing".
+Nothing says whether "per run" is every run that counts, or every run's end, or the
+boss kills alone.
+
+**Shipped provisionally (Phase 6b.3): every run that counts yields — a boss kill,
+or §6.3's mercy for failing deep — exactly the runs that tick the enchanter**, in
+the same event at the run's end (`CampaignState.EndRun`, `Farm.Yield`). A run that
+does not count yields nothing, and the run's summary says so: `THE FARM YIELDED
+NOTHING - THE RUN DID NOT COUNT`. A boss killed and then a wipe is a clear, and
+counts, so it yields (§6.3's "Killed the boss, died on the way out", a run that
+ticks; settled.md's "Every boss kill adds its dungeon").
+
+**What the pick lets a player do.** A losing streak deep in a dungeon still sends
+the party down with potions, as it still works the enchanter's shop; a run in and
+straight out again stocks nothing.
+
+**This decides how often the shelf is stocked, so it is the user's to decide.**
+The alternatives: (a) only a boss kill yields — the mercy tick "advances the
+service clock and nothing else", read literally; or (b) every run's end yields,
+counted or not — since the batch never banks (DECISION 6), a twenty-second entry
+gains nothing there but a fresh batch to mix. settled.md's Phase 6b implementation
+pass records the ruling.
+
+## When the first batch comes (§6.6) — PHASE 6b DECISION 5
+
+§6.6 has the first real clear "hand over an entire category rather than a number
+going up", and the hub "makes potions while you are away" (phase-6-between-runs.md).
+A run's end records the clear and makes the farm's yield in one event: nothing says
+which comes first — whether the dungeon a run beats for the first time is already a
+worker when that run's yield is made.
+
+**Shipped provisionally (Phase 6b.3): the clearing run's own end yields at the new
+count.** The clear is recorded first, then the yield is worked out, so the first
+clear of a dungeon besides the tutorial brings the alchemist and a batch at once —
+`A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` — even on a
+wipe after the boss fell, and each later first clear yields at the count it brings.
+
+**This decides whether the first real clear pays at once, so it is the user's to
+decide.** The alternative: a new worker produces from the next run on, so the
+first batch comes a counted run after the first real clear, and the run that beat
+a dungeon yields at the count it began with. settled.md's Phase 6b implementation
+pass records the ruling.
+
+## Where the batch lives, and what is saved (§6.6, §6.7, §3.5) — PHASE 6b DECISION 6
+
+§6.7 says "the batch must never reach `CampaignState`"; §3.5 says "The batch is not
+saved between runs ... computed at the hub and discarded" (phase-3-loot.md); and
+§6.7 also has the campaign hold "the farm's stock". The hub saves every change
+(PHASE 6a DECISION 10), and the user's ruling R1 says a bad roll is never reloaded
+away: a batch recomputed on every load would be mixed again after a quit and a load.
+
+**Shipped provisionally (Phase 6b.3): the run's yield is saved as a fact of the
+run's result** (`lastResult.farmYield`, beside the clears it was made at, whether
+the run was a first clear, and the potions that spoiled as it ended). **The batch is
+that yield less every potion's quality the bags hold, worked out (`Farm.Batch`),
+never a field of the campaign.** A mix (Phase 6b.4) writes only a potion into a
+bag, which is saved; so quitting and loading never refills the batch, a held
+visit reads it as 0, and the units left unmixed spoil on the descent with no code to
+spoil them. The next run's end replaces the result, and the yield with it: nothing
+is ever added to a batch. The save refuses bags holding more units than the last
+run yielded (check 32).
+
+**This bends §3.5**, whose batch is not saved at all, **and keeps §6.7**: no batch
+in `CampaignState` (pinned: `FarmTests.TheBatchNeverReachesCampaignState`).
+
+**This decides what a reload can do to the batch, so it is the user's to decide.**
+The alternatives: (a) §3.5 as written — nothing saved, the batch recomputed at the
+hub from the clear set — where a mix, a quit and a load mixes it again; or (b) the
+units left as a campaign field, set at the run's end, spent by mixing and zeroed on
+entry — which bends §6.7's "never reach `CampaignState`". settled.md's Phase 6b
+implementation pass records the ruling.
+
+## `FarmYieldPerClear` and "tune the total" (§6.6) — PHASE 6b DECISION 7
+
+The user's ruling states the farm's target "as a total, not a rate, because the
+dungeon count is an unmade content decision and a per-clear number would inflate
+silently with every dungeon added" (settled.md), and §6.6 adds "Then the count can
+change without retuning". The target: "a campaign that has cleared everything
+should produce about one full loadout of maximum-quality potions per run", by
+`FarmYieldPerClear = (PartyCarrySlots-worth of potions ÷ HealthPotionPercent) ÷
+number of non-tutorial dungeons` — stated "the way §1.3 states
+`MovementUnitsPerMana`", a key "re-derived by hand, never computed from the budget"
+(settled.md). A loadout is "six" elsewhere in
+§6.6 ("it carries the same six", "a full loadout of six maximum-value potions costs
+thirty units"); `PartyCarrySlots` is 24. And the hand-off names the key
+`FarmYieldPerClear` (settled.md's Phase 5 hand-off; phase-5-save.md §5.3's table).
+
+**Shipped provisionally (Phase 6b.3): the hand-off's per-clear key, re-derived by
+hand.** A loadout is six maximum potions, each at the quality that restores a
+whole pool — 100 ÷ `HealthPotionPercent` rounded up, 5 at 20 — so 6 × 5 = 30
+units, over the four dungeons beside the tutorial that ship: 7.5, rounded down to
+7, so a full clear yields 28 a run. Its comment in `tuning.json` carries the
+derivation and says to re-derive it, and the suite fails whenever re-deriving
+would give a rate other than the master's — the master's roster moved, or
+`HealthPotionPercent` moved far enough to change the quality for a whole pool (21
+to 24 still ask 5) — or when the rate is not that rounding down, 6 or 8 at four
+dungeons (`FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions`).
+
+**What the pick costs, plainly.** It is a rate. A dungeon added through
+`dungeons.json` — beside the game in a playtest, or in the master without a test
+run — raises a full clear's yield by 7 a dungeon with no test and no warning: the
+silent inflation the ruling rules against. The test catches it only in the master,
+and only when the suite runs.
+
+**This decides how the farm's number is kept, so it is the user's to decide.** The
+alternatives: (a) a loadout read as `PartyCarrySlots`-worth — 24 × 5 = 120 units,
+30 a dungeon, the ceiling arriving after the second clear; (b) **the form that
+keeps both rules**: a `tuning.json` key for the total — the full-clear yield, 30,
+or the loadout, 6 — with the per-clear yield computed as the content loads, from the
+loaded count of dungeons that do not retire on their clear, so a dungeon added
+anywhere re-derives it and the number is still tuned without a rebuild; its cost is
+the hand-off's key name, since the key would not be `FarmYieldPerClear`, and
+settled.md's hand-off and §5.3's table would move with it; or (c) rounded up to 8,
+32 a run. Whatever the form, the six-or-24 reading of "a loadout" and the 7-or-8
+rounding are this decision's too. settled.md's Phase 6b implementation pass records
+the ruling.
+
+## The roster stays at four (§6.6; settled.md's "Phase 6b completes the roster") — PHASE 6b DECISION 8
+
+settled.md has the first playable hub ship "6 non-tutorial dungeons", then records
+"Four dungeons ship beside the tutorial, not the six above — provisional. The
+missing two need content that does not exist yet (a Great Axe unique, or a repeated
+theme), and Phase 6b completes the roster." A dungeon's name and its boss are
+setting, which is kept outside this repository, and the Great Axe unique for Cleave
+does not exist.
+
+**Shipped provisionally (Phase 6b.3): deferred.** No dungeon is added, and
+`FarmYieldPerClear` is derived against the four that ship (DECISION 7).
+`dungeons.json`'s header, which said "Phase 6b completes the roster", now says the
+roster stays at four for now, deferred here, and that `FarmYieldPerClear` is
+re-derived by hand when a dungeon is added. **This bends the settled hand-off.**
+
+**This decides how much hub Phase 6b leaves, so it is the user's to decide.** The
+alternative: two placeholder rows, each a repeated theme with provisional names,
+marked `/* provisional */` as the four are, and `FarmYieldPerClear` re-derived to 5
+(30 over six). settled.md's Phase 6b implementation pass records the ruling.
+
+## Whether the alchemist can leave (§6.6) — PHASE 6b DECISION 11
+
+§6.6 has the alchemist arrive with the first real clear: "nobody mixes potions until
+you have beaten a dungeon that is not the tutorial", and "the tutorial does not
+count" (phase-6-between-runs.md). Phase 6b.3 derives his arrival from the campaign's
+own records: he is there once the farm has a worker, a dungeon cleared and not
+retired (`Farm.AlchemistHasArrived`), asked of the retired list and never of which
+dungeon today's `dungeons.json` retires on its clear (check 30's precedent). Nothing
+says whether he can go again. Under the shipped files he cannot: only the tutorial
+retires, and it is never a worker. But a `dungeons.json` beside the game may move
+`retiresOnClear` onto a dungeon already beaten (check 3, withdrawn). If that is the
+farm's one worker, the hub lists it alone, as the content's tutorial now, until it is
+beaten again, and that clear retires it. The farm has no worker, so the alchemist is
+not there, and the next first clear of a dungeon that does not retire brings him
+again.
+
+**Shipped provisionally (the Phase 6b.3 review): he is there while the farm has a
+worker**, derived as built, with nothing saved. So under that file he goes with the
+farm's one worker, and the run that brings him back says so as the first did: `A
+FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS`. No potion can
+be in a bag while he is gone: those carried into the re-clear spoiled as it ended,
+and nothing mixes one until he is back. So the save's check that a potion needs a
+worker (31) refuses nothing play writes. The log's arrival line says only what is
+true both times, `[Farm] The alchemist has arrived: The Long Gallery, beaten for the
+first time, is the one dungeon the farm counts`, never "the first dungeon beaten
+besides the tutorial", which the Spear Hall was. The ALCHEMIST page (Phase 6b.4)
+opens and closes on the same question, so it follows this reading: under that file
+it says when he arrives again, naming the content's tutorial — `THE ALCHEMIST
+ARRIVES WITH THE FIRST CLEAR BEYOND THE SPEAR HALL` — until the next first clear.
+
+**This decides whether the hub can lose a service it has opened, so it is the
+user's to decide.** The alternatives: (a) he stays for good once any dungeon besides
+the tutorial has been beaten. That needs the tutorial told apart from a worker a
+moved flag retired: either asked of today's content, against check 30's precedent,
+or saved, as a version-3 member such as the run he arrived on, with a check of its
+own. With no worker the farm still yields nothing, so his page would stay open over
+an empty batch until the next first clear, whose summary would say the farm grows.
+(b) He counts every dungeon ever beaten but the first, taking the tutorial to come
+first. A dev-override launch (`DISTANCERPG_DUNGEON`) beats a real dungeon first, so
+(b) would miscount it. settled.md's Phase 6b implementation pass records the ruling.
+
+## Pouring a potion back before the descent (§6.6) — PHASE 6b DECISION 9
+
+§6.6 has the split made once: "that trade is decided at the moment the potions are
+handed to you, with the run's whole supply in front of you and nothing recoverable
+afterwards" (phase-6-between-runs.md), and §3.4 "you split it between health and
+mana *and strength* when you collect it, and anything you leave with him has
+spoiled by the time you climb back out" (phase-3-loot.md). The doc's most literal
+shape is a single hand-over: the whole split set at once, and what is left spoiling
+there and then. Nothing says whether a potion, once mixed, can be undone before the
+party descends.
+
+**Shipped provisionally (Phase 6b.4): potions are mixed one at a time, and each is
+reversible until the descent.** On the ALCHEMIST page, H or M mixes a health or a
+mana potion at the quality A/D set into the chosen member's bag, and T on any
+potion in a bag pours it back, its units back in the batch exactly — the batch is
+the last run's yield less what the bags hold, so a pour-back needs no number of its
+own (DECISION 6). Each mix and each pour-back is saved at once (PHASE 6a DECISION
+10). So a misplaced mix — the wrong bag, the wrong strength — costs nothing before
+the descent, and nothing can be recovered after it: what is left unmixed spoils as
+the party descends, which DUNGEONS says beforehand (`THE ALCHEMIST HOLDS 3 UNMIXED
+UNITS - THEY SPOIL WHEN YOU DESCEND`), and every potion carried spoils as the run
+ends. The descent logs the run's split — `[Alchemist] Descending with 3 health
+potions (9 units) and 2 mana potions (4 units); 1 of 14 units unmixed, spoiled` —
+the numbers §6.6 asks a playtest for ("if every party mixes the same ratio every
+run, the prices are wrong").
+
+**What the pick lets a player do.** Try a split, read what each potion would
+restore each member on the page's right, and change it, for nothing, until the
+party goes down; and move a potion to another bag by pouring it back and mixing it
+again.
+
+**This decides whether the split is a commitment before the descent, so it is the
+user's to decide.** The alternatives: (a) a mix is final, made one at a time — no
+pour-back, so a misplaced potion is carried or poured out in the dungeon; or (b)
+**a single hand-over**, the doc's literal shape: the whole split set on the page
+and confirmed once, what is left spoiling at that moment rather than at the
+descent, and nothing mixed or poured back after it until the next batch.
+settled.md's Phase 6b implementation pass records the ruling.
+
+## The ALCHEMIST page before the alchemist arrives (§6.6) — PHASE 6b DECISION 10
+
+§6.6: before the first real clear there are "no potions on the shelf and no shelf"
+(phase-6-between-runs.md). The enchanter, shut until the tutorial is beaten, says
+so where he would be — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` — and the
+presentation backlog asks for what is unavailable to be shown as unavailable
+"rather than simply absent" (settled.md).
+
+**Shipped provisionally (Phase 6b.4): the third page is there from the start.**
+TAB goes DUNGEONS, WEAPONS, ALCHEMIST and round on every campaign, and until the
+first clear of a dungeon besides the tutorial the ALCHEMIST page says `THE
+ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`, naming the tutorial
+off its row as the enchanter's gate does, with nothing to choose; H and M say it
+over the keys, every other key but TAB and ESC does nothing, and its keys line is
+`TAB DUNGEONS - ESC MENU`. It opens with his arrival, and closes again if he goes
+(DECISION 11).
+
+**This decides whether the hub shows a service before it has one, so it is the
+user's to decide.** The alternative: the page is absent until he arrives — TAB goes
+between DUNGEONS and WEAPONS alone until then — and the run's summary that brings
+him (`A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - ...`) announces the third page.
+settled.md's Phase 6b implementation pass records the ruling.
+
+## Words the farm shares with older screens: spoil, farm, and its count (§6.6, §4.3) — PHASE 6b DECISION 12
+
+§6.6 has what is not used "spoil" — units left with the alchemist, and every
+potion by the end of its trip — the user's own word. The run's summary has always
+called what a run carries home its spoils (`NO SPOILS CARRIED`, `NO SPOILS -
+NOTHING DROPS WHILE THE BOSS STANDS`), and Phase 6b puts `2 POTIONS SPOILED - A
+POTION KEEPS FOR ONE TRIP` directly under those lines, while the ALCHEMIST page
+says `UNMIXED UNITS SPOIL ON THE DESCENT`. "Farm" has two senses on screen too:
+§4's, stacking a modifier off repeat kills, in the tutorial's row on DUNGEONS —
+`BEATING THE STONE GOLEM CLOSES IT FOR GOOD - AND ITS BLOCK FARM WITH IT`, the
+first thing a new campaign says — and §6.6's farm in the hub, which the tutorial
+is the one dungeon not to count toward. Phase 6b's audit flagged both for the
+user, since both senses are the docs' own and the presentation is an art
+question (§6.6). The same audit found the farm's count reading as every dungeon
+beaten (`THE FARM - 1 DUNGEON BEATEN` after the tutorial and the Spear Hall), and
+the words that replaced it are a pick of the same kind.
+
+**Shipped provisionally (Phase 6b's audit): the docs' words, unchanged — spoils
+and spoiled side by side, and the tutorial's Block farm — and the count as the
+farm's workers.** The ALCHEMIST page says `THE FARM - 3 DUNGEONS WORK IT - 21
+UNITS A COUNTED RUN`, as long as its column allows at its worst numbers; the
+run's summary says `THE FARM YIELDED 21 UNITS - 3 DUNGEONS WORK IT`, and where the
+farm grows, with the room to say which dungeons count, `A FIRST CLEAR - THE FARM
+GROWS TO 3 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 21 UNITS`. The log says it in
+the arrival line's words: `[Farm] The run counted: the 3 dungeons the farm counts
+yield a batch of 21 units`.
+
+**This decides wording alone, so it is the user's to decide.** The alternatives:
+(a) the potions' word changes — `2 POTIONS WENT OFF - A POTION KEEPS FOR ONE
+TRIP`, `UNMIXED UNITS GO OFF ON THE DESCENT`; (b) the loot's lines change instead,
+`NO LOOT CARRIED` and the rest; (c) the tutorial's warning keeps "farm" for the
+hub — `... - AND ITS BLOCK DROPS WITH IT`; (d) the count in other words: `1 REAL
+CLEAR` (§6.6's "the first real clear"), `1 WORKER` (the docs' own), or a page line
+that drops `A COUNTED RUN` for the room to say `1 DUNGEON PAST THE TUTORIAL`.
+settled.md's Phase 6b implementation pass records the ruling.

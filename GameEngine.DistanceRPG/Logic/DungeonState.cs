@@ -149,14 +149,21 @@ public sealed class Floor
     /// (<see cref="CampaignState.EndRun"/>): it is lost with the dungeon unless
     /// someone picks it up again.
     /// </para>
+    /// <para>
+    /// <strong>A weapon only.</strong> A potion is poured out, never left: it is
+    /// gone, not lying here (PHASE 6b DECISION 1,
+    /// <see cref="PartyMemberState.TakePotion"/>), so a floor and its save hold
+    /// weapons alone.
+    /// </para>
     /// </summary>
     /// <param name="member">The member putting it down, standing on this floor.</param>
     /// <param name="slot">The bag slot it comes out of: 1 up to the member's last slot.</param>
     /// <returns>The item now lying on this floor, the last of <see cref="LooseItems"/>.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is the hand (0), or no slot the member carries.</exception>
     /// <exception cref="ArgumentException">
-    /// The slot is empty, so there is nothing to put down; or the member does not
-    /// stand on a floor tile of this floor.
+    /// The slot is empty, so there is nothing to put down, or holds a potion, which
+    /// is poured out and never left; or the member does not stand on a floor tile
+    /// of this floor.
     /// </exception>
     public LooseItem Leave(PartyMemberState member, int slot)
     {
@@ -165,7 +172,9 @@ public sealed class Floor
             throw new ArgumentOutOfRangeException(nameof(slot), slot, slot == 0
                 ? "Slot 0 is the weapon in hand: only a bag slot is put down, and nobody empties their own hand this way."
                 : $"Member '{member.Id}' carries slots 0 to {member.Inventory.Length - 1}, the hand and its bag: there is no slot {slot}.");
-        var weapon = member.Inventory[slot]
+        if (member.Inventory[slot] is Potion potion)
+            throw new ArgumentException($"Slot {slot} of member '{member.Id}' holds a {potion.Type} potion: a potion is poured out, never left (PHASE 6b DECISION 1).", nameof(slot));
+        var weapon = member.WeaponIn(slot)
             ?? throw new ArgumentException($"Slot {slot} of member '{member.Id}' is empty: there is nothing in it to put down.", nameof(slot));
 
         var tile = Displacer.TileOf(member);

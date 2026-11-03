@@ -154,7 +154,7 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal((5, 1), (visit.BossFloor, visit.PromisedStacks));
 
         // Floor 1: B puts down the staff it carried in, where it stands — gear, never a spoil.
-        Assert.Equal("staff_of_renewal", script.Member("B").Inventory[1]!.Id);
+        Assert.Equal("staff_of_renewal", script.Member("B").WeaponIn(1)!.Id);
         script.Leave("B", 1);
 
         // Floor 2: a dagger dummy farmed — put down, up again nine turns later with
@@ -688,7 +688,7 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal(2, script.Take("A", golem));
         var spoil = script.Member("A").Inventory[2]!;
         script.Leave("A", 2);
-        Assert.Equal("staff_of_mire", script.Member("D").Inventory[1]!.Id);
+        Assert.Equal("staff_of_mire", script.Member("D").WeaponIn(1)!.Id);
         script.Leave("D", 1);
         Assert.Same(spoil, Assert.Single(script.Visit.Spoils));
         string text = Save(script.Campaign);
@@ -709,7 +709,7 @@ public sealed class VisitSaveTests : IDisposable
             Assert.Equal(RunOutcome.Death, result.Outcome);
             Assert.Empty(result.SpoilsKept);
             Assert.Null(party[0].Inventory[2]);                                 // the spoil taken out of the bag
-            Assert.Equal("staff_of_mire", party[3].Inventory[1]!.Id);           // the gear never a spoil
+            Assert.Equal("staff_of_mire", party[3].WeaponIn(1)!.Id);           // the gear never a spoil
         }
         Assert.Equal(Describe(Assert.Single(results[0].SpoilsLost)), Describe(Assert.Single(results[1].SpoilsLost)));
     }

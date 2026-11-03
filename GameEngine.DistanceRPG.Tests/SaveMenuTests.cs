@@ -968,7 +968,9 @@ public sealed class SaveMenuTests : IDisposable
 /// <summary>
 /// The host of a screen built with no window and walked key by key: what it is
 /// asked for is recorded, it names the slot the campaign saves into as it was
-/// handed it, and it saves, quits and descends nothing itself. Its two
+/// handed it, and it saves, quits and descends nothing itself — unless a test
+/// hands it <see cref="Entering"/>, the real host's entry, to run as it is asked
+/// to descend (the real one enters there and then). Its two
 /// <c>RequestSave</c>s are its two hosts' apart (Phase 6a.2): the hub's autosave
 /// is counted, and a dungeon's, which a screen walked with no window never asks
 /// for, is refused.
@@ -998,11 +1000,23 @@ internal sealed class RecordingHost : IRunHost, IBetweenRunsHost
     /// <summary>How many saves the hub asked for after a change it made (<see cref="IBetweenRunsHost.RequestSave"/>, PHASE 6a DECISION 10).</summary>
     public int HubSavesAsked { get; private set; }
 
+    /// <summary>
+    /// What a descent does beside being recorded, or nothing: the real host enters
+    /// the dungeon synchronously (<c>DistanceRpgGame.Descend</c> -&gt;
+    /// <c>BeginRun</c> -&gt; <see cref="CampaignState.Enter"/>), so a test that
+    /// hands the entry in here sees what was said before it and what after.
+    /// </summary>
+    public Action<string>? Entering { get; set; }
+
     public void SaveNow() => HandSaves++;
 
     public void QuitToTitle() => QuitsToTitle++;
 
-    public void Descend(string dungeonId) => Descended.Add(dungeonId);
+    public void Descend(string dungeonId)
+    {
+        Descended.Add(dungeonId);
+        Entering?.Invoke(dungeonId);
+    }
 
     public void RunOver() => throw new InvalidOperationException("A screen walked with no window is never played to a run's end.");
 

@@ -40,7 +40,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The unique table — phase-1-weapons.md L1075-1083 (§1.5):
 /// <c>UniqueContentTests</c>' <c>Table</c>.</item>
 /// <item>The tutorial's row: its boss pinned to floor 2, and its golem's 80 HP,
-/// movement budget of 40 and Block x3 — phase-5-save.md L376 and L377 (§5.8):
+/// movement budget of 40 and Block x3 — phase-5-save.md L415 and L416 (§5.8):
 /// <see cref="DungeonContentTests.TheTutorialIsTheShippedDungeon"/>.</item>
 /// <item>A weapon's wear capacity: <c>StartingPool</c> 30, the capacity it opens
 /// on, and <c>WearCapacityPerBar</c> 1, a point for every full bar cashed — the
@@ -59,6 +59,16 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>StartingPool</c> when it refines: 6 in 100 on a fresh full bar, 7 at capacity 40 and
 /// 9 at capacity 60 — phase-6-between-runs.md §6.4 and settled.md L1149-1154 and R4's
 /// consequence 2, L1699-1703: <see cref="ImprovementRollTests.TheOddsAreTheRulings"/>.</item>
+/// <item>The farm's yield a clear, as the rule §6.6 states it rather than a number:
+/// "about one full loadout of maximum-quality potions per run" — six potions at the
+/// quality that restores a whole pool from 1 HP, off the master's own
+/// <c>HealthPotionPercent</c> — over the dungeons that do not retire on their clear,
+/// rounded down (phase-6-between-runs.md §6.6, settled.md L1048-1054; PHASE 6b
+/// DECISION 7). No literal: the master's rate, percent and roster are read together,
+/// so a move that would re-derive another rate fails until the rate follows it, by
+/// name, and only when the suite runs — a percent that leaves the quality for a whole
+/// pool where it was moves nothing:
+/// <see cref="FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions"/>.</item>
 /// </list>
 /// A relation, an id or a row is no number: a test that names one fails, when an
 /// edit moves it, at the assertion that states it.

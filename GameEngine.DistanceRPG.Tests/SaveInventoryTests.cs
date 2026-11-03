@@ -45,6 +45,10 @@ public class SaveInventoryTests
             new("_stable", Kept.Saved, "campaign.stable[], each weapon whole, in the order they were put there — null for an empty stable (Phase 6a.2)"),
             new("_enchanter", Kept.Saved, "campaign.enchanter[], each deposit whole, in deposit order — null for an empty shop (Phase 6a.3a)"),
             new("DepositsMade", Kept.Saved, "campaign.depositsMade: the next deposit's ordinal (Phase 6a.3a)"),
+            // No farm and no batch (Phase 6b.3): what the farm yielded is a fact of the
+            // run, saved with it (lastResult.farmYield), and the batch is that less the
+            // potions the bags hold, worked out (Farm.Batch) — never a field here
+            // (PHASE 6b DECISION 6; §6.7: "the batch must never reach CampaignState").
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],
@@ -68,7 +72,7 @@ public class SaveInventoryTests
             new("WeaponXp", Kept.Saved, "weaponXp by class name, zeros left out — never by position"),
             new("HpXp", Kept.Saved, "hpXp"),
             new("ManaXp", Kept.Saved, "manaXp"),
-            new("Inventory", Kept.Saved, "inventory[], its length the count the member was built with"),
+            new("Inventory", Kept.Saved, "inventory[], its length the count the member was built with: a weapon row, or null at a potion's slot; the potions in potions[], each with its slot (Phase 6b.1)"),
             new("DistLeft", Kept.Saved, "distLeft: a save mid-turn resumes mid-turn"),
             new("EffectiveMax", Kept.Saved, "effectiveMax"),
             new("SavedMovement", Kept.Saved, "savedMovement"),
@@ -95,6 +99,11 @@ public class SaveInventoryTests
             new("Unique", Kept.Derived, "the row's, by id"),
             new("ResolvedCost", Kept.Derived, "Resolve(): the cost less Light's discount on the live spread"),
             new("ResolvedManaCost", Kept.Derived, "Resolve(): the mana cost less Resonant's"),
+        ],
+        [typeof(Potion)] =
+        [
+            new("Type", Kept.Saved, "potions[].type, by name (Phase 6b.1)"),
+            new("Quality", Kept.Saved, "potions[].quality: the units it was mixed from (Phase 6b.1)"),
         ],
         [typeof(Enchantment)] =
         [
@@ -271,6 +280,7 @@ public class SaveInventoryTests
             new("XpCredited", Kept.NotSaved, "an event"),
             new("EnchantmentTiered", Kept.NotSaved, "an event"),
             new("WeaponWornFull", Kept.NotSaved, "an event"),
+            new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
         ],
     };
@@ -379,7 +389,8 @@ public class SaveInventoryTests
             new("_notices", Kept.NotSaved, "this showing's notices, a failed save of the hub's laid ahead of them: the log keeps them"),
             new("_shownWhole", Kept.NotSaved, "how many of this showing's notices are shown whole"),
             new("_weapons", Kept.NotSaved, "the WEAPONS page: its rows are the campaign's, read afresh; its choice, its window and a carry are presentation (HubWeapons, below)"),
-            new("_onWeapons", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
+            new("_alchemist", Kept.NotSaved, "the ALCHEMIST page (Phase 6b.4): its rows are the campaign's, read afresh, and the batch is worked out from the last result and the bags; its choice, its window and its quality are presentation (AlchemistPage, below)"),
+            new("_page", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
             new("_refusal", Kept.NotSaved, "what the last key was refused with, until the next key"),
             new("_panel", Kept.NotSaved, "the deposit panel or the take-back ask (Phase 6a.5): the screen's alone, like a carry — the campaign changes only at the ENTER that deposits or takes back, so a save never sees one, and every showing opens with none up (DepositPanel, below)"),
         ],
@@ -389,6 +400,13 @@ public class SaveInventoryTests
             new("_chosen", Kept.NotSaved, "the page's choice: every showing opens on the first row it can choose"),
             new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
             new("_carried", Kept.NotSaved, "a carry is the page's alone and moves nothing: the campaign changes only as it is put down (CampaignState.Move), so a save never sees one, and a quit mid-carry loses nothing"),
+        ],
+        [typeof(AlchemistPage)] =
+        [
+            new("_campaign", Kept.Derived, "the campaign the save restores — the page's rows, the farm and the batch are read off it afresh each time"),
+            new("_chosen", Kept.NotSaved, "the page's choice, kept by place: every showing opens on the first member"),
+            new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
+            new("_quality", Kept.NotSaved, "the quality H and M mix at: every showing opens on 1, and nothing is mixed until H or M"),
         ],
         [typeof(DepositPanel)] =
         [
@@ -440,7 +458,8 @@ public class SaveInventoryTests
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
         // scenes — and of the WEAPONS page the screen between runs holds (Phase
-        // 6a.2), and of its deposit panel (Phase 6a.5) — is in the document's view,
+        // 6a.2), of its deposit panel (Phase 6a.5) and of its ALCHEMIST page (Phase
+        // 6b.4) — is in the document's view,
         // derived from what the save restores, or not saved for the reason given — so
         // a scene field added later fails here until someone decides whether a resume
         // needs it.

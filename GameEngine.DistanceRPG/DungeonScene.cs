@@ -1303,13 +1303,15 @@ public class DungeonScene : Scene
         // A credit that bought something says so over whoever earned it (§2.2).
         // The beat is only a beat: what a credit was worth was settled by the
         // applier that raised this, and the label states the member's own state
-        // -- no XP rule lives out here.
+        // -- no XP rule lives out here. It is said of the member, so a drink's
+        // heal that buys a point is said in the open bag beside the drink's
+        // answer (DungeonHud.BagLine), not over the floor under the panel.
         _turns.XpCredited += (member, credit, gained) =>
         {
             string label = DungeonHud.LevelUpLabel(member, credit);
             Log.Info($"[Progress] {member.Id} {label} (+{gained})");
             if (TryObjectFor(member, out var obj) && obj.IsActive)
-                _hud.AddFloatingText(obj.Position, label, LevelUpColor, -64f);
+                _hud.AddBeat(obj, obj.Position, label, LevelUpColor, -64f);
         };
 
         // The mana an entry spent burned the circle a step deeper (§3.3). The
@@ -1330,6 +1332,23 @@ public class DungeonScene : Scene
         // the log says when, once, since a full weapon banks nothing more.
         _turns.WeaponWornFull += (member, weapon) =>
             Log.Info($"[Wear] {member.Id}'s {weapon.Name} is full: wear {weapon.Wear} of {weapon.WearCapacity}");
+
+        // A potion drunk from a member's bag (§3.4): what it was, what it offered
+        // and what the pool took, in the log, and what the pool gained over the
+        // member, in the potion's colour, in place of any answer still rising there
+        // — said in the open bag's own row, where the drink was asked for
+        // (DungeonHud.BagLine). A heal also rises as +12 from CharacterHealed, as
+        // every heal does, over the floor, which is not drawn while the bag is open.
+        _turns.PotionDrunk += (member, drink) =>
+        {
+            var potion = drink.Potion;
+            string pool = potion.Type == PotionType.Health
+                ? $"+{drink.Restored} HP of {drink.Share} offered ({member.Hp}/{member.MaxHp})"
+                : $"+{drink.Restored} mana of {drink.Share} offered ({member.Mana}/{member.UsableMaxMana} usable)";
+            Log.Info($"[Potion] {member.Id} drinks a {potion.Type} potion (quality {potion.Quality}) from slot {drink.Slot + 1}: {pool}, {drink.Cost} movement");
+            if (TryObjectFor(member, out var obj) && obj.IsActive)
+                _hud.AddAnswer(obj, obj.Position, DungeonHud.DrankBeat(drink), DungeonHud.PotionColor(potion.Type), -52f);
+        };
 
         _turns.CharacterHealed += (c, amount) =>
         {
@@ -1570,8 +1589,9 @@ public class DungeonScene : Scene
     /// <summary>
     /// A number key, routed by the menu that is open (§4.4: the swap keys
     /// generalise to every slot): with the bag open, 2 and up swap the bag slot
-    /// printed with that number into the hand — 1 is the hand itself — or, with
-    /// the bag's X armed, put that slot's weapon down (<see cref="LeaveSlot"/>);
+    /// printed with that number into the hand — 1 is the hand itself — or drink
+    /// the potion there (<see cref="DrinkSlot"/>), or, with the bag's X armed,
+    /// put that slot's weapon down or pour its potion out (<see cref="LeaveSlot"/>);
     /// on the pause menu (<see cref="PauseMenu.Press"/>), 1 closes it, 2 asks the
     /// host to save the campaign into its own slot on the party's own turn — the
     /// menu kept up for the answer — and otherwise says why not, and 3 quits to
@@ -1623,6 +1643,8 @@ public class DungeonScene : Scene
             {
                 if (LeaveArmed)
                     LeaveSlot(slot);
+                else if (ActiveCharacter.State.PotionIn(slot) is not null)
+                    DrinkSlot(slot);   // a potion is drunk, never held: the hand keeps a weapon (PHASE 6b DECISION 1)
                 else
                     EquipSlot(slot);
             }
@@ -1707,6 +1729,43 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
+    /// A bag number on a potion's slot (§3.4): the active member drinks it, through
+    /// the turn system, which prices it — <see cref="TurnSystem.PotionUseCost"/>
+    /// movement, in combat and out (PHASE 6b DECISION 2), paid whole or refused —
+    /// and restores what it offers through the heal or mana applier. What was drunk
+    /// says so over the member and in the log from <see cref="TurnSystem.PotionDrunk"/>
+    /// (<see cref="WireTurnSystem"/>). Short of the whole cost, the drink is refused
+    /// and says why over the member — <c>NOT ENOUGH MOVE TO DRINK - IT COSTS 40</c>
+    /// — with nothing drunk and nothing spent; outside the party's phase it only
+    /// logs, as a swap refused there does.
+    /// </summary>
+    private void DrinkSlot(int slot)
+    {
+        var member = ActiveCharacter.State;
+        if (_turns.TryDrink(member, slot) is not null) return;   // the beat and the log line are PotionDrunk's
+
+        int cost = _turns.PotionUseCost;
+        if (_turns.Phase == TurnPhase.Player && member.Alive && member.DistLeft < cost)
+        {
+            Log.Info(DrinkShortLine(member.Id, slot, member.DistLeft, cost));
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.DrinkShortCue(cost), false));
+        }
+        else
+            Log.Info($"[Potion] {member.Id} cannot drink from slot {slot + 1}: a drink is the party's own, in its turn and alive");
+    }
+
+    /// <summary>
+    /// The log's line for a drink refused short of its cost, the bag slot by the
+    /// number its key bears: <c>[Potion] A cannot drink from slot 2: 39 movement
+    /// left, a drink costs 40</c>. The movement left is rounded down to the whole,
+    /// since a whole cost is paid from the whole movement exactly when the gate
+    /// pays it from the fraction (<see cref="TurnSystem.CanDrink"/>): so 39.6 reads
+    /// 39, never the 40 it falls short of.
+    /// </summary>
+    internal static string DrinkShortLine(string id, int slot, float distLeft, int cost)
+        => $"[Potion] {id} cannot drink from slot {slot + 1}: {MathF.Floor(distLeft):0} movement left, a drink costs {cost}";
+
+    /// <summary>
     /// X, in the bag (§4.4): arm "leave", so the next bag number puts that slot's
     /// weapon down where the active member stands rather than equipping it, and
     /// the bag's key hint becomes <c>LEAVE WHICH? 2-6 - X CANCELS</c>. X again
@@ -1736,7 +1795,15 @@ public class DungeonScene : Scene
     /// <c>BAG FULL</c>, and leaves X armed for another pick. What was left says so
     /// over the member in place of any answer still rising there, such as that
     /// <c>SLOT 3 IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
-    /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack on the open panel.
+    /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack — said in the
+    /// open bag's own row, under its title (<see cref="DungeonHud.BagLine"/>).
+    /// <para>
+    /// <strong>A potion is poured out, never left</strong> (PHASE 6b DECISION 1):
+    /// out of the bag through its one door (<see cref="PartyMemberState.TakePotion"/>)
+    /// and gone — nothing lies on the floor and nothing comes back — for nothing, as
+    /// leaving a weapon is free. It disarms X too, and says so over the member:
+    /// <c>POURED OUT THE HEALTH POTION Q2</c>.
+    /// </para>
     /// </summary>
     private void LeaveSlot(int slot)
     {
@@ -1745,6 +1812,14 @@ public class DungeonScene : Scene
         if (member.Inventory[slot] is null)
         {
             SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.EmptySlotCue(slot), false));
+            return;
+        }
+        if (member.PotionIn(slot) is not null)
+        {
+            var potion = member.TakePotion(slot);
+            _leaveArmed = false;
+            Log.Info($"[Potion] {member.Id} pours out a {potion.Type} potion (quality {potion.Quality}) from slot {slot + 1} on floor {_floor.Index + 1}");
+            _hud.AddAnswer(ActiveCharacter, ActiveCharacter.Position, DungeonHud.PouredBeat(potion), DungeonHud.PotionColor(potion.Type), -52f);
             return;
         }
 
@@ -2708,7 +2783,8 @@ public class DungeonScene : Scene
     /// says why a full bag took nothing. That is a carry limit, not a fault:
     /// §4.4's six slots a member, 24 party-wide, which loot shares with the weapons
     /// being carried. So the cue says how to make room: the bag's X puts one down
-    /// here. A spoil taken is carried home by the way out and lost to a wipe (§4.4).
+    /// here, or pours a potion out while the bag holds one. A spoil taken is
+    /// carried home by the way out and lost to a wipe (§4.4).
     /// </summary>
     private void PickUp()
     {
@@ -2723,7 +2799,7 @@ public class DungeonScene : Scene
         };
         if (slot == Pickup.BagFull)
         {
-            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.BagFullCue(member.Inventory.Length), false));
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.BagFullCue(member), false));
             return;
         }
 

@@ -86,7 +86,7 @@ public sealed class PartyMemberState : ActorState
             Id = id,
             ColorIndex = colorIndex,
             Stats = stats,
-            Inventory = new Weapon?[slots],
+            Inventory = new IItem?[slots],
         };
     }
 
@@ -259,10 +259,89 @@ public sealed class PartyMemberState : ActorState
     /// tuning; slot 0 is the equipped weapon. The array is the member's for good:
     /// only construction sizes it — a restore (<see cref="Restore"/>) to the count
     /// the saved member was built with — and every write after is to a slot.
+    /// <para>
+    /// <strong>A slot holds a weapon or a potion</strong> (<see cref="IItem"/>,
+    /// §3.4), one thing or nothing. The hand holds a weapon by rule (PHASE 6a
+    /// DECISION 7); a potion lies in the bag, slots 1 and up (PHASE 6b DECISION 1).
+    /// So a reader that wants a weapon asks for one (<see cref="WeaponIn"/>), and a
+    /// count of what a member carries counts weapons
+    /// (<see cref="WeaponsCarried"/>): a potion's slot is full, never room, and
+    /// never a weapon.
+    /// </para>
     /// </summary>
-    public Weapon?[] Inventory { get; private init; } = new Weapon?[InventorySlots];
+    public IItem?[] Inventory { get; private init; } = new IItem?[InventorySlots];
 
-    public override Weapon? EquippedWeapon => Inventory[0];
+    /// <summary>The weapon in hand. Slot 0 holds a weapon or nothing — nothing ever puts a potion there — so a potion is never read as one.</summary>
+    public override Weapon? EquippedWeapon => Inventory[0] as Weapon;
+
+    /// <summary>The weapon in <paramref name="slot"/>, or null when the slot is empty or holds a potion.</summary>
+    public Weapon? WeaponIn(int slot) => Inventory[slot] as Weapon;
+
+    /// <summary>The potion in <paramref name="slot"/>, or null when the slot is empty or holds a weapon.</summary>
+    public Potion? PotionIn(int slot) => Inventory[slot] as Potion;
+
+    /// <summary>How many weapons the member carries, the hand's and the bag's: what every rule that keeps a member armed counts (PHASE 6a DECISION 7). A potion is never one.</summary>
+    public int WeaponsCarried => Inventory.Count(item => item is Weapon);
+
+    /// <summary>The potions in the bag, each with its slot, in slot order.</summary>
+    public IEnumerable<(int Slot, Potion Potion)> Potions
+    {
+        get
+        {
+            for (int slot = 1; slot < Inventory.Length; slot++)
+                if (Inventory[slot] is Potion potion)
+                    yield return (slot, potion);
+        }
+    }
+
+    /// <summary>
+    /// The bag's empty slots, 1 and up, in slot order: where a potion mixed between
+    /// runs can go — the first of them (<see cref="CampaignState.Stow"/>) — and the
+    /// room both pages between runs say: the ALCHEMIST page's count, and the WEAPONS
+    /// page's room row, whose place is the first of them. It is the one reader of a
+    /// bag's room, so the two pages never disagree (its readers are pinned,
+    /// <c>AlchemistPageTests.TheBagsRoomIsReadInOnePlace</c>); a pickup in a dungeon
+    /// asks another question, the first empty slot with the hand among them
+    /// (<see cref="Pickup.FirstEmptySlot"/>). The hand is never among these, empty or
+    /// not: it keeps a weapon, and a potion lies in the bag (PHASE 6b DECISION 1). A
+    /// potion's slot is full, as a weapon's is.
+    /// </summary>
+    public IEnumerable<int> EmptyBagSlots
+    {
+        get
+        {
+            for (int slot = 1; slot < Inventory.Length; slot++)
+                if (Inventory[slot] is null)
+                    yield return slot;
+        }
+    }
+
+    /// <summary>
+    /// Empty bag slot <paramref name="slot"/>, which holds a potion, and hand the
+    /// potion back: <strong>the one way a potion leaves a bag</strong>. Its callers
+    /// are pinned (<c>PotionSlotTests.APotionLeavesABagThroughOneDoor</c>): the
+    /// pour-out in a dungeon (<c>DungeonScene.LeaveSlot</c>, PHASE 6b DECISION 1),
+    /// the drink (<see cref="TurnSystem.TryDrink"/>, Phase 6b.2), the run's end,
+    /// which spoils every potion carried (<see cref="Farm.Spoil"/>, Phase 6b.3), and
+    /// a pour-back at the alchemist between runs (<see cref="CampaignState.Unstow"/>,
+    /// Phase 6b.4, PHASE 6b DECISION 9). A potion is never put down on a floor, moved
+    /// to the stable or carried into another bag.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is the hand (0), which keeps a weapon, or no slot the member carries.</exception>
+    /// <exception cref="ArgumentException">The slot holds no potion: it is empty or holds a weapon.</exception>
+    internal Potion TakePotion(int slot)
+    {
+        if (slot < 1 || slot >= Inventory.Length)
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, slot == 0
+                ? "Slot 0 is the hand, which keeps a weapon: a potion lies in the bag, slot 1 and up."
+                : $"Member '{Id}' carries slots 0 to {Inventory.Length - 1}, the hand and its bag: there is no slot {slot}.");
+        if (Inventory[slot] is not Potion potion)
+            throw new ArgumentException(
+                $"Slot {slot} of member '{Id}' holds {(Inventory[slot] is Weapon weapon ? weapon.Name : "nothing")}, not a potion: only a potion leaves a bag this way.",
+                nameof(slot));
+        Inventory[slot] = null;
+        return potion;
+    }
 
     /// <summary>
     /// The base movement a turn refills (§1.2): <see cref="Tuning.MovementBudget"/>
@@ -348,7 +427,8 @@ public sealed class PartyMemberState : ActorState
     /// copied: what the rest before a dungeon does (<see cref="Rest"/>), and what a
     /// move between runs does to the hand it empties (PHASE 6a DECISION 7,
     /// <see cref="CampaignState.Move"/>). A hand already holding something is left
-    /// as it is, and a member carrying nothing stays unarmed.
+    /// as it is, and a member carrying no weapon stays unarmed. A potion is passed
+    /// over wherever it lies: the hand keeps a weapon (PHASE 6b DECISION 1).
     /// </summary>
     /// <returns>The weapon taken into the hand, or null when none was.</returns>
     internal Weapon? ArmFromBag()
@@ -357,7 +437,7 @@ public sealed class PartyMemberState : ActorState
             return null;
         for (int slot = 1; slot < Inventory.Length; slot++)
         {
-            if (Inventory[slot] is not { } carried) continue;
+            if (Inventory[slot] is not Weapon carried) continue;
             Inventory[0] = carried;
             Inventory[slot] = null;
             return carried;

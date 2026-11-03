@@ -4,7 +4,7 @@ using GameEngine.DistanceRPG.Logic;
 namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
-/// The data files' edge (1e): the data sits beside the executable (S:43,
+/// The data files' edge (1e): the data sits beside the executable (P5:69,
 /// PHASE5-033), read from the folder handed in — there is no default one, so
 /// these read and write a temporary folder of their own and nothing else, and
 /// delete it after — with every file read or missed reported by its full path.

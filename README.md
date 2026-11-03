@@ -41,11 +41,13 @@ recent save and resumes it where it was left: on the screen between runs, with
 `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title, or
 back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 [Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
-is passed over. The screen between runs is two pages, Tab going from one to the
-other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
-has ended — until the tutorial's golem is beaten it lists the tutorial alone — and
-WEAPONS, every member's hand and bag, the stable and the enchanter's shop, where
-weapons are moved between them and deposited at the enchanter (below). In play —
+is passed over. The screen between runs is three pages, Tab going from each to the
+next and round: DUNGEONS, the dungeon list, with the last run's summary above it
+once a run has ended — until the tutorial's golem is beaten it lists the tutorial
+alone; WEAPONS, every member's hand and bag, the stable and the enchanter's shop,
+where weapons are moved between them and deposited at the enchanter (below); and
+ALCHEMIST, the farm's batch and the bags it is mixed into as potions (below).
+Every showing opens on DUNGEONS. In play —
 in a dungeon or between runs — Esc opens the menu, where the campaign is saved by
 hand into its own slot, the one it saves into all the time, and play is left for
 the title.
@@ -80,12 +82,27 @@ the title.
 
 | Between runs: WEAPONS | Action |
 | --- | --- |
-| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
+| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped, and so is a potion in a bag, listed grey under its member as `  BAG   HEALTH POTION Q2`: a potion is never moved here, and its slot is no room — PHASE 6b DECISION 1). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
 | Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
 | D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
 | T | On a weapon in the shop (`WORKING` or `STALLED`), or a transfer's source held there (`HELD`): ask whether to take it back (below) — a transfer's two weapons together |
+| Tab | The ALCHEMIST page |
+| Esc | Open the menu, over the hub |
+
+| Between runs: ALCHEMIST | Action |
+| --- | --- |
+| W/S / Up/Down | Choose a member — `[A] - 2 BAG SLOTS FREE` — or a potion in its bag, `  BAG 3  HEALTH POTION Q3` (the farm, the batch, what spoils and the quality over them are read, never chosen). The window scrolls with the choice, and the chosen row is said whole on the right: for a member, what a health and a mana potion at the quality would restore it now (`H  HEALTH POTION Q3 - RESTORES 18 OF 30 HP`); for a potion, what it restores and what pouring it back gives the batch |
+| A/D / Left/Right | The quality a unit down or up — `QUALITY 3 - 3 UNITS A POTION - A/D CHANGES IT` — from 1 to the units left. Every showing starts at 1 |
+| H / M | Mix a health or a mana potion at the quality into the chosen member's bag — on a potion, its member's — in its first empty bag slot, never the hand: its units leave the batch, and the campaign is saved at once. Refused, it says why over the keys and mixes nothing: `THE BATCH IS SPENT - POUR ONE BACK TO MIX ANOTHER`, `[A] HAS NO ROOM IN THE BAG - THE HAND KEEPS A WEAPON`, `NO BATCH - THE LAST RUN DID NOT COUNT` |
+| T | On a potion: pour it back — its units return to the batch exactly, and the campaign is saved at once (PHASE 6b DECISION 9). On a member, nothing |
 | Tab | The DUNGEONS page |
 | Esc | Open the menu, over the hub |
+| Enter, the digits, every other key | Nothing (D is the quality's here: WEAPONS' deposit is not on this page) |
+
+Before the alchemist arrives — the first clear of a dungeon besides the tutorial
+— the page says `THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`,
+nothing on it is chosen, H and M say that over the keys, and Tab and Esc are its
+only other keys (PHASE 6b DECISION 10).
 
 | Between runs: the deposit panel (D) | Action |
 | --- | --- |
@@ -136,8 +153,8 @@ bag.
 | Space / Enter | End turn (banks half your unspent movement) |
 | E | Take the stairs the active character stands on: down, up, or out by the first floor's way out. Every living member must be within 3 tiles; the way out asks first, and E or Enter says yes |
 | G | Pick up what the active character stands on: a drop, or a weapon the party left there |
-| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot into the hand) |
-| X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free. X again cancels; G takes it back |
+| I / B | Inventory: six slots a member, slot 1 in hand (2–6 swap that bag slot's weapon into the hand). A slot can hold a potion instead of a weapon — `3  HEALTH POTION Q2` in green, `4  MANA POTION Q1` in cyan, with what it restores now under it (`RESTORES 12 OF 30 HP`) — which fills it (a pickup finds no room there) and is never taken into the hand: its number drinks it (below), and the key hint says `PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE` while the bag holds one |
+| X (inventory open) | Leave a weapon: then 2–6 puts that bag slot's weapon on the floor here, free — or, on a potion's slot, pours the potion out, free: `POURED OUT THE HEALTH POTION Q2`, and it is gone, nothing left on the floor (PHASE 6b DECISION 1). The keys say so while the bag holds a potion: `X TO LEAVE OR POUR ONE OUT`, then `LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS`. X again cancels; G takes a weapon back |
 | Scroll wheel | Zoom |
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
@@ -160,6 +177,113 @@ hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
 `[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter spends it
 and grows a weapon's capacity (below).
+
+**Potions** (Phase 6b): a potion in a member's bag is drunk by its number with the
+bag open (I), from the member's own bag — health or mana, the whole list — and
+costs `PotionUseCost` (40) movement, in combat and out alike (PHASE 6b DECISION 2
+in `docs/roadmap/open-questions.md`): the whole of it, or the drink is refused and
+says so over the member, `NOT ENOUGH MOVE TO DRINK - IT COSTS 40`, nothing drunk
+and nothing spent. The bag says what a drink costs under the swap line while it
+holds a potion — `A DRINK COSTS 40 MOVE`, red and `- NOT ENOUGH LEFT` when it is
+short, `DRINKING IS FREE` at 0 — and under each potion what it restores now: a
+share of the member's maximum, `HealthPotionPercent` (20) of max HP or
+`ManaPotionPercent` (20) of max mana for each unit of quality it was mixed at,
+rounded down (PHASE 6b DECISION 3) — `RESTORES 12 OF 30 HP` for quality 2 at 30,
+`RESTORES ALL 30 HP` when it is exactly a whole pool, `RESTORES ALL 30 HP - 6 OVER`
+once it is a whole pool and more — and for a caster whose locks reserve some of
+its mana, against what it can spend: `RESTORES ALL 17 SPENDABLE MANA - 15 OVER`.
+So a potion rides the ladder its member climbs,
+and quality 5 is the best there is at 20: it heals completely from 1 HP. No
+cooldown and no limit a turn: several drinks while the movement lasts. A health
+potion heals through the same applier every heal does — never past full, and the
+HP it restored is HP XP, so a drink at full restores and teaches nothing (allowed,
+and wasted) — and what lands past full is lost, unless the member holds Overheal,
+which banks it as Ward. A mana potion fills the pool up to what the equipped locks
+leave spendable, and teaches nothing: mana XP is mana spent. What was drunk is
+said in the bag's own row, under its title, in the potion's colour — `DRANK
+HEALTH POTION Q2 - +12 HP`, `DRANK MANA POTION Q1 - +6 MANA`, or `... - NOTHING TO
+RESTORE` at full, with any level it bought beside it — as every answer to a key
+pressed in the bag is (a pour, a weapon left, a refusal), and nothing rises over
+the floor under the open bag; G's full bag says `BAG FULL - 6 CARRIED - I THEN X
+LEAVES OR POURS ONE OUT` while it holds a potion. And the
+log says it whole: `[Potion] A drinks a Health potion (quality 2) from slot 3: +12
+HP of 12 offered (30/30), 40 movement`. The `+12` is the heal the drink applied,
+the same number the heal floats and the HP XP it teaches: when that XP buys a point
+of max HP, the point arrives filled, as it does after any heal, and is the
+ladder's, not counted as the drink's (so `+12 HP of 12 offered (28/31)` can
+follow a drink at 15/30). A drink refused short of its cost logs the movement left
+rounded down — `39 movement left, a drink costs 40` at 39.6 — while the MOVE
+readout rounds up, as it always has, and reads 40: the bag's red `- NOT ENOUGH
+LEFT` is the one to trust. The farm (below) yields the units a potion is mixed
+from, and the alchemist mixes them between runs (below).
+
+**The farm** (Phase 6b): every dungeon besides the tutorial beaten once is one of
+the farm's workers, and every run that counts — a boss kill, or a mercy for
+failing deep, the runs that tick the enchanter — yields `FarmYieldPerClear` (7)
+units a worker as it ends (PHASE 6b DECISION 4), the run that beats a dungeon for
+the first time at the count it brings (DECISION 5). So the first clear of a
+dungeon besides the tutorial brings the alchemist and a batch of 7 at once, a
+boss killed and then a wipe included, and a full clear of the four that ship
+yields 28 a run; a run that does not count yields nothing, and the tutorial never
+counts. What a run yielded is kept with its result, and the batch is that less
+what the bags hold, never a number of its own (DECISION 6): quitting and loading
+never refills it, and it is gone the moment the party descends — what is left
+unmixed spoils, and the next run that counts brings a fresh one, never added to
+the last. Every potion carried spoils as the run ends, on the way out or by a
+wipe — a potion keeps for one trip — and the way out's question says so first:
+`THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT`, and with the boss down, `THE BOSS IS
+DOWN - YOU KEEP THE WEAPONS YOU CARRY`. The run's summary, at its end and on
+the hub, says what the farm did right after whether the run counted — `A FIRST
+CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS` and `A FIRST CLEAR -
+THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 14 UNITS` in green,
+`THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT` in cyan (the farm's workers,
+never the tutorial; PHASE 6b DECISION 12 holds the words), `THE FARM YIELDED
+NOTHING - THE RUN DID NOT COUNT` in grey, and nothing before the alchemist — and
+after the spoils, `2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP` in yellow.
+The log says it too:
+`[Farm] The alchemist has arrived: The Spear Hall, beaten for the first time, is
+the one dungeon the farm counts`, `[Farm] The run counted: the 2 dungeons the farm
+counts yield a batch of 14 units`, `[Farm] 2 potions spoiled at the run's end:
+Health Q2, Mana Q1`. The alchemist is there while the farm has a worker: a
+`dungeons.json` beside
+the game that moves `retiresOnClear` onto the farm's one worker retires it on its
+next clear, and he arrives again with the next first clear (DECISION 11). Mixing
+— how many potions of which type, at what quality, in whose bag — is the
+alchemist's (below). The roster stays at the four dungeons that ship (DECISION 8),
+and `FarmYieldPerClear` is derived for them by hand (DECISION 7; see [Tuning the
+numbers](#tuning-the-numbers-tuningjson)).
+
+**The alchemist** (Phase 6b): the ALCHEMIST page between runs, the third Tab
+page, is where the batch is split. Before the first clear of a dungeon besides the
+tutorial it says `THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL`
+and nothing else (PHASE 6b DECISION 10); it closes again if he goes (DECISION 11).
+Once he is there it shows numbers, never a person: what the farm yields a run that
+counts — `THE FARM - 2 DUNGEONS WORK IT - 14 UNITS A COUNTED RUN`, or `... - IT
+YIELDS NOTHING` at a rate of 0 — the batch, `THE BATCH - 9 OF 14 UNITS LEFT` in
+cyan (`THE BATCH - ALL 14 UNITS MIXED`; and with none, why: `NO BATCH - THE LAST
+RUN DID NOT COUNT`, `NO BATCH - THE FARM YIELDS NOTHING`, or `NO BATCH YET - THE
+NEXT RUN THAT COUNTS BRINGS ONE` on a save from before the farm), `UNMIXED UNITS
+SPOIL ON THE DESCENT - A POTION KEEPS ONE TRIP`, the quality A/D set, in yellow
+(grey with nothing left to mix, as the H and M lines are then), and each member
+with the room its bag has and its potions under it. A potion of
+quality *q* costs *q* units, takes no runs and no place in a queue, and goes into
+the chosen member's first empty bag slot — never the hand, and never the stable,
+another bag or the floor (PHASE 6b DECISION 1): pour it back with T and mix it
+again. No quality is refused but by the batch: past the quality that restores a
+whole pool (5 at 20 a unit, which the detail says, `QUALITY 5 RESTORES A WHOLE
+POOL`) more is overshoot, which only Overheal keeps. Each mix and each pour-back is
+saved at once (PHASE 6a DECISION 10), so a quit and a load bring the potions back
+and never refill the batch; and any potion can be poured back, its units back in
+the batch exactly, until the descent (PHASE 6b DECISION 9). While units are left
+unmixed, DUNGEONS ends its list with `THE ALCHEMIST HOLDS 3 UNMIXED UNITS - THEY
+SPOIL WHEN YOU DESCEND`, in orange. The log says each: `[Alchemist] Mixed a Health
+potion, quality 3, into A's bag slot 3: 4 of 7 units left`, `[Alchemist] Poured
+back A's Health potion, quality 3, from bag slot 3: 7 of 7 units left`, a refusal
+as `[Alchemist] Refused: ...`, and on the descent the run's split, `[Alchemist]
+Descending with 3 health potions (9 units) and 2 mana potions (4 units); 1 of 14
+units unmixed, spoiled`; the hub's own line on opening says `- the batch holds 9 of
+14 units`. With no batch, both say why, as the page does: `- no batch: the last run
+did not count`, and the descent's `...; no batch: the last run did not count`.
 
 **The stable** (Phase 6a): the weapons the party owns and is not carrying,
 kept with the campaign in the order they were put there, as many as you like. The
@@ -389,7 +513,8 @@ back to it, and the game quits from it.
   (the summary with it), when NEW CAMPAIGN on the title or `--new-campaign` begins
   one, after every change made on the screen between runs — a weapon moved
   between the bags and the stable, a deposit at the enchanter, a weapon taken
-  back from it (PHASE 6a DECISION 10) — and whenever play is left — the menu's
+  back from it, a potion mixed or poured back at the alchemist (PHASE 6a DECISION
+  10) — and whenever play is left — the menu's
   `3  QUIT TO TITLE`, or the window's close button. A save is never taken while
   the enemies are moving: a quit during their turn (the menu can be opened then,
   and the close button pressed any time) plays their turn out to your next one
@@ -451,7 +576,7 @@ back to it, and the game quits from it.
   asks nothing: LOAD GAME's keys line says it, `PLAY SAVES INTO THE SLOT YOU
   LOAD`. A slot you kept as a checkpoint is played forward from its first load,
   its save before one save deep as the backup, then gone.
-- **The format is version 2** (Phase 6a): every weapon in a save carries its
+- **Version 2** (Phase 6a): every weapon in a save carries its
   wear (`"wear"`) and the wear it has ever cashed at the enchanter
   (`"wearCashed"` — its capacity is worked out afresh from that under the
   `tuning.json` loaded now, never stored), and the save names which version's
@@ -479,7 +604,7 @@ back to it, and the game quits from it.
   cannot be read, naming where. A save an earlier build wrote —
   version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
   version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
-  or the shop, and saved as version 2 from then on. It says `THE NUMBERS HAVE
+  or the shop, and on to version 3 (below), and saved as version 3 from then on. It says `THE NUMBERS HAVE
   CHANGED` only if a number it was played under moved: the ones Phase 6a began to
   play (the Enchanter group's) are none it was played under (PHASE 6a DECISION 9).
   **Do not open a slot this build has saved with an older checkout.** A Phase 5
@@ -499,6 +624,43 @@ back to it, and the game quits from it.
   earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
   loads it, though no number moved, since each step adds the numbers it plays to
   version 2's record. A released version 2 never does.
+- **The format is version 3** (Phase 6b): a member carries potions in its bag
+  (`"potions"`: each with its bag slot, counted from 0 as the inventory is, its
+  type, `"Health"` or `"Mana"`, and its quality, the units it was mixed from;
+  `null` while it carries none). The inventory stays a list of weapon rows, `null`
+  at a potion's slot. A potion row that cannot be — in the hand, past the bag, on
+  a slot a weapon fills, two on one slot or listed out of slot order, a type that
+  is neither, a quality below 1 or past the sanity bound — is refused as one that
+  cannot be read, naming where (`campaign.party[0].potions[0].slot`), and so is a
+  potion carried before the alchemist could have mixed one: while every dungeon
+  the campaign has cleared is retired — before a dungeon besides the tutorial is
+  beaten (§6.6). The last run's record says what the farm did —
+  `"farmYield"`, the units it yielded; `"farmClears"`, the dungeons besides the
+  tutorial beaten as it ended; `"firstClear"`; and `"spoiled"`, the potions that
+  spoiled as it ended, each its type and quality, `null` for none — and the potions
+  carried are checked against it: bags holding more units of quality than the last
+  run yielded are refused, naming the potion where the sum passes it, and so are a
+  yield on a run that did not count or past any tuning's, more clears than the
+  campaign holds, and potions spoiled that the bags could not hold or before the
+  alchemist had arrived. A version-2 save — Phase 6a's — loads as ever: it is
+  lifted to version 3 as it is read by a step that writes nothing (a stray
+  `"potions"`, or a stray farm member on the last run's record, a hand gave it is
+  removed, since version 2 knew none), its last run read as one that yielded
+  nothing — so it carries no batch until its next run that counts — and saved as
+  version 3 from then on. **Do not open a Phase 6b slot with an older checkout.** A Phase 6a
+  checkout reads version 3 as a newer build's save and sets it aside, kept and
+  never deleted, and loads nothing in its place. While Phase 6b is being built,
+  every 6b step reads version 3 as its own, as every 6a step read version 2: an
+  earlier step's build loads a save a later step wrote, passes over what it does
+  not know of, and its next save drops it (PHASE 6a DECISION 14, extended). Since
+  6b.3 that costs more: the last run's record holds what the farm yielded, and
+  every potion carried is checked against it, so a slot a 6b.3-or-later build
+  saved and a 6b.1 or 6b.2 build then saved again with potions in its bags is
+  refused by a 6b.3-or-later build — the yield it was mixed from is gone — and set
+  aside, kept and never deleted. And a save an earlier 6b step wrote may say
+  `THE NUMBERS HAVE CHANGED` once when a later step loads it, though no number
+  moved, since the steps add the numbers they play to version 3's record. A
+  released version 3 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
@@ -581,11 +743,14 @@ back to it, and the game quits from it.
   counter in the billions, hit points past the largest bar plus what was earned,
   a weapon's wear past any capacity any `tuning.json` could give it (10000 plus
   1000 for each wear it has cashed), a service at the enchanter taking more than
-  11 runs, a run's end working more than 10 of them — and then against the rest:
+  11 runs, a run's end working more than 10 of them, a potion's quality in the
+  billions, a run's yield past 1000 units for each dungeon the farm counted (the
+  most any `tuning.json` yields) — and then against the rest:
   a retired dungeon never cleared, a last run's summary that disagrees with the
   campaign (its run count, its lock, the dungeon it cleared), a run in progress
   in a dungeon the list could not have offered, a boss standing that the run has
-  down, an enemy's weapon or a drop carrying wear, a shop that contradicts itself
+  down, an enemy's weapon or a drop carrying wear, a shop that contradicts itself,
+  potions carried past what the last run yielded or before the alchemist
   (above). Wear above the capacity today's
   `tuning.json` gives is no fault: lower `StartingPool` and a full weapon keeps
   its wear, reading `WEAR 30/20 FULL`. A save that fails any of it is set
@@ -726,6 +891,29 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   the numbers it plays to version 2's record. The docs' older
   `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming either
   is told which key took its place.
+- **The Consumables' keys** (Phase 6b) are what a drink costs and what a potion
+  restores (`docs/roadmap/phase-3-loot.md` §3.4): `PotionUseCost`, the movement a
+  drink costs, in combat and out (0 to 10000, as `WeaponSwapCost`; 0 makes a drink
+  free; PHASE 6b DECISION 2), and `HealthPotionPercent` and `ManaPotionPercent`, the
+  share of max HP or max mana a unit of quality restores, rounded down (1 to 100;
+  20 each, equal until play says otherwise; PHASE 6b DECISION 3) — at 20, quality 5
+  is the best potion there is. They play since Phase 6b's drink reads them, and
+  turning one says `THE NUMBERS HAVE CHANGED` when a campaign saved under the other
+  number resumes — never to a save from before Phase 6b, whose record covers only
+  the keys played then; while Phase 6b is being built, a save an earlier step's
+  build wrote says it once, though no number moved, since the drink's three and
+  then the farm's joined version 3's record. The group's fourth, `FarmYieldPerClear`, is the units the
+  farm yields a worker on every run that counts (0 to 1000; 0 yields nothing;
+  provisional — PHASE 6b DECISIONS 4 and 7), played since Phase 6b's farm reads it.
+  It is derived by hand, not picked: a campaign that has beaten everything should
+  yield about one full loadout of six maximum-quality potions a run, each at the
+  quality that restores a whole pool — 100 ÷ `HealthPotionPercent` 20, rounded up,
+  5 — so 6 × 5 = 30, over the four dungeons beside the tutorial, 7.5 → 7. It is a
+  rate, and nothing re-derives it for you: a dungeon added to `dungeons.json` —
+  the master or the copy beside the game — raises a full clear's yield by 7 with
+  no warning, so re-derive it by hand when the roster or `HealthPotionPercent`
+  moves (the suite says so of the master copy, and only when
+  it runs). No key is still to come: every key of §5.3's set has its reader.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at
@@ -766,7 +954,13 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   fail `EnchanterTests.TheRulingsClimb_WearDepositsAndRuns`, the ruling's worked
   climb; and `GraftBaseChance` 3, §6.4's, which fails
   `ImprovementRollTests.TheOddsAreTheRulings`, the 6, 7 and 9 in 100 the ruling
-  works out from it. Every other number in it fails nothing: the tests read it from the master, or stand
+  works out from it; and `FarmYieldPerClear` 7, derived from `HealthPotionPercent`
+  20 and the four dungeons beside the tutorial as §6.6's loadout rule states it,
+  fails `FarmTests.TheShippedYieldIsAboutOneLoadoutOfMaximumPotions` whenever
+  re-deriving it would give a rate other than the master's — a fifth dungeon in
+  the master `dungeons.json`, a `HealthPotionPercent` that moves the quality for a
+  whole pool (21 to 24 still ask 5, and fail nothing), or a rate other than 7 with
+  neither moved. Every other number in it fails nothing: the tests read it from the master, or stand
   on numbers of their own (`Premise`, in the test project: the numbers the
   worked examples were written against, which most scenario suites play instead
   of the master's) — give `PerStack`'s `Block` 4, rebuild and run the suite, and
@@ -869,7 +1063,12 @@ everything in them is named by a stable string id.
   and `retiresOnClear`, the tutorial's alone. Moved onto another dungeon once a
   campaign has deposits at the enchanter, it refuses no save and hides nothing in
   the shop: the enchanter takes no new deposit until that dungeon is beaten, and
-  what is in the shop is listed and worked as ever. There is no drop table: what a boss
+  what is in the shop is listed and worked as ever. Moved onto the farm's one
+  worker, its next clear retires it, and the alchemist goes with it until the next
+  first clear (PHASE 6b DECISION 11). A dungeon added here raises what the farm
+  yields a full clear, since `FarmYieldPerClear` is a rate derived for the four
+  that ship (PHASE 6b DECISIONS 7 and 8): re-derive it by hand when one is.
+  There is no drop table: what a boss
   drops is computed from its theme and `restricted.json`, so taking `Brace` out
   of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
   with no edit to this file.

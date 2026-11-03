@@ -23,8 +23,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// arrive at 0 of <see cref="Tuning.StartingPool"/>. Nothing in combat reads
 /// either, so a full weapon plays as a fresh one does.
 /// </para>
+/// <para>
+/// It is one of the two things a slot holds (<see cref="IItem"/>, Phase 6b), and
+/// the only one a hand does.
+/// </para>
 /// </summary>
-public sealed class Weapon
+public sealed class Weapon : IItem
 {
     /// <summary>Percentages are integers out of this.</summary>
     private const int Percent = 100;
@@ -309,7 +313,7 @@ public sealed class Weapon
     /// reaches; since <see cref="Wear"/> is no more than that, what was cashed is
     /// never less than what this call returns. The one caller is
     /// <see cref="Enchanter.Deposit"/>: the enchanter is the single place wear is
-    /// spent (P6:902–903; <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c>).
+    /// spent (P6:941–942; <c>EnchanterTests.WearIsSpentAndReturnedInOnePlace</c>).
     /// </summary>
     /// <returns>The wear cashed: the deposit's.</returns>
     internal int CashWear()

@@ -1,4 +1,5 @@
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using static GameEngine.DistanceRPG.Tests.TestSlots;
 
@@ -198,6 +199,23 @@ public sealed class BetweenRunsHudTests : IDisposable
             "RUN COUNTED - 1 RUN SO FAR",
             "THE TUTORIAL IS CLOSED FOR GOOD",
         }, Texts(BetweenRunsHud.SummaryLines(campaign.LastResult!)));
+
+        // The first real clear brings the alchemist, and its summary says so after
+        // whether the run counted and before the lock (Phase 6b.3), at the farm's rate
+        // stated here.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        Assert.Equal(new[]
+        {
+            "CLEARED",
+            "THE SPEAR HALL - DEEPEST FLOOR 5",
+            "THE SPEAR WARDEN FELL ON FLOOR 5",
+            "NO SPOILS CARRIED",
+            "XP KEPT",
+            "RUN COUNTED - 2 RUNS SO FAR",
+            "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS",
+            "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
+        }, Texts(BetweenRunsHud.SummaryLines(campaign.LastResult!)));
     }
 
     [Fact]
@@ -238,8 +256,14 @@ public sealed class BetweenRunsHudTests : IDisposable
         const float h = 720f;
         var campaign = CampaignRuns.Campaign();
         CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
-        float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch)
-            + 20f;   // and room for the lock rule, the longest the shipped list gets
+        var rows = BetweenRunsHud.ListRows(campaign.Listings(), 0, unmixed: ContentBounds.MostCount);
+        float listHeight = rows.Sum(row => row.Pitch)
+            + 20f;   // and room for the lock rule: with the alchemist's note on units unmixed (Phase 6b.4), the longest the shipped list gets
+
+        // The note is the list's last row, and one line across the window at its widest.
+        var note = rows[^1];
+        Assert.Equal((BetweenRunsHud.UnmixedNote(ContentBounds.MostCount), DungeonHud.Orange), (note.Text, note.Color));
+        Assert.True(note.Text.Length * 6f * note.Scale <= BetweenRunsHud.FullWidth, $"'{note.Text}' is past the window");
 
         var ordinary = BetweenRunsHud.Layout(h, summaryLines: 7, listHeight);
         Assert.Equal(7, ordinary.SummaryRows);
@@ -317,7 +341,8 @@ public sealed class BetweenRunsHudTests : IDisposable
             var campaign = CampaignRuns.Campaign();
             if (cleared)
                 CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
-            float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch) + 20f;   // and room for the lock rule
+            float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0, unmixed: cleared ? ContentBounds.MostCount : 0).Sum(row => row.Pitch)
+                + 20f;   // and room for the lock rule — and, past the tutorial, the alchemist's note on units unmixed (Phase 6b.4)
 
             foreach (int summaryLines in new[] { 0, 7, 40 })
             {
@@ -470,7 +495,7 @@ public sealed class BetweenRunsHudTests : IDisposable
     }
 
     /// <summary>Every member's slots, as they stand: what a carry must leave alone.</summary>
-    private static Weapon?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
+    private static IItem?[][] Bags(CampaignState campaign) => campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
 
     /// <summary>The chosen row's text on the page.</summary>
     private static string ChosenText(BetweenRunsScene scene) => scene.Weapons.ChosenRow.Text;
@@ -490,16 +515,22 @@ public sealed class BetweenRunsHudTests : IDisposable
     [Fact]
     public void TabSwitchesPages_AndTheMenuTakesEveryKey()
     {
-        // §6.2, Phase 6a.2: the screen between runs has two pages, and TAB goes from
-        // one to the other — DUNGEONS, where every showing opens, and WEAPONS. The
-        // title, the notices and the menu are the same on both; the keys line is the
-        // page's.
+        // §6.2, Phase 6a.2, and §6.6, Phase 6b.4: the screen between runs has three
+        // pages, and TAB goes from each to the next and round — DUNGEONS, where every
+        // showing opens, WEAPONS, and ALCHEMIST. The title, the notices and the menu
+        // are the same on all three; the keys line is the page's — the ALCHEMIST
+        // page's, before the alchemist arrives, TAB and ESC alone.
         var (scene, host) = Hub();
-        Assert.Equal((BetweenRunsScene.HubMode.Dungeons, false), (scene.Mode, scene.OnWeapons));
+        Assert.Equal((BetweenRunsScene.HubMode.Dungeons, BetweenRunsScene.HubPage.Dungeons, false), (scene.Mode, scene.Page, scene.OnWeapons));
         Assert.Equal(BetweenRunsHud.KeysLine, BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
         scene.OnKey(Keys.Tab);
-        Assert.Equal((BetweenRunsScene.HubMode.Weapons, true), (scene.Mode, scene.OnWeapons));
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        Assert.Equal((BetweenRunsScene.HubMode.Weapons, BetweenRunsScene.HubPage.Weapons, true), (scene.Mode, scene.Page, scene.OnWeapons));
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB ALCHEMIST - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle).Text);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((BetweenRunsScene.HubMode.Alchemist, BetweenRunsScene.HubPage.Alchemist, false), (scene.Mode, scene.Page, scene.OnWeapons));
+        Assert.Equal("TAB DUNGEONS - ESC MENU", BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle, alchemistOpen: scene.Alchemist.Open).Text);
+        Assert.Equal("W/S OR ARROWS CHOOSE - A/D OR ARROWS QUALITY - H MIXES HEALTH - M MIXES MANA - T POURS BACK - TAB DUNGEONS - ESC MENU",
+            BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Alchemist).Text);
         scene.OnKey(Keys.Tab);
         Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
         scene.OnKey(Keys.Tab);
@@ -531,7 +562,8 @@ public sealed class BetweenRunsHudTests : IDisposable
         // key — ESC always to the game, which asks HandleEscape — and then what the
         // screen does with it, walked.
         var modes = Enum.GetValues<BetweenRunsScene.HubMode>();
-        Keys[] keys = [Keys.Tab, Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.D, Keys.T, Keys.N, Keys.Space];
+        Keys[] keys = [Keys.Tab, Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.Left, Keys.Right, Keys.D1, Keys.D2, Keys.D3, Keys.A, Keys.D, Keys.H, Keys.M, Keys.T,
+            Keys.N, Keys.Space];
         foreach (var mode in modes)
         {
             Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(mode, Keys.Escape));
@@ -545,6 +577,7 @@ public sealed class BetweenRunsHudTests : IDisposable
                     BetweenRunsScene.HubMode.Carrying => BetweenRunsScene.KeyRoute.Carrying,   // TAB is the carry's, and does nothing
                     BetweenRunsScene.HubMode.Deposit => BetweenRunsScene.KeyRoute.Panel,       // TAB, D and T are the panel's, and do nothing
                     BetweenRunsScene.HubMode.Ask => BetweenRunsScene.KeyRoute.Ask,             // and the ask's
+                    BetweenRunsScene.HubMode.Alchemist => key == Keys.Tab ? BetweenRunsScene.KeyRoute.Page : BetweenRunsScene.KeyRoute.Alchemist,   // D is the quality's there
                     _ => throw new InvalidOperationException($"{mode} is a mode the table does not have: add its row"),
                 };
                 Assert.True(expected == BetweenRunsScene.Route(mode, key), $"{mode}, {key}: routed to {BetweenRunsScene.Route(mode, key)}, not {expected}");
@@ -552,9 +585,10 @@ public sealed class BetweenRunsHudTests : IDisposable
         }
 
         // DUNGEONS: W/S choose, ENTER descends, TAB turns the page, and every other
-        // key is inert — D and T are WEAPONS' keys, and here they say nothing.
+        // key is inert — D and T are WEAPONS' keys, A, H and M the ALCHEMIST's, and
+        // here they say nothing.
         var (scene, host) = Hub();
-        foreach (var key in new[] { Keys.D, Keys.T, Keys.D1, Keys.N, Keys.Space })
+        foreach (var key in new[] { Keys.D, Keys.T, Keys.A, Keys.H, Keys.M, Keys.Left, Keys.Right, Keys.D1, Keys.N, Keys.Space })
             scene.OnKey(key);
         Assert.Equal((BetweenRunsScene.HubMode.Dungeons, 0, (string?)null), (scene.Mode, scene.Chosen, scene.Refusal));
 
@@ -592,6 +626,31 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(BetweenRunsScene.HubMode.Menu, scene.Mode);
         Assert.True(scene.HandleEscape());
         Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+
+        // ALCHEMIST (Phase 6b.4), the alchemist not arrived on a new campaign: every
+        // key but TAB and ESC is inert there — W/S, A/D, the arrows, T, ENTER, the
+        // digits — and H and M say when he arrives, over the keys, mixing nothing. ESC
+        // opens the menu over it, and closed, ALCHEMIST is back; TAB turns to DUNGEONS.
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((BetweenRunsScene.HubMode.Alchemist, BetweenRunsScene.HubPage.Alchemist), (scene.Mode, scene.Page));
+        foreach (var key in new[] { Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.A, Keys.D, Keys.Left, Keys.Right, Keys.T, Keys.Enter, Keys.D1, Keys.N, Keys.Space })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Alchemist, (string?)null, 1), (scene.Mode, scene.Refusal, scene.Alchemist.Quality));
+        scene.OnKey(Keys.H);
+        Assert.Equal("THE ALCHEMIST ARRIVES WITH THE FIRST CLEAR BEYOND THE TUTORIAL", scene.Refusal);
+        scene.OnKey(Keys.N);
+        Assert.Null(scene.Refusal);
+        scene.OnKey(Keys.M);
+        Assert.Equal(Alchemist.NotYet(Dungeons.Tutorial), scene.Refusal);
+        Assert.All(scene.Alchemist.Rows(), row => Assert.Equal(AlchemistPage.RowKind.Member, row.Kind));   // no potion in any bag
+        Assert.True(scene.HandleEscape());
+        Assert.Equal((BetweenRunsScene.HubMode.Menu, BetweenRunsScene.HubPage.Alchemist, (string?)null), (scene.Mode, scene.Page, scene.Refusal));
+        foreach (var key in new[] { Keys.Tab, Keys.H, Keys.M, Keys.A, Keys.D, Keys.T, Keys.W, Keys.S })
+            scene.OnKey(key);
+        Assert.Equal((BetweenRunsScene.HubMode.Menu, BetweenRunsScene.HubPage.Alchemist, (string?)null), (scene.Mode, scene.Page, scene.Refusal));
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(BetweenRunsScene.HubMode.Alchemist, scene.Mode);
+
         scene.OnKey(Keys.Tab);
         Assert.True(scene.HandleEscape());
         Assert.Equal((BetweenRunsScene.HubMode.Menu, false), (scene.Mode, scene.OnWeapons));
@@ -649,7 +708,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         // back; carrying, neither is named, and neither does anything. While the
         // deposit panel or the take-back ask is up, its keys stand in the hub's
         // place, as the menu's do.
-        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU", BetweenRunsHud.WeaponsKeysLine);
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB ALCHEMIST - ESC MENU", BetweenRunsHud.WeaponsKeysLine);
         Assert.Equal((BetweenRunsHud.WeaponsKeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Weapons));
         var sword = TestWeapons.Get("arming_sword");
         Assert.DoesNotContain(" D ", BetweenRunsHud.BottomLine(BetweenRunsScene.HubMode.Carrying, carried: sword).Text, StringComparison.Ordinal);
@@ -737,7 +796,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             b.Inventory[slot] = TestWeapons.Get("darts");
         var a = campaign.Party[0];
         var def = GameContent.Current.Weapons["weakspot_stiletto"];
-        var full = new Weapon(def, a.Inventory[0]!.Forged, a.Inventory[0]!.Modifiers, [], 0, wear: 30);
+        var full = new Weapon(def, a.WeaponIn(0)!.Forged, a.WeaponIn(0)!.Modifiers, [], 0, wear: 30);
         a.Inventory[0] = null;
         a.Inventory[2] = full;
         var rows = HubWeapons.Rows(campaign);
@@ -835,6 +894,55 @@ public sealed class BetweenRunsHudTests : IDisposable
         // A readout's entries wrap to the column, never split, the rest indented.
         Assert.Equal(new[] { "* AAAA  BBBB", "  CCCC  DD" }, BetweenRunsHud.Listed("* ", "AAAA  BBBB  CCCC  DD", 12));
         Assert.Empty(BetweenRunsHud.Listed("* ", "", 12));
+    }
+
+    [Fact]
+    public void TheWeaponsPageListsAPotionAsARowItNeverChooses()
+    {
+        // Phase 6b.1: a potion in a bag is a row of the page under its member, in
+        // its slot's order — grey, read and never chosen, never put down on (PHASE
+        // 6b DECISION 1) — and the bag's room counts its empty slots alone. It says
+        // nothing on the right, since it is never the choice.
+        var campaign = CampaignState.Start(GameContent.Current);
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        var (scene, host) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        var rows = scene.Weapons.Rows();
+        var texts = rows.Select(row => row.Text).ToList();
+        int at = texts.IndexOf("  BAG   HEALTH POTION Q2");
+        Assert.Equal(["  BAG   STAFF OF RENEWAL - WEAR 0/30", "  BAG   HEALTH POTION Q2", "  BAG   MANA POTION Q1", HubWeapons.BagRoom(2), "[B]"],
+            texts.Skip(at - 1).Take(5));
+        Assert.All(HubWeapons.Runs(rows[at]), run => Assert.Equal(DungeonHud.Grey, run.Color));
+        Assert.Empty(BetweenRunsHud.DetailRows(rows[at]));
+
+        // W/S stop on every weapon and room, round the page, and never on a potion.
+        int choosable = rows.Count(row => row.Choosable);
+        for (int step = 0; step < 2 * choosable; step++)
+        {
+            scene.OnKey(Keys.S);
+            Assert.True(scene.Weapons.ChosenRow.Choosable, $"the choice stopped on '{ChosenText(scene)}'");
+        }
+
+        // Carrying A's staff, every stop is a place to put it down — never a potion's
+        // slot — and ESC puts it back with nothing moved and nothing saved.
+        ChooseRow(scene, "  BAG   STAFF OF RENEWAL - WEAR 0/30");
+        var bags = Bags(campaign);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
+        for (int step = 0; step < 2 * rows.Count; step++)
+        {
+            scene.OnKey(Keys.W);
+            Assert.True(scene.Weapons.ChosenRow.Target, $"carrying, the choice stopped on '{ChosenText(scene)}'");
+        }
+        Assert.True(scene.HandleEscape());
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(0, host.HubSavesAsked);
+
+        // The widest potion row the save may load fits its column, in the HUD's font.
+        var widest = new HubWeapons.Row(HubWeapons.RowKind.Potion, HubWeapons.BagLabel, new WeaponPlace("A", GameConstants.MaxInventorySlots - 1),
+            Potion: TestPotions.Health(ContentBounds.MostCount));
+        Assert.True(widest.Text.Length * 6f * BetweenRunsHud.WeaponRowScale <= BetweenRunsHud.ColumnWidth, $"'{widest.Text}' is past the column");
+        Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]*$", widest.Text);
     }
 
     [Fact]
@@ -960,7 +1068,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.S);
         Assert.Equal("  BAG   STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
-        var staff = campaign.Party[0].Inventory[1]!;
+        var staff = campaign.Party[0].WeaponIn(1)!;
         scene.OnKey(Keys.Enter);
         Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
         Assert.Equal((new WeaponPlace("A", 1), staff), scene.Weapons.Carried);
@@ -1144,6 +1252,313 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(NoticeText.Rows([resumed, data], 1), handed.NoticeRows);
     }
 
+    // ── The alchemist (§6.6, Phase 6b.4) ────────────────────────────────────
+
+    /// <summary>The farm's rate these tests' batches are made at: their own input, never the master's.</summary>
+    private static Tuning Farming(Tuning t) => t with { FarmYieldPerClear = 7, HealthPotionPercent = 20, ManaPotionPercent = 20, PotionUseCost = 40 };
+
+    /// <summary>Step the ALCHEMIST page's choice down until its row reads <paramref name="text"/>, failing if a lap never meets it.</summary>
+    private static void ChooseAlchemistRow(BetweenRunsScene scene, string text)
+    {
+        for (int step = 0; step <= scene.Alchemist.Rows().Count; step++)
+        {
+            if (scene.Alchemist.ChosenRow?.Text == text)
+                return;
+            scene.OnKey(Keys.S);
+        }
+        Assert.Fail($"No row of the ALCHEMIST page reads '{text}'");
+    }
+
+    /// <summary>The log's lines, newest last.</summary>
+    private static IEnumerable<string> Logged() => GameEngine.Core.Diagnostics.Log.RecentEntries.Select(entry => entry.Message);
+
+    [Fact]
+    public void AMixAndAPourBackAskTheHostForASave()
+    {
+        // PHASE 6a DECISION 10, grown (Phase 6b.4): a mix and a pour-back each change
+        // the campaign — a potion into a bag, or out of one — and each asks the host
+        // for a save; a key that changes nothing — the quality, the choice, T on a
+        // member — asks nothing. Each is logged at the edge, and so is the run's split
+        // on the descent.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        var (scene, host) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((BetweenRunsScene.HubMode.Alchemist, true), (scene.Mode, scene.Alchemist.Open));
+        Assert.Equal(BetweenRunsHud.AlchemistKeysLine, BetweenRunsHud.BottomLine(scene.Mode, scene.HasTitle, alchemistOpen: scene.Alchemist.Open).Text);
+
+        // D and the right arrow: quality 3; H mixes a health potion at it into A's bag.
+        scene.OnKey(Keys.D);
+        scene.OnKey(Keys.Right);
+        Assert.Equal((3, 0), (scene.Alchemist.Quality, host.HubSavesAsked));
+        scene.OnKey(Keys.H);
+        Assert.Equal((TestPotions.Health(3), 1), (campaign.Party[0].PotionIn(2), host.HubSavesAsked));
+        Assert.Contains("[Alchemist] Mixed a Health potion, quality 3, into A's bag slot 3: 4 of 7 units left", Logged());
+
+        // [B]; A and the left arrow down to 1, D back up to 2; M: a mana potion in B's bag.
+        ChooseAlchemistRow(scene, "[B] - 4 BAG SLOTS FREE");
+        scene.OnKey(Keys.A);
+        scene.OnKey(Keys.Left);
+        scene.OnKey(Keys.D);
+        Assert.Equal((2, 1), (scene.Alchemist.Quality, host.HubSavesAsked));
+        scene.OnKey(Keys.M);
+        Assert.Equal((TestPotions.Mana(2), 2, 2), (campaign.Party[1].PotionIn(2), host.HubSavesAsked, Farm.Batch(campaign)));
+
+        // T on a member does nothing; on A's potion it pours it back: asked again.
+        scene.OnKey(Keys.T);
+        Assert.Equal(2, host.HubSavesAsked);
+        ChooseAlchemistRow(scene, "  BAG 3  HEALTH POTION Q3");
+        scene.OnKey(Keys.T);
+        Assert.Equal((3, 5, (Potion?)null), (host.HubSavesAsked, Farm.Batch(campaign), campaign.Party[0].PotionIn(2)));
+        Assert.Equal("[A] - 4 BAG SLOTS FREE", scene.Alchemist.ChosenRow!.Text);
+        Assert.Contains("[Alchemist] Poured back A's Health potion, quality 3, from bag slot 3: 5 of 7 units left", Logged());
+
+        // ENTER, a digit, W/S, N and the space bar change nothing and ask nothing.
+        foreach (var key in new[] { Keys.Enter, Keys.D1, Keys.W, Keys.S, Keys.N, Keys.Space })
+            scene.OnKey(key);
+        Assert.Equal(3, host.HubSavesAsked);
+
+        // The descent says the run's split, and what spoils unmixed, before it enters.
+        // The host enters there and then, as the game's does, and the entry leaves the
+        // batch at 0: said after it, the line would read 0 of 7 units unmixed.
+        host.Entering = id => campaign.Enter(id, CampaignRuns.GoldenSeed);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(BetweenRunsScene.HubMode.Dungeons, scene.Mode);
+        scene.OnKey(Keys.Enter);
+        Assert.Single(host.Descended);
+        Assert.Equal((true, 0), (campaign.Visit is not null, Farm.Batch(campaign)));
+        Assert.Contains("[Alchemist] Descending with 0 health potions (0 units) and 1 mana potion (2 units); 5 of 7 units unmixed, spoiled", Logged());
+        Assert.Equal(3, host.HubSavesAsked);
+        Assert.Null(BetweenRunsScene.DescentLine(CampaignState.Start(GameContent.Current)));   // nothing before the alchemist
+        Assert.Equal("[Alchemist] Mixed a Mana potion, quality 1, into C's bag slot 4: 1 of 1 unit left",
+            BetweenRunsScene.MixedLine(new Mixed(TestPotions.Mana(1), "C", 3, 1), 1));
+    }
+
+    [Fact]
+    public void TheLogSaysWhyThereIsNoBatch()
+    {
+        // The hub's opening line and the descent's split say the batch once the
+        // alchemist has arrived — 7 of 7 units, and 0 of 7 with all of it mixed, a
+        // batch that came — and with nothing yielded, why there is none, in the page's
+        // words in the log's case (Alchemist.NoBatch), as the farm's own log has a zero
+        // form ("[Farm] The run did not count: no batch"): never "0 of 0 units", which
+        // the 6b.4 build logged after every run that did not count (its review).
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        Assert.Equal(" - the batch holds 7 of 7 units", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal("[Alchemist] Descending with 0 health potions (0 units) and 0 mana potions (0 units); 7 of 7 units unmixed, spoiled",
+            BetweenRunsScene.DescentLine(campaign));
+        Alchemist.Mix(campaign, "A", PotionType.Health, 7);
+        Assert.Equal(" - the batch holds 0 of 7 units", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal("[Alchemist] Descending with 1 health potion (7 units) and 0 mana potions (0 units); 0 of 7 units unmixed, spoiled",
+            BetweenRunsScene.DescentLine(campaign));
+
+        // A run that did not count — its end spoiled the potion — and a farm at a rate of 0.
+        const string Carrying = "[Alchemist] Descending with 0 health potions (0 units) and 0 mana potions (0 units); ";
+        CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        Assert.Equal(Alchemist.NoBatchNotCounted, AlchemistPage.BatchLine(campaign));
+        Assert.Equal(" - no batch: the last run did not count", BetweenRunsScene.BatchClause(campaign));
+        Assert.Equal(Carrying + "no batch: the last run did not count", BetweenRunsScene.DescentLine(campaign));
+        using (TestContent.UsePremise(tuning: t => Farming(t) with { FarmYieldPerClear = 0 }))
+        {
+            CampaignRuns.DeepRetreat(campaign, "long_gallery");
+            Assert.Equal(Alchemist.NoBatchFarmIdle, AlchemistPage.BatchLine(campaign));
+            Assert.Equal(" - no batch: the farm yields nothing", BetweenRunsScene.BatchClause(campaign));
+            Assert.Equal(Carrying + "no batch: the farm yields nothing", BetweenRunsScene.DescentLine(campaign));
+        }
+
+        // A Phase 6a save, lifted: its last run counted, before the farm yielded anything.
+        var lifted = SaveGame.Restore(SaveCodec.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "phase-6a-between-runs.json"))),
+            GameContent.Current).Campaign;
+        Assert.Equal(Alchemist.NoBatchYet, AlchemistPage.BatchLine(lifted));
+        Assert.Equal(" - no batch yet: the next run that counts brings one", BetweenRunsScene.BatchClause(lifted));
+        Assert.Equal(Carrying + "no batch yet: the next run that counts brings one", BetweenRunsScene.DescentLine(lifted));
+
+        // Before the alchemist, neither says anything of a batch.
+        var start = CampaignState.Start(GameContent.Current);
+        Assert.Equal(("", (string?)null), (BetweenRunsScene.BatchClause(start), BetweenRunsScene.DescentLine(start)));
+    }
+
+    [Fact]
+    public void TheDungeonsPageWarnsOfUnmixedUnits()
+    {
+        // §6.6: "what you do not pick up is gone". While the alchemist holds units
+        // unmixed, DUNGEONS — where the descent is chosen — ends its list saying they
+        // spoil on it, in orange; with every unit mixed, or before he arrives, it says
+        // nothing.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        var (scene, _) = Hub(campaign);
+        Assert.Equal(7, scene.Unmixed);
+        var rows = BetweenRunsHud.ListRows(scene.Listings, scene.Chosen, scene.Unmixed);
+        Assert.Equal(("THE ALCHEMIST HOLDS 7 UNMIXED UNITS - THEY SPOIL WHEN YOU DESCEND", DungeonHud.Orange), (rows[^1].Text, rows[^1].Color));
+        Assert.Equal(Texts(BetweenRunsHud.ListRows(scene.Listings, scene.Chosen)), Texts(rows.Take(rows.Count - 1)));
+
+        Alchemist.Mix(campaign, "A", PotionType.Health, 6);
+        Assert.Equal(1, scene.Unmixed);
+        Assert.Equal("THE ALCHEMIST HOLDS 1 UNMIXED UNIT - IT SPOILS WHEN YOU DESCEND", BetweenRunsHud.ListRows(scene.Listings, scene.Chosen, scene.Unmixed)[^1].Text);
+        Alchemist.Mix(campaign, "B", PotionType.Mana, 1);
+        Assert.Equal(0, scene.Unmixed);
+        Assert.Equal(Texts(BetweenRunsHud.ListRows(scene.Listings, scene.Chosen)), Texts(BetweenRunsHud.ListRows(scene.Listings, scene.Chosen, scene.Unmixed)));
+        Assert.DoesNotContain(Texts(BetweenRunsHud.ListRows(scene.Listings, scene.Chosen, scene.Unmixed)), row => row.Contains("UNMIXED", StringComparison.Ordinal));
+
+        // Before the alchemist, no batch and nothing said.
+        var (before, _) = Hub(CampaignState.Start(GameContent.Current));
+        Assert.Equal(0, before.Unmixed);
+    }
+
+    [Fact]
+    public void ARefusedMixIsSaidOverTheKeys_AndMixesNothing()
+    {
+        // A mix the alchemist refuses is said in the refusal row over the keys, in
+        // orange, until the next key, and logged — the batch spent, a bag with no room,
+        // no batch at all — and nothing is mixed or saved.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        var (scene, host) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        for (int i = 0; i < 4; i++)
+            scene.OnKey(Keys.H);
+        Assert.Equal((4, 3), (host.HubSavesAsked, Farm.Batch(campaign)));
+        var bags = Bags(campaign);
+
+        scene.OnKey(Keys.H);
+        Assert.Equal("[A] HAS NO ROOM IN THE BAG - THE HAND KEEPS A WEAPON", scene.Refusal);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(4, host.HubSavesAsked);
+        Assert.Contains("[Alchemist] Refused: [A] HAS NO ROOM IN THE BAG - THE HAND KEEPS A WEAPON", Logged());
+        scene.OnKey(Keys.S);
+        Assert.Null(scene.Refusal);   // until the next key
+
+        // The rest of the batch into B, and then M on it: spent.
+        ChooseAlchemistRow(scene, "[B] - 4 BAG SLOTS FREE");
+        scene.OnKey(Keys.D);
+        scene.OnKey(Keys.D);
+        scene.OnKey(Keys.H);
+        Assert.Equal((5, 0), (host.HubSavesAsked, Farm.Batch(campaign)));
+        bags = Bags(campaign);
+        scene.OnKey(Keys.M);
+        Assert.Equal(Alchemist.Spent, scene.Refusal);
+        Assert.Equal(bags, Bags(campaign));
+        Assert.Equal(5, host.HubSavesAsked);
+
+        // A run that did not count: no batch, and the page and H say why.
+        CampaignRuns.ShallowRetreat(campaign, "long_gallery");
+        var (idle, asked) = Hub(campaign);
+        idle.OnKey(Keys.Tab);
+        idle.OnKey(Keys.Tab);
+        idle.OnKey(Keys.H);
+        Assert.Equal(("NO BATCH - THE LAST RUN DID NOT COUNT", 0), (idle.Refusal, asked.HubSavesAsked));
+        Assert.All(campaign.Party, member => Assert.Empty(member.Potions));
+    }
+
+    [Fact]
+    public void TheWeaponsChoiceStaysOnItsWeapon_AcrossAMix()
+    {
+        // The scene holds one WEAPONS page for the whole showing, its choice an index
+        // into the rows as they stand. A mix on ALCHEMIST adds a potion row under a
+        // member — and the one that fills a bag takes its room row away — and a
+        // pour-back takes one, so every row below would move: after TAB round, the
+        // choice would sit on another weapon, which ENTER, D or T would then act on.
+        // So the choice is kept on what it was on (HubWeapons.Keep): the same weapon;
+        // the same room — a bag's, the stable's end, an empty hand; and with that room
+        // gone, the same member's nearest row over it, never another member's.
+        using var farm = TestContent.UsePremise(tuning: Farming);
+        var campaign = AlchemistTests.Arrived();
+        var (scene, _) = Hub(campaign);
+        scene.OnKey(Keys.Tab);
+        ChooseRow(scene, "  HAND  TOWER GUARD - WEAR 0/30");
+        int was = scene.Weapons.Chosen;
+
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(BetweenRunsScene.HubMode.Alchemist, scene.Mode);
+        for (int i = 0; i < 4; i++)
+            scene.OnKey(Keys.H);   // A's bag filled, its room gone: four rows added over B's hand, one taken
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
+        Assert.Equal("  HAND  TOWER GUARD - WEAR 0/30", ChosenText(scene));
+        Assert.Equal(was + 3, scene.Weapons.Chosen);
+
+        // A pour-back from the full bag takes a potion row away over it and brings
+        // A's room row back: as many rows over B's hand as before. The next, from a
+        // bag with room, takes one away: B's hand is a row higher, and still chosen.
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "  BAG 3  HEALTH POTION Q1");
+        scene.OnKey(Keys.T);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "  BAG 4  HEALTH POTION Q1");
+        scene.OnKey(Keys.T);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(5, Farm.Batch(campaign));
+
+        // On A's room, which a mix moves to its next empty slot: the choice with it.
+        ChooseRow(scene, HubWeapons.BagRoom(2));
+        Assert.Equal(new WeaponPlace("A", 2), scene.Weapons.ChosenRow.Place);
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "[A] - 2 BAG SLOTS FREE");
+        scene.OnKey(Keys.H);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.BagRoom(1), new WeaponPlace("A", 3)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
+
+        // On the stable's end: a mix into C adds a row over it, and the choice moves down with it.
+        ChooseRow(scene, HubWeapons.StableRoom);
+        int stableAt = scene.Weapons.Chosen;
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "[C] - 4 BAG SLOTS FREE");
+        scene.OnKey(Keys.H);
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.StableRoom, stableAt + 1, WeaponPlace.InTheStable(0)), (ChosenText(scene), scene.Weapons.Chosen, scene.Weapons.ChosenRow.Place));
+
+        // On C's room, the mixes that fill C's bag take it away: the choice goes to
+        // the nearest row over it that is still C's — the staff in its bag — never
+        // to the first row on the page, A's hand, a page away.
+        ChooseRow(scene, HubWeapons.BagRoom(3));
+        Assert.Equal(new WeaponPlace("C", 3), scene.Weapons.ChosenRow.Place);
+        scene.OnKey(Keys.Tab);
+        ChooseAlchemistRow(scene, "[C] - 3 BAG SLOTS FREE");
+        for (int i = 0; i < 3; i++)
+            scene.OnKey(Keys.H);
+        Assert.Equal((0, "[C] - THE BAG IS FULL"), (Farm.Batch(campaign), scene.Alchemist.ChosenRow!.Text));
+        scene.OnKey(Keys.Tab);
+        scene.OnKey(Keys.Tab);
+        Assert.Equal(("  BAG   STAFF OF RENEWAL - WEAR 0/30", new WeaponPlace("C", 1)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
+
+        // An empty hand is a room of its own (TheWeaponsPageListsEveryMemberAndTheStable):
+        // B's, its staff still in the bag. On it, a mix into A moves it down a row and
+        // the choice with it; on B's bag room, a mix into B moves that room, and the
+        // choice with it — never onto the hand, B's other room.
+        var bare = AlchemistTests.Arrived();
+        bare.Party[1].Inventory[0] = null;
+        var (other, _) = Hub(bare);
+        other.OnKey(Keys.Tab);
+        ChooseRow(other, HubWeapons.EmptyHand);
+        int handAt = other.Weapons.Chosen;
+        other.OnKey(Keys.Tab);
+        ChooseAlchemistRow(other, "[A] - 4 BAG SLOTS FREE");
+        other.OnKey(Keys.H);
+        other.OnKey(Keys.Tab);
+        other.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.EmptyHand, handAt + 1, new WeaponPlace("B", 0)), (ChosenText(other), other.Weapons.Chosen, other.Weapons.ChosenRow.Place));
+        ChooseRow(other, HubWeapons.BagRoom(4));
+        Assert.Equal(new WeaponPlace("B", 2), other.Weapons.ChosenRow.Place);
+        other.OnKey(Keys.Tab);
+        ChooseAlchemistRow(other, "[B] - 4 BAG SLOTS FREE");
+        other.OnKey(Keys.H);
+        other.OnKey(Keys.Tab);
+        other.OnKey(Keys.Tab);
+        Assert.Equal((HubWeapons.BagRoom(3), new WeaponPlace("B", 3)), (ChosenText(other), other.Weapons.ChosenRow.Place));
+    }
+
     // ── The enchanter (§6.2, §6.3; Phase 6a.3a) ─────────────────────────────
 
     [Fact]
@@ -1185,7 +1600,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         {
             Assert.False(campaign.IsRetired(GameContent.Current.Dungeons.Tutorial.Id));
             Assert.Equal(rows.TakeLast(4).Select(row => row.Text), HubWeapons.Rows(campaign).TakeLast(4).Select(row => row.Text));
-            Assert.Equal(Enchanter.Closed(GameContent.Current.Dungeons.Tutorial), Enchanter.Refusal(campaign, campaign.Party[0].Inventory[0]!, Service.Refine));
+            Assert.Equal(Enchanter.Closed(GameContent.Current.Dungeons.Tutorial), Enchanter.Refusal(campaign, campaign.Party[0].WeaponIn(0)!, Service.Refine));
         }
 
         // Drawn: a worked row cyan, a stalled one yellow, a unique's name orange;
@@ -1367,6 +1782,97 @@ public sealed class BetweenRunsHudTests : IDisposable
         // named by its id, never a throw while the screen draws.
         var gone = back with { Services = [new ServiceReport("gone_weapon", Service.Enchant, 1, 1, EnchantmentId: "gone_soul")] };
         Assert.Contains("GONE_WEAPON IS BACK FROM THE ENCHANTER - ATTACHED GONE_SOUL - NO CHANGE", Texts(BetweenRunsHud.SummaryLines(gone)));
+    }
+
+    [Fact]
+    public void TheSummarySaysWhatTheFarmYielded()
+    {
+        // §6.6, Phase 6b.3: once the farm has a worker, the run's summary says what it
+        // yielded, a line of its own right after whether the run counted — before the
+        // enchanter's lines, so the hub's cut of a long summary takes theirs first.
+        // The first real clear brings the alchemist; a later first clear grows the
+        // farm; any other run that counted says what it yielded and at how many
+        // dungeons; one that did not count yields nothing and says why — and each has
+        // its zero form, a rate of 0 yielding nothing. Before the alchemist, no line.
+        // At the farm's rate stated here. The count is the farm's workers, the
+        // dungeons beaten besides the tutorial, so it never reads as every dungeon
+        // beaten: the line that grows the farm says which count, and the rest that
+        // that many work it (the audit of Phase 6b, after four clears read as three).
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = CampaignRuns.Campaign();
+        Assert.Null(BetweenRunsHud.FarmLine(CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed)));
+        Assert.Null(BetweenRunsHud.FarmLine(CampaignRuns.DeepRetreat(campaign, "spear_hall")));
+
+        var arrival = CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        var grows = CampaignRuns.Clear(campaign, "long_gallery", CampaignRuns.FiveDeep);
+        var mercy = CampaignRuns.DeepRetreat(campaign, "knife_warrens");
+        var idle = CampaignRuns.ShallowRetreat(campaign, "knife_warrens");
+        (RunResult Result, string Text, Vector4 Color)[] forms =
+        [
+            (arrival, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7 UNITS", DungeonHud.Green),
+            (arrival with { FarmYield = 0 }, "A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED NOTHING", DungeonHud.Green),
+            (grows, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 14 UNITS", DungeonHud.Green),
+            (grows with { FarmYield = 0 }, "A FIRST CLEAR - THE FARM GROWS TO 2 DUNGEONS BEYOND THE TUTORIAL - IT YIELDED NOTHING", DungeonHud.Green),
+            (mercy, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT", DungeonHud.Cyan),
+            (mercy with { FarmYield = 1, FarmClears = 1 }, "THE FARM YIELDED 1 UNIT - 1 DUNGEON WORKS IT", DungeonHud.Cyan),
+            (mercy with { FarmYield = 0 }, "THE FARM YIELDED NOTHING", DungeonHud.Grey),
+            (idle, "THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey),
+        ];
+        foreach (var (result, text, color) in forms)
+        {
+            Assert.Equal(new DungeonHud.Run(text, color), BetweenRunsHud.FarmLine(result));
+            var lines = BetweenRunsHud.SummaryLines(result);
+            int counted = Array.FindIndex(Texts(lines), line => line.StartsWith("RUN COUNTED", StringComparison.Ordinal) || line.StartsWith("RUN NOT COUNTED", StringComparison.Ordinal));
+            Assert.Equal(text, lines[counted + 1].Text);
+            Assert.Equal(lines, BetweenRunsHud.HubSummaryLines(result));
+        }
+
+        // The tutorial's own first clear retires it, and is no worker: on a farm that
+        // has one, its run says what the farm yielded as any counted run does.
+        Assert.Equal(new DungeonHud.Run("THE FARM YIELDED 7 UNITS - 1 DUNGEON WORKS IT", DungeonHud.Cyan),
+            BetweenRunsHud.FarmLine(arrival with { DungeonId = "tutorial", Retired = true, LockedUntilRun = null }));
+
+        // Before the enchanter's lines: a run that worked a deposit says the farm first.
+        var worked = mercy with { Services = [new ServiceReport("tower_guard", Service.Refine, 1, 2)] };
+        var told = Texts(BetweenRunsHud.SummaryLines(worked));
+        Assert.Equal(Array.IndexOf(told, "THE FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT") + 1,
+            Array.FindIndex(told, line => line.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
+
+        // Each in the font, and a summary line at its widest numbers.
+        foreach (var result in new[] { arrival, grows, mercy, idle }.Select(r => r with { FarmYield = ContentBounds.MostCount, FarmClears = r.FarmClears == 1 ? 1 : 99 }))
+        {
+            string widest = BetweenRunsHud.FarmLine(result)!.Value.Text;
+            Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", widest);
+            Assert.True(widest.Length * 6f * 2f <= 1240f, $"'{widest}' runs off the window");
+        }
+    }
+
+    [Fact]
+    public void TheSummarySaysWhatSpoiled()
+    {
+        // §6.6, Phase 6b.3: "a mixed potion keeps exactly as long as the trip it was
+        // mixed for", so a run's summary says how many spoiled, in yellow, right after
+        // the spoils — on the way out and on a wipe alike — and nothing when none was
+        // carried.
+        using var farm = TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 });
+        var campaign = CampaignRuns.Campaign();
+        CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+        CampaignRuns.Clear(campaign, "spear_hall", CampaignRuns.FiveDeep);
+        TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)), (3, TestPotions.Mana(1)));
+        var walked = BetweenRunsHud.SummaryLines(CampaignRuns.ShallowRetreat(campaign, "long_gallery"));
+        Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP", "XP KEPT" },
+            Texts(walked).Skip(3).Take(3));
+        Assert.Equal(DungeonHud.Yellow, walked[4].Color);
+
+        CampaignRuns.DeepRetreat(campaign, "long_gallery");
+        TestPotions.Carrying(campaign, "C", (4, TestPotions.Health(1)));
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var wiped = BetweenRunsHud.SummaryLines(CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)));
+        Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "1 POTION SPOILED - A POTION KEEPS FOR ONE TRIP" }, Texts(wiped).Skip(3).Take(2));
+        Assert.Equal(DungeonHud.Yellow, wiped[4].Color);
+
+        Assert.DoesNotContain(Texts(BetweenRunsHud.SummaryLines(CampaignRuns.ShallowRetreat(campaign, "long_gallery"))), line => line.Contains("SPOILED", StringComparison.Ordinal));
+        Assert.Equal("24 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP", BetweenRunsHud.SpoiledLine(24));
     }
 
     [Fact]

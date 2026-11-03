@@ -672,7 +672,7 @@ public sealed class DepositPanelTests : IDisposable
 
         // A soul that would never fire on the weapon is chosen all the same, noted.
         Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [A] - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
-            DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("A", 1), campaign.Party[0].Inventory[1], 0, campaign.Party[0].Inventory[1]!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
+            DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("A", 1), campaign.Party[0].WeaponIn(1), 0, campaign.Party[0].WeaponIn(1)!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
         // A reorder moves one of two souls at the least (the last is last already), so
         // it takes 2 runs at the least (PHASE 6a DECISION 11).
         var own = TestShop.Opened();

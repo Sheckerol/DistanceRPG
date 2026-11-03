@@ -83,7 +83,7 @@ public sealed class CarryLimitTests : IDisposable
         Assert.True(turns.TrySwap(member, 5));
         Assert.Same(member.Inventory[0], member.EquippedWeapon);
         Assert.Equal("longbow", member.EquippedWeapon!.Id);
-        Assert.Equal("arming_sword", member.Inventory[5]!.Id);
+        Assert.Equal("arming_sword", member.WeaponIn(5)!.Id);
 
         // Slot 0 is the hand itself, never a slot to swap in from.
         Assert.False(turns.CanSwap(member, 0));
@@ -138,11 +138,13 @@ public sealed class CarryLimitTests : IDisposable
         Assert.False(next.DropTaken);
 
         // And there is no other container: the only things on a member that hold a
-        // weapon are the six slots and the hand, which is slot 0 of them.
+        // weapon are the six slots and the hand, which is slot 0 of them. Asked of
+        // anything that holds an item (Phase 6b.1: a slot holds a weapon or a
+        // potion), which a weapon is, so a second list of items would be found too.
         var holders = typeof(PartyMemberState)
             .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(p => typeof(Weapon).IsAssignableFrom(p.PropertyType)
-                || typeof(IEnumerable<Weapon?>).IsAssignableFrom(p.PropertyType))
+            .Where(p => typeof(IItem).IsAssignableFrom(p.PropertyType)
+                || typeof(IEnumerable<IItem?>).IsAssignableFrom(p.PropertyType))
             .Select(p => p.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();

@@ -15,7 +15,11 @@ namespace GameEngine.DistanceRPG;
 /// the stable and the enchanter's shop down the left (<see cref="HubWeapons"/>), a window that scrolls with
 /// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
 /// a refused key over the keys, and the deposit panel or the take-back ask over the
-/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>) — and, under
+/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>); on the ALCHEMIST page (Phase
+/// 6b.4) the farm, the batch and the quality, the members' bags and their potions in
+/// a window that scrolls with the choice, and the chosen row said whole
+/// (<see cref="AlchemistPage"/>), or before the alchemist arrives the line that says
+/// when he does — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
@@ -70,8 +74,20 @@ public sealed class BetweenRunsHud : IDisposable
     /// </summary>
     internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU";
 
-    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns back to DUNGEONS, ESC opens the menu.</summary>
-    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU";
+    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns to the ALCHEMIST page (Phase 6b.4), ESC opens the menu.</summary>
+    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB ALCHEMIST - ESC MENU";
+
+    /// <summary>
+    /// The keys the ALCHEMIST page answers once the alchemist has arrived (§6.6, Phase
+    /// 6b.4): W/S or the up and down arrows move the choice over the members and the
+    /// potions, A/D or the left and right arrows set the quality, H and M mix a health
+    /// or a mana potion at it into the chosen member's bag, T pours a potion back, TAB
+    /// turns back to DUNGEONS, ESC opens the menu.
+    /// </summary>
+    internal const string AlchemistKeysLine = "W/S OR ARROWS CHOOSE - A/D OR ARROWS QUALITY - H MIXES HEALTH - M MIXES MANA - T POURS BACK - TAB DUNGEONS - ESC MENU";
+
+    /// <summary>The keys the ALCHEMIST page answers before he has arrived (PHASE 6b DECISION 10): nothing on it is chosen, so TAB and ESC alone.</summary>
+    internal const string AlchemistClosedKeysLine = "TAB DUNGEONS - ESC MENU";
 
     /// <summary>
     /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
@@ -197,7 +213,10 @@ public sealed class BetweenRunsHud : IDisposable
     /// what the wipe clawed back, member by member. Then whether the run counted
     /// and the counter it stands at (§6.3), and the lock or the closing a clear
     /// wrote. These are the run's own numbers, off its <see cref="RunResult"/> and
-    /// nothing else. The dungeon shows them at the run's end, with its key under
+    /// nothing else — the farm's among them (§6.6, Phase 6b.3): after the spoils,
+    /// the potions that spoiled (<see cref="SpoiledLine"/>), and after whether the
+    /// run counted, what the farm yielded (<see cref="FarmLine"/>). The dungeon
+    /// shows them at the run's end, with its key under
     /// them (<see cref="DungeonHud.RunSummaryLines"/>). The between-runs screen
     /// shows them again above the list, where they are the context the next
     /// choice is made in.
@@ -255,6 +274,10 @@ public sealed class BetweenRunsHud : IDisposable
         if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
             lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", DungeonHud.Grey));
 
+        // The potions carried out, spoiled (§6.6), whichever way the run ended.
+        if (result.Spoiled is { Count: > 0 } spoiled)
+            lines.Add(new Run(SpoiledLine(spoiled.Count), DungeonHud.Yellow));
+
         // The XP: kept, or the share of each pool's gain a wipe took back, member by member.
         if (result.Outcome != RunOutcome.Death)
             lines.Add(new Run("XP KEPT", DungeonHud.Green));
@@ -278,6 +301,11 @@ public sealed class BetweenRunsHud : IDisposable
             : mercyReachable ? $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}" : "RUN NOT COUNTED";
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
+        // What the farm yielded, which the count decided too — before the enchanter,
+        // so the hub's cut of a long summary takes the enchanter's lines first.
+        if (FarmLine(result) is { } farm)
+            lines.Add(farm);
+
         // What the enchanter did on the run's end, which the count decided.
         lines.AddRange(ServiceLines(result, mostServiceLines, moreTail));
 
@@ -289,6 +317,57 @@ public sealed class BetweenRunsHud : IDisposable
 
         return lines;
     }
+
+    /// <summary>
+    /// The summary's line for the potions a run's end spoiled (§6.6), in yellow:
+    /// <c>2 POTIONS SPOILED - A POTION KEEPS FOR ONE TRIP</c>, or <c>1 POTION
+    /// SPOILED - …</c>.
+    /// </summary>
+    internal static string SpoiledLine(int count) => $"{count} {(count == 1 ? "POTION" : "POTIONS")} SPOILED - A POTION KEEPS FOR ONE TRIP";
+
+    /// <summary>
+    /// The summary's line for the farm (§6.6), off the run's result, once the farm
+    /// has a worker (<see cref="RunResult.FarmClears"/> at least 1), and none before:
+    /// the run that brought the alchemist — the first clear of a dungeon besides the
+    /// tutorial — <c>A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED 7
+    /// UNITS</c>; a later first clear, <c>A FIRST CLEAR - THE FARM GROWS TO 3
+    /// DUNGEONS BEYOND THE TUTORIAL - IT YIELDED 21 UNITS</c> — both green, and
+    /// <c>… YIELDED NOTHING</c> at a yield of 0; any other run that counted, <c>THE
+    /// FARM YIELDED 14 UNITS - 2 DUNGEONS WORK IT</c> (<see cref="WorkIt"/>) in cyan,
+    /// or <c>THE FARM YIELDED NOTHING</c> in grey at a yield of 0; and a run that did
+    /// not count, <c>THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT</c>, grey (PHASE
+    /// 6b DECISION 4). The count is the farm's workers, never every dungeon beaten:
+    /// the tutorial is none of them, so the line that grows the farm says which
+    /// dungeons count (the audit of Phase 6b).
+    /// </summary>
+    internal static Run? FarmLine(RunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.FarmClears < 1)
+            return null;   // before the alchemist: no farm to speak of
+        string yielded = result.FarmYield > 0 ? Units(result.FarmYield) : "NOTHING";
+        if (result.FirstClear && !result.Retired)
+            return new Run(result.FarmClears == 1
+                ? $"A FIRST CLEAR - THE ALCHEMIST HAS ARRIVED - THE FARM YIELDED {yielded}"
+                : $"A FIRST CLEAR - THE FARM GROWS TO {result.FarmClears} DUNGEONS BEYOND THE TUTORIAL - IT YIELDED {yielded}", DungeonHud.Green);
+        if (!result.ServiceTick)
+            return new Run("THE FARM YIELDED NOTHING - THE RUN DID NOT COUNT", DungeonHud.Grey);
+        return result.FarmYield > 0
+            ? new Run($"THE FARM YIELDED {yielded} - {WorkIt(result.FarmClears)}", DungeonHud.Cyan)
+            : new Run("THE FARM YIELDED NOTHING", DungeonHud.Grey);
+    }
+
+    /// <summary>
+    /// The farm's workers as the hub counts them — the dungeons beaten besides the
+    /// tutorial, which the farm grows by (§6.6) — in the words the summary and the
+    /// ALCHEMIST page share: <c>2 DUNGEONS WORK IT</c>, <c>1 DUNGEON WORKS IT</c>.
+    /// Never "beaten": that would count the tutorial too.
+    /// </summary>
+    /// <param name="clears">The farm's workers (<see cref="Farm.Clears"/>, <see cref="RunResult.FarmClears"/>).</param>
+    internal static string WorkIt(int clears) => clears == 1 ? "1 DUNGEON WORKS IT" : $"{clears} DUNGEONS WORK IT";
+
+    /// <summary>A number of units of the farm's yield as the HUD says it: <c>1 UNIT</c>, <c>7 UNITS</c>.</summary>
+    internal static string Units(int n) => $"{n} {(n == 1 ? "UNIT" : "UNITS")}";
 
     /// <summary>
     /// The summary's lines for the enchanter (§6.2, §6.3), off the run's reports
@@ -466,11 +545,13 @@ public sealed class BetweenRunsHud : IDisposable
     /// where a run is committed to, so the warning is there. While the tutorial
     /// is all there is, the list says the rest opens behind it
     /// (<see cref="HubGate"/>). Under any countdown it says what a countdown
-    /// counts (<see cref="LockRule"/>).
+    /// counts (<see cref="LockRule"/>). And last, while the alchemist holds units
+    /// unmixed, that they spoil on the descent (<see cref="UnmixedNote"/>).
     /// </summary>
     /// <param name="listings">The campaign's list (<see cref="CampaignState.Listings"/>).</param>
     /// <param name="chosen">The index of the listing ENTER would descend into, or -1.</param>
-    internal static IReadOnlyList<ListRow> ListRows(IReadOnlyList<DungeonListing> listings, int chosen)
+    /// <param name="unmixed">The units the alchemist's batch holds unmixed (<see cref="Farm.Batch"/>, Phase 6b.4): above 0, the list ends with what becomes of them on the descent (<see cref="UnmixedNote"/>), in orange.</param>
+    internal static IReadOnlyList<ListRow> ListRows(IReadOnlyList<DungeonListing> listings, int chosen, int unmixed = 0)
     {
         ArgumentNullException.ThrowIfNull(listings);
         var rows = new List<ListRow> { new(ChooseHeading, DungeonHud.Grey, HeadingScale, HeadingPitch) };
@@ -498,8 +579,21 @@ public sealed class BetweenRunsHud : IDisposable
             rows.Add(new ListRow(HubGate(only.Def), DungeonHud.Grey, NoteScale, NotePitch));
         if (listings.Any(listing => !listing.Selectable))
             rows.Add(new ListRow(LockRule(content.Tuning.MercyFloor), DungeonHud.Grey, NoteScale, NotePitch));
+        if (unmixed > 0)
+            rows.Add(new ListRow(UnmixedNote(unmixed), DungeonHud.Orange, NoteScale, NotePitch));
         return rows;
     }
+
+    /// <summary>
+    /// What the list says last while the alchemist holds units unmixed (§6.6, Phase
+    /// 6b.4): the descent is where they spoil, so it is said where the descent is
+    /// chosen — <c>THE ALCHEMIST HOLDS 9 UNMIXED UNITS - THEY SPOIL WHEN YOU
+    /// DESCEND</c>, or <c>... 1 UNMIXED UNIT - IT SPOILS ...</c>.
+    /// </summary>
+    internal static string UnmixedNote(int units)
+        => units == 1
+            ? "THE ALCHEMIST HOLDS 1 UNMIXED UNIT - IT SPOILS WHEN YOU DESCEND"
+            : $"THE ALCHEMIST HOLDS {units} UNMIXED UNITS - THEY SPOIL WHEN YOU DESCEND";
 
     // ── Where it all goes ────────────────────────────────────────────────────
 
@@ -569,7 +663,9 @@ public sealed class BetweenRunsHud : IDisposable
     /// The line along the bottom, and its colour, in grey: the keys the screen
     /// answers in what it is doing — the DUNGEONS page's (<see cref="KeysLine"/>),
     /// the WEAPONS page's (<see cref="WeaponsKeysLine"/>), a carry's, naming the
-    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu, the deposit
+    /// weapon (<see cref="CarryingKeysLine"/>), the ALCHEMIST page's
+    /// (<see cref="AlchemistKeysLine"/>, or before he arrives
+    /// <see cref="AlchemistClosedKeysLine"/>) — and while the menu, the deposit
     /// panel or the take-back ask is up, its own (<see cref="MenuKeysLine"/>,
     /// <see cref="DepositPanel.KeysLine"/>) in their place.
     /// </summary>
@@ -577,14 +673,16 @@ public sealed class BetweenRunsHud : IDisposable
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
     /// <param name="carried">The weapon taken up, while carrying.</param>
     /// <param name="panel">The deposit panel or the take-back ask, while one is up.</param>
+    /// <param name="alchemistOpen">Whether the alchemist has arrived, on the ALCHEMIST page (<see cref="AlchemistPage.Open"/>).</param>
     internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null,
-        DepositPanel? panel = null)
+        DepositPanel? panel = null, bool alchemistOpen = true)
         => (mode switch
         {
             BetweenRunsScene.HubMode.Menu => MenuKeysLine(hasTitle),
             BetweenRunsScene.HubMode.Weapons => WeaponsKeysLine,
             BetweenRunsScene.HubMode.Carrying => carried is null ? WeaponsKeysLine : CarryingKeysLine(carried),
             BetweenRunsScene.HubMode.Deposit or BetweenRunsScene.HubMode.Ask => panel?.KeysLine ?? WeaponsKeysLine,
+            BetweenRunsScene.HubMode.Alchemist => alchemistOpen ? AlchemistKeysLine : AlchemistClosedKeysLine,
             _ => KeysLine,
         }, DungeonHud.Grey);
 
@@ -643,9 +741,9 @@ public sealed class BetweenRunsHud : IDisposable
     internal const float DetailWhereScale = 1.3f;
     private const float DetailWherePitch = 20f;
     internal const float DetailNameScale = 2f;
-    private const float DetailNamePitch = 26f;
+    internal const float DetailNamePitch = 26f;
     internal const float DetailScale = 1.4f;
-    private const float DetailPitch = 18f;
+    internal const float DetailPitch = 18f;
 
     /// <summary>
     /// The refusal row's distance up from the bottom: one row over the keys line,
@@ -673,6 +771,31 @@ public sealed class BetweenRunsHud : IDisposable
         float bottom = windowHeight - RefusalFromBottom - RefusalClearance;
         int rows = (int)MathF.Floor((bottom - top - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
         return new WeaponsLayout(top, bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>How many lines the ALCHEMIST page draws over its rows (Phase 6b.4; <see cref="AlchemistPage.Lines(CampaignState, int)"/>): the farm, the batch, what spoils, the quality.</summary>
+    internal const int AlchemistLineCount = 4;
+
+    /// <summary>The gap between the ALCHEMIST page's lines and the rows under them.</summary>
+    private const float AlchemistGap = 10f;
+
+    /// <summary>The top of the ALCHEMIST page under the notices, where its rows start under its lines, the lowest a row's glyphs may reach over the refusal row, and how many rows fit between.</summary>
+    internal readonly record struct AlchemistLayout(float Top, float RowsTop, float Bottom, int Rows);
+
+    /// <summary>
+    /// Where the ALCHEMIST page goes in a window <paramref name="windowHeight"/> pixels
+    /// tall (Phase 6b.4): from where the WEAPONS page starts (<see cref="WeaponsPage"/>),
+    /// its lines — kept in view, since A/D change one and a mix another — then, a gap
+    /// under them, the rows the choice goes over, down to the refusal row's clearance:
+    /// the window the choice scrolls (<see cref="AlchemistPage.Window"/>). At least one
+    /// row, so the choice is always in view.
+    /// </summary>
+    internal static AlchemistLayout AlchemistPlace(float windowHeight, int noticeRows = 0)
+    {
+        var page = WeaponsPage(windowHeight, noticeRows);
+        float rowsTop = page.Top + AlchemistLineCount * WeaponRowPitch + AlchemistGap;
+        int rows = (int)MathF.Floor((page.Bottom - rowsTop - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
+        return new AlchemistLayout(page.Top, rowsTop, page.Bottom, Math.Max(1, rows));
     }
 
     /// <summary>How many characters a detail line runs to before a list on it wraps: the right column's width at <see cref="DetailScale"/>.</summary>
@@ -1107,10 +1230,18 @@ public sealed class BetweenRunsHud : IDisposable
         for (int i = 0; i < notices.Count; i++)
             DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
 
-        if (scene.OnWeapons)
-            DrawWeapons(scene, w, h, notices.Count);
-        else
-            DrawDungeons(scene, w, h, notices.Count);
+        switch (scene.Page)
+        {
+            case BetweenRunsScene.HubPage.Weapons:
+                DrawWeapons(scene, w, h, notices.Count);
+                break;
+            case BetweenRunsScene.HubPage.Alchemist:
+                DrawAlchemist(scene, w, h, notices.Count);
+                break;
+            default:
+                DrawDungeons(scene, w, h, notices.Count);
+                break;
+        }
 
         if (scene.MenuOpen)
         {
@@ -1146,7 +1277,7 @@ public sealed class BetweenRunsHud : IDisposable
                 DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel);
+        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel, scene.Alchemist.Open);
         DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
@@ -1154,7 +1285,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>The DUNGEONS page: the last run above (when there has been one), and the list under it with the choice marked.</summary>
     private void DrawDungeons(BetweenRunsScene scene, int w, int h, int noticeRows)
     {
-        var rows = ListRows(scene.Listings, scene.Chosen);
+        var rows = ListRows(scene.Listings, scene.Chosen, scene.Unmixed);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? HubSummaryLines(lastRun) : [];
         var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), noticeRows);
 
@@ -1205,6 +1336,46 @@ public sealed class BetweenRunsHud : IDisposable
         float right = w / 2f + RightColumn;
         float y = layout.Top;
         foreach (var line in DetailRows(page.ChosenRow))
+        {
+            _text.DrawText(line.Text, right, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+    }
+
+    /// <summary>
+    /// The ALCHEMIST page (§6.6, Phase 6b.4): before the alchemist arrives, the one
+    /// grey line that says when he does (<see cref="AlchemistPage.ClosedLine"/>); after,
+    /// down the left its lines — the farm, the batch, what spoils, the quality — and
+    /// under them the members and the potions, as many as the window holds, scrolled
+    /// to keep the choice in view and the choice marked; and the chosen row said whole
+    /// on the right (<see cref="AlchemistPage.DetailRows"/>).
+    /// </summary>
+    private void DrawAlchemist(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
+        var page = scene.Alchemist;
+        var layout = AlchemistPlace(h, noticeRows);
+        float left = w / 2f + LeftColumn;
+        if (!page.Open)
+        {
+            _text.DrawText(AlchemistPage.ClosedLine, left, layout.Top, WeaponRowScale, DungeonHud.Grey);
+            return;
+        }
+
+        float y = layout.Top;
+        foreach (var line in page.Lines())
+        {
+            _text.DrawText(line.Text, left, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+        var rows = page.Rows();
+        int top = page.Window(layout.Rows);
+        int chosen = page.Chosen;
+        for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
+            DrawRuns(left, layout.RowsTop + (i - top) * WeaponRowPitch, WeaponRowScale, AlchemistPage.Runs(rows[i], chosen: i == chosen));
+
+        float right = w / 2f + RightColumn;
+        y = layout.Top;
+        foreach (var line in page.Detail())
         {
             _text.DrawText(line.Text, right, y, line.Scale, line.Color);
             y += line.Pitch;

@@ -137,7 +137,7 @@ public static class Wear
     /// StartingPool</c>, on the whole deposit: 6 in 100 cashing a fresh full bar of
     /// 30, 7 cashing 40 at capacity 40, 9 cashing 60 at capacity 60, and no top —
     /// "refinement improves whether the roll lands, not what it lands on"
-    /// (S:782–784). One expression with one branch (P6:923–925), in integers:
+    /// (S:782–784). One expression with one branch (P6:962–964), in integers:
     /// <c>GraftBaseChance × (StartingPool + wear)</c> out of <c>100 × StartingPool</c>,
     /// the wear counted for a refinement alone, so nothing is rounded, and a
     /// numerator at or past its denominator lands every time. In <c>long</c>s: no

@@ -68,9 +68,12 @@ internal sealed record NumberBound(string File, string Field, int Min, int Max, 
 /// largest whole number (<see cref="MostRuns"/>) and the most enchantments a
 /// weapon holds (<see cref="MostEnchantments"/>), and with it the most runs a
 /// service takes (<see cref="MostServiceRuns"/>) and the most deposits a run's end
-/// works (<see cref="MostWorked"/>); and the save's sanity bounds,
+/// works (<see cref="MostWorked"/>) — and the most a run's end yields a dungeon
+/// cleared (<see cref="MostYieldPerClear"/>); and the save's sanity bounds,
 /// where a count's arithmetic stops being whole (<see cref="MostCount"/>,
-/// <see cref="MostLevels"/>, <see cref="MostHeldShots"/>). One accessor each, read once,
+/// <see cref="MostLevels"/>, <see cref="MostHeldShots"/>) — with the overshoot a
+/// potion hands the heal applier, held where the levels it grants stop being
+/// whole (<see cref="MostOverflow"/>). One accessor each, read once,
 /// so the content and the save never disagree about how deep a number goes.
 /// </para>
 /// <para>
@@ -158,6 +161,16 @@ internal static class ContentBounds
     internal static int MostWorked { get; } = Int(nameof(Tuning.EnchanterWorksOn)).Max;
 
     /// <summary>
+    /// The most units the farm yields a worker at a run's end (§6.6, Phase 6b.3):
+    /// <c>FarmYieldPerClear</c>'s clamp ceiling. A run's end yields that a dungeon
+    /// besides the tutorial ever cleared, and no tuning in range yields more, so a
+    /// saved yield above it times the clears it was made at — or potions spoiled
+    /// that add to more, which were mixed from a yield no larger and the clears only
+    /// grow — is none play wrote.
+    /// </summary>
+    internal static int MostYieldPerClear { get; } = Int(nameof(Tuning.FarmYieldPerClear)).Max;
+
+    /// <summary>
     /// The largest count play grows a bounded step at a time, <strong>a sanity
     /// bound</strong>: half the largest whole number. A visit's turn and its dice,
     /// a turn's counters, the farm's numbers, a body's mana and every XP pool are
@@ -177,6 +190,32 @@ internal static class ContentBounds
     /// Play never nears it: a level lands a hit at a time.
     /// </summary>
     internal static int MostLevels { get; } = int.MaxValue / (2 * Table(nameof(Tuning.EffectPerLevel)).Max);
+
+    /// <summary>
+    /// The most healing past full a potion hands the heal applier,
+    /// <strong>a sanity bound</strong> (Phase 6b.2): a potion's quality is
+    /// uncapped (§6.6, "Overheal can use it"), so the share it offers can be any
+    /// size up to the largest whole number, and what lands past full is
+    /// Overheal's to bank. A drink hands the applier what is missing and at most
+    /// this past it (<see cref="TurnSystem.TryDrink"/>), so the arithmetic the
+    /// overshoot meets stays whole: Overheal grants it as levels at its
+    /// percentage, <c>ApplyPercent</c>'s clamp ceiling at most
+    /// (<see cref="Enchantment.LevelsOffSource"/>), which is
+    /// <see cref="MostLevels"/> at this overshoot — and at those levels the
+    /// trigger it scales (<see cref="EnchantmentBehaviours.PartialFire"/>: the
+    /// levels times a flat trigger of a few mana) and the hidden pool it feeds
+    /// (the levels banked and granted, times <c>EffectPerLevel</c> at its clamp
+    /// ceiling) stay inside an int. The Ward that pool folds into is not this
+    /// bound's: at the clamps' extreme fold, <c>EffectPerLevel</c>'s ceiling over
+    /// one point a Ward, far less overshoot than this makes more Ward than a save
+    /// reads back, so the fold itself is held at <see cref="MostLevels"/>
+    /// (<see cref="StatusBehaviours.OverhealPool"/>). It is about 107,000 points:
+    /// no play nears it, and every overshoot play reaches is handed whole.
+    /// </summary>
+    internal static long MostOverflow { get; } = (long)MostLevels * FullPercent / Table(nameof(Tuning.ApplyPercent)).Max;
+
+    /// <summary>The whole a percentage is of: 100.</summary>
+    private const int FullPercent = 100;
 
     /// <summary>
     /// The most shots a body holds on Overwatch: a hold is the wielder's

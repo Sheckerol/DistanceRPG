@@ -71,10 +71,21 @@ public sealed class DungeonHud
     public readonly record struct Run(string Text, Vector4 Color);
 
     /// <summary>A line rising over a world position, and fading as it rises.</summary>
-    /// <param name="Speaker">Whoever it answers for, on the answer to a key or a click (<see cref="AddAnswer"/>); null on everything else.</param>
-    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null)
+    /// <param name="Speaker">Whoever it is said over, on the answer to a key or a click (<see cref="AddAnswer"/>) and on a beat said of a member (<see cref="AddBeat"/>); null on everything else.</param>
+    /// <param name="Answer">Whether it is the speaker's answer, which the next answer replaces.</param>
+    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null, bool Answer = false)
     {
         public float Age;
+
+        /// <summary>How opaque it is at its age: whole when raised, gone at <see cref="FloatingTextLife"/>.</summary>
+        public float Alpha
+        {
+            get
+            {
+                float t = Age / FloatingTextLife;
+                return 1f - t * t;
+            }
+        }
     }
 
     private readonly List<FloatingText> _floatingTexts = new();
@@ -370,15 +381,67 @@ public sealed class DungeonHud
     /// A refusal and the act that follows it never stack on one spot. Without this,
     /// <c>SLOT 3 IS EMPTY</c> and then <c>LEFT HATCHET HERE</c> would stack over the
     /// member at the middle of the screen, which is where the open bag's panel is.
-    /// Every other rising line (a hit, a beat, a level) is left alone.
+    /// Every other rising line (a hit, a beat, a level) is left alone. While the
+    /// speaker's bag is open the answer is said in the panel, never over the floor
+    /// (<see cref="BagLine"/>).
     /// </summary>
     /// <param name="speaker">Whoever the answer is said over: the scene object it rises from.</param>
     public void AddAnswer(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
     {
         ArgumentNullException.ThrowIfNull(speaker);
-        _floatingTexts.RemoveAll(ft => ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.RemoveAll(ft => ft.Answer && ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker, Answer: true));
+    }
+
+    /// <summary>
+    /// Spawn a beat said of <paramref name="speaker"/> that answers no key — a level
+    /// it bought — rising as any beat does, beside whatever answer is rising over it,
+    /// which it never replaces. A key pressed in the bag can raise one (a drink's heal
+    /// buys a point of max HP), so while the speaker's bag is open it is said in the
+    /// panel after the answer (<see cref="BagLine"/>), never over the floor.
+    /// </summary>
+    /// <param name="speaker">The member it is said of: the scene object it rises from.</param>
+    public void AddBeat(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
         _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker));
     }
+
+    /// <summary>
+    /// What the open bag says in its own row (<see cref="InventoryAnswerDrop"/>) for
+    /// <paramref name="speaker"/>, the member whose bag it is: the answer still rising
+    /// over it (<see cref="AddAnswer"/>), then every beat said of it
+    /// (<see cref="AddBeat"/>), oldest first, side by side — each faded as it would
+    /// fade in the air, and gone when it would be. Empty when nothing is being said.
+    /// <para>
+    /// The answer to a key pressed in the bag — a drink, a pour, a weapon left, a
+    /// refusal — rises from the member, and the member stands under the middle of the
+    /// screen, where the panel is: drawn over the floor it ran into the panel's own
+    /// header rows and could not be read (the audit of Phase 6b). So while the bag is
+    /// open it is said here, and nothing rises over the floor
+    /// (<see cref="RisingLines"/>).
+    /// </para>
+    /// </summary>
+    /// <param name="speaker">The member whose bag is open: the scene object its answers rise from.</param>
+    internal IReadOnlyList<Run> BagLine(object speaker)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
+        var said = _floatingTexts.Where(ft => ReferenceEquals(ft.Speaker, speaker)).OrderByDescending(ft => ft.Answer);   // stable: beats keep their order
+        return said.SelectMany(ft => ft.Runs.Select(run => run with { Color = run.Color with { W = run.Color.W * ft.Alpha } })).ToArray();
+    }
+
+    /// <summary>
+    /// The lines that rise over the floor now, as <see cref="DrawFloatingTexts"/>
+    /// draws them: every one — and none while the bag is open
+    /// (<paramref name="bagOpen"/>), whose answers are said in the panel
+    /// (<see cref="BagLine"/>). A line over the floor would run into the panel's own
+    /// rows there: the member stands under it, and the panel has no backing. Each
+    /// still ages, so a line still in the air when the bag closes is drawn again.
+    /// </summary>
+    internal IReadOnlyList<IReadOnlyList<Run>> RisingLines(bool bagOpen) => InTheAir(bagOpen).Select(ft => ft.Runs).ToArray();
+
+    /// <summary>The floating texts <see cref="RisingLines"/> names: every one, and none while the bag is open.</summary>
+    private IEnumerable<FloatingText> InTheAir(bool bagOpen) => bagOpen ? [] : _floatingTexts;
 
     /// <summary>
     /// Spawn one line of differently coloured pieces above a world position,
@@ -450,8 +513,10 @@ public sealed class DungeonHud
             // would read as the menu's own lines: a weapon just put down would be
             // named across the bag's slots, and the way out's label would sit in
             // its own question. None of them is what the menu is asking about.
-            // The rising lines stay, because a key pressed in the bag answers
-            // there, one answer at a time (AddAnswer).
+            // The rising lines are drawn clear of the bag too: a key pressed in it
+            // answers in the panel's own row (BagLine), since the member it rises
+            // from stands under the panel, and an answer over the floor ran into
+            // the panel's header rows (the audit of Phase 6b).
             // A run's summary is drawn clear of all of it: the run is over.
             if (!scene.AnyMenuOpen)
             {
@@ -460,7 +525,7 @@ public sealed class DungeonHud
                 DrawGroundItems(camera, scene, w, h);
             }
             DrawAllyCue(camera, scene, w, h);
-            DrawFloatingTexts(camera, w, h);
+            DrawFloatingTexts(camera, w, h, bagOpen: scene.InventoryOpen);
             DrawAimCue(scene);
         }
 
@@ -472,13 +537,13 @@ public sealed class DungeonHud
         }
 
         if (scene.InventoryOpen)
-            DrawInventory(w, h, active, turns, scene.LeaveArmed);
+            DrawInventory(w, h, active, turns, scene.LeaveArmed, BagLine(scene.ActiveCharacter));
 
         if (scene.PauseMenuOpen)
             DrawMenu(w, h, scene);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
-            DrawConfirmLeave(w, h, scene.Visit);
+            DrawConfirmLeave(w, h, scene.Visit, scene.Party.Sum(member => member.State.Potions.Count()));
 
         if (ended is not null)
         {
@@ -859,12 +924,12 @@ public sealed class DungeonHud
         }
     }
 
-    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>) — the last line, what it costs whatever else it means, in grey.</summary>
-    private void DrawConfirmLeave(int w, int h, DungeonState visit)
+    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>), the party's <paramref name="potionsCarried"/> among it — the last line, what it costs whatever else it means, in grey.</summary>
+    private void DrawConfirmLeave(int w, int h, DungeonState visit, int potionsCarried)
     {
         float top = h / 2f - 60f;
         DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
-        var lines = LeavePreview(visit);
+        var lines = LeavePreview(visit, potionsCarried);
         float y = top + 44f;
         for (int i = 0; i < lines.Count; i++)
         {
@@ -879,41 +944,64 @@ public sealed class DungeonHud
     /// <summary>
     /// What leaving now means, under the way out's question (§4.4) — said before
     /// the player commits, since the answer ends the run. With the boss down it
-    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and the
-    /// dungeon closes for good (the tutorial) or locks for as many runs as its
+    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c> — while the
+    /// party carries a potion, which spoils on the way out whatever the run was,
+    /// <c>... - YOU KEEP THE WEAPONS YOU CARRY</c> (<see cref="ClearKeepsLine"/>) —
+    /// and the dungeon closes for good (the tutorial) or locks for as many runs as its
     /// floor (<see cref="DungeonState.LockRuns"/>, the number the clear will
     /// write). With it standing it is a retreat: <c>NO BOSS - A RETREAT: XP KEPT,
     /// THE DEPTH RE-ROLLS</c> — the re-roll said only where there is one, so the
     /// tutorial, two floors on every visit, says <c>NO BOSS - A RETREAT: XP
     /// KEPT</c> (<see cref="DungeonCatalogue.HasFixedDepth"/>) — and whether the
     /// party got deep enough for the run to count (§6.3's mercy, from
-    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. And either
-    /// way, the whole visit (<see cref="ResetLine"/>), last.
+    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. Then, when the
+    /// party carries any, that its potions spoil on the way out (§6.6, Phase 6b.3:
+    /// <see cref="PotionsSpoilLine"/>). And either way, the whole visit
+    /// (<see cref="ResetLine"/>), last.
     /// </summary>
-    internal static IReadOnlyList<string> LeavePreview(DungeonState visit)
+    /// <param name="visit">The visit the party is leaving.</param>
+    /// <param name="potionsCarried">How many potions the party's bags hold: each spoils as the run ends, so the prompt warns while one is left to drink.</param>
+    internal static IReadOnlyList<string> LeavePreview(DungeonState visit, int potionsCarried = 0)
     {
         ArgumentNullException.ThrowIfNull(visit);
         string dungeon = visit.Def.Name.ToUpperInvariant();
+        var lines = new List<string>();
         if (visit.BossDefeated)
         {
             string clear = visit.Def.RetiresOnClear
                 ? $"{dungeon} CLOSES FOR GOOD"
                 : $"{dungeon} LOCKS FOR {Runs(visit.LockRuns)}";
-            return ["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear, ResetLine];
+            lines.AddRange([ClearKeepsLine(potionsCarried), clear]);
         }
-
-        var content = GameContent.Current;
-        string retreat = content.Dungeons.HasFixedDepth(visit.Def)
-            ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
-            : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
-        bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
-        return
-        [
-            retreat,
-            counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN",
-            ResetLine,
-        ];
+        else
+        {
+            var content = GameContent.Current;
+            string retreat = content.Dungeons.HasFixedDepth(visit.Def)
+                ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
+                : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
+            bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
+            lines.AddRange([retreat, counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN"]);
+        }
+        if (potionsCarried > 0)
+            lines.Add(PotionsSpoilLine(potionsCarried));
+        lines.Add(ResetLine);
+        return lines;
     }
+
+    /// <summary>
+    /// The way out's first line with the boss down: what the clear keeps. <c>THE BOSS
+    /// IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and while the party carries a potion —
+    /// which spoils on the way out, the line under it says (<see cref="PotionsSpoilLine"/>)
+    /// — <c>THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY</c>, so the two never say
+    /// opposite things of the bags (the audit of Phase 6b).
+    /// </summary>
+    /// <param name="potionsCarried">How many potions the party's bags hold.</param>
+    internal static string ClearKeepsLine(int potionsCarried)
+        => potionsCarried > 0 ? "THE BOSS IS DOWN - YOU KEEP THE WEAPONS YOU CARRY" : "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY";
+
+    /// <summary>What leaving does to the potions carried (§6.6): <c>THE 2 POTIONS CARRIED SPOIL ON THE WAY OUT</c>, or <c>THE POTION CARRIED SPOILS ON THE WAY OUT</c>.</summary>
+    internal static string PotionsSpoilLine(int carried)
+        => carried == 1 ? "THE POTION CARRIED SPOILS ON THE WAY OUT" : $"THE {carried} POTIONS CARRIED SPOIL ON THE WAY OUT";
 
     /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
     internal static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
@@ -1287,17 +1375,19 @@ public sealed class DungeonHud
         _text.DrawText(cue.Label, scene.MousePos.X + 18f, scene.MousePos.Y + 12f, 1.5f, cue.Ready ? Yellow : Grey);
     }
 
-    private void DrawFloatingTexts(Camera camera, int w, int h)
+    /// <summary>The lines rising over the floor (<see cref="RisingLines"/>): none while the bag is open, whose answers it says itself.</summary>
+    private void DrawFloatingTexts(Camera camera, int w, int h, bool bagOpen)
     {
-        foreach (var ft in _floatingTexts)
+        foreach (var ft in InTheAir(bagOpen))
         {
             if (!WorldToScreen(camera, ft.WorldPos + Vector3.UnitY * 1.2f, w, h, out var px)) continue;
-            float t = ft.Age / FloatingTextLife;
-            float alpha = 1f - t * t;
-            float y = px.Y + ft.PixelYOffset - FloatingTextRise * t;
-            DrawRunsCenteredAt(px.X, y, 2f, ft.Runs, alpha);
+            float y = px.Y + ft.PixelYOffset - FloatingTextRise * ft.Age / FloatingTextLife;
+            DrawRunsCenteredAt(px.X, y, FloatingTextScale, ft.Runs, ft.Alpha);
         }
     }
+
+    /// <summary>A rising line's scale, over the floor and in the bag's answer row alike.</summary>
+    internal const float FloatingTextScale = 2f;
 
     // Inventory panel geometry. The panel was a fixed height until §2.2, so a
     // top fixed at the middle of the window always had room under it. It grows
@@ -1305,8 +1395,23 @@ public sealed class DungeonHud
     // short window loses first are the lines under the rows: what a swap costs
     // and which key equips.
 
+    /// <summary>The panel's title, <c>INVENTORY - CHAR A</c>, at the panel's top: its scale.</summary>
+    internal const float InventoryTitleScale = 3f;
+
+    /// <summary>The header row under the title — <c>EQUIPPED</c>, and X's hint on the right — how far under the top, and its scale.</summary>
+    internal const float InventoryHeaderDrop = 46f;
+    internal const float InventoryHeaderScale = 1.2f;
+
+    /// <summary>
+    /// The answer row (<see cref="BagLine"/>): how far under the top it sits, in the
+    /// band between the title's glyphs and the header row, which nothing else is
+    /// drawn in. At <see cref="FloatingTextScale"/> it clears the title by 5 px and
+    /// the header row by 6.
+    /// </summary>
+    internal const float InventoryAnswerDrop = 26f;
+
     /// <summary>The first slot's line, under the title and the EQUIPPED label.</summary>
-    private const float InventorySlotsTop = 70f;
+    internal const float InventorySlotsTop = 70f;
 
     /// <summary>A slot: its name, and the statline under it.</summary>
     private const float InventorySlotPitch = 46f;
@@ -1330,6 +1435,9 @@ public sealed class DungeonHud
     /// <summary>The swap line under the last row, and the key hint under that.</summary>
     private const float InventorySwapGap = 16f;
     private const float InventoryHintGap = 26f;
+
+    /// <summary>What a drink costs, under the swap line while the bag holds a potion (<see cref="DrinkCostLine"/>): the key hint moves down by this.</summary>
+    private const float InventoryDrinkPitch = 18f;
 
     /// <summary>The last line's own glyphs, so a height covers what the panel draws and not just where it starts.</summary>
     private const float InventoryLineHeight = 12f;
@@ -1366,12 +1474,14 @@ public sealed class DungeonHud
     /// HUD is laid out for either. A slot whose statline wraps
     /// (<see cref="SlotDetailLines"/>) grows the panel by
     /// <paramref name="wrappedLines"/> — every slot's lines past its first —
-    /// as a class row does: slid up first, then rows dropped.
+    /// as a class row does: slid up first, then rows dropped. So does the line
+    /// that says what a drink costs, under the swap line while the bag holds a
+    /// potion (<paramref name="drinkLine"/>, <see cref="DrinkCostLine"/>).
     /// </summary>
-    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0)
+    internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0, bool drinkLine = false)
     {
         float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + wrappedLines * InventoryDetailPitch + InventoryLabelHeight
-            + InventorySwapGap + InventoryHintGap + InventoryLineHeight;
+            + InventorySwapGap + (drinkLine ? InventoryDrinkPitch : 0f) + InventoryHintGap + InventoryLineHeight;
         float floorLine = windowHeight - InventoryBottomMargin;
         float top = MathF.Min(windowHeight / 2f - InventoryCentredOffset,
                               floorLine - fixedHeight - rowCount * InventoryRowPitch);
@@ -1407,9 +1517,17 @@ public sealed class DungeonHud
     /// down (<see cref="LeaveHint"/>) instead of naming the equip keys. When it is
     /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
     /// wherever X would arm it: in the party's phase, with a bag to put a weapon
-    /// down from.
+    /// down from. A potion's slot names the potion in its colour
+    /// (<see cref="SlotName"/>) and says under it what it restores now
+    /// (<see cref="PotionDetail"/>); while the bag holds one both hints say it is
+    /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1), the key hint
+    /// that its number drinks it (<see cref="EquipHint"/>), and a line under the
+    /// swap line what a drink costs (<see cref="DrinkCostLine"/>). What a key just
+    /// did, or why it did nothing — and any level it bought — is said in a row of its
+    /// own under the title (<paramref name="answer"/>, <see cref="BagLine"/>), never
+    /// over the floor under the panel.
     /// </summary>
-    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
+    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving, IReadOnlyList<Run> answer)
     {
         float cx = w / 2f;
 
@@ -1423,38 +1541,48 @@ public sealed class DungeonHud
 
         // Each weapon's statline as it reads in this member's hands, wrapped to the
         // room right of its slot's number: a slot grows by the lines it wraps to.
+        // A potion's says what it restores now, on one line.
         int attacks = turns.AttacksThisTurn(active);
         var details = active.Inventory
-            .Select((weapon, slot) => weapon is null ? [] : SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)))
+            .Select((item, slot) => item switch
+            {
+                Weapon weapon => SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)),
+                Potion potion => PotionDetailLines(potion, active),
+                _ => [],
+            })
             .ToArray();
+        bool potions = active.Potions.Any();
         int wrapped = details.Sum(lines => Math.Max(0, lines.Count - 1));
 
-        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped);
+        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped, drinkLine: potions);
         float top = layout.Top;
         float left = cx - InventoryHalfWidth;
 
-        DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", 3f, Cyan);
-        _text.DrawText("EQUIPPED", left, top + 46f, 1.2f, Grey);
+        DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", InventoryTitleScale, Cyan);
+        DrawRunsCenteredAt(cx, top + InventoryAnswerDrop, FloatingTextScale, answer);   // already faded
+        _text.DrawText("EQUIPPED", left, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
         if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
         {
             // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
-            float width = LeaveKeyHint.Length * GlyphAdvance * 1.2f;
-            _text.DrawText(LeaveKeyHint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
+            string hint = potions ? PourKeyHint : LeaveKeyHint;
+            float width = hint.Length * GlyphAdvance * InventoryHeaderScale;
+            _text.DrawText(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
         }
 
         float y = top + InventorySlotsTop;
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
-            var weapon = active.Inventory[slot];
-            if (weapon == null)
+            var item = active.Inventory[slot];
+            if (item == null)
             {
                 _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
                 y += InventorySlotPitch;
                 continue;
             }
 
-            // The name, then the statline and modifiers under it as they read in this member's hands.
-            _text.DrawText($"{slot + 1}  {weapon.ShownName}", left, y, 2f, weapon.Unique ? Orange : WeaponLineColor(slot));
+            // The name, then a weapon's statline and modifiers under it as they read in this member's hands.
+            var name = SlotName(slot, item);
+            _text.DrawText(name.Text, left, y, 2f, name.Color);
             for (int line = 0; line < details[slot].Count; line++)
                 DrawRuns(left + InventoryDetailIndent, y + InventoryDetailDrop + line * InventoryDetailPitch, InventoryDetailScale, details[slot][line]);
             y += InventorySlotPitch + Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch;
@@ -1479,11 +1607,108 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
+        // A drink costs movement in combat and out (§3.4): said under the swap line while there is one to drink.
+        float hintY = swapY + InventoryHintGap;
+        if (potions)
+        {
+            var drink = DrinkCostLine(turns.PotionUseCost, active.DistLeft);
+            DrawCentered(w, swapY + InventoryDrinkPitch, drink.Text, 1.5f, drink.Color);
+            hintY += InventoryDrinkPitch;
+        }
+
         if (leaving)
-            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length), 1.5f, Yellow);
+            DrawCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
         else
-            DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
+            DrawCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
     }
+
+    /// <summary>
+    /// What the bag panel prints for a slot that holds something: its number — the
+    /// key that reaches it, so the hand is 1 — and the item's name, in the item's
+    /// colour. A weapon is orange when it is a unique and otherwise in its line's
+    /// colour (<see cref="WeaponLineColor"/>); a potion is green for health and cyan
+    /// for mana (<see cref="PotionColor"/>): <c>3  HEALTH POTION Q2</c>.
+    /// </summary>
+    /// <param name="slot">The slot, 0 being the hand.</param>
+    /// <param name="item">What lies there.</param>
+    internal static Run SlotName(int slot, IItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var color = item switch
+        {
+            Weapon weapon => weapon.Unique ? Orange : WeaponLineColor(slot),
+            Potion potion => PotionColor(potion.Type),
+            _ => White,
+        };
+        return new Run($"{slot + 1}  {item.ShownName}", color);
+    }
+
+    /// <summary>A potion's colour wherever the dungeon names it: green for health, cyan for mana, the colours of the two pools it fills.</summary>
+    internal static Vector4 PotionColor(PotionType type) => type == PotionType.Health ? Green : Cyan;
+
+    /// <summary>
+    /// What a potion in the bag restores now, under its name (§3.4): the share it
+    /// offers of <paramref name="member"/>'s maximum as it stands
+    /// (<see cref="Alchemist.Share(Potion, ActorState)"/>) — <c>RESTORES 12 OF 30
+    /// HP</c>, <c>RESTORES 32 OF 160 MANA</c> — and at a whole pool,
+    /// <c>RESTORES ALL 30 HP</c>, or past it, <c>RESTORES ALL 30 HP - 6 OVER</c>:
+    /// the overshoot, which only Overheal keeps. Mana is a share of the pool the
+    /// member has earned (PHASE 6b DECISION 3), but a drink fills no more than the
+    /// equipped locks leave spendable (<see cref="ActorState.UsableMaxMana"/>), so
+    /// where they reserve some the line is said against that pool — <c>RESTORES 12
+    /// OF 17 SPENDABLE MANA</c>, <c>RESTORES ALL 17 SPENDABLE MANA - 15 OVER</c> —
+    /// the share unchanged (the audit of Phase 6b).
+    /// </summary>
+    internal static string PotionDetail(Potion potion, ActorState member)
+    {
+        ArgumentNullException.ThrowIfNull(potion);
+        ArgumentNullException.ThrowIfNull(member);
+        int share = Alchemist.Share(potion, member);
+        int max = Alchemist.MaxOf(potion.Type, member);
+        string pool = potion.Type == PotionType.Health ? "HP" : "MANA";
+        if (potion.Type == PotionType.Mana && member.UsableMaxMana < max)
+            (max, pool) = (member.UsableMaxMana, "SPENDABLE MANA");   // what the drink can take: TurnSystem.TryDrink's cap
+        if (share < max)
+            return $"RESTORES {share} OF {max} {pool}";
+        return share == max ? $"RESTORES ALL {max} {pool}" : $"RESTORES ALL {max} {pool} - {share - max} OVER";
+    }
+
+    /// <summary>A potion's slot's detail as the bag panel draws it under the name: <see cref="PotionDetail"/>, one line in the potion's colour.</summary>
+    internal static IReadOnlyList<IReadOnlyList<Run>> PotionDetailLines(Potion potion, ActorState member)
+        => [[new Run(PotionDetail(potion, member), PotionColor(potion.Type))]];
+
+    /// <summary>
+    /// What a drink costs, under the swap line while the bag holds a potion: a
+    /// drink costs <paramref name="cost"/> movement in combat and out (PHASE 6b
+    /// DECISION 2) — <c>A DRINK COSTS 40 MOVE</c>, grey; red and
+    /// <c>... - NOT ENOUGH LEFT</c> when the member has less, since the cost is
+    /// paid whole or the drink refused; <c>DRINKING IS FREE</c> at a cost of 0.
+    /// </summary>
+    internal static Run DrinkCostLine(int cost, float distLeft)
+    {
+        if (cost <= 0) return new Run("DRINKING IS FREE", Grey);
+        return distLeft < cost
+            ? new Run($"A DRINK COSTS {cost} MOVE - NOT ENOUGH LEFT", Red)
+            : new Run($"A DRINK COSTS {cost} MOVE", Grey);
+    }
+
+    /// <summary>
+    /// The beat over a member who has just drunk: the potion, and what the pool
+    /// gained — <c>DRANK HEALTH POTION Q2 - +12 HP</c>, <c>DRANK MANA POTION Q1 -
+    /// +6 MANA</c> — or, at a full pool, <c>DRANK HEALTH POTION Q2 - NOTHING TO
+    /// RESTORE</c>: drinking at full is allowed, and wasted (§3.4).
+    /// </summary>
+    internal static string DrankBeat(PotionDrink drink)
+    {
+        ArgumentNullException.ThrowIfNull(drink);
+        string gained = drink.Restored > 0
+            ? $"+{drink.Restored} {(drink.Potion.Type == PotionType.Health ? "HP" : "MANA")}"
+            : "NOTHING TO RESTORE";
+        return $"DRANK {drink.Potion.ShownName} - {gained}";
+    }
+
+    /// <summary>What a potion's number says over the member when the drink's whole cost is not left (§3.4): <c>NOT ENOUGH MOVE TO DRINK - IT COSTS 40</c>. Nothing is drunk, and nothing spent.</summary>
+    internal static string DrinkShortCue(int cost) => $"NOT ENOUGH MOVE TO DRINK - IT COSTS {cost}";
 
     /// <summary>
     /// The inventory panel's key hint: the number keys that equip a bag slot —
@@ -1492,10 +1717,14 @@ public sealed class DungeonHud
     /// slots, <c>PRESS 2-6 TO EQUIP - I TO CLOSE</c>. The range is read off the
     /// member's slots and the scene's own highest binding
     /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names every slot a key
-    /// reaches and no key that does nothing.
+    /// reaches and no key that does nothing. While the bag holds a potion
+    /// (<paramref name="potion"/>) the same keys drink it:
+    /// <c>PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE</c>.
     /// </summary>
-    internal static string EquipHint(int slots)
-        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO EQUIP - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
+    /// <param name="slots">The member's slots, the hand among them.</param>
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string EquipHint(int slots, bool potion = false)
+        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO {(potion ? "EQUIP OR DRINK" : "EQUIP")} - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
 
     /// <summary>
     /// The number keys that reach a bag slot, as a hint prints them — <c>2-6</c>
@@ -1522,11 +1751,17 @@ public sealed class DungeonHud
     /// by the same number keys that equip, and how to back out. For six slots it
     /// is <c>LEAVE WHICH? 2-6 - X CANCELS</c>. It replaces <see cref="EquipHint"/>
     /// on the panel for as long as X is armed. It names no key for the hand,
-    /// because the weapon in hand is never put down this way.
+    /// because the weapon in hand is never put down this way. While the bag holds
+    /// a potion (<paramref name="potion"/>) it says the same keys pour one out —
+    /// <c>LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS</c> — since a potion is never
+    /// left (PHASE 6b DECISION 1).
     /// </summary>
     /// <param name="slots">The member's slots, the hand among them.</param>
-    internal static string LeaveHint(int slots)
-        => BagKeys(slots) is { } keys ? $"LEAVE WHICH? {keys} - X CANCELS" : "NOTHING TO LEAVE - X CANCELS";
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string LeaveHint(int slots, bool potion = false)
+        => BagKeys(slots) is { } keys
+            ? $"{(potion ? "LEAVE OR POUR OUT WHICH?" : "LEAVE WHICH?")} {keys} - X CANCELS"
+            : "NOTHING TO LEAVE - X CANCELS";
 
     /// <summary>
     /// What the panel's header row says while X is not armed, so the key can be
@@ -1534,6 +1769,20 @@ public sealed class DungeonHud
     /// the way a full bag makes room.
     /// </summary>
     internal const string LeaveKeyHint = "X TO LEAVE ONE HERE";
+
+    /// <summary>
+    /// <see cref="LeaveKeyHint"/> while the bag holds a potion: X puts a weapon
+    /// down, or pours a potion out — gone, never left on the floor (PHASE 6b
+    /// DECISION 1) — and either makes room.
+    /// </summary>
+    internal const string PourKeyHint = "X TO LEAVE OR POUR ONE OUT";
+
+    /// <summary>The beat over a member who has just poured a potion out: <c>POURED OUT THE HEALTH POTION Q2</c>. It is gone: nothing lies on the floor, and nothing comes back.</summary>
+    internal static string PouredBeat(Potion potion)
+    {
+        ArgumentNullException.ThrowIfNull(potion);
+        return $"POURED OUT THE {potion.ShownName}";
+    }
 
     /// <summary>
     /// What an armed bag number says when its slot holds nothing: <c>SLOT 3 IS
@@ -1546,10 +1795,23 @@ public sealed class DungeonHud
     /// <summary>
     /// What <c>G</c> says when the bag has no room (§4.4): a carry limit, not a
     /// fault — <c>BAG FULL - 6 CARRIED</c>, loot sharing the slots the weapons are
-    /// carried in — and how to make room: open the bag and put one down.
+    /// carried in — and how to make room: open the bag and put one down. While the
+    /// bag holds a potion (<paramref name="potion"/>) X pours one out too, as the
+    /// panel's hints say (<see cref="PourKeyHint"/>): <c>BAG FULL - 6 CARRIED - I
+    /// THEN X LEAVES OR POURS ONE OUT</c>, since a potion is never left (PHASE 6b
+    /// DECISION 1).
     /// </summary>
     /// <param name="carried">The member's slots, every one of them full.</param>
-    internal static string BagFullCue(int carried) => $"BAG FULL - {carried} CARRIED - I THEN X LEAVES ONE";
+    /// <param name="potion">Whether the bag holds a potion.</param>
+    internal static string BagFullCue(int carried, bool potion = false)
+        => $"BAG FULL - {carried} CARRIED - I THEN X {(potion ? "LEAVES OR POURS ONE OUT" : "LEAVES ONE")}";
+
+    /// <summary><see cref="BagFullCue(int, bool)"/> for <paramref name="member"/>'s full bag: its slots, and whether one of them holds a potion.</summary>
+    internal static string BagFullCue(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        return BagFullCue(member.Inventory.Length, member.Potions.Any());
+    }
 
     /// <summary>The beat over a member who has just put a weapon down: <c>LEFT HATCHET HERE</c>, so it reads as a thing done on purpose, answered by <c>TOOK HATCHET</c> when it is taken back.</summary>
     internal static string LeftBeat(Weapon weapon)
@@ -1909,7 +2171,7 @@ public sealed class DungeonHud
 
     /// <summary>True when a weapon of <paramref name="cls"/> sits in one of the member's slots: a class in hand or in the bag is listed before it has earned anything.</summary>
     private static bool Holds(PartyMemberState member, WeaponClass cls)
-        => member.Inventory.Any(w => w?.Class == cls);
+        => member.Inventory.Any(item => item is Weapon weapon && weapon.Class == cls);
 
     private static string ClassName(WeaponClass cls) => cls.ToString().ToUpperInvariant();
 

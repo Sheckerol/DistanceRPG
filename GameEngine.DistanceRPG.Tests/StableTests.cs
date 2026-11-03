@@ -224,18 +224,65 @@ public sealed class StableTests : IDisposable
         Assert.Equal(["Move", "Put", "Release", "Restore", "Take", "WeaponAt", "get_Stable"], Touching(OpCodes.Ldfld, OpCodes.Ldflda));
         Assert.Equal([".ctor"], Touching(OpCodes.Stfld));
 
-        static bool Same(MethodBase x, MethodBase y) => x.Module == y.Module && x.MetadataToken == y.MetadataToken;
-        string[] CallersOf(Type type, string name) => Calls(typeof(CampaignState).Assembly)
-            .Where(call => Same(call.Target, type.GetMethod(name, Declared)!))
-            .Select(call => $"{Root(call.From.DeclaringType)!.Name}.{call.From.Name}")
-            .Distinct().Order(StringComparer.Ordinal).ToArray();
-        Assert.Equal(["BetweenRunsScene.PutDown"], CallersOf(typeof(CampaignState), nameof(CampaignState.Move)));
+        Assert.Equal(["BetweenRunsScene.PutDown"], CallersOf(typeof(CampaignState), nameof(CampaignState.Move)));   // TestIl.CallersOf
         Assert.Equal(["CampaignState.Move"], CallersOf(typeof(CampaignState), "Put"));
         Assert.Equal(["CampaignState.Enqueue", "CampaignState.Move"], CallersOf(typeof(CampaignState), "Take"));
 
         // And a hand is armed from its bag in the three places that empty one: the
         // rest before a dungeon, the door, and a deposit (Phase 6a.3a).
         Assert.Equal(["CampaignState.Enqueue", "CampaignState.Move", "PartyMemberState.Rest"], CallersOf(typeof(PartyMemberState), nameof(PartyMemberState.ArmFromBag)));
+    }
+
+    [Fact]
+    public void AMoveNeverLandsOnAPotion_AndThePageNeverOffersOne()
+    {
+        // A potion lies in a member's bag and is never moved by hand (PHASE 6b
+        // DECISION 1): the door refuses a move onto its slot — a slot holds one
+        // thing — and a move from it, from the stable or a bag alike, and nothing
+        // moves. The stable holds weapons alone.
+        var campaign = NewCampaign();
+        var a = TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)));
+        campaign.Move(Slot("B", 1), Stable(0));
+        var bags = campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
+        var onto = Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 1), Slot("A", 2)));
+        Assert.Contains("PHASE 6b DECISION 1", onto.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Stable(0), Slot("A", 2)));
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 2), Stable(1)));
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 2), Slot("C", 3)));
+        Assert.Equal(bags, campaign.Party.Select(member => member.Inventory.ToArray()));
+        Assert.Single(campaign.Stable);
+        Assert.Equal(((Weapon?)null, (IItem?)TestPotions.Health(2)), (campaign.WeaponAt(Slot("A", 2)), campaign.ItemAt(Slot("A", 2))));
+
+        // The page lists it, grey, under its member — never chosen and never put down
+        // on — and the room left in A's bag counts the empty slots alone, from the
+        // first of them past the potion.
+        var rows = HubWeapons.Rows(campaign);
+        var potion = Assert.Single(rows, row => row.Kind == HubWeapons.RowKind.Potion);
+        Assert.Equal(("  BAG   HEALTH POTION Q2", Slot("A", 2)), (potion.Text, potion.Place));
+        Assert.Equal((false, false), (potion.Choosable, potion.Target));
+        Assert.Equal([new DungeonHud.Run("  BAG   HEALTH POTION Q2", DungeonHud.Grey)], HubWeapons.Runs(potion));
+        int at = rows.ToList().IndexOf(potion);
+        Assert.Equal(["[A]", "  HAND  WEAKSPOT STILETTO", "  BAG   STAFF OF RENEWAL", "  BAG   HEALTH POTION Q2", HubWeapons.BagRoom(3)],
+            rows.Skip(at - 3).Take(5).Select(row => row.Kind == HubWeapons.RowKind.Weapon ? $"{row.Label}{HubWeapons.Name(row.Weapon!)}" : row.Text));
+        Assert.Equal(Slot("A", 3), rows[at + 1].Place);
+        Assert.Same(a, campaign.Party[0]);
+
+        // Every step passes over it: browsing, and carrying a weapon to put down.
+        var page = new HubWeapons(campaign);
+        for (int step = 0; step < 2 * rows.Count; step++)
+        {
+            page.Step(+1);
+            Assert.NotEqual(HubWeapons.RowKind.Potion, page.ChosenRow.Kind);
+        }
+        while (page.ChosenRow.Kind != HubWeapons.RowKind.Weapon)
+            page.Step(+1);
+        Assert.NotNull(page.TakeUp());
+        for (int step = 0; step < 2 * rows.Count; step++)
+        {
+            page.Step(-1);
+            Assert.True(page.ChosenRow.Target, page.ChosenRow.Text);
+        }
+        Assert.NotNull(page.PutBack());
     }
 
     [Fact]
@@ -391,6 +438,6 @@ public sealed class StableTests : IDisposable
         Assert.Equal(RunOutcome.Retreat, CampaignRuns.Exit(loaded).Outcome);
         Assert.Equal(["staff_of_renewal", "staff_of_mire"], loaded.Stable.Select(weapon => weapon.Id));
         loaded.Move(Stable(0), Slot("A", 1));
-        Assert.Equal("staff_of_renewal", loaded.Party[0].Inventory[1]!.Id);
+        Assert.Equal("staff_of_renewal", loaded.Party[0].WeaponIn(1)!.Id);
     }
 }

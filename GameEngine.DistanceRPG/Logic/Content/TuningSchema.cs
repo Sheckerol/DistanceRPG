@@ -2,9 +2,10 @@ namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
 /// The groups <c>tuning.json</c> is laid out under: §5.3's ten, in §5.3's order
-/// (S:80-91), then the four groups of keys its starting set does not list, which
-/// sit beside it. <see cref="Consumables"/> holds no key yet: its keys arrive with
-/// the readers Phase 6b builds (<see cref="TuningSchema.Deferred"/>).
+/// (P5:107-118), then the four groups of keys its starting set does not list, which
+/// sit beside it. <see cref="Consumables"/> holds what a drink costs and what a
+/// potion restores, each arrived with the drink that reads it (Phase 6b.2), and
+/// the farm's yield, arrived with the farm (Phase 6b.3).
 /// <see cref="Enchanter"/> holds what a hit wears and what a deposit costs, the
 /// user's ruling of 2026-09-25, whose keys were declared ahead of Phase 6a's
 /// enchanter and are played since its rules read them
@@ -63,7 +64,8 @@ public abstract record TuningKey(string Name, TuningGroup Group)
     /// The save version whose tuning hash first covers this key (PHASE 6a
     /// DECISION 9): 1 for every key a rule played when version 1 was the format,
     /// and the version a key starts to play with for one that starts later —
-    /// Phase 6a's, which play from version 2. A save's hash is of the keys played
+    /// Phase 6a's, which play from version 2, and Phase 6b's, from version 3. A
+    /// save's hash is of the keys played
     /// at the version it records (<see cref="SaveFile.TuningHashVersion"/>), so a
     /// campaign saved before a key played is never told the numbers changed for a
     /// number it was never played under: it is compared on its own version's keys,
@@ -82,7 +84,7 @@ public sealed record BoolKey(string Name, TuningGroup Group,
 
 /// <summary>
 /// A table of whole numbers by name — namespaced scalars, never a list and never
-/// nested, so "scalars only" (S:60) holds leaf by leaf (A4). A file beside the
+/// nested, so "scalars only" (P5:87) holds leaf by leaf (A4). A file beside the
 /// game names only the entries it changes, and the rest keep the built-in
 /// copy's numbers: the read merges per entry (<see cref="TuningJson.Read"/>).
 /// </summary>
@@ -111,10 +113,10 @@ public sealed record TableKey(string Name, TuningGroup Group, int Min, int Max,
 /// <para>
 /// <strong>What it never holds</strong>: anything the golden tests pin — the
 /// map generator's, the random streams' and the pathfinder's constants stay
-/// compiled "permanently and without exception" (S:48-51), which a test asserts
-/// against a hardcoded list — and nothing structural (S:57-60): the relations
+/// compiled "permanently and without exception" (P5:75-78), which a test asserts
+/// against a hardcoded list — and nothing structural (P5:84-87): the relations
 /// are <c>restricted.json</c>'s, the classes and variants content's. And no
-/// decay constant: a status loses one level a round, universally (S:83).
+/// decay constant: a status loses one level a round, universally (P5:110).
 /// </para>
 /// </summary>
 public static class TuningSchema
@@ -132,13 +134,13 @@ public static class TuningSchema
     /// played since a Phase 6a rule reads it (<see cref="TuningKey.Played"/>).
     /// <c>WearPerHit</c>, <c>EnchanterWorksOn</c> and the improvement roll's
     /// <c>GraftBaseChance</c> — which waited here until Phase 6a.4 — arrived with
-    /// their readers, so only the Consumables' wait now.
+    /// their readers, and so did the Consumables' first three with the drink
+    /// (Phase 6b.2) and the farm's yield with the farm (Phase 6b.3), so no key
+    /// waits now: every key has its reader. The dictionary is kept, empty, with the
+    /// headings it names, for the next key that is promised before its reader.
     /// </summary>
     public static IReadOnlyDictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)> Deferred { get; } =
-        new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>
-        {
-            [TuningGroup.Consumables] = ("Phase 6b", ["PotionUseCost", "HealthPotionPercent", "ManaPotionPercent", "FarmYieldPerClear"]),
-        };
+        new Dictionary<TuningGroup, (string Phase, IReadOnlyList<string> Keys)>();
 
     private static readonly IReadOnlyDictionary<string, TuningKey> ByName =
         Keys.ToDictionary(k => k.Name, StringComparer.Ordinal);
@@ -336,6 +338,22 @@ public static class TuningSchema
         Int(nameof(Tuning.PartyCarrySlots), TuningGroup.Inventory, GameConstants.PartySize, GameConstants.PartySize * GameConstants.MaxInventorySlots,
             t => t.PartyCarrySlots, (t, v) => t with { PartyCarrySlots = v }),
 
+        // Consumables (§3.4, §6.6) — what a drink costs and what a potion restores,
+        // each played, hashed from the save's version 3, since Phase 6b.2's drink
+        // reads it, and what the farm yields, since Phase 6b.3's farm reads it. A
+        // drink's cost clamps as a swap's does, whose principle it shares (§3.4): 0
+        // makes it free, and 10000 is MovementBudget's ceiling — no rule ties it to
+        // the budget, as none ties the swap's. A share is a percentage a unit of
+        // quality: 1 at least, since it divides the quality that restores a whole
+        // pool (Alchemist.QualityForAll), and 100 makes one unit a whole pool. The
+        // farm's yield a clear is a count of units: 0 is a dial (the farm yields
+        // nothing), and 1000 is where the file's magnitudes clamp — the ceiling a
+        // saved yield is held to, a clear at a time (ContentBounds.MostYieldPerClear).
+        PlayedFrom3(Int(nameof(Tuning.PotionUseCost), TuningGroup.Consumables, 0, 10000, t => t.PotionUseCost, (t, v) => t with { PotionUseCost = v })),
+        PlayedFrom3(Int(nameof(Tuning.HealthPotionPercent), TuningGroup.Consumables, 1, 100, t => t.HealthPotionPercent, (t, v) => t with { HealthPotionPercent = v })),
+        PlayedFrom3(Int(nameof(Tuning.ManaPotionPercent), TuningGroup.Consumables, 1, 100, t => t.ManaPotionPercent, (t, v) => t with { ManaPotionPercent = v })),
+        PlayedFrom3(Int(nameof(Tuning.FarmYieldPerClear), TuningGroup.Consumables, 0, 1000, t => t.FarmYieldPerClear, (t, v) => t with { FarmYieldPerClear = v })),
+
         // Progression (§2.2) — not in §5.3's list
         Int(nameof(Tuning.WeaponXpPerLevel), TuningGroup.Progression, 1, 100000, t => t.WeaponXpPerLevel, (t, v) => t with { WeaponXpPerLevel = v }),
 
@@ -372,6 +390,13 @@ public static class TuningSchema
     /// never played under it — is compared without it.
     /// </summary>
     private static IntKey PlayedFrom2(IntKey key) => key with { HashedFrom = 2 };
+
+    /// <summary>
+    /// <paramref name="key"/>, which a rule of play reads from Phase 6b, with the
+    /// save's version 3: a save's hash covers it from that version, so a campaign
+    /// saved at version 1 or 2 — never played under it — is compared without it.
+    /// </summary>
+    private static IntKey PlayedFrom3(IntKey key) => key with { HashedFrom = 3 };
 
     /// <summary>
     /// A table keyed by an enum's members, read as the game reads it: every
@@ -416,7 +441,7 @@ public static class TuningSchema
     /// <summary>
     /// <c>ApplyPercent</c>, keyed by enchantment id: the catalogue lays each
     /// entry the table names over that entry's own percentage, so the dial owns
-    /// the number for every id it names (S:84, S:128) — and for the entries the
+    /// the number for every id it names (P5:111, P5:155) — and for the entries the
     /// catalogue leaves to it (<see cref="EnchantmentDefinitions.SetByTuning"/>),
     /// it is the only number there is. The table is every id the tuning names,
     /// in ordinal order.
