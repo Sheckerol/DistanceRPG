@@ -217,6 +217,8 @@
   gain, rolled back from a snapshot taken at dungeon entry. Retreat and death
   already shared the mercy tick (§6.3, floor 3+); they no longer share an XP
   outcome — surviving the climb out is what earns the difference. (§4.4, §5.1.)
+  **Superseded by Phase 7** (*Death, revives and the wipe*, below): the third
+  outcome is the wipe, which resets the run's XP rather than clawing back a share.
 - **Finding a dungeon's boss floor does not commit you to fighting it.**
   Declining and retreating instead is a legitimate choice — it re-rolls the
   depth for next visit, accepted as part of the risk/reward rather than an
@@ -793,7 +795,8 @@
   because those were never two events.
 - **A fully worn weapon is not broken.** It swings identically; it simply stops
   banking, so further hits are work done for free. That is the entire penalty,
-  and it is the right one — this design has no punishment mechanics, and
+  and it is the right one — this design has no punishment mechanics (Phase 7
+  narrows this to gear: death takes run XP, never equipment), and
   degradation would be a death spiral in a game whose way out of trouble is to
   fight. It also supplies the bound on hoarding that §6.4's deposit-timing
   decision needed: you cannot wait past full.
@@ -4447,3 +4450,63 @@ its number, and this pass records the ruling when it is made.
   holds at its worst numbers, and `... - 3 DUNGEONS WORK IT` on the summary,
   whose line for the farm growing has the room to say which count: `THE FARM
   GROWS TO 3 DUNGEONS BEYOND THE TUTORIAL`.
+
+## Death, revives and the wipe — Phase 7 (2026-11-02, planned)
+
+Supersedes "dead for the rest of the run" and the earlier single
+`DeathXpLossPercent` clawback, which applied only to a party wipe (§4.4, as
+shipped in Phase 4). Planned as its own phase rather than rewritten into §4.4:
+see [phase-7-death](phase-7-death.md).
+
+- **A fallen member is down for the encounter, not the run.** Losing a body for
+  the rest of the dungeon was a death spiral: every later fight harder, the next
+  death likelier. A death still costs the fight you are in, which keeps it a
+  tactical event; it stops costing every fight after.
+- **An encounter ends on the switch from combat back to movement mode** — no
+  live enemy in view. Breaking line of sight counts, deliberately: escaping was
+  the hard part. The check moves into `Logic/` as `TurnSystem.CombatEnded` and
+  ignores the marching spacing test.
+- **Reviving costs half the member's XP gained since entering the dungeon**, in
+  every pool, levels recomputed. `DeathXpLossPercent` = 50, tunable (§5.3).
+  Pre-dungeon progress is never touched.
+- **Repeat deaths get cheaper, and that is accepted.** Each one halves what is
+  left, so the penalty shrinks with the reward for continuing. One character
+  spiralling back to baseline across a whole run is a visible, plannable
+  weakness, not a lost body, and is fine.
+- **A revived member gets up beside the leader, not where they fell** —
+  nearest free tile behind the leader along the march trail. Reviving in place
+  would put them back in a fight the party just escaped, and marching would drag
+  the other three after them.
+- **A wipe is the whole party down within one encounter.** It resets every
+  member's XP to the entry snapshot, levels included — fixed at 100%, not tuned —
+  and ejects the party from the dungeon, forfeiting loot and `DefeatCount` and
+  taking the mercy tick if deep enough. Deaths cannot accumulate across
+  encounters, so the existing all-dead check is the wipe check.
+- **Leaving the dungeon by any route sets the new baseline.** Whatever XP each
+  member walks out with, after penalties, is what the next entry snapshots.
+- **Gear never punishes you; death is the one thing that takes back, and it
+  takes run XP.** §6.1's "no punishment mechanics" is narrowed to equipment
+  accordingly.
+- **PHASE 7 DECISION 1 — leaving with a fallen member (§7.5), ruled
+  2026-11-03.** Leaving ends the encounter: a member carried out the way out
+  revives and pays the death cut before the run ends, so the next baseline is
+  taken after it and a body cannot be carried home to dodge it. The stairs work
+  the same way from the other side: the arrival check on the new floor revives
+  the fallen if no live enemy is in view there.
+- **PHASE 7 DECISION 2 — the stored outcome is `PartyWipe` (§7.4, §7.7), ruled
+  2026-11-03.** `RunOutcome.Death` is renamed `PartyWipe` in code, on screen
+  (`PARTY WIPE`) and in the save, taken with save version 4 and a migration step
+  that rewrites a stored `"Death"`. Changing the save format is cheap at this
+  point, and "party wipe" says exactly what ended the run.
+- **PHASE 7 DECISION 3 — a save taken while a member is down (§7.2, §5.1), ruled
+  2026-11-03.** Accepted with no new field: `ActorDto.Alive` already records it,
+  and the member revives at the first turn-start check after the load that finds
+  no live enemy in view. A Phase 6b save loaded under Phase 7 follows Phase 7's
+  rules — the rule changed, not the save.
+- **PHASE 7 DECISION 4 — a revived member's mana (§7.1), ruled 2026-11-03.**
+  As it was when they fell, capped at their new `UsableMaxMana`. Only HP is
+  refilled: dying never tops up a caster better than the members who survived.
+- **PHASE 7 DECISION 5 — when a revive happens (§7.2), ruled 2026-11-03.** At
+  the start of the player turn that finds no live enemy in view — the moment the
+  game already drops into movement mode — never mid-turn when the last enemy in
+  view falls.

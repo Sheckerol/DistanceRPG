@@ -6,7 +6,7 @@ Lands last, once the state model above is final.
 
 | Group | Contents |
 | --- | --- |
-| Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
+| Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (Phase 7: each death removes `DeathXpLossPercent` of a member's gain since it, a wipe resets to it; shipped: §4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
 | Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity` — built in Phase 6a as `wear` and `wearCashed`, the wear ever cashed, from which the capacity and its progress are replayed as HP is from its XP: settled.md's Phase 6a pass, PHASE 6a DECISION 2), active status effects, the hidden `Overheal` remainder, carried consumables — built in Phase 6b as a member's `potions`, each its bag slot, type and quality, in the save's version 3, and the last run's result saying what the farm yielded and what spoiled (settled.md's Phase 6b pass; PHASE 6b DECISION 6, provisional and the user's to rule) |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
@@ -112,7 +112,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Modifiers | `AcquiredHeadroom`, per-stack values, `MaxForged` overrides |
 | Farming | `DefeatStackChance`, `ReviveStepPercent`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
-| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
+| Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` (Phase 7 makes it the per-death share; a wipe's reset is fixed, not tuned) |
 | Enchanter | `WearPerHit`, `GraftBaseChance`, and what a deposit costs by the user's ruling of 2026-09-25 (settled.md): `WearCapacityPerBar`, `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`, `FirstEnchantmentWear`, `EnchantmentWearStep` — superseding `WearCapacityLadder` (30/40/55) and `EnchantmentWearCost` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` — played since Phase 6b, each with its reader, and hashed from the save's version 3 (settled.md's Phase 6b pass; `FarmYieldPerClear` is PHASE 6b DECISION 7, provisional and the user's to rule) |
