@@ -30,16 +30,16 @@ public class RestrictedDataTests
     [Fact]
     public void DefaultRestricted_Validates()
     {
-        var known = KnownPlus(ContentDefaults.EnchantmentIds.ToArray());
-        ContentValidator.ValidateRestricted(ContentDefaults.Restricted, known);   // does not throw
-        Assert.NotNull(GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        var known = KnownPlus(ShippedContent.Enchantments.Enchantments.Select(e => e.Id).ToArray());   // the ids the shipped relations may name: the catalogue's
+        ContentValidator.ValidateRestricted(ShippedContent.Restricted, known);   // does not throw
+        Assert.NotNull(TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.NotNull(GameContent.Current);   // the static init loaded the same defaults
     }
 
     [Fact]
     public void Default_DeclaresTheDocumentedRelations()
     {
-        var r = ContentDefaults.Restricted;
+        var r = ShippedContent.Restricted;
 
         Assert.Equal(7, r.Excludes.Count);
         Assert.Equal(new[] { "Brace", "Opportunist", "Overwatch" }, r.Excludes[0]);
@@ -180,6 +180,29 @@ public class RestrictedDataTests
     }
 
     [Fact]
+    public void Validator_RejectsAnEnchantmentInKindOrForgedOnly()
+    {
+        // kind and forgedOnly are relations only modifiers have (§1.1's weapon-kind
+        // restriction and its safety rule): the modifier rules keep their modifier
+        // rows and nothing reads an enchantment's, so an enchantment named in either
+        // could only be dropped silently. The relations' own check refuses it,
+        // naming the enchantment — kind in ordinal key order, forgedOnly in its own.
+        var known = KnownPlus("flaming", "burning");
+
+        var kind = Assert.Throws<ContentException>(() => ContentValidator.ValidateRestricted(
+            Data(kind: new Dictionary<string, string> { ["flaming"] = "caster", ["Brace"] = "melee", ["burning"] = "melee" }), known));
+        Assert.Equal(("burning", ContentValidator.RuleModifierRelationIds), (kind.EntryId, kind.Rule));
+
+        var forgedOnly = Assert.Throws<ContentException>(() =>
+            ContentValidator.ValidateRestricted(Data(forgedOnly: ["Charges", "flaming", "burning"]), known));
+        Assert.Equal(("flaming", ContentValidator.RuleModifierRelationIds), (forgedOnly.EntryId, forgedOnly.Rule));
+
+        // Modifiers in both pass, as they always have.
+        ContentValidator.ValidateRestricted(
+            Data(kind: new Dictionary<string, string> { ["Brace"] = "melee" }, forgedOnly: ["Charges"]), known);   // does not throw
+    }
+
+    [Fact]
     public void Validator_AcceptsRelationsOverEnchantmentIds_OnceTheyAreKnown()
     {
         var data = Data(
@@ -198,7 +221,7 @@ public class RestrictedDataTests
     {
         var before = GameContent.Current;
         var ex = Assert.Throws<ContentException>(() =>
-            GameContent.Load(new Tuning(), Data(excludes: [["Brace", "Brace"]]), ContentDefaults.Enchantments, ContentDefaults.Weapons));
+            TestContent.Load(ShippedContent.Tuning, Data(excludes: [["Brace", "Brace"]]), ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal(ContentValidator.RuleSelfExclusion, ex.Rule);
         Assert.Same(before, GameContent.Current);
     }
@@ -209,20 +232,21 @@ public class RestrictedDataTests
         // The relations under test, plus the opposed-element pairs the enchantment catalogue is checked
         // against and the never-rolled list the default souls' unique flag is cross-checked with. A
         // headroom of one banks two stacks on a two-modifier weapon, so this tuning's bosses pay one at
-        // most: a boss never pays as much as the farm (PHASE4-045), and a load refuses one that would.
-        var content = GameContent.Load(
-            new Tuning { AcquiredHeadroom = 1, BossStackOffset = 9 },
+        // most — an offset a floor short of the deepest boss floor: a boss never pays as much as the
+        // farm (PHASE4-045), and a load refuses one that would.
+        var content = TestContent.Load(
+            ShippedContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = ShippedContent.Tuning.BossFloorMax - 1 },
             Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
-                 neverRolled: ContentDefaults.Restricted.NeverRolled),
-            ContentDefaults.Enchantments, ContentDefaults.Weapons);
+                 neverRolled: ShippedContent.Restricted.NeverRolled),
+            ShippedContent.Enchantments, ShippedContent.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);
         Assert.NotSame(content, GameContent.Current);
-        Assert.Equal(5, GameContent.Current.Modifiers.AcquiredHeadroom);
+        Assert.Equal(ShippedContent.Tuning.AcquiredHeadroom, GameContent.Current.Modifiers.AcquiredHeadroom);   // the running content's is the shipped one still
 
         // Use makes content current; re-using the current content is the only safe swap in a parallel suite.
         GameContent.Use(GameContent.Current);
-        Assert.Same(ContentDefaults.Tuning, GameContent.Current.Tuning);
+        Assert.Same(ShippedContent.Tuning, GameContent.Current.Tuning);
     }
 
     [Theory]

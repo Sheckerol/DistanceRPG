@@ -1,3 +1,4 @@
+using System.Reflection;
 using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG.Tests;
@@ -6,12 +7,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §4.2 and §4.3's seed arithmetic: the per-floor seed, the three new salts and
 /// the streams they keep apart, and the boss floor's roll — the doc's formulas
 /// verbatim, floor 0 resolving to the map seed exactly so the golden dungeon is
-/// untouched, and the tutorial's pinned depth. In the content collection because
-/// one test swaps the tuning the roll reads its range from.
+/// untouched, and the tutorial's pinned depth. The roll's range is two tuning
+/// keys, and these stand on the 5 to 10 they were written against
+/// (<see cref="Premise"/>), made current for each test; one test swaps the range
+/// over it, so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class DungeonSeedTests
+public sealed class DungeonSeedTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The shipped seed, which does not fit in an int.</summary>
     private const long GoldenSeed = 2762136374;
 
@@ -203,6 +210,118 @@ public class DungeonSeedTests
     }
 
     [Fact]
+    public void TheDiceComeOffTheirOwnStream()
+    {
+        // Phase 5.7 (1c, USER DECISION 1, ruled by the user, 2026-09-25): the
+        // visit's d20 is a stream family of its own — draw n is the first roll of
+        // SplitMix32(mapSeed ^ DiceSalt ^ n × DiceMix), a stream per draw, so the
+        // die's position is one integer a save holds — on two new constants,
+        // written out here as literals so this pins the formula rather than
+        // restating the code.
+        Assert.Equal((0x7FEB352DL, 0x846CA68BL), (DungeonState.DiceSalt, DungeonState.DiceMix));
+        foreach (long seed in new[] { GoldenSeed, 0L, uint.MaxValue })
+            foreach (int draw in new[] { 0, 1, 2, 4095, 4096 })
+                Assert.Equal(Fingerprint(new Mulberry32(FarmLadder.SplitMix32(seed ^ 0x7FEB352D ^ (draw * 0x846CA68BL)))),
+                    Fingerprint(DungeonState.DiceStream(seed, draw)));
+
+        // Each odd and 32-bit — the mix odd, so no two of the first 2^32 draws share
+        // a composed seed — and neither a value any other salt or mix in Logic holds,
+        // every one of them found by reflection, the private ones included.
+        var constants = TestIl.Types(typeof(Floor).Assembly)
+            .Where(t => t.Namespace == typeof(Floor).Namespace)
+            .SelectMany(t => t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(f => f.IsLiteral && (f.Name.EndsWith("Salt", StringComparison.Ordinal) || f.Name.EndsWith("Mix", StringComparison.Ordinal)))
+            .Select(f => (Name: $"{f.DeclaringType!.Name}.{f.Name}", Value: Convert.ToInt64(f.GetRawConstantValue())))
+            .ToArray();
+        Assert.Contains(constants, c => c.Name == $"{nameof(DungeonState)}.{nameof(DungeonState.FloorSalt)}");   // the scan finds the salts it guards
+        foreach (long dice in new[] { DungeonState.DiceSalt, DungeonState.DiceMix })
+        {
+            Assert.InRange(dice, 1L, uint.MaxValue);
+            Assert.Equal(1, dice & 1);
+            Assert.Single(constants, c => c.Value == dice);
+        }
+
+        // No draw a visit can plausibly roll is a stream anything else rolls on,
+        // under the shipped BossFloorMax: dice draws 0 to 4096 coincide with no
+        // drop, revival or boss-drop stream of any floor a boss can then sit on
+        // (indices 0 to 9), over the domain the Phase 3 and 4 families are
+        // verified on — drops to spawn 128, revivals to spawn and cycle 64. Every
+        // family here is SplitMix32 over the map seed XORed with a term of its own,
+        // so the check holds whatever the map seed; the dice are keyed by the
+        // visit's seed, the rest by each floor's.
+        const int Draws = 4096;
+        int floors = GameContent.Current.Tuning.BossFloorMax;
+        Assert.Equal(10, floors);
+        foreach (long seed in new[] { GoldenSeed, 0L })
+        {
+            var finalized = new Dictionary<ulong, string>();
+            void Finalized(Mulberry32 stream, string name)
+            {
+                ulong print = Fingerprint(stream);
+                if (!finalized.TryAdd(print, name))
+                    Assert.Fail($"{name} is the same stream as {finalized[print]}");
+            }
+            for (int n = 0; n < floors; n++)
+            {
+                long floorSeed = DungeonState.FloorSeed(seed, n);
+                for (int spawn = 0; spawn <= 128; spawn++)
+                    Finalized(LootTable.StreamFor(floorSeed, spawn), $"drop: floor {n}, spawn {spawn}");
+                for (int spawn = 0; spawn <= 64; spawn++)
+                    for (int cycle = 0; cycle <= 64; cycle++)
+                        Finalized(FarmLadder.ReviveStream(floorSeed, spawn, cycle), $"revival: floor {n}, spawn {spawn}, cycle {cycle}");
+                Finalized(BossLoot.StreamFor(floorSeed), $"boss drop: floor {n}");
+            }
+            for (int draw = 0; draw <= Draws; draw++)
+                Finalized(DungeonState.DiceStream(seed, draw), $"dice: draw {draw}");
+            Assert.Equal(floors * (129 + 65 * 65 + 1) + Draws + 1, finalized.Count);
+
+            // Far outside, at draw 34,430, the die meets floor index 8 / spawn 50 /
+            // cycle 2's revival roll: a d20 and a revival sharing a number, which
+            // breaks nothing and exploits nothing — the sharing settled.md's Phase 4
+            // pass accepts for the families beside it. Pinned so the record stays true.
+            Assert.Equal(
+                Fingerprint(DungeonState.DiceStream(seed, 34_430)),
+                Fingerprint(FarmLadder.ReviveStream(DungeonState.FloorSeed(seed, 8), 50, 2)));
+        }
+
+        // A tuning can dig deeper than the shipped ten: tuning.json clamps
+        // BossFloorMax at 99, so a tuning can put a boss as deep as floor index 98.
+        // Over every floor down to there, in the same domain, the dice meet exactly
+        // one other stream: floor index 58's revival roll for spawn 7, cycle 16 is
+        // dice draw 2801, and the 58 floors above it stay clean. The same harmless
+        // sharing as draw 34,430's, pinned the same way so the record stays true.
+        // The other families' meetings with one another are not asked here: past
+        // the 21st floor they meet too, accepted and pinned by
+        // PastTwentyOneFloors_TwoDummiesMayShareARevivalRoll.
+        int deepest = Assert.IsType<IntKey>(TuningSchema.Find(nameof(Tuning.BossFloorMax))).Max;
+        Assert.Equal(99, deepest);
+        foreach (long seed in new[] { GoldenSeed, 0L })
+        {
+            var dice = new Dictionary<ulong, int>();
+            for (int draw = 0; draw <= Draws; draw++)
+                dice.Add(Fingerprint(DungeonState.DiceStream(seed, draw)), draw);
+
+            var met = new List<string>();
+            void Against(Mulberry32 stream, string name)
+            {
+                if (dice.TryGetValue(Fingerprint(stream), out int draw))
+                    met.Add($"dice: draw {draw} is {name}");
+            }
+            for (int n = 0; n < deepest; n++)
+            {
+                long floorSeed = DungeonState.FloorSeed(seed, n);
+                for (int spawn = 0; spawn <= 128; spawn++)
+                    Against(LootTable.StreamFor(floorSeed, spawn), $"drop: floor {n}, spawn {spawn}");
+                for (int spawn = 0; spawn <= 64; spawn++)
+                    for (int cycle = 0; cycle <= 64; cycle++)
+                        Against(FarmLadder.ReviveStream(floorSeed, spawn, cycle), $"revival: floor {n}, spawn {spawn}, cycle {cycle}");
+                Against(BossLoot.StreamFor(floorSeed), $"boss drop: floor {n}");
+            }
+            Assert.Equal(new[] { "dice: draw 2801 is revival: floor 58, spawn 7, cycle 16" }, met);
+        }
+    }
+
+    [Fact]
     public void BossFloorIsTheDocsFormulaVerbatim()
     {
         // PHASE4-020: bossFloor = 5 + new Mulberry32(mapSeed ^ BossSalt).NextInt(0, 5),
@@ -279,7 +398,7 @@ public class DungeonSeedTests
         // The 5-10 is two tuning keys, read through the content that is current:
         // swap them and every unpinned dungeon rolls over the new range, by the
         // same one draw.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { BossFloorMin = 3, BossFloorMax = 4 });
+        using var _ = TestContent.UsePremise(tuning: t => t with { BossFloorMin = 3, BossFloorMax = 4 });
         var hall = Dungeon("spear_hall");
         var tutorial = GameContent.Current.Dungeons.Tutorial;
 

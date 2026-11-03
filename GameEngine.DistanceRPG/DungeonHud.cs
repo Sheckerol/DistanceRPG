@@ -12,9 +12,12 @@ namespace GameEngine.DistanceRPG;
 /// badges, the stairs' labels and the cue at the one underfoot, what lies on the
 /// floor (a corpse's drop, or a weapon the party put down), the click and aim
 /// cues, floating combat text, the end-of-turn banner, the inventory panel and
-/// its "leave" (X, then the slot), the pause menu and the way out's prompt with
-/// what leaving now means, the stairs' fade and the banner over it (the floor
-/// reached, the trade on the boss floor, the boss's fall), and the run's end —
+/// its "leave" (X, then the slot), the pause menu — close, save by hand, quit to
+/// the title, and the slot the run saves itself into (<see cref="PauseMenuLayout"/>,
+/// which the screen between runs draws too) — and the way out's prompt with what
+/// leaving now means, the stairs' fade and the banner over it (the floor reached,
+/// the trade on the boss floor, the boss's fall, <c>RESUMED</c> over a floor a
+/// save brought back), and the run's end —
 /// its summary, over the defeat screen when the party wiped, in the lines the
 /// between-runs screen repeats above the dungeon list (<see cref="BetweenRunsHud"/>).
 /// Every number it shows is a resolved one — a swing's cost
@@ -78,15 +81,67 @@ public sealed class DungeonHud
 
     /// <summary>
     /// A banner across the upper third of the screen: a small line over it, the
-    /// line itself, any lines of warning under it, and how long it stays up.
+    /// line itself, any lines of warning under it, and how long it stays up — and,
+    /// over a floor a save brought back, <see cref="ResumedLine"/> over all of it
+    /// (<see cref="Header"/>). It sits under the notices that were up when it went
+    /// up, <see cref="NoticeRows"/> rows lifted <see cref="NoticeLift"/>
+    /// (<see cref="BannerLine"/>), and keeps that place until it comes down, so it
+    /// never jumps when they fade first.
     /// </summary>
-    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds);
+    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds, string Header = "",
+        int NoticeRows = 0, float NoticeLift = 0f);
 
-    // The banner up now (ShowArrival, ShowBossFall), and how long it has been up —
+    /// <summary>What a resumed visit's banner says over the floor banner (1f): <c>RESUMED</c>, where the screen between runs says <c>CAMPAIGN RESUMED FROM SLOT 2</c>.</summary>
+    internal const string ResumedLine = "RESUMED";
+
+    /// <summary>How long a resumed floor's banner stays up: long enough to read what it resumed and the trade under it.</summary>
+    private const float ResumedBannerSeconds = WarningBannerSeconds;
+
+    /// <summary>The <see cref="ResumedLine"/> header: its scale, and how far over the banner's over-line it sits.</summary>
+    private const float HeaderScale = 3f;
+    internal const float HeaderLift = 34f;
+
+    /// <summary>How far the banner's over-line (the dungeon's name, on arrival) sits over its main line.</summary>
+    internal const float OverLineRise = 30f;
+
+    // The banner up now (ShowArrival, ShowResume, ShowBossFall), and how long it has been up —
     // taken down early (HideArrival) the moment the party starts off the floor it
     // speaks of.
     private Banner? _banner;
     private float _bannerAge;
+
+    /// <summary>How long the startup notices stay over the first floor, and the last stretch of it over which they fade: long enough to read the four rows a capped list runs to (<see cref="NoticeLife"/>).</summary>
+    private const float NoticeSeconds = 12f;
+    private const float NoticeFadeSeconds = 2f;
+
+    /// <summary>How much longer the notices stay up for each row past a capped list's four: the save's word, shown whole over a resumed floor, can run to a dozen.</summary>
+    private const float NoticeSecondsPerRow = 2f;
+
+    /// <summary>The notices' rows: their scale, their pitch, and the gap they keep above the banner's line over it.</summary>
+    private const float NoticeScale = 1.5f;
+    internal const float NoticePitch = 18f;
+    private const float NoticeGap = 12f;
+
+    /// <summary>
+    /// The highest a notice row is drawn: under the two readouts along the top —
+    /// the MOVE line, and the weapon line at 42 under it — so a notice is never
+    /// drawn over them or off the window. When the rows reach it, the banner
+    /// moves down to make room (<see cref="BannerLine"/>).
+    /// </summary>
+    internal const float NoticeTopMargin = 62f;
+
+    // The notices up now (ShowNotices, ShowResume, ShowSaveFailed): what they say
+    // and how many of them, from the first, are shown whole — the save's word — so
+    // a save that fails can be said among them; the rows NoticeText laid them out
+    // as, how long they have been up and how long they stay; and how far they sit
+    // over the banner's over-line — clear of RESUMED on a resumed floor, for as
+    // long as they are up, which outlasts the banner.
+    private IReadOnlyList<string> _notices = [];
+    private int _noticesWhole;
+    private IReadOnlyList<string> _noticeRows = [];
+    private float _noticeAge;
+    private float _noticeSeconds;
+    private float _noticeLift;
 
     public DungeonHud(Game game)
     {
@@ -105,10 +160,70 @@ public sealed class DungeonHud
     {
         ArgumentNullException.ThrowIfNull(visit);
         var trade = BossFloorBanner(visit);
-        _banner = new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
-            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds);
+        PutUp(new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
+            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds));
+    }
+
+    /// <summary>Put <paramref name="banner"/> up under the notices up now, which it keeps its place under until it comes down (<see cref="Banner"/>).</summary>
+    private void PutUp(Banner banner)
+    {
+        _banner = banner with { NoticeRows = _noticeRows.Count, NoticeLift = _noticeLift };
         _bannerAge = 0f;
     }
+
+    /// <summary>
+    /// Put up what a floor a save brought back says (1f, Phase 5.8): the floor's
+    /// own arrival banner — the dungeon's name over the floor reached, the trade
+    /// under it on the boss floor (<see cref="ShowArrival"/>) — with
+    /// <see cref="ResumedLine"/> over it all, up long enough to read; and the
+    /// game's notices over that. First the save's word on the campaign —
+    /// resumed from its backup, the numbers changed, a file set aside with its
+    /// full path and how to try it again — <strong>shown whole</strong>, as the
+    /// screen between runs shows it (S8's review: a notice cut off here would hide
+    /// the one thing the player has to act on). Then what the data files raised,
+    /// capped as every screen caps it (<see cref="NoticeText.Rows"/>), the log
+    /// keeping every word. The banner moves down to make room when the word runs
+    /// long (<see cref="BannerLine"/>). The load's word that it resumed the slot's
+    /// own save, which the screen between runs leads with — <c>CAMPAIGN RESUMED
+    /// FROM SLOT 2</c>, <c>... FROM THE OLD AUTOSAVE</c>, whatever slot it names
+    /// (<see cref="CampaignBoot.SaysResumedFromItsSave"/>) — is the banner's own
+    /// word here, so it is not said twice, and is not counted among the notices
+    /// shown whole; resumed from the backup, the word says so, whole.
+    /// </summary>
+    /// <param name="visit">The visit resumed, standing on the floor it was saved on.</param>
+    /// <param name="notices">What the game has to say, in order: the save's word, then what the data files raised.</param>
+    /// <param name="leading">How many of <paramref name="notices"/>, from the first, are the save's word on the campaign (<see cref="StartupNotices.Leading"/>).</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="leading"/> is negative.</exception>
+    public void ShowResume(DungeonState visit, IReadOnlyList<string> notices, int leading)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        ArgumentNullException.ThrowIfNull(notices);
+        ArgumentOutOfRangeException.ThrowIfNegative(leading);
+
+        var said = new List<string>(notices.Count);
+        int whole = 0;
+        for (int i = 0; i < notices.Count; i++)
+        {
+            if (CampaignBoot.SaysResumedFromItsSave(notices[i]))
+                continue;   // RESUMED over the banner says it
+            if (i < leading)
+                whole++;
+            said.Add(notices[i]);
+        }
+        LayNotices(said, whole, HeaderLift);   // first: the banner goes up under them
+
+        ShowArrival(visit);
+        _banner = _banner! with { Header = ResumedLine, Seconds = MathF.Max(_banner.Seconds, ResumedBannerSeconds) };
+    }
+
+    /// <summary>The banner up now, its lines top to bottom — <see cref="ResumedLine"/> first on a resumed floor, then the line over the banner, the banner, and what is under it — or none once it is down: what the HUD draws, for a test to read with no window.</summary>
+    internal IReadOnlyList<string> BannerLines => _banner is not { } banner
+        ? []
+        : [.. new[] { banner.Header, banner.Over }.Where(line => line.Length > 0), banner.Main, .. banner.Under];
+
+    /// <summary>Where the banner up now is drawn in a window <paramref name="windowHeight"/> pixels tall — under the notices it went up under (<see cref="BannerLine"/>) — or null once it is down: for a test to read with no window.</summary>
+    internal float? BannerLineIn(float windowHeight)
+        => _banner is { } banner ? BannerLine(windowHeight, banner.NoticeRows, banner.NoticeLift) : null;
 
     /// <summary>
     /// The boss is down (§4.3): the banner says who fell and what that means —
@@ -123,8 +238,7 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(boss);
         var (headline, aftermath) = BossFalls(boss);
         IReadOnlyList<string> under = drop is null ? [aftermath] : [aftermath, BossDropLine(drop, boss.Theme)];
-        _banner = new Banner("", headline, under, WarningBannerSeconds);
-        _bannerAge = 0f;
+        PutUp(new Banner("", headline, under, WarningBannerSeconds));
     }
 
     /// <summary>
@@ -137,6 +251,109 @@ public sealed class DungeonHud
     /// <see cref="ShowArrival"/> puts one up as ever.
     /// </summary>
     public void HideArrival() => _banner = null;
+
+    /// <summary>
+    /// Put the startup notices up over the arrival banner — what the data files
+    /// raised: a <c>tuning.json</c> value clamped or fitted, a file missing — for a
+    /// dungeon the game booted straight into, which never passes the screen
+    /// between runs that says them otherwise. Wrapped and capped by
+    /// <see cref="NoticeText.Rows"/>, the one wrapper every notice goes through,
+    /// and up for as long as they take to read (<see cref="NoticeLife"/>), fading
+    /// at the end.
+    /// </summary>
+    public void ShowNotices(IReadOnlyList<string> notices)
+    {
+        ArgumentNullException.ThrowIfNull(notices);
+        LayNotices(notices, whole: 0, lift: 0f);
+    }
+
+    /// <summary>
+    /// Say over the floor being played, at once, that a save could not be written
+    /// (1f): <paramref name="notice"/>, the save's word, shown whole ahead of the
+    /// notices up now, all of them up long enough to read from now
+    /// (<see cref="NoticeLife"/>). The next screen between runs says it too; here it
+    /// is said where the player is, so a run whose saves fail is never played on
+    /// as though it were being saved. A notice already up is not said twice — an
+    /// autosave that fails at every turn's start fails with the same words — and
+    /// only stays up from now. The rows sit clear of <see cref="ResumedLine"/> when
+    /// the banner up now carries it, and a banner up now that went up under fewer
+    /// rows moves down under these (<see cref="BannerLine"/>), so no row is drawn
+    /// over it; it never moves up.
+    /// </summary>
+    /// <param name="notice">The failed write's notice (<see cref="CampaignBoot.NotSaved"/>), or that of a file the write set aside first (<see cref="CampaignBoot.SetAsideNotice"/>), said alike.</param>
+    public void ShowSaveFailed(string notice)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(notice);
+        bool up = _noticeRows.Count > 0;
+        IReadOnlyList<string> said = up ? _notices : [];
+        int whole = up ? _noticesWhole : 0;
+        float lift = up ? _noticeLift : _banner is { Header.Length: > 0 } ? HeaderLift : 0f;
+        if (said.Take(whole).Contains(notice, StringComparer.Ordinal))
+            LayNotices(said, whole, lift);
+        else
+            LayNotices([notice, .. said], whole + 1, lift);
+
+        if (_banner is { } banner && _noticeRows.Count > banner.NoticeRows)
+            _banner = banner with { NoticeRows = _noticeRows.Count, NoticeLift = _noticeLift };
+    }
+
+    /// <summary>
+    /// Put <paramref name="notices"/> up over the banner as <see cref="NoticeText.Rows"/>
+    /// lays them out, the first <paramref name="whole"/> of them shown whole,
+    /// <paramref name="lift"/> over its over-line, for as long as they take to read
+    /// (<see cref="NoticeLife"/>).
+    /// </summary>
+    private void LayNotices(IReadOnlyList<string> notices, int whole, float lift)
+    {
+        _notices = notices;
+        _noticesWhole = whole;
+        _noticeRows = NoticeText.Rows(notices, whole);
+        _noticeAge = 0f;
+        _noticeSeconds = NoticeLife(_noticeRows.Count);
+        _noticeLift = lift;
+    }
+
+    /// <summary>
+    /// How long <paramref name="rows"/> rows of notices stay up:
+    /// <see cref="NoticeSeconds"/> for a list capped as every screen caps one —
+    /// three rows and the one that counts the rest — and
+    /// <see cref="NoticeSecondsPerRow"/> more for each row past that, so the
+    /// save's word, shown whole over a resumed floor, is up long enough to read.
+    /// </summary>
+    internal static float NoticeLife(int rows)
+        => NoticeSeconds + Math.Max(0, rows - (NoticeText.MaxRows + 1)) * NoticeSecondsPerRow;
+
+    /// <summary>The notice rows up now, as <see cref="ShowNotices"/>, <see cref="ShowResume"/> or <see cref="ShowSaveFailed"/> laid them out: what the HUD draws over the banner.</summary>
+    internal IReadOnlyList<string> NoticeRows => _noticeRows;
+
+    /// <summary>How far the notice rows up now sit over the banner's over-line: <see cref="HeaderLift"/> on a resumed floor, clear of <see cref="ResumedLine"/>, and none elsewhere.</summary>
+    internal float NoticeLift => _noticeLift;
+
+    /// <summary>
+    /// Where the banner's line — the top of its main line — sits in a window
+    /// <paramref name="windowHeight"/> pixels tall, under <paramref name="noticeRows"/>
+    /// rows of notices lifted <paramref name="noticeLift"/> over its over-line. It
+    /// sits a third of the way down, as it always has, while the rows fit between
+    /// it and the readouts along the top. When they do not, it sits lower by as
+    /// much as they need (<see cref="NoticeTopMargin"/>). The save's word, shown
+    /// whole over a resumed floor, can run to a dozen rows: no row of it is drawn
+    /// over the readouts, off the window, or over the banner.
+    /// </summary>
+    internal static float BannerLine(float windowHeight, int noticeRows, float noticeLift)
+    {
+        float line = windowHeight / 3f;
+        if (noticeRows <= 0)
+            return line;
+        return line + MathF.Max(0f, NoticeTopMargin - NoticesTopOver(line, noticeRows, noticeLift));
+    }
+
+    /// <summary>Where the first of <paramref name="noticeRows"/> notice rows sits in a window <paramref name="windowHeight"/> pixels tall: a gap over the banner's over-line, lifted <paramref name="noticeLift"/> more, over a banner at <see cref="BannerLine"/>, and never higher than <see cref="NoticeTopMargin"/>.</summary>
+    internal static float NoticesTop(float windowHeight, int noticeRows, float noticeLift)
+        => NoticesTopOver(BannerLine(windowHeight, noticeRows, noticeLift), noticeRows, noticeLift);
+
+    /// <summary>Where the first of <paramref name="rows"/> notice rows sits over a banner whose line is <paramref name="line"/>: the last row ends a gap over the over-line, lifted <paramref name="lift"/> more.</summary>
+    private static float NoticesTopOver(float line, int rows, float lift)
+        => line - OverLineRise - lift - NoticeGap - rows * NoticePitch;
 
     /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
     public void ClearFloatingTexts() => _floatingTexts.Clear();
@@ -187,6 +404,17 @@ public sealed class DungeonHud
             _bannerAge += deltaTime;
             if (_bannerAge >= _banner.Seconds)
                 _banner = null;
+        }
+
+        if (_noticeRows.Count > 0)
+        {
+            _noticeAge += deltaTime;
+            if (_noticeAge >= _noticeSeconds)
+            {
+                _notices = [];
+                _noticesWhole = 0;
+                _noticeRows = [];
+            }
         }
     }
 
@@ -246,7 +474,7 @@ public sealed class DungeonHud
             DrawInventory(w, h, active, turns, scene.LeaveArmed);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h);
+            DrawMenu(w, h, scene);
 
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
             DrawConfirmLeave(w, h, scene.Visit);
@@ -274,6 +502,7 @@ public sealed class DungeonHud
         // being left came down when its fade began (HideArrival).
         _fade.Draw(_game.ShaderManager, scene.TransitFade);
         DrawBanner(scene, w, h);
+        DrawNotices(scene, w, h);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -492,8 +721,8 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The question the way out asks before the party leaves, with the keys
-    /// that answer it — never a number key, since 2 on the pause menu is the
-    /// exit from the game.
+    /// that answer it — never a number key, since the pause menu's number keys
+    /// save the game and leave play for the title.
     /// </summary>
     internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
 
@@ -595,8 +824,10 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to
-    /// the between-runs screen, and ESC does nothing there — what the run just
-    /// wrote lives only in memory until it is saved, so it never offers a quit.
+    /// the between-runs screen, and ESC does nothing there — leaving play is the
+    /// menu's to offer, and the screen between runs opens it. What the run wrote is
+    /// saved once the frame it ended in is over, the summary with it, so the screen
+    /// between runs shows it again when the campaign is next loaded from the title.
     /// </summary>
     internal const string ContinueHint = "ENTER TO CONTINUE";
 
@@ -646,21 +877,45 @@ public sealed class DungeonHud
     /// trade, what the fall means). Not over a menu or the game-over screen, whose
     /// words are at the same height and are the ones being asked about; and never
     /// over the fade away from the floor it speaks of, which takes it down as it
-    /// starts (<see cref="HideArrival"/>).
+    /// starts (<see cref="HideArrival"/>). A third of the way down, or lower under
+    /// notices that need the room (<see cref="BannerLine"/>).
     /// </summary>
     private void DrawBanner(DungeonScene scene, int w, int h)
     {
         if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
         float alpha = Math.Clamp((banner.Seconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
-        float y = h / 3f;
+        float y = BannerLine(h, banner.NoticeRows, banner.NoticeLift);
+        if (banner.Header.Length > 0)
+            DrawCentered(w, y - OverLineRise - HeaderLift, banner.Header, HeaderScale, Green with { W = alpha });
         if (banner.Over.Length > 0)
-            DrawCentered(w, y - 30f, banner.Over, 2f, Grey with { W = alpha });
+            DrawCentered(w, y - OverLineRise, banner.Over, 2f, Grey with { W = alpha });
         DrawCentered(w, y, banner.Main, 5f, White with { W = alpha });
         float underY = y + 52f;
         foreach (string line in banner.Under)
         {
             DrawCentered(w, underY, line, 2f, Yellow with { W = alpha });
             underY += 26f;
+        }
+    }
+
+    /// <summary>
+    /// The notices (<see cref="ShowNotices"/>, <see cref="ShowResume"/>, and a save
+    /// that failed, <see cref="ShowSaveFailed"/>),
+    /// over the arrival banner — above the line over it, and above
+    /// <see cref="ResumedLine"/> on a resumed floor, clear of the top readouts
+    /// (<see cref="NoticesTop"/>) — in the warning's orange, fading over their last
+    /// <see cref="NoticeFadeSeconds"/>. Like the banner, not over a menu or the
+    /// game-over screen.
+    /// </summary>
+    private void DrawNotices(DungeonScene scene, int w, int h)
+    {
+        if (_noticeRows.Count == 0 || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
+        float alpha = Math.Clamp((_noticeSeconds - _noticeAge) / NoticeFadeSeconds, 0f, 1f);
+        float y = NoticesTop(h, _noticeRows.Count, _noticeLift);
+        foreach (string row in _noticeRows)
+        {
+            DrawCentered(w, y, row, NoticeScale, Orange with { W = alpha });
+            y += NoticePitch;
         }
     }
 
@@ -1107,19 +1362,131 @@ public sealed class DungeonHud
         return $"LEFT {weapon.Name.ToUpperInvariant()} HERE";
     }
 
+    // ── The menu: the pause menu, and the same menu between runs ─────────────
+
     /// <summary>
-    /// The pause menu: close it, or leave the game. Stopping resurrection is the
-    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for
-    /// it went when the boss arrived — so what the dungeon has become is the
-    /// floor line's to say (<see cref="FloorLine"/>).
+    /// What the menu says under its options (1f): the run saves itself at every
+    /// turn's start and every arrival — into the slot the campaign came from, which
+    /// SAVE GAME saves too, so the player always knows which slot is theirs (the
+    /// user's ruling of 2026-09-25 on the save slots, R5): <c>PROGRESS SAVES TO SLOT
+    /// 2 AT EVERY TURN</c>, <c>... TO THE OLD AUTOSAVE ...</c>, <c>... TO THE SCRATCH
+    /// SLOT ...</c>. With no slot to name, <c>PROGRESS SAVES AT EVERY TURN</c>.
     /// </summary>
-    private void DrawMenu(int w, int h)
+    /// <param name="savesInto">The slot the campaign saves into, by its name (<see cref="ISaveHost.SavesInto"/>).</param>
+    internal static string PauseSavesLine(string savesInto)
+        => string.IsNullOrWhiteSpace(savesInto) ? "PROGRESS SAVES AT EVERY TURN" : $"PROGRESS SAVES TO {savesInto} AT EVERY TURN";
+
+    /// <summary>The menu's title, over its options.</summary>
+    internal const string PausedTitle = "PAUSED";
+
+    /// <summary>Under the menu's options and its line: ESC closes it.</summary>
+    internal const string EscToClose = "ESC TO CLOSE";
+
+    /// <summary>A glyph's height at scale 1: the font is 5 x 7.</summary>
+    private const float GlyphHeight = 7f;
+
+    // The menu's block, laid out from its top: the title, the options a pitch
+    // apart from where they start, the two lines under the last option, and the
+    // answer under them. The block sits where the menu always has, a little above
+    // the middle, and rises as far as it needs.
+    private const float MenuTitleScale = 4f;
+    private const float MenuOptionsTop = 66f;
+    private const float MenuOptionPitch = 40f;
+    private const float MenuOptionScale = 2f;
+    private const float MenuLineScale = 1.5f;
+    private const float MenuLinePitch = 24f;
+    private const float MenuAnswerGap = 30f;
+    private const float MenuAnswerPitch = 18f;
+    private const float MenuAnswerScale = 1.5f;
+    private const float MenuCentredOffset = 90f;
+
+    /// <summary>The highest the menu's block rises, and the room it keeps along the bottom — clear of the dungeon's help line at <c>h - 24</c> and the hub's keys at <c>h - 28</c>.</summary>
+    internal const float MenuTopMargin = 16f;
+    internal const float MenuBottomMargin = 32f;
+
+    /// <summary>One row of the menu as a screen draws it, centred on the window: its text, how far down, and its scale and colour.</summary>
+    internal readonly record struct MenuRow(string Text, float Y, float Scale, Vector4 Color)
     {
-        float top = h / 2f - 90f;
-        DrawCentered(w, top, "PAUSED", 4f, Cyan);
-        DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
-        DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
-        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
+        /// <summary>The row's width in pixels.</summary>
+        public float Width => Text.Length * GlyphAdvance * Scale;
+
+        /// <summary>Where the row's glyphs end, downward.</summary>
+        public float Bottom => Y + GlyphHeight * Scale;
+    }
+
+    /// <summary>
+    /// The menu, row by row, in a window <paramref name="w"/> by <paramref name="h"/>
+    /// (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)): the pause
+    /// menu, and the same menu over the hub between runs (<see cref="PauseMenu"/>).
+    /// The options under <see cref="PausedTitle"/>, a pitch apart —
+    /// <see cref="PauseMenu.SaveLine"/> dimmed where nothing can be saved by hand
+    /// (<paramref name="canSave"/>), 2 then saying why — and <strong>their two lines
+    /// under the last of them</strong>, however many there are: the slot the
+    /// campaign saves into (<paramref name="savesLine"/>, <see cref="PauseSavesLine"/>),
+    /// then <see cref="EscToClose"/>. Then the answer (<paramref name="answer"/>) —
+    /// what a save by hand came to, or why 2 saved nothing — wrapped as a notice is,
+    /// green for a save that went through and orange otherwise
+    /// (<see cref="AnswerColor"/>), inside the menu: a notice is never drawn over a
+    /// menu, and would age out unseen behind it. SAVE GAME opens no list: it saves
+    /// the campaign's own slot (the user's ruling of 2026-09-25 on the save slots,
+    /// R5). The block sits where the menu always has, a little above the middle, and
+    /// rises as far as it needs to end clear of the line along the bottom — never
+    /// above <see cref="MenuTopMargin"/>. Pure, so what is drawn is tested
+    /// (<c>SaveMenuTests</c>); only the drawing is not.
+    /// </summary>
+    /// <param name="w">The window's width, in pixels.</param>
+    /// <param name="h">The window's height, in pixels.</param>
+    /// <param name="options">The menu's options, top to bottom (<see cref="PauseMenu.Options"/>).</param>
+    /// <param name="canSave">Whether 2 can save now: a safe point.</param>
+    /// <param name="savesLine">The first line under the options: where the campaign saves (<see cref="PauseSavesLine"/>).</param>
+    /// <param name="answer">What the menu answers under its lines, or null for nothing.</param>
+    internal static IReadOnlyList<MenuRow> PauseMenuLayout(float w, float h, IReadOnlyList<string> options, bool canSave, string savesLine, string? answer)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(savesLine);
+
+        // Laid out from a top of 0, then moved down to where the block sits.
+        var rows = new List<MenuRow> { new(PausedTitle, 0f, MenuTitleScale, Cyan) };
+        for (int i = 0; i < options.Count; i++)
+            rows.Add(new MenuRow(options[i], MenuOptionsTop + i * MenuOptionPitch, MenuOptionScale,
+                options[i] == PauseMenu.SaveLine && !canSave ? DarkGrey : White));
+        float lines = MenuOptionsTop + options.Count * MenuOptionPitch;
+        rows.Add(new MenuRow(savesLine, lines, MenuLineScale, Grey));
+        rows.Add(new MenuRow(EscToClose, lines + MenuLinePitch, MenuLineScale, Grey));
+        if (answer is not null)
+        {
+            var color = AnswerColor(answer);
+            float y = lines + MenuLinePitch + MenuAnswerGap;
+            foreach (string row in NoticeText.Wrap(answer))
+            {
+                rows.Add(new MenuRow(row, y, MenuAnswerScale, color));
+                y += MenuAnswerPitch;
+            }
+        }
+
+        float bottom = rows.Max(row => row.Bottom);
+        float top = MathF.Max(MenuTopMargin, MathF.Min(h / 2f - MenuCentredOffset, h - MenuBottomMargin - bottom));
+        return rows.Select(row => row with { Y = row.Y + top }).ToList();
+    }
+
+    /// <summary>The answer's colour: green for a save by hand that went through (<see cref="CampaignBoot.SavedTo"/>), the warning's orange for one that did not, or for 2 saying why it saved nothing.</summary>
+    internal static Vector4 AnswerColor(string answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        return answer.StartsWith(CampaignBoot.SavedPrefix, StringComparison.Ordinal) ? Green : Orange;
+    }
+
+    /// <summary>
+    /// The pause menu (<see cref="PauseMenuLayout"/>): its options, the slot the
+    /// campaign saves into, and what a save by hand came to. Stopping resurrection is the
+    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for it
+    /// went when the boss arrived — so what the dungeon has become is the floor
+    /// line's to say (<see cref="FloorLine"/>).
+    /// </summary>
+    private void DrawMenu(int w, int h, DungeonScene scene)
+    {
+        foreach (var row in PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), scene.CanSaveNow, PauseSavesLine(scene.SavesInto), scene.MenuAnswer))
+            _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────

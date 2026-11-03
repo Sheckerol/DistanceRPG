@@ -4,9 +4,21 @@ using static GameEngine.DistanceRPG.Logic.StatusEffectType;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class DamagePipelineTests
+/// <summary>
+/// The damage chain step by step: the shares and the outputs, Block, Ward and
+/// the floor of one, the applier's one write. Every case stands on the numbers
+/// it was written against — the weapons' damage, the modifier table, a status's
+/// effect a level (<see cref="Premise"/>) — made current for each test, so the
+/// content collection holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class DamagePipelineTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static void Advance(TurnSystem turns, float seconds, float dt = 1f / 30f)
     {
@@ -33,9 +45,10 @@ public class DamagePipelineTests
     private static Weapon Club => TestWeapons.Make("Club", 40, 10, 30);
     private static Weapon Fists => TestWeapons.Make("Fists", 40, 1, 0);   // an enemy weapon with no Block
 
-    // Catalogue instances shared across this class, read-only: nothing here Acquires on them.
-    private static readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
-    private static readonly Weapon Spear = TestWeapons.Get("skirmishers_pike");     // dmg 7, Brace x1
+    // Catalogue instances shared across a test, read-only: nothing here Acquires on them. Made
+    // under the premise, which the field above makes current first (initialisers run in order).
+    private readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
+    private readonly Weapon Spear = TestWeapons.Get("skirmishers_pike");     // dmg 7, Brace x1
 
     private static PartyMemberState Member(Weapon? weapon, string id = "A")
         => TestPools.Holding(id, weapon);

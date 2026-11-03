@@ -23,8 +23,9 @@ public static class GameConstants
     /// </summary>
     public const float Tile = LogicUnitsPerTile;
 
-    /// <summary>Movement budget per character per turn, in logic units.</summary>
-    public const float MaxDistance = 160f;
+    // A party member's movement budget per turn lived here as a constant. It is
+    // Tuning.MovementBudget, tuning.json's number alone — play reads
+    // GameContent.Current.Tuning.MovementBudget, and no copy of it is kept in code.
 
     /// <summary>Player movement speed, logic units per second.</summary>
     public const float Speed = 160f;
@@ -70,12 +71,12 @@ public static class GameConstants
     /// <para>
     /// The slot count is all that is left here. Who the members are — their ids,
     /// their innate spreads, what they start holding and what is in the bag — is
-    /// the roster (<see cref="ContentDefaults.Party"/>, <c>party.json</c> in
-    /// Phase 5), read through <see cref="GameContent.Party"/> and turned into
-    /// members by <see cref="PartyMemberState.From"/>. It was stated twice, once
-    /// here as three hand-kept arrays and once as content, and only the copy
-    /// here was spawned: a roster edit changed nothing the player saw. One
-    /// source, and this constant is the one number both ends check.
+    /// the starting party (<see cref="StartingParty"/>, reference data in code),
+    /// read through <see cref="GameContent.Party"/> and turned into members by
+    /// <see cref="PartyMemberState.From"/>. It was stated twice, once here as
+    /// three hand-kept arrays and once as the roster, and only the copy here was
+    /// spawned: a roster edit changed nothing the player saw. One source, and
+    /// this constant is the one number both ends check.
     /// </para>
     /// </summary>
     public const int PartySize = 4;

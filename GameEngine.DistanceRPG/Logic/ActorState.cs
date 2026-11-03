@@ -29,6 +29,19 @@ public abstract class ActorState
 
     private int? _hp;
 
+    /// <summary>
+    /// <see cref="Hp"/> as stored: null while nobody has written it, when it
+    /// reads as the maximum. What a save writes and a load hands back (§5.1) —
+    /// the stored number and never the read one, since "unwritten" follows the
+    /// maximum as it grows and "full" does not. Internal: the save's door, not a
+    /// second way to set HP.
+    /// </summary>
+    internal int? RawHp
+    {
+        get => _hp;
+        set => _hp = value;
+    }
+
     /// <summary>Full hit points for this kind of actor.</summary>
     public abstract int MaxHp { get; }
 
@@ -171,6 +184,19 @@ public abstract class ActorState
     }
 
     private int? _mana;
+
+    /// <summary>
+    /// <see cref="Mana"/> as stored, before the read clamps it: null while nobody
+    /// has written it, when it reads as the spendable ceiling wherever the locks
+    /// move that. What a save writes and a load hands back (§5.1): a pool written
+    /// full and a pool never written read alike until a lock or a point moves the
+    /// ceiling, and then they part — so the save keeps which one it was.
+    /// </summary>
+    internal int? RawMana
+    {
+        get => _mana;
+        set => _mana = value;
+    }
 
     /// <summary>
     /// The pool this actor has earned (§2.2): what XP grows and what a save

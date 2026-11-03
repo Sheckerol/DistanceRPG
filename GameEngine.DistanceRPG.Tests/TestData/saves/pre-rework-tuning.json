@@ -1,0 +1,295 @@
+/*
+ * tuning.json - every number DistanceRPG is tuned by, on one screen.
+ *
+ * Read once, when the game starts: edit a number, save the file, and start the game again to play
+ * under it. A key left out keeps its built-in number, so a file may name only what it changes. A key
+ * the game does not know, a value out of range, or one that is not a whole number costs a warning on
+ * screen and a line in the log - never a crash: the game clamps it and plays on. Every value is a
+ * whole number, true or false, or a table of whole numbers by name: a ratio is an integer divisor
+ * with its units in its name, and a percentage says Percent.
+ *
+ * The copy to edit is the one beside the game (bin/Debug/net10.0/tuning.json - the log prints its
+ * full path). GameEngine.DistanceRPG/Data/tuning.json is generated from the compiled numbers
+ * (DistanceRPG --write-data <folder>) and pinned by the tests: a number worth keeping goes into
+ * Logic/Content/Tuning.cs, and the file is generated again.
+ *
+ * Nothing the golden tests pin - the map generator, the random streams, the pathfinder - is here.
+ */
+{
+  /* ---- Economy ---- */
+
+  /* Banked movement, in logic units (32 a tile), that buys one mana at a turn's end: mana regained
+     = unspent movement / MovementUnitsPerMana - an integer divisor, never a rate. Derived rather
+     than picked: a caster at Resonant x6 with a tier-1 enchantment sustains one cast a round
+     standing still, (MovementBudget 160 - a staff's 40) / (8 + 3 at Resonant x6) = 10.9 -> 10. It
+     does not follow MovementBudget or a cast cost on its own: when either moves, re-derive it by
+     hand. */
+  "MovementUnitsPerMana": 10,
+
+  /* How far each party member moves in a turn, in logic units (32 a tile): what every swing, cast
+     and swap is priced against, what a turn start refills and Mire cuts, the half of it a turn may
+     bank, and what scales an enemy's costs (its 100 against this). MovementUnitsPerMana does not
+     follow it - re-derive the divisor by hand, (MovementBudget 160 - a staff's 40) / (8 + 3 at
+     Resonant x6) = 10.9 -> 10; left alone, a longer budget also banks more mana a turn. */
+  "MovementBudget": 160,
+
+  /* The bar every pool opens on: max HP, max mana and (from Phase 6a) a weapon's wear capacity
+     alike. A point then costs currentMax / governing stat in XP, so every member starts level and
+     diverges through play. 30 admits two Regeneration locks, or exactly one Arcane. */
+  "StartingPool": 30,
+
+  /* ---- Statuses ---- */
+
+  /* The effect of one level of each status, the only dial a status has: 1 damage a level for
+     Poison, Bleeding and Searing, 1 HP for Regeneration, 1 point absorbed for Ward, 10 percent of
+     the movement budget for Mire (ten levels paralyse), 1 a hit for Sundered and Weakened, 1 Block
+     for Softened. No decay dial: a status loses one level a round, and a damage-over-time's tick is
+     its decay - Searing burns for its level, then loses one - so a burn lasts as many rounds as it
+     has levels, against however long the fight runs. */
+  "EffectPerLevel": {
+    "Regeneration": 1,
+    "Ward": 1,
+    "Poison": 1,
+    "Mire": 10,
+    "Sundered": 1,
+    "Weakened": 1,
+    "Bleeding": 1,
+    "OverhealPool": 1,
+    "Searing": 1,
+    "Softened": 1
+  },
+
+  /* Surplus healing points that make one Ward level: Overheal banks healing above full HP at this
+     many points to one level - a salvage, lossy on purpose, and it teaches no HP. */
+  "OverhealPerWard": 5,
+
+  /* Expected damage-over-time points one point of trigger mana buys: a status applier's trigger =
+     max(1, its expected total / DotDamagePerMana). The docs' DotManaPerDamage of 1/3, written as
+     its integer reciprocal 3 because a ratio is an integer divisor - there is no DotManaPerDamage
+     key. */
+  "DotDamagePerMana": 3,
+
+  /* ---- Appliers ---- */
+
+  /* Per enchantment id: the percentage of the source number (a hit's damage) that becomes status
+     levels - the one number that decides how many levels a source grants. An id named here sets
+     that enchantment's percentage, whatever its own entry says. The elements sit at different
+     points of the 10-25 band so their burns are paced apart; an element's percentage is also the
+     burn its lingering unique feeds. */
+  "ApplyPercent": {
+    "acidic": 15,
+    "cold": 15,
+    "flaming": 20,
+    /* Provisional: the docs' BleedPercent, the share of the weapon's own damage a hit leaves as
+       Bleeding - picked in the elements' band, fixed by no doc. */
+    "serrated": 20,
+    "shocking": 25
+  },
+
+  /* ---- Modifiers ---- */
+
+  /* Acquired stacks a modifier may gain above its forging: the farm allowance, cap = forged +
+     AcquiredHeadroom (forged + 5). A well-farmed two-modifier weapon banks twice it, and a boss
+     always pays less than that: BossStackOffset is raised to keep it so. */
+  "AcquiredHeadroom": 5,
+
+  /* What one stack of each modifier is worth - the modifier table: Block absorbs 3 a stack, Light
+     and Resonant take 10 percent off, Splitting and Softening strip 3 Block, the rest count one a
+     stack. Momentum and OnHitPoison never stack on a weapon. */
+  "PerStack": {
+    "Brace": 1,
+    "Block": 3,
+    "CritWindow": 1,
+    "CritMultiplier": 1,
+    "Cleave": 1,
+    "Charges": 1,
+    "Longshot": 1,
+    "Light": 10,
+    "Riposte": 1,
+    "Push": 1,
+    "Drag": 1,
+    "Splitting": 3,
+    "Overwatch": 1,
+    "Opportunist": 1,
+    "Rout": 1,
+    "Pin": 1,
+    "Softening": 3,
+    "CritWeaken": 1,
+    "CritSunder": 1,
+    "BlockWeaken": 1,
+    "OnHitPoison": 0,
+    "Resonant": 10,
+    "Momentum": 0
+  },
+
+  /* What a modifier grants before its first stack: CritMultiplier's base x2 and Charges' first
+     throw; nothing for the rest. */
+  "Offset": {
+    "Brace": 0,
+    "Block": 0,
+    "CritWindow": 0,
+    "CritMultiplier": 2,
+    "Cleave": 0,
+    "Charges": 1,
+    "Longshot": 0,
+    "Light": 0,
+    "Riposte": 0,
+    "Push": 0,
+    "Drag": 0,
+    "Splitting": 0,
+    "Overwatch": 0,
+    "Opportunist": 0,
+    "Rout": 0,
+    "Pin": 0,
+    "Softening": 0,
+    "CritWeaken": 0,
+    "CritSunder": 0,
+    "BlockWeaken": 0,
+    "OnHitPoison": 0,
+    "Resonant": 0,
+    "Momentum": 0
+  },
+
+  /* The deepest a weapon may be forged in each modifier: 3, a unique's one raised modifier, and 1
+     for the currency pair Light and Resonant. At most 3, and never below the deepest forging the
+     loaded weapons carry: a lower limit is raised to it, with a warning. */
+  "MaxForged": {
+    "Brace": 3,
+    "Block": 3,
+    "CritWindow": 3,
+    "CritMultiplier": 3,
+    "Cleave": 3,
+    "Charges": 3,
+    "Longshot": 3,
+    "Light": 1,
+    "Riposte": 3,
+    "Push": 3,
+    "Drag": 3,
+    "Splitting": 3,
+    "Overwatch": 3,
+    "Opportunist": 3,
+    "Rout": 3,
+    "Pin": 3,
+    "Softening": 3,
+    "CritWeaken": 3,
+    "CritSunder": 3,
+    "BlockWeaken": 3,
+    "OnHitPoison": 3,
+    "Resonant": 1,
+    "Momentum": 3
+  },
+
+  /* ---- Farming ---- */
+
+  /* Turns a dummy at DefeatCount 0 takes to get up: resurrectTurns(n) = max(ResurrectTurnsFloor,
+     ResurrectTurnsBase - n), so each death brings the next revival a turn sooner. */
+  "ResurrectTurnsBase": 10,
+
+  /* The shortest a revival ever gets - a two-turn revival is a treadmill, not a fight. At least 1,
+     or a dummy could get up the turn it died. */
+  "ResurrectTurnsFloor": 3,
+
+  /* The chance, as a percentage, that one farm cycle buys the drop a stack. Flat on purpose: what
+     ends a farm is the forged + AcquiredHeadroom ceiling. */
+  "DefeatStackChance": 50,
+
+  /* What a clean kill - a killing blow of at least the target's max HP - advances DefeatCount by:
+     two cycles of drop quality, and two of the dummy's statline. */
+  "CleanKillBonus": 2,
+
+  /* Provisional: the percentage of its own damage or max HP a dummy gains per revival -
+     proportional and compounding. At 15 an 18-damage axe dummy reaches 37 in five damage rolls. */
+  "ReviveStepPercent": 15,
+
+  /* ---- Uniques ---- */
+
+  /* The percentage the unique chance climbs toward and never reaches: no amount of grinding
+     guarantees a unique. */
+  "UniqueChanceCeilingPercent": 50,
+
+  /* The DefeatCount the unique curve is steepest at, where it passes half the ceiling. If a
+     twenty-times-revived dummy proves unsurvivable or trivial, this moves to match
+     ReviveStepPercent, never the other way round. */
+  "UniqueChanceMidpoint": 20,
+
+  /* How sharply the unique curve arrives, as a percentage: the docs' K = 0.26 is 26, tuned so
+     DefeatCount 5 lands near 1 percent. */
+  "UniqueChanceKPercent": 26,
+
+  /* ---- Dungeon ---- */
+
+  /* The shallowest floor number a boss is rolled onto at entry, counting floors from 1. A dungeon
+     that pins its own range - the tutorial's floor 2 - ignores it. */
+  "BossFloorMin": 5,
+
+  /* The deepest floor number a boss is rolled onto. Never shallower than BossFloorMin: raised to
+     it, with a warning. */
+  "BossFloorMax": 10,
+
+  /* The floors a boss's drop pays nothing for: its guaranteed stacks are max(0, boss floor -
+     BossStackOffset), 1 at floor 5 and 6 at floor 10. Raised, with a warning, until the deepest
+     boss - the range above, and every dungeon's pinned floor - pays less than a well-farmed weapon
+     banks (2 x AcquiredHeadroom). */
+  "BossStackOffset": 4,
+
+  /* Runs a clear locks its dungeon for, per floor its boss was beaten on: the lock is boss floor x
+     this, counted on the run counter. */
+  "CooldownRunsPerFloor": 1,
+
+  /* The floor number a failed run must have reached for the run to count (the mercy tick). */
+  "MercyFloor": 3,
+
+  /* Provisional: the percentage of this run's gain in each XP pool a wipe claws back. 100 erases
+     the run's progress; 0 makes death a pure loss of loot. */
+  "DeathXpLossPercent": 50,
+
+  /* How near the stairs, in whole tiles, every living member must stand for the party to take them. */
+  "StairGatherTiles": 3,
+
+  /* ---- Enchanter - Phase 6a: WearPerHit, WearCapacityLadder, EnchantmentWearCost, GraftBaseChance ---- */
+  /* No key yet: these arrive with the Phase 6a code that reads them, since a key nothing reads
+     would be a dial wired to nothing. */
+
+  /* ---- Inventory ---- */
+
+  /* The party's whole carry in weapon slots, shared evenly by its four members - 6 each at 24: slot
+     1 is the hand, the rest the bag, loot and weapons alike. Rounded down to a multiple of four, at
+     most 36 (nine a member, as far as the number keys reach), and never less than the roster's
+     starting loadouts need. */
+  "PartyCarrySlots": 24,
+
+  /* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */
+  /* No key yet: these arrive with the Phase 6b code that reads them, since a key nothing reads
+     would be a dial wired to nothing. */
+
+  /* ---- Progression ---- */
+
+  /* The weapon ladder's bar per level: XP to the next level = WeaponXpPerLevel x level / governing
+     stat. */
+  "WeaponXpPerLevel": 100,
+
+  /* ---- Combat ---- */
+
+  /* Movement a weapon swap costs once a live enemy has been seen this turn; free otherwise. */
+  "WeaponSwapCost": 20,
+
+  /* Tiles a Longshot shot travels before its bonus damage starts paying out. */
+  "LongshotFreeTiles": 3,
+
+  /* Whether area casts hit allies: off until the kiting AI and the wand placement scorer exist. */
+  "FriendlyFireEnabled": false,
+
+  /* The percentage of an area cast's damage an ally takes while friendly fire is on. */
+  "FriendlyFireAllyPercent": 50,
+
+  /* ---- Drops ---- */
+
+  /* Provisional: the chance, as a percentage, that a martial drop arrives carrying an enchantment -
+     a caster's is fixed by its variant. The docs name no number. */
+  "DropEnchantChancePercent": 10,
+
+  /* Provisional: the untyped damage a tier-1 Arcane adds to a hit, before its tier multiplies it;
+     it replaces the arcane entry's own potency. The docs price Arcane's lock and trigger and give
+     it no potency. */
+  "ArcanePotency": 4
+}

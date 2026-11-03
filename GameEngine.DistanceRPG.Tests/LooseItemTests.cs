@@ -15,10 +15,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// in, which is the scene's rule and is pinned on the items alone. Every fact a
 /// test leans on is pinned before it is used.
 /// </para>
+/// <para>
+/// The bags are the size the fixtures were written against — the carry
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
+/// </para>
 /// </summary>
-public class LooseItemTests
+[Collection(TestContent.Collection)]
+public sealed class LooseItemTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>The shipped seed: the tutorial is two floors deep on it.</summary>
     private const long GoldenSeed = 2762136374;

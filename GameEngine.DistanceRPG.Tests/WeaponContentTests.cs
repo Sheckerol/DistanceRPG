@@ -6,14 +6,26 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// The thirty-two weapons and the innate enchantments as content: the
 /// validator's checks, the statlines, the resolved costs, and the catalogue's
-/// lookups by stable id. In the content collection because one test swaps the
+/// lookups by stable id. In the content collection because tests here swap the
 /// current content.
+/// <para>
+/// The statlines and the wands' shapes are §1.2–§1.4's tables, pinned here as
+/// literals (<see cref="Statlines_MatchTheTables"/>,
+/// <see cref="WandShapes_MatchTheTable"/>: REWORK DECISION 3). Every other number
+/// is the master's: the ladders read it from the tuning the game reads, and the
+/// resolved costs' truncation is worked in the numbers the doc's examples were
+/// written against, made current for the test that works it (<see cref="Premise"/>).
+/// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
 public class WeaponContentTests
 {
     private static WeaponCatalogue Catalogue => GameContent.Current.Weapons;
     private static ModifierRules Rules => GameContent.Current.Modifiers;
+
+    /// <summary>The roll a wielder with <paramref name="stacks"/> of CritWindow crits on, as the tuning the game reads prices a stack.</summary>
+    private static int ThresholdAt(int stacks)
+        => CombatRules.NaturalTwenty - (ShippedContent.Tuning.Offset[CritWindow] + ShippedContent.Tuning.PerStack[CritWindow] * stacks);
 
     private static readonly WeaponClass[] MartialClasses =
         [WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe, WeaponClass.Ranged, WeaponClass.Throwing];
@@ -35,7 +47,18 @@ public class WeaponContentTests
         Assert.Equal(
             new[] { "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic" },
             innates.Select(e => e.Id));
-        Assert.Equal(GameContent.Current.Enchantments.Ids, ContentDefaults.EnchantmentIds);
+        // The ids content may name an enchantment by are the catalogue's
+        // twenty-two (UniqueContentTests pins their order), held literally: the
+        // catalogue is code and Current is built from it, so reading the
+        // expected ids back from a catalogue would compare it with itself.
+        Assert.Equal(
+            new[]
+            {
+                "regeneration", "ward", "poison", "mire", "flaming", "cold", "shocking", "acidic",
+                "vampiric", "arcane", "shattering", "aegis", "echoing",
+                "siphon", "weightless", "sturdy", "momentum", "overheal", "serrated", "immovable", "piercing", "burning",
+            }.Order(StringComparer.Ordinal),
+            GameContent.Current.Enchantments.Ids.Order(StringComparer.Ordinal));
         Assert.Equal(Catalogue.All.Count, Catalogue.All.Select(w => w.Id).Distinct().Count());
     }
 
@@ -67,7 +90,7 @@ public class WeaponContentTests
         foreach (var def in Catalogue.All)
         {
             int types = def.Forged.Count(f => f.Value > 0);
-            if (Weapon.KindOf(def.Class) == WeaponKind.Caster)
+            if (Catalogue.KindOf(def.Class) == WeaponKind.Caster)
             {
                 // A caster's second axis is its innate enchantment, not a stack: Resonant x1 and nothing else forged.
                 Assert.Equal(1, types);
@@ -205,39 +228,39 @@ public class WeaponContentTests
     }
 
     [Theory]
-    [InlineData("flensing_knife", "Flensing Knife", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
-    [InlineData("assassins_fang", "Assassin's Fang", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
-    [InlineData("disarming_kris", "Disarming Kris", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
-    [InlineData("weakspot_stiletto", "Weakspot Stiletto", WeaponClass.Dagger, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
-    [InlineData("arming_sword", "Arming Sword", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
-    [InlineData("tower_guard", "Tower Guard", WeaponClass.Sword, 80, 10, 50, 0, "Block x2, Push x1")]
-    [InlineData("riposte_blade", "Riposte Blade", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
-    [InlineData("wardens_shield", "Warden's Shield", WeaponClass.Sword, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
-    [InlineData("skirmishers_pike", "Skirmisher's Pike", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
-    [InlineData("phalanx_spear", "Phalanx Spear", WeaponClass.Spear, 128, 7, 55, 0, "Brace x2, Longshot x1")]
-    [InlineData("halberd", "Halberd", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Push x1")]
-    [InlineData("pinning_lance", "Pinning Lance", WeaponClass.Spear, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
-    [InlineData("hatchet", "Hatchet", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Light x1, Opportunist x1")]
-    [InlineData("great_axe", "Great Axe", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
-    [InlineData("reaver", "Reaver", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
-    [InlineData("routing_axe", "Routing Axe", WeaponClass.Axe, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
-    [InlineData("hunting_bow", "Hunting Bow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
-    [InlineData("longbow", "Longbow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x2")]
-    [InlineData("pinning_bow", "Pinning Bow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
-    [InlineData("crossbow", "Crossbow", WeaponClass.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Overwatch x1")]
-    [InlineData("darts", "Darts", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Light x1")]
-    [InlineData("bandolier", "Bandolier", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
-    [InlineData("harpoon", "Harpoon", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Drag x1")]
-    [InlineData("softening_javelins", "Softening Javelins", WeaponClass.Throwing, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
-    [InlineData("staff_of_renewal", "Staff of Renewal", WeaponClass.Staff, 100, 0, 40, 15, "Resonant x1")]
-    [InlineData("staff_of_warding", "Staff of Warding", WeaponClass.Staff, 100, 0, 40, 20, "Resonant x1")]
-    [InlineData("staff_of_blight", "Staff of Blight", WeaponClass.Staff, 100, 0, 40, 20, "Resonant x1")]
-    [InlineData("staff_of_mire", "Staff of Mire", WeaponClass.Staff, 100, 0, 40, 25, "Resonant x1")]
-    [InlineData("wand_of_the_blast", "Wand of the Blast", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_cone", "Wand of the Cone", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_beam", "Wand of the Beam", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    [InlineData("wand_of_the_nova", "Wand of the Nova", WeaponClass.Wand, 160, 8, 45, 20, "Resonant x1")]
-    public void Statlines_MatchTheTables(string id, string name, WeaponClass cls, int range, int damage, int cost, int manaCost, string forged)
+    [InlineData("flensing_knife", "Flensing Knife", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, Light x1")]
+    [InlineData("assassins_fang", "Assassin's Fang", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x2, CritMultiplier x1")]
+    [InlineData("disarming_kris", "Disarming Kris", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritWeaken x1")]
+    [InlineData("weakspot_stiletto", "Weakspot Stiletto", WeaponClass.Dagger, WeaponKind.Melee, 40, 15, 30, 0, "CritWindow x1, CritMultiplier x1, CritSunder x1")]
+    [InlineData("arming_sword", "Arming Sword", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Light x1, Push x1")]
+    [InlineData("tower_guard", "Tower Guard", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x2, Push x1")]
+    [InlineData("riposte_blade", "Riposte Blade", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Riposte x1, Push x1")]
+    [InlineData("wardens_shield", "Warden's Shield", WeaponClass.Sword, WeaponKind.Melee, 80, 10, 50, 0, "Block x1, Push x1, BlockWeaken x1")]
+    [InlineData("skirmishers_pike", "Skirmisher's Pike", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Light x1")]
+    [InlineData("phalanx_spear", "Phalanx Spear", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x2, Longshot x1")]
+    [InlineData("halberd", "Halberd", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Push x1")]
+    [InlineData("pinning_lance", "Pinning Lance", WeaponClass.Spear, WeaponKind.Melee, 128, 7, 55, 0, "Brace x1, Longshot x1, Pin x1")]
+    [InlineData("hatchet", "Hatchet", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Light x1, Opportunist x1")]
+    [InlineData("great_axe", "Great Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x2, Opportunist x1")]
+    [InlineData("reaver", "Reaver", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Splitting x2, Opportunist x1")]
+    [InlineData("routing_axe", "Routing Axe", WeaponClass.Axe, WeaponKind.Melee, 60, 18, 60, 0, "Cleave x1, Opportunist x1, Rout x1")]
+    [InlineData("hunting_bow", "Hunting Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Light x1")]
+    [InlineData("longbow", "Longbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x2")]
+    [InlineData("pinning_bow", "Pinning Bow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Pin x1")]
+    [InlineData("crossbow", "Crossbow", WeaponClass.Ranged, WeaponKind.Ranged, 320, 5, 30, 0, "CritWindow x1, Longshot x1, Overwatch x1")]
+    [InlineData("darts", "Darts", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Light x1")]
+    [InlineData("bandolier", "Bandolier", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x2")]
+    [InlineData("harpoon", "Harpoon", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Drag x1")]
+    [InlineData("softening_javelins", "Softening Javelins", WeaponClass.Throwing, WeaponKind.Ranged, 190, 9, 15, 0, "CritMultiplier x1, Charges x1, Softening x1")]
+    [InlineData("staff_of_renewal", "Staff of Renewal", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 15, "Resonant x1")]
+    [InlineData("staff_of_warding", "Staff of Warding", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
+    [InlineData("staff_of_blight", "Staff of Blight", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 20, "Resonant x1")]
+    [InlineData("staff_of_mire", "Staff of Mire", WeaponClass.Staff, WeaponKind.Caster, 100, 0, 40, 25, "Resonant x1")]
+    [InlineData("wand_of_the_blast", "Wand of the Blast", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_cone", "Wand of the Cone", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_beam", "Wand of the Beam", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    [InlineData("wand_of_the_nova", "Wand of the Nova", WeaponClass.Wand, WeaponKind.Caster, 160, 8, 45, 20, "Resonant x1")]
+    public void Statlines_MatchTheTables(string id, string name, WeaponClass cls, WeaponKind kind, int range, int damage, int cost, int manaCost, string forged)
     {
         var def = Catalogue[id];
         Assert.Equal(name, def.Name);
@@ -249,7 +272,13 @@ public class WeaponContentTests
         Assert.Equal((id, name, cls), (weapon.Id, weapon.Name, weapon.Class));
         Assert.Equal((range, damage, cost, manaCost), (weapon.Range, weapon.Damage, weapon.Cost, weapon.ManaCost));
         Assert.Equal(forged, weapon.Forged.ToString());   // in ModifierType order
-        Assert.Equal(Weapon.KindOf(cls), weapon.Kind);
+
+        // The kind each class plays as, as §1.1 fixes it — bows and throwing are
+        // ranged, staves and wands cast, the rest melee — held literally: the kind
+        // is its class row's in weapons.json now, and reading the expected value
+        // back from that row would be the very definition of Weapon.Kind
+        // (REWORK DECISION 3, a doc-fixed pin).
+        Assert.Equal(kind, weapon.Kind);
         Assert.Equal(cls is WeaponClass.Staff or WeaponClass.Wand, weapon.IsCaster);
     }
 
@@ -269,6 +298,10 @@ public class WeaponContentTests
     [Fact]
     public void ResolvedCost_TruncatesLightDiscount()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // statlines' costs, Light's ten percent a stack and the headroom of five.
+        using var premise = TestContent.UsePremise();
+
         Assert.Equal(27, TestWeapons.Get("flensing_knife").ResolvedCost);    // 30 x 90 / 100
         Assert.Equal(49, TestWeapons.Get("skirmishers_pike").ResolvedCost);  // 55 x 90 / 100 = 49.5, truncated
         Assert.Equal(13, TestWeapons.Get("darts").ResolvedCost);             // 15 x 90 / 100 = 13.5
@@ -302,6 +335,10 @@ public class WeaponContentTests
     [Fact]
     public void ResolvedManaCost_TruncatesResonant()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // staves' mana, Resonant's ten percent a stack and the headroom of five.
+        using var premise = TestContent.UsePremise();
+
         var mire = TestWeapons.Get("staff_of_mire");
         Assert.Equal(25, mire.ManaCost);
         Assert.Equal(22, mire.ResolvedManaCost);   // x1: 25 x 90 / 100 = 22.5
@@ -326,6 +363,10 @@ public class WeaponContentTests
     [Fact]
     public void Acquire_ClampsAtForgedPlusFive_AndRefreshesResolvedCost()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // headroom of five, a stack of window a point, Light's ten percent.
+        using var premise = TestContent.UsePremise();
+
         var fang = TestWeapons.Get("assassins_fang");   // CritWindow x2 forged
         fang.Acquire(CritWindow, 10);
         Assert.Equal(7, fang.Stacks(CritWindow));        // 2 + 5
@@ -357,12 +398,13 @@ public class WeaponContentTests
         // takes, so it asks the predicate a roll gates its offers on: a refused stack throws and the weapon is
         // untouched. Nothing ever gives a bow its first Charges, a Brace, or a member outside the table.
         var bow = TestWeapons.Get("longbow");
+        int cost = bow.ResolvedCost;
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Charges, 1));       // forged only: deepened, never granted
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Brace, 1));         // melee only
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(Momentum, 1));      // an enchantment, never a stack
         Assert.Throws<InvalidOperationException>(() => bow.Acquire(OnHitPoison, 1));   // reserved: no behaviour
         Assert.Equal(bow.Forged, bow.Modifiers);
-        Assert.Equal(30, bow.ResolvedCost);
+        Assert.Equal(cost, bow.ResolvedCost);
 
         // One displacement direction: a sword that pushes is never given a pull, nor a Rout (which wants a Cleave besides).
         var guard = TestWeapons.Get("tower_guard");
@@ -383,33 +425,35 @@ public class WeaponContentTests
     }
 
     [Theory]
-    [InlineData(0, 20)]
-    [InlineData(1, 19)]
-    [InlineData(2, 18)]
-    [InlineData(3, 17)]
-    [InlineData(6, 14)]
-    [InlineData(8, 12)]
-    public void CritWindowLadder(int stacks, int threshold)
+    [InlineData(0)]   // the natural 20 alone, as shipped
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(6)]
+    [InlineData(8)]
+    public void CritWindowLadder(int stacks)
     {
         var actor = TestPools.Char("A");
         actor.Innate = ModifierSet.Of((CritWindow, stacks));
-        Assert.Equal(threshold, CombatRules.CritThreshold(actor));
+        Assert.Equal(ThresholdAt(stacks), CombatRules.CritThreshold(actor));
     }
 
     [Fact]
     public void CritWindow_IsForgedOnDaggersAndBowsOnly_CritMultiplierOnDaggersAndThrowing()
     {
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("weakspot_stiletto")));
-        Assert.Equal(18, CombatRules.CritThreshold(TestWeapons.Get("assassins_fang")));
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("hunting_bow")));
-        Assert.Equal(19, CombatRules.CritThreshold(TestWeapons.Get("longbow")));   // Purity deepens Longshot, not the window: the variant table wins over the stale ladder row
+        // The stacks are §1.2's spreads; what a stack is worth is the tuning's.
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("weakspot_stiletto")));
+        Assert.Equal(ThresholdAt(2), CombatRules.CritThreshold(TestWeapons.Get("assassins_fang")));
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("hunting_bow")));
+        Assert.Equal(ThresholdAt(1), CombatRules.CritThreshold(TestWeapons.Get("longbow")));   // Purity deepens Longshot, not the window: the variant table wins over the stale ladder row
         foreach (var def in Catalogue.All.Where(d => d.Class is not (WeaponClass.Dagger or WeaponClass.Ranged)))
-            Assert.Equal(20, CombatRules.CritThreshold(Any(def)));
+            Assert.Equal(ThresholdAt(0), CombatRules.CritThreshold(Any(def)));
 
+        var tuning = ShippedContent.Tuning;
         foreach (var def in Catalogue.All)
         {
-            int expected = def.Class is WeaponClass.Dagger or WeaponClass.Throwing ? 3 : 2;
-            Assert.Equal(expected, Any(def).Modifiers.Value(CritMultiplier));
+            int stacks = def.Class is WeaponClass.Dagger or WeaponClass.Throwing ? 1 : 0;
+            Assert.Equal(tuning.Offset[CritMultiplier] + tuning.PerStack[CritMultiplier] * stacks, Any(def).Modifiers.Value(CritMultiplier));
         }
     }
 
@@ -436,6 +480,11 @@ public class WeaponContentTests
     [Fact]
     public void Enchantment_LevelsAndTriggerCosts_FollowTheLadder()
     {
+        // Worked in the numbers the doc's examples were written against: the
+        // tuning's percentages, three damage a point of mana, Resonant's ten
+        // percent a stack.
+        using var premise = TestContent.UsePremise();
+
         var staff = TestWeapons.Get("staff_of_renewal");
         var regeneration = staff.Innate!;
         Assert.Equal(1, regeneration.LevelsFor(1));
@@ -460,16 +509,18 @@ public class WeaponContentTests
     [Fact]
     public void Validator_RefusesIllegalWeapons_NamingEntryAndRule()
     {
-        // Past MaxForged: Light x2, and Resonant x2 on a staff, caught before the caster check reads the spread.
-        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, 2)) });
+        // Past MaxForged — a stack past whatever limit tuning.json sets — on Light, and on Resonant on a staff,
+        // caught before the caster check reads the spread.
+        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, Rules.MaxForged(Light) + 1)) }, ShippedContent.Tuning);
         Assert.Equal(("flensing_knife", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
-        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, 2)) });
+        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, Rules.MaxForged(Resonant) + 1)) }, ShippedContent.Tuning);
         Assert.Equal(("staff_of_mire", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
 
-        // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of.
+        // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of,
+        // its detail naming the field and the whole range, the top the forge limit of the tuning in hand.
         ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, -1)) });
         Assert.Equal(("flensing_knife", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
-        Assert.Contains("Light x-1", ex.Message);
+        Assert.Contains($"forged.Light -1 is outside 1 to {ForgeRoom.MaxForged[Light]}", ex.Message);
         ex = LoadWith("darts", w => w with { Forged = Spread((CritMultiplier, 1), (Charges, 1), (Light, 0)) });
         Assert.Equal(("darts", ContentValidator.RuleForgedStackCount), (ex.EntryId, ex.Rule));
 
@@ -504,18 +555,37 @@ public class WeaponContentTests
         Assert.Equal(("tower_guard", ContentValidator.RulePurityDeepensBaseline), (ex.EntryId, ex.Rule));
         Assert.Contains("signature Block", ex.Message);
 
-        // A class whose baseline lost its signature: every dagger forged Block where CritWindow was.
-        var bludgeons = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Class == WeaponClass.Dagger
-                ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
-                : w)
-            .ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, bludgeons));
+        // Every dagger forged Block where CritWindow was: the baseline is the Dagger
+        // row's now (the content rework, 1d), not what the four share, so the first
+        // dagger is off its class row — it carries CritWindow x0 against the row's x1.
+        var bludgeons = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Class == WeaponClass.Dagger
+                    ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
+                    : w)
+                .ToList(),
+        };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeons));
+        Assert.Equal(("flensing_knife", ContentValidator.RuleVariantDelta), (ex.EntryId, ex.Rule));
+
+        // And a class whose baseline lost its signature is its row's fault: the
+        // Dagger row forging Block where CritWindow was, whatever its variants carry.
+        var bludgeonRow = ShippedContent.Weapons with
+        {
+            Classes = ShippedContent.Weapons.Classes
+                .Select(c => c.Class == WeaponClass.Dagger
+                    ? c with { Baseline = c.Baseline.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
+                    : c)
+                .ToList(),
+        };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeonRow));
         Assert.Equal(("Dagger", ContentValidator.RuleClassBaseline), (ex.EntryId, ex.Rule));
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));
 
-        // A caster forged on anything but Resonant x1, or with the wrong innate.
+        // A caster forged on anything but its class's baseline (the Staff row's
+        // Resonant x1), or with the wrong innate.
         ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, 1), (Block, 1)) });
         Assert.Equal(("staff_of_mire", ContentValidator.RuleCasterForged), (ex.EntryId, ex.Rule));
         ex = LoadWith("staff_of_mire", w => w with { Enchantments = [new EnchantmentRef("mire"), new EnchantmentRef("poison")] });
@@ -530,13 +600,13 @@ public class WeaponContentTests
         Assert.Equal(("staff_of_renewal", ContentValidator.RuleUnknownId), (ex.EntryId, ex.Rule));
 
         // Ids are unique.
-        var doubled = new WeaponsData(ContentDefaults.Weapons.Weapons.Append(ContentDefaults.Weapons.Weapons[0]).ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, doubled));
+        var doubled = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Append(ShippedContent.Weapons.Weapons[0]).ToList() };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, doubled));
         Assert.Equal(("flensing_knife", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // Every forgedOnly id is forged somewhere, or it could never exist.
-        var restricted = ContentDefaults.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, restricted, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        var restricted = ShippedContent.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal((nameof(OnHitPoison), ContentValidator.RuleForgedOnlyUnused), (ex.EntryId, ex.Rule));
 
         // Every abort names both the entry and the rule, and the defaults are untouched by any of it.
@@ -571,27 +641,27 @@ public class WeaponContentTests
         Assert.Equal(("shattering", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
         ex = LoadWithEnchantment("aegis", e => e with { Potency = 0 });
         Assert.Equal(("aegis", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
-        GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted,
-            new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Select(e =>
-                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ContentDefaults.Weapons);   // a declared-inert kind is not asked
+        TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted,
+            new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e =>
+                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ShippedContent.Weapons);   // a declared-inert kind is not asked
 
         // The chart: two elements carrying one type, or an element nobody opposes.
         ex = LoadWithEnchantment("cold", e => e with { DamageType = DamageType.Flaming });
         Assert.Equal(("cold", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
-        var unopposed = ContentDefaults.Restricted with
+        var unopposed = ShippedContent.Restricted with
         {
-            Excludes = ContentDefaults.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
+            Excludes = ShippedContent.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
         };
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, unopposed, ContentDefaults.Enchantments, ContentDefaults.Weapons));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, unopposed, ShippedContent.Enchantments, ShippedContent.Weapons));
         Assert.Equal(("flaming", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
 
         // Duplicate ids.
-        var doubled = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Append(ContentDefaults.Enchantments.Enchantments[0]).ToList());
-        ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, doubled, ContentDefaults.Weapons));
+        var doubled = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Append(ShippedContent.Enchantments.Enchantments[0]).ToList());
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, doubled, ShippedContent.Weapons));
         Assert.Equal(("regeneration", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // The opposed pairs may be read off the relations: flaming-cold, shocking-acidic, and nothing across.
-        var excludes = ContentDefaults.Restricted.Excludes;
+        var excludes = ShippedContent.Restricted.Excludes;
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "flaming", "cold" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "shocking", "acidic" }));
         Assert.DoesNotContain(excludes, g => g.Contains("flaming") && g.Contains("shocking"));
@@ -601,33 +671,49 @@ public class WeaponContentTests
     public void TestContent_SwapsCurrentForOneTest_AndRestoresIt()
     {
         var before = GameContent.Current;
-        var cheaper = new WeaponsData(ContentDefaults.Weapons.Weapons
-            .Select(w => w.Id == "great_axe" ? w with { Cost = 10 } : w)
-            .ToList());
+        int axe = TestWeapons.Get("great_axe").ResolvedCost, reaver = TestWeapons.Get("reaver").ResolvedCost;
+        var cheaper = ShippedContent.Weapons with
+        {
+            Weapons = ShippedContent.Weapons.Weapons
+                .Select(w => w.Id == "great_axe" ? w with { Cost = 10 } : w)
+                .ToList(),
+        };
 
         using (TestContent.Use(weapons: cheaper))
         {
             Assert.NotSame(before, GameContent.Current);
-            Assert.Equal(10, TestWeapons.Get("great_axe").ResolvedCost);
-            Assert.Equal(60, TestWeapons.Get("reaver").ResolvedCost);   // the rest of the defaults came along
+            var cheap = TestWeapons.Get("great_axe");
+            Assert.Equal(10, cheap.Cost);
+            Assert.Equal(10 * Math.Max(0, 100 - cheap.Modifiers.Value(Light)) / 100, cheap.ResolvedCost);   // the swapped cost, less whatever Light it carries
+            Assert.Equal(reaver, TestWeapons.Get("reaver").ResolvedCost);   // the rest of the defaults came along
         }
 
         Assert.Same(before, GameContent.Current);
-        Assert.Equal(60, TestWeapons.Get("great_axe").ResolvedCost);
+        Assert.Equal(axe, TestWeapons.Get("great_axe").ResolvedCost);
     }
 
-    private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit)
+    /// <summary>
+    /// The shipped tuning with every forge limit at x3 at least: the refusals below forge a modifier deeper
+    /// than any shipped weapon does (Cleave x3, Push x2), and how deep that may be is tuning.json's to say — the
+    /// fixtures' premise, not their subject. The two cases about the limit itself load under the master's.
+    /// </summary>
+    private static Tuning ForgeRoom => ShippedContent.Tuning with
     {
-        var weapons = new WeaponsData(ContentDefaults.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList());
+        MaxForged = ShippedContent.Tuning.MaxForged.ToDictionary(kv => kv.Key, kv => Math.Max(3, kv.Value)),
+    };
+
+    private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit, Tuning? tuning = null)
+    {
+        var weapons = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
         return Assert.Throws<ContentException>(() =>
-            GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments, weapons));
+            TestContent.Load(tuning ?? ForgeRoom, ShippedContent.Restricted, ShippedContent.Enchantments, weapons));
     }
 
     private static ContentException LoadWithEnchantment(string id, Func<EnchantmentDef, EnchantmentDef> edit)
     {
-        var enchantments = new EnchantmentsData(ContentDefaults.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
+        var enchantments = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
         return Assert.Throws<ContentException>(() =>
-            GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, enchantments, ContentDefaults.Weapons));
+            TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, enchantments, ShippedContent.Weapons));
     }
 
     private static IReadOnlyDictionary<ModifierType, int> Spread(params (ModifierType Type, int Stacks)[] forged)

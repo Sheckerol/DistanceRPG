@@ -1,4 +1,5 @@
 using GameEngine.Core;
+using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Mathematics;
 using Run = GameEngine.DistanceRPG.DungeonHud.Run;
@@ -8,7 +9,16 @@ namespace GameEngine.DistanceRPG;
 /// <summary>
 /// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
 /// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it.
+/// the hub's dungeon list under it, and the keys that choose from it — and, under
+/// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
+/// first one a campaign opens on, the save's word on it, shown whole
+/// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
+/// aside and where), and then anything else, capped; on a later one, a save that
+/// could not be written. While the menu ESC opens is up, the hub dims under it and
+/// the menu is drawn over it as the dungeon's pause menu is
+/// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, the slot the campaign
+/// saves into, and what a save by hand came to — and the keys line along the
+/// bottom gives way to the menu's (<see cref="BottomLine"/>).
 /// <list type="bullet">
 /// <item><strong>The list is the campaign's</strong>
 /// (<see cref="CampaignState.Listings"/>), in the content's file order. Before
@@ -44,18 +54,37 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, ESC quits the game. This is the one screen
-    /// where ESC quits outright. A run's end never offers it (<see cref="DungeonHud.ContinueHint"/>),
-    /// and in a dungeon it opens the pause menu.
+    /// choice, ENTER descends into it, ESC opens the menu — the dungeon's pause menu,
+    /// over the hub, where the campaign is saved by hand and play is left for the
+    /// title (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)). NEW
+    /// CAMPAIGN is the title's (R2(e)), so no key here begins one.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC QUITS";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU";
+
+    /// <summary>How the menu's keys line ends, after its options: ESC closes the menu.</summary>
+    private const string EscCloses = "ESC CLOSES";
+
+    /// <summary>
+    /// The keys line while the menu is up, in the hub's keys' place: the menu's
+    /// options, each led by its key, then ESC — <c>1  CLOSE - 2  SAVE GAME - 3  QUIT TO
+    /// TITLE - ESC CLOSES</c>, or <c>3  QUIT GAME</c> in a dev-override session.
+    /// </summary>
+    /// <param name="hasTitle">Whether the session has a title to quit to (<see cref="ISaveHost.HasTitle"/>).</param>
+    internal static string MenuKeysLine(bool hasTitle) => string.Join(" - ", [.. PauseMenu.Options(hasTitle), EscCloses]);
+
+    /// <summary>Under the title of the screen a loaded campaign opens on between runs, first among the notices (1f): the word of every load, <c>CAMPAIGN RESUMED FROM SLOT 2</c> and the rest, starts with it, and so is green.</summary>
+    internal const string Resumed = "CAMPAIGN RESUMED";
 
     /// <summary>What the list says when nothing is left to enter: content whose only dungeon is the tutorial, beaten.</summary>
     internal const string NothingLeft = "NO DUNGEON IS LEFT TO ENTER";
 
     private readonly Game _game;
     private readonly TextRenderer _text = new();
+    private readonly FullscreenFade _fade = new();
     private bool _glReady;
+
+    /// <summary>How far the hub dims under the menu: further than the dungeon's floor does under its pause menu (0.65), since the hub is text on black, and its rows would otherwise read through the menu's.</summary>
+    private const float MenuDim = 0.88f;
 
     public BetweenRunsHud(Game game)
     {
@@ -294,8 +323,23 @@ public sealed class BetweenRunsHud : IDisposable
     private const float TitleY = 36f;
     private const float TitleScale = 4f;
 
+    /// <summary>A glyph's height at scale 1: the font is 5 x 7.</summary>
+    private const float GlyphHeight = 7f;
+
+    /// <summary>Where the title's glyphs end: the startup notices start under it.</summary>
+    internal const float TitleBottom = TitleY + GlyphHeight * TitleScale;
+
+    /// <summary>
+    /// The startup notices (<see cref="NoticeText.Rows"/>) sit under the title, a
+    /// row a pitch, and everything below them — the last run and the list — moves
+    /// down by as many pitches as there are rows (<see cref="ScreenLayout.Shift"/>).
+    /// </summary>
+    internal const float NoticeTop = 72f;
+    internal const float NoticePitch = 16f;
+    private const float NoticeScale = 1.4f;
+
     /// <summary>The last run's heading, its headline under it, and the rest of its lines from the first row down.</summary>
-    private const float LastRunHeadingY = 88f;
+    internal const float LastRunHeadingY = 88f;
     private const float HeadlineY = 106f;
     private const float HeadlineScale = 2.6f;
     private const float SummaryFirstRowY = 134f;
@@ -306,7 +350,7 @@ public sealed class BetweenRunsHud : IDisposable
     private const float SummaryRowHeight = 10f;
 
     /// <summary>The keys line's distance up from the bottom, and the clearance the list keeps above it.</summary>
-    private const float KeysLineFromBottom = 28f;
+    internal const float KeysLineFromBottom = 28f;
     internal const float ListBottomMargin = 44f;
 
     /// <summary>The gap between the last summary row and the list's heading.</summary>
@@ -315,8 +359,38 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>How far down the window the list starts when there is no last run to show above it.</summary>
     private const float ListTopShareAlone = 0.3f;
 
-    /// <summary>Where the list starts, and how many of the summary's lines under the headline there is room for.</summary>
-    internal readonly record struct ScreenLayout(float ListTop, int SummaryRows);
+    /// <summary>
+    /// Where the list starts, how many of the summary's lines under the headline
+    /// there is room for, and how far the startup notices push the last run and
+    /// the list down from where they sit without them.
+    /// </summary>
+    internal readonly record struct ScreenLayout(float ListTop, int SummaryRows, float Shift = 0f);
+
+    /// <summary>How far <paramref name="noticeRows"/> rows of notices push everything under the title down: a pitch a row, none for none.</summary>
+    internal static float NoticeShift(int noticeRows) => noticeRows <= 0 ? 0f : noticeRows * NoticePitch;
+
+    /// <summary>
+    /// A notice row's colour: the campaign resuming, and the old autosave moved into
+    /// a slot of its own (<see cref="CampaignBoot.AutosaveMoved"/>), in green — news,
+    /// not a warning — and every other notice in the warning's orange.
+    /// </summary>
+    internal static Vector4 NoticeColor(string row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return row.StartsWith(Resumed, StringComparison.Ordinal) || row.StartsWith(CampaignBoot.MovedInto, StringComparison.Ordinal)
+            ? DungeonHud.Green
+            : DungeonHud.Orange;
+    }
+
+    /// <summary>
+    /// The line along the bottom, and its colour, in grey: the keys the screen
+    /// answers (<see cref="KeysLine"/>), and while the menu is up, the menu's
+    /// (<see cref="MenuKeysLine"/>) in their place.
+    /// </summary>
+    /// <param name="menu">Whether the menu is up.</param>
+    /// <param name="hasTitle">Whether the session has a title to quit to.</param>
+    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool hasTitle = true)
+        => (menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -330,33 +404,43 @@ public sealed class BetweenRunsHud : IDisposable
     /// that claws back from every member and loses a full haul, and the dungeon's
     /// own summary showed all of it. With no run to show yet, the list sits in the
     /// upper third, so the upper half is not left empty.
+    /// <para>
+    /// <paramref name="noticeRows"/> rows of startup notices under the title push
+    /// the last run and the list down by their height (<see cref="NoticeShift"/>);
+    /// the list still comes first, so the summary is what gives way to them.
+    /// </para>
     /// </summary>
-    internal static ScreenLayout Layout(float windowHeight, int summaryLines, float listHeight)
+    internal static ScreenLayout Layout(float windowHeight, int summaryLines, float listHeight, int noticeRows = 0)
     {
+        float shift = NoticeShift(noticeRows);
         float lowest = windowHeight - ListBottomMargin - listHeight;   // the lowest the list may start and still clear the keys line
         if (summaryLines <= 0)
-            return new ScreenLayout(MathF.Max(HeadlineY, MathF.Min(lowest, windowHeight * ListTopShareAlone)), 0);
+            return new ScreenLayout(MathF.Max(HeadlineY + shift, MathF.Min(lowest, windowHeight * ListTopShareAlone)), 0, shift);
 
-        float underTheSummary = SummaryFirstRowY + (summaryLines - 1) * SummaryPitch + SummaryRowHeight + ListGap;
+        float firstRow = SummaryFirstRowY + shift;
+        float underTheSummary = firstRow + (summaryLines - 1) * SummaryPitch + SummaryRowHeight + ListGap;
         if (underTheSummary <= lowest)
-            return new ScreenLayout(underTheSummary, summaryLines);
+            return new ScreenLayout(underTheSummary, summaryLines, shift);
 
-        float listTop = MathF.Max(lowest, SummaryFirstRowY + SummaryRowHeight + ListGap);
-        int room = (int)MathF.Floor((listTop - ListGap - SummaryRowHeight - SummaryFirstRowY) / SummaryPitch) + 1;
-        return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines));
+        float listTop = MathF.Max(lowest, firstRow + SummaryRowHeight + ListGap);
+        int room = (int)MathF.Floor((listTop - ListGap - SummaryRowHeight - firstRow) / SummaryPitch) + 1;
+        return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines), shift);
     }
 
     // ── Drawing ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The screen: its title, the last run above (when there has been one), the
-    /// list under it with the choice marked, and the keys along the bottom.
+    /// The screen: its title, the startup notices under it (when there are any),
+    /// the last run above (when there has been one), the list under it with the
+    /// choice marked, and the keys along the bottom — and, while the menu is up,
+    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>).
     /// </summary>
     public void Render(BetweenRunsScene scene)
     {
         if (!_glReady)
         {
             _text.Initialize();
+            _fade.Initialize();
             _glReady = true;
         }
 
@@ -365,15 +449,19 @@ public sealed class BetweenRunsHud : IDisposable
 
         DrawCentered(w, TitleY, Title, TitleScale, DungeonHud.Cyan);
 
+        var notices = scene.NoticeRows;
+        for (int i = 0; i < notices.Count; i++)
+            DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
+
         var rows = ListRows(scene.Listings, scene.Chosen);
         IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
-        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch));
+        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), notices.Count);
 
         if (summary.Count > 0)
         {
-            DrawCentered(w, LastRunHeadingY, LastRunHeading, SummaryScale, DungeonHud.Grey);
-            DrawCentered(w, HeadlineY, summary[0].Text, HeadlineScale, summary[0].Color);
-            float y = SummaryFirstRowY;
+            DrawCentered(w, LastRunHeadingY + layout.Shift, LastRunHeading, SummaryScale, DungeonHud.Grey);
+            DrawCentered(w, HeadlineY + layout.Shift, summary[0].Text, HeadlineScale, summary[0].Color);
+            float y = SummaryFirstRowY + layout.Shift;
             int shown = layout.SummaryRows;
             bool cut = shown < summary.Count - 1;
             for (int i = 0; i < shown; i++)
@@ -391,9 +479,24 @@ public sealed class BetweenRunsHud : IDisposable
             rowY += row.Pitch;
         }
 
-        DrawCentered(w, h - KeysLineFromBottom, KeysLine, 1.3f, DungeonHud.Grey);
+        if (scene.MenuOpen)
+        {
+            // The hub dims under the menu, as the floor does under the pause menu,
+            // and the menu is drawn over it.
+            _text.Flush(_game.ShaderManager);
+            _fade.Draw(_game.ShaderManager, MenuDim);
+            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
+                         scene.MenuAnswer))
+                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+        }
+
+        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.HasTitle);
+        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
         _text.Flush(_game.ShaderManager);
     }
+
+    /// <summary>The keys line's scale.</summary>
+    internal const float KeysLineScale = 1.3f;
 
     private void DrawCentered(int viewportW, float y, string text, float scale, Vector4 color)
     {
@@ -401,5 +504,9 @@ public sealed class BetweenRunsHud : IDisposable
         _text.DrawText(text, viewportW / 2f - width / 2f, y, scale, color);
     }
 
-    public void Dispose() => _text.Dispose();
+    public void Dispose()
+    {
+        _text.Dispose();
+        _fade.Dispose();
+    }
 }

@@ -44,7 +44,7 @@ use this table to find the file a section lives in.
 | [phase-2-progression](docs/roadmap/phase-2-progression.md) | §2.1–2.3 | Innate stats, the three XP pools |
 | [phase-3-loot](docs/roadmap/phase-3-loot.md) | §3.1–3.5 | Drops, the repeat-kill ladder, enchantments, consumables |
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
-| [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.8 | What is stored, in what format, and the five data files |
+| [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.9 | What is stored, in what format, the data files, and what stays code |
 | [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.7 | Wear, the enchanter, enchant-or-refine, grafting, the farm, the hub |
 | [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
 | [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
@@ -85,8 +85,8 @@ These hold for every phase:
   had this wrong once by reasoning in tiles while the code counted units, and it
   was a factor of 32.
 - **Tunable numbers live in `tuning.json`** (§5.3), read once at startup, never
-  hot-reloaded, always with a compiled fallback. Nothing the golden tests pin
-  may ever go in it.
+  hot-reloaded, with the shipped `tuning.json` built into the game as the
+  fallback, key by key and whole. Nothing the golden tests pin may ever go in it.
 - **Behaviour attaches through the event table** (§1.7), never through a
   `switch` a new entry has to be added to. A handler **transforms a payload and
   returns it** so the next one can act on the result — nothing mutates the world
@@ -95,8 +95,15 @@ These hold for every phase:
   **queue rather than recurse**, and the subscriber list is an ordered structure
   rather than a `Dictionary` iterated directly, because dispatch order is
   covered by the determinism rule above.
-- **Content lives in `restricted.json`, `weapons.json`, `enchantments.json`,
-  `dungeons.json` and `party.json`** (§5.4–5.8), loaded in that order and validated at load,
-  referenced everywhere by **stable string id** rather than by index. Only
-  *behaviour* stays in code — relations are data too, or adding a modifier would
-  still be a recompile. A dungeon's drop table is computed rather than authored.
+- **Behaviour and reference data live in code; everything else lives in JSON,
+  and the JSON is the master copy** (§5.3–5.9; the user's ruling of
+  2026-09-25). In code: behaviour, and the reference data it is addressed by —
+  the modifiers, the enchantment catalogue and its unique souls, the starting
+  party. In JSON: the relations (`restricted.json`), the weapon types, weapons
+  and uniques (`weapons.json`), the dungeons (`dungeons.json`) and the numbers
+  (`tuning.json`) — with no copy of any of them in code, and the shipped files
+  built into the game as the fallback. Loaded in the order code catalogues,
+  tuning, relations, weapons, dungeons, the starting party; validated at load
+  against the code catalogues; referenced everywhere by **stable string id**
+  rather than by index. Relations are data, so declaring a modifier's relations
+  is never a recompile. A dungeon's drop table is computed rather than authored.

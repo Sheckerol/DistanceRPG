@@ -43,8 +43,9 @@ public sealed class EnemyState : ActorState
     /// party moves 160). Read wherever an enemy's turn budget is read — the walk
     /// it plans, the mana an idle turn banks, the Mire legend over it — and
     /// nowhere else: the attack-cost scale stays the standard budget's
-    /// (<c>EnemyMove / MaxDistance</c>), which converts the party's costs into an
-    /// enemy's, so a slower enemy buys fewer swings as well as fewer steps.
+    /// (<c>EnemyMove / MovementBudget</c>, the party's tuned budget), which
+    /// converts the party's costs into an enemy's, so a slower enemy buys fewer
+    /// swings as well as fewer steps.
     /// </summary>
     public float MoveBudget { get; set; } = GameConstants.EnemyMove;
 
@@ -174,7 +175,9 @@ public sealed class EnemyState : ActorState
     /// above already fixes it, so a floor entry re-derives it through the table
     /// the roster fixed for it — <see cref="LootTable.Roll"/>, or the boss's
     /// <see cref="BossLoot.Roll"/> — and gets the identical weapon back
-    /// (<see cref="TurnSystem.GroundItemOf"/>).
+    /// (<see cref="TurnSystem.GroundItemOf"/>). Across a save and a load, whose
+    /// tuning and content may differ, the save pins it instead
+    /// (<see cref="PinnedDrop"/>).
     /// <para>
     /// This one flag is what retires the offer. Without it a save taken after a
     /// pickup would hand the same weapon over again on the next load, and a save
@@ -183,4 +186,23 @@ public sealed class EnemyState : ActorState
     /// </para>
     /// </summary>
     public bool DropTaken { get; set; }
+
+    /// <summary>
+    /// The drop a save found this row lying on, handed back by the load that
+    /// restored it (§5.1, Phase 5.6): what <see cref="TurnSystem.GroundItemOf"/>
+    /// answers before it derives one, while the row still lies on its drop.
+    /// <para>
+    /// <strong>Why a derived item is pinned at all.</strong> The derivation reads
+    /// the row and the floor's seed — and the loaded tuning and content as well
+    /// (<see cref="LootTable.Roll"/>, <see cref="BossLoot.Roll"/>): a weapon lying
+    /// on a corpse, which the player may already have seen, would change under
+    /// a <c>tuning.json</c> or a <c>weapons.json</c> edited between two sessions.
+    /// So a save writes what the row is lying on, and the load pins it here.
+    /// Null on every row no load pinned, which derives exactly as it always has,
+    /// and cleared when the row gets up: a corpse that revives is lying on
+    /// nothing, and its next drop is its own.
+    /// </para>
+    /// Set only by a restore, and internal: never a way to hand a corpse an item.
+    /// </summary>
+    internal Drop? PinnedDrop { get; set; }
 }

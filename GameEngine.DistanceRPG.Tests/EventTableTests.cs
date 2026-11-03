@@ -3,12 +3,26 @@ using GameEngine.DistanceRPG.Logic;
 
 namespace GameEngine.DistanceRPG.Tests;
 
-public class EventTableTests
+/// <summary>
+/// The event table: priorities, the one applier, the queue and its depth guard,
+/// the chains the compiled behaviours print as, and that no handler writes. The
+/// walks through the damage chain stand on the numbers they were written against
+/// — the dagger's damage, the modifier table, a status's effect a level
+/// (<see cref="Premise"/>) — made current for each test, so the content collection
+/// holds it.
+/// </summary>
+[Collection(TestContent.Collection)]
+public sealed class EventTableTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
 
-    // A catalogue instance shared across this class, read-only: nothing here Acquires on it.
-    private static readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
+    // A catalogue instance shared across a test, read-only: nothing here Acquires on it. Made
+    // under the premise, which the field above makes current first (initialisers run in order).
+    private readonly Weapon Dagger = TestWeapons.Get("weakspot_stiletto");   // dmg 15, CritWindow x1 (19+), CritMultiplier x1 (x3)
 
     /// <summary>A payload that records which handlers touched it, in order.</summary>
     private sealed record Trace(ImmutableList<string> Steps)

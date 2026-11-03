@@ -60,7 +60,7 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// §5.1's serialisation would churn for nothing. The set is kept for lookups and
 /// <see cref="SeenInOrder"/> is the only view of it anyone iterates, draws over
 /// or saves. The party is handed out the same way, as a list in roster order
-/// (<see cref="Party"/>) whose order is the roster file's and never a hash's,
+/// (<see cref="Party"/>) whose order is the roster's and never a hash's,
 /// and so are the run's-end records below — the locks, the cleared set and the
 /// retired set — each as an ordinal-sorted view (<see cref="LockedInOrder"/>,
 /// <see cref="ClearedInOrder"/>, <see cref="RetiredInOrder"/>).
@@ -87,16 +87,17 @@ public sealed class CampaignState
     // The run's-end records (§4.5, §6.7), keyed by dungeon id: the run each
     // cleared dungeon is locked until, the dungeons cleared at least once, and
     // the dungeons retired for good. Lookups only; the sorted views are what
-    // anyone iterates or saves. Only a run's end writes them, and RunCounter:
-    // there is no restore path yet. Phase 5's load (§5.1) adds one of its own,
-    // an internal restore constructor or factory taking the counter and the
-    // three sorted views, never a public setter or a public Retire.
+    // anyone iterates or saves. Only a run's end writes them, and RunCounter —
+    // and a load, which brings back what a run's end wrote through its own
+    // internal door (Restore, Phase 5.4), never a public setter or a public
+    // Retire.
     private readonly Dictionary<string, int> _lockedUntilRun = new(StringComparer.Ordinal);
     private readonly HashSet<string> _cleared = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);
 
-    // The subscription Enter made on the visit in progress's Wiped, taken off
-    // again at the run's end, so a discarded visit keeps nothing of the campaign.
+    // The subscription Enter (or a load, through Restore) made on the visit in
+    // progress's Wiped, taken off again at the run's end, so a discarded visit
+    // keeps nothing of the campaign.
     private Action? _onWiped;
 
     /// <summary>A campaign with no party: what the seen set alone is tested on. It holds nothing to send into a dungeon.</summary>
@@ -107,9 +108,10 @@ public sealed class CampaignState
 
     /// <summary>
     /// A campaign holding <paramref name="party"/>, in roster order: what a test
-    /// builds around its fixture members, and what Phase 5's load restores. It
-    /// meets nothing on its own — a loaded campaign's seen set is the saved one;
-    /// <see cref="Start"/> is where a new campaign meets its loadout.
+    /// builds around its fixture members, and what a load builds its campaign on
+    /// (<see cref="Restore"/>). It meets nothing on its own — a loaded campaign's
+    /// seen set is the saved one; <see cref="Start"/> is where a new campaign
+    /// meets its loadout.
     /// </summary>
     /// <exception cref="ArgumentException">The party names a null member.</exception>
     public CampaignState(IReadOnlyList<PartyMemberState> party)
@@ -122,7 +124,7 @@ public sealed class CampaignState
 
     /// <summary>
     /// A new campaign (§2.1, §5.9): the roster of <paramref name="content"/> built
-    /// once, in file order — each member by <see cref="PartyMemberState.From"/>,
+    /// once, in roster order — each member by <see cref="PartyMemberState.From"/>,
     /// colour by position — and everything they carry met at once (§3.3: the
     /// loadout enters the party's hands the moment it is handed over). Built
     /// once for the whole campaign: every visit is made by these same members,
@@ -154,6 +156,67 @@ public sealed class CampaignState
         var campaign = new CampaignState(members);
         foreach (var member in members)
             campaign.See(member);
+        return campaign;
+    }
+
+    /// <summary>
+    /// A campaign as a save describes it (§5.1, §6.7): the party as the load
+    /// rebuilt it, what it has met, the run counter, every lock a clear wrote — an
+    /// early offer's rewrite as it stands — the dungeons cleared and retired, how
+    /// the last run ended, and the visit in progress, or none between runs. The
+    /// one door the run's-end records come back through: internal, so there is
+    /// still no public setter on the counter and no public <c>Retire</c> (a run's
+    /// end is the only other writer). Nothing is re-derived and nothing is met: a
+    /// loaded campaign has met what it had met, which is not what its bags hold now.
+    /// <para>
+    /// <strong>A visit comes back held as <see cref="Enter"/> holds one</strong>:
+    /// its wipe is wired to the run's end (<see cref="DungeonState.Wiped"/> →
+    /// <see cref="EndRun"/>), so a party that falls after a load ends its run in
+    /// Logic exactly as one that never left. It is the load's to have built
+    /// (<see cref="DungeonState.Restore"/>), on these members.
+    /// </para>
+    /// <para>
+    /// The ids are the load's to have checked against the content
+    /// (<see cref="SaveGame.Restore"/>): this takes them as they are, and refuses
+    /// only what no campaign can hold — a negative counter or lock, a dungeon
+    /// locked twice, and a visit with nobody to make it.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException">The party names a null member, an id is null, a dungeon is locked twice, or a visit is handed in with no party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The counter or a lock is negative.</exception>
+    internal static CampaignState Restore(IReadOnlyList<PartyMemberState> party, IReadOnlyList<string> seen, int runCounter,
+        IReadOnlyList<(string DungeonId, int LockedUntilRun)> locks, IReadOnlyList<string> cleared, IReadOnlyList<string> retired,
+        RunResult? lastResult, DungeonState? visit)
+    {
+        ArgumentNullException.ThrowIfNull(seen);
+        ArgumentNullException.ThrowIfNull(locks);
+        ArgumentNullException.ThrowIfNull(cleared);
+        ArgumentNullException.ThrowIfNull(retired);
+        ArgumentOutOfRangeException.ThrowIfNegative(runCounter);
+        if (seen.Concat(cleared).Concat(retired).Any(id => id is null))
+            throw new ArgumentException("A campaign's records name their entries by id, and one is null.");
+
+        var campaign = new CampaignState(party)
+        {
+            RunCounter = runCounter,
+            LastResult = lastResult,
+        };
+        campaign._seen.UnionWith(seen);
+        foreach (var (dungeonId, until) in locks)
+        {
+            ArgumentNullException.ThrowIfNull(dungeonId, nameof(locks));
+            ArgumentOutOfRangeException.ThrowIfNegative(until, nameof(locks));
+            if (!campaign._lockedUntilRun.TryAdd(dungeonId, until))
+                throw new ArgumentException($"'{dungeonId}' is locked twice: a dungeon has one lock, the last a clear wrote.", nameof(locks));
+        }
+        campaign._cleared.UnionWith(cleared);
+        campaign._retired.UnionWith(retired);
+        if (visit is not null)
+        {
+            if (campaign._party.Count == 0)
+                throw new ArgumentException("A visit in progress needs a party to be making it, and the campaign has none.", nameof(visit));
+            campaign.Hold(visit);
+        }
         return campaign;
     }
 
@@ -250,6 +313,17 @@ public sealed class CampaignState
         if (early)
             _lockedUntilRun[def.Id] = RunCounter;   // the lock lifted now: the entry stays, and nothing else moves
 
+        Hold(visit);
+        return visit;
+    }
+
+    /// <summary>
+    /// Hold <paramref name="visit"/> as the visit in progress, its wipe wired to
+    /// the run's end: what <see cref="Enter"/> does with a visit it has just built,
+    /// and what a load does with one it has restored (<see cref="Restore"/>).
+    /// </summary>
+    private void Hold(DungeonState visit)
+    {
         _onWiped = () =>
         {
             if (ReferenceEquals(Visit, visit))
@@ -257,7 +331,6 @@ public sealed class CampaignState
         };
         visit.Wiped += _onWiped;
         Visit = visit;
-        return visit;
     }
 
     /// <summary>

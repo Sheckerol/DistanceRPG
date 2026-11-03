@@ -132,4 +132,74 @@ public class LogicPurityTests
         Assert.True(Builds(typeof(Floor)));
         Assert.True(Builds(typeof(EnemyPlacer)));
     }
+
+    /// <summary>
+    /// What reading or writing the machine looks like from IL: a file or a folder,
+    /// the environment's variables and folders, the executable's own folder, a
+    /// stream opened on a path — and what the build carries, a manifest resource
+    /// read out of an assembly, which is IO like any file.
+    /// </summary>
+    private static bool TouchesTheDisk(MethodBase target)
+    {
+        var type = target.DeclaringType;
+        if (type is null) return false;
+        if (type == typeof(File) || type == typeof(Directory) || type == typeof(FileInfo) || type == typeof(DirectoryInfo) || type == typeof(FileStream))
+            return true;
+        if (type == typeof(Environment))
+            return target.Name is nameof(Environment.GetEnvironmentVariable) or nameof(Environment.GetFolderPath);
+        if (type == typeof(AppContext))
+            return target.Name == "get_" + nameof(AppContext.BaseDirectory);
+        if (typeof(Assembly).IsAssignableFrom(type))
+            return target.Name is nameof(Assembly.GetManifestResourceStream) or nameof(Assembly.GetManifestResourceNames) or nameof(Assembly.GetManifestResourceInfo);
+        return (type == typeof(StreamReader) || type == typeof(StreamWriter))
+            && target is ConstructorInfo constructor
+            && constructor.GetParameters() is [{ ParameterType: var first }, ..] && first == typeof(string);
+    }
+
+    /// <summary>The game's root namespace: the edge, where the disk and the build are read and the scenes draw.</summary>
+    private const string EdgeNamespace = "GameEngine.DistanceRPG";
+
+    /// <summary>Whether <paramref name="target"/> belongs to a type of the game's edge — the root namespace, where <c>ShippedData</c>, <c>DataFiles</c> and every scene live — which <c>Logic/</c> never calls into.</summary>
+    private static bool IsTheEdge(MethodBase target)
+        => target.Module == Game.ManifestModule && Root(target.DeclaringType)?.Namespace == EdgeNamespace;
+
+    [Fact]
+    public void NoLogicTypeTouchesTheDisk()
+    {
+        // A31, 1e: Logic reads strings and never the disk. The data files are read
+        // at the edge (DataFiles) and handed in as text, so every reader is tested
+        // on text and no test can touch a real folder through Logic. Nothing in the
+        // namespace calls into a file, a folder, the environment's variables or
+        // folders, the executable's own folder, or what the build carries — the IL
+        // of every Logic type, compiler-generated nested types included.
+        var calls = Calls(Game).Where(c => Root(c.From.DeclaringType)?.Namespace == LogicNamespace).ToArray();
+        var offenders = calls.Where(c => TouchesTheDisk(c.Target)).Select(Describe).Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([], offenders);
+
+        // Nor does it reach the disk or the build through the edge (the content
+        // rework, 1f): no Logic type calls a type of the game's root namespace —
+        // ShippedData, DataFiles, a scene — so a built-in copy is only ever handed
+        // in, as the content GameContent.Current opens on is (GameContent.OpenOn).
+        var intoTheEdge = calls.Where(c => IsTheEdge(c.Target)).Select(c => $"{Describe(c)} -> {c.Target.DeclaringType?.Name}.{c.Target.Name}")
+            .Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([], intoTheEdge);
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(DistanceRpgGame) && c.From.Name == "LoadData"
+            && IsTheEdge(c.Target) && c.Target.DeclaringType == typeof(ShippedData));   // the predicate catches the edge calling itself
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(ShippedData) && TouchesTheDisk(c.Target));   // and the build's reader
+
+        // Both guards read the namespace exactly, so a Logic type declared in a
+        // namespace under it (…Logic.Content.Json, say) would slip past both: no
+        // type of the game's is declared in one.
+        var nested = Types(Game).Where(t => t.Namespace?.StartsWith(LogicNamespace + ".", StringComparison.Ordinal) == true)
+            .Select(t => t.FullName ?? t.Name).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal([], nested);
+
+        // The scan is not reading nothing: the new readers are in it, and the same
+        // predicate catches the edge, which does read and write the disk.
+        var logic = LogicTypes();
+        Assert.Contains(typeof(TuningJson), logic);
+        Assert.Contains(typeof(ContentFiles), logic);
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(DataFiles) && TouchesTheDisk(c.Target));
+        Assert.Contains(Calls(Game), c => Root(c.From.DeclaringType) == typeof(DistanceRpgGame) && TouchesTheDisk(c.Target));
+    }
 }

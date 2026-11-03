@@ -10,13 +10,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// §1.5/§3.3's souls as behaviour: each is an entry in the per-kind table of
 /// the event it fires on — or, for the two the defender carries, a compiled
 /// step of its own — pays its trigger through the one record, and settles
-/// everything on the payload for the applier to write once. In the content
-/// collection because tests here swap the current content.
+/// everything on the payload for the applier to write once. Every scenario
+/// stands on the numbers it was written against — the uniques' statlines, the
+/// modifier table, the appliers' percentages and the trigger ladder
+/// (<see cref="Premise"/>) — made current for each test, and tests here edit it,
+/// so the content collection holds it.
 /// </summary>
 [Collection(TestContent.Collection)]
-public class SoulBehaviourTests
+public sealed class SoulBehaviourTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 
@@ -494,8 +501,8 @@ public class SoulBehaviourTests
         Assert.Equal((200 - 16 - 3, 2), (seared.Hp, seared.StatusLevel(Searing, Flaming)));
 
         // Without Flaming on the weapon, content refuses the burn: a lingering element needs its element.
-        var ex = Assert.Throws<ContentException>(() => GameContent.Load(ContentDefaults.Tuning, ContentDefaults.Restricted, ContentDefaults.Enchantments,
-            new WeaponsData(ContentDefaults.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList())));
+        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
         Assert.Equal(("wand_of_the_nova_unique", ContentValidator.RuleEnchantmentDependency), (ex.EntryId, ex.Rule));
 
         // And transfer the Flaming off, as a later transfer (section 6.5) will leave a weapon built past the
@@ -573,15 +580,15 @@ public class SoulBehaviourTests
         // levels each, and the burn's price paid once for the cast beside the element's.
         var shock = new EnchantmentDef("test_static", "Static", EffectKind.LingeringElement, TargetSide.Enemy, Lock: 20, Trigger: null,
             Potency: 0, ApplyPercent: 100, Applies: Mire, DamageType: Shocking, Unique: true);
-        var requires = new Dictionary<string, string[]>(ContentDefaults.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
-        var stormNova = ContentDefaults.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova_unique") with
+        var requires = new Dictionary<string, string[]>(ShippedContent.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
+        var stormNova = Premise.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova_unique") with
         {
             Id = "test_storm_nova", Name = "Storm Nova", Enchantments = [new EnchantmentRef("shocking"), new EnchantmentRef("test_static")],
         };
-        using (TestContent.Use(
-            restricted: ContentDefaults.Restricted with { NeverRolled = [.. ContentDefaults.Restricted.NeverRolled, "test_static"], Requires = requires },
-            enchantments: new EnchantmentsData([.. ContentDefaults.Enchantments.Enchantments, shock]),
-            weapons: new WeaponsData([.. ContentDefaults.Weapons.Weapons, stormNova])))
+        using (TestContent.UsePremise(
+            restricted: ShippedContent.Restricted with { NeverRolled = [.. ShippedContent.Restricted.NeverRolled, "test_static"], Requires = requires },
+            enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, shock]),
+            weapons: w => w with { Weapons = [.. w.Weapons, stormNova] }))
         {
             var a = Char("A", 5, 5, "test_storm_nova");
             var ring = new[] { Enemy(5, 6), Enemy(5, 4), Enemy(4, 5) };
@@ -699,7 +706,7 @@ public class SoulBehaviourTests
         Assert.Equal(new[] { "Killed (0,0) momentum@0" }, turns.Events.HandlersFor(GameEvent.Killed, b).Select(h => h.ToString()));
 
         Assert.True(turns.TryAttack(a, target));
-        Assert.Equal(GameConstants.MaxDistance - 15, a.DistLeft);
+        Assert.Equal(Premise.Budget - 15, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana, a.Mana);
         Assert.False(target.Alive);
 
@@ -707,7 +714,7 @@ public class SoulBehaviourTests
         var axe = new TurnSystem(grid, new[] { b }, new[] { victim }, () => 10);
         Assert.True(axe.TryAttack(b, victim));
         Assert.False(victim.Alive);
-        Assert.Equal(GameConstants.MaxDistance - 60, b.DistLeft);
+        Assert.Equal(Premise.Budget - 60, b.DistLeft);
         Assert.Equal(TestPools.FixtureMana, b.Mana);
         Assert.Empty(spent);
     }
@@ -855,10 +862,10 @@ public class SoulBehaviourTests
         // share; each element's own share resolves against the target's attunement by its own type at step
         // 4 — halved in a Flaming dungeon on the one element while the other still lands in full — and each
         // pays its trigger once at the cast. Priced here so the shares are visible: 4 each at 100%.
-        using var _ = TestContent.Use(
-            enchantments: new EnchantmentsData(ContentDefaults.Enchantments.Enchantments
+        using var _ = TestContent.UsePremise(
+            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
                 .Select(e => e.Id is "shocking" or "flaming" ? e with { Potency = 4 } : e).ToList()),
-            tuning: ContentDefaults.Tuning with { ApplyPercent = new Dictionary<string, int>(StringComparer.Ordinal) { ["shocking"] = 100, ["flaming"] = 100 } });
+            tuning: t => TuningValues.With(t, ("ApplyPercent.shocking", 100), ("ApplyPercent.flaming", 100)));
 
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "the_long_candle");

@@ -1,16 +1,18 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The loaded enchantment entries (§5.7), keyed by stable string id and kept in
-/// file order, with <see cref="Tuning.ApplyPercent"/> laid over each entry's
-/// own percentage and <see cref="Tuning.ArcanePotency"/> over the magnitude of
-/// the one id it names, and the attunement chart (§1.4) read off the relations
-/// the elements sit in: four types in two opposed pairs, never a matrix. Beside
-/// the entries it holds the two relations the file keeps for enchantments
-/// (§5.5): <see cref="NeverRolled"/>, the ids no roll grants — the unique
-/// souls, cross-checked against the <c>unique</c> flag on load — and the
-/// enchantment-keyed <c>requires</c> rows (<see cref="Prerequisites"/>), a
-/// lingering element's element. Phase 1 shipped the eight innates — the four
+/// The loaded enchantment entries (§5.7) — the rows of the game's catalogue,
+/// which is code (<see cref="EnchantmentDefinitions"/>) — keyed by stable string
+/// id and kept in the catalogue's order, with <see cref="Tuning.ApplyPercent"/>
+/// laid over each entry's own percentage and <see cref="Tuning.ArcanePotency"/>
+/// over the magnitude of the one id it names, and the attunement chart (§1.4)
+/// read off the relations the elements sit in: four types in two opposed pairs,
+/// never a matrix. Beside the entries it holds the two relations
+/// <c>restricted.json</c> keeps for enchantments (§5.5):
+/// <see cref="NeverRolled"/>, the ids no roll grants — the unique souls, as the
+/// shipped file has it, and whatever the file says, since the relation is its
+/// alone — and the enchantment-keyed <c>requires</c> rows
+/// (<see cref="Prerequisites"/>), a lingering element's element. Phase 1 shipped the eight innates — the four
 /// staff effects and the four wand elements — Vampiric, and the nine unique
 /// souls; Phase 3 completed §3.3's starting set with Arcane, Shattering, the
 /// shielding entry and Echoing, the last declared with its behaviour open.
@@ -22,31 +24,34 @@ public sealed class EnchantmentCatalogue
     private readonly Dictionary<string, string[]> _requires = new(StringComparer.Ordinal);
     private readonly IReadOnlyDictionary<DamageType, DamageType> _opposed;
 
-    /// <exception cref="ContentException">An entry is malformed (<see cref="ContentValidator.ValidateEnchantments"/>), the chart is broken (<see cref="ContentValidator.ValidateOpposition"/>) or the unique flag and <c>neverRolled</c> disagree (<see cref="ContentValidator.ValidateNeverRolled"/>).</exception>
+    /// <exception cref="ContentException">An entry is malformed (<see cref="ContentValidator.ValidateEnchantments"/>), a number it leaves to the tuning is not there (<see cref="ContentValidator.ValidateDials"/>), the chart is broken (<see cref="ContentValidator.ValidateOpposition"/>) or <c>neverRolled</c> names something that is no enchantment of the catalogue (<see cref="ContentValidator.ValidateNeverRolled"/>).</exception>
     public EnchantmentCatalogue(EnchantmentsData data, Tuning tuning, RestrictedData restricted)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(tuning);
         ArgumentNullException.ThrowIfNull(restricted);
         ContentValidator.ValidateEnchantments(data);   // never build around a malformed entry
+        ContentValidator.ValidateDials(data, tuning);  // nor around a number no one sets
         _opposed = ContentValidator.ValidateOpposition(data, restricted);   // the chart: every element opposed by exactly one, both ways
-        ContentValidator.ValidateNeverRolled(data, restricted);            // one question, one answer: unique entries are exactly the never-rolled ones
+        ContentValidator.ValidateNeverRolled(data, restricted);            // neverRolled names this catalogue's entries: which ones is the file's alone
 
         var all = new List<EnchantmentDef>(data.Enchantments.Count);
         foreach (var entry in data.Enchantments)
         {
             // The tuning table wins per id; an id it does not name keeps the
-            // catalogue's percentage. Arcane's magnitude is laid over the same
-            // way and for the same reason (§5.3: a number a playtest turns lives
-            // in tuning.json rather than in a content row) — and keyed the same
+            // catalogue's percentage — and the rows that leave theirs to it
+            // (EnchantmentDefinitions.SetByTuning) are named there, or the load
+            // has stopped. Arcane's magnitude is laid over the same way and for
+            // the same reason (§5.3: a number a playtest turns lives in
+            // tuning.json rather than in a catalogue row) — and keyed the same
             // way too, by the id the dial names rather than by the kind. Keyed by
             // the kind it would overwrite every bonus-damage row there will ever
             // be: a second such entry would silently inherit Arcane's dial with
-            // no way for content to say otherwise, and the magnitude the
+            // no way for its row to say otherwise, and the magnitude the
             // validator checks on those rows would be one nothing ever reads.
             var def = entry with
             {
-                ApplyPercent = tuning.Lookup(x => x.ApplyPercent, entry.Id, entry.ApplyPercent),
+                ApplyPercent = tuning.ApplyPercent.TryGetValue(entry.Id, out int dial) ? dial : entry.ApplyPercent,
                 Potency = entry.Id == Tuning.ArcaneId ? tuning.ArcanePotency : entry.Potency,
             };
             all.Add(def);
@@ -65,7 +70,7 @@ public sealed class EnchantmentCatalogue
                 _requires[id] = needs.ToArray();
     }
 
-    /// <summary>Every entry, in file order.</summary>
+    /// <summary>Every entry, in the catalogue's order.</summary>
     public IReadOnlyList<EnchantmentDef> All { get; }
 
     /// <summary>The ids content may name: what the relations file is checked against.</summary>
@@ -73,30 +78,31 @@ public sealed class EnchantmentCatalogue
 
     /// <summary>
     /// The ids no roll grants and no service copies (§5.5 <c>neverRolled</c>):
-    /// the unique souls, which exist only on the uniques that carry them.
-    /// Cross-checked with the entries' <c>unique</c> flag on load.
+    /// in the shipped file the unique souls, which exist only on the uniques that
+    /// carry them. <c>restricted.json</c>'s alone (the user's ruling of
+    /// 2026-09-25): the load asks only that each is an entry here, never that the
+    /// list matches the entries' <c>unique</c> flag, which pins a tier.
     /// </summary>
     public IReadOnlySet<string> NeverRolled { get; }
 
     /// <summary>
-    /// Everything not in <see cref="NeverRolled"/>, in file order: the entries a
-    /// grant may consider, which is a wider set than the entries a grant may
-    /// hand out.
+    /// Everything not in <see cref="NeverRolled"/>, in the catalogue's order: the
+    /// entries a grant may consider, which is a wider set than the entries a
+    /// grant may hand out.
     /// <para>
     /// <strong>It is not itself a grantable pool.</strong> A drop draws from
     /// <see cref="LootTable.DropOrder"/>, which starts from a code-fixed order
-    /// (file order re-indexes on every append) and then filters out the entries
+    /// (the catalogue's re-indexes on every append) and then filters out the entries
     /// that cannot work on what they would land on: a declared-inert kind, and a
     /// kind whose only behaviour sits on an event that class never raises. Both
     /// of those live here — <c>echoing</c> fires nothing at all, <c>aegis</c>
-    /// fires only as a compiled step on a defender — and neither can be moved
-    /// into <see cref="NeverRolled"/>, which
-    /// <see cref="ContentValidator.ValidateNeverRolled"/> pins to the unique
-    /// flag. So §6.4's enchanter must apply that same live-behaviour test rather
-    /// than <see cref="NeverRolled"/> alone, or it will offer an entry that can
-    /// only reserve a lock; docs/roadmap/open-questions.md carries that, beside
-    /// the note that <c>aegis</c> has no source at all until the enchanter
-    /// exists.
+    /// fires only as a compiled step on a defender — and the shipped
+    /// <see cref="NeverRolled"/> lists neither: it is an economy rule about souls,
+    /// not a list of what cannot fire. So §6.4's enchanter must apply that same
+    /// live-behaviour test rather than <see cref="NeverRolled"/> alone, or it will
+    /// offer an entry that can only reserve a lock; docs/roadmap/open-questions.md
+    /// carries that, beside the note that <c>aegis</c> has no source at all until
+    /// the enchanter exists.
     /// </para>
     /// </summary>
     public IReadOnlyList<EnchantmentDef> Rollable { get; }

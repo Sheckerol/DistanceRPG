@@ -90,8 +90,11 @@ Three things this gets right at once:
   more than the last and no pool runs away. Growth is fast while you are fragile
   and glacial once you are not.
 - **A weapon divides by 1 because it has no nature to divide by.** It needs a
-  whole bar for every step, which is why `WearCapacity` climbs on an authored
-  ladder (§6.1) rather than a curve — one full pool cashed, one step up.
+  whole bar for every point: one full bar cashed, one point up — the same curve
+  as HP and mana with a stat of 1, the progress carrying from one deposit to the
+  next (§6.1). (Superseded by the user's ruling of 2026-09-25: this said
+  `WearCapacity` climbs on an authored ladder rather than a curve — one full
+  pool cashed, one step up.)
 
 ## 2.2 Three XP pools, each fed by *doing the thing*
 

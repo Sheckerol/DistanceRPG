@@ -1233,7 +1233,16 @@ in the game **arrives** carrying, and it costs the last stack there is to spend.
 down the service table. The trade here buys a *head start*, not a higher cap:
 the Efficiency dagger walks out of the floor with three-fifths of a finished
 weapon's souls and pays the same fifteen-run climb minus what it was handed,
-exactly as a caster does with its one (§6.2).
+exactly as a caster does with its one (§6.2). (Qualified for the user's ruling
+of 2026-09-25: counting the bars between the enchanter's slots (§6.1), the head
+start is in the souls the dagger holds from its first fight, never in the
+climb. It saves no wear — slot 5 opens at capacity 50 whatever a weapon arrived
+with, so every weapon cashes the same 840 to fill it — and the three souls are
+in the count every later deposit pays `count + 1` runs on, refinements
+included, while slot 4 opens only at capacity 45. So the dagger's climb to five
+takes 89 runs of downtime against a fresh weapon's 71, attaching each
+enchantment as its slot opens, and 85 against 31 in the order that takes the
+least (§6.2) — longer, not shorter, by what it was handed.)
 
 > **The Efficiency dagger** — from the Flensing Knife — carries
 > `CritWindow ×2, Light ×1`, **`Serrated`**, **`Vampiric` at tier 3**, and

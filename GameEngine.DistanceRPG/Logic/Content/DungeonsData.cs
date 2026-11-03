@@ -52,8 +52,8 @@ public sealed record DungeonDef(string Id, string Name, ModifierType Theme, Dama
     int? BossFloorMin, int? BossFloorMax, BossDef Boss, bool RetiresOnClear);
 
 /// <summary>
-/// The §5.8 <c>dungeons.json</c> shape: the dungeon rows in file order. Phase 4
-/// ships a compiled instance (<see cref="ContentDefaults.Dungeons"/>); Phase 5
-/// adds only deserialisation.
+/// The §5.8 <c>dungeons.json</c> shape: the dungeon rows in file order. The
+/// shipped file is the master copy of every row (<see cref="DungeonsJson"/>); no
+/// dungeon is kept in code.
 /// </summary>
 public sealed record DungeonsData(IReadOnlyList<DungeonDef> Dungeons);

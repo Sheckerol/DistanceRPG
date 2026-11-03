@@ -14,11 +14,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// These run whole runs through the campaign, entered and left by the stairs
 /// (<see cref="CampaignRuns"/>). Every list is checked against the invariants
 /// every list keeps (<see cref="Listed"/>) before a test reads it. Each seed's
-/// depth is pinned by an assertion before a test leans on it.
+/// depth is pinned by an assertion before a test leans on it. Every run stands on
+/// the numbers it was written against — the boss floor range, the mercy floor,
+/// the lock a floor (<see cref="Premise"/>) — made current for each test, so the
+/// content collection holds it.
 /// </para>
 /// </summary>
-public class DungeonListingTests
+[Collection(TestContent.Collection)]
+public sealed class DungeonListingTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     private static DungeonCatalogue Dungeons => GameContent.Current.Dungeons;
 
     private static DungeonDef SpearHall => Dungeons["spear_hall"];
@@ -234,7 +242,9 @@ public class DungeonListingTests
 /// floor's way out or by a wipe inside a turn system. The boss's fall is
 /// recorded on the bottom floor as its death records it
 /// (<see cref="DungeonState.RecordBossDefeated"/>). These tests are about the
-/// campaign's numbers, and the killing is <c>RunOutcomeTests</c>' to pin.
+/// campaign's numbers, and the killing is <c>RunOutcomeTests</c>' to pin. The
+/// seeds' depths, the mercy a deep retreat earns and the poison a wipe dies of
+/// are the premise's (<see cref="Premise"/>): a caller runs them with it current.
 /// </summary>
 internal static class CampaignRuns
 {

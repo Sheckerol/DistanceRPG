@@ -241,10 +241,14 @@ public sealed class TurnSystem
     // given, Floor.Seed, which the visit hands over. The revival ladder (§3.2)
     // is drawn on mapSeed ^ FarmLadder.ReviveSalt, per enemy and per cycle, so
     // this is the one thing that makes a farm replay identically after a reload.
-    // It is NOT allowed to fall back to Random.Shared the way _rollD20 does: a
-    // die roll nobody saved may differ between a session and its reload, and a
-    // dummy's statline may not. A fixture that never revives anything can leave
-    // it at 0, which is a seed like any other.
+    // It never falls back to Random.Shared, and in a visit neither does the die:
+    // DungeonState.OpenTurns hands every floor it opens the visit's own d20
+    // (DungeonState.RollD20) unless a die is injected, and the save keeps that
+    // die's position (DiceRolled), so a reload rolls on exactly where the session
+    // left off — the dice as well as the ladder. Only a bare fixture that passes
+    // no die and opens no visit meets _rollD20's unsaved Random.Shared fallback
+    // below. A fixture that never revives anything can leave this at 0, which is
+    // a seed like any other.
     private readonly long _mapSeed;
 
     /// <param name="mapSeed">
@@ -1212,14 +1216,16 @@ public sealed class TurnSystem
         }
 
         // Attack cost scales the same way the prototype scaled it: the standard
-        // enemy budget is 100 vs the player's 160, so weapon costs shrink to
-        // match. The scale is that standard budget's, never the enemy's own: it
-        // converts the party's cost units into an enemy's, so a slower enemy (a
-        // boss's 40, EnemyState.MoveBudget) buys fewer swings as well as fewer
-        // steps. The cost taken is the wielder's, which for an actor with no
-        // pools is the weapon's own (§2.2) -- the seam whichever phase gives
-        // enemies progression will need, and a no-op until it does.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.MovementCost(enemy.Weapon);
+        // enemy budget is 100 vs the party's MovementBudget (tuning.json's, 160
+        // as shipped), so weapon costs shrink to match. The scale is that
+        // standard budget's, never the enemy's own: it converts the party's cost
+        // units into an enemy's, so a slower enemy (a boss's 40,
+        // EnemyState.MoveBudget) buys fewer swings as well as fewer steps, and a
+        // party budget tuned longer makes every enemy swing cheaper. The cost
+        // taken is the wielder's, which for an actor with no pools is the
+        // weapon's own (§2.2) -- the seam whichever phase gives enemies
+        // progression will need, and a no-op until it does.
+        float scaledCost = EnemyCostScale * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
         if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
@@ -1244,6 +1250,13 @@ public sealed class TurnSystem
 
         _timer = AttackBeatSeconds;
     }
+
+    /// <summary>
+    /// What converts the party's movement costs into an enemy's: the standard
+    /// enemy budget over the party's, <c>EnemyMove / MovementBudget</c> — 100 / 160
+    /// at the shipped tuning, read from the current one at each beat.
+    /// </summary>
+    private static float EnemyCostScale => GameConstants.EnemyMove / GameContent.Current.Tuning.MovementBudget;
 
     /// <summary>The nearest living party member <paramref name="enemy"/>'s weapon reaches from where it stands (ties in roster order), or null.</summary>
     private PartyMemberState? NearestHittable(EnemyState enemy)
@@ -1275,7 +1288,7 @@ public sealed class TurnSystem
     private void TryEnemyCastBeat(EnemyState caster)
     {
         var weapon = caster.Weapon;
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * caster.MovementCost(weapon);
+        float scaledCost = EnemyCostScale * caster.MovementCost(weapon);
         ActorState? target = caster.IsSupportCaster
             ? EnemyAi.SelectSupportTarget(caster, _enemies)
             : NearestHittable(caster);
@@ -1405,6 +1418,7 @@ public sealed class TurnSystem
         enemy.Hp = enemy.MaxHp;
         enemy.Alive = true;
         enemy.TurnsSinceSeen = 2;
+        enemy.PinnedDrop = null;   // up, it lies on nothing: whatever a save pinned under the corpse went with it
 
         // Someone may be standing on the remnant: wake up on the
         // nearest free tile instead of inside them.
@@ -2284,13 +2298,22 @@ public sealed class TurnSystem
     /// (<see cref="EnemyState.DropTaken"/>) is not offered twice.
     /// <para>
     /// <strong>It is derived, never stored</strong>, which is the whole of §3.5's
-    /// answer to a save taken between the permanent kill and the pickup: the
-    /// table reads the enemy row and this system's map seed and nothing else, so
-    /// a floor re-entry re-derives the identical weapon — same variant, same
-    /// stacks, same tiers, same unique outcome — rather than either re-rolling it
-    /// (a different weapon) or forgetting it (a lost one). Both the defeat above
-    /// and the scene's floor entry read this one method, so there is one rule
-    /// rather than two that have to agree.
+    /// answer to a floor left and returned to: the table reads the enemy row and
+    /// this system's map seed and nothing else of the visit, so a floor re-entry
+    /// re-derives the identical weapon — same variant, same stacks, same tiers,
+    /// same unique outcome — rather than either re-rolling it (a different
+    /// weapon) or forgetting it (a lost one). Both the defeat above and the
+    /// scene's floor entry read this one method, so there is one rule rather
+    /// than two that have to agree.
+    /// </para>
+    /// <para>
+    /// <strong>Except across a save.</strong> The table also reads the loaded
+    /// tuning and content, which a session and its reload need not share, so a
+    /// save writes what each such row is lying on and the load pins it
+    /// (<see cref="EnemyState.PinnedDrop"/>): a pinned row answers its pin, the
+    /// weapon that lay there when the game was saved, and only a row nobody
+    /// pinned derives. The pin answers only while the row lies on its drop —
+    /// never for a row standing, or a drop taken.
     /// </para>
     /// <para>
     /// <strong>Which table is the roster's to say</strong>: the drop feed the
@@ -2308,7 +2331,7 @@ public sealed class TurnSystem
         if (!_dropFeeds.TryGetValue(enemy, out var drop))
             throw new InvalidOperationException("Asked what an enemy that is not on this turn system's roster is lying on: its drop is its own floor's to derive.");
         if (ResurrectionActive || enemy.Alive || enemy.DropTaken) return null;
-        return drop();
+        return enemy.PinnedDrop ?? drop();
     }
 
     private static float Dist2(ActorState a, ActorState b)

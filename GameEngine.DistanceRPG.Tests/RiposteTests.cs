@@ -5,11 +5,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// §1.2 Riposte: a successful block grants a free counter-swing, once per
 /// stack per turn — and a crit, which bypasses Block entirely, is never a
-/// successful block.
+/// successful block. The exchanges stand on the numbers they were written
+/// against — the swords' damage, the shields' Block (<see cref="Premise"/>) —
+/// made current for each test, so the content collection holds it.
 /// </summary>
-public class RiposteTests
+[Collection(TestContent.Collection)]
+public sealed class RiposteTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 

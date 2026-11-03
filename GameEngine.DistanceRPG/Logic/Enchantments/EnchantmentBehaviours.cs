@@ -607,7 +607,7 @@ public static class EnchantmentBehaviours
     {
         if (payload.Type != DamageType.None || !payload.CastFired.IsDefaultOrEmpty) return payload;
         var weapon = self.EquippedWeapon;
-        if (weapon == null || Weapon.KindOf(weapon.Class) == WeaponKind.Caster) return payload;
+        if (weapon == null || weapon.IsCaster) return payload;
 
         int awake = self.AwakeCount;
         for (int i = 0; i < weapon.Enchantments.Count && i < awake; i++)

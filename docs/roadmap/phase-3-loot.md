@@ -21,7 +21,7 @@ A dropped weapon rolls for an enchantment (§3.3) alongside its variant:
 Always **exactly one**, always **tier 1**. Breadth stays the enchanter's
 product (§6.4) and depth past the first tier stays a project; what the dungeon
 hands you is a *seed*, and the fifteen-run climb to a fully enchanted weapon
-(§6.2) is untouched.
+(§6.2) is untouched. (Qualified for the user's ruling of 2026-09-25: the climb is longer than fifteen runs — from a fresh weapon, 840 wear and 71 runs of downtime attaching each enchantment as its slot opens, 31 at the least (§6.2) — and a seed does not shorten it: it saves no wear, and being in the count every later deposit pays, it adds downtime, 72 runs against 71, or 48 against 31.)
 
 **The two casters are asymmetric on purpose.** A staff's identity is the effect
 it casts, so fixing it keeps a Staff of Mire recognisably a Staff of Mire. A
@@ -45,8 +45,8 @@ moves to someone whose pool already does (§6.5).
 
 ## 3.2 Repeat kills deepen the drop
 
-Dummies resurrect after 10 turns (`GameConstants.DummyResurrectTurns`) and
-already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
+Dummies resurrect after 10 turns (`tuning.json`'s `ResurrectTurnsBase`, 10
+shipped, §5.3) and already record `DefeatedAtTurn`. Add `DefeatCount` to `EnemyState`: the *n*-th
 defeat of the same dummy deepens the weapon it is carrying.
 
 Repeat kills never add a **new** enchantment. Farming buys depth in what the
@@ -350,8 +350,8 @@ simultaneously — which is honest, because that is exactly what it is.
 ### And it comes back sooner
 
 The roll decides *what* a revival grants; the count decides **how fast it
-happens**. Resurrection is 10 turns today (`GameConstants.DummyResurrectTurns`),
-and it shortens with every defeat:
+happens**. Resurrection is 10 turns today (`tuning.json`'s `ResurrectTurnsBase`,
+10 shipped, §5.3), and it shortens with every defeat:
 
 ```
 resurrectTurns(n) = max(3, 10 − n)
@@ -1322,9 +1322,10 @@ crit, on kill, on being hit, on cast. Phase 0's unified attack resolver is
 where hit/crit/kill all pass through, so this is one call site rather than the
 several it would have been before.
 
-Note `Weapon` is a `record` shared by reference from `GameConstants.Weapons`
-today, so dropped instances must be **copies**, never mutations of the shared
-table — both `ModifierSet` and the enchantment list should be immutable.
+Note a `Weapon` is shared by reference from the loaded catalogue
+(`GameContent.Weapons`, built from `weapons.json`, §5.6), so dropped instances
+must be **copies**, never mutations of the shared table — both `ModifierSet` and
+the enchantment list should be immutable.
 
 `PartyMemberState.MaxMana` subtracts the equipped item's total lock.
 

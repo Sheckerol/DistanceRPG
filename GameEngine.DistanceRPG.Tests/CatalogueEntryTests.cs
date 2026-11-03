@@ -11,13 +11,21 @@ namespace GameEngine.DistanceRPG.Tests;
 /// types itself at (0,5), ahead of the chart — which is an enchantment rule and
 /// so lives with the enchantments rather than in the swing path.
 /// <para>
-/// Nothing here swaps content: every entry it exercises is in the compiled
-/// catalogue, and the tiers it needs are instances rather than rows.
+/// Nothing here edits content: every entry it exercises is in the game's
+/// catalogue, and the tiers it needs are instances rather than rows. What the
+/// entries are priced against — Arcane's potency, the modifier table, the wand's
+/// statline — is the numbers the cases were written against (<see cref="Premise"/>),
+/// made current for each test, so the content collection holds it.
 /// </para>
 /// </summary>
-public class CatalogueEntryTests
+[Collection(TestContent.Collection)]
+public sealed class CatalogueEntryTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static (float X, float Y) At(int r, int c) => (c * Tile + Tile / 2f, r * Tile + Tile / 2f);
 

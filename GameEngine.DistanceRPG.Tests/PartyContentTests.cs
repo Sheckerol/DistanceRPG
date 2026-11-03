@@ -17,7 +17,7 @@ public class PartyContentTests
 
     /// <summary>The compiled roster with <paramref name="edit"/> applied to the member at <paramref name="index"/>.</summary>
     private static PartyData With(int index, Func<PartyMemberDef, PartyMemberDef> edit)
-        => new(ContentDefaults.Party.Members.Select((m, i) => i == index ? edit(m) : m).ToList());
+        => new(ShippedContent.Party.Members.Select((m, i) => i == index ? edit(m) : m).ToList());
 
     private static ContentException Rejected(PartyData party)
         => Assert.Throws<ContentException>(() => TestContent.Use(party: party));
@@ -132,10 +132,14 @@ public class PartyContentTests
         Assert.Equal("D", bagged.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, bagged.Rule);
 
-        // One equipped plus six bagged is seven weapons into six slots.
+        // One equipped plus a whole share of the carry bagged is a weapon more
+        // than a member's slots, whatever share tuning.json gives each.
+        int slots = ShippedContent.Tuning.PartyCarrySlots / GameConstants.PartySize;
         var deep = Rejected(With(3, m => m with
         {
-            BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword"],
+            BagWeaponIds = Enumerable.Range(0, slots)
+                .Select(i => new[] { "staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword" }[i % 6])
+                .ToList(),
         }));
         Assert.Equal("D", deep.EntryId);
         Assert.Equal(ContentValidator.RulePartyBagFits, deep.Rule);
@@ -150,10 +154,10 @@ public class PartyContentTests
 
         // A roster longer or shorter than the party's slots would otherwise
         // spawn a prefix and drop whoever came last, silently.
-        var short_ = Rejected(new PartyData(ContentDefaults.Party.Members.Take(3).ToList()));
+        var short_ = Rejected(new PartyData(ShippedContent.Party.Members.Take(3).ToList()));
         Assert.Equal(ContentValidator.RulePartySize, short_.Rule);
 
-        var long_ = Rejected(new PartyData([.. ContentDefaults.Party.Members, ContentDefaults.Party.Members[0] with { Id = "E" }]));
+        var long_ = Rejected(new PartyData([.. ShippedContent.Party.Members, ShippedContent.Party.Members[0] with { Id = "E" }]));
         Assert.Equal(ContentValidator.RulePartySize, long_.Rule);
 
         // Every refusal left the running content alone.
@@ -163,7 +167,7 @@ public class PartyContentTests
     [Fact]
     public void DefaultParty_Validates_AndIsReachableThroughGameContent()
     {
-        ContentValidator.ValidateParty(ContentDefaults.Party, GameContent.Current.Weapons);   // does not throw
+        ContentValidator.ValidateParty(ShippedContent.Party, GameContent.Current.Weapons);   // does not throw
 
         var before = GameContent.Current;
         var renamed = With(0, m => m with { Name = "Thief" });
@@ -179,16 +183,14 @@ public class PartyContentTests
         Assert.Same(before, GameContent.Current);
         Assert.Equal("Dagger", GameContent.Current.Party["A"].Name);
 
-        // The two tuning keys the roster's pools are measured against, and the
-        // loader's refusal of a bar there is no step off.
-        Assert.Equal(30, GameContent.Current.Tuning.StartingPool);
-        Assert.Equal(100, GameContent.Current.Tuning.WeaponXpPerLevel);
-
-        var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(new Tuning { StartingPool = 0 }));
+        // The two tuning keys the roster's pools are measured against are
+        // tuning.json's to set; what is the code's is the loader's refusal of a
+        // bar there is no step off.
+        var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { StartingPool = 0 }));
         Assert.Equal(ContentValidator.RulePoolBarIsPositive, zeroPool.Rule);
         Assert.Equal(nameof(Tuning.StartingPool), zeroPool.EntryId);
 
-        var zeroLadder = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(new Tuning { WeaponXpPerLevel = 0 }));
+        var zeroLadder = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { WeaponXpPerLevel = 0 }));
         Assert.Equal(ContentValidator.RulePoolBarIsPositive, zeroLadder.Rule);
         Assert.Equal(nameof(Tuning.WeaponXpPerLevel), zeroLadder.EntryId);
     }
@@ -198,7 +200,7 @@ public class PartyContentTests
     {
         // The roster is content and so is the bar it grows from: a tuning swap
         // moves every member's first point, because nothing caches a maximum.
-        using var _ = TestContent.Use(tuning: ContentDefaults.Tuning with { StartingPool = 40 });
+        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { StartingPool = 40 });
 
         Assert.Equal(40, Progression.Pool(0, 4).Max);
         Assert.Equal(10, Progression.Pool(0, 4).XpToNext);   // 40 / 4

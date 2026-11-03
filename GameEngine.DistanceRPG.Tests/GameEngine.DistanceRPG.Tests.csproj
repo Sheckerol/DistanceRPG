@@ -26,4 +26,10 @@
     <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The shipped data files are read as the game carries them, built in (ShippedData.Texts,
+       through ShippedContent): the suite reads no copy of them from a folder. (The game
+       project's own copies also reach this output's root through the project reference;
+       no test reads that folder.) -->
+
+
 </Project>

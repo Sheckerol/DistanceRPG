@@ -13,13 +13,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// arithmetic alone. There is no unique roll, and nothing else in the dungeon is
 /// forged with the theme.
 /// <para>
-/// Every named seed is pinned by an assertion before a test leans on it. In the
-/// content collection, because two tests swap the relations or the tuning.
+/// Every named seed is pinned by an assertion before a test leans on it. Every
+/// drop stands on the numbers it was written against — the boss floor range and
+/// offset, the forge limits, the headroom (<see cref="Premise"/>) — made current
+/// for each test, and two tests swap the relations or the tuning over it, so the
+/// content collection holds it.
 /// </para>
 /// </summary>
 [Collection(TestContent.Collection)]
-public class BossLootTests
+public sealed class BossLootTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     /// <summary>The shipped seed: its tutorial golem holds a Pinning Lance and drops an Assassin's Fang forged with Block.</summary>
     private const long GoldenSeed = 2762136374;
 
@@ -135,7 +142,7 @@ public class BossLootTests
             {
                 var drop = BossLoot.Roll(Boss(def), seed);
                 Assert.Equal(Grafted(VariantOf(drop), def.Theme), drop.Weapon.Forged);
-                if (ContentValidator.Signature.TryGetValue(drop.Weapon.Class, out var signature))
+                if (Weapons.Class(drop.Weapon.Class).Signature is { } signature)
                     Assert.True(drop.Weapon.Forged.Stacks(signature) >= 1, $"{drop.Weapon.Id} lost its class's {signature}");
             }
     }
@@ -215,9 +222,9 @@ public class BossLootTests
         // Brace table - a floor whose class draws never touched the axe drops the
         // identical weapon, and only a floor with an axe draw ahead of the kept
         // one moves: to the axe, the first draw that now stands.
-        var braceFreed = ContentDefaults.Restricted with
+        var braceFreed = ShippedContent.Restricted with
         {
-            Excludes = ContentDefaults.Restricted.Excludes
+            Excludes = ShippedContent.Restricted.Excludes
                 .Select(g => g.Contains(nameof(Brace)) ? g.Where(id => id != nameof(Brace)).ToArray() : g)
                 .ToList(),
         };
@@ -229,7 +236,7 @@ public class BossLootTests
 
         string[] after;
         WeaponClass[] afterClasses;
-        using (TestContent.Use(restricted: braceFreed))
+        using (TestContent.UsePremise(restricted: braceFreed))
         {
             Assert.Equal(new[] { Dagger, Sword, Spear, Axe }, GameContent.Current.Dungeons.ThemeClasses(Brace));
             after = seeds.Select(s => Describe(BossLoot.Roll(boss, s))).ToArray();
@@ -393,7 +400,7 @@ public class BossLootTests
 
             Assert.Equal(new[] { hunted[def.Id] }, uniques.Distinct());
             var own = Weapons[hunted[def.Id]];
-            Assert.Equal((ContentValidator.ClassSignedBy(def.Theme), 3), ((WeaponClass?)own.Class, own.Forged[def.Theme]));
+            Assert.Equal((Weapons.ClassSignedBy(def.Theme), 3), ((WeaponClass?)own.Class, own.Forged[def.Theme]));
             double expected = 1.0 / Dungeons.ThemeClasses(def.Theme).Count / LootTable.Roles;
             Assert.InRange(uniques.Count / (double)Floors, expected - 0.02, expected + 0.02);
         }
@@ -494,7 +501,7 @@ public class BossLootTests
         // PHASE4-045: the most a boss pays is six, deliberately short of the ten
         // a well-farmed two-modifier weapon banks: entering a dungeon is a choice
         // and farming is not, so certainty does not also get to be the largest
-        // reward. Six on the compiled values; a tuning or a dungeon that would
+        // reward. Six on the shipped values; a tuning or a dungeon that would
         // bring it level with the farm is refused at load
         // (DungeonContentTests.ABossThatWouldPayAsMuchAsTheFarmIsRefused).
         var tuning = GameContent.Current.Tuning;
@@ -598,7 +605,7 @@ public class BossLootTests
         };
         Assert.Equal(dropped, Describe(BossLoot.Roll(reloaded, bottom.Seed)));
 
-        using (TestContent.Use(tuning: ContentDefaults.Tuning with { BossStackOffset = 2 }))
+        using (TestContent.UsePremise(tuning: t => t with { BossStackOffset = 2 }))
         {
             Assert.Equal(5, DungeonState.PromisedStacksFor(7));             // the tuning now prices floor 7 at five...
             Assert.Equal(3, visit.PromisedStacks);                          // ...and the visit still owes three
@@ -714,14 +721,14 @@ public class BossLootTests
             var table = Dungeons.ThemeClasses(theme);
             foreach (var cls in AllEight)
             {
-                var variants = Weapon.KindOf(cls) == WeaponKind.Caster
-                    ? LootTable.CasterVariants[cls].Select(id => Weapons[id]).ToArray()
+                var variants = Weapons.KindOf(cls) == WeaponKind.Caster
+                    ? Weapons.Class(cls).DropOrder!.Select(id => Weapons[id]).ToArray()
                     : Enum.GetValues<VariantRole>().Select(role => Weapons.Variant(cls, role)).ToArray();
                 bool allTake = true;
                 foreach (var variant in variants)
                 {
                     var spread = Spread(variant);
-                    bool can = Rules.CanGraft(theme, Weapon.KindOf(cls), spread, spread, asForged: true);
+                    bool can = Rules.CanGraft(theme, Weapons.KindOf(cls), spread, spread, asForged: true);
                     allTake &= can;
                     if (can)
                         Assert.Equal(Grafted(variant, theme), Weapons.Instantiate(variant.Id, cls == Wand ? DamageType.Cold : null, forgedGraft: theme).Forged);

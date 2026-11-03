@@ -78,7 +78,7 @@
   per attachment and capped, exactly the combination asked for. Ship the
   existing three-step ladder; add a fourth step later if playtesting shows
   weapons plateauing at 40, per §6.1's own note that the ladder is authored
-  precisely so it can grow.
+  precisely so it can grow. (Superseded in its ladder by the user's ruling, 2026-09-25 — that capacity caps wear, and a deposit spends it whole, stands: R4, below.)
 - **A batch of balance questions are accepted as designed, to be watched
   during playtest rather than pre-solved on paper** — each is a case where the
   doc's own reasoning already leans toward "probably fine" and no amount of
@@ -233,7 +233,12 @@
   but at 3% (doubled at most by a full wear bar, §6.4) it should stay rare in
   practice without an extra rule. Revisit with an explicit per-weapon
   distinct-modifier cap only if playtesting shows heavily-serviced weapons
-  actually accumulating breadth this way.
+  actually accumulating breadth this way. (Superseded by the user's ruling,
+  2026-09-25, in its parenthesis: refining's multiplier grows with the wear a
+  weapon can hold, and capacity has no top now, so a full bar more than doubles
+  the 3% once a weapon has grown — 7% at capacity 40, 9% at 60, which is 1,335
+  wear cashed from new. It climbs slowly enough that the rest stands — R4, the
+  Phase 5 pass below.)
 - **Sword's `Push` stays always-on.** It fires on every hit, same as the rest
   of the sword's kit; occasionally shoving a target out of an axe's cleave or a
   spear's threat zone is accepted as a small tactical cost of mixing a sword
@@ -453,9 +458,10 @@
 - **The tutorial is consumed by beating it**; every other dungeon is picked
   from the hub and repeatable. Rushing its boss permanently forfeits its themed
   drops, which is the game's central decision delivered once in miniature.
-- **The tutorial is two floors deep**, boss on floor 2 — the only hardcoded
-  depth in the game. Shortest run that demonstrates every dungeon mechanic, and
-  a fast turnaround into the hub since it cannot be replayed.
+- **The tutorial is two floors deep**, boss on floor 2 — the one dungeon with a
+  fixed rather than rolled depth (`dungeons.json` pins both bounds to 2, §5.8).
+  Shortest run that demonstrates every dungeon mechanic, and a fast turnaround
+  into the hub since it cannot be replayed.
 - **Modifiers can live on an actor, not just a weapon.** `ActorState` carries
   its own `ModifierSet`; resolution reads weapon plus innate.
 - **Killing the boss stops resurrection**, turning the dungeon from an infinite
@@ -644,19 +650,26 @@
   is −10% of the weapon's cost per stack, not a flat subtraction — attack costs
   span 20–60, and flat would zero out a dagger while barely touching an axe.
 - **Tunable numbers live in `tuning.json`** (§5.3) — read once at startup,
-  never hot-reloaded, compiled fallback for every missing key, scalars only.
-  Nothing the golden tests pin may ever appear in it, enforced by a test that
-  asserts the schema is disjoint from the parity-critical names. Ratios are
+  never hot-reloaded, the built-in file's number for every missing key, scalars
+  only. Nothing the golden tests pin may ever appear in it, enforced by a test
+  that asserts the schema is disjoint from the parity-critical names. Ratios are
   **integer divisors with the units in the name** (`MovementUnitsPerMana: 10`),
   because §1.3 already made the tiles-versus-units error once and it was a
   factor of 32. Saves record a hash of the values they were played under and
-  warn on mismatch rather than refusing.
-- **Content lives in four validated files** (§5.4–5.8) — `restricted.json`,
-  `enchantments.json`, `weapons.json`, `dungeons.json` — loading in that order,
-  since relations validate everything, weapons name enchantment ids, and
+  warn on mismatch rather than refusing. (Superseded by the user's ruling,
+  2026-09-25, in one clause: a missing key had a "compiled fallback"; the
+  shipped `tuning.json` is now the master copy, built into the game, and the
+  code keeps no number of its own — the Phase 5 pass below.)
+- **Content lives in three validated files** (§5.4–5.8) — `restricted.json`,
+  `weapons.json`, `dungeons.json` — beside the code catalogues, loading in the
+  order the catalogues, tuning, relations, weapons, dungeons, the starting
+  party, since relations validate everything, weapons name enchantment ids, and
   dungeons name modifiers. Invalid content **aborts startup** naming the entry
   and the rule, rather than clamping as `tuning.json` does, because a broken
-  invariant is not a bad balance number.
+  invariant is not a bad balance number. (Superseded by the user's ruling,
+  2026-09-25: there were four files, `enchantments.json` among them; the
+  enchantment catalogue and the starting party are code — the Phase 5 pass
+  below.)
 - **Relations are data, not code.** `restricted.json` holds `excludes` (as
   *groups*, expanded to directed pairs at load), `requires`, `kind`,
   `forgedOnly` and `neverRolled`, for modifiers and enchantments alike. The
@@ -676,12 +689,17 @@
   otherwise re-rolls every enemy in every existing save; shifting an enchantment
   id silently turns a player's earned catalogue into a set of different
   enchantments.
-- **The point of it is that mechanics become additive.** Behaviour and relations
-  stay in code, values are `tuning.json`, and which weapons and dungeons *use*
-  them is content — so adding a modifier is: implement it, price it, declare its
-  relations, and it is then usable on any weapon in any spread without touching
-  code again. That is §1.1's uniformity finally paying out in the workflow
-  rather than only in the design.
+- **The point of it is that mechanics become additive.** Behaviour and the
+  reference data it is addressed by stay in code, relations are
+  `restricted.json`, values are `tuning.json`, and which weapons and dungeons
+  *use* them is content — so adding a modifier is: implement it, price it,
+  declare its relations, and it is then usable on any weapon in any spread
+  without touching code again. That is §1.1's uniformity finally paying out in
+  the workflow rather than only in the design. (Superseded by the user's
+  ruling, 2026-09-25: this said "behaviour and relations stay in code", against
+  the entry above; the relations are `restricted.json`'s alone, and the
+  modifiers, the enchantment catalogue and the starting party are the reference
+  data code keeps — the Phase 5 pass below.)
 - **A dungeon's drop table is computed, not authored.** §4.3's rule that a
   themed boss cannot drop a class that will not take its theme *is* `Allowed`
   run over the eight classes at load. Authoring it by hand would let the two
@@ -746,7 +764,14 @@
   literally *the price of the enchantment, unspent*. No second knob, and three
   consequences arrive free: a fresh drop refines for nothing, hoarding wear
   before a deposit is a real decision, and refinement cannot be spammed because
-  the pool — not the clock — is what limits it.
+  the pool — not the clock — is what limits it. (Superseded — already by §6.4,
+  whose two services differ by what the smith works on and not by a remainder,
+  and by the user's ruling, 2026-09-25: a deposit spends the whole pool whatever
+  it buys, and attaching enchantment n needs a deposit of at least
+  `30 + 5(n − 1)` wear, so no remainder is left over to pay for a roll.
+  Refining's odds are `GraftBaseChance × (1 + wear ÷ StartingPool)` on the whole
+  deposit, and the three consequences follow from that instead — R4, the Phase
+  5 pass below.)
 - **A deposit empties the weapon's wear**, whichever service it bought. That is
   what makes *when* to deposit a decision rather than a formality.
 - **Refinement costs the same downtime as the enchantment it replaced** and does
@@ -819,7 +844,10 @@
   derives from and stops being an artifact. So `×3` buys two enchantments and
   `×2` buys three, and three is the most any weapon in the game *arrives*
   carrying. **Five remains the ceiling** (§6.2) — the trade buys a head start on
-  the service climb, not a higher cap.
+  the service climb, not a higher cap. (Qualified by the user's ruling,
+  2026-09-25: a head start in the souls the weapon holds, never on the climb to
+  five, which costs every weapon the same 840 wear and costs one that arrives
+  with souls more downtime — R4's fifth consequence, the Phase 5 pass below.)
 - **The Efficiency dagger is `CritWindow ×2, Light ×1` + `Serrated`,
   `Vampiric` tier 3, `Overheal`** — three souls forming a *chain* rather than a
   pair, each link consuming what the last produced: a hit becomes continuous
@@ -1113,7 +1141,11 @@
   bar.
 - **`WearCapacity` is an authored ladder: 30 → 40 → 55**, one step per full bar
   cashed, and **no fourth step until play asks for one**. Authored rather than
-  computed precisely so a fourth can be appended.
+  computed precisely so a fourth can be appended. (Superseded by the user's
+  ruling, 2026-09-25: capacity is computed after all, by the entry above's own
+  rule with a weapon's flat 1 — a point for every full bar's worth of wear
+  cashed, the bar being the capacity at the time and the progress carrying, with
+  no top, so there is no step to append — R4, the Phase 5 pass below.)
 - **Grafting is 3% base when enchanting**, multiplied by
   `1 + wear ÷ StartingWearCapacity` when refining — so a full fresh bar doubles
   it to 6%. Proportional rather than thresholded, so cashing one point of wear
@@ -1209,7 +1241,13 @@
   `Arcane` eventually meets dummies that shrug it off — a better lesson than the
   number quietly having been smaller all along.
 - **This is also what keeps the arms race in the data files** (§5.5). A counter
-  is an entry someone adds; a rebalance is a recompile and an argument.
+  is an entry someone adds: a relation or a weapon in the data files, an
+  enchantment in the catalogue — never a rebalance of a constant, which is a
+  recompile and an argument. (Superseded by the user's ruling, 2026-09-25, in
+  its example: the enchantment catalogue is code, so a new enchantment is a
+  rebuild — the Phase 5 pass below — and a rebalance of a number is a
+  `tuning.json` edit rather than a recompile; what makes it the worse tool is
+  that it reaches everyone silently.)
 
 ## Implementation pass — Phase 2 (innate stats and the three pools)
 
@@ -1278,7 +1316,11 @@ it.
   25 → 30 → 40 would have made a weapon's first service raise its capacity from
   30 to 30 and buy nothing. The rungs keep widening, so reaching the third step
   is now 70 hits on one weapon rather than 55 — a longer arc, deliberately, and
-  still three steps with no fourth until play asks for one.
+  still three steps with no fourth until play asks for one. (Superseded by the
+  user's ruling, 2026-09-25: there is no ladder to shift. What this kept stands —
+  a weapon's capacity opens on the shared starting pool, 30, `StartingPool` —
+  and from there it rises a point a full bar cashed, 30 → 31 → 32 and on, with
+  no top — R4, the Phase 5 pass below.)
 
 ## Implementation pass — Phase 4 (floors, the boss, the theme, the way out)
 
@@ -1410,3 +1452,1829 @@ four as shipped.
   `bossFloor` runs") in that one corner. The alternatives weighed were a
   second clock (ruled out above), shortening every lock while all are locked,
   and making a sixth dungeon a Phase 4 requirement; the early offer stands.
+
+## Implementation pass — Phase 5 (the numbers, the content files, save and load)
+
+Rulings the Phase 5 branch made where the phase doc was silent, or where two
+passages met and one had to be read in the light of the other. Each is written
+down here so the next reader meets the ruling rather than the code that assumes
+it. Six of them bent a line of the phase doc rather than fill a silence; those
+are marked **bends the phase doc**, each with why it needs no ruling, or that it
+is the user's. Four rulings were the user's to make — the dice on a reload, the
+save model, where content's truth lives, and the class baselines, which was also
+one of the six bends — and each shipped provisionally. **All four are ruled**
+(superseded by the user's rulings, 2026-09-25, below): content's truth is the
+JSON, and the class baselines are a section of `weapons.json`, which withdraws
+that bend; the dice stay the visit's own, seeded and saved; and **the save
+model**, the fourth, is the user's R2 — a title screen, one autosave slot and
+manual slots whose count is a `tuning.json` key — built in three steps and now
+whole (R2, below), its entry below superseded, and superseded in part by the
+user's ruling of the same day on the save slots (R5, below), built in five steps
+and now whole too: a campaign saves into the slot it came from. Choices of its
+building ship provisionally, the user's to rule — USER DECISION 1, and R5's SLOT
+DECISIONS 1 to 4 — and open-questions.md sets out their alternatives.
+
+### The user's ruling on content (2026-09-25)
+
+**Reference data is code; everything else is JSON, and the JSON is the master
+copy.** The user ruled: "behaviour, modifiers, and enchantments living in the
+code due to them being reference data, while weapon types, weapon modifiers,
+rolled weapons and numbers driving tuning are fully in json" — and on why no
+value may keep a second home in code, "if it lives in the code then changing the
+json loses all purpose": a number or a relation with a copy in code is one whose
+file edit may not be the one that plays. Phase 5 had shipped six files generated
+from a compiled copy of all of it (`ContentDefaults`), pinned byte for byte; the
+ruling ends that, and supersedes the entries below where they differ.
+
+- **In code**: behaviour (the event table, the modifier and enchantment
+  behaviours), and as reference data the modifiers — the `ModifierType`
+  definitions and what each is; the enchantment catalogue and its unique souls
+  (`Logic/Enchantments/EnchantmentDefinitions.cs`), so `enchantments.json` is
+  gone; and the starting party, its roster and its loadouts
+  (`Logic/Content/StartingParty.cs`), so `party.json` is gone. Each is addressed
+  everywhere by a stable string id, and each is validated at load against the
+  JSON, a failure naming the entry, the rule and the file to fix: a relation
+  naming an enchantment the catalogue lacks stops the game on `restricted.json`,
+  a weapon naming an innate that does not exist on `weapons.json`, and a
+  `weapons.json` that renames a weapon only the party names on `weapons.json`,
+  naming the member. A copy of either retired file left beside the exe is named
+  on screen as no longer read.
+- **In JSON, the master copy**: `restricted.json` — the relations (`excludes`,
+  `requires`, `kind`, `forgedOnly`, `neverRolled`) live there alone; `weapons.json`
+  — the weapon types as a section of their own, every variant, the uniques, and
+  each weapon's forged modifiers and innate enchantment references;
+  `dungeons.json`; and `tuning.json`, whose `Tuning` record keeps its shape, its
+  key names, its clamps and its never-contain rules and holds no value. The
+  shipped files in `GameEngine.DistanceRPG/Data` are hand-kept, the build embeds
+  them, and each is the fallback for its copy beside the exe, **per file and,
+  for the tuning, per key**: a copy missing or unreadable plays the built-in one
+  and says so, as before, and a key left out plays the built-in number. A broken
+  built-in copy stops the game on its screen marked `(BUILT-IN)` — and, when no
+  file beside the exe can have broken it, names the master to fix and rebuild.
+- **The save** keeps the weapons the party owns in `campaign.json`, as before. It
+  stores ids and enum names, every id kept its name, and the tuning's hash
+  covers the same values, so a save written before the ruling loads and resumes
+  unchanged — pinned by two saves the pre-rework code wrote — and the save
+  format needs no new version.
+- **Phase 5 USER DECISIONS 3 and 4 are ruled**: content's truth is the JSON, and
+  the weapon types are a section of `weapons.json` — the class-baselines bend is
+  withdrawn, and §5.6 holds literally. **Decisions 1 and 2** — the dice across a
+  reload, the save model — **stay open**, and so does whether a content file's
+  numbers have bounds; what a deposit costs stays Phase 6a's. (Superseded by the
+  user's rulings of 2026-09-25, below: the user ruled those four the same day —
+  the dice kept, the save model rebuilt, every number of a content file given a
+  range, and what a deposit costs, which Phase 6a builds.)
+
+**The exceptions, named so that none reads as a surviving copy.** Code still
+names some weapon ids and keeps one coexistence rule, each for a reason of its
+own:
+
+- The starting party's loadouts — reference data, by the ruling.
+- `arming_sword`, what a dummy holds (`EnemyState.DefaultWeaponId`), and
+  `staff_of_renewal`, a crowded room's healer (`EnemyPlacer.HealerWeaponId`) —
+  named by behaviour, and each checked at load by `RuleCodeNamedWeaponsExist`,
+  which also wants a variant of every class the placer draws.
+- `ContentValidator.CurrencyGroup` (`Light`, `Resonant`), the one coexistence
+  rule the code keeps. Which modifiers can pay for a second soul (§1.5's combo
+  platform) is what those two modifiers *do*, so it gates
+  `RuleDependencyOnCurrency` from code; every relation *between* ids is
+  `restricted.json`'s alone.
+
+(Superseded by the rework's audit, 2026-09-25: a third exception stood here,
+`LootTable.CasterVariants`, a C# list of eight `weapons.json` variant ids — which
+staves and wands a caster drop rolls between, and in what order. It is the
+`dropOrder` of the Staff and Wand rows now, below.)
+
+**The rework's audit (2026-09-25)** found three copies of a master value the
+ruling leaves no room for, and closed them the ruling's way:
+
+- **The caster drop order is `weapons.json`'s**: each caster class's row names
+  its `dropOrder`, the variants a drop of it rolls between, in the order the
+  draw indexes them. The draw is uniform over the order's length (four a class,
+  as ever, so no saved drop moved), and never over the file's order of its
+  variants, so reordering `variants` re-rolls nobody (§3.5). A caster variant the
+  order leaves out never drops, and one appended to it drops with no code edit.
+  The load checks it (`RuleCasterVariantPool`): a caster class that fields
+  variants names an order, every id one of its own variants and none twice, and
+  a martial class names none, since its drop draws a role. A copy of
+  `weapons.json` beside the exe from before has no order, and stops the game
+  saying to delete it or run `--write-data <exe folder>`, as the flat format's
+  copy does.
+- **`neverRolled` is `restricted.json`'s alone**: the load no longer holds it to
+  exactly the catalogue's unique souls, which made any edit to the list alone
+  stop the game. The `unique` flag pins a soul's tier and nothing else; the load
+  asks only that `neverRolled` names enchantments of the catalogue
+  (`RuleNeverRolledNamesEnchantments`: a modifier there is a relation nothing
+  reads). A soul taken out of the list may be copied and still drops nowhere —
+  the drop pool (`LootTable.DropPool`, the code's list of the catalogue's
+  entries a drop may carry) names none — and an entry put in stops dropping.
+- **A caster's baseline is its row's**: the load asks it what it asks any
+  baseline — the forge allows it — plus one modifier at least (a caster's two
+  axes are a modifier and its innate) and no signature, and holds every staff
+  and wand to it (`RuleCasterForged`); it no longer pins both caster rows to
+  exactly `Resonant ×1`. That value is the rows' design (§1.3, §1.4), pinned by
+  the tests as a design doc's value (REWORK DECISION 3), never by a load rule.
+
+It also made two failures of a file say so readably: a JSON reader's sentence is
+one short line (a word it does not know, `nul` or `tru`, had it quote the rest
+of the file into the screen that stops the game), and a blank `tuning.json`
+beside the exe plays the built-in numbers with the notice `TUNING.JSON: THE FILE
+IS EMPTY - THE BUILT-IN NUMBERS ARE PLAYING`, where it had played them silently.
+Whether the gameplay numbers still compiled — an enemy's hit points, mana and
+movement, the crowded-room healer's odds, the chart's ×1.5, the proficiency
+steps, the room cap — are tuning numbers the ruling moves into `tuning.json` is
+the user's to rule: open-questions.md sets it out, and they stay compiled until
+then.
+
+**The rework's own choices, shipped provisionally** — each labelled REWORK
+DECISION, never USER DECISION, which names Phase 5's list; open-questions.md
+sets out each alternative, and this pass records the ruling once the user makes
+it:
+
+- **REWORK DECISION 1 — a variant may name its own statline, field by field.**
+  A class row carries the statline its variants share; any of `range`, `damage`,
+  `cost` and `manaCost` given on a variant plays instead of its class's. The
+  shipped file uses it only for the Staff of Renewal's 15 mana and the Staff of
+  Mire's 25.
+- **REWORK DECISION 2 — any edit to the caster drop order plays.** The order
+  is `weapons.json`'s (the audit, above), and a copy beside the exe may reorder,
+  shorten or lengthen it; each moves what a saved, not-yet-collected caster
+  dummy of that class drops, as a fifth variant moves the placement (§5.6: "a
+  deliberate, rare change rather than an ordinary edit"). (Superseded by the
+  rework's audit, 2026-09-25: this decision was that the order stays in code, as
+  `LootTable.CasterVariants`; the ruling left no room for that copy.)
+- **REWORK DECISION 3 — the suite keeps as literals only the values a design
+  doc fixes** — `MovementBudget` 160 and the `MovementUnitsPerMana` derived from
+  it, §1.2–§1.4's class rows, statlines, spreads and wand shapes, §1.5's unique
+  table, §5.8's tutorial row, and the friendly-fire switch — so an edit to one
+  fails by name and its doc moves with it. Every other test reads the master or
+  stands on numbers of its own (`Premise`), and no other master edit fails the
+  suite.
+
+### The user's rulings of 2026-09-25: the dice, the save model, raw JSON, and the deposit
+
+The same day as the ruling on content, the user ruled on four things more. Each
+supersedes the phase docs, the entries above and the rest of this pass wherever
+they differ: **R1**, what the d20 does across a reload; **R2**, the save model —
+a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT, one autosave
+slot, and manual slots whose count is a `tuning.json` key (superseded by the
+user's ruling of the same day on the save slots, in the autosave slot and what
+the count counts: a campaign is bound to the slot NEW CAMPAIGN begins it in, or
+LOAD GAME or CONTINUE loads, and every save of it goes there, so there is no
+autosave slot apart from the others, and `SaveSlots` counts every slot — R5,
+below); **R3**, raw JSON —
+"since we are storing in raw json we should probably not trust the fields", so
+every number of a content file gets a range, and a save's fields are checked
+against each other; and **R4**, what a deposit costs. R1 and R4 change no rule
+of play — R1 keeps what shipped, and R4 is Phase 6a's to build, its numbers
+declared as `tuning.json` keys ahead of it — so both are written here whole. R3
+and R2 change the game, and each is written here as it is built. R3 is, both
+halves: every number of a content file has a range (R3(a), below), and every
+count of a save has its ceiling and its fields are checked against each other
+(R3(b), below). R2 is built in three steps, each written below: the save
+folder's slots, a save's time, the slot count, and what a write never costs (R2,
+the folder); the title screen, with CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT
+(R2, the title); and saving by hand, with the menus that leave play by the title
+(R2, saving by hand). The entry below that R2 supersedes — the save model — is
+superseded whole. R5, the ruling on the save slots, has an entry of its own
+after R2's, built in five steps and written there, and each passage of R2's it
+makes false is marked where it stands.
+
+- **R1 — the dice are the visit's own, seeded and saved: kept.** What shipped
+  provisionally as Phase 5 USER DECISION 1 stands, ruled (the entry under "The
+  save", below): each d20 is a draw from a sequence the visit seeds, and how
+  many the visit has rolled is saved, so a reload rolls on exactly where play
+  left off and never rerolls. The user's reason: "just to protect players from
+  themselves" — a bad roll is never reloaded away. The price stated with the
+  decision is accepted as it stands: a turn replayed after the process is killed
+  past its autosave knows its next draws, and keying each draw by the turn, the
+  actor and the attack's ordinal instead stays not taken. The question leaves
+  open-questions.md.
+- **R4 — what a deposit costs.** Recorded for Phase 6a, which builds the
+  enchanter: nothing of it is played yet — its numbers are `tuning.json` keys
+  (below), which no rule reads until then. The user's rule:
+  - A weapon's `WearCapacity` starts at **30**: `StartingPool`, the one bar
+    every pool opens on (the Phase 2 pass above), which the graft formula spells
+    `StartingWearCapacity`.
+  - **It rises by 1 for every full bar's worth of wear cashed in**, a bar being
+    the capacity at the time. The progress accumulates across deposits: a
+    partial deposit counts, and what a deposit cashes past a full bar carries
+    toward the next point. Whatever the deposit bought, the growth is the same —
+    "the wear bar increases by one per full bar value cashed in". The pool
+    itself still empties at every deposit (§6.1): what carries is the capacity's
+    progress, never the wear.
+  - **Enchantment slots open every 5 capacity**: slot n at `30 + 5(n − 1)` —
+    30, 35, 40, 45, and the fifth and last at 50, §6.2's five.
+  - **Attaching enchantment #n needs a free slot and a deposit of at least
+    `30 + 5(n − 1)` wear**, and a deposit still spends the whole pool (§6.1).
+    Capacity above the price is breathing room: at capacity 35 with no
+    enchantment, cashing 30 buys the first.
+  - **Worked**, a fresh weapon cashing full bars: #1 at 30 hits, capacity 30 →
+    31; bars of 31, 32, 33 and 34 take capacity to 35, at 160 hits in all; and
+    #2 at 195. On by the same rule: #3 at 385 (bars of 36 to 39 between), #4 at
+    600 (41 to 44) and #5 at 840 (46 to 49) — twenty-one deposits from a fresh
+    weapon, five of them attaching.
+- **R4 agrees with §2.1, and replaces the ladder.** Phase 2's
+  `xpToNextPoint = currentMax / governingStat`, with a weapon's flat 1 — the
+  superseding pass's "all grow by `currentMax / governingStat` … a flat 1 for
+  weapons" — *is* a point per full bar, the bar the current capacity, the
+  progress carrying: capacity climbs the curve HP and mana climb, with a stat
+  of 1. The authored 30 → 40 → 55 ladder was the one passage that disagreed,
+  and it goes, and with it `n × EnchantmentWearCost` (§6.2) and §6.4's
+  service-dependent growth — "`+` a little" when enchanting, "`+` more" when
+  refining. Each passage that stated them is marked where it stands. Above: the
+  entry that answered "does wear cap" with the ladder (its answer stands: the
+  capacity caps wear, and a deposit spends it whole), the graft's "doubled at
+  most", the two rates as one mechanism, the ladder and its shift to 30. Below:
+  the Enchanter's hand-off. In the phase docs: §6.1, §6.2, §6.4 and §6.7, §5.3's
+  rows and §2.1's line on a weapon. The question leaves open-questions.md.
+- **R4's consequences are the rule's own**, each superseding a passage of the
+  phase docs:
+  1. **Refinement grows the pool no faster than enchanting.** §6.1, §6.2 and
+     §6.4 had refinement buy "a bigger pool *forever*" and grow capacity
+     fastest; every deposit now grows it alike, a point a full bar. What sets
+     the two services apart is what they buy — a chosen soul, or the graft roll
+     at refinement's odds (§6.4) — and between one slot and the next there is no
+     soul to buy, so the bars that open a slot are refinements.
+  2. **The graft odds climb without a top, slowly.** §6.4's "the odds cannot run
+     away" stood on a short authored ladder. Capacity has no top now, so
+     refinement's multiplier `1 + wear ÷ StartingPool` climbs a point of
+     capacity per full bar — 6% on a fresh full bar, 7% at capacity 40, and 9%
+     at 60, which is 1,335 wear cashed from new.
+  3. **A fifth enchantment also waits on the bars between slots.** §6.2's
+     "fifteen runs to a fully enchanted weapon" counted the attaching services
+     alone. From new the climb is 840 wear and twenty-one deposits at the least,
+     since slot 5 opens only at capacity 50, and every deposit, refinements
+     included, costs `count + 1` runs (§6.4). Attaching each enchantment as its
+     slot opens, the sixteen deposits between the slots are refinements and the
+     climb takes 71 runs of downtime. Refining first and attaching all five on
+     the last five deposits, at capacities 46 to 50, takes the least there is:
+     31 runs, for a weapon that carries no soul until then.
+  4. **"A free slot" is read literally.** What a weapon arrives with fills its
+     slots from the first: a staff's innate fills slot 1, so a fresh staff
+     attaches its second enchantment only once capacity opens slot 2, at 35; and
+     a unique that arrives with three souls attaches a fourth only once capacity
+     opens slot 4, at 45. At the ruled numbers the deposit implies the slot — a
+     deposit of `30 + 5(n − 1)` needs a capacity at least that high, which is
+     where slot n opens — so the two conditions part only if their numbers are
+     tuned apart.
+  5. **What a weapon arrives with is a head start in the souls it holds, never
+     on the climb to five.** It saves no wear: slot 5 opens at capacity 50
+     whatever the weapon arrived with, so every weapon cashes the same 840 to
+     fill it. And it costs downtime, because every soul a weapon arrives with
+     is in the count each later deposit pays `count + 1` runs on, refinements
+     included. Attaching each enchantment as its slot opens, an innate staff's
+     climb takes 72 runs, a unique that arrives with two souls 78 and one that
+     arrives with three 89, against a fresh weapon's 71; in the order that
+     takes the least (3), they take 48, 66 and 85 against 31. The phase docs
+     had a head start shorten the climb by what the weapon was handed (§1.5,
+     §3.1, §6.2), and each of those passages is qualified where it stands, as
+     is the entry above on a `Light` artifact's souls.
+- **Every number of R4 but its start, which is `StartingPool`'s already, is a
+  `tuning.json` key of the Enchanter group**, by the user's standing preference
+  that a number the user may revisit lives in the file: `WearCapacityPerBar`
+  (the capacity a full bar cashed adds), `FirstSlotCapacity` and
+  `SlotCapacityStep` (slot n opens at `FirstSlotCapacity + SlotCapacityStep ×
+  (n − 1)`), `EnchantmentSlots` (the most enchantments a weapon holds), and
+  `FirstEnchantmentWear` and `EnchantmentWearStep` (attaching #n needs a deposit
+  of at least `FirstEnchantmentWear + EnchantmentWearStep × (n − 1)`). They
+  replace the `WearCapacityLadder` and `EnchantmentWearCost` placeholders: a file
+  naming either is told it is no key and pointed at the key that took its place.
+  `WearPerHit` and `GraftBaseChance` are not R4's numbers, and wait with their
+  Phase 6a readers as before.
+  - **Each number its own key — how they split is provisional, the user's to
+    rule.** Apart, any one number moves alone, and a weapon's starting capacity
+    stays `StartingPool`, the Phase 2 pass's one key for every pool. The
+    alternatives: tie them — slot n opening at, and enchantment #n costing,
+    `StartingPool + SlotCapacityStep × (n − 1)`, three keys, so the slots and the
+    price can drift neither apart nor from the start — or split the start into a
+    key of its own, un-ruling the Phase 2 pass. Apart, the slots and the price
+    agree at the ruled numbers and part only if tuned apart (consequence 4,
+    above). It goes to open-questions.md with the save model's own choices, once
+    that is built. (It went there as USER DECISION 1 when saving by hand was
+    built — R2, saving by hand, below — and stays open.)
+  - **The clamps**, each the whole check a file's number gets:
+    `WearCapacityPerBar` 0–1000 — 0 freezes capacity, a dial rather than an
+    error, and 1000 is where the file's magnitudes clamp; `FirstSlotCapacity`
+    1–10000, a capacity, so `StartingPool`'s range; `SlotCapacityStep` 0–10000,
+    0 opening every slot at once; `EnchantmentSlots` 3–10 — never fewer than a
+    weapon already arrives with, the floor read off
+    `ContentValidator.MostArrivingEnchantments` (the Nameless Knife's three) and
+    never written as 3, so no `tuning.json` can declare a weapon over its own
+    slot count, and at most twice the docs' five until Phase 6a sees a weapon
+    carry more; `FirstEnchantmentWear` 1–10000 — never free, since a weapon
+    never fought with is never enchanted (§6.1); `EnchantmentWearStep` 0–10000,
+    0 pricing every enchantment as the first.
+  - **Keys ahead of their reader: validated, and outside the hash until they
+    play.** Each is `TuningKey.Played = false`, and is read exactly as every
+    key: the built-in copy must name it with a whole number, a copy beside the
+    exe merges it, clamps it and warns, a doc's spelling is pointed at it, and
+    the log names it among the numbers a file changed. But the save's tuning
+    hash walks the played keys alone. A save's hash answers "are these the
+    numbers it was played under?", and a number nothing plays is none it was
+    played under — so turning one never says THE NUMBERS HAVE CHANGED on a
+    resume, and adding the six moved no save's hash: the saves written before
+    the rework still hash as the tuning they were played under — their frozen
+    tuning file, read over the master, lacks these six keys and no other. No
+    `ContentValidator.ValidateTuning` rule: it holds what a reader
+    needs of a `Tuning` built in code, and nothing reads these. Phase 6a flips
+    each to played as it reads it, with the save's version 2.
+  - **The docs' five is two numbers, kept apart on purpose.** `EnchantmentSlots`
+    is how many enchantments the enchanter lets a weapon hold; the Light shape's
+    five — `ContentValidator.LightShapeSlots`, a rule constant: `signature ×n`
+    buys `5 − n` souls (§1.5) — decides what a unique *arrives* with. They agree
+    at five by the docs and mean different things: moving the key moves the
+    enchanter's ceiling and never the unique table's shape, and the key's floor,
+    `MostArrivingEnchantments` — the Light shape at its floor, `LightShapeSlots −
+    LightShapeFloor` — keeps the two from contradicting.
+- **R3(a) — every number of a content file has a range.** The user's reason:
+  "since we are storing in raw json we should probably not trust the fields".
+  Every number `weapons.json` and `dungeons.json` hold has a row of
+  `ContentBounds` — the range the game plays it in, and why — and one outside it
+  stops the game under `RuleNumberInRange`, naming the file, the entry, the field,
+  the number and the whole range: `cost 0 is outside 1 to 10000 - movement is
+  charged a unit at least, …`. Never clamped, since content is validated (§5.4):
+  a copy beside the exe out of range never falls back to the built-in copy, and a
+  built-in copy out of range is the master's own — a range is the game's, never
+  another file's to break — so the screen names the master to fix and rebuild.
+  Every top is read once off a `tuning.json` clamp's ceiling or a rule of the
+  game, never a number of a master, and every shipped and doc-fixed number lies
+  inside its row:
+
+  | Number | Range | Why |
+  | --- | --- | --- |
+  | a class row's `range`, and a variant's own | 1 – `MovementBudget`'s ceiling (10000) | a reach of 0 hits nothing, and the farthest the tuning measures is past any map |
+  | a class row's `damage`, and a variant's own | 0 – `PerStack`'s ceiling (1000) | a staff hits for 0, its cast being its innate; the most a magnitude can be |
+  | a class row's `cost`, and a variant's own | `Progression.MinimumMovementCost` (1) – 10000 | movement is charged a unit at least, so a smaller cost names one never charged, which the HUD's COST would show |
+  | a class row's `manaCost`, and a variant's own | 0 – 1000 | a martial class casts for 0; below 0 the cast gate opens on an empty pool |
+  | a class row's `baseline` stack; a weapon's spread as composed, a unique's `raises` among it | 1 – the modifier's tuned `MaxForged` (3 at most) | `RuleForgedStackCount` and `RuleMaxForged`, both ends, as before |
+  | a variant's `adds` stack | 1 – `MaxForged`'s ceiling (3) | an add adds a stack at least, and none is deeper than any forge goes; what it composes to stays the forge's rules' |
+  | an enchantment's `tier` | `DropTier` (1) – `ArtifactTier` (3) | a weapon arrives at tier 1 and an artifact at 3 at most; tier grows in play from there, uncapped (§3.3), and a saved weapon's tier is the save's to bound. Below 1 plays as 1, a tier the game never plays |
+  | a wand's `radius`, `length`, `width`, `targetReach` its kind measures | 1 – 10000 | a measured dimension of 0 covers nothing (a left-out one read as 0); the farthest the tuning measures |
+  | a Cone's `angleDegrees` | 1 – a full turn (360) | a cone of nothing, or wider than all around, is no cone |
+  | a pinned `bossFloorMin` or `bossFloorMax` | 1 – `BossFloorMax`'s ceiling (99) | a floor number starts at 1; no tuning names a deeper floor, and the fit can always serve 99 |
+  | a boss's `maxHp` | 1 – `StartingPool`'s ceiling (10000) | a hit point at least; no pool opens on a bigger bar |
+  | a boss's `movementBudget` | 1 – 10000 | a unit of movement at least; the farthest the tuning measures |
+  | a boss's `innate` stack | 1 – `MaxForged`'s ceiling plus `AcquiredHeadroom`'s (53) | innate is no forge's — "a golem deeper than any forge is a golem" — but no stack grows deeper |
+
+  - **The rules that bounded a number before keep the end they own**, and the
+    range rule is asked after them, so each refuses what it always refused, its
+    detail now in the range rule's form, naming the field and the whole range:
+    `RuleBossStatline` (`boss.maxHp 0 is outside 1 to 10000 - …`, and
+    `boss.movementBudget` alike; a boss that is missing keeps `names no boss`),
+    `RuleBossFloorRange` (`bossFloorMin 0 is outside 1 to 99 - …`, and a
+    `bossFloorMax` below 1 alike; an inverted range `bossFloorMax 3 is below
+    bossFloorMin 5`, an end the dungeon leaves to the tuning named as its key,
+    `tuning.json BossFloorMin 5` — asked only once both ends lie in range, so an
+    inversion is never how a floor out of range is named),
+    `RuleBossInnateStackable` (`boss.innate.Brace 0 is outside 1 to 53 - …`; a
+    member that never stacks breaks no range, and keeps its detail), and the
+    forge's two, which keep both ends of a forged count: a class row's
+    `baseline.CritMultiplier 0 is outside 1 to 3 - …`, a weapon's
+    `forged.CritWindow 4 is outside 1 to 3 - …`, the top the tuned `MaxForged` of
+    the modifier. A refusal that names a relation keeps its words
+    (`baseline Brace x1 on a Ranged weapon beside …`): it breaks no range.
+  - **Where the range rule is asked.** A class row's statline once the row's own
+    checks pass, so a fault is named on the class, where it is written, and never
+    on the first variant that plays it; a weapon's statline as composed, its
+    shape's measured dimensions and its enchantments' tiers once its row's
+    checks pass; a boss's numbers after its own rules; and a pinned boss floor
+    **once `RuleBossFloorRange` has kept the 1 of each end, and before it asks
+    whether the range inverts or the retiring rule and the farm's read the
+    floor**, so a floor out of range is named as one, with the whole range,
+    whatever the tuning or the other end: a dungeon pinned to floor 500 is the
+    range rule's, where it had been `RuleBossPaysLessThanTheFarm`'s; a
+    `bossFloorMin` of 150 beside the tuning's deeper end is the range rule's too,
+    never `tuning.json BossFloorMax 10 is below bossFloorMin 150`; a
+    `bossFloorMax` of 0 is `bossFloorMax 0 is outside 1 to 99 - …`, never below
+    the other end; and `TuningFit` raises no offset for a floor past the top and
+    says nothing about it. What a variant `adds` the reader asks
+    as it reads it, before summing it onto the class's baseline: summed, a raw
+    `-1` would read as a composed stack one short, a `0` on a baseline modifier
+    would add nothing in silence, and the largest whole number would wrap — so the
+    refusal names the number written, at its path (`weapons.json:
+    variants[0].adds.Light: 0 is outside 1 to 3 - …`). A unique's `raises` is set,
+    not summed, so the composed spread's rules name its raw number.
+  - **The boss floor's top is the save's too.** `ContentBounds.DeepestBossFloor`,
+    `BossFloorMax`'s clamp ceiling, is one accessor that the content's pinned
+    floors and the save's boss floor both read (`SaveMapper`), so the two never
+    disagree about how deep a boss goes; the save had summed a farm's banks to
+    198 while a pinned floor had no top. And at `AcquiredHeadroom`'s clamp floor a
+    farm banks 2, so a boss on floor 99 needs an offset of 98, inside
+    `BossStackOffset`'s clamp: the fit can always serve the deepest floor a
+    dungeon may pin, which the suite asserts off the schema.
+  - **What holds no number**: `restricted.json`'s relations are ids and groups of
+    ids, and a caster's `dropOrder` is ids, its length and membership bound by
+    `RuleCasterVariantPool`. A dimension a shape's kind does not measure is 0 or
+    refused by the reader, as before.
+  - **A unique soul's tier is held to the same 1 – 3, and plays at its pin.** A
+    narrower row, 1 to 1, was planned — a soul written above 1 names a tier the
+    game never plays (`Enchantment.Tier` pins it) — and is not built: the suite
+    loads a soul written at 3 and holds the pin on it
+    (`UniqueContentTests.UniqueSouls_AreNeverRolled_AndTierPinned`), a test this
+    step had no licence to rewrite. Narrowing it is that row and that test.
+  - **The enchantment catalogue, the other half of the old question, is settled
+    as code.** Under the ruling on content it is code (`EnchantmentDefinitions`),
+    reviewed and tested like every rule, and R3's reason does not reach it: no
+    player edits it. Its load checks stand (`RuleEnchantmentLockIsPositive`,
+    `RuleZeroTrigger`, `RuleMagnitudeNamesAPotency`), and the dialled numbers laid
+    over it (`ApplyPercent`, `ArcanePotency`) are `tuning.json`'s, clamped 0–1000.
+    Nothing of it is a user decision, and the question — whether a content file's
+    numbers have bounds — leaves open-questions.md whole.
+- **R3(b) — a save is raw JSON too: every count has its ceiling, and the fields
+  are checked against each other.** The user's reason is R3's: "since we are
+  storing in raw json we should probably not trust the fields". The save's walk
+  (`SaveMapper`) already refused an id the content lacks, a count below its
+  floor, a list that is not one and two answers to one question; it now also
+  refuses every count whose larger value would wrap the arithmetic that reads it
+  — at the field's own path, beside its floor, before anything else is asked of
+  it — and, once every field has been read on its own, `SaveConsistency.Check`
+  asks the fields of each other, so every refusal of a single field keeps its
+  path. A save that fails either is refused whole as one that cannot be read:
+  set aside as `campaign.unreadable-N.json`, never deleted, the backup tried, and
+  never a crash (the resume catches every exception). The notice shows the field
+  and the first clause of what is wrong there — `CAMPAIGN.JSON COULD NOT BE READ
+  (CAMPAIGN.RETIRED[0]: TUTORIAL IS RETIRED AND WAS NEVER CLEARED)` — so every
+  problem is written in the HUD's font, an id named bare. Every ceiling and every
+  check holds by construction in play, on both saves the pre-rework code wrote
+  and on the Flagship, and `SaveConsistencyTests` plays a campaign through every
+  outcome to show it.
+
+  | Count (a weapon's wherever it is: a bag, a floor, a spoil, a row, a pinned drop, a summary) | Refused when | Read off | What it would break |
+  | --- | --- | --- | --- |
+  | a forged stack | above 3 | `MaxForged`'s clamp ceiling (`ContentBounds.DeepestForge`): nothing forges past it | a spread past any forge, which the cap then lifts further |
+  | a live stack | above its forged stack + 50 | `AcquiredHeadroom`'s clamp ceiling (`MostAcquired`): acquisition stops at the forged count plus the headroom, and a lowered headroom never takes a stack away | a Block two billion deep, whose absorb overflows |
+  | a member's innate stack | above 53 | the deepest a stack grows (`DeepestStack`), a boss innate's top in `dungeons.json` too | a member's Block past any weapon's |
+  | an enchantment's tier | above 2147 | `DeepestTier`: the largest whole number ÷ (`ApplyPercent`'s clamp ceiling 1000 × `ArcanePotency`'s 1000, the largest potency) | an entry's lock (lock × tier) and its levels (percentage × potency or source × tier) past an int |
+  | a weapon's enchantments | more than 10 | `EnchantmentSlots`' clamp ceiling (`MostEnchantments`); none arrives with more than 3 | `Weapon.TotalLock` summing its locks past an int |
+  | the run counter, and the last run's copy of it | 2,147,473,846 or more | `MostRuns`: the largest whole number less `BossFloorMax`'s ceiling 99 × `CooldownRunsPerFloor`'s 99 | a run's end adds one, and a clear locks until the counter plus up to 9,801 runs: both would wrap negative |
+  | the visit's boss floor | above 99 | `DeepestBossFloor`, R3(a)'s | a dungeon no content made, every floor of which a load generates |
+  | a member's hit points; a row's | above 10000 plus its HP XP; above 10000 plus its revival gains — each summed as a long | `StartingPool`'s clamp ceiling (`Bar`): a maximum is its bar plus a point for each HP XP at most, or its base plus what its revivals added | a member standing on 99999 HP |
+
+  - **The tier's ceiling is a sanity bound, and is recorded as one.** Tier is
+    uncapped by design (§3.3, "the pool is the cap"), and 2147 is only where the
+    arithmetic of an entry stops being whole. Play never nears it: an entry
+    climbs only while awake, its lock inside its wielder's max mana, so tier 2147
+    under the catalogue's smallest lock (15) wants 32,190 mana — some 117 million
+    mana XP — and a drop banks at most `AcquiredHeadroom` tiers onto an
+    artifact's 3.
+  - **Every ceiling is a clamp's ceiling or a rule, never the tuning in hand**,
+    read once in `ContentBounds` beside R3(a)'s, so no tuning in range and no
+    content that loads refuses a save play wrote (the run counter's own edge
+    aside, below), and the content and the save never disagree about how deep a
+    number goes. Beside the three the save alone needs (`DeepestTier`,
+    `MostRuns`, `MostEnchantments`), a live stack's reads `MostAcquired`, which
+    `DeepestStack` is now built from.
+  - **A lock keeps its floor alone** — the campaign's and the last run's. The
+    first draft held both to `MostRuns` as well, and the review of Phase 5.S4
+    found that play could write a lock the next load refused: a clear locks until
+    the counter plus up to 9,801 runs — `MostRuns` or more whenever the counter
+    is within that of it. And a lock needs no ceiling, since nothing reads one but
+    against the counter: entering and the list compare the two (`IsSelectable`,
+    `EarlyOffer`), and the two countdowns take the counter from a lock above it —
+    the list's, only for a dungeon not yet selectable, and the summary's, whose
+    lock check 7 holds at or above its own counter — so no lock wraps anything.
+  - **The cross-checks**, in the order asked: (1) a retired dungeon was cleared —
+    it retires on its clear; (2) a locked one was cleared — only a clear writes a
+    lock; (4) with no run ended, nothing is counted and nothing cleared; (5) a
+    boss kill has the boss down and a retreat has it standing; (6) a run counted
+    exactly when its boss fell or its mercy was earned, and never a mercy with the
+    boss down; (7) a clear locks or retires its dungeon and never both, a failure
+    does neither, and a last run's own lock is never below its own counter; (8)
+    the boss floor is told exactly when it was reached — it is the deepest floor,
+    never missing with the boss down — and the deepest floor is no deeper than
+    99, the ceiling a visit's boss floor has; (9) spoils are lost and XP clawed
+    back only by a wipe, and a wipe keeps no spoil; (10) a claw-back takes back,
+    once a pool; (11) the last run's counter is the campaign's; (12) a last run's
+    lock is the campaign's on that dungeon, unless a visit to it is in progress
+    and the lock is the counter — the early offer's rewrite — while a run that
+    locks nothing writes none beside an earlier clear's lock, so an unset lock is
+    never compared; (13) a clear's dungeon is cleared, and a retiring clear's
+    retired; (14) no two members share a colour; (15) a visit's dungeon is neither
+    retired nor locked past the counter, which only the early offer's lifted lock
+    lets it be entered at; (16) what each pool held at the door is no more than it
+    holds now — a visit only adds XP; (17) the boss's drop is promised no more
+    stacks than the boss floor; (18) where the bottom floor is saved, its boss
+    row stands exactly while the visit has the boss standing — its fall records
+    it, and a boss never rises; (19) a drop is taken only from a corpse, once the
+    boss is down.
+  - **The ruling's own example is legal state — please confirm.** "A lock ending
+    before the current run count" is how a lifted lock stays: nothing removes a
+    lock (`CampaignState.LockedInOrder`: "a lock that has lifted stays, reading a
+    run already reached"), since a lifted lock already reads as open — the
+    counter at or past it — and the early offer compares locks lifted or not; and
+    the early offer itself writes the counter as a lock. Refusing it would refuse
+    every campaign that played a cooldown out. The form of it no play writes is
+    check 7's — a last run's own lock below its own counter — and that is refused.
+  - **Check 3, a lock on a retired dungeon, is withdrawn.** `dungeons.json`
+    beside the exe may move `retiresOnClear` onto a dungeon already cleared and
+    locked (`RuleOneRetiringDungeon` asks only that one dungeon carry it, and a
+    retiring dungeon pins its floor), and its next clear retires it and leaves
+    the old lock where it was: play writes the pair. It is inert — the list, the
+    early offer and entering all ask whether a dungeon is retired first.
+  - **Considered and not refused**, each for its reason: HP and mana against
+    their maximum — stored mana reads as its spendable ceiling at most, and the
+    maximum is derived at load from today's tuning and content, so a save made
+    before either was lowered holds more HP honestly, and play meets it (a heal
+    adds nothing past full, a rest sets the maximum); a soul's tier above 1,
+    which its pin plays at 1 (a later build may make an entry a soul); a lock
+    further ahead of the counter than a clear writes, which only counts down, the
+    early offer reaching it before any dead end; the active member naming nobody,
+    where the scene falls back; an enchantment carried and never seen; spoils
+    lost on a wipe whose boss stood, which the summary alone reads; a row's farm
+    counters against each other, and the boss row's defeat turn against the
+    visit's — tests fell rows by hand, and only a revival's timing reads them,
+    which tolerates it; a member's `alive` against its HP, written apart; and
+    bags of unequal length, each member keeping the bag it was built with.
+  - **The walk's known edge.** Every other count — the XP pools and an entry's
+    XP, the turn and the dice rolled, a row's farm counters and revival gains,
+    held shots, a status's levels — keeps its floor alone, since no clamp or rule
+    gives an honest ceiling short of the largest whole number: a pool grows with
+    play, a soul banks its spend for ever, revival gains compound. So a
+    hand-edited count within one credit of the largest whole number can still
+    wrap on that credit. And the run counter is the one count play itself carries
+    up to its ceiling: a counter a hand edit leaves just short of `MostRuns`
+    loads, and the ticking runs played on from it take it to `MostRuns`, a save
+    the next load sets aside — and played on past that in the same session, a
+    clear's lock can wrap. No ceiling on a count play adds to can admit
+    everything played on from it; two billion runs are never played, so only a
+    hand edit meets it (`SaveConsistencyTests` pins it). A list longer than play
+    writes — a floor's rows — costs load time, never a wrong number: every
+    duplicate and every row that names nothing is refused already.
+- **R2, the folder — the save folder's slots, and a save's time.** The user's
+  ruling: a title screen offering CONTINUE, NEW CAMPAIGN, LOAD GAME and QUIT; one
+  autosave slot that saves itself where the game autosaves today; and manual
+  slots, "the number of saves should live on the tuning.json so that we don't need
+  to fix the code every time I change my mind". (Superseded by the user's ruling
+  of the same day on the save slots, in its autosave slot and manual slots: a
+  campaign is bound to the slot it is begun in or loaded from, and every save of
+  it goes there, so there is no autosave slot apart from the others, and the save
+  folder's own campaign is the old autosave, moved into a slot at launch — R5, the
+  slot, R5, the old autosave, and R5, the move, below.) Its first part is the disk
+  and the loader under them, built beneath a launch that plays exactly as before —
+  it loads the autosave, and no play writes a manual slot yet:
+  - **The save folder is the autosave slot**: `campaign.json`, its backup, its
+    markers and its set-aside files, by the names they always had. So a save
+    written before the slots is the autosave as it stands — no file moves, and
+    there is no migration to fail halfway; both saves the pre-rework code wrote
+    load as the autosave, through the listing (`PreReworkSaveTests`). **Manual
+    slot n is the folder `slot-n` inside it**, holding the same files for its own
+    save: its own backup, markers and set-aside files. The names are built from
+    the numbers and the folder is never enumerated, so a folder named any other
+    way — `slot-01`, `slot-10`, `slot-x` — is no slot: never read, listed or
+    written, and no folder's spelling or order reaches a choice. (Superseded by
+    the user's ruling of the same day on the save slots, in the save folder being
+    the autosave: nothing new is saved there, so it is the old autosave — listed,
+    as `OLD AUTOSAVE`, only while it holds a save or a backup, and played in place
+    — and the slots are slot 1 up — R5, the old autosave, below. Superseded again
+    in "no file moves, and there is no migration", and in its being played in
+    place: every launch moves the save folder's own campaign — the pre-rework
+    saves among them — into a slot of its own, byte for byte and all or nothing, a
+    move of the files with no migration of their text, so it is the old autosave
+    only while a launch could not move it, played in place only while no slot is
+    free for it, and loading nothing in a session whose move failed — R5, the
+    move, below.)
+  - **The slot count is `tuning.json`'s `SaveSlots`**: 3, clamped 1–9 with the
+    usual warning. At least one, so saving by hand always has somewhere to go; at
+    most nine, since a digit picks each slot, as the bag's are picked, and the
+    number row stops at 9. It sits in a group of its own, `Saves`, the file's
+    last, and is `TuningKey.Played = false`: the launcher reads it, never a rule
+    of play, so the save's hash leaves it out and turning it never says the
+    numbers changed. A count lowered below a slot that holds a save deletes
+    nothing: the slot is kept, listed for loading and never saved into, and a
+    count raised again makes it an ordinary slot. (Superseded by the user's ruling
+    of the same day on the save slots, in what such a slot takes: loading it is
+    choosing it, so the campaign played from it saves into it, marked `BEYOND THE
+    3 SLOTS` and no longer `- LOAD ONLY`; NEW CAMPAIGN never offers it — R5, the
+    slot, and R5, NEW CAMPAIGN, below. And in what it counts: every slot, 3
+    places where there were 4, and at least one so that a campaign always has a
+    slot to begin in, since saving by hand chooses none — R5, the old autosave,
+    below.)
+  - **Every save carries its time** — `savedAt`, the document's last member: the
+    UTC instant as round-trip text, from the edge's clock. `Logic/` never reads a
+    clock; the game hands the time in, and a test a fixed one. A save written
+    before the member has none, and reads as one with no time. A save of the
+    campaign a slot already holds, whatever its time, writes nothing — the two are
+    compared with the time left out — so the backup stays the save before it and
+    a save keeps the time its state was first written. `savedAt` is raw JSON like
+    every field (R3): one that is no round-trip time refuses the save whole,
+    `savedAt: yesterday is no time`, set aside as any unreadable save is.
+    (Superseded by the user's ruling of the same day on the save slots, in whose
+    save keeps its time: the game's own; a save by hand of the campaign a slot
+    holds already rewrites its time alone, the backup kept — R5, SAVE GAME,
+    below.)
+  - **The most recent save** — what CONTINUE is to load — is chosen by that time,
+    deterministically: the latest among the slots whose save, or failing that
+    whose backup, reads; a save with no time is older than any with one; a time
+    more than a day ahead of the clock counts as none, so a hand edit or a clock
+    once set wrong can never pin the choice on one slot through every autosave
+    after it, while the day's slack admits a save carried from a machine whose
+    clock runs a little fast; and a tie goes to the autosave, then the lower
+    slot number, by number and never by a folder's order. File times are never
+    read — a copy or a sync tool rewrites them, and a test cannot fix them — at
+    the price the README states: a clock set back can make an older save look
+    newer. A counter would need every slot read at every write. (Superseded by the
+    user's ruling of the same day on the save slots, in the tie: it goes to the
+    lower number, the old autosave's 0 while it is listed, with no autosave slot
+    apart from the others — R5, the old autosave, below.)
+  - **The listing reads and never moves**: each slot's save and backup are read
+    and parsed for a header — when it was saved, the runs counted, and the
+    dungeon, floor and turn of a run in progress — and never restored, since a
+    run in progress would regenerate its floors; nothing is moved, deleted or
+    written. A save that parses and will not restore — content gone, a
+    contradiction — is listed as reading, and its load sets it aside.
+  - **A load is per slot, and never makes a campaign**: a slot's resume marker,
+    its save, then its backup, each set aside in the slot's own folder when it
+    cannot be read or restored, as the one launch's resume always did. The words
+    are the autosave's as ever — `CAMPAIGN RESUMED`, `... FROM ITS BACKUP, ONE SAVE
+    OLDER` — and a manual slot's `CAMPAIGN RESUMED FROM SLOT 2` and `CAMPAIGN
+    RESUMED FROM THE BACKUP OF SLOT 2, ONE SAVE OLDER`, green like them. A slot
+    that brings nothing back hands the choice to its caller: the launch begins a
+    campaign, saying `A NEW CAMPAIGN BEGINS` ahead of whatever was set aside.
+    (Superseded by the title, below: the launch no longer loads, and a load that
+    brings nothing back goes back to the title, saying so. And by the user's
+    ruling of the same day on the save slots, in the autosave's words: every load
+    names its slot, the old autosave's too — `CAMPAIGN RESUMED FROM THE OLD
+    AUTOSAVE`, `... FROM THE OLD AUTOSAVE BACKUP, ONE SAVE OLDER` — R5, the old
+    autosave, below.)
+  - **No write costs a file.** Until the slots, every launch set an unreadable,
+    crashed or newer-build `campaign.json` aside before anything wrote there. A
+    slot can now be written without being loaded — the autosave after a manual
+    load, a save by hand into any slot — and the replace would rotate such a file
+    into the backup and delete it at the next write: a newer build's save written
+    over, which the codec promises never happens, and a readable backup deleted
+    under an unreadable save. So the one door every write goes through checks the
+    files first: a `campaign.json` whose text the codec refuses is set aside as
+    `unreadable`, and the write moves into place with the backup untouched; while
+    a save stands for the replace to rotate, a backup the codec refuses is set
+    aside too. Only the codec's refusal counts — a file the file system cannot
+    read right now is left to the write, which fails and says so, so a passing
+    lock never refuses a session's writes — and a file this session wrote there
+    or read whole is not read again. What it sets aside is said like a failed
+    save, at once over the floor and on the next screen, and never taken back: it
+    is a fact about a file. A file that will not move refuses the slot's writes,
+    as a load's does, and its notice is the failure. (Superseded by the user's
+    ruling of the same day on the save slots, in its example: no autosave follows a
+    manual load now — the slot loaded is the slot written — and a save by hand
+    goes into the campaign's own slot too, so no save writes a slot its campaign
+    did not come from; the guard stands, for a file put there behind the game's
+    back — R5, the slot, and R5, SAVE GAME, below.)
+  - **A write clears its slot's resume marker.** The marker guards the file a
+    load was resuming; once a write has replaced that file, a marker left standing
+    would set the new save aside as crashed at the next load and resume the
+    backup — the very save that crashed. No write reaches a slot while its own
+    load is in flight: the autosaves a loaded screen asks for wait until it is up
+    and its marker cleared, and are written the frame it clears, so a load whose
+    first screen crashes never reaches the save it was loading.
+  - **A dev-override session never touches a slot**: its store is its scratch
+    slot, emptied as ever, and the slots are never made, so no save of the session
+    — entry, turn, arrival, a run's end, quit — reaches the autosave or a manual
+    slot. (Superseded by the user's ruling of the same day on the save slots, in
+    the autosave: the save folder's own campaign is the old autosave, which every
+    other launch moves into a slot of its own, and a dev-override launch neither
+    saves into it nor moves it — R5, the move, below.)
+- **R2, the title — CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT.** The ruling's
+  second part: "the game opens on a TITLE SCREEN offering, in this order, CONTINUE
+  / NEW CAMPAIGN / LOAD GAME / QUIT". Built on the folder above, in place of the
+  launch that resumed the autosave:
+  - **The game opens on the title**: `DISTANCE RPG`, the notices under it, the
+    four options in the ruling's order, and the keys along the bottom
+    (`TitleScene`, `TitleHud`, every string of `TitleText` and `SlotText` tested).
+    A dev-override launch has none — it boots straight into its scratch campaign,
+    as ever — and `--new-campaign` begins a campaign at launch, straight to the
+    screen between runs: both developer tooling. No campaign is in play at the
+    title, so a close from it saves nothing. The data files' notices are the
+    title's, as the first scene's. (Superseded by the user's ruling of the same
+    day on the save slots, in `--new-campaign`'s clause: it begins in a slot, the
+    lowest empty one within the count, else slot 1, never the autosave — R5, NEW
+    CAMPAIGN, below.)
+  - **CONTINUE loads the most recent save** — the listing's choice (R2, the
+    folder), the autosave or a manual slot — and names it by its own row:
+    `CONTINUE - AUTOSAVE - THE SPEAR HALL FLOOR 4 - 3 RUNS - 2026-09-25 14:32`, the
+    time in the player's own zone. With nothing to load it is `CONTINUE - NO SAVE
+    YET`, dimmed and passed over, and the choice starts on NEW CAMPAIGN; otherwise
+    it starts on CONTINUE, so ENTER at launch is one key to where the game stood.
+    (Superseded by the user's ruling of the same day on the save slots, in its
+    example: `CONTINUE - SLOT 2 - ...`, or `CONTINUE - OLD AUTOSAVE - ...` while
+    the save folder itself holds a campaign — R5, the old autosave, below.)
+  - **LOAD GAME lists every slot** in the options' place and the notices', so the
+    list never contends with the save's word for height: `AUTOSAVE`, `SLOT 1` to
+    the count, then any slot beyond it that holds a save. A slot is its own row —
+    where its campaign stands (the dungeon's name and floor, or `BETWEEN RUNS`),
+    the runs counted and the time, or `EMPTY`, or `CANNOT BE READ` — and, only
+    when one applies, a markers' row under it: `FROM ITS BACKUP`, `ITS LAST LOAD
+    DID NOT FINISH`, `AHEAD OF THIS CLOCK` or `NO TIME RECORDED`, `BEYOND THE 3
+    SLOTS - LOAD ONLY`. One row of both would run past a 1280-pixel window at any
+    scale the list can be read at; split, at the list's one scale (1.4), ten
+    slots each with its markers' row fit a 720-pixel window. W/S or the arrows
+    move over the slots that hold something, a digit takes its slot (0 the
+    autosave), and an empty slot says `SLOT 2 IS EMPTY` and loads nothing. A digit
+    loads at once, as ENTER does, and never only picks, so the keys line says so:
+    `W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - ESC BACK` (S6's review; the plan's
+    `W/S OR ARROWS OR 0-9 CHOOSE - ...` read as a digit that only picks). A slot
+    whose files none of which reads can be chosen: its load sets them aside and
+    says so. Nothing drawn is the file's raw text: a dungeon id the content lacks
+    is `AN UNKNOWN DUNGEON`, and a time the player's zone cannot hold is shown in
+    UTC. (Superseded by the user's ruling of the same day on the save slots, in
+    the marker and the keys line: `BEYOND THE 3 SLOTS`, no longer `- LOAD ONLY` or
+    dimmed, and `W/S OR ARROWS CHOOSE - ENTER OR 0-9 LOADS - PLAY SAVES INTO THE
+    SLOT YOU LOAD - ESC BACK` — R5, the slot, below. And in the `AUTOSAVE` row and
+    the digit 0: the save folder itself is the `OLD AUTOSAVE`, listed first only
+    while it holds a save or a backup; 0 loads it then and does nothing
+    otherwise, and the keys line reads `... ENTER OR 1-9 LOADS ...`, `0-9` while
+    it is listed — R5, the old autosave, below.)
+  - **Every ask is two rows, where the keys stand, and only ENTER says yes**:
+    what it does, then `... - ENTER: YES - ESC: NO`. N, Y and every other key say
+    no and are spent, so a player pressing N to mean no keeps what the ask named —
+    the guarantee the between-runs prompt gave (a key that answers never also
+    acts), kept, and its N-then-N yes gone with it.
+  - **NEW CAMPAIGN asks only when it sets something aside** — USER DECISION 3,
+    shipped provisionally: with the autosave slot empty it begins at once; when it
+    holds a save or a backup it asks, `NEW CAMPAIGN SETS THE AUTOSAVE ASIDE - THE
+    SPEAR HALL FLOOR 4 - 3 RUNS` / `AS FILES, NEVER DELETED - SLOTS 1 TO 3 ARE
+    KEPT - ENTER: YES - ESC: NO`, and on ENTER sets the autosave's backup and save
+    aside as `campaign.abandoned-N.json` — `--new-campaign`'s path, its notices
+    naming no command line — the manual slots untouched, the new campaign saved
+    at once, and the screen between runs saying `A NEW CAMPAIGN BEGINS` and where
+    the old files went. The alternative: it asks, then saves over the autosave
+    (the old save one save deep as the backup, then gone). (Superseded by the
+    user's ruling of the same day on the save slots, whole: NEW CAMPAIGN chooses
+    its slot, 1 to the count, never the autosave, and asks only over a slot in
+    use, which alone it sets aside; USER DECISION 3's question is asked again of
+    that slot, SLOT DECISION 2 — R5, NEW CAMPAIGN, below.)
+  - **A manual slot loaded over a different autosave asks first, then sets that
+    autosave aside — never a silent loss** (USER DECISION 2, shipped
+    provisionally). Whatever slot a campaign is loaded from, it autosaves into the
+    autosave slot, and the manual slot changes only when saved into by hand. Left
+    at that, a different campaign in the autosave slot — for a player who never
+    saved by hand, their only copy — would be the backup after the first autosave
+    and gone after the second. So a load of a manual slot while the autosave holds
+    anything else (another text, time aside, or files that cannot be read) asks —
+    `LOADING SLOT 2 SETS THE AUTOSAVE ASIDE - ...` / `AS FILES, NEVER DELETED -
+    ENTER: YES - ESC: NO` — from the list or from CONTINUE alike, and once the
+    slot's load has brought its campaign back (never before, so a load that
+    restores nothing leaves the autosave as it was) and before anything is
+    written, the autosave's backup and then its save are set aside
+    (`CampaignBoot.MakeRoom`): the one its resume marker guards as `crashed`, one
+    the codec refuses as `unreadable`, anything else as `replaced` —
+    `CAMPAIGN.JSON MADE WAY FOR SLOT 2 - SET ASIDE AS ...` — said on the loaded
+    screen after the load's own word; then the marker is cleared. A file that will
+    not move refuses the autosave's writes, as every stuck file does, and nothing
+    is autosaved that session. A slot whose text is the autosave's own (a hand save,
+    then a quit that changed nothing) asks nothing: continuing it is continuing
+    the autosave. The title's ask and the host's load read one question, off the
+    one listing the title showed. A slot listed `CANNOT BE READ` is asked too, in
+    words that promise no set-aside — `SLOT 2 CANNOT BE READ - IF IT LOADS, THE
+    AUTOSAVE IS SET ASIDE - ...` — since its load most likely sets its own files
+    aside and brings nothing back, which leaves the autosave as it was (S6's
+    review: the plain words promised a set-aside that would not happen, and could
+    scare a player off trying the slot). It is asked, never skipped: a file
+    another program held while the list was read can load a moment later, and a
+    load that set the autosave aside unasked would break the ask's promise. The
+    alternative: a loaded manual slot autosaves into itself, the autosave slot
+    kept for the last campaign begun or continued there — no ask and no file set
+    aside, but a manual slot is then written by the game and not by hand alone.
+    (Superseded by the user's ruling of the same day on the save slots, whole: a
+    loaded slot saves into itself, every save of its campaign, so no load asks and
+    none sets another slot's files aside — `MakeRoom`, `NeedsRoom`,
+    `SameAsAutosave` and the ask are gone, and USER DECISION 2 is answered — R5,
+    the slot, below.)
+  - **A load that restores nothing goes back to the title** — every file of the
+    slot set aside — which says so first, whole: `NOTHING COULD BE LOADED FROM
+    SLOT 2` (or `FROM THE AUTOSAVE`), then each file set aside, in the load's
+    order; the listing is read again (the slot now empty, or its backup's), and
+    nothing else is touched. Nothing begins on its own any more: the launch's `A
+    NEW CAMPAIGN BEGINS` over what was set aside is gone with the launch's resume.
+    (Superseded by the user's ruling of the same day on the save slots, in `FROM
+    THE AUTOSAVE`: `... FROM THE OLD AUTOSAVE` — R5, the old autosave, below.)
+  - **A refusal is the session's, and a campaign that will not be autosaved says
+    so on its first screen** (S6's review). A file that can be neither read nor
+    moved refuses its slot's writes for as long as the game runs (the slot's one
+    store, R2 above) — even once another program lets go of it — so nothing
+    written that session takes its place. Before the title there was one load, at
+    launch, and the refusal came with it; the title lets the player try again,
+    and a try that loads once the file is free, or a NEW CAMPAIGN after a stuck
+    one, plays a campaign the autosave will not take. So that campaign's first
+    screen says it, after the load's word or the new campaign's: `NOTHING IS
+    AUTOSAVED THIS SESSION: EARLIER, CAMPAIGN.JSON COULD NOT BE READ (ANOTHER
+    PROGRAM HAS IT OPEN) AND COULD NOT BE SET ASIDE (ANOTHER PROGRAM HAS IT
+    OPEN) - LAUNCH THE GAME AGAIN TO SAVE`, rather than leave it to the first
+    autosave to fail. A relaunch is the retry. A refusal the load or the new
+    campaign met itself is said by its own stuck notice, once. The alternative,
+    not taken: let a retry clear the refusal once the file reads again — which
+    would change the refusal's contract, and is the user's to rule. (Superseded by
+    the user's ruling of the same day on the save slots, in whose refusal it is
+    and what is played: a refusal is its slot's alone, and a slot that takes no
+    saves brings no campaign into play — its load loads nothing and says `SLOT 2
+    TAKES NO SAVES THIS SESSION: EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN
+    IT`, and NEW CAMPAIGN begins nothing there — so `NOTHING IS AUTOSAVED THIS
+    SESSION` is gone; clearing a refusal stays the user's call — R5, the slot,
+    below.)
+  - **The unsaved-quit marker is the title's to say**: it is the autosave's (a
+    quit saves there), and the title takes it when it opens, before anything is
+    loaded, in words true of the window's close and of leaving play for the title
+    alike, and of a manual slot's campaign that a quit was writing into the
+    autosave: `THE AUTOSAVE COULD NOT BE WRITTEN WHEN YOU LAST LEFT PLAY - WHAT IT
+    HOLDS IS FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT`. A load says what resumed,
+    and nothing of the marker. (Superseded by the user's ruling of the same day on
+    the save slots, in whose marker it is: the quit saves into the campaign's own
+    slot, so the marker is left there, and the title takes every slot's, each
+    named — `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - ...` — R5, the
+    slot, below; the save folder's own by its name too, `THE OLD AUTOSAVE COULD
+    NOT BE SAVED WHEN ...`, the words above gone — R5, the old autosave, below.)
+  - **What went with the title** (R2(e)): the launch's resume — CONTINUE is its
+    replacement — and the screen between runs' NEW CAMPAIGN, N then N, whose keys
+    line now reads `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC SAVES AND QUITS`.
+    ESC between runs still saves and quits, and the pause menu's `2  SAVE AND
+    QUIT` still closes the game, until saving by hand gives both screens their
+    menu. The developer tooling stays as it was: `DISTANCERPG_DUNGEON`,
+    `DISTANCERPG_SEED` and their scratch slot, `--new-campaign`, `--write-data`.
+    (Superseded by saving by hand, below: ESC between runs opens the menu —
+    `W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU` — and both screens leave
+    play by its `3  QUIT TO TITLE`.)
+  - **The save's word can now name three files** (the entry on the save's word,
+    below): a manual slot's save set aside as its backup resumes, and the
+    autosave's two making room. The common case — a slot's campaign making room
+    for itself — takes about seven rows in the player's own save folder; the
+    rarest — the slot resumed from its backup under other numbers, its save set
+    aside with a long reason, the autosave's crashed save and its backup set aside
+    — about fourteen, the ceiling itself, past which the rows are cut and counted
+    and the log has every word. S6's review measured that rarest word at about
+    fifteen with a longer user name in the path — a row past the ceiling, cut and
+    counted like any other. Left as recorded: raising the ceiling a row puts a
+    resumed floor's banner exactly at the two-thirds line it keeps above, and
+    shortening the notices (the folder named once) is a change to every
+    set-aside notice; both are left for the step that brings saving by hand,
+    which measures the word again. (Measured, and the ceiling kept: saving by
+    hand, below. Superseded by the user's ruling of the same day on the save
+    slots, in the three files: no load sets another slot's files aside, so a load
+    names at most its own slot's two; the fourteen-row ceiling stands — R5, the
+    slot, below — measured again once R5 was whole, and kept: R5, the save's
+    word, below.)
+- **R2, saving by hand — SAVE GAME, and QUIT TO TITLE.** The ruling's third part:
+  "a manual save can be made at ANY SAFE POINT: from the pause menu on the
+  player's own turn during a run, or on the between-runs screen — never while
+  enemies are moving", "saving into an occupied slot asks before overwriting",
+  and what becomes of the old ways out of play (R2(e)). Built on the folder and
+  the title above. (Superseded by the user's ruling of the same day on the save
+  slots, in "saving into an occupied slot asks before overwriting": SAVE GAME
+  saves the campaign's own slot, which no list offers and nothing asks about —
+  R5, SAVE GAME, below.)
+  - **One menu, both screens with a campaign in play**: ESC in a dungeon opens
+    the pause menu, and ESC between runs now opens the same menu over the hub,
+    the hub dimmed under it — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE`
+    (`PauseMenu`) — and under the options, as ever, `PROGRESS SAVES AT EVERY
+    TURN`: the autosave goes on saving itself, whatever is saved by hand. The
+    menu's two lines sit under its last option, however many there are, where
+    they had sat at a fixed height a third option would have landed on. Between
+    runs the hub's keys line gives way to the menu's while it is up, and ESC never
+    quits there any more. (Superseded by the user's ruling of the same day on the
+    save slots, in what saves itself: the campaign's own slot — the one it was
+    loaded from or begun in — goes on saving itself, whatever is saved by hand
+    into another, and the save list shows that slot's row as `SAVES ITSELF` —
+    R5, the slot, below. Superseded again in the line under the options, which
+    names that slot — `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — the one SAVE
+    GAME saves too, with no list — R5, SAVE GAME, below.)
+  - **SAVE GAME only at a safe point, the autosave's**: in a dungeon the party's
+    own turn with nothing in flight — never while the enemies move or their
+    turn's banner is up, never on a run's summary or during a stair's fade;
+    between runs always. Off one the option is dimmed and 2 answers `SAVE ON YOUR
+    OWN TURN`, saving nothing; the host asks the safe point again when it writes,
+    at the frame's end like every save.
+  - **The save list** stands in the options' place, laid out as the title's list
+    is: `AUTOSAVE - ... - SAVES ITSELF`, shown and never chosen, then `SLOT 1` to
+    the count — never a slot beyond it, which keeps its save for loading. It
+    starts on the first empty slot, so an ENTER pressed without looking saves
+    over nothing. A digit, or ENTER on the chosen row, saves into an empty slot at
+    once; one that holds a save asks — `SLOT 2 HOLDS BETWEEN RUNS - 2 RUNS -
+    2026-09-24 20:10` / `ENTER: SAVE OVER IT - ESC: NO` — the save it held becoming
+    the slot's backup, one save deep, as every write's does; one whose save cannot
+    be read asks `SLOT 3 CANNOT BE READ` (`- ITS BACKUP IS KEPT` when the backup
+    reads) / `ENTER: SET IT ASIDE AND SAVE HERE - ESC: NO`. **Only ENTER says
+    yes**, as on the title: the slot's digit again, N, ESC and every other key say
+    no and are spent. 0 answers `THE AUTOSAVE SAVES ITSELF`, and a digit above
+    the count `SLOT 5 IS BEYOND THE 3 SLOTS`. (Superseded by the user's ruling of
+    the same day on the save slots, whole: there is no save list, and SAVE GAME
+    saves the campaign's own slot, asking nothing; its ENTER-only asking lives on
+    NEW CAMPAIGN's list — R5, SAVE GAME, and R5, NEW CAMPAIGN, below.)
+  - **What is set aside is the files' to decide, never the list's**: a save by
+    hand goes through the one door every write does (`CampaignBoot.SaveTo`, then
+    `Save`), whose guard sets aside a `campaign.json` the codec refuses — and such
+    a backup a replace would rotate away — whatever the list said: a slot whose
+    save cannot be read has it set aside as `slot-n/campaign.unreadable-N.json`,
+    never deleted, the new save moved into place and a backup that reads left
+    untouched, even when a list read before the save broke called the slot
+    readable. (Superseded by the user's ruling of the same day on the save slots,
+    in the list: there is none, and `CampaignBoot.SaveTo` is gone; a save by hand
+    goes through the door every save of the campaign in play does, into its own
+    slot, and the guard sets aside such a file there as ever — R5, SAVE GAME,
+    below.)
+  - **The answer is drawn inside the menu, never as a notice**: the list closes
+    back to the menu, which says under its lines how the save went — `SAVED TO
+    SLOT 2` in green, then each file the save set aside first, where, and how to
+    try it again; `SLOT 2 COULD NOT BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE
+    LOG` in orange, a slot whose store refuses its writes this session answering
+    with why — until the next key or until the menu closes. A notice is not drawn
+    over a menu and ages while hidden, so it would time out unseen. (Superseded by
+    the user's ruling of the same day on the save slots, in the list closing back
+    to the menu: 2 saves at once and the menu stays up for the answer, which reads
+    as it did — R5, SAVE GAME, below.)
+  - **Every key is the menu's while it is up, in both screens**: between runs 1,
+    2 and 3 act and every other key does nothing — ENTER, W/S and the arrows never
+    reach the dungeon list, so nothing descends behind the menu — and with the
+    list up every key but ESC is the list's. In the dungeon, which binds its keys
+    one by one, one catch-all handler hands the list every key but ESC while it
+    is up, so G, Tab, I, E and Space answer an ask no, as every key but ENTER
+    does on the title. The number keys reach their menu, their bag and their
+    members through that catch-all too, and only while the list is not up —
+    **bends the plan, needs no ruling**: kept on subscriptions of their own
+    beside it, the key that opens the list, or the one that saves from it and
+    closes it, would be read twice. ESC answers an ask no, then goes back from the
+    list to the menu, then closes the menu. (Superseded by the user's ruling of
+    the same day on the save slots, in the list: there is none, so every key but
+    ESC is the menu's while it is up, and ESC closes it; the number keys stay on
+    the one catch-all — R5, SAVE GAME, below.)
+  - **QUIT TO TITLE — this pass's decision on R2(e)**: from either menu, the host
+    writes the autosave through the window close's own door — an enemies' turn in
+    flight played out first on the playing scene's own step, the resume marker
+    cleared, a quit that cannot save leaving `campaign.unsaved`, which the title
+    says at once — then drops the campaign, so a close from the title saves
+    nothing, re-arms that once-only door for the next campaign, and shows the
+    title, the slots listed afresh. The game quits from the title (QUIT, ESC) or
+    by the window's close button from anywhere, which saves the campaign in play
+    first. There is no QUIT GAME in a session with a title, and no LOAD in the
+    pause menu: the title is the one place a campaign is chosen, two keys away.
+    Once either menu has asked, its screen reads no key while it fades to the
+    title (S7's review: the dungeon's menu, still up under the first half of the
+    fade, went on taking 1 and 2 — a slot listing read, the menu closed and the
+    turn played on, all on a campaign the host had let go — where the hub's never
+    did); the menu stays up, so nothing behind it acts either. A second ask anyway
+    finds no campaign in play and does nothing. (Superseded by the user's ruling
+    of the same day on the save slots, in what the quit writes: the campaign's own
+    slot — the one it was loaded from or begun in — and the unsaved marker beside
+    that slot's save — R5, the slot, below.)
+  - **A dev-override session has no title and saves apart**: its menu's 3 reads
+    `3  QUIT GAME` — the window's close, saving its scratch slot as ever — and its
+    2 says `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH SLOT`; the host refuses a
+    save by hand outright in a session with no slots, whatever asked, so no path
+    puts a scratch campaign in a player's slot. (Superseded by the user's ruling of
+    the same day on the save slots, in its 2: it saves the scratch slot, the
+    campaign's own there, and nothing else — R5, SAVE GAME, below.)
+  - **What replaced what (R2(e))**: N, then N → the title's NEW CAMPAIGN (R2, the
+    title); ESC-save-and-quit between runs → ESC MENU, with SAVE GAME and QUIT TO
+    TITLE; the pause menu's `2  SAVE AND QUIT` → `2  SAVE GAME` and `3  QUIT TO
+    TITLE`; resume-on-launch → the title's CONTINUE. The developer tooling is
+    unchanged: `DISTANCERPG_DUNGEON`, `DISTANCERPG_SEED` and their scratch slot,
+    `--new-campaign`, `--write-data`.
+  - **Three choices ship provisionally, the user's to rule**, each with its
+    alternatives in open-questions.md: the deposit's numbers as six keys of their
+    own (USER DECISION 1; R4's keys, above); a campaign loaded from a manual slot
+    autosaving into the one autosave slot, a load over a different autosave
+    asking and then setting it aside (USER DECISION 2; R2, the title); and NEW
+    CAMPAIGN over a held autosave setting it aside rather than saving over it
+    (USER DECISION 3). (Superseded by the user's ruling of the same day on the
+    save slots, in USER DECISION 2, which it answers: a loaded slot saves into
+    itself; and in USER DECISION 3, whose question it asks again of the slot NEW
+    CAMPAIGN is begun in, SLOT DECISION 2 — R5, below.)
+  - **The save's word, measured again, and its ceiling kept at fourteen rows**:
+    the rarest word — a manual slot resumed from its backup under changed
+    numbers, its save set aside with a long reason, the autosave's crashed save and
+    its backup set aside to make room — takes fifteen rows in the player's own
+    save folder under a five-letter user name, and eighteen under a twenty-letter
+    one. Fifteen would put a resumed floor's banner exactly on the two-thirds line
+    it keeps above, with no slack, and would still cut the longer name's word;
+    naming the folder once would reword every set-aside notice, for a case that
+    needs five rare things at once. Past the ceiling the rows are cut and counted
+    (`+1 MORE - SEE THE LOG`), and the log has every word. (Superseded by the
+    user's ruling of the same day on the save slots, in the files that word names:
+    no load sets the autosave's two aside any more, so that rarest word has lost
+    them; the ceiling stands — R5, the slot, below — measured again once R5 was
+    whole, and kept: R5, the save's word, below.)
+  - **A quit whose save goes through takes back a failed autosave's word** (S7's
+    review, which licensed the change to the take-back's pin): a save that fails
+    is said on the next screen until a later save goes through, which takes it
+    back — and the quit's own save is one. The quit's door tells the game once the
+    campaign stands on the disk as it was left, written or held there already, and
+    the game takes back what the failed saves said, as its own autosave does; so
+    the title QUIT TO TITLE opens never says the campaign could not be saved when
+    the quit's own save put it there. A quit that cannot save leaves them for the
+    title, beside its marker's word, since both are true; the window's close takes
+    them back too, with no screen left to say them on; and dropping the campaign
+    forgets them, so no later campaign's save takes anything back on its behalf.
+    (Until the review the quit's door took nothing back, and the title could say an
+    earlier autosave had failed right after the quit had saved.)
+  - **Saved by hand, then left with nothing played since, CONTINUE names the
+    slot** — S7's review, accepted as it stands, for the user to see. A save of
+    the campaign a slot already holds writes nothing and keeps the time its state
+    was first written (R2, the folder), so the quit's autosave keeps its older
+    time while the save by hand just made, of the same campaign, carries a later
+    one; CONTINUE, the most recent save by its own time, names the slot —
+    `CONTINUE - SLOT 1 - ...` where the player might look for `AUTOSAVE`. It is
+    the autosave's own campaign, so loading it asks nothing and sets nothing aside
+    (`SameAsAutosave`), and its autosaves go into the autosave slot as ever. The
+    alternative, not taken: let CONTINUE prefer the autosave over a newer slot that
+    holds the same campaign — a special case in the one rule CONTINUE's choice
+    follows, for a choice between two copies of one campaign, and one that would
+    have to read the resume markers too, or it would send CONTINUE to an autosave
+    whose last load crashed the game (its marker sets that save aside and resumes
+    the backup, one save older) over a slot holding the same campaign cleanly.
+    (Superseded by the user's ruling of the same day on the save slots, in what
+    loading that slot does: no load asks, and the slot loaded is the slot its
+    campaign saves into from then on, so `SameAsAutosave` is gone and the
+    campaign continued from slot 1 saves into slot 1 — R5, the slot, below. Then
+    whole: a save by hand goes into the campaign's own slot and stamps its time,
+    so the slot just saved by hand is the one CONTINUE names — R5, SAVE GAME,
+    below.)
+
+### The user's ruling of 2026-09-25 on the save slots: each campaign saves in its own slot (R5)
+
+Later the same day the user ruled on the save model again: "save slots should
+work more like the old games, where you choose a save slot and any saving happens
+on that save slot instead of choosing a save slot everytime you save." **R5**
+supersedes R2 wherever the two differ, and the phase docs, the entries above and
+the rest of this pass with it. **A campaign is bound to one slot** — the one NEW
+CAMPAIGN begins it in, or the one LOAD GAME or CONTINUE loads — **and every save
+of it goes there**: the game's own at every safe point, the quit's, and SAVE
+GAME's, which no longer lists the slots. So there is no autosave slot apart from
+the others, which reverses R2's "one autosave slot that saves itself where the
+game autosaves today": the game's own saves are saving too. There is no list to
+save by, and no question over the campaign's own slot, which retires R2's "saving
+into an occupied slot asks before overwriting" for saving. `SaveSlots` counts
+every slot. A slot above the count that is loaded saves into itself, since
+loading it is choosing it. What stands: R2's title and its four options, CONTINUE
+loading the most recent save, a save only at a safe point, never deleted, one save
+deep, cross-checked on load (R3(b)), and the dice saved (R1). **What R5 costs:** a
+campaign can no longer be copied into a second slot to keep a checkpoint, which a
+save by hand into another slot did under R2. No COPY is built, and a slot a player
+saved by hand under R2 plays forward from its first load. USER DECISION 2 is
+answered by the first half of its listed alternative — a loaded slot saves into
+itself — and leaves open-questions.md; its other half, an autosave slot kept for
+the last campaign begun or continued there, goes with R5. USER DECISION 3's
+question, what becomes of the campaign in the slot NEW CAMPAIGN begins in, is asked
+again of a slot (SLOT DECISION 2). Built in five steps, each written below, and
+now whole — the binding (R5, the slot), the title's NEW CAMPAIGN (R5, NEW
+CAMPAIGN), saving by hand (R5, SAVE GAME), the save folder's name (R5, the old
+autosave) and its move (R5, the move), the save's word measured again once all
+five stood (R5, the save's word) — and its choices ship provisionally, each
+labelled SLOT DECISION, never USER DECISION, which names Phase 5's list;
+open-questions.md sets out each alternative: SLOT DECISIONS 1 to 4, what a slot
+above the count may do, what NEW CAMPAIGN does to a slot in use, what becomes of
+play in a slot whose writes keep failing, and where the old autosave goes.
+
+- **R5, the slot — every save of a campaign goes into the slot it came from.**
+  The ruling's first half, built beneath NEW CAMPAIGN and SAVE GAME as they
+  stood:
+  - **A campaign is bound to one slot as it comes into play, and nothing
+    rebinds it**: the slot LOAD GAME or CONTINUE loaded, above the count too; the
+    one NEW CAMPAIGN began it in — the autosave slot, until NEW CAMPAIGN chose its
+    slot (R5, NEW CAMPAIGN, below); a dev override's scratch slot. The game holds
+    it in one field, set as the campaign comes into play and cleared as it goes
+    (`_slot`, `Adopt`, `DropCampaign`, pinned off the IL), and every save of the
+    campaign goes there — a run's entry, every player turn's start, every arrival,
+    a run's end and the quit — so play from one slot leaves the autosave and every
+    other slot byte for byte as they were. The slot a load reads is now the slot its campaign writes,
+    so S5's wait — no write before the loaded screen is up — is what keeps a write
+    off a slot whose own load is in flight. A close during a loaded campaign's fade
+    in, before its screen is up, writes the campaign as it was loaded, or nothing
+    when the slot holds it already, and clears the resume marker as ever: the game
+    quit cleanly, and the marker guards a screen that crashes. Accepted as it
+    stands. (Mended in Phase 5.T6's review, in "as it was loaded": for the fade's
+    first half no scene plays a loaded run yet, and the quit's save, with none to
+    read a view off, wrote the campaign less the view the load brought back — the
+    save that had it pushed to the backup, and the next load arriving on the floor
+    afresh, its active member and its march lost. The game now keeps that view
+    until the screen is up, and the quit's save carries it: `_loadedView`, pinned
+    off the IL.)
+  - **No load asks, and none sets another slot's files aside**: the load's ask,
+    `MakeRoom`, `NeedsRoom` and `SameAsAutosave` are gone, and a slot chosen on
+    the list, or by CONTINUE, loads at once. What a load means is said where the
+    choice is made, on LOAD GAME's keys line — `W/S OR ARROWS CHOOSE - ENTER OR 0-9
+    LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC BACK` — **bends the plan, needs
+    no ruling**: a slot saved by hand under R2 to keep a checkpoint is played
+    forward from its first load, and written over one save deep, and the line is
+    the one place the player meets that before it happens. (Superseded in its
+    digits: `... ENTER OR 1-9 LOADS ...`, `0-9` only while the old autosave is
+    listed — R5, the old autosave, below.)
+  - **A slot above the count saves into itself**, which follows from the ruling:
+    loading it is choosing it. Its marker is `BEYOND THE 3 SLOTS` (`BEYOND THE 1
+    SLOT`), no longer `- LOAD ONLY`, and LOAD GAME no longer dims it. The save
+    list never offers it (the list itself goes: R5, SAVE GAME, below). Whether
+    such a slot may be played at all, rather than first moved within the count,
+    is SLOT DECISION 1, shipped as yes (open-questions.md).
+  - **A campaign never comes into play in a slot that takes no saves this
+    session — bends S6's review, needs no ruling.** A refusal holds for the
+    session, and the ruling removed the other place such a campaign could be
+    saved, so playing it would lose what was played at the quit, where not
+    beginning it loses nothing. A load of such a slot loads nothing and touches
+    nothing — no marker, nothing read or set aside — and the title says
+    `NOTHING COULD BE LOADED FROM SLOT 2` / `SLOT 2 TAKES NO SAVES THIS SESSION:
+    EARLIER, ... - LAUNCH THE GAME AGAIN TO PLAY IN IT`. NEW CAMPAIGN there reads
+    the refusal first, touches nothing, and says `NO NEW CAMPAIGN BEGAN IN SLOT 2`,
+    then the same. A refusal is its slot's alone: another slot loads in the same
+    session. Clearing a refusal mid-session stays the user's call, as S6's review
+    left it. The stuck notice ends `- THIS SLOT TAKES NO SAVES THIS
+    SESSION, SO IT IS NEVER WRITTEN OVER`, where `- NOTHING IS SAVED THIS SESSION,
+    ...` read as the whole game while the player is meant to go on in another slot
+    — **bends the plan, needs no ruling** — and the word that leads it names the
+    slot. (Mended in Phase 5.T's audit, in what the lists say of such a slot: its
+    row said `FROM ITS BACKUP`, a load it would not do, and NEW CAMPAIGN asked
+    `BEGIN HERE ... ENTER: YES` over it, a yes that could begin nothing, so the
+    player learnt of the refusal only by trying each. LOAD GAME and NEW CAMPAIGN
+    now mark it `TAKES NO SAVES THIS SESSION`, in place of `FROM ITS BACKUP` and
+    `ITS LAST LOAD DID NOT FINISH`, which say what a load would do, and NEW
+    CAMPAIGN chooses it at once, asking nothing, and says the words above. CONTINUE
+    still names it while its save is the most recent, the most recent save being
+    chosen by its time alone, and its load says why.)
+  - **A NEW CAMPAIGN whose first save fails is not begun — bends the plan, needs
+    no ruling, for the same reason.** The new campaign's first save is written
+    into the slot before the campaign is bound to it. When it fails, or when
+    setting the old campaign aside stops at a file that will not move, nothing is
+    played, and what NEW CAMPAIGN set aside goes back where it was, the save
+    before the backup (`CampaignBoot.PutBack`: a move, refusing a name that is
+    taken, deleting nothing), so the slot is as it was, its backup one save deep.
+    The title says `NO NEW CAMPAIGN BEGAN IN SLOT 2`, then the failed save's word
+    — or the stuck notice alone — then the set-aside notice of any file that would
+    not go back. `--new-campaign` is the same, and the game then opens on
+    the title. The slot's markers stay with it (the review of this step): the
+    marker of a load that never finished is cleared by the new campaign's first
+    save as it goes through, and not before, so a NEW CAMPAIGN that is not begun
+    leaves it guarding the save put back, whose next load sets that save aside as
+    crashed, as it would have — cleared, it would have let the save that crashed
+    the game be resumed unguarded again; and the quit's unsaved marker, which
+    `--new-campaign` takes before any title has said it, is said last, as the
+    title would have said it.
+  - **The unsaved-quit marker is the campaign's slot's**: the quit leaves it
+    beside the save it could not replace, and the title takes every slot's, the
+    autosave's and slot 1 to 9's, before it lists them, each said once, in slot
+    order: `SLOT 2 COULD NOT BE SAVED WHEN YOU LAST LEFT PLAY - WHAT IT HOLDS IS
+    FROM BEFORE THAT, BEHIND WHERE YOU LEFT IT` — two rows at slot 9 — and the
+    autosave's in the words it has always had. (Superseded in the autosave's
+    words: `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`, two rows — R5, the old
+    autosave, below. Mended in Phase 5.T's audit, in which markers are said: one
+    beside no save and no backup — its files moved or deleted by hand since — is
+    taken and logged, and not said, since its `WHAT IT HOLDS` would name nothing,
+    and the old autosave is not even listed then; `PutBack` says a marker only
+    when the slot holds its campaign again, the same way.)
+  - **The save list, transitional — bends the plan, needs no ruling**: SAVE GAME's
+    list stays in its S7 form until SAVE GAME saves the campaign's own slot, and
+    is keyed to that slot meanwhile: its row ends `SAVES ITSELF` and is never
+    chosen, its digit says `SLOT 2 SAVES ITSELF` (`THE AUTOSAVE SAVES ITSELF` for a
+    campaign in the autosave), 0 does nothing for a campaign that saves elsewhere,
+    and the list starts on the lowest empty slot other than it — or on none, when
+    it has no other slot to offer (a count of one, the campaign in slot 1), and
+    ENTER then says `SLOT 1 SAVES ITSELF` too, never the load list's `EVERY SLOT
+    IS EMPTY`. Another slot chosen there takes a copy, and the campaign goes on
+    saving into its own. (Gone: SAVE GAME saves the campaign's own slot, and the
+    list with it — R5, SAVE GAME, below.)
+- **R5, NEW CAMPAIGN — the title chooses its slot.** The ruling's "you choose a
+  save slot", at a campaign's start; from here no campaign is begun in the save
+  folder itself:
+  - **NEW CAMPAIGN opens a slot list** in the options' place, as LOAD GAME does:
+    `NEW CAMPAIGN - CHOOSE A SLOT`, then slots 1 to the count, each as LOAD GAME
+    shows it and none dimmed, since a campaign can begin in any — never the
+    autosave, and never a slot beyond the count, so the count limits where
+    campaigns begin — and the keys, `W/S OR ARROWS CHOOSE - ENTER OR 1-9 BEGINS -
+    ESC BACK`. The choice starts on the lowest empty slot, else slot 1
+    (`SaveListing.NewCampaignSlot`), so an ENTER pressed without looking sets
+    nothing aside while a slot is free: the save list's rule, kept. A digit above
+    the count says `SLOT 5 IS BEYOND THE 3 SLOTS` (`... THE 1 SLOT`); 0 and the
+    keypad do nothing. ESC answers an ask no, then closes the list. (Mended in
+    Phase 5.T's audit, in the keys' digits: `ENTER OR 1-3 BEGINS`, the slots the
+    list offers — `ENTER OR 1 BEGINS` at a count of one — since a digit above the
+    count begins nothing, where `1-9` offered them all.)
+  - **An empty slot begins at once; one in use asks** — SLOT DECISION 2, shipped
+    provisionally, USER DECISION 3's question asked of a slot. The campaign in the
+    slot is the ask's subject, as old games ask whether to overwrite a file:
+    `SLOT 2 HOLDS THE SPEAR HALL FLOOR 4 - 3 RUNS` (`SLOT 2 CANNOT BE READ` for
+    files none of which reads) / `BEGIN HERE - WHAT IT HOLDS LEAVES LOAD GAME,
+    KEPT AS FILES, NEVER DELETED - ENTER: YES - ESC: NO`, the widest of them well
+    inside the keys row. Only ENTER says yes; the slot's digit again, N, Y, the
+    arrows and every other key say no and are spent — the ENTER-only guarantee,
+    moved over from the save list, whose asking this is. On yes, that slot's
+    backup and save are set aside as `slot-2/campaign.abandoned-N.json`, never
+    deleted, and the save folder and every other slot are untouched; the new
+    campaign's first save is written into the slot before it is bound there (R5,
+    the slot, above), and the screen between runs says `A NEW CAMPAIGN BEGINS`,
+    then where the old files went. The words that name the slot name the one
+    chosen: `NO NEW CAMPAIGN BEGAN IN SLOT 2`. The alternative, in
+    open-questions.md: ask, then save over it, the old save one save deep as the
+    new campaign's backup.
+  - **An abandoned file's notice says to move it, not to rename it — bends the
+    plan, needs no ruling**: `... WAS LEFT FOR A NEW CAMPAIGN - SET ASIDE AS ... -
+    TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS CAMPAIGN.JSON`. The new
+    campaign's save takes `campaign.json` in that same folder at once, so renaming
+    the file back where it lies, as every other set-aside notice says
+    (`RENAME IT TO CAMPAIGN.JSON TO TRY AGAIN`, kept), would collide with it. A
+    slot folder holding only files set aside lists as `EMPTY`, and moved into one
+    the old campaign lists, loads and plays. The notice is 29 characters longer;
+    the notices' ceiling is measured again once the ruling is whole. (Measured,
+    and kept at fourteen rows: R5, the save's word, below.)
+  - **`--new-campaign` begins in the lowest empty slot within the count, else
+    slot 1 — bends the plan, needs no ruling**: developer tooling, which asks
+    nothing, takes the slot NEW CAMPAIGN's list would start on, so it sets nothing
+    aside while a slot is free, and with none free sets slot 1 aside, never
+    deleted, as the title would on ENTER. `--new-campaign <n>`, naming the slot, is
+    a possible later addition.
+  - **The save list stays transitional**: SAVE GAME's list, keyed to the
+    campaign's own slot, stands until SAVE GAME saves that slot (R5, the slot,
+    above). (Gone — R5, SAVE GAME, below.)
+- **R5, SAVE GAME — saved where the campaign saves, asking nothing.** The
+  ruling's last clause, "instead of choosing a save slot everytime you save":
+  - **2 saves the campaign's own slot at once**: `2  SAVE GAME` on the pause
+    menu or the menu between runs, at a safe point, saves into the slot the
+    campaign was loaded from or begun in — no list, no digit to choose, no
+    question — and the menu stays up for the answer. It goes through the one door
+    every save of the campaign in play goes through but the quit's, the game's
+    own at every turn and arrival, at the frame's end (`WriteRequestedSave`),
+    which asks the safe point there: so a save by hand and an autosave asked for
+    in the same frame are one write, answered once. Off a safe point the option
+    is dimmed and 2 answers `SAVE ON YOUR OWN TURN`, as ever; a save by hand that
+    finds the campaign off one by the frame's end is answered so and dropped —
+    never kept to be written later, and never settling the enemies' turn to
+    reach one, which is the quit's alone. The answer is drawn inside the menu
+    until the next key, as it was: `SAVED TO SLOT 2` in green, then each file the
+    write guard set aside first (`CampaignBoot.SaveAnswer`); or `SLOT 2 COULD NOT
+    BE SAVED (...) - WHAT IT HELD IS KEPT - SEE THE LOG` in orange, which, like
+    every failed save, is also said over the floor and led for the next screen
+    until a save goes through. The save list and its asks — `SLOT 2 HOLDS ...` /
+    `ENTER: SAVE OVER IT - ESC: NO`, `... SET IT ASIDE AND SAVE HERE ...`, `THE
+    AUTOSAVE SAVES ITSELF`, `SLOT 2 SAVES ITSELF` — are gone, and so is
+    `CampaignBoot.SaveTo`; NEW CAMPAIGN's list keeps the ENTER-only asking they
+    had (R5, NEW CAMPAIGN, above).
+  - **A save by hand of an unchanged campaign stamps its time — bends the plan,
+    needs no ruling**, though the user is asked to confirm it. The game's own
+    saves have usually written the campaign as it stands, and a save of what a
+    slot holds already writes nothing and keeps the time (R2, the folder). Left
+    at that, a player who loads the older of two slots, presses SAVE GAME and
+    quits would find CONTINUE naming the other slot, a different campaign. So a
+    save by hand rewrites the save's time alone — a temp file flushed, then
+    renamed over the save in one step with no backup made (`SaveStore.Restamp`) —
+    as old games' saves stamp their file, and the slot just saved by hand is the
+    one CONTINUE names. The backup is not rotated: it stays the save before, a
+    different state, so one save deep holds. "A save keeps the time its state was
+    first written" now holds for the game's own saves alone. A slot that takes no
+    saves this session restamps nothing. The step is a rename, not the replace
+    a write over a save takes (the review of this step): a replace that makes no
+    backup can fail at its last step with the save already gone, where a rename
+    that fails leaves the save as it was, so `WHAT IT HELD IS KEPT` stays true.
+    The file is replaced all the same, so, like every write, a restamp clears a
+    resume marker standing in the slot. In play none stands by then — no save
+    reaches a slot before its loaded screen is up — but one whose clearing
+    failed once that screen was up, which the restamp takes away (the review of
+    this step).
+  - **The menu names the slot — bends the plan, needs no ruling**: under the
+    options, `PROGRESS SAVES TO SLOT 2 AT EVERY TURN` — `... TO THE AUTOSAVE
+    ...` for a campaign in the save folder itself, `... TO THE SCRATCH SLOT ...`
+    on a dev override — so the player always knows which slot is theirs.
+    (Superseded in the save folder's name: `... TO THE OLD AUTOSAVE ...`, and
+    `SAVED TO THE OLD AUTOSAVE` — R5, the old autosave, below.)
+  - **A dev override's SAVE GAME saves its scratch slot — bends the plan, needs
+    no ruling**: its campaign's slot is the scratch slot, so "any saving happens
+    on that save slot" puts a save by hand there, and nowhere else: the player's
+    slots stay untouched, as ever. `A DEV OVERRIDE LAUNCH SAVES ONLY ITS SCRATCH
+    SLOT` is gone.
+  - **A slot whose writes keep failing costs what was played since its last
+    save — SLOT DECISION 3, shipped provisionally.** A full disk, a file another
+    program holds, a folder with no rights: each failed save says `SLOT 2 COULD
+    NOT BE SAVED (...)` over the floor and on the next screen, and the quit leaves
+    the unsaved marker, which the title says. Under R2 a player could save by
+    hand into another slot meanwhile; the ruling removed that, so what was played
+    since the last save that went through is lost at the quit. The alternatives,
+    in open-questions.md: the quit writes what it could not save into the same
+    slot folder as a new file, overwriting nothing; or SAVE GAME, only while the
+    slot's writes are failing, offers an empty slot to move the campaign into.
+  - **What R5 costs, again**: no COPY is built, so a campaign can no longer be
+    saved into a second slot to keep a checkpoint (the R5 paragraph, above); the
+    user is asked to confirm it.
+- **R5, the old autosave — the save folder's own campaign, until it moves.**
+  NEW CAMPAIGN begins in a slot it chooses (R5, NEW CAMPAIGN, above), so nothing
+  new is saved in the save folder itself, and the folder is no autosave slot: what
+  it holds is the campaign a build before the ruling autosaved there — the **old
+  autosave** — played in place, as it has been since R5, the slot, until a launch
+  moves it into a slot of its own (R5, the move, below; superseded there in when
+  it is played in place: only while no slot is free for it, and in a session
+  whose move failed, or left it in two halves, it loads nothing):
+  - **It is named as a slot is named, and every word names it**: `OLD AUTOSAVE`
+    on the lists and CONTINUE's row, `THE OLD AUTOSAVE` in the words —
+    `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE`, `NOTHING COULD BE LOADED FROM THE
+    OLD AUTOSAVE`, `THE OLD AUTOSAVE COULD NOT BE SAVED (...) - WHAT IT HELD IS
+    KEPT - SEE THE LOG`, `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN YOU LAST LEFT
+    PLAY - ...`, `SAVED TO THE OLD AUTOSAVE`, `PROGRESS SAVES TO THE OLD AUTOSAVE
+    AT EVERY TURN`. From its backup it is `CAMPAIGN RESUMED FROM THE OLD AUTOSAVE
+    BACKUP, ONE SAVE OLDER`, 61 characters and one notice row, where `... FROM THE
+    BACKUP OF THE OLD AUTOSAVE, ...`, a numbered slot's shape, would run to 68 and
+    draw its second row in the warning's orange; a numbered slot's words are as
+    they were. The autosave's words that named no slot — `CAMPAIGN RESUMED`, `...
+    FROM ITS BACKUP, ONE SAVE OLDER`, `THE CAMPAIGN COULD NOT BE SAVED (...) - THE
+    LAST SAVE IS KEPT`, `THE AUTOSAVE COULD NOT BE WRITTEN WHEN ...` — are gone,
+    and a dev override's scratch slot, which spoke them too, is named the same way
+    (`THE SCRATCH SLOT COULD NOT BE SAVED (...)`). A save that stops at a file it
+    could not set aside says so in the failed save's words, naming the slot and
+    why, as a numbered slot's always did.
+  - **A floor resumed mid-run says `RESUMED` over its banner, and no more, from
+    whichever slot — bends the plan, needs no ruling**: a load's word that it
+    resumed the slot's own save, `CAMPAIGN RESUMED FROM SLOT 2` or `... FROM THE
+    OLD AUTOSAVE`, is the banner's own word there, as the autosave's plain
+    `CAMPAIGN RESUMED` was, so it is not said again among the floor's notices,
+    which are drawn in the warning's orange; from the backup it is news the
+    banner does not carry, and is shown whole, as ever. A numbered slot's floor
+    had shown `CAMPAIGN RESUMED FROM SLOT 2` there, in orange, since the slots,
+    where every account of the resume says `RESUMED` over the floor banner; the
+    old autosave's did the same once its word named it, until this step's review.
+  - **It is listed only while it holds a campaign**: LOAD GAME shows the `OLD
+    AUTOSAVE` first while the save folder holds a `campaign.json` or a
+    `campaign.bak.json` — a marker or a file set aside alone is nothing to load —
+    and otherwise starts at `SLOT 1`. Loaded, by LOAD GAME or CONTINUE, it saves
+    back into the save folder, the slot it came from; NEW CAMPAIGN never begins
+    there. (Superseded in when it is listed: only while a launch could not move
+    it into a slot, its row marked `NOT YET MOVED INTO A SLOT`; and it is played
+    in place only when no slot was free — R5, the move, below.)
+  - **0 loads it, and only while it is listed**: LOAD GAME's keys line reads `W/S
+    OR ARROWS CHOOSE - ENTER OR 1-9 LOADS - PLAY SAVES INTO THE SLOT YOU LOAD - ESC
+    BACK`, and `... 0-9 ...` while the old autosave is listed. With none listed, 0
+    does nothing and says nothing, where it said `AUTOSAVE IS EMPTY`.
+  - **A tie goes to the lower number — bends the plan, needs no ruling**: the old
+    autosave, 0, while it is listed, then slot 1 up, where it went to the autosave
+    first, then the lower slot — the same order, with no slot apart from the
+    others. A slot loaded and left with nothing played and no SAVE GAME keeps its
+    time, as a file an old game loaded and did not save keeps its own, so CONTINUE
+    may then name another slot whose save is newer; SAVE GAME stamps the time
+    (R5, SAVE GAME, above).
+  - **`SaveSlots` counts every slot — bends the plan, needs no ruling**: 3
+    places where there were 4, the autosave and three manual slots. At least one,
+    so that a campaign always has a slot to begin in, where it read "so saving by
+    hand always has somewhere to go", which chooses no slot now. The launch log
+    says `[Save] Saves in ...: 3 slots`.
+- **R5, the move — the old autosave moved into a slot at launch, all or nothing,
+  never deleted.** The ruling leaves no autosave slot, so the campaign a build
+  before it autosaved in the save folder itself is moved into a slot of its own,
+  as every other campaign is in one (`OldAutosave.MoveIntoASlot`):
+  - **At every launch, before the title, without asking — SLOT DECISION 4,
+    shipped provisionally**: into the lowest slot free for it, 1 to the count,
+    else the lowest free one above it, listed `BEYOND THE 3 SLOTS` and played like
+    any (SLOT DECISION 1). The title says `THE AUTOSAVE MOVED INTO SLOT 4 - ITS
+    CAMPAIGN SAVES THERE FROM NOW ON` first, then the slot's unsaved-quit word
+    when that marker moved with it. (Mended in Phase 5.T's audit, in its words
+    and where it stands: `THE AUTOSAVE MOVED INTO SLOT 4 - IT SAVES THERE FROM
+    NOW ON`, one notice row where the first ran to two, `NOW ON` alone on the
+    second, and drawn in green as news, where it stood in the warning's orange;
+    and under `--new-campaign` it is said first on the screen the launch opens
+    on, as the move came first, where it was said last, after `A NEW CAMPAIGN
+    BEGINS` and what was set aside, and was the notice a long save path cut.) It
+    runs once the slots are made and before anything reads them — before
+    `--new-campaign` lists them for its slot, so it never sets aside the campaign
+    just moved while a slot within the count is still free after the move (when
+    the move takes the last free one, every slot is in use and `--new-campaign`
+    sets slot 1 aside all the same — the campaign just moved, when that was slot
+    1: developer tooling, never deleted, noted in Phase 5.T6's review), and
+    before the title takes their markers — and at every launch, not once: every
+    set-aside notice in the save folder says to rename the file back there, and
+    one renamed back is the old autosave for the rest of that session and moves
+    at the next launch. Never on a dev override, and never mid-session, so a
+    campaign in play is never moved from under it. The alternatives, in
+    open-questions.md: the first title after the update asks which slot, on NEW
+    CAMPAIGN's list; or it stays the old autosave until it is loaded, and its
+    load asks.
+  - **Only the campaign's four files, the save first, never over anything —
+    bends the plan, needs no ruling**: `campaign.json`, `campaign.bak.json`,
+    `campaign.resuming` and `campaign.unsaved`, each under its own name, by a move
+    that refuses a name taken there by a file or a folder. Nothing is read,
+    rewritten or deleted, and the save document carries no slot: no version bump,
+    no migration. The save goes first, as the file another program is likeliest
+    to hold, so a held save stops the move before anything has moved. The resume
+    marker moves only with the save or backup it guards — the slot then lists
+    `ITS LAST LOAD DID NOT FINISH`, and its next load sets that save aside as
+    crashed, in the slot's own folder — and a lone one guards nothing and is
+    left, logged; the quit's marker moves so the title says it as the slot's.
+    Files set aside, `campaign.json.tmp` and `override/` stay where they are. A
+    slot is free only when none of the four names is taken there and its folder
+    is no file: a stray marker is passed over, never cleared, and files set aside
+    are no obstacle. A save folder's campaign a slot also holds — an R2 save by
+    hand of it — moves all the same: two slots, one campaign, nothing lost.
+  - **All or nothing — bends the plan, needs no ruling**: before the first file
+    moves, the save folder gets `campaign.moving`, naming the slot, flushed to
+    the disk as a save is, so a power loss cannot keep the renames and lose where
+    they went. A try that stops at a file is undone — what moved goes back, the
+    last first, by the same move — and the next free slot is tried, since the
+    failure may be the slot's. When every try fails, the failure is the save
+    folder's own — its save held by another program, or no rights there — and
+    every write there would fail too, so it takes no saves that session: listed
+    as the old autosave, its load loads nothing and says `NOTHING COULD BE LOADED
+    FROM THE OLD AUTOSAVE` / `THE OLD AUTOSAVE TAKES NO SAVES THIS SESSION:
+    EARLIER, CAMPAIGN.JSON COULD NOT BE MOVED INTO A SLOT (...) - LAUNCH THE GAME
+    AGAIN TO PLAY IN IT`, and the title says `THE AUTOSAVE COULD NOT MOVE INTO A
+    SLOT (...) - IT STAYS AS THE OLD AUTOSAVE AND TAKES NO SAVES THIS SESSION -
+    LAUNCH THE GAME AGAIN TO MOVE IT`; the next launch tries again. A marker
+    that cannot be written, or cleared once a try is undone, or dropped, leaves
+    the save folder taking no saves that session the same way, its refusal naming
+    the marker for what it is: `... EARLIER, CAMPAIGN.MOVING, THE MARKER OF ITS
+    MOVE, COULD NOT BE WRITTEN (...) - ...`. One that will not clear after a move
+    that went through refuses nothing — the log says so — and each launch after,
+    finding the move done, says `THE AUTOSAVE MOVED INTO SLOT 4` again as it
+    tries to clear it, until one does (known and left in Phase 5.T6's review: no
+    launch can tell that marker from one a crash left before the title said the
+    move). A try undone leaves behind the slot folder it made, empty, which lists
+    `EMPTY`: the move deletes nothing but its own marker. (Mended in Phase 5.T's
+    audit: a try undone takes back the slot folder it made while nothing is in it
+    — never recursively, so no file goes — where a save folder whose own save
+    another program held left slot-1 to slot-9 behind, empty; a folder that was
+    there before the try, or holds anything, stays. The move deletes no file but
+    its own marker.) A move a crash cut off is finished at the next launch,
+    before anything is listed or loaded, into the slot the marker names; a marker
+    naming a slot that has since taken one of the names still in the save folder
+    — a build without the move ran in between — or naming no slot is dropped and
+    logged, the log naming every slot that holds a lone save or a lone backup, so
+    a split can be joined by hand, and the move goes afresh. A marker that cannot
+    be read at all is not one naming no slot, since it may name the slot a half
+    is in: it is kept, and nothing moves — moved afresh, a split would stand in
+    two slots with nothing left to join it — and the save folder, while it holds
+    a save or a backup, takes no saves that session, until a launch can read it
+    and finish the move. A finish that stops is undone as a try is, and the
+    halves the crash left stand; a crash that came before any file moved left
+    none, so that finish is a try that stopped, and the move goes afresh. A move
+    that can be neither finished nor undone leaves the campaign in two halves,
+    and neither takes saves that session, so no load runs on a split and no save
+    forks it: `THE AUTOSAVE IS HALF MOVED INTO SLOT 4 (...) - NEITHER LOADS THIS
+    SESSION - LAUNCH THE GAME AGAIN TO FINISH IT`, the marker kept for the next
+    launch to finish it.
+  - **With no slot free, it stays — bends the plan, needs no ruling**: with
+    slots 1 to 9 all holding something nothing is tried, so nothing is known to
+    fail, and the old autosave is listed, marked `NOT YET MOVED INTO A SLOT`, and
+    played in place, saving back into the save folder; the log says why, and the
+    title says nothing. The move looks at every slot to 9, so raising the count
+    frees nothing it did not already see.
+  - **An older build run afterwards loses nothing**: a build before the ruling
+    finds no autosave and lists the slot the old autosave moved into as a manual
+    slot, load-only above its count.
+- **R5, the save's word — measured again once the ruling was whole, and its
+  ceiling kept at fourteen rows.** The ruling changed what the save's word holds:
+  no load sets another slot's files aside (R5, the slot), NEW CAMPAIGN's notices
+  end with the longer `TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS
+  CAMPAIGN.JSON`, the stuck notice's end speaks of its slot, and the title can say
+  why no new campaign began and what became of the old autosave's move. Measured
+  in Phase 5.T6, and again in its review, which added the title's own cases, in
+  the player's own save folder, each notice naming its file's full path, under a
+  five- and a twenty-letter user name: NEW CAMPAIGN on the title over a slot in
+  use, its save and backup set aside, takes nine rows; `NO NEW CAMPAIGN BEGAN IN
+  SLOT 2` on the title, its save stuck and its backup not gone back, eight — ten
+  with the listing's word on the save another program holds — and with its first
+  save failed and neither file gone back, eleven; a slot resumed from its backup
+  under other numbers, its save set aside with a long reason — a resumed floor's
+  word — eight and nine; the title's word on a load that brought nothing back,
+  the slot's crashed save and unreadable backup set aside, with a slot's
+  unsaved-quit word that would not clear, twelve and fourteen, and fourteen from
+  an eleven-letter user name up: a word play can make fills the ceiling. The
+  move's word is said at launch, before anything is loaded, so it never shares
+  that title. `--new-campaign` over a full save folder, both files set aside and
+  the move refused or left in two halves, takes fourteen under both names. Of the
+  words measured, one passes the ceiling only where several failures meet: the
+  title's word on a load that brought nothing back with one more two-row word on
+  it — a second slot's unsaved-quit word that would not clear, or the listing's
+  word on a slot's file another program holds (`SLOT 3: CAMPAIGN.JSON COULD NOT
+  BE READ (ANOTHER PROGRAM HAS IT OPEN)`) — fourteen and sixteen, past it from an
+  eight-letter user name; and, under `--new-campaign`, `NO NEW CAMPAIGN BEGAN IN
+  SLOT 1` with its own unsaved-quit word, the moved autosave's slot's and the
+  move's word on it, fifteen with its save stuck and its backup not gone back,
+  and nineteen with its first save failed and neither file gone back (measured
+  again in Phase 5.T's audit, the move's word one row: fourteen, at the ceiling,
+  and eighteen). A title's word grows the same way with every further failure —
+  markers that will not clear, files another program holds — and past the ceiling
+  each is cut and counted (`+N MORE - SEE THE LOG`), the log having every word.
+  So the ceiling stands (`NoticeText.MaxWholeRows`): what passes it needs several
+  failures at once, and a higher one would take room the dungeon list and a
+  resumed floor's banner keep in a 720-pixel window.
+
+### The numbers: `tuning.json`
+
+- **A key is the `Tuning` property's name, verbatim, and `MovementBudget` is the
+  one new key.** One naming source: `DotDamagePerMana` (the entry above that
+  made it an integer reciprocal), and never an alias — §5.3's spellings are
+  unknown keys whose warning points at the key. `MovementBudget` is the 160 the
+  Phase 2 pass named, in logic units, and the party's refill, its bank's cap and
+  the enemies' cost scale read it. (Superseded by the user's ruling of
+  2026-09-25 on the deposit, in its count: six more keys came with it, the
+  Enchanter's — R4's keys, above.)
+- **`OverhealPerWard` is the key, and `OverhealPerWardLevel` is the other
+  spelling of it.** The Overheal entry above calls its rate
+  `OverhealPerWardLevel`; §5.3 and the provisional-numbers batch call the same
+  constant, at 5, `OverhealPerWard`, which is the `Tuning` property's name and
+  so the key. `OverhealPerWardLevel` in `tuning.json` is an unknown key: it is
+  ignored, and its warning points at `OverhealPerWard`, as the warnings for
+  §5.3's own spellings point at theirs. The graft formula's
+  `StartingWearCapacity` points at `StartingPool` the same way, the one key the
+  Phase 2 pass made it.
+- **`MovementUnitsPerMana` is re-derived by hand, never computed from the
+  budget.** It is derived — `(MovementBudget − 40) / (8 + 3)`, the budget less a
+  staff's 40 of movement, over the mana one cast moves at Resonant: 10.9, so 10
+  — and its comment in the file carries that formula and says the divisor does
+  not follow the budget. Computed, a budget edit would silently re-price every
+  cast; a designer who turns the budget re-derives the divisor on purpose.
+- **The file clamps; a tuning built in code is still refused.** A missing key
+  keeps the built-in file's number, a table merges per entry, an unknown key or a
+  value that is not an integer warns and is ignored, and a value out of range
+  clamps and warns — a typo costs a line on screen and in the log, never a
+  session. `ContentValidator.ValidateTuning` keeps refusing a `Tuning` built in
+  code — now also a table that does not name every member of its kind
+  (`RuleTableNamesEveryMember`) — so every rule still has its refusal, and every
+  tuning a file can make passes it. (Superseded by the user's ruling,
+  2026-09-25, in its first clause: a missing key kept "its compiled default"
+  until the ruling took every number out of the code.)
+- **Where tuning meets content, the tuning bends — never the content, and never
+  with an abort.** Three keys are measured against the content as well as
+  against themselves, and an in-range value can still break shipped content: a
+  forge limit below a shipped spread, a carry too small for the roster's
+  loadout, a boss offset that lets a pinned boss floor pay the farm. So
+  `TuningFit` raises `MaxForged`, `PartyCarrySlots` and `BossStackOffset` to what
+  the loaded content needs, within their own ranges, with one warning naming the
+  entry that needed it; content no in-range value can serve is content's own
+  error. Every tuning a file can make loads with the shipped content, and a test
+  holds that.
+- **The save records the hash of the effective values**: the fitted tuning,
+  every table expanded over every member it can be asked for, as sorted
+  `Key=value` lines, so formatting, order and comments never move it and any
+  value — a number the master copy ships, changed by a new build, included —
+  does. (Superseded by the user's ruling, 2026-09-25, in its example: this read
+  "a compiled default a new build changed". The hash covers the same values it
+  did, so a save written before the ruling still hashes as its tuning. And by
+  the user's ruling of the same day on the deposit, in its reach: the values
+  hashed are those of every key a rule of play reads. A key declared ahead of
+  its reader — the Enchanter's six, until Phase 6a — is left out, so turning one
+  never says the numbers changed, and declaring them moved no save's hash: R4's
+  keys, above. And by the ruling of the same day on the save model, `SaveSlots`,
+  which the launcher reads and no rule of play does, is left out the same way:
+  R2, the folder, above — every slot's count since the ruling on the save slots,
+  R5, the old autosave, above.)
+- **The `…Percent` key names — bends the phase doc** (§5.3 fixes
+  `UniqueChanceCeiling` and `UniqueChanceK`; the keys are
+  `UniqueChanceCeilingPercent` and `UniqueChanceKPercent`). Needs no ruling:
+  §5.3 itself makes every ratio an integer with its units in its name, so the
+  doc's `K = 0.26` is written 26 and must say percent, and the entry that made
+  `DotDamagePerMana` an integer ruled the identical case.
+- **The `Tuning` record, not `GameConstants` — bends the phase doc** (§5.3:
+  "read once at startup into `GameConstants`"). Needs no ruling: a `const`
+  cannot be overridden at runtime, §5.3 keeps the parity constants compiled
+  "permanently and without exception", so tunables and parity constants must not
+  share a home, and the record has been §5.3's home since Phase 1.
+  `GameConstants` keeps only what never tunes.
+- **The Enchanter and Consumables keys wait for their readers — bends the phase
+  doc** (§5.3's starting set lists them). Needs no ruling: a key with no reader
+  is a dial wired to nothing, and `EnchantmentWearCost` sits on the open
+  question of what a deposit costs, which nothing here may resolve by accident.
+  `tuning.json` still shows both groups as headings naming their keys, so §5.3's
+  one screen stays whole. **The hand-off**: Phase 6a adds `WearPerHit`,
+  `WearCapacityLadder` (30/40/55), `EnchantmentWearCost` and `GraftBaseChance`
+  with their readers; Phase 6b adds `PotionUseCost`, `HealthPotionPercent`,
+  `ManaPotionPercent` and `FarmYieldPerClear` with theirs. (Superseded by the
+  user's ruling, 2026-09-25, in the Enchanter's half: what a deposit costs is
+  ruled — R4, above — so no open question holds `EnchantmentWearCost`, and there
+  is no ladder for `WearCapacityLadder` to hold. The ruling's six numbers have
+  taken the two placeholders' place as keys of the Enchanter group, in the file
+  ahead of their reader: the one exception to this entry's rule, since the user
+  keeps a number they may revisit in the file, and a safe one, since nothing
+  plays them and the save's hash leaves them out (R4's keys, above). A file
+  naming either placeholder is pointed at the key that took its place.
+  `WearPerHit` and `GraftBaseChance` still wait with their Phase 6a readers.)
+
+### The content files
+
+- **Content is strict where tuning is lenient.** Three files —
+  `restricted.json`, `weapons.json` and `dungeons.json` — each a top-level object,
+  every entry with a stable string id, field names the records' camel-cased and
+  the doc's where it fixes them, enum values by their names, comments and
+  trailing commas allowed. An unknown member is refused (`RuleFileShape`): a
+  mistyped field in content is a rule that silently does not apply. Invalid
+  content stops the game on a screen naming the file, the entry, the rule and
+  its detail — and so does a number outside its range: every number of the files
+  has one (R3(a), above), and the refusal names the field, the number and the
+  range. (Superseded by the user's ruling, 2026-09-25: there were five
+  files, the contract covering `enchantments.json` and `party.json` too, until
+  the catalogue and the party became code.)
+- **The staged load's order is a stated rule.** Every present file is parsed
+  first, each shape failure recorded, then the stages run in §5.4's order — the
+  enchantment catalogue on its own, the tuning, the relations and the catalogue
+  against them, the weapons, the dungeons, the starting party — each first
+  reporting its own file's shape failure: so a syntax error in a later file never
+  pre-empts a semantic error in an earlier one. (Superseded by the user's ruling,
+  2026-09-25: the one order a reader might not expect — `enchantments.json`'s
+  shape reported before `restricted.json`'s own rules — went with the file.)
+- **An absent content file plays the built-in copy, and says so.** The doc
+  gives a fallback for missing tuning keys and is silent on a missing content
+  file; the built-in copy is the shipped file itself, the master copy the game
+  is built with, so there is nothing to abort for, and a notice keeps a renamed
+  or deleted file from passing unseen. A file there but unreadable does the
+  same, and says why. (Superseded by the user's ruling, 2026-09-25: it played
+  "the compiled record", the copy in code the ruling removed.)
+- **One owner for a dialled number: the dial.** `ApplyPercent`'s five ids and
+  `arcane`'s potency are `tuning.json`'s (§5.3, and §5.4's "what number? —
+  `tuning.json`"). The code catalogue carries no number of theirs — each row
+  marks its dialled field as set by tuning — so there is no second number for an
+  edit to disagree with, and a built-in `tuning.json` that leaves one out stops
+  the game (`RuleTuningOwnsTheNumber`). (Superseded by the user's ruling,
+  2026-09-25: the row in `enchantments.json` kept its field as the base, the
+  file marked each dialled one, and an edit there was a notice naming both
+  files; the notice went with the file.)
+- **The content checks the files brought, none a new invariant**: a file's
+  shape (`RuleFileShape`) and the weapons the code names existing
+  (`RuleCodeNamedWeaponsExist`, now also a variant of each class the placer
+  draws). With the ruling came the checks between the code and the JSON: each
+  class of `weapons.json` having one row (`RuleEveryClassHasARow`), casting
+  exactly when the code casts with it (`RuleCasterClass`), levelling on STR, DEX
+  or INT (`RuleClassStats`) and signing alone (`RuleClassSignatureDistinct`) —
+  each a code-names-it-so-the-JSON-must-fit check; a number the catalogue leaves
+  to the tuning named there (`RuleTuningOwnsTheNumber`) and a tuning table built
+  in code naming every member (`RuleTableNamesEveryMember`) — each a
+  no-number-under-it check; and the game carrying every data file it plays built
+  in (`RuleBuiltInCopy`) — a the-build-carries-it check. `kind` and `forgedOnly`
+  name modifiers alone, since only the modifier rules read them: an enchantment
+  named in either would silently not apply, so it is refused under the existing
+  relation-id rule; and `neverRolled` names enchantments alone, the mirror of it
+  (`RuleNeverRolledNamesEnchantments`, since the rework's audit, which retired the
+  check holding `neverRolled` to the catalogue's unique souls). A caster class
+  orders its drop variants on its row (`RuleCasterVariantPool`, which checked a
+  list in code until the audit). (Superseded by the user's ruling, 2026-09-25:
+  there were three, the third an effect name resolving to a kind —
+  `RuleUnknownEffect` — which went with `enchantments.json`, since an entry's
+  effect is now typed in code. And the user's ruling of the same day on raw JSON
+  brought one new invariant: every number of a content file in its range,
+  `RuleNumberInRange` — R3(a), above.)
+- **"Naming both" is an explanation, not a check.** A weapon a relations edit
+  makes illegal names the relation that refused it, read off the file in hand,
+  asking the rules' own clauses in their order — for modifiers and enchantments
+  alike. It is there exactly when the rule refuses.
+- **Where content's truth lives: the JSON — ruled by the user (2026-09-25).**
+  The shipped files are the master copy, hand-kept and built into the game as
+  the fallback, with no copy of any of their values in code (the ruling above).
+  A designer tunes the copies beside the exe and makes a keeper in the master.
+  `--write-data <folder>` writes the four built-in copies out — the way back
+  from an edited copy beside the exe — and refuses the source `Data` folder.
+  (Superseded by the user's ruling, 2026-09-25: shipped provisionally as the
+  compiled content, `ContentDefaults`, being the source, `--write-data` writing
+  the six files from it, and a test pinning the shipped ones byte for byte.)
+- **Class baselines are a section of `weapons.json` — ruled by the user
+  (2026-09-25), withdrawing the bend** (§5.6: "the class baselines leave
+  `Weapons.cs`" — now for a section of the file). Each class has a row — kind,
+  levelling stats, signature (none for a caster), baseline, statline — a
+  variant is written as its class and the modifier it adds (nothing, for a
+  caster), and a unique as its variant and what it raises; re-basing a class is
+  one edit. (Superseded by the user's ruling, 2026-09-25:
+  shipped provisionally as derived, never a section — every variant carrying its
+  whole forged spread, a class's baseline what its four variants share.)
+- **No `condition` field in an enchantment's entry — bends the phase doc** (§5.7,
+  and the entry above listing condition among an enchantment's dials). Needs no
+  ruling: §5.7's own example puts the condition inside the effect an entry
+  names, and Phase 3 resolved the condition vocabulary into the kinds' events; a
+  column would be a second answer to "when does it fire". It holds for the code
+  catalogue's record as it held for the file (superseded by the user's ruling,
+  2026-09-25, in where the entries live: `EnchantmentDefinitions`, not
+  `enchantments.json`).
+- Whether a content file's numbers have bounds stays open: open-questions.md
+  sets out both readings, and Phase 5 adds no new kind of content rule.
+  (Superseded by the user's ruling, 2026-09-25: every number of a content file
+  has a range, and the enchantment catalogue's numbers are settled as code —
+  R3(a), above; the question left open-questions.md.)
+
+### The save
+
+- **A DTO layer, and every piece of live state accounted for.** The save is plain
+  records in `Logic/Save/` — ids for content, names for enums, locators for
+  references — restored through internal doors, never a public setter, and no
+  gameplay type carries an attribute. The campaign is the outer document, the
+  visit inside it or none between runs: PHASE6-223, Phase 6's line, shipped in
+  Phase 5.4.
+  Beyond §5.1's list the save holds the last run's summary; a member's innate
+  modifiers and attunement (empty today); the whole a turn's movement cap was cut
+  from, which the Mire legend reads; the spoils as locators, a bag slot or a
+  floor, since a spoil put down is still a spoil; the current floor's sight this
+  turn, which the pick and the march read; an untaken drop lying on a corpse,
+  pinned; the visit's die's position; and the scene's view — the active member,
+  and whether the turn marches. Every field of every type the save walks, the
+  two scenes' included, is listed as saved, derived or not saved with its reason,
+  in a test a new field fails. The marching line itself is not saved: a resumed
+  march starts a fresh line, as every march does, so a reload is not claimed
+  indistinguishable on a marching turn — only for what the turn's Logic calls do.
+- **A pending revival follows a changed tuning; a lying drop does not.** A drop
+  already lying there may have been seen, so it is pinned and never changes under
+  an edit. A revival is a future event: under new numbers a dummy due by them
+  gets up as the floor opens — the arrival rule above — and the changed-numbers
+  notice promises exactly that the campaign plays on under the new ones.
+- **The dice are the visit's own, seeded and saved — ruled by the user
+  (2026-09-25): kept.** The d20 is a family of its own (`DiceSalt`, `DiceMix`),
+  each draw a stream keyed by the map seed and how many the visit has rolled,
+  and the count is saved, so after a reload the dice fall as they would have and
+  a reload is never a reroll — "just to protect players from themselves", the
+  user's reason: a bad roll is never reloaded away. The price stated with it is
+  accepted as it stands: a turn replayed after killing the process knows its
+  next draws, and keying each draw by the turn, the actor and the attack's
+  ordinal instead is not taken (R1, above). The family is clean against every
+  drop, revival and boss-drop stream under the shipped `BossFloorMax`, and
+  shares a number with a revival roll only as the Phase 4 pass accepts between
+  the floors' own streams: draw 34,430 meets floor index 8's revival roll for
+  spawn 50, cycle 2 at the shipped depth, and under a tuning as deep as
+  `BossFloorMax`'s clamp allows (99) draw 2801 meets floor index 58's for spawn
+  7, cycle 16 — the one meeting of draws 0–4096 on any floor a tuning reaches.
+  Both are pinned by a test. (Superseded by the user's ruling, 2026-09-25:
+  shipped provisionally as the user's to rule, open-questions.md setting out the
+  alternatives — keep it, key each draw by turn, actor and ordinal, or go back to
+  `Random.Shared`, so that a reload is a reroll. The user kept it.)
+- **A save is taken only at a safe point, and a quit settles on the fixed logic
+  clock.** A safe point is between runs, a visit with no floor open, or the
+  player phase with nothing in flight; the enemies' turn, its banner and a raise
+  in flight never are, which is what lets a save hold none of the enemy phase's
+  working state. The turn system runs on a fixed logic clock — whole steps of
+  1/120 s, never a frame's own time — so the enemies' turn plays out the same at
+  any frame rate, and a quit during it is played out to the next player turn on
+  that same step, the scene's sighting included, before anything is written: the
+  save is the turn the player would have met. A settle in which the party is
+  wiped ends the run, and the campaign is saved between runs.
+- **The save model: one campaign, one slot, saved by itself, resumed where it
+  stood — provisional, the user's to rule.** Saves live in the player's data
+  folder, never beside the exe (the data files do). The game saves at a run's
+  entry, every player turn's start, every floor arrival, a run's end, NEW
+  CAMPAIGN and every quit, with no manual save. A launch resumes the campaign
+  where it stood: between runs, or in the dungeon at the saved floor and turn,
+  the turn's sight, active member and march as they were, `RESUMED` over the
+  floor banner. A `campaign.resuming` marker guards a resume, NEW CAMPAIGN asks
+  twice, `--new-campaign` sets the save and its backup aside and saves the new
+  campaign at once, and the dev overrides play in a scratch slot that never
+  touches the campaign. The alternatives were in open-questions.md. (Superseded
+  by the user's ruling, 2026-09-25, whole — R2, above: the save folder is the
+  autosave slot, beside manual slots whose count is `tuning.json`'s, and every
+  save carries its time (R2, the folder); the game opens on a title screen —
+  CONTINUE, NEW CAMPAIGN, LOAD GAME, QUIT — in place of resuming at launch and of
+  NEW CAMPAIGN's N-then-N between runs (R2, the title); and the player saves by
+  hand into a slot at any safe point, and leaves play by the menus' QUIT TO
+  TITLE, in place of the pause menu's save-and-quit and ESC's between runs
+  (R2, saving by hand). What still stands of it: saves in the player's data
+  folder, the autosave's triggers, the resume marker, `--new-campaign` and the
+  dev overrides' scratch slot. And by the ruling of the same day on the save
+  slots, in the autosave slot: the save folder itself is only the old autosave,
+  the slots are slot 1 up, and `SaveSlots` counts every one — R5, the old
+  autosave, above.)
+- **A save that cannot be played is set aside, never deleted or written over** —
+  unreadable, crashed on its own resume, or retired by `--new-campaign` — named
+  by its full path with how to try it again, and the backup is tried.
+  (Superseded by the user's ruling, 2026-09-25, in what cannot be read: a save
+  that contradicts itself, or holds a count past what play can reach, is one too,
+  set aside the same way — R3(b), above.)
+- **A save that fails is said at once, and a quit that cannot save is said at
+  the next launch.** A write that fails — a full disk, a folder with no rights,
+  another program holding the file — costs nothing, since the save before it is
+  kept, but the player is told straight away: over the floor being played, the
+  save's word shown whole ahead of whatever is up, and again on the next screen
+  between runs — once, however many autosaves failed, and not at all if a later
+  save has gone through by then, since the campaign is on the disk again. No
+  screen follows a quit, so a quit that cannot save — its write fails, or the
+  enemies' turn cannot be played out — leaves `campaign.unsaved` beside the save,
+  and the next launch says, under the resumed line, that what resumes is from
+  before that quit. A marker that cannot be written either leaves the log to say
+  so. (Superseded by the user's ruling, 2026-09-25, in who says it and how: the
+  title, when it opens and before anything is loaded, that what the autosave
+  holds is from before the last time play was left — R2, the title, above. And
+  by the ruling of the same day on the save slots, in whose: every slot's, each
+  by its name, the save folder's `THE OLD AUTOSAVE COULD NOT BE SAVED WHEN ...`
+  — R5, the slot, and R5, the old autosave, above.)
+- **The save's word is shown whole, on the screen between runs and over a floor
+  a saved run resumes on; the data files' notices keep their three-row cap after
+  it.** The cap is for what a broken file can make without bound; what became of
+  the campaign is bounded by construction — a handful of notices, and a launch
+  sets at most two files aside — and a notice cut off there would hide the one
+  thing the player has to act on. That holds on a resumed floor too: a backup
+  holding a run resumes in the dungeon, and the file set aside beside it is
+  named there. The floor's banner moves down to make room, so no row is drawn
+  over the readouts along the top, and the rows stay up longer the more there
+  are. A dungeon a dev override boots into and the error screen cap as before,
+  the log keeping every word. **The whole rows have a ceiling of their own:
+  fourteen.** What construction bounds is how many notices there are, not how
+  long a path is, and fourteen rows — with the data files' three and the row
+  that counts the rest under them — still leave the dungeon list on a 720-pixel
+  window, and a resumed floor's banner in its upper two thirds. The longest case
+  in the player's own save folder, a new campaign after the save and its backup
+  were both set aside, takes about ten, so only a save folder with an unusually
+  long path (`DISTANCERPG_SAVE_DIR` can name any) reaches the ceiling; past it
+  the rows are cut and counted like any others. The alternative not taken: a
+  shorter notice naming the file and the save folder, the full path in the log
+  alone. (Superseded by the user's ruling, 2026-09-25, in how many files: a load
+  of a manual slot can set three aside, the title shows the save's word whole
+  too, and the rarest such word reaches the ceiling in an ordinary save folder —
+  R2, the title, above — and runs a row past it, measured when saving by hand
+  was built, which kept the ceiling: R2, saving by hand, above. Superseded by the
+  user's ruling of the same day on the save slots, in those three: no load sets
+  another slot's files aside, so a load names at most its own slot's two, and the
+  ceiling of fourteen stands — R5, the slot, above — measured again once R5 was
+  whole, and kept: R5, the save's word, above.)
+- **Wear, `WearCapacity` and carried consumables are not in save version 1 —
+  bends the phase doc** (§5.1 lists them). Needs no ruling: the state does not
+  exist until Phases 6a and 6b, and the save's version and migration steps are
+  how the doc asks the format to grow. **The hand-off**: 6a adds `wear` and
+  `wearCapacity` to a weapon's row as a version-2 migration step, with the four
+  Enchanter keys and their readers; 6b adds a non-weapon inventory slot as a
+  migration step, with the four Consumables keys. Every row is a named-field
+  object, so each is an addition and a step, never a reshaping. And PHASE6-223,
+  the campaign as the save's outer document, shipped in Phase 5.4 (above).
+  (Superseded by the user's ruling, 2026-09-25, in the Enchanter's keys: six of
+  them, what a deposit costs, are in `tuning.json` already, read by nothing and
+  outside the save's hash (R4's keys, above). 6a flips each to played as it
+  reads it, adds `WearPerHit` and `GraftBaseChance`, the two still to come, with
+  their readers, and saves beside `wear` and `wearCapacity` the capacity's
+  progress toward its next point, which carries from one deposit to the next
+  (§6.7).)

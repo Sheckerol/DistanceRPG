@@ -16,10 +16,21 @@ namespace GameEngine.DistanceRPG.Tests;
 /// in. <see cref="AllDamage"/> and <see cref="Mixed"/> are the two the file
 /// leans on, each pinned by an assertion before it is used.
 /// </para>
+/// <para>
+/// The ladders below are worked in the numbers they were written against — the
+/// timer's base and floor, the step, the clean-kill bonus, the dummies' weapons
+/// (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
+/// </para>
 /// </summary>
-public class FarmingTests
+[Collection(TestContent.Collection)]
+public sealed class FarmingTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     /// <summary>A map seed whose first five revival cycles at spawn index 0 all roll Damage, so the damage ladder is visible without a Health roll moving the bar under it.</summary>
     private const long AllDamage = 201;

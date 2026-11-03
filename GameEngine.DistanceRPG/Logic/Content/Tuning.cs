@@ -1,108 +1,85 @@
-using static GameEngine.DistanceRPG.Logic.ModifierType;
-
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// The §5.3 <c>tuning.json</c> scalars Phase 1 reads, with their compiled
-/// fallbacks as the initialisers: a partial file is valid key by key and the
-/// game runs with no file at all. Read once at startup, never hot-reloaded.
-/// Ratios are integer divisors whose names say what they convert. Nothing the
-/// golden tests pin belongs here. The tables are per-key overlays on the
-/// compiled instance: readers go through <see cref="Lookup"/>, so a file that
-/// names one entry leaves the rest at their compiled values and a deserialiser
-/// may replace a table wholesale without merging it.
+/// The §5.3 <c>tuning.json</c> scalars and tables: the record's shape — every
+/// key's name, which is a property's name here, verbatim, and what each one
+/// means — and never a value. The values are <c>tuning.json</c>'s: the file is
+/// the master copy (the content rework, 1f), which the game carries built in
+/// and reads first, strictly (<see cref="TuningJson.ReadBuiltIn"/>), so every
+/// key has a number; the copy beside the executable is then read over it key by
+/// key and per table entry (<see cref="TuningJson.Read"/>), so a partial file is
+/// valid and the game runs with no file at all. Read once at startup, never
+/// hot-reloaded. <see cref="TuningSchema"/> lists every key with its group and
+/// its clamp range. Ratios are integer divisors whose names say what they
+/// convert. Nothing the golden tests pin belongs here.
+/// <para>
+/// There is no tuning of nothing: the constructor is private, and the one
+/// instance built here is <see cref="Blank"/> — every scalar 0 or false, every
+/// table empty — which the built-in read lays the file over and which is never
+/// played (<see cref="ContentValidator.ValidateTuning"/> refuses it). Any other
+/// tuning is a read file, or one of those with keys changed (<c>with</c>). The
+/// four tables keyed by an enum are complete by rule
+/// (<see cref="ContentValidator.RuleTableNamesEveryMember"/>) and read directly.
+/// </para>
 /// </summary>
 public sealed record Tuning
 {
-    /// <summary>
-    /// Read <paramref name="key"/> from one of this instance's tables, falling
-    /// back per key to the compiled table (§5.3: a missing key means the compiled
-    /// default) and then to <paramref name="fallback"/> for a key in neither.
-    /// </summary>
-    public int Lookup<TKey>(Func<Tuning, IReadOnlyDictionary<TKey, int>> table, TKey key, int fallback)
-        where TKey : notnull
+    private Tuning()
     {
-        ArgumentNullException.ThrowIfNull(table);
-        return table(this).TryGetValue(key, out var value)
-            ? value
-            : table(ContentDefaults.Tuning).GetValueOrDefault(key, fallback);
     }
+
+    /// <summary>
+    /// Every scalar 0 or false and every table empty: what the built-in
+    /// <c>tuning.json</c> is read over, so every number the game plays is the
+    /// file's. Never played — <see cref="ContentValidator.ValidateTuning"/>
+    /// refuses it — and never a fallback.
+    /// </summary>
+    internal static readonly Tuning Blank = new();
 
     // ---- Modifiers (§1.1) ----
 
     /// <summary>Acquired stacks a modifier may gain above its forged count: <c>cap(t) = forged(t) + AcquiredHeadroom</c>.</summary>
-    public int AcquiredHeadroom { get; init; } = 5;
-
-    /// <summary>What one stack is worth, per modifier — the §1.1 table. First-pass targets, not tuned values. Complete: every member has a row, so no stack is ever worth nothing by omission.</summary>
-    public IReadOnlyDictionary<ModifierType, int> PerStack { get; init; } = new Dictionary<ModifierType, int>
-    {
-        [Brace] = 1,           // +1 retaliation
-        [Block] = 3,           // +3 absorbed; flat by deliberate exception
-        [CritWindow] = 1,      // +1 to the crit window
-        [CritMultiplier] = 1,  // +1 to the multiplier (the base x2 is its Offset)
-        [Cleave] = 1,          // +1 extra target
-        [Charges] = 1,         // +1 throw per turn, on top of the 1 in its Offset
-        [Longshot] = 1,        // +1 damage per tile beyond LongshotFreeTiles
-        [Light] = 10,          // -10% of the weapon's cost, additive not compounding
-        [Riposte] = 1,         // +1 counter per turn
-        [Push] = 1,            // +1 tile displaced
-        [Drag] = 1,            // +1 tile displaced, toward the wielder
-        [Splitting] = 3,       // +3 of the target's Block ignored
-        [Overwatch] = 1,       // +1 held shot
-        [Opportunist] = 1,     // +1 free attack when a target leaves reach
-        [Rout] = 1,            // +1 tile displaced, on everything a cleave caught
-        [Pin] = 1,             // +1 Mire level on the target
-        [Softening] = 3,       // +3 of the target's Block stripped for a round
-        [CritWeaken] = 1,      // +1 Weakened level on a crit
-        [CritSunder] = 1,      // +1 Sundered level on a crit
-        [BlockWeaken] = 1,     // +1 Weakened level on a successful block
-        [OnHitPoison] = 0,     // reserved: no behaviour in Phase 1
-        [Resonant] = 10,       // -10% of all mana the weapon spends
-        [Momentum] = 0,        // enchantment-only: never a modifier stack
-    };
-
-    /// <summary>What a modifier grants before its first stack; absent falls back to this compiled table, then 0.</summary>
-    public IReadOnlyDictionary<ModifierType, int> Offset { get; init; } = new Dictionary<ModifierType, int>
-    {
-        [CritMultiplier] = 2,  // the base x2
-        [Charges] = 1,         // the first throw
-    };
+    public int AcquiredHeadroom { get; init; }
 
     /// <summary>
-    /// Forge-limit overrides; absent falls back to this compiled table, then 3
-    /// (a unique raises one modifier to x3 and nothing is forged past it). The
-    /// currency pair shares the limit of 1 because they share a shape and
-    /// exclude each other.
+    /// What one stack is worth, per modifier — the §1.1 table. Complete by rule
+    /// (<see cref="ContentValidator.RuleTableNamesEveryMember"/>): every member
+    /// has a row, so no stack is ever worth nothing by omission. The values are
+    /// <c>tuning.json</c>'s, each commented there beside its member.
     /// </summary>
-    public IReadOnlyDictionary<ModifierType, int> MaxForged { get; init; } = new Dictionary<ModifierType, int>
-    {
-        [Light] = 1,     // Light ceilings at x6, a 60% discount
-        [Resonant] = 1,  // same shape, same limit
-    };
+    public IReadOnlyDictionary<ModifierType, int> PerStack { get; init; } = new Dictionary<ModifierType, int>();
+
+    /// <summary>
+    /// What a modifier grants before its first stack — CritMultiplier's base x2,
+    /// Charges' first throw. Complete by rule
+    /// (<see cref="ContentValidator.RuleTableNamesEveryMember"/>); the values are
+    /// <c>tuning.json</c>'s.
+    /// </summary>
+    public IReadOnlyDictionary<ModifierType, int> Offset { get; init; } = new Dictionary<ModifierType, int>();
+
+    /// <summary>
+    /// The deepest a weapon may be forged in each modifier: a unique raises one
+    /// modifier to x3 and nothing is forged past it, and the currency pair shares
+    /// a lower limit because they share a shape and exclude each other. Complete
+    /// by rule (<see cref="ContentValidator.RuleTableNamesEveryMember"/>); the
+    /// values are <c>tuning.json</c>'s, raised to the loaded weapons' forgings
+    /// where they fall short (<see cref="TuningFit"/>).
+    /// </summary>
+    public IReadOnlyDictionary<ModifierType, int> MaxForged { get; init; } = new Dictionary<ModifierType, int>();
 
     // ---- Statuses (§1.5) ----
 
     /// <summary>
     /// The constant effect of one level of each status — the §1.5 table's
-    /// third column, the only dial a status has. Complete: every member has a
-    /// row. No decay constants: one level a round, universally.
+    /// third column, the only dial a status has. Complete by rule
+    /// (<see cref="ContentValidator.RuleTableNamesEveryMember"/>); the values are
+    /// <c>tuning.json</c>'s, each commented there beside its status. No decay
+    /// constants: one level a round, universally.
     /// </summary>
-    public IReadOnlyDictionary<StatusEffectType, int> EffectPerLevel { get; init; } = new Dictionary<StatusEffectType, int>
-    {
-        [StatusEffectType.Regeneration] = 1,   // 1 HP restored per level at the target's turn end
-        [StatusEffectType.Ward] = 1,           // 1 point absorbed per level, spent as it absorbs
-        [StatusEffectType.Poison] = 1,         // 1 damage per level at the target's turn end
-        [StatusEffectType.Mire] = 10,          // 10 percent of the movement budget cut per level; ten levels is all of it
-        [StatusEffectType.Sundered] = 1,       // +1 taken per level from every weapon hit
-        [StatusEffectType.Weakened] = 1,       // -1 dealt per level, floored at 1
-        [StatusEffectType.Bleeding] = 1,       // 1 damage per level at the target's turn end
-        [StatusEffectType.OverhealPool] = 1,   // 1 surplus healing point per level; OverhealPerWard of them make one Ward level
-        [StatusEffectType.Searing] = 1,        // 1 damage per level at the target's turn end, whatever element lit it
-        [StatusEffectType.Softened] = 1,       // 1 Block stripped per level for the round
-    };
+    public IReadOnlyDictionary<StatusEffectType, int> EffectPerLevel { get; init; } = new Dictionary<StatusEffectType, int>();
 
     /// <summary>Surplus healing points that convert into one Ward level.</summary>
-    public int OverhealPerWard { get; init; } = 5;
+    public int OverhealPerWard { get; init; }
 
     /// <summary>
     /// Expected damage-over-time points bought per point of trigger mana. This is
@@ -113,27 +90,24 @@ public sealed record Tuning
     /// property's name; there is no <c>DotManaPerDamage</c> key, since 1/3 cannot be
     /// written as an integer under that name.
     /// </summary>
-    public int DotDamagePerMana { get; init; } = 3;
+    public int DotDamagePerMana { get; init; }
 
     // ---- Appliers (§1.5) ----
 
     /// <summary>
     /// Per-enchantment percentage of the source number that becomes status
-    /// levels, keyed by enchantment id; an entry here overrides the catalogue's.
-    /// The four elements sit at different points of the 10–25% band so their
-    /// burns are not identically paced; an element's percentage is also the
-    /// burn its lingering unique feeds (§1.5). Serrated's row is the docs'
-    /// <c>BleedPercent</c>: the share of the weapon's own damage a hit leaves
-    /// as Bleeding levels — provisional, in the same band as the elements.
+    /// levels, keyed by enchantment id: an id named here sets that entry's
+    /// percentage, laid over its catalogue row. The four elements and Serrated
+    /// (the docs' <c>BleedPercent</c>: the share of the weapon's own damage a
+    /// hit leaves as Bleeding levels) have no percentage of their own at all —
+    /// the catalogue leaves theirs to this table
+    /// (<see cref="EnchantmentDefinitions.SetByTuning"/>), so the built-in
+    /// <c>tuning.json</c> names each or the game does not start
+    /// (<see cref="ContentValidator.RuleTuningOwnsTheNumber"/>). An id the
+    /// catalogue does not have is dropped at load, with a notice. The values and
+    /// what each is for are <c>tuning.json</c>'s.
     /// </summary>
-    public IReadOnlyDictionary<string, int> ApplyPercent { get; init; } = new Dictionary<string, int>(StringComparer.Ordinal)
-    {
-        ["flaming"] = 20,
-        ["cold"] = 15,
-        ["shocking"] = 25,
-        ["acidic"] = 15,
-        ["serrated"] = 20,
-    };
+    public IReadOnlyDictionary<string, int> ApplyPercent { get; init; } = new Dictionary<string, int>(StringComparer.Ordinal);
 
     /// <summary>
     /// The odds a non-caster drop arrives carrying an enchantment (§3.1): a
@@ -143,12 +117,13 @@ public sealed record Tuning
     /// for the reason <see cref="FarmLadder.UniqueChancePermille"/> gives.
     /// <para>
     /// <strong>Provisional.</strong> §3.1 says "an uncommon roll on the loot
-    /// stream" and names no number anywhere, so 10 is picked here to stop the
-    /// drop path blocking on it and is expected to move after play — one of the
-    /// two figures in Phase 3 that is a guess rather than a doc's.
+    /// stream" and names no number anywhere, so the number <c>tuning.json</c>
+    /// ships is picked to stop the drop path blocking on it and is expected to
+    /// move after play — one of the two figures in Phase 3 that is a guess
+    /// rather than a doc's.
     /// </para>
     /// </summary>
-    public int DropEnchantChancePercent { get; init; } = 10;
+    public int DropEnchantChancePercent { get; init; }
 
     /// <summary>
     /// The one entry <see cref="ArcanePotency"/> is the dial for. The overlay is
@@ -156,25 +131,25 @@ public sealed record Tuning
     /// which is the rule <see cref="ApplyPercent"/> already follows: a dial names
     /// an entry, while which entries carry a kind is content's to say. A second
     /// bonus-damage row — a greater Arcane, a soul that adds untyped damage —
-    /// therefore keeps the magnitude its content row authored, exactly as an
-    /// element this file's percentage table does not name keeps its own.
+    /// therefore keeps the magnitude its catalogue row states, exactly as an
+    /// entry this file's percentage table does not name keeps its own.
     /// </summary>
     public const string ArcaneId = "arcane";
 
     /// <summary>
     /// Arcane's base potency: the untyped damage it adds to a hit, before its
-    /// tier multiplies it through <see cref="Enchantment.LevelsFor"/> (§3.3). At
-    /// <c>ApplyPercent</c> 100 a tier-1 Arcane adds 4 for a trigger of 8 and a
-    /// tier-6 adds 24 for a lock of 180. It lays over the row of
-    /// <see cref="ArcaneId"/> and no other.
+    /// tier multiplies it through <see cref="Enchantment.LevelsFor"/> (§3.3). It
+    /// is the potency of the row of <see cref="ArcaneId"/> and no other: that row
+    /// states none of its own (<see cref="EnchantmentDefinitions.SetByTuning"/>),
+    /// so this key is where Arcane's magnitude lives.
     /// <para>
     /// <strong>Provisional.</strong> §3.3's starting-set table prices Arcane's
     /// lock and trigger and gives no potency column at all, so this is the second
     /// of Phase 3's two guessed figures. It sits here rather than in the
-    /// catalogue row so a playtest can turn it without a content edit.
+    /// catalogue row so a playtest can turn it without a rebuild.
     /// </para>
     /// </summary>
-    public int ArcanePotency { get; init; } = 4;
+    public int ArcanePotency { get; init; }
 
     // ---- Farming (§3.2) ----
     // The repeat-kill ladder's knobs. They are read through FarmLadder, which is
@@ -183,12 +158,12 @@ public sealed record Tuning
     /// <summary>
     /// Turns a dummy at <c>DefeatCount</c> 0 takes to resurrect:
     /// <c>resurrectTurns(n) = max(ResurrectTurnsFloor, ResurrectTurnsBase − n)</c>
-    /// (§3.2). Replaces the compiled <c>DummyResurrectTurns</c>, which was this
-    /// same 10 with no ladder under it. settled.md keeps the front-loaded slope
+    /// (§3.2). Replaces the constant <c>DummyResurrectTurns</c>, which was a
+    /// single number with no ladder under it. settled.md keeps the front-loaded slope
     /// as designed and records <c>10 − n/2</c> as the fallback if the front half
     /// of a farm ever feels too samey.
     /// </summary>
-    public int ResurrectTurnsBase { get; init; } = 10;
+    public int ResurrectTurnsBase { get; init; }
 
     /// <summary>
     /// The shortest a revival ever gets (§3.2). A floor rather than a curve
@@ -199,7 +174,7 @@ public sealed record Tuning
     /// <see cref="ContentValidator.ValidateTuning"/> refuses a value below 1, or
     /// a dummy could revive the turn it died.
     /// </summary>
-    public int ResurrectTurnsFloor { get; init; } = 3;
+    public int ResurrectTurnsFloor { get; init; }
 
     /// <summary>
     /// The chance, as a percentage, that one farm cycle buys the drop a stack
@@ -207,7 +182,7 @@ public sealed record Tuning
     /// what ends a farm is the per-modifier <c>forged + 5</c> ceiling, so a
     /// falling rate would only make the same ending slower to reach.
     /// </summary>
-    public int DefeatStackChance { get; init; } = 50;
+    public int DefeatStackChance { get; init; }
 
     /// <summary>
     /// What a clean kill — a killing blow dealing at least the target's max HP —
@@ -219,7 +194,7 @@ public sealed record Tuning
     /// would leave a clean kill advancing nothing — strictly worse than the
     /// ordinary kill it is supposed to be worth double.
     /// </summary>
-    public int CleanKillBonus { get; init; } = 2;
+    public int CleanKillBonus { get; init; }
 
     /// <summary>
     /// The percentage of its own current damage or max HP a dummy gains per
@@ -233,7 +208,7 @@ public sealed record Tuning
     /// five Damage rolls: 18, 21, 24, 28, 32, 37.
     /// </para>
     /// </summary>
-    public int ReviveStepPercent { get; init; } = 15;
+    public int ReviveStepPercent { get; init; }
 
     // ---- Uniques (§3.2) ----
     // The logistic's three constants, all knobs: the ceiling sets how much
@@ -246,7 +221,7 @@ public sealed record Tuning
     /// "no amount of grinding *guarantees* a unique". The asymptote does the work
     /// a hard cap used to.
     /// </summary>
-    public int UniqueChanceCeilingPercent { get; init; } = 50;
+    public int UniqueChanceCeilingPercent { get; init; }
 
     /// <summary>
     /// The <c>DefeatCount</c> the curve is steepest at, where it passes half the
@@ -255,7 +230,7 @@ public sealed record Tuning
     /// coupling: if a twenty-times-revived dummy proves unsurvivable or trivial
     /// the midpoint moves to match, never the other way round.
     /// </summary>
-    public int UniqueChanceMidpoint { get; init; } = 20;
+    public int UniqueChanceMidpoint { get; init; }
 
     /// <summary>
     /// How sharply the curve arrives, as a percentage: the doc's
@@ -263,7 +238,7 @@ public sealed record Tuning
     /// because §5.3 makes every rate an integer with its units in its name rather
     /// than a bare float.
     /// </summary>
-    public int UniqueChanceKPercent { get; init; } = 26;
+    public int UniqueChanceKPercent { get; init; }
 
     // ---- Economy (§1.2, §1.3) ----
 
@@ -281,26 +256,47 @@ public sealed record Tuning
     /// pays 12, against the 11 spent: a hair above break-even, forever.
     /// Nothing below x6 sustains, and that cliff is deliberate.
     /// </summary>
-    public int MovementUnitsPerMana { get; init; } = 10;
+    public int MovementUnitsPerMana { get; init; }
+
+    /// <summary>
+    /// How far a party member moves in a turn, in logic units (32 per tile):
+    /// the 160 every movement cost is priced against (§1.2, §1.3) — a swing, a
+    /// cast, a swap — the whole a turn start refills before Mire cuts it
+    /// (<see cref="PartyMemberState.StartTurn"/>), and the half of it a turn may
+    /// bank. It is also what converts the party's costs into an enemy's: an
+    /// enemy pays <c>EnemyMove / MovementBudget</c> of a weapon's cost, so a
+    /// longer party budget makes every enemy swing cheaper as well. settled.md's
+    /// Phase 2 pass names it: the caster's 160 "is <c>MovementBudget</c>" beside
+    /// <see cref="StartingPool"/>. Its number is <c>tuning.json</c>'s alone: no
+    /// constant in the code holds it.
+    /// <para>
+    /// <see cref="MovementUnitsPerMana"/> is derived from it and does
+    /// <strong>not</strong> follow it: a budget turned in <c>tuning.json</c>
+    /// leaves the divisor where it was, so a longer budget also banks more mana a
+    /// turn, and whoever turns one re-derives the other by hand (settled.md: the
+    /// divisor "re-derives when the movement budget or cast costs move").
+    /// </para>
+    /// </summary>
+    public int MovementBudget { get; init; }
 
     /// <summary>Movement a weapon swap costs once a live enemy has been seen this turn; free otherwise.</summary>
-    public int WeaponSwapCost { get; init; } = 20;
+    public int WeaponSwapCost { get; init; }
 
     /// <summary>Tiles a Longshot shot travels before it starts paying out.</summary>
-    public int LongshotFreeTiles { get; init; } = 3;
+    public int LongshotFreeTiles { get; init; }
 
     /// <summary>Whether area casts hit allies. Off until the kiting AI and the wand placement scorer exist.</summary>
-    public bool FriendlyFireEnabled { get; init; } = false;
+    public bool FriendlyFireEnabled { get; init; }
 
     /// <summary>Percentage of an area cast's damage an ally takes when friendly fire is on.</summary>
-    public int FriendlyFireAllyPercent { get; init; } = 50;
+    public int FriendlyFireAllyPercent { get; init; }
 
     // ---- Progression (§2.1, §2.2) ----
     // StartingPool is §5.3's own key, in its Economy group. WeaponXpPerLevel is
-    // named here, because §5.3 names the weapon ladder's 100 nowhere at all; the
-    // Economy group is where it lands when Phase 5 writes tuning.json. They are
-    // the two numbers a playtest would actually turn; the shape of a level's
-    // effect (Progression.DamagePerLevels and the rest) stays compiled.
+    // named here, because §5.3 names the weapon ladder's bar nowhere at all, and
+    // tuning.json keeps it under a Progression heading of its own. They are the
+    // two numbers a playtest would actually turn; the shape of a level's effect
+    // (Progression.DamagePerLevels and the rest) stays code.
 
     /// <summary>
     /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
@@ -313,8 +309,8 @@ public sealed record Tuning
     /// <strong>A caster's pool opens here too, on 30 and not on 160.</strong>
     /// settled.md had both figures live; the 160 in §1.3's derivations is the
     /// <em>movement</em> budget — <c>(160 - 40) / (8 + 3)</c> divides a staff's
-    /// 40-unit movement cost out of <see cref="GameConstants.MaxDistance"/>,
-    /// which is what <see cref="MovementUnitsPerMana"/> above is derived from —
+    /// 40-unit movement cost out of <see cref="MovementBudget"/>, which is what
+    /// <see cref="MovementUnitsPerMana"/> above is derived from —
     /// so there is no second starting-mana key and this one number is every
     /// pool's bar. Recorded under settled.md's Phase 2 implementation pass, with
     /// the consequence it accepts: a fresh caster gets one cast from a full
@@ -322,7 +318,7 @@ public sealed record Tuning
     /// <see cref="GameConstants.MaxMana"/>, and is a different number.
     /// </para>
     /// </summary>
-    public int StartingPool { get; init; } = 30;
+    public int StartingPool { get; init; }
 
     /// <summary>
     /// The weapon ladder's bar per level (§2.2): the doc's
@@ -331,7 +327,7 @@ public sealed record Tuning
     /// run on one function. Marked "tune later" where it is written and left
     /// unnamed there; this is the name.
     /// </summary>
-    public int WeaponXpPerLevel { get; init; } = 100;
+    public int WeaponXpPerLevel { get; init; }
 
     // ---- Dungeon (§4.3, §4.4) ----
     // §5.3's Dungeon group, plus the stairs' gathering radius, which §5.3 does
@@ -347,10 +343,10 @@ public sealed record Tuning
     /// (<see cref="DungeonDef.BossFloorMin"/>) ignores this, as the tutorial's
     /// floor 2 does; every other dungeon reads it at entry.
     /// </summary>
-    public int BossFloorMin { get; init; } = 5;
+    public int BossFloorMin { get; init; }
 
     /// <summary>The deepest floor a dungeon's boss is rolled onto; the roll's one draw spans <c>BossFloorMax − BossFloorMin</c>.</summary>
-    public int BossFloorMax { get; init; } = 10;
+    public int BossFloorMax { get; init; }
 
     /// <summary>
     /// The floors a boss's drop pays nothing for: its guaranteed stacks are
@@ -362,17 +358,17 @@ public sealed record Tuning
     /// a headroom that would bring it level
     /// (<see cref="ContentValidator.RuleBossPaysLessThanTheFarm"/>).
     /// </summary>
-    public int BossStackOffset { get; init; } = 4;
+    public int BossStackOffset { get; init; }
 
     /// <summary>Runs a clear locks its dungeon for, per floor its boss was beaten on: the lock is <c>BossFloor × CooldownRunsPerFloor</c> (§4.3), counted on the campaign's run counter, and multiplied out in one place, <see cref="DungeonState.LockRuns"/>.</summary>
-    public int CooldownRunsPerFloor { get; init; } = 1;
+    public int CooldownRunsPerFloor { get; init; }
 
     /// <summary>
     /// The floor NUMBER a failed run must have reached to earn the mercy tick
     /// (§6.3: "failing at floor 3 or deeper"). A number, not an index: the
     /// tutorial's two floors never reach it, with no exception written.
     /// </summary>
-    public int MercyFloor { get; init; } = 3;
+    public int MercyFloor { get; init; }
 
     /// <summary>
     /// The percentage of this run's gain in each XP pool a wipe claws back
@@ -385,7 +381,7 @@ public sealed record Tuning
     /// play.
     /// </para>
     /// </summary>
-    public int DeathXpLossPercent { get; init; } = 50;
+    public int DeathXpLossPercent { get; init; }
 
     /// <summary>
     /// How near the stairs, in whole tiles, every living member must stand for
@@ -393,7 +389,60 @@ public sealed record Tuning
     /// logic units multiplies by <see cref="GameConstants.LogicUnitsPerTile"/>.
     /// Three admits a marching line of three ranks behind whoever is on the stair.
     /// </summary>
-    public int StairGatherTiles { get; init; } = 3;
+    public int StairGatherTiles { get; init; }
+
+    // ---- Enchanter (Phase 6a; the user's ruling of 2026-09-25) ----
+    // What a deposit costs (§6.1, §6.2): how a weapon's wear capacity grows, where
+    // its enchantment slots open, and how much wear attaching each enchantment
+    // needs. The user ruled the numbers and keeps each in tuning.json, so they are
+    // keys ahead of their reader: no rule of play reads one until Phase 6a builds
+    // the enchanter, and until then a save's hash leaves them out
+    // (TuningKey.Played). A weapon's capacity opens on StartingPool, the one bar
+    // every pool opens on, which stays one key.
+
+    /// <summary>
+    /// The capacity a full bar's worth of cashed wear adds to a weapon's
+    /// <c>WearCapacity</c> (§6.1): the bar is the capacity at the time, and the
+    /// progress carries — a deposit short of a full bar still counts toward the
+    /// next point, and what one cashes past a bar starts the next. The growth is
+    /// the same whichever service the deposit bought (§6.4). 0 freezes capacity.
+    /// No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int WearCapacityPerBar { get; init; }
+
+    /// <summary>
+    /// The capacity a weapon's first enchantment slot opens at (§6.2): slot n opens
+    /// at <c>FirstSlotCapacity + SlotCapacityStep × (n − 1)</c>, up to
+    /// <see cref="EnchantmentSlots"/>. What a weapon arrives with fills its slots
+    /// from the first. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int FirstSlotCapacity { get; init; }
+
+    /// <summary>The capacity between one enchantment slot and the next (<see cref="FirstSlotCapacity"/>); 0 opens every slot at once. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    public int SlotCapacityStep { get; init; }
+
+    /// <summary>
+    /// The most enchantments the enchanter lets a weapon hold: the docs' five
+    /// (§6.2), the last slot. Never fewer than a weapon arrives carrying — the
+    /// key's clamp starts at <see cref="ContentValidator.MostArrivingEnchantments"/>,
+    /// so no <c>tuning.json</c> can hold a weapon to fewer slots than its own
+    /// souls fill. Not the five of §1.5's Light shape, which decides what a unique
+    /// arrives with and stays a rule constant: the two agree by the docs and mean
+    /// different things. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int EnchantmentSlots { get; init; }
+
+    /// <summary>
+    /// The least wear a deposit must cash to attach a weapon's first enchantment
+    /// (§6.2): attaching enchantment #n needs a free slot and a deposit of at least
+    /// <c>FirstEnchantmentWear + EnchantmentWearStep × (n − 1)</c>. A deposit still
+    /// spends the whole pool (§6.1), and capacity above the price is breathing
+    /// room. No rule reads it yet: Phase 6a's enchanter will.
+    /// </summary>
+    public int FirstEnchantmentWear { get; init; }
+
+    /// <summary>How much more wear each later enchantment needs than the one before (<see cref="FirstEnchantmentWear"/>); 0 prices every one as the first. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    public int EnchantmentWearStep { get; init; }
 
     // ---- Inventory (§4.4) ----
 
@@ -413,5 +462,20 @@ public sealed record Tuning
     /// stops at 9.
     /// </para>
     /// </summary>
-    public int PartyCarrySlots { get; init; } = 24;
+    public int PartyCarrySlots { get; init; }
+
+    // ---- Saves (the user's ruling of 2026-09-25 on the save model) ----
+
+    /// <summary>
+    /// How many save slots there are, each holding one campaign that saves only
+    /// there: the save folder's <c>slot-1</c> to <c>slot-N</c>. The user ruled the
+    /// count a key — "the number of saves should live on the tuning.json so that we
+    /// don't need to fix the code every time I change my mind". At least one, so a
+    /// campaign always has a slot to begin in, and at most nine, a digit picking
+    /// each. A count lowered below a slot that holds a save deletes nothing: the
+    /// slot is kept, listed, and goes on saving the campaign played from it; NEW
+    /// CAMPAIGN never offers it. The launcher reads it, never a rule of play, so a
+    /// save's hash leaves it out (<see cref="TuningKey.Played"/>).
+    /// </summary>
+    public int SaveSlots { get; init; }
 }

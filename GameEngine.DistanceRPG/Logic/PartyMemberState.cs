@@ -26,7 +26,7 @@ public sealed class PartyMemberState : ActorState
     /// The spread comes off the def, which is the whole point: a member built
     /// any other way carries <see cref="InnateStats.None"/> and divides every
     /// threshold by 1, so the §2.1 table would exist and do nothing. The
-    /// starting weapon is slot 0 and the bag follows it in file order, each
+    /// starting weapon is slot 0 and the bag follows it in the def's order, each
     /// instantiated fresh — two members carrying the same id carry two weapons.
     /// </para>
     /// <para>
@@ -56,6 +56,38 @@ public sealed class PartyMemberState : ActorState
             member.Inventory[i + 1] = catalogue.Instantiate(def.BagWeaponIds[i]);
 
         return member;
+    }
+
+    /// <summary>
+    /// A member as a save describes it (§5.1): its id, its colour, the spread it
+    /// was built with and the bag it was built with — <paramref name="slots"/>
+    /// of them, whatever the current tuning's carry would give a member built
+    /// now, since a member keeps the count it was built with and a changed
+    /// <c>tuning.json</c> never resizes a bag. Everything else — the XP, the body,
+    /// what the bag holds, the turn's movement — the load writes back after, as
+    /// plain state. The one construction a load makes, beside
+    /// <see cref="From"/>'s for a new campaign; internal, so a restore is never a
+    /// public way to set a spread.
+    /// <para>
+    /// The spread is taken as saved and never asked the §2.1 permutation rule,
+    /// which is the roster's: a member's spread is fixed at creation, and
+    /// this is the same member coming back.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slots"/> is not a count a member can carry: at least the hand, at most <see cref="GameConstants.MaxInventorySlots"/>.</exception>
+    internal static PartyMemberState Restore(string id, int colorIndex, InnateStats stats, int slots)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentOutOfRangeException.ThrowIfLessThan(slots, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(slots, GameConstants.MaxInventorySlots);
+
+        return new PartyMemberState
+        {
+            Id = id,
+            ColorIndex = colorIndex,
+            Stats = stats,
+            Inventory = new Weapon?[slots],
+        };
     }
 
     /// <summary>
@@ -222,32 +254,57 @@ public sealed class PartyMemberState : ActorState
         return tuning.PartyCarrySlots / GameConstants.PartySize;
     }
 
-    /// <summary>The member's <see cref="InventorySlots"/> slots, six under the shipped tuning; slot 0 is the equipped weapon.</summary>
-    public Weapon?[] Inventory { get; } = new Weapon?[InventorySlots];
+    /// <summary>
+    /// The member's <see cref="InventorySlots"/> slots, six under the shipped
+    /// tuning; slot 0 is the equipped weapon. The array is the member's for good:
+    /// only construction sizes it — a restore (<see cref="Restore"/>) to the count
+    /// the saved member was built with — and every write after is to a slot.
+    /// </summary>
+    public Weapon?[] Inventory { get; private init; } = new Weapon?[InventorySlots];
 
     public override Weapon? EquippedWeapon => Inventory[0];
 
+    /// <summary>
+    /// The base movement a turn refills (§1.2): <see cref="Tuning.MovementBudget"/>
+    /// under the current content, read on every use and never cached, so a
+    /// member built after a tuning is loaded moves by that tuning's number.
+    /// </summary>
+    private static float Budget => GameContent.Current.Tuning.MovementBudget;
+
     /// <summary>Movement budget left this turn, in logic units.</summary>
-    public float DistLeft { get; set; } = GameConstants.MaxDistance;
+    public float DistLeft { get; set; } = Budget;
 
     /// <summary>This turn's cap: base budget plus movement saved last turn, less what Mire cut.</summary>
-    public float EffectiveMax { get; set; } = GameConstants.MaxDistance;
+    public float EffectiveMax { get; set; } = Budget;
 
     /// <summary>Banked at end of turn (half the unspent budget, capped).</summary>
     public float SavedMovement { get; set; }
+
+    /// <summary>
+    /// The whole this turn's cap was cut from: the base budget plus the bank
+    /// <see cref="StartTurn"/> cashed in, before Mire took its share — the budget
+    /// alone after a <see cref="Rest"/>, and for a member no turn has started for.
+    /// What a Mire legend states beside the MOVE readout's cap (§1.5: 10% a level
+    /// <em>of this</em>). Kept on the member and not beside it, because the bank
+    /// it holds is spent by the time anyone reads it, and a save carries it
+    /// (§5.1) so a reload reads the same whole.
+    /// </summary>
+    public float BudgetBeforeMire { get; set; } = Budget;
 
     public override float Radius => GameConstants.PlayerHalf;
 
     /// <summary>
     /// Start-of-turn reset: cash in the saved movement bonus, refill the budget,
     /// then take Mire's cut off the whole of it — 10% a level, and at ten
-    /// levels the budget is gone, which is all paralysis is (§1.5).
+    /// levels the budget is gone, which is all paralysis is (§1.5). The whole it
+    /// cut from is kept (<see cref="BudgetBeforeMire"/>).
     /// </summary>
     public void StartTurn()
     {
         float bonus = SavedMovement;
         SavedMovement = 0;
-        EffectiveMax = StatusBehaviours.MiredBudget(this, GameConstants.MaxDistance + bonus);
+        BudgetBeforeMire = Budget + bonus;
+        EffectiveMax = StatusBehaviours.MiredBudget(this, BudgetBeforeMire);
         DistLeft = EffectiveMax;
     }
 
@@ -291,8 +348,9 @@ public sealed class PartyMemberState : ActorState
         Mana = UsableMaxMana;
         HeldShots = 0;
         SavedMovement = 0;
-        EffectiveMax = GameConstants.MaxDistance;
-        DistLeft = GameConstants.MaxDistance;
+        BudgetBeforeMire = Budget;
+        EffectiveMax = Budget;
+        DistLeft = Budget;
     }
 
     /// <summary>
@@ -306,7 +364,7 @@ public sealed class PartyMemberState : ActorState
             SavedMovement = 0;
             return 0;
         }
-        float save = Math.Min(MathF.Floor(DistLeft / 2f), GameConstants.MaxDistance / 2f);
+        float save = Math.Min(MathF.Floor(DistLeft / 2f), Budget / 2f);
         SavedMovement = save;
         return save;
     }

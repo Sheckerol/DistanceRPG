@@ -1,4 +1,6 @@
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Windowing.GraphicsLibraryFramework;
+using static GameEngine.DistanceRPG.Tests.TestSlots;
 
 namespace GameEngine.DistanceRPG.Tests;
 
@@ -10,10 +12,18 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <c>HudTextTests</c>, the drawing is untested, but what it draws is tested:
 /// the strings, the list's rows in the order the screen draws them, where the
 /// choice starts and how it moves, and the one piece of arithmetic that keeps
-/// the list on the screen.
+/// the list on the screen. The runs behind the lists stand on the numbers they
+/// were written against — the boss floor range, the mercy floor, the lock a
+/// floor (<see cref="Premise"/>) — made current for each test, so the content
+/// collection holds it.
 /// </summary>
-public class BetweenRunsHudTests
+[Collection(TestContent.Collection)]
+public sealed class BetweenRunsHudTests : IDisposable
 {
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
+
     private static DungeonCatalogue Dungeons => GameContent.Current.Dungeons;
 
     private static string[] Texts(IEnumerable<BetweenRunsHud.ListRow> rows) => rows.Select(r => r.Text).ToArray();
@@ -243,5 +253,188 @@ public class BetweenRunsHudTests
         var alone = BetweenRunsHud.Layout(h, summaryLines: 0, listHeight);
         Assert.Equal(0, alone.SummaryRows);
         Assert.InRange(alone.ListTop, 100f, h / 3f);
+    }
+
+    [Fact]
+    public void NoticesSitUnderTheTitle_AndNeverPushTheListOffA720Window()
+    {
+        // The startup notices (1h, 1i) — a tuning.json value clamped, a file
+        // missing — sit under the title, in the rows the one wrapper lays them out
+        // in, and push the last run and the list down by their height. The list is
+        // still never pushed off the shipped 1280 x 720: the summary gives way.
+        const float h = 720f;
+        var notices = NoticeText.Rows(Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1").ToList());
+        Assert.Equal(NoticeText.MaxRows + 1, notices.Count);   // three, and how many more are in the log
+
+        var campaign = CampaignRuns.Campaign();
+        CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+        float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch) + 20f;
+
+        // Under the title, and above everything they push down.
+        Assert.True(BetweenRunsHud.NoticeTop > BetweenRunsHud.TitleBottom);
+        var plain = BetweenRunsHud.Layout(h, summaryLines: 7, listHeight);
+        var noted = BetweenRunsHud.Layout(h, summaryLines: 7, listHeight, notices.Count);
+        Assert.Equal(0f, plain.Shift);
+        Assert.Equal(notices.Count * BetweenRunsHud.NoticePitch, noted.Shift);
+        Assert.True(BetweenRunsHud.NoticeTop + notices.Count * BetweenRunsHud.NoticePitch <= BetweenRunsHud.LastRunHeadingY + noted.Shift);
+        Assert.Equal(7, noted.SummaryRows);
+        Assert.Equal(plain.ListTop + noted.Shift, noted.ListTop);
+        Assert.True(noted.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin);
+
+        // The longest summary a run can write gives way further; the list still clears the keys line.
+        var longest = BetweenRunsHud.Layout(h, summaryLines: 40, listHeight, notices.Count);
+        Assert.InRange(longest.SummaryRows, 1, BetweenRunsHud.Layout(h, summaryLines: 40, listHeight).SummaryRows - 1);
+        Assert.Equal(h - BetweenRunsHud.ListBottomMargin, longest.ListTop + listHeight, precision: 3);
+
+        // Before any run: the list sits under the notices, and still on the screen.
+        var alone = BetweenRunsHud.Layout(h, summaryLines: 0, listHeight, notices.Count);
+        Assert.True(alone.ListTop >= BetweenRunsHud.NoticeTop + notices.Count * BetweenRunsHud.NoticePitch);
+        Assert.True(alone.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin);
+
+        // No notices: the screen is exactly as it was.
+        Assert.Empty(NoticeText.Rows([]));
+        Assert.Equal(plain, BetweenRunsHud.Layout(h, summaryLines: 7, listHeight, noticeRows: 0));
+    }
+
+    [Fact]
+    public void TheSavesWordShownWholeStillLeavesTheListOnA720Window()
+    {
+        // S5's review: the save's word leads the notices and is shown whole, up to
+        // its ceiling, and the data files' notices take their three rows after it,
+        // then the row that counts the rest — the most rows of notices the screen
+        // between runs can be handed. Under all of them the list is still never
+        // pushed off the shipped 1280 x 720: the summary gives way, as ever.
+        const float h = 720f;
+        int most = NoticeText.MaxWholeRows + NoticeText.MaxRows + 1;
+        var saysWhole = Enumerable.Range(1, NoticeText.MaxWholeRows).Select(i => $"the save's word, row {i}");
+        var data = Enumerable.Range(1, 5).Select(i => $"tuning.json: Key{i} 0 is below 1 - using 1");
+        var rows = NoticeText.Rows([.. saysWhole, .. data], whole: NoticeText.MaxWholeRows);
+        Assert.Equal(most, rows.Count);
+        Assert.Equal(NoticeText.More(2), rows[^1]);
+
+        foreach (bool cleared in new[] { false, true })
+        {
+            var campaign = CampaignRuns.Campaign();
+            if (cleared)
+                CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            float listHeight = BetweenRunsHud.ListRows(campaign.Listings(), 0).Sum(row => row.Pitch) + 20f;   // and room for the lock rule
+
+            foreach (int summaryLines in new[] { 0, 7, 40 })
+            {
+                var layout = BetweenRunsHud.Layout(h, summaryLines, listHeight, rows.Count);
+                Assert.True(BetweenRunsHud.NoticeTop + rows.Count * BetweenRunsHud.NoticePitch <= layout.ListTop,
+                    $"the notices run into the list ({summaryLines} summary lines, tutorial cleared: {cleared})");
+                Assert.True(layout.ListTop + listHeight <= h - BetweenRunsHud.ListBottomMargin,
+                    $"the list is pushed off the window ({summaryLines} summary lines, tutorial cleared: {cleared})");
+            }
+        }
+    }
+
+    [Fact]
+    public void TheKeysChooseAndDescend()
+    {
+        // 1f, and the user's ruling of 2026-09-25 on the save model, R2(e): the
+        // screen between runs names the keys that choose and descend, and ESC, which
+        // opens the menu — where the campaign is saved by hand and play is left for
+        // the title. NEW CAMPAIGN is the title's now, so no key here begins one, and
+        // the line names none.
+        Assert.Equal("W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU", BetweenRunsHud.KeysLine);
+        Assert.DoesNotContain("NEW CAMPAIGN", BetweenRunsHud.KeysLine, StringComparison.Ordinal);
+
+        // The keys stand along the bottom in their grey.
+        Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine());
+
+        // It fits the shipped 1280-wide window at the keys line's scale, with room either side.
+        foreach (string line in new[] { BetweenRunsHud.KeysLine })
+            Assert.True(line.Length * 6f * 1.3f <= 1280f - 40f, line);
+
+        // A resumed campaign says so first under the title, in green — news, not a
+        // warning — and every other notice keeps the warning's orange.
+        Assert.Equal("CAMPAIGN RESUMED", BetweenRunsHud.Resumed);
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([BetweenRunsHud.Resumed])[0]));
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.Resumed(Named(1), backup: true)])[0]));
+        Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor(NoticeText.Rows([CampaignBoot.TuningChanged])[0]));
+        Assert.Equal(DungeonHud.Orange, BetweenRunsHud.NoticeColor("TUNING.JSON: MOVEMENTUNITSPERMANA 0 IS BELOW 1 - USING 1"));
+    }
+
+    [Fact]
+    public void TheMenuBetweenRunsSavesAndQuitsToTheTitle()
+    {
+        // The user's ruling of 2026-09-25 on the save model, R2(d) and R2(e): between
+        // runs is a safe point, and ESC there opens the dungeon's pause menu over the
+        // hub — 1 CLOSE, 2 SAVE GAME, 3 QUIT TO TITLE — its keys line in the hub's
+        // keys' place while it is up. SAVE GAME saves the campaign's own slot at once,
+        // asking nothing (the user's ruling of the same day on the save slots, R5), so
+        // no list ever stands in the menu's place.
+        Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT TO TITLE - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: true));
+        Assert.Equal("1  CLOSE - 2  SAVE GAME - 3  QUIT GAME - ESC CLOSES", BetweenRunsHud.MenuKeysLine(hasTitle: false));
+        Assert.Equal((BetweenRunsHud.KeysLine, DungeonHud.Grey), BetweenRunsHud.BottomLine());
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: true), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true));
+        Assert.Equal((BetweenRunsHud.MenuKeysLine(hasTitle: false), DungeonHud.Grey), BetweenRunsHud.BottomLine(menu: true, hasTitle: false));
+        foreach (string line in new[] { BetweenRunsHud.MenuKeysLine(hasTitle: true), BetweenRunsHud.MenuKeysLine(hasTitle: false) })
+        {
+            Assert.Matches("^[A-Z0-9 /-]+$", line);
+            Assert.True(line.Length * 6f * BetweenRunsHud.KeysLineScale <= 1280f - 40f, line);
+        }
+
+        // Where a key goes, walked key by key: with the menu up, ENTER, W, S and the
+        // arrows are the menu's — which does nothing with them, so nothing descends
+        // behind it — as every other key is; ESC is always the game's, which asks
+        // HandleEscape.
+        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D1, Keys.D2, Keys.D3, Keys.N, Keys.Space })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Menu, BetweenRunsScene.Route(menu: true, key));
+        foreach (var key in new[] { Keys.Enter, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.D2, Keys.N })
+            Assert.Equal(BetweenRunsScene.KeyRoute.List, BetweenRunsScene.Route(menu: false, key));
+        foreach (bool menu in new[] { false, true })
+            Assert.Equal(BetweenRunsScene.KeyRoute.Game, BetweenRunsScene.Route(menu, Keys.Escape));
+
+        // Walked through the screen itself, built with no window over a new campaign,
+        // the tutorial chosen, its campaign in slot 2: its host records what it is
+        // asked for.
+        var host = new RecordingHost();
+        var scene = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), host, shownWhole: 0);
+        Assert.Equal((0, false), (scene.Chosen, scene.MenuOpen));
+        Assert.True(scene.HandleEscape());
+        Assert.True(scene.MenuOpen);
+        foreach (var key in new[] { Keys.Enter, Keys.KeyPadEnter, Keys.W, Keys.S, Keys.Up, Keys.Down })
+            scene.OnKey(key);
+        Assert.Equal((0, true, 0), (host.Descended.Count, scene.MenuOpen, scene.Chosen));   // nothing descended, or moved, behind the menu
+
+        // The menu names the campaign's slot under its options. 2 asks the host to
+        // save — between runs is always a safe point — and the menu stays up; what
+        // the save came to, once the host has written it, is drawn inside the menu,
+        // green, over the hub, clear of the keys line along the bottom of a
+        // 720-pixel window, until the next key.
+        string savesLine = DungeonHud.PauseSavesLine(scene.SavesInto);
+        Assert.Equal("PROGRESS SAVES TO SLOT 2 AT EVERY TURN", savesLine);
+        scene.OnKey(Keys.D2);
+        Assert.Equal((1, true, (string?)null), (host.HandSaves, scene.MenuOpen, scene.MenuAnswer));
+        scene.SlotSaved(CampaignBoot.SavedTo(Named(2)));
+        Assert.Equal("SAVED TO SLOT 2", scene.MenuAnswer);
+        var menuRows = DungeonHud.PauseMenuLayout(1280f, 720f, PauseMenu.Options(hasTitle: true), canSave: true, savesLine, scene.MenuAnswer);
+        Assert.Contains(menuRows, row => row.Text == "SAVED TO SLOT 2" && row.Color == DungeonHud.Green);
+        Assert.Contains(menuRows, row => row.Text == savesLine && row.Color == DungeonHud.Grey);
+        Assert.True(menuRows.Max(row => row.Bottom) <= 720f - BetweenRunsHud.KeysLineFromBottom, "the menu runs into the keys line");
+        scene.OnKey(Keys.X);
+        Assert.Null(scene.MenuAnswer);
+
+        // ESC closes the menu, and closed, the hub is the hub again: ENTER descends.
+        Assert.True(scene.HandleEscape());
+        Assert.False(scene.MenuOpen);
+        Assert.Equal(1, host.HandSaves);
+        scene.OnKey(Keys.Enter);
+        Assert.Equal(["tutorial"], host.Descended);
+
+        // 3 leaves play for the title, through the host, and the screen is on its way
+        // out: nothing after it is read.
+        var leaving = new RecordingHost();
+        var quitting = new BetweenRunsScene(game: null!, CampaignRuns.Campaign(), leaving, shownWhole: 0);
+        quitting.HandleEscape();
+        quitting.OnKey(Keys.D3);
+        Assert.Equal(1, leaving.QuitsToTitle);
+        quitting.OnKey(Keys.D2);
+        quitting.OnKey(Keys.Enter);
+        Assert.Equal((0, 0), (leaving.HandSaves, leaving.Descended.Count));
+        Assert.True(quitting.HandleEscape());
     }
 }

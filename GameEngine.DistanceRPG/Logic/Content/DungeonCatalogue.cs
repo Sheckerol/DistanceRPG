@@ -17,18 +17,20 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <para>
 /// <strong>Built from the instances it is handed, never from
 /// <see cref="GameContent.Current"/>.</strong> <see cref="GameContent.Load"/>
-/// runs inside <c>Current</c>'s own static initialiser, where <c>Current</c>
-/// is not yet assigned, and under a test's content swap it is the content
-/// being replaced: a table computed off it would fail at startup or, worse,
-/// describe the previous relations. So the rules and the weapon catalogue
-/// come in by constructor, and a <c>restricted.json</c> edit moves a table
-/// with no dungeon edit anywhere — which is the point of computing it.
+/// may be the load of the very content <c>Current</c> opens on, and under a
+/// test's content swap it is the content being replaced: a table computed off
+/// it would re-enter the load or, worse, describe the previous relations. So
+/// the rules, the weapon catalogue and the tuning come in by constructor, and a
+/// <c>restricted.json</c> edit moves a table with no dungeon edit anywhere —
+/// which is the point of computing it.
 /// </para>
 /// <para>
 /// A class's variants are read as <see cref="WeaponDef"/> spreads — a martial
 /// class's one per role through <see cref="WeaponCatalogue.Variant"/>, a
-/// caster's through <see cref="LootTable.CasterVariants"/> — and never
-/// instantiated, so loading content still builds no <see cref="Weapon"/>.
+/// caster's through the drop order its class row names
+/// (<see cref="WeaponClassDef.DropOrder"/>) — each asked of the kind its class
+/// row gives it (<see cref="WeaponCatalogue.KindOf"/>), and never instantiated,
+/// so loading content still builds no <see cref="Weapon"/>.
 /// Every class is asked about every variant, because the variant is rolled
 /// after the class and a boss must never drop an ungrafted weapon.
 /// </para>
@@ -52,17 +54,18 @@ public sealed class DungeonCatalogue
     /// <param name="tuning">
     /// The scalars an unpinned boss floor range reads (<see cref="Tuning.BossFloorMin"/>,
     /// <see cref="Tuning.BossFloorMax"/>): <see cref="GameContent.Load"/> passes the
-    /// tuning it is loading, the one <paramref name="modifiers"/> was built on.
-    /// Null reads the compiled fallback, §5.3's rule for a missing key — never
-    /// the current content.
+    /// tuning it is loading, the one <paramref name="modifiers"/> was built on —
+    /// never the current content's, and there is no tuning in code to stand in
+    /// for it.
     /// </param>
     /// <exception cref="ContentException">A dungeon breaks one of the §5.8 rules (<see cref="ContentValidator.ValidateDungeons"/>).</exception>
-    public DungeonCatalogue(DungeonsData data, ModifierRules modifiers, WeaponCatalogue weapons, Tuning? tuning = null)
+    public DungeonCatalogue(DungeonsData data, ModifierRules modifiers, WeaponCatalogue weapons, Tuning tuning)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(modifiers);
         ArgumentNullException.ThrowIfNull(weapons);
-        _tuning = tuning ?? ContentDefaults.Tuning;
+        ArgumentNullException.ThrowIfNull(tuning);
+        _tuning = tuning;
 
         // Every modifier's table, not only the themes in the file: a table is
         // a fact about the relations and the weapons, asked of any modifier.
@@ -165,7 +168,7 @@ public sealed class DungeonCatalogue
         foreach (var cls in Enum.GetValues<WeaponClass>())
         {
             var variants = DropVariants(cls, weapons);
-            if (variants.Count > 0 && variants.All(v => TakesAsForged(theme, v, modifiers)))
+            if (variants.Count > 0 && variants.All(v => TakesAsForged(theme, v, modifiers, weapons)))
                 table.Add(cls);
         }
         return table.ToArray();
@@ -174,16 +177,16 @@ public sealed class DungeonCatalogue
     /// <summary>
     /// The variants a drop of <paramref name="cls"/> rolls between, as the loot
     /// table decodes its draw: a martial class's one per role, a caster's the
-    /// code-fixed <see cref="LootTable.CasterVariants"/> list. None for a class
+    /// drop order its class row names in <c>weapons.json</c>. None for a class
     /// the weapon file leaves out, which no boss can drop.
     /// </summary>
     private static IReadOnlyList<WeaponDef> DropVariants(WeaponClass cls, WeaponCatalogue weapons)
     {
         if (weapons.ByClass(cls).Count == 0)
             return [];
-        if (Weapon.KindOf(cls) != WeaponKind.Caster)
+        if (weapons.KindOf(cls) != WeaponKind.Caster)
             return Roles.Select(role => weapons.Variant(cls, role)).ToArray();
-        return LootTable.CasterVariants.TryGetValue(cls, out var ids)
+        return weapons.Class(cls).DropOrder is { } ids
             ? ids.Select(id => weapons[id]).ToArray()
             : [];
     }
@@ -191,12 +194,13 @@ public sealed class DungeonCatalogue
     /// <summary>
     /// Whether <paramref name="variant"/> as it drops can take <paramref name="theme"/>
     /// forged: the relations beside its forged spread, and the forge limit
-    /// (<see cref="ModifierRules.CanGraft"/>). A drop is forged and nothing else
-    /// when the graft lands, so its spread is both what is present and what is forged.
+    /// (<see cref="ModifierRules.CanGraft"/>), asked of the kind its class row in
+    /// <paramref name="weapons"/> gives it. A drop is forged and nothing else when
+    /// the graft lands, so its spread is both what is present and what is forged.
     /// </summary>
-    private static bool TakesAsForged(ModifierType theme, WeaponDef variant, ModifierRules modifiers)
+    private static bool TakesAsForged(ModifierType theme, WeaponDef variant, ModifierRules modifiers, WeaponCatalogue weapons)
     {
         var spread = ModifierSet.Of(variant.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
-        return modifiers.CanGraft(theme, Weapon.KindOf(variant.Class), spread, spread, asForged: true);
+        return modifiers.CanGraft(theme, weapons.KindOf(variant.Class), spread, spread, asForged: true);
     }
 }

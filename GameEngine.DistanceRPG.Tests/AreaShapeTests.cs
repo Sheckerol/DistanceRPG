@@ -5,11 +5,20 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// The four wand geometries (§1.4) in logic units: what each shape contains
 /// from where the caster stands and where it is aimed, that every shape stops
-/// at walls, and that the caster is never inside its own cast.
+/// at walls, and that the caster is never inside its own cast. Every case is
+/// worked out against the shapes' dimensions it was written against
+/// (<see cref="Premise"/>), made current for each test, so the content
+/// collection holds it; the shipped shapes are pinned to §1.4's table by
+/// <c>WeaponContentTests.WandShapes_MatchTheTable</c>.
 /// </summary>
-public class AreaShapeTests
+[Collection(TestContent.Collection)]
+public sealed class AreaShapeTests : IDisposable
 {
     private const float Tile = GameConstants.Tile;
+
+    private readonly IDisposable _premise = TestContent.UsePremise();
+
+    public void Dispose() => _premise.Dispose();
 
     private static readonly int[,] Open = new int[20, 20];
 
