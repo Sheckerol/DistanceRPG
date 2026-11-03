@@ -73,12 +73,15 @@ public class TurnEconomyTests
         Assert.Equal((20, 20, "swap"), spent[^1]);
         Assert.Equal(4, spent.Count);
 
-        // An empty slot is nothing to swap to, slot 0 is the equipped slot itself, and there is no slot 3.
+        // An empty slot is nothing to swap to (slots 2 and 3 are empty), slot 0 is the equipped slot itself,
+        // and there is no slot past the member's last.
         a.DistLeft = GameConstants.MaxDistance;
         Assert.Null(a.Inventory[2]);
         Assert.False(turns.CanSwap(a, 2));
         Assert.False(turns.CanSwap(a, 0));
+        Assert.Null(a.Inventory[3]);
         Assert.False(turns.CanSwap(a, 3));
+        Assert.False(turns.CanSwap(a, PartyMemberState.InventorySlots));
         Assert.False(turns.TrySwap(a, 2));
         Assert.Equal(GameConstants.MaxDistance, a.DistLeft);
 

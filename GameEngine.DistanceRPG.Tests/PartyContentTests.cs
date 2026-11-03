@@ -132,8 +132,11 @@ public class PartyContentTests
         Assert.Equal("D", bagged.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, bagged.Rule);
 
-        // One equipped plus three bagged is four weapons into three slots.
-        var deep = Rejected(With(3, m => m with { BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding"] }));
+        // One equipped plus six bagged is seven weapons into six slots.
+        var deep = Rejected(With(3, m => m with
+        {
+            BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword"],
+        }));
         Assert.Equal("D", deep.EntryId);
         Assert.Equal(ContentValidator.RulePartyBagFits, deep.Rule);
 

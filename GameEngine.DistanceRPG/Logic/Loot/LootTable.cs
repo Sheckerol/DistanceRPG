@@ -28,12 +28,21 @@ public sealed record Drop(Weapon Weapon, int DefeatCount, bool WasUniqueRoll);
 /// of this table's own, seeded per enemy.
 /// <para>
 /// <strong><see cref="Roll"/> is a pure function of
-/// <c>(enemy.Weapon.Class, enemy.DefeatCount, enemy.SpawnIndex, mapSeed)</c></strong>
+/// <c>(enemy.Weapon.Class, enemy.DefeatCount, enemy.SpawnIndex, enemy.Theme, mapSeed)</c></strong>
 /// and the loaded content. Nothing else: no collection order, no turn number, no
 /// party state. That is what makes a drop replayable from a save that stores
 /// only §5.1's fields, and what lets a floor re-derive a ground item nobody
 /// picked up rather than storing it — a re-derived drop is bit-identical because
-/// its inputs are.
+/// its inputs are. The theme is the dungeon's (§4.3) and re-derives from it, so
+/// a save stores nothing new for it.
+/// </para>
+/// <para>
+/// <strong>The boss's own drop is not rolled here</strong> (§4.3): it is a
+/// variant of any class its dungeon's theme can be forged onto, forged with the
+/// theme, carrying its guaranteed stacks — <see cref="BossLoot"/>, which takes
+/// this table's variant, innate and farm-landing steps rather than copying them.
+/// Which table a corpse is rolled on is the roster's to say (the turn system's
+/// drop feed), never a branch here.
 /// </para>
 /// <para>
 /// <strong>It is called at collection, never at defeat</strong> (§3.2: "nothing
@@ -97,8 +106,8 @@ public static class LootTable
     /// </summary>
     private const int NoNature = InnateStats.Low;
 
-    /// <summary>The variants a drop rolls between, counted off the code-fixed enum and never off the catalogue's length (see <see cref="StreamFor"/>).</summary>
-    private static readonly int Roles = Enum.GetValues<VariantRole>().Length;
+    /// <summary>The variants a drop rolls between, counted off the code-fixed enum and never off the catalogue's length (see <see cref="StreamFor"/>). The boss's drop draws its variant over the same count (<see cref="BossLoot"/>).</summary>
+    internal static readonly int Roles = Enum.GetValues<VariantRole>().Length;
 
     /// <summary>The four elements a wand's drop rolls between, in <see cref="DamageType"/> order: a code-fixed count, for the same reason.</summary>
     private static readonly DamageType[] Elements =
@@ -255,7 +264,8 @@ public static class LootTable
     /// on a hit, one entry of <see cref="DropOrder"/>;</item>
     /// <item>the <strong>farm investment</strong>: <c>DefeatCount</c> draws at
     /// <see cref="Tuning.DefeatStackChance"/>, each success landing uniformly on
-    /// one of the entries the weapon still has room in;</item>
+    /// one of the entries the weapon still has room in — its dungeon's theme
+    /// among them, last, where the weapon can hold it (<see cref="Eligible"/>);</item>
     /// <item>the <strong>unique roll</strong>, one draw against
     /// <see cref="FarmLadder.UniqueChancePermille"/>, which a win resolves to a
     /// unique of the dummy's class and discards the farm's investment for.</item>
@@ -263,8 +273,18 @@ public static class LootTable
     /// Every branch draws or does not draw by a rule that depends on saved state
     /// alone, so the pass is deterministic and the same enemy row rolls the same
     /// weapon on every run and on every machine.
+    /// <para>
+    /// <strong>The theme weights the drop and never hands it over</strong> (§4.3:
+    /// "a dungeon does not change what drops; it changes what the drops are
+    /// likely to grow"). The class, the variant and the entry it arrives with are
+    /// drawn before the theme is read at all; the theme is one more entry the
+    /// farm's stacks may land on, arriving acquired and capped at the acquired
+    /// headroom like any graft that is not forged. A row with no theme builds the
+    /// list Phase 3 built, entry for entry, and rolls exactly the drop it always
+    /// did.
+    /// </para>
     /// </summary>
-    /// <param name="enemy">The dummy being collected: its weapon's class, its <c>DefeatCount</c> and its <c>SpawnIndex</c>, and nothing else.</param>
+    /// <param name="enemy">The dummy being collected: its weapon's class, its <c>DefeatCount</c>, its <c>SpawnIndex</c> and its dungeon's <c>Theme</c>, and nothing else.</param>
     /// <param name="mapSeed">The floor's generation seed.</param>
     public static Drop Roll(EnemyState enemy, long mapSeed)
     {
@@ -281,29 +301,14 @@ public static class LootTable
         var variant = VariantOf(catalogue, cls, rng.NextInt(0, Roles - 1));
 
         // (2) The entry it arrives with. A staff's is already on the def.
-        DamageType? element = null;
-        EnchantmentDef? rolled = null;
-        if (cls == WeaponClass.Wand)
-        {
-            element = Elements[rng.NextInt(0, Elements.Length - 1)];
-        }
-        else if (cls != WeaponClass.Staff)
-        {
-            int chance = GameContent.Current.Tuning.DropEnchantChancePercent * PermillePerPercent;
-            if (rng.NextInt(0, Permille - 1) < chance)
-            {
-                var pool = DropOrder(cls);
-                if (pool.Count > 0)
-                    rolled = GameContent.Current.Enchantments[pool[rng.NextInt(0, pool.Count - 1)]];
-            }
-        }
+        var (element, rolled) = RollInnate(cls, rng);
 
         var weapon = catalogue.Instantiate(variant.Id, element, rolled);
 
         // (3) The farm: one draw per cycle at DefeatStackChance, then a uniform
         // draw over what still has room. Depth, never breadth — the list is what
-        // the weapon already carries — and the entries run out while the odds
-        // below never do.
+        // the weapon already carries, and the dungeon's theme — and the entries
+        // run out while the odds below never do.
         int bankedTiers = 0;
         var eligible = new List<ModifierType?>(Roles);
         for (int cycle = 0; cycle < defeatCount; cycle++)
@@ -311,24 +316,14 @@ public static class LootTable
             if (!FarmLadder.RollsAStack(rng))
                 continue;
 
-            Eligible(weapon, bankedTiers, eligible);
+            Eligible(weapon, bankedTiers, enemy.Theme, eligible);
             if (eligible.Count == 0)
                 continue;   // everything capped: the cycle is spent, which is what ends a farm
 
             var entry = eligible[rng.NextInt(0, eligible.Count - 1)];
-            if (entry is { } modifier)
-            {
-                weapon.Acquire(modifier, 1);
-            }
-            else
-            {
-                // A tier's worth of XP rather than a tier outright (§3.2): the
-                // same credit a trigger the dummy paid for would have made, so
-                // the farm has no path of its own into the ladder.
-                var innate = weapon.Enchantments[InnateIndex];
-                weapon.CreditEnchantment(InnateIndex, innate.XpToNextTier(NoNature), NoNature);
+            Land(weapon, entry);
+            if (entry is null)
                 bankedTiers++;
-            }
         }
 
         // (4) The unique. The draw is taken either way, so the stream stands in
@@ -359,9 +354,12 @@ public static class LootTable
     /// code-fixed draw indexes <see cref="CasterVariants"/>, an ordered id list
     /// held in code. Either way both the <em>count</em> and the <em>order</em>
     /// are fixed here rather than by the catalogue's, so appending a weapon
-    /// re-rolls nobody and reordering the file moves nobody.
+    /// re-rolls nobody and reordering the file moves nobody. The boss's drop
+    /// decodes its own variant draw here too (<see cref="BossLoot"/>), which is
+    /// what keeps its table computed over the variants a drop can actually roll
+    /// (<see cref="DungeonCatalogue.ThemeClasses"/>).
     /// </summary>
-    private static WeaponDef VariantOf(WeaponCatalogue catalogue, WeaponClass cls, int index)
+    internal static WeaponDef VariantOf(WeaponCatalogue catalogue, WeaponClass cls, int index)
     {
         if (Weapon.KindOf(cls) != WeaponKind.Caster)
             return catalogue.Variant(cls, (VariantRole)index);
@@ -375,6 +373,34 @@ public static class LootTable
     }
 
     /// <summary>
+    /// The entry a drop arrives with (§3.1), the pass's second question, drawn on
+    /// <paramref name="rng"/> exactly where <see cref="Roll"/> draws it: a wand
+    /// draws one of the four elements, a staff draws nothing (its effect is on
+    /// the def), and everything else rolls <see cref="Tuning.DropEnchantChancePercent"/>
+    /// and, on a hit, one entry of <see cref="DropOrder"/>. The boss's drop asks
+    /// it too (<see cref="BossLoot"/>), so a drop is a drop whoever it came off.
+    /// </summary>
+    /// <returns>A wand's element, or null; the martial entry rolled, or null.</returns>
+    internal static (DamageType? Element, EnchantmentDef? Rolled) RollInnate(WeaponClass cls, Mulberry32 rng)
+    {
+        ArgumentNullException.ThrowIfNull(rng);
+
+        if (cls == WeaponClass.Wand)
+            return (Elements[rng.NextInt(0, Elements.Length - 1)], null);
+        if (cls == WeaponClass.Staff)
+            return (null, null);
+
+        int chance = GameContent.Current.Tuning.DropEnchantChancePercent * PermillePerPercent;
+        if (rng.NextInt(0, Permille - 1) >= chance)
+            return (null, null);
+
+        var pool = DropOrder(cls);
+        return pool.Count > 0
+            ? (null, GameContent.Current.Enchantments[pool[rng.NextInt(0, pool.Count - 1)]])
+            : (null, null);
+    }
+
+    /// <summary>
     /// What a farm cycle may land on, rebuilt into <paramref name="into"/> each
     /// time because what is capped changes as the farm runs.
     /// <para>
@@ -382,8 +408,11 @@ public static class LootTable
     /// draw is a uniform index into it: the weapon's forged modifier types first,
     /// in <see cref="ModifierType"/> order (which
     /// <see cref="ModifierSet.Entries"/> already yields), then the enchantment
-    /// entry last. Putting the entry first instead would change which entry every
-    /// hit on every farmed weapon landed on, with nothing in the suite noticing.
+    /// entry, then the dungeon's theme last of all. Putting the entry first
+    /// instead would change which entry every hit on every farmed weapon landed
+    /// on, with nothing in the suite noticing; appending the theme after
+    /// everything Phase 3 listed keeps what every existing index <em>means</em>,
+    /// and a row with no theme builds Phase 3's list exactly.
     /// </para>
     /// <para>
     /// A modifier is eligible while it is below <see cref="ModifierRules.Cap"/>
@@ -393,11 +422,31 @@ public static class LootTable
     /// than throwing at it. The enchantment entry is eligible until
     /// <see cref="Tuning.AcquiredHeadroom"/> tiers have been banked through it:
     /// the entry's own tier has no ceiling (§3.3), only the farm's contribution
-    /// to it does, and it leaves the draw exactly as a capped modifier does.
+    /// to it does, and it leaves the draw exactly as a capped modifier does. A
+    /// unique entry never is — a soul is pinned at tier 1, so a tier's worth
+    /// banked into it would buy nothing. No weapon this table rolls a farm onto
+    /// carries one (a unique is only ever the end of the pass); the boss's drop,
+    /// which may be a unique by arithmetic before its stacks land, can.
+    /// </para>
+    /// <para>
+    /// <strong>The theme</strong> (§4.3, <see cref="EnemyState.Theme"/>) joins
+    /// the list as one entry — weighting it, never handing it over — only while
+    /// the weapon is not forged with it (then it is already listed, as its own
+    /// depth), the relations allow it beside what the weapon carries (an axe in a
+    /// Brace dungeon never offers Brace: its forged Opportunist excludes it, and
+    /// the stack lands elsewhere), and it is below its cap over nothing forged —
+    /// the acquired headroom, 5. So a theme an ordinary drop grows arrives
+    /// acquired, shallower than the boss's forged graft.
     /// </para>
     /// </summary>
-    private static void Eligible(Weapon weapon, int bankedTiers, List<ModifierType?> into)
+    /// <param name="weapon">The drop, as it stands so far.</param>
+    /// <param name="bankedTiers">Tiers already banked through the enchantment entry on this drop.</param>
+    /// <param name="theme">The dungeon's theme, or null for a row no dungeon placed — which leaves the list Phase 3's.</param>
+    /// <param name="into">The list to rebuild.</param>
+    internal static void Eligible(Weapon weapon, int bankedTiers, ModifierType? theme, List<ModifierType?> into)
     {
+        ArgumentNullException.ThrowIfNull(weapon);
+        ArgumentNullException.ThrowIfNull(into);
         var rules = GameContent.Current.Modifiers;
         into.Clear();
 
@@ -405,8 +454,34 @@ public static class LootTable
             if (weapon.Modifiers.Stacks(type) < rules.Cap(type, forged) && rules.Allowed(type, weapon.Kind, weapon.Modifiers))
                 into.Add(type);
 
-        if (weapon.Enchantments.Count > InnateIndex && bankedTiers < rules.AcquiredHeadroom)
-            into.Add(null);   // the enchantment entry, always last
+        if (weapon.Enchantments.Count > InnateIndex && !weapon.Enchantments[InnateIndex].Unique && bankedTiers < rules.AcquiredHeadroom)
+            into.Add(null);   // the enchantment entry, after the modifiers
+
+        if (theme is { } t && weapon.Forged.Stacks(t) == 0
+            && weapon.Modifiers.Stacks(t) < rules.Cap(t, 0) && rules.Allowed(t, weapon.Kind, weapon.Modifiers))
+            into.Add(t);      // the dungeon's theme, always last
+    }
+
+    /// <summary>
+    /// One of the farm's stacks landed on <paramref name="entry"/> (§3.2): a
+    /// modifier gains an acquired stack; the enchantment entry (null) banks a
+    /// tier's worth of XP rather than a tier outright — the same credit a trigger
+    /// the wielder paid for would have made, so the farm has no path of its own
+    /// into the ladder. The caller counts the tiers banked, against
+    /// <see cref="Eligible"/>'s ceiling. The boss's guaranteed stacks land here
+    /// too (<see cref="BossLoot"/>): distributed exactly as a farm's are.
+    /// </summary>
+    internal static void Land(Weapon weapon, ModifierType? entry)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        if (entry is { } modifier)
+        {
+            weapon.Acquire(modifier, 1);
+            return;
+        }
+
+        var innate = weapon.Enchantments[InnateIndex];
+        weapon.CreditEnchantment(InnateIndex, innate.XpToNextTier(NoNature), NoNature);
     }
 
     /// <summary>
@@ -440,9 +515,10 @@ public static class LootTable
     /// Whether <paramref name="def"/> is a wand whose element is still open, and
     /// so takes the one the drop already rolled. A wand unique that names its own
     /// element takes none — handing it a second would be refused — and everything
-    /// else takes none either.
+    /// else takes none either. The boss's drop asks it of a unique its graft
+    /// arrives at (<see cref="BossLoot"/>).
     /// </summary>
-    private static bool NeedsAnElement(WeaponDef def)
+    internal static bool NeedsAnElement(WeaponDef def)
     {
         if (def.Class != WeaponClass.Wand)
             return false;

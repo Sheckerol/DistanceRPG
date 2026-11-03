@@ -20,4 +20,10 @@ internal sealed class ReactionPool
 
     /// <summary>A new turn: every reaction's uses are restored.</summary>
     public void Reset() => _uses.Clear();
+
+    /// <summary>Every (actor, reaction) that has spent a use since the last <see cref="Reset"/>, and how many: what a floor's turn system hands on when the party takes the stairs (<see cref="TurnCarry"/>).</summary>
+    public IEnumerable<KeyValuePair<(ActorState Actor, ModifierType Type), int>> SpentUses => _uses;
+
+    /// <summary>An actor's uses of <paramref name="type"/> as a carry brought them from another floor this same turn: what it spent stays spent.</summary>
+    public void RestoreUses(ActorState actor, ModifierType type, int used) => _uses[(actor, type)] = used;
 }

@@ -1,8 +1,11 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// Gameplay state of the training-dummy enemy, ported from the prototype.
-/// Position is the circle centre in logic space.
+/// Gameplay state of an enemy: the training dummy ported from the prototype,
+/// and — built to its dungeon's statline, with a name, a movement budget and
+/// modifiers of its own (<see cref="DungeonState.BossRow"/>) — the boss waiting
+/// on a dungeon's bottom floor (§4.3), which is a row like any dummy's in every
+/// other respect. Position is the circle centre in logic space.
 /// </summary>
 public sealed class EnemyState : ActorState
 {
@@ -10,7 +13,8 @@ public sealed class EnemyState : ActorState
     public const string DefaultWeaponId = "arming_sword";
 
     /// <summary>
-    /// A dummy's HP is the flat constant plus whatever its revivals have added
+    /// An enemy's HP is its base (<see cref="BaseMaxHp"/> — a dummy's flat
+    /// constant, a boss's statline) plus whatever its revivals have added
     /// (<see cref="RevivalMaxHp"/>, §3.2), and it spawns full: unwritten HP reads
     /// as this (<see cref="ActorState.Hp"/>), so no constructor copies it.
     /// <para>
@@ -21,7 +25,66 @@ public sealed class EnemyState : ActorState
     /// one you cannot at 10.
     /// </para>
     /// </summary>
-    public override int MaxHp => GameConstants.DummyHp + RevivalMaxHp;
+    public override int MaxHp => BaseMaxHp + RevivalMaxHp;
+
+    /// <summary>
+    /// The HP this enemy has before any revival adds to it: the flat
+    /// <see cref="GameConstants.DummyHp"/> for rank and file, and its dungeon's
+    /// statline for a boss (§5.8 — the golem's 80, <see cref="DungeonState.BossRow"/>).
+    /// Settable like every field a row is restored from, though a save need not
+    /// store a boss's: it re-derives from content (§5.1).
+    /// </summary>
+    public int BaseMaxHp { get; set; } = GameConstants.DummyHp;
+
+    /// <summary>
+    /// How far this enemy moves in a turn, in logic units (32 per tile): the
+    /// standard <see cref="GameConstants.EnemyMove"/> for rank and file, and a
+    /// boss's statline for a boss (§5.8 — the golem's 40, slow in a game whose
+    /// party moves 160). Read wherever an enemy's turn budget is read — the walk
+    /// it plans, the mana an idle turn banks, the Mire legend over it — and
+    /// nowhere else: the attack-cost scale stays the standard budget's
+    /// (<c>EnemyMove / MaxDistance</c>), which converts the party's costs into an
+    /// enemy's, so a slower enemy buys fewer swings as well as fewer steps.
+    /// </summary>
+    public float MoveBudget { get; set; } = GameConstants.EnemyMove;
+
+    /// <summary>
+    /// The name its plate reads: a boss's (<see cref="BossDef.Name"/> — the Stone
+    /// Golem). Null for rank and file, whose plate names what they are by what
+    /// they hold: DUMMY, HEALER or CASTER.
+    /// </summary>
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// The dungeon's theme (§4.3, <see cref="DungeonDef.Theme"/>), on every enemy
+    /// the dungeon spawns — the boss's and every dummy's alike — and null on a
+    /// row no dungeon placed (a fixture). It is what every drop in the dungeon
+    /// <em>rolls for</em>: the theme joins the farm's roll pool as one more entry
+    /// (<see cref="LootTable.Roll"/>), weighting it rather than handing it over, so
+    /// an ordinary drop may grow it acquired and never forged. The boss's own drop
+    /// is forged with it instead (<see cref="BossLoot.Roll"/>).
+    /// <para>
+    /// The dungeon's and never the individual's, like <see cref="ActorState.Attunement"/>:
+    /// a save need not store it, since it re-derives from the dungeon (§5.1).
+    /// </para>
+    /// </summary>
+    public ModifierType? Theme { get; set; }
+
+    /// <summary>
+    /// The guaranteed stacks this enemy's drop carries (§4.3: one per floor past
+    /// four) — set on the boss row alone, by generation, from
+    /// <see cref="DungeonState.PromisedStacks"/>, and null on every other row. It
+    /// is how the boss floor "survives into the drop resolution": the count is
+    /// on the row, so a drop re-derived later in the visit, or after a load that
+    /// restored the row, pays exactly the stacks the visit promised at entry.
+    /// <para>
+    /// It is read by the boss's drop and decides nothing on its own: which table a
+    /// corpse is rolled on is the roster's to say (<see cref="TurnSystem"/>'s
+    /// drop feed for the actor it names as the boss), so a dummy handed a promise
+    /// by hand still rolls the ordinary drop.
+    /// </para>
+    /// </summary>
+    public int? PromisedStacks { get; set; }
 
     /// <summary>
     /// What this dummy adds to whatever it is holding: its accumulated revival
@@ -84,7 +147,10 @@ public sealed class EnemyState : ActorState
     /// carrying <em>and</em> how dangerous it has become, deliberately the same
     /// number (§3.2). Advanced by <see cref="FarmLadder.DefeatAdvance"/> when the
     /// Killed event settles — by 1, or by <see cref="Tuning.CleanKillBonus"/> for
-    /// a blow that dealt at least this dummy's <see cref="MaxHp"/>.
+    /// a blow that dealt at least this dummy's <see cref="MaxHp"/>. A boss's
+    /// advances by exactly 1 at its one death, however clean the blow: nobody
+    /// farms it, so the clean kill's bonus is not its to earn (the defeat feed
+    /// <see cref="TurnSystem"/> fixes for the roster's boss).
     /// </summary>
     public int DefeatCount { get; set; }
 
@@ -105,8 +171,9 @@ public sealed class EnemyState : ActorState
     /// <summary>
     /// Whether the weapon this dummy was carrying has been taken off the floor
     /// (§3.5). A permanent kill leaves a ground item that nothing stores: the row
-    /// above already fixes it, so a floor entry re-derives it through
-    /// <see cref="LootTable.Roll"/> and gets the identical weapon back
+    /// above already fixes it, so a floor entry re-derives it through the table
+    /// the roster fixed for it — <see cref="LootTable.Roll"/>, or the boss's
+    /// <see cref="BossLoot.Roll"/> — and gets the identical weapon back
     /// (<see cref="TurnSystem.GroundItemOf"/>).
     /// <para>
     /// This one flag is what retires the offer. Without it a save taken after a

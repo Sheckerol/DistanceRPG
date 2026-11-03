@@ -7,18 +7,34 @@ namespace GameEngine.DistanceRPG;
 
 /// <summary>
 /// Screen-space HUD for the dungeon scene, drawn with the engine's bitmap
-/// <see cref="TextRenderer"/>: movement/weapon readouts, the party selector,
-/// the enemy nameplates and their effect badges, the click and aim cues,
-/// floating combat text, the end-of-turn banner, the inventory panel, and the
-/// game-over screen. Every number it shows is a resolved one — a swing's cost
-/// after Light, a cast's mana after Resonant, a Block as the points it
-/// absorbs, a crit window as the roll it needs, Mire as the budget it leaves —
-/// never a percentage, a stack count or a base with a discount (§1.1, §1.7).
+/// <see cref="TextRenderer"/>: movement/weapon readouts, the floor line, the
+/// party selector, the enemy nameplates — a boss's among them — and their effect
+/// badges, the stairs' labels and the cue at the one underfoot, what lies on the
+/// floor (a corpse's drop, or a weapon the party put down), the click and aim
+/// cues, floating combat text, the end-of-turn banner, the inventory panel and
+/// its "leave" (X, then the slot), the pause menu and the way out's prompt with
+/// what leaving now means, the stairs' fade and the banner over it (the floor
+/// reached, the trade on the boss floor, the boss's fall), and the run's end —
+/// its summary, over the defeat screen when the party wiped, in the lines the
+/// between-runs screen repeats above the dungeon list (<see cref="BetweenRunsHud"/>).
+/// Every number it shows is a resolved one — a swing's cost
+/// after Light, a cast's mana after Resonant, a Block as the points it absorbs,
+/// a crit window as the roll it needs, Mire as the budget it leaves — never a
+/// percentage, a stack count or a base with a discount (§1.1, §1.7); and nothing
+/// it shows names how deep the dungeon goes before the party has reached the
+/// bottom (§4.3).
 /// </summary>
 public sealed class DungeonHud
 {
     private const float FloatingTextLife = 1.2f;
     private const float FloatingTextRise = 50f;
+
+    /// <summary>How long the arrival banner stays up, and the last stretch of it over which it fades.</summary>
+    private const float BannerSeconds = 2.4f;
+    private const float BannerFadeSeconds = 0.8f;
+
+    /// <summary>How long a banner with lines under it stays up — the boss floor's trade, the boss's fall: long enough to read them.</summary>
+    private const float WarningBannerSeconds = 5f;
 
     /// <summary>Pixels a character advances at scale 1: the 5-px glyph and its 1-px gap.</summary>
     private const float GlyphAdvance = 6f;
@@ -26,14 +42,22 @@ public sealed class DungeonHud
     /// <summary>Spaces between two runs drawn side by side.</summary>
     private const int RunGap = 2;
 
-    private static readonly Vector4 White = new(1f, 1f, 1f, 1f);
-    private static readonly Vector4 Yellow = new(1f, 0.87f, 0f, 1f);
-    private static readonly Vector4 Grey = new(0.6f, 0.6f, 0.65f, 1f);
-    private static readonly Vector4 DarkGrey = new(0.4f, 0.4f, 0.42f, 1f);
-    private static readonly Vector4 Red = new(1f, 0.27f, 0.27f, 1f);
-    private static readonly Vector4 Orange = new(0.96f, 0.65f, 0.14f, 1f);
-    private static readonly Vector4 Cyan = new(0.31f, 0.76f, 0.97f, 1f);
-    private static readonly Vector4 Green = new(0.27f, 0.87f, 0.47f, 1f);
+    // The HUD's palette, which the between-runs screen shares (BetweenRunsHud):
+    // a run's summary reads in the same colours on both screens.
+    internal static readonly Vector4 White = new(1f, 1f, 1f, 1f);
+    internal static readonly Vector4 Yellow = new(1f, 0.87f, 0f, 1f);
+    internal static readonly Vector4 Grey = new(0.6f, 0.6f, 0.65f, 1f);
+    internal static readonly Vector4 DarkGrey = new(0.4f, 0.4f, 0.42f, 1f);
+    internal static readonly Vector4 Red = new(1f, 0.27f, 0.27f, 1f);
+    internal static readonly Vector4 Orange = new(0.96f, 0.65f, 0.14f, 1f);
+    internal static readonly Vector4 Cyan = new(0.31f, 0.76f, 0.97f, 1f);
+    internal static readonly Vector4 Green = new(0.27f, 0.87f, 0.47f, 1f);
+
+    /// <summary>Where a farmed count's colour ends up (<see cref="ThreatColor"/>): a red past the hit colour's, the deepest farm on the floor.</summary>
+    private static readonly Vector4 DeepRed = new(1f, 0.12f, 0.1f, 1f);
+
+    /// <summary>A boss's name over its plate: the pale of the stone its golem is cut from, and no other enemy's colour.</summary>
+    private static readonly Vector4 Stone = new(0.87f, 0.85f, 0.77f, 1f);
 
     private readonly Game _game;
     private readonly TextRenderer _text = new();
@@ -43,21 +67,100 @@ public sealed class DungeonHud
     /// <summary>One coloured piece of HUD text; runs drawn side by side read as one line.</summary>
     public readonly record struct Run(string Text, Vector4 Color);
 
-    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset)
+    /// <summary>A line rising over a world position, and fading as it rises.</summary>
+    /// <param name="Speaker">Whoever it answers for, on the answer to a key or a click (<see cref="AddAnswer"/>); null on everything else.</param>
+    private sealed record FloatingText(Vector3 WorldPos, IReadOnlyList<Run> Runs, float PixelYOffset, object? Speaker = null)
     {
         public float Age;
     }
 
     private readonly List<FloatingText> _floatingTexts = new();
 
+    /// <summary>
+    /// A banner across the upper third of the screen: a small line over it, the
+    /// line itself, any lines of warning under it, and how long it stays up.
+    /// </summary>
+    private sealed record Banner(string Over, string Main, IReadOnlyList<string> Under, float Seconds);
+
+    // The banner up now (ShowArrival, ShowBossFall), and how long it has been up —
+    // taken down early (HideArrival) the moment the party starts off the floor it
+    // speaks of.
+    private Banner? _banner;
+    private float _bannerAge;
+
     public DungeonHud(Game game)
     {
         _game = game;
     }
 
+    /// <summary>
+    /// Put the arrival banner up for the floor <paramref name="visit"/> now
+    /// stands on — <c>FLOOR 2</c>, the dungeon's name over it — for
+    /// <see cref="BannerSeconds"/>. Drawn over the stairs' fade, so it is there
+    /// at black and the floor comes up under it. On the boss floor, with the boss
+    /// still standing, the trade is stated under it before the fight
+    /// (<see cref="BossFloorBanner"/>), and it stays up long enough to read.
+    /// </summary>
+    public void ShowArrival(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        var trade = BossFloorBanner(visit);
+        _banner = new Banner(visit.Def.Name.ToUpperInvariant(), ArrivalBanner(visit), trade,
+            trade.Count > 0 ? WarningBannerSeconds : BannerSeconds);
+        _bannerAge = 0f;
+    }
+
+    /// <summary>
+    /// The boss is down (§4.3): the banner says who fell and what that means —
+    /// nothing revives, and the way out is back up through everything farmed
+    /// (<see cref="BossFalls"/>) — and what it left lying there, forged with its
+    /// dungeon's theme (<see cref="BossDropLine"/>), when its drop is down.
+    /// </summary>
+    /// <param name="boss">The boss that fell.</param>
+    /// <param name="drop">What it left on the floor, or null when there is nothing to name.</param>
+    public void ShowBossFall(EnemyState boss, Drop? drop = null)
+    {
+        ArgumentNullException.ThrowIfNull(boss);
+        var (headline, aftermath) = BossFalls(boss);
+        IReadOnlyList<string> under = drop is null ? [aftermath] : [aftermath, BossDropLine(drop, boss.Theme)];
+        _banner = new Banner("", headline, under, WarningBannerSeconds);
+        _bannerAge = 0f;
+    }
+
+    /// <summary>
+    /// Take the banner down before its time — the arrival's, or the boss's fall:
+    /// the party is starting off the floor it speaks of, down or up the stairs or
+    /// out by the way out. The banner is drawn over the stairs' fade, which is
+    /// what puts the next floor's up at black; left up, the floor being left would
+    /// go on naming itself on that black — until the swap on the stairs, and
+    /// through the whole fade to the screen between runs on the way out. The next
+    /// <see cref="ShowArrival"/> puts one up as ever.
+    /// </summary>
+    public void HideArrival() => _banner = null;
+
+    /// <summary>Drop every floating text in the air: they hang over the floor being left, and nothing on the next floor is where they point.</summary>
+    public void ClearFloatingTexts() => _floatingTexts.Clear();
+
     /// <summary>Spawn combat text above a world position, rising and fading out.</summary>
     public void AddFloatingText(Vector3 worldPos, string text, Vector4 color, float pixelYOffset = 0f)
         => _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset));
+
+    /// <summary>
+    /// Spawn the answer to a key or a click over <paramref name="speaker"/>: why it
+    /// did nothing, or what it just did. It takes the place of any answer still
+    /// rising over the same speaker, so there is one answer a speaker, the latest.
+    /// A refusal and the act that follows it never stack on one spot. Without this,
+    /// <c>SLOT 3 IS EMPTY</c> and then <c>LEFT HATCHET HERE</c> would stack over the
+    /// member at the middle of the screen, which is where the open bag's panel is.
+    /// Every other rising line (a hit, a beat, a level) is left alone.
+    /// </summary>
+    /// <param name="speaker">Whoever the answer is said over: the scene object it rises from.</param>
+    public void AddAnswer(object speaker, Vector3 worldPos, string text, Vector4 color, float pixelYOffset)
+    {
+        ArgumentNullException.ThrowIfNull(speaker);
+        _floatingTexts.RemoveAll(ft => ReferenceEquals(ft.Speaker, speaker));
+        _floatingTexts.Add(new FloatingText(worldPos, [new Run(text, color)], pixelYOffset, speaker));
+    }
 
     /// <summary>
     /// Spawn one line of differently coloured pieces above a world position,
@@ -78,6 +181,13 @@ public sealed class DungeonHud
             if (_floatingTexts[i].Age >= FloatingTextLife)
                 _floatingTexts.RemoveAt(i);
         }
+
+        if (_banner is not null)
+        {
+            _bannerAge += deltaTime;
+            if (_bannerAge >= _banner.Seconds)
+                _banner = null;
+        }
     }
 
     public void Render(Camera camera, DungeonScene scene)
@@ -93,6 +203,7 @@ public sealed class DungeonHud
         int h = _game.ClientSize.Y;
         var turns = scene.Turns;
         var active = scene.ActiveCharacter.State;
+        var ended = scene.ActiveMenu == GameMenu.RunSummary ? scene.EndedRun : null;
 
         // Dim layers go first so all text draws on top of them.
         if (turns.Phase == TurnPhase.GameOver)
@@ -101,12 +212,28 @@ public sealed class DungeonHud
             _fade.Draw(_game.ShaderManager, 0.65f);
 
         DrawTopReadouts(w, active, turns);
+        DrawFloorLine(scene.Visit);
         DrawPartySelector(scene);
-        DrawEnemyLabels(camera, scene, w, h);
-        DrawGroundItems(camera, scene, w, h);
-        DrawAllyCue(camera, scene, w, h);
-        DrawFloatingTexts(camera, w, h);
-        DrawAimCue(scene);
+        if (ended is null)
+        {
+            // The world's own labels: the plates, the stairs, what lies on the
+            // floor. Every menu is drawn clear of them. Over the dimmed floor they
+            // would read as the menu's own lines: a weapon just put down would be
+            // named across the bag's slots, and the way out's label would sit in
+            // its own question. None of them is what the menu is asking about.
+            // The rising lines stay, because a key pressed in the bag answers
+            // there, one answer at a time (AddAnswer).
+            // A run's summary is drawn clear of all of it: the run is over.
+            if (!scene.AnyMenuOpen)
+            {
+                DrawEnemyLabels(camera, scene, w, h);
+                DrawStairs(camera, scene, w, h);
+                DrawGroundItems(camera, scene, w, h);
+            }
+            DrawAllyCue(camera, scene, w, h);
+            DrawFloatingTexts(camera, w, h);
+            DrawAimCue(scene);
+        }
 
         if (turns.Phase == TurnPhase.TurnEnding)
         {
@@ -116,21 +243,37 @@ public sealed class DungeonHud
         }
 
         if (scene.InventoryOpen)
-            DrawInventory(w, h, active, turns);
+            DrawInventory(w, h, active, turns, scene.LeaveArmed);
 
         if (scene.PauseMenuOpen)
-            DrawMenu(w, h, turns.ResurrectionActive);
+            DrawMenu(w, h);
 
-        if (turns.Phase == TurnPhase.GameOver)
+        if (scene.ActiveMenu == GameMenu.ConfirmLeave)
+            DrawConfirmLeave(w, h, scene.Visit);
+
+        if (ended is not null)
         {
-            DrawCentered(w, h / 2f - 60f, "GAME OVER", 6f, Red);
-            DrawCentered(w, h / 2f + 20f, "PRESS ESC TO QUIT", 2f, Grey);
+            DrawRunSummary(w, h, ended);   // a wipe's included: its headline is the defeat
+        }
+        else if (turns.Phase == TurnPhase.GameOver)
+        {
+            DrawCentered(w, h / 2f - 60f, DefeatHeadline, 6f, Red);
+            DrawCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
         }
         else
         {
             DrawCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
         }
 
+        _text.Flush(_game.ShaderManager);
+
+        // The stairs' fade goes over everything drawn so far, the world and the
+        // HUD alike — the floor line changes at black, never in view — and the
+        // banner over the fade, so the arrival's is up at black and the new floor
+        // comes in under it. Only ever the new floor's: the banner of the floor
+        // being left came down when its fade began (HideArrival).
+        _fade.Draw(_game.ShaderManager, scene.TransitFade);
+        DrawBanner(scene, w, h);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -168,6 +311,357 @@ public sealed class DungeonHud
         return actor.PaidLocks > 0
             ? $"MANA: {actor.Mana} / {actor.UsableMaxMana} ({actor.MaxMana})"
             : $"MANA: {actor.Mana} / {actor.MaxMana}";
+    }
+
+    // ── The floor, its stairs, and leaving ──────────────────────────────────
+
+    /// <summary>The floor line, top left: which dungeon, which floor (<see cref="FloorLine"/>).</summary>
+    private void DrawFloorLine(DungeonState visit)
+        => _text.DrawText(FloorLine(visit), 14f, 14f, 1.5f, Cyan);
+
+    /// <summary>
+    /// Where the party is, as the floor line prints it: the dungeon and the
+    /// floor <em>number</em> — the index plus one — <c>THE TUTORIAL - FLOOR 1</c>.
+    /// <strong>Never the depth</strong> (§4.3, PHASE4-024): the boss floor is
+    /// rolled at entry and not disclosed, the player learns it only by reaching
+    /// it, so the line is never "floor 3 of 7", never "3/7", and reads the same
+    /// on floor 3 of a five-floor visit as of a ten-floor one. That is what keeps
+    /// the depth from being scummed: nothing on screen tells a shallow roll from
+    /// a deep one before the bottom is under the party's feet.
+    /// <para>
+    /// Once the boss has fallen the line says what the dungeon has become, on
+    /// every floor for the rest of the visit — <c>THE TUTORIAL - FLOOR 1 - NOTHING
+    /// REVIVES</c> — since the climb out is fought against a floor that no longer
+    /// replenishes, and every corpse on it is lying on what it carried (§4.3).
+    /// </para>
+    /// </summary>
+    internal static string FloorLine(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        string line = $"{visit.Def.Name.ToUpperInvariant()} - {ArrivalBanner(visit)}";
+        return visit.BossDefeated ? $"{line} - {NothingRevives}" : line;
+    }
+
+    /// <summary>What the dungeon is once its boss is down (§4.3): said on the floor line, and in the boss's fall.</summary>
+    private const string NothingRevives = "NOTHING REVIVES";
+
+    /// <summary>A boss by the name its plate reads, for the lines that speak of it: <c>STONE GOLEM</c>.</summary>
+    private static string BossName(EnemyState boss) => boss.Title?.ToUpperInvariant() ?? "BOSS";
+
+    /// <summary>
+    /// The trade the boss floor states before the fight (§4.3, settled's backlog:
+    /// "surface the boss-floor lockout/re-roll trade-off ... before a player
+    /// commits"), under its arrival banner: who waits here, and what beating it
+    /// costs — the tutorial closes for good (§4.3: it is the one dungeon the game
+    /// is allowed to warn you about); any other dungeon locks for
+    /// <see cref="DungeonState.LockRuns"/> — as many runs as its floor, at the
+    /// shipped tuning — while leaving without the fight re-rolls the depth for
+    /// next time (PHASE4-026), said only where the dungeon's range spans more
+    /// than one floor (<see cref="DungeonCatalogue.HasFixedDepth"/>), so it never
+    /// promises a re-roll that cannot happen. The number is the visit's, never
+    /// worked out here: the lock a clear writes is <c>RunCounter + LockRuns</c>,
+    /// the same rule, so the promise cannot drift from what is applied. The depth
+    /// is the party's to know by now: they are standing on it.
+    /// <para>
+    /// Empty everywhere else — above the bottom, where saying so would disclose
+    /// how deep the dungeon goes (PHASE4-024), and on the bottom once the boss is
+    /// down, when there is no trade left to make.
+    /// </para>
+    /// </summary>
+    internal static IReadOnlyList<string> BossFloorBanner(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        if (visit.Current.Boss is not { Alive: true } boss || visit.BossDefeated)
+            return [];
+
+        string waits = $"THE {BossName(boss)} WAITS ON THIS FLOOR";
+        string dungeon = visit.Def.Name.ToUpperInvariant();
+        if (visit.Def.RetiresOnClear)
+            return [waits, $"BEATING IT CLOSES {dungeon} FOR GOOD"];
+
+        string locks = $"BEATING IT LOCKS {dungeon} FOR {Runs(visit.LockRuns)}";
+        return GameContent.Current.Dungeons.HasFixedDepth(visit.Def)
+            ? [waits, locks]   // as deep on every visit: leaving re-rolls nothing
+            : [waits, locks, "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS"];
+    }
+
+    /// <summary>
+    /// What the boss's fall says (§4.3): who fell, and what it means —
+    /// <c>THE STONE GOLEM FALLS</c>, then <c>NOTHING REVIVES - FIGHT YOUR WAY OUT</c>:
+    /// the farm is over, the dungeon is finite, and the boss does not end the run
+    /// (§4.4) — the party turns round and climbs back through everything it farmed.
+    /// </summary>
+    internal static (string Headline, string Aftermath) BossFalls(EnemyState boss)
+    {
+        ArgumentNullException.ThrowIfNull(boss);
+        return ($"THE {BossName(boss)} FALLS", $"{NothingRevives} - FIGHT YOUR WAY OUT");
+    }
+
+    /// <summary>
+    /// What the boss left on the floor, as its fall states it (§4.3): the weapon,
+    /// and what makes it the boss's — <c>DROPPED: HUNTING BOW - FORGED WITH
+    /// BLOCK</c>, the theme forged onto whatever class it came as. When the graft
+    /// made it its class's unique the line says that instead — <c>DROPPED: THE
+    /// BULWARK - UNIQUE</c> — the unique being the theme at its deepest.
+    /// </summary>
+    /// <param name="drop">The boss's drop.</param>
+    /// <param name="theme">The boss's dungeon's theme; null names the weapon alone.</param>
+    internal static string BossDropLine(Drop drop, ModifierType? theme)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        string name = drop.Weapon.Name.ToUpperInvariant();
+        if (drop.Weapon.Unique) return $"DROPPED: {name} - UNIQUE";
+        return theme is { } t ? $"DROPPED: {name} - FORGED WITH {ModifierName(t)}" : $"DROPPED: {name}";
+    }
+
+    /// <summary>
+    /// The beat a unique drop earns the moment it lands (§1.5): its name, called
+    /// out — <c>UNIQUE: THE BULWARK!</c> — however it came: the farm's lottery on
+    /// a permanent kill, or the boss's graft taking the Purity variant of its
+    /// theme's own class to ×3. Null for every other drop, which its gold-less
+    /// name on the floor says enough about.
+    /// </summary>
+    internal static string? UniqueBeat(Drop drop)
+    {
+        ArgumentNullException.ThrowIfNull(drop);
+        return drop.Weapon.Unique ? $"UNIQUE: {drop.Weapon.Name.ToUpperInvariant()}!" : null;
+    }
+
+    /// <summary>A modifier by name in the HUD's capitals, its words apart: <c>BLOCK</c>, <c>CRIT WINDOW</c>, <c>LONGSHOT</c>.</summary>
+    internal static string ModifierName(ModifierType type)
+    {
+        string raw = type.ToString();
+        var name = new System.Text.StringBuilder(raw.Length + 2);
+        for (int i = 0; i < raw.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(raw[i]))
+                name.Append(' ');
+            name.Append(char.ToUpperInvariant(raw[i]));
+        }
+        return name.ToString();
+    }
+
+    /// <summary>The arrival banner's line: <c>FLOOR 2</c>, the floor number reached and nothing about how many there are (§4.3).</summary>
+    internal static string ArrivalBanner(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        return $"FLOOR {visit.FloorIndex + 1}";
+    }
+
+    /// <summary>What each kind of stair is labelled, on its slab once its tile has been seen.</summary>
+    private static readonly IReadOnlyDictionary<Stair, string> StairLabels = new Dictionary<Stair, string>
+    {
+        [Stair.Down] = "STAIRS DOWN",
+        [Stair.Up] = "STAIRS UP",
+        [Stair.Exit] = "WAY OUT",
+    };
+
+    /// <summary>What E does on each kind of stair, when the party may take it: a verb with its key.</summary>
+    private static readonly IReadOnlyDictionary<Stair, string> StairVerbs = new Dictionary<Stair, string>
+    {
+        [Stair.Down] = "E: DESCEND",
+        [Stair.Up] = "E: CLIMB",
+        [Stair.Exit] = "E: LEAVE THE DUNGEON",
+    };
+
+    /// <summary>
+    /// A stair's label, by what it does: <c>STAIRS DOWN</c>, <c>STAIRS UP</c>,
+    /// and the first floor's up-stairs <c>WAY OUT</c> — the kind is the visit's
+    /// (<see cref="DungeonState.StairsOf"/>), so a label never says up where the
+    /// stair leads out.
+    /// </summary>
+    internal static string StairLabel(Stair kind)
+        => StairLabels.GetValueOrDefault(kind, kind.ToString().ToUpperInvariant());
+
+    /// <summary>
+    /// The cue at the stair the active member stands on, given what the visit
+    /// said to it (<see cref="DungeonState.CanUse"/>): the stair's verb with its
+    /// key when the party may take it — <c>E: DESCEND</c>, <c>E: CLIMB</c>,
+    /// <c>E: LEAVE THE DUNGEON</c> — or, with the party short, how short it is,
+    /// <c>GATHER THE PARTY - 2 OF 4 HERE</c>: <paramref name="gathered"/> of the
+    /// <paramref name="living"/> members within reach of it, the fallen counted
+    /// in neither, since they are carried. Null when it is not the party's turn:
+    /// the cue is drawn only in the player phase, and there E says nothing.
+    /// </summary>
+    internal static string? StairCue(StairUse stair, StairRefusal? refusal, int gathered, int living) => refusal switch
+    {
+        null => StairVerbs.GetValueOrDefault(stair.Kind, $"E: {stair.Kind.ToString().ToUpperInvariant()}"),
+        StairRefusal.PartyNotGathered => $"GATHER THE PARTY - {gathered} OF {living} HERE",
+        _ => null,
+    };
+
+    /// <summary>
+    /// The question the way out asks before the party leaves, with the keys
+    /// that answer it — never a number key, since 2 on the pause menu is the
+    /// exit from the game.
+    /// </summary>
+    internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
+
+    // A stair's label and its cue hang under the near edge of its tile — the
+    // edge toward the camera, which looks up the map (-Z) — so at any zoom they
+    // clear the slab, whoever stands on it, the nameplate of a dummy standing
+    // on it, and a ground item's name and PRESS G on the same tile.
+    private const float StairLabelOffset = 6f;
+    private const float StairCueOffset = 22f;
+
+    /// <summary>
+    /// Each stair of the floor, labelled in its colour once its tile has been
+    /// seen — explored, it shows through the shroud, and its label is how the way
+    /// back is found — and at the stair the active member stands on, what E
+    /// would do there, or why not (<see cref="DungeonScene.ActiveStairPrompt"/>).
+    /// Never under a menu (<see cref="Render"/>): standing on the way out, its label
+    /// would land among the lines under the way out's own question.
+    /// </summary>
+    private void DrawStairs(Camera camera, DungeonScene scene, int w, int h)
+    {
+        var seen = scene.Visit.Current.Fog.Seen;
+        var prompt = scene.ActiveStairPrompt;
+        foreach (var marker in scene.StairMarkers)
+        {
+            var (r, c) = marker.Stair.Tile;
+            if (!seen[r, c]) continue;
+            var nearEdge = marker.Slab.Position + Vector3.UnitZ * (WorldSpace.UnitsPerTile / 2f);
+            if (!WorldToScreen(camera, nearEdge, w, h, out var px)) continue;
+
+            DrawCenteredAt(px.X, px.Y + StairLabelOffset, StairLabel(marker.Stair.Kind), 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
+            if (prompt is { } p && p.Stair == marker.Stair)
+                DrawCenteredAt(px.X, px.Y + StairCueOffset, p.Cue, 1.4f, p.Ready ? White : Grey);
+        }
+    }
+
+    /// <summary>"Leave the dungeon?", over the dimmed floor: the question with its keys, then what leaving now means (<see cref="LeavePreview"/>) — the last line, what it costs whatever else it means, in grey.</summary>
+    private void DrawConfirmLeave(int w, int h, DungeonState visit)
+    {
+        float top = h / 2f - 60f;
+        DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
+        var lines = LeavePreview(visit);
+        float y = top + 44f;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            DrawCentered(w, y, lines[i], 1.5f, i == lines.Count - 1 ? Grey : White);
+            y += 22f;
+        }
+    }
+
+    /// <summary>What every leave costs, whatever else it means: the visit, whole (§4.1).</summary>
+    private const string ResetLine = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+
+    /// <summary>
+    /// What leaving now means, under the way out's question (§4.4) — said before
+    /// the player commits, since the answer ends the run. With the boss down it
+    /// is a clear: <c>THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY</c>, and the
+    /// dungeon closes for good (the tutorial) or locks for as many runs as its
+    /// floor (<see cref="DungeonState.LockRuns"/>, the number the clear will
+    /// write). With it standing it is a retreat: <c>NO BOSS - A RETREAT: XP KEPT,
+    /// THE DEPTH RE-ROLLS</c> — the re-roll said only where there is one, so the
+    /// tutorial, two floors on every visit, says <c>NO BOSS - A RETREAT: XP
+    /// KEPT</c> (<see cref="DungeonCatalogue.HasFixedDepth"/>) — and whether the
+    /// party got deep enough for the run to count (§6.3's mercy, from
+    /// <see cref="Tuning.MercyFloor"/>) — a rule, never the depth. And either
+    /// way, the whole visit (<see cref="ResetLine"/>), last.
+    /// </summary>
+    internal static IReadOnlyList<string> LeavePreview(DungeonState visit)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        string dungeon = visit.Def.Name.ToUpperInvariant();
+        if (visit.BossDefeated)
+        {
+            string clear = visit.Def.RetiresOnClear
+                ? $"{dungeon} CLOSES FOR GOOD"
+                : $"{dungeon} LOCKS FOR {Runs(visit.LockRuns)}";
+            return ["THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", clear, ResetLine];
+        }
+
+        var content = GameContent.Current;
+        string retreat = content.Dungeons.HasFixedDepth(visit.Def)
+            ? "NO BOSS - A RETREAT: XP KEPT"   // as deep on every visit: nothing re-rolls
+            : "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS";
+        bool counts = visit.DeepestFloorIndex + 1 >= content.Tuning.MercyFloor;
+        return
+        [
+            retreat,
+            counts ? "DEEP ENOUGH TO COUNT AS A RUN" : "TOO SHALLOW TO COUNT AS A RUN",
+            ResetLine,
+        ];
+    }
+
+    /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
+    internal static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
+
+    // ── The run's end ────────────────────────────────────────────────────────
+
+    /// <summary>A wiped run's headline (§4.4), on its summary and on the defeat screen: the run is over, not the game.</summary>
+    internal const string DefeatHeadline = "DEFEATED";
+
+    /// <summary>
+    /// The one key a run's end answers: the summary is modal, ENTER moves on to
+    /// the between-runs screen, and ESC does nothing there — what the run just
+    /// wrote lives only in memory until it is saved, so it never offers a quit.
+    /// </summary>
+    internal const string ContinueHint = "ENTER TO CONTINUE";
+
+    /// <summary>
+    /// A run's summary as its end shows it over the last floor (§4.4): the run's
+    /// own facts, a line a fact and the headline first — the lines the
+    /// between-runs screen shows again above the dungeon list
+    /// (<see cref="BetweenRunsHud.SummaryLines"/>, where they are written) — and
+    /// last the key the panel answers, <c>ENTER TO CONTINUE</c>, never ESC. The
+    /// key names <paramref name="next"/>, the next run's dungeon, when a caller
+    /// knows it. The dungeon scene names none: ENTER goes on to the between-runs
+    /// screen, and the next dungeon is chosen there.
+    /// </summary>
+    /// <param name="result">The run's end, as the campaign returned it.</param>
+    /// <param name="next">The next run's dungeon, by name; null names none.</param>
+    internal static IReadOnlyList<Run> RunSummaryLines(RunResult result, string? next = null)
+    {
+        var lines = new List<Run>(BetweenRunsHud.SummaryLines(result));
+        lines.Add(new Run(next is null ? ContinueHint : $"{ContinueHint} - NEXT: {next.ToUpperInvariant()}", White));
+        return lines;
+    }
+
+    /// <summary>
+    /// The run's summary over the dimmed floor (<see cref="RunSummaryLines"/>):
+    /// the headline large, each line under it, and the key last, a step apart.
+    /// Anchored above the middle, never over the top readouts.
+    /// </summary>
+    private void DrawRunSummary(int w, int h, RunResult result)
+    {
+        var lines = RunSummaryLines(result);
+        float y = MathF.Max(80f, h / 2f - 170f);
+        DrawCentered(w, y, lines[0].Text, 5f, lines[0].Color);
+        y += 56f;
+        for (int i = 1; i < lines.Count; i++)
+        {
+            bool last = i == lines.Count - 1;
+            if (last) y += 12f;
+            DrawCentered(w, y, lines[i].Text, last ? 2f : 1.6f, lines[i].Color);
+            y += 22f;
+        }
+    }
+
+    /// <summary>
+    /// The banner, fading over its last <see cref="BannerFadeSeconds"/>: the
+    /// line over it (the dungeon's name, on arrival), the line itself (the floor
+    /// reached, the boss fallen), and any warning under it (the boss floor's
+    /// trade, what the fall means). Not over a menu or the game-over screen, whose
+    /// words are at the same height and are the ones being asked about; and never
+    /// over the fade away from the floor it speaks of, which takes it down as it
+    /// starts (<see cref="HideArrival"/>).
+    /// </summary>
+    private void DrawBanner(DungeonScene scene, int w, int h)
+    {
+        if (_banner is not { } banner || scene.AnyMenuOpen || scene.Turns.Phase == TurnPhase.GameOver) return;
+        float alpha = Math.Clamp((banner.Seconds - _bannerAge) / BannerFadeSeconds, 0f, 1f);
+        float y = h / 3f;
+        if (banner.Over.Length > 0)
+            DrawCentered(w, y - 30f, banner.Over, 2f, Grey with { W = alpha });
+        DrawCentered(w, y, banner.Main, 5f, White with { W = alpha });
+        float underY = y + 52f;
+        foreach (string line in banner.Under)
+        {
+            DrawCentered(w, underY, line, 2f, Yellow with { W = alpha });
+            underY += 26f;
+        }
     }
 
     // Party selector layout, shared between drawing and click hit-testing.
@@ -233,21 +727,24 @@ public sealed class DungeonHud
 
     private void DrawEnemyLabels(Camera camera, DungeonScene scene, int w, int h)
     {
+        var boss = scene.Visit.Current.Boss;
         foreach (var obj in scene.Enemies)
         {
             if (!obj.IsActive || !obj.State.Alive) continue; // fogged or dead
-            var anchor = obj.Position + Vector3.UnitY * 0.9f;
+            var anchor = obj.Position + Vector3.UnitY * (0.9f * obj.Size);   // a boss's box is taller, and so is where its plate hangs
             if (!WorldToScreen(camera, anchor, w, h, out var px)) continue;
 
             var enemy = obj.State;
-            // HEALER is what mends (the innate's status restores HP); every other caster, warding or debuffing, is CASTER.
-            string name = enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY";
-            string label = $"{name} [{enemy.Weapon.Name}]";
+            string label = EnemyTitle(enemy);
+            // The boss's name is the one plate on the floor that is not a dummy's: larger, and in the stone its golem is cut from.
+            bool isBoss = enemy == boss;
+            float titleScale = isBoss ? 1.8f : 1.5f;
+            float titleY = px.Y - (isBoss ? 21f : 18f);
             // Inside the held wand's shape as aimed right now: a click there catches it.
             if (scene.AimCaught.Contains(enemy))
-                DrawCenteredAt(px.X, px.Y - 18f, $"> {label} <", 1.5f, Yellow);
+                DrawCenteredAt(px.X, titleY, $"> {label} <", titleScale, Yellow);
             else
-                DrawCenteredAt(px.X, px.Y - 18f, label, 1.5f, enemy.Weapon.IsCaster ? Cyan : Orange);
+                DrawCenteredAt(px.X, titleY, label, titleScale, isBoss ? Stone : enemy.Weapon.IsCaster ? Cyan : Orange);
 
             DrawRunsCenteredAt(px.X, px.Y, 1.5f, NameplateRuns(enemy));
 
@@ -260,7 +757,7 @@ public sealed class DungeonHud
                 DrawCenteredAt(px.X, y, cue.Label, 1.4f, cue.Ready ? White : Grey);
                 y += 14f;
             }
-            foreach (var line in StatusLegend(enemy, GameConstants.EnemyMove))
+            foreach (var line in StatusLegend(enemy, enemy.MoveBudget))   // Mire cuts this enemy's own budget: a golem's 40, a dummy's 100
             {
                 DrawCenteredAt(px.X, y, line.Text, 1.2f, line.Color);
                 y += 12f;
@@ -269,23 +766,72 @@ public sealed class DungeonHud
     }
 
     /// <summary>
+    /// The title line over an enemy's plate: what it is, and what it is holding
+    /// in brackets — <c>DUMMY [Arming Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
+    /// and a boss by its own name, <c>STONE GOLEM [Hatchet]</c> (§4.3: it wields
+    /// a weapon like a dummy does). HEALER is what mends (the innate's status
+    /// restores HP); every other caster, warding or debuffing, is CASTER.
+    /// </summary>
+    internal static string EnemyTitle(EnemyState enemy)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        string name = enemy.Title?.ToUpperInvariant()
+            ?? (enemy.IsHealer ? "HEALER" : enemy.Weapon.IsCaster ? "CASTER" : "DUMMY");
+        return $"{name} [{enemy.Weapon.Name}]";
+    }
+
+    /// <summary>How far apart the labels of two items on one tile stack: a label's height and a hair.</summary>
+    private const float GroundItemLabelPitch = 13f;
+
+    /// <summary>
     /// What is lying on the floor: over each ground item in sight, the weapon it
-    /// is and the farm's depth it was collected at, and — on the one the active
-    /// member is standing on — the key that takes it. Nothing is drawn for an
-    /// item on a fogged tile: it is exactly as visible as the corpse it came off.
+    /// is — a drop's with the farm's depth it was collected at, a weapon the party
+    /// put down as itself — and, on the one the active member is standing on, the
+    /// key that takes it. Nothing is drawn for an item on a fogged tile: it is
+    /// exactly as visible as the tile it lies on, and nothing is drawn under a menu
+    /// (<see cref="Render"/>). Where several lie on one tile — a full bag's weak
+    /// weapon put down on the drop it makes room for — their labels stack upward in
+    /// the order <c>G</c> takes them, the next one lowest, just above its key. That
+    /// is the order the scene hands them over in
+    /// (<see cref="DungeonScene.GroundItems"/>, <see cref="DungeonScene.InTakingOrder"/>),
+    /// so the stack and the key cannot disagree.
     /// </summary>
     private void DrawGroundItems(Camera camera, DungeonScene scene, int w, int h)
     {
         var target = scene.PickupTarget;
+        var stacked = new Dictionary<(int R, int C), int>();
         foreach (var item in scene.GroundItems)
         {
             if (!item.Marker.IsActive) continue;
             if (!WorldToScreen(camera, item.Marker.Position + Vector3.UnitY * 0.5f, w, h, out var px)) continue;
 
-            DrawRunsCenteredAt(px.X, px.Y - 14f, 1.5f, GroundItemRuns(item.Drop));
+            int under = stacked.GetValueOrDefault(item.Tile);
+            stacked[item.Tile] = under + 1;
+            DrawRunsCenteredAt(px.X, px.Y - 14f - under * GroundItemLabelPitch, 1.5f, ItemRuns(item));
             if (item == target)
                 DrawCenteredAt(px.X, px.Y + 2f, DungeonScene.PickupHint, 1.4f, White);
         }
+    }
+
+    /// <summary>An item on the floor's label, by what it is: a drop's (<see cref="GroundItemRuns"/>), or a weapon the party put down (<see cref="LooseItemRuns"/>).</summary>
+    private static IReadOnlyList<Run> ItemRuns(GroundItem item) => item switch
+    {
+        { Loose: { } loose } => LooseItemRuns(loose),
+        { Drop: { } drop } => GroundItemRuns(drop),
+        _ => [],   // neither: nothing the scene lays, and nothing to name
+    };
+
+    /// <summary>
+    /// A weapon the party put down (§4.4), as the floor labels it: its name, a
+    /// unique's in the gold every other readout gives it, and nothing else. It
+    /// carries no <c>xN</c>, because the farm's depth was the dummy's and not the
+    /// weapon's, and no corpse's drop is made up to borrow a label from. It is
+    /// labelled as what it is: a weapon someone left here.
+    /// </summary>
+    internal static IReadOnlyList<Run> LooseItemRuns(LooseItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return [new Run(item.Weapon.Name, item.Weapon.Unique ? Orange : White)];
     }
 
     /// <summary>
@@ -377,6 +923,9 @@ public sealed class DungeonHud
     /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under.</summary>
     private const float InventoryTopMargin = 56f;
 
+    /// <summary>How far either side of the middle the panel's column runs: its slots start this far left, and the header row's right-hand hint ends this far right.</summary>
+    private const float InventoryHalfWidth = 190f;
+
     /// <summary>Where the inventory panel opens, how many of its progression rows there is room for, and the line past its last glyph.</summary>
     internal readonly record struct InventoryLayout(float Top, int Rows, float Bottom);
 
@@ -387,10 +936,14 @@ public sealed class DungeonHud
     /// its centred place while the whole of it fits, slides up — never under
     /// the top readouts — when it does not, and only past that drops rows it
     /// has no room for, from the end of the list, rather than the lines that
-    /// name the swap cost and the equip keys. Below about 370 px of window even
-    /// a row-less panel is taller than the room under the readouts, and the
-    /// panel is then anchored as high as it goes and clipped: that is a window
-    /// smaller than the rest of the HUD is laid out for either.
+    /// name the swap cost and the equip keys. A row-less panel needs
+    /// <c>228 + 46 × slots</c> px of window (the top margin, the panel's fixed
+    /// lines, its slots and the help line's clearance) — about 370 at Phase 3's
+    /// three slots, about 500 at §4.4's six; the shipped 1280 x 720 window holds
+    /// six with every row printed. Below that even a row-less panel is taller
+    /// than the room under the readouts, and the panel is then anchored as high
+    /// as it goes and clipped: that is a window smaller than the rest of the
+    /// HUD is laid out for either.
     /// </summary>
     internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount)
     {
@@ -404,7 +957,16 @@ public sealed class DungeonHud
         return new InventoryLayout(top, rows, top + fixedHeight + rows * InventoryRowPitch);
     }
 
-    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns)
+    /// <summary>
+    /// The inventory panel: the member's slots with their statlines, the
+    /// progression rows, what a swap costs, and the key hint. With the bag's X
+    /// armed (<paramref name="leaving"/>), the key hint asks which weapon to put
+    /// down (<see cref="LeaveHint"/>) instead of naming the equip keys. When it is
+    /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
+    /// wherever X would arm it: in the party's phase, with a bag to put a weapon
+    /// down from.
+    /// </summary>
+    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving)
     {
         float cx = w / 2f;
 
@@ -418,10 +980,16 @@ public sealed class DungeonHud
 
         var layout = LayoutInventory(h, active.Inventory.Length, rows.Count);
         float top = layout.Top;
-        float left = cx - 190f;
+        float left = cx - InventoryHalfWidth;
 
         DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", 3f, Cyan);
         _text.DrawText("EQUIPPED", left, top + 46f, 1.2f, Grey);
+        if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
+        {
+            // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
+            float width = LeaveKeyHint.Length * GlyphAdvance * 1.2f;
+            _text.DrawText(LeaveKeyHint, cx + InventoryHalfWidth - width, top + 46f, 1.2f, Grey);
+        }
 
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
@@ -460,27 +1028,98 @@ public sealed class DungeonHud
         else
             DrawCentered(w, swapY, $"IN COMBAT - A SWAP COSTS {cost} MOVE", 1.5f, Orange);
 
-        DrawCentered(w, swapY + InventoryHintGap, "PRESS 2-3 TO EQUIP - I TO CLOSE", 1.5f, Grey);
+        if (leaving)
+            DrawCentered(w, swapY + InventoryHintGap, LeaveHint(active.Inventory.Length), 1.5f, Yellow);
+        else
+            DrawCentered(w, swapY + InventoryHintGap, EquipHint(active.Inventory.Length), 1.5f, Grey);
     }
 
     /// <summary>
-    /// The pause menu, and one entry that is scaffolding: stopping resurrection
-    /// is Phase 4's boss's doing (§4.3), and until that boss exists there is no
-    /// way to reach the drop path in play at all. It is one-way, as the boss kill
-    /// it stands in for is, and it goes when the boss arrives — the line it
-    /// leaves behind says what the dungeon has become.
+    /// The inventory panel's key hint: the number keys that equip a bag slot —
+    /// each the number the panel prints beside that slot, so the hand is 1 and
+    /// the bag runs from 2 — then the key that closes the bag. For §4.4's six
+    /// slots, <c>PRESS 2-6 TO EQUIP - I TO CLOSE</c>. The range is read off the
+    /// member's slots and the scene's own highest binding
+    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names every slot a key
+    /// reaches and no key that does nothing.
     /// </summary>
-    private void DrawMenu(int w, int h, bool resurrectionActive)
+    internal static string EquipHint(int slots)
+        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO EQUIP - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
+
+    /// <summary>
+    /// The number keys that reach a bag slot, as a hint prints them — <c>2-6</c>
+    /// for §4.4's six slots, <c>2</c> for a bag of one — or null for a hand and no
+    /// bag. Each key is the number the panel prints beside its slot, so the hand
+    /// is 1 and never among them. The range stops at the scene's highest binding
+    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names no key that does
+    /// nothing. Equipping and putting down read the same keys
+    /// (<see cref="EquipHint"/>, <see cref="LeaveHint"/>).
+    /// </summary>
+    private static string? BagKeys(int slots)
+    {
+        int last = Math.Min(slots, DungeonScene.HighestSlotKey);
+        return last switch
+        {
+            < 2 => null,
+            2 => "2",
+            _ => $"2-{last}",
+        };
+    }
+
+    /// <summary>
+    /// The bag's key hint while its X is armed (§4.4): which weapon to put down,
+    /// by the same number keys that equip, and how to back out. For six slots it
+    /// is <c>LEAVE WHICH? 2-6 - X CANCELS</c>. It replaces <see cref="EquipHint"/>
+    /// on the panel for as long as X is armed. It names no key for the hand,
+    /// because the weapon in hand is never put down this way.
+    /// </summary>
+    /// <param name="slots">The member's slots, the hand among them.</param>
+    internal static string LeaveHint(int slots)
+        => BagKeys(slots) is { } keys ? $"LEAVE WHICH? {keys} - X CANCELS" : "NOTHING TO LEAVE - X CANCELS";
+
+    /// <summary>
+    /// What the panel's header row says while X is not armed, so the key can be
+    /// found at all: X puts a weapon down where the member stands (§4.4). It is
+    /// the way a full bag makes room.
+    /// </summary>
+    internal const string LeaveKeyHint = "X TO LEAVE ONE HERE";
+
+    /// <summary>
+    /// What an armed bag number says when its slot holds nothing: <c>SLOT 3 IS
+    /// EMPTY</c>, by the number the panel prints for <paramref name="slot"/> (the
+    /// key that was pressed). X stays armed for another pick.
+    /// </summary>
+    /// <param name="slot">The slot, 0 being the hand.</param>
+    internal static string EmptySlotCue(int slot) => $"SLOT {slot + 1} IS EMPTY";
+
+    /// <summary>
+    /// What <c>G</c> says when the bag has no room (§4.4): a carry limit, not a
+    /// fault — <c>BAG FULL - 6 CARRIED</c>, loot sharing the slots the weapons are
+    /// carried in — and how to make room: open the bag and put one down.
+    /// </summary>
+    /// <param name="carried">The member's slots, every one of them full.</param>
+    internal static string BagFullCue(int carried) => $"BAG FULL - {carried} CARRIED - I THEN X LEAVES ONE";
+
+    /// <summary>The beat over a member who has just put a weapon down: <c>LEFT HATCHET HERE</c>, so it reads as a thing done on purpose, answered by <c>TOOK HATCHET</c> when it is taken back.</summary>
+    internal static string LeftBeat(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return $"LEFT {weapon.Name.ToUpperInvariant()} HERE";
+    }
+
+    /// <summary>
+    /// The pause menu: close it, or leave the game. Stopping resurrection is the
+    /// boss's doing (§4.3), and nothing else's — the dev switch that stood in for
+    /// it went when the boss arrived — so what the dungeon has become is the
+    /// floor line's to say (<see cref="FloorLine"/>).
+    /// </summary>
+    private void DrawMenu(int w, int h)
     {
         float top = h / 2f - 90f;
         DrawCentered(w, top, "PAUSED", 4f, Cyan);
         DrawCentered(w, top + 66f, "1  CLOSE", 2f, White);
         DrawCentered(w, top + 106f, "2  EXIT GAME", 2f, White);
-        if (resurrectionActive)
-            DrawCentered(w, top + 146f, "3  STOP RESURRECTION", 2f, White);
-        else
-            DrawCentered(w, top + 146f, "RESURRECTION STOPPED - DEFEATS ARE PERMANENT", 1.5f, Orange);
-        DrawCentered(w, top + 196f, "ESC TO CLOSE", 1.5f, Grey);
+        DrawCentered(w, top + 156f, "ESC TO CLOSE", 1.5f, Grey);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────
@@ -762,7 +1401,7 @@ public sealed class DungeonHud
     /// The bottom help line for what the active member holds: how its weapon is
     /// used — a swing, a staff's cast on the side its effect lands on, a wand's
     /// aim by its shape, Overwatch's hold on a ranged weapon that has it — then
-    /// the keys every turn shares.
+    /// the keys every turn shares, the stairs' E among them (§4.2).
     /// </summary>
     internal static string HelpLine(PartyMemberState active)
     {
@@ -776,7 +1415,7 @@ public sealed class DungeonHud
             parts.Add("CLICK ENEMY: ATTACK");
         if (weapon is { Kind: WeaponKind.Ranged } && active.Value(ModifierType.Overwatch) > 0)
             parts.Add("O: HOLD FIRE");
-        parts.Add("SPACE END TURN - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
+        parts.Add("SPACE END TURN - E STAIRS - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
         return string.Join(" - ", parts);
     }
 
@@ -852,9 +1491,12 @@ public sealed class DungeonHud
         };
 
     /// <summary>
-    /// A dummy's plate: its hit points out of a maximum its revivals may have
-    /// raised, <c>xN</c> once it has been put down at least once, then the same
-    /// effect badges a party row carries — riders land on enemies too.
+    /// An enemy's plate: its hit points out of a maximum its revivals may have
+    /// raised, <c>xN</c> once it has been put down at least once, the damage its
+    /// revivals have added (<c>+9 DMG</c>), what it carries on itself whatever it
+    /// holds (a boss's <c>BLOCK 9</c>, <see cref="InnateReadout"/>), then the same
+    /// effect badges a party row carries — riders land on enemies too. A farmed
+    /// dummy reads <c>62/74  x7  +9 DMG</c>; the golem <c>80/80  BLOCK 9</c>.
     /// <para>
     /// The count has to read as a threat level and a reward tier at once (§3.2),
     /// "which is honest, because that is exactly what it is": one number saying
@@ -862,6 +1504,15 @@ public sealed class DungeonHud
     /// hits than the one beside it. It sits between the pool and the badges so
     /// the two things a player reads before deciding to swing — what is left of
     /// it, and how many times they have done this — are adjacent.
+    /// </para>
+    /// <para>
+    /// <strong>And the threat half is shown, not only implied</strong> (§4.5,
+    /// PHASE4-137): "a bare 7 communicates the reward half and hides the half
+    /// that kills you". The earned statline stands next to the count — the HP the
+    /// farm added is already in the maximum, and the damage it added follows the
+    /// count — and the count reddens as it climbs (<see cref="ThreatColor"/>), so
+    /// "further is worse" reads with no denominator: the count is unbounded, and
+    /// never prints as <c>n/5</c> (PHASE4-139).
     /// </para>
     /// <para>
     /// <c>xN</c> with an ASCII x, the <c>CRIT 19+ x3</c> convention this HUD
@@ -875,9 +1526,67 @@ public sealed class DungeonHud
         ArgumentNullException.ThrowIfNull(enemy);
         var plate = new List<Run> { new($"{enemy.Hp}/{enemy.MaxHp}", White) };
         if (enemy.DefeatCount > 0)
-            plate.Add(new Run($"x{enemy.DefeatCount}", Orange));
+            plate.Add(new Run($"x{enemy.DefeatCount}", ThreatColor(enemy.DefeatCount)));
+        if (enemy.RevivalDamage > 0)
+            plate.Add(new Run($"+{enemy.RevivalDamage} DMG", Red));
+        string innate = InnateReadout(enemy);
+        if (innate.Length > 0)
+            plate.Add(new Run(innate, Stone));
         plate.AddRange(StatusBadgeRuns(enemy));
         return plate;
+    }
+
+    /// <summary>
+    /// The colour a farmed count is printed in (§3.2, §4.5): orange at the first
+    /// defeat, reddening with every one after it, and fully red from
+    /// <see cref="Tuning.UniqueChanceMidpoint"/> on — the depth at which a farm is
+    /// hot both ways, a coin-flip's unique chance on a dummy that hits
+    /// accordingly. Monotonic: a deeper count is never less red. That is how the
+    /// plate says "further is worse" without a denominator (PHASE4-139), while
+    /// the number itself stays a bare <c>xN</c>.
+    /// </summary>
+    internal static Vector4 ThreatColor(int defeatCount)
+    {
+        int hot = Math.Max(2, GameContent.Current.Tuning.UniqueChanceMidpoint);
+        float t = Math.Clamp((defeatCount - 1) / (float)(hot - 1), 0f, 1f);
+        return Vector4.Lerp(Orange, DeepRed, t);
+    }
+
+    /// <summary>
+    /// What an actor carries on itself whatever it holds (§4.3's innate
+    /// modifiers — the golem's Block), resolved as a hit meets it: weapon plus
+    /// innate, in the readout's own words, so a golem holding a hatchet reads
+    /// <c>BLOCK 9</c> and one holding a Tower Guard <c>BLOCK 15</c> — the Block its
+    /// blows are absorbed by, never its innate stacks alone. Empty for an actor
+    /// with nothing innate, which is every dummy.
+    /// </summary>
+    internal static string InnateReadout(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        var parts = new List<string>();
+        foreach (var (type, _) in actor.Innate.Entries)
+        {
+            string text = ModifierFormats.TryGetValue(type, out var format) && actor.EquippedWeapon is { } held
+                ? format(new ReadoutContext(held, actor, Equipped: false, AttacksThisTurn: 0))
+                : $"{type.ToString().ToUpperInvariant()} {actor.Value(type)}";
+            if (!parts.Contains(text)) // the crit pair reads as one entry
+                parts.Add(text);
+        }
+        return string.Join("  ", parts);
+    }
+
+    /// <summary>
+    /// The beat over a dummy the moment it gets up stronger (§4.5, PHASE4-138):
+    /// what this revival's rolls added — <c>STRONGER +3 DMG +8 HP</c> — so the
+    /// player connects the count going up with the statline going up. Null when
+    /// a revival added nothing, which none does: every cycle rolls one gain or both.
+    /// </summary>
+    internal static string? RevivalBeat(int damageGained, int healthGained)
+    {
+        var gains = new List<string>(2);
+        if (damageGained > 0) gains.Add($"+{damageGained} DMG");
+        if (healthGained > 0) gains.Add($"+{healthGained} HP");
+        return gains.Count == 0 ? null : $"STRONGER {string.Join(" ", gains)}";
     }
 
     /// <summary>

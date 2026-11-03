@@ -37,8 +37,26 @@ public sealed class Weapon
     /// wand's element is supplied at instantiation and is forged all the same
     /// (§1.4, §3.1) though no def lists it.
     /// </param>
+    /// <param name="forgedGraft">
+    /// A modifier grafted onto <paramref name="def"/>'s spread <em>as forged</em>,
+    /// one stack of it, or null for none: the boss's theme on the boss's own drop
+    /// (§4.3). It goes on here, at construction, because <see cref="Forged"/> is
+    /// fixed here and never written again — a forged graft is part of what the
+    /// weapon <em>is</em>, which is what puts its ceiling a stack deeper than an
+    /// acquired one's (forged + 5, §1.1). It asks the one question every graft
+    /// asks (<see cref="ModifierRules.CanGraft"/>, as forged): the relations
+    /// beside the def's spread, and the forge limit.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="forgedCount"/> is not a count of <paramref name="enchantments"/>.</exception>
-    public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments, int? forgedCount = null)
+    /// <exception cref="ArgumentException">
+    /// <paramref name="forgedGraft"/> cannot be forged onto <paramref name="def"/>:
+    /// the relations refuse it beside the def's spread, or it would forge past
+    /// <see cref="ModifierRules.MaxForged"/>. A source asks
+    /// <see cref="ModifierRules.CanGraft"/> before it offers a graft — the boss's
+    /// drop table is computed from that same question — so a refusal here is a
+    /// source that skipped its gate: thrown rather than forged silently.
+    /// </exception>
+    public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments, int? forgedCount = null, ModifierType? forgedGraft = null)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(enchantments);
@@ -51,7 +69,7 @@ public sealed class Weapon
         Damage = def.Damage;
         Cost = def.Cost;
         ManaCost = def.ManaCost;
-        Forged = ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+        Forged = Forge(def, forgedGraft);
         Modifiers = Forged;
         _enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
         Enchantments = Array.AsReadOnly(_enchantments);   // a live view: a credited entry shows through, a write does not get in
@@ -223,6 +241,26 @@ public sealed class Weapon
     }
 
     public int Stacks(ModifierType t) => Modifiers.Stacks(t);
+
+    /// <summary>
+    /// The identity spread <paramref name="def"/> is forged with, plus one forged
+    /// stack of <paramref name="graft"/> when there is one — the same operation
+    /// the enchanter's graft is (§6.4), asked as forged: the boss "only chooses
+    /// which modifier instead of rolling it" (§4.3). No other path grafts a
+    /// forged stack, so this is the one place the question is asked of a weapon.
+    /// </summary>
+    private static ModifierSet Forge(WeaponDef def, ModifierType? graft)
+    {
+        var spread = ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
+        if (graft is not { } theme)
+            return spread;
+
+        if (!GameContent.Current.Modifiers.CanGraft(theme, KindOf(def.Class), spread, spread, asForged: true))
+            throw new ArgumentException(
+                $"'{def.Id}' cannot be forged with {theme} beside {spread}: every graft asks ModifierRules.CanGraft first, and a forged one the forge limit too.",
+                "forgedGraft");
+        return ModifierSet.Of([.. spread.Entries, (theme, 1)]);
+    }
 
     private void Resolve()
     {

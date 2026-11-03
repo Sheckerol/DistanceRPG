@@ -44,4 +44,10 @@ internal sealed class ThreatZone
 
     /// <summary>Spend one free attack.</summary>
     public void Spend(ActorState bracer) => _usesThisTurn[bracer] = UsesThisTurn(bracer) + 1;
+
+    /// <summary>Every bracer that has spent a free attack since the last <see cref="ResetUses"/>, and how many: what a floor's turn system hands on when the party takes the stairs (<see cref="TurnCarry"/>).</summary>
+    public IEnumerable<KeyValuePair<ActorState, int>> SpentUses => _usesThisTurn;
+
+    /// <summary>A bracer's uses as a carry brought them from another floor this same turn: the turn goes on, so what it spent stays spent.</summary>
+    public void RestoreUses(ActorState bracer, int used) => _usesThisTurn[bracer] = used;
 }

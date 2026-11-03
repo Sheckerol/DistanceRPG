@@ -8,8 +8,8 @@ namespace GameEngine.DistanceRPG.Logic;
 /// The compiled fallback for every content file (§5.4): the instances the
 /// game runs on when no file overrides them, and what Phase 5's loader falls
 /// back to. Tuning, the relations, the enchantment catalogue's innates and
-/// souls, the thirty-two weapons and the eleven uniques — one line per entry,
-/// so the validator is the reviewer.
+/// souls, the thirty-two weapons and the eleven uniques, the five dungeons and
+/// the starting roster — one line per entry, so the validator is the reviewer.
 /// </summary>
 public static class ContentDefaults
 {
@@ -206,6 +206,49 @@ public static class ContentDefaults
     private const int WandDamage = 8;
     private const int WandCost = 45;
     private const int WandManaCost = 20;
+
+    // ---- Dungeons (§5.8): the tutorial, and four provisional dungeons ----
+    // Each theme is a class signature with a unique to hunt: the Purity variant
+    // of the theme's own class, grafted by the boss, is that class's unique by
+    // arithmetic (§4.3). Only the tutorial's golem is the docs' — 80 HP, a
+    // movement budget of 40, Block x3 innate (S:302). Everything else here —
+    // the four dungeons, their names, their bosses' names and statlines — is
+    // PROVISIONAL: picked so the hub has somewhere to go, and expected to move
+    // after play. settled.md's first playable hub has six; the two missing need
+    // content that does not exist yet (a Great Axe unique for Cleave, or a
+    // repeated theme), and Phase 6b completes the roster. No dungeon here is
+    // attuned: attunement is its own field, and none is set yet.
+
+    /// <summary>
+    /// The §5.8 dungeons as <c>dungeons.json</c> would declare them, in the
+    /// order the hub lists them. A floor range left null reads the tuning's
+    /// 5–10; the tutorial pins both ends to 2 and is the one dungeon that
+    /// retires on its clear. What each can drop is computed from its theme
+    /// (<see cref="DungeonCatalogue.ThemeClasses"/>) and written nowhere.
+    /// </summary>
+    public static readonly DungeonsData Dungeons = new(
+    [
+        //       id               name                  theme        boss floor   boss
+        Dungeon("tutorial", "The Tutorial", Block, bossFloor: 2,
+            Boss("stone_golem", "Stone Golem", maxHp: 80, movementBudget: 40, (Block, 3)),   // the docs' golem: 80 HP, slow, Block x3 whatever it holds
+            retiresOnClear: true),
+        Dungeon("spear_hall", "The Spear Hall", Brace, bossFloor: null,
+            Boss("spear_warden", "Spear Warden", maxHp: 200, movementBudget: 70, (Brace, 3))),                 // provisional: drops daggers, swords and spears; hunts Hoplite's Wall
+        Dungeon("long_gallery", "The Long Gallery", Longshot, bossFloor: null,
+            Boss("gallery_marksman", "Gallery Marksman", maxHp: 200, movementBudget: 70, (Longshot, 3))),      // provisional: drops all eight; hunts Stormcrow, a bow no enemy wields
+        Dungeon("knife_warrens", "The Knife Warrens", CritWindow, bossFloor: null,
+            Boss("knife_mother", "Knife Mother", maxHp: 200, movementBudget: 70, (CritWindow, 3))),            // provisional: drops all eight; hunts Widowmaker
+        Dungeon("quiver_pits", "The Quiver Pits", Charges, bossFloor: null,
+            Boss("quiver_keeper", "Quiver Keeper", maxHp: 200, movementBudget: 70, (Charges, 3))),             // provisional: Charges is forged-only, so it drops throwing weapons alone; hunts Feathered Death
+    ]);
+
+    /// <summary>A dungeon row, unattuned: <paramref name="bossFloor"/> pins both ends of the boss's floor range, or null leaves both to the tuning.</summary>
+    private static DungeonDef Dungeon(string id, string name, ModifierType theme, int? bossFloor, BossDef boss, bool retiresOnClear = false)
+        => new(id, name, theme, Attunement: null, BossFloorMin: bossFloor, BossFloorMax: bossFloor, boss, retiresOnClear);
+
+    /// <summary>A boss's statline and the modifiers it carries on itself rather than on its weapon.</summary>
+    private static BossDef Boss(string id, string name, int maxHp, int movementBudget, params (ModifierType Type, int Stacks)[] innate)
+        => new(id, name, maxHp, movementBudget, Spread(innate));
 
     // ---- The starting roster (§5.9): the §2.1 table, verbatim ----
 

@@ -25,6 +25,34 @@ public class HudTextTests
 
     private static string[] Item(Drop drop) => DungeonHud.GroundItemRuns(drop).Select(r => r.Text).ToArray();
 
+    /// <summary>Four fixture members in roster order, a Weakspot Stiletto each: a party to walk a real visit's floors with.</summary>
+    private static PartyMemberState[] Party()
+        => new[] { "A", "B", "C", "D" }
+            .Select((id, i) => TestPools.Holding(id, TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
+            .ToArray();
+
+    /// <summary>
+    /// Stand the first <paramref name="count"/> members round <paramref name="stair"/>
+    /// as a party that walked there would — around living enemies, never on them —
+    /// and leave the rest where they are.
+    /// </summary>
+    private static void Gather(DungeonState visit, IReadOnlyList<PartyMemberState> party, (int R, int C) stair, int count)
+    {
+        var floor = visit.Current;
+        var taken = floor.Enemies.Where(e => e.Alive).Select(Displacer.TileOf).ToHashSet();
+        var tiles = GridUtils.FindPartySpawnTiles(floor.Map.Grid, stair.R, stair.C, count, taken);
+        for (int i = 0; i < count; i++)
+            (party[i].X, party[i].Y) = Displacer.CentreOf(tiles[i].R, tiles[i].C);
+    }
+
+    /// <summary>Gather the whole party at the down-stairs, take them, and open the floor below.</summary>
+    private static void GoDown(DungeonState visit, IReadOnlyList<PartyMemberState> party)
+    {
+        Gather(visit, party, visit.Current.DownStairs!.Value, party.Count);
+        visit.Descend(party);
+        visit.OpenTurns(party, () => 10);
+    }
+
     [Fact]
     public void WeaponStats_ShowTheResolvedCosts_NeverAPercentage()
     {
@@ -187,15 +215,269 @@ public class HudTextTests
         // A farmed one carries its DefeatCount, and that one number is honest
         // about being two things: the depth of the drop it is holding and how
         // much harder it hits than the dummy beside it (3.2). The maximum it is
-        // read against is its own, revivals included.
+        // read against is its own, revivals included, and the damage its revivals
+        // added stands beside the count: the earned statline (4.5, PHASE4-137).
         var farmed = new EnemyState { DefeatCount = 4, RevivalMaxHp = 17, RevivalDamage = 6 };
-        Assert.Equal(new[] { "67/67", "x4" }, Plate(farmed));
+        Assert.Equal(new[] { "67/67", "x4", "+6 DMG" }, Plate(farmed));
 
         // It sits between the pool and the badges, so what is left of it and how
         // many times this has happened are adjacent.
         farmed.Hp = 12;
         farmed.ApplyStatus(Sundered, null, 2);
-        Assert.Equal(new[] { "12/67", "x4", "SUND 2" }, Plate(farmed));
+        Assert.Equal(new[] { "12/67", "x4", "+6 DMG", "SUND 2" }, Plate(farmed));
+    }
+
+    [Fact]
+    public void ABossPlateNamesItAndWhatItCarries()
+    {
+        // The golem's plate names it and what it is holding — it wields a weapon
+        // like a dummy does (§4.3) — and reads its HP and the Block it carries on
+        // itself, as a hit meets it: weapon plus innate.
+        var tutorial = GameContent.Current.Dungeons.Tutorial;
+        var golem = DungeonState.BossRow(tutorial, TestWeapons.Get("hatchet"));
+        Assert.Equal("STONE GOLEM [Hatchet]", DungeonHud.EnemyTitle(golem));
+        Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(golem));
+        Assert.Equal("BLOCK 9", DungeonHud.InnateReadout(golem));
+
+        golem.Hp = 62;
+        Assert.Equal(new[] { "62/80", "BLOCK 9" }, Plate(golem));
+
+        // The Block its blows meet, a sword's included: never its own stacks alone.
+        Assert.Equal(new[] { "80/80", "BLOCK 12" }, Plate(DungeonState.BossRow(tutorial, TestWeapons.Get("arming_sword"))));
+        Assert.Equal(new[] { "80/80", "BLOCK 15" }, Plate(DungeonState.BossRow(tutorial, TestWeapons.Get("tower_guard"))));
+
+        // Another dungeon's boss reads its own theme in the readout's own words:
+        // the Knife Mother's CritWindow x3 on a Weakspot Stiletto's x1 is 16+.
+        var warrens = GameContent.Current.Dungeons["knife_warrens"];
+        var mother = DungeonState.BossRow(warrens, TestWeapons.Get("weakspot_stiletto"));
+        Assert.Equal("KNIFE MOTHER [Weakspot Stiletto]", DungeonHud.EnemyTitle(mother));
+        Assert.Equal("CRIT 16+ x3", DungeonHud.InnateReadout(mother));
+
+        // The golem the shipped seed's tutorial generates.
+        var bottom = Floor.Generate(2762136374, 1, bottom: true, tutorial);
+        Assert.Equal("STONE GOLEM [Pinning Lance]", DungeonHud.EnemyTitle(bottom.Boss!));
+        Assert.Equal(new[] { "80/80", "BLOCK 9" }, Plate(bottom.Boss!));
+
+        // Rank and file are named by what they hold, as they always were, and
+        // carry nothing on themselves to print.
+        Assert.Equal("DUMMY [Arming Sword]", DungeonHud.EnemyTitle(new EnemyState()));
+        Assert.Equal("HEALER [Staff of Renewal]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_renewal") }));
+        Assert.Equal("CASTER [Staff of Mire]", DungeonHud.EnemyTitle(new EnemyState { Weapon = TestWeapons.Get("staff_of_mire") }));
+        Assert.Equal("", DungeonHud.InnateReadout(new EnemyState()));
+    }
+
+    [Fact]
+    public void AFarmedPlateShowsTheStatlineItEarned()
+    {
+        // PHASE4-119, -137: the count is on the plate so the choice of which dummy
+        // to go back for is informed, and it reads as a threat as well as a reward:
+        // the earned statline stands next to it. Farmed three cycles through the
+        // turn system itself — on a seed whose first rolls are Damage, then Both —
+        // the HP its revivals added is in the maximum it is read against, and the
+        // damage they added follows the count.
+        var member = TestPools.Holding("A", TestWeapons.Make("Chisel", range: 60, damage: 25, cost: 20),
+            x: 5 * GameConstants.Tile + 16, y: 5 * GameConstants.Tile + 16);
+        var dummy = new EnemyState
+        {
+            X = 5 * GameConstants.Tile + 16 + 40f,
+            Y = 5 * GameConstants.Tile + 16,
+            Weapon = TestWeapons.Get("hatchet"),
+        };
+        var turns = new TurnSystem(new int[20, 20], new[] { member }, new[] { dummy }, () => 10, mapSeed: 1);
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            while (dummy.Alive)
+                Assert.True(turns.TryAttack(member, dummy));
+            while (!dummy.Alive)
+            {
+                turns.EndTurn();
+                for (float t = 0f; t < 3f; t += 1f / 30f)
+                    turns.Update(1f / 30f);
+            }
+        }
+
+        Assert.Equal(3, dummy.DefeatCount);
+        Assert.True(dummy.RevivalDamage > 0 && dummy.RevivalMaxHp > 0);
+        Assert.Equal(GameConstants.DummyHp + dummy.RevivalMaxHp, dummy.MaxHp);
+        Assert.Equal(new[] { $"{dummy.MaxHp}/{dummy.MaxHp}", "x3", $"+{dummy.RevivalDamage} DMG" }, Plate(dummy));
+        Assert.Equal(dummy.RevivalDamage, dummy.BonusDamage);   // what the plate says it adds is what its swings add
+
+        // Hurt, the pool comes first; the count, what it hits for, then its badges.
+        dummy.Hp = 9;
+        dummy.ApplyStatus(Sundered, null, 1);
+        Assert.Equal(new[] { $"9/{dummy.MaxHp}", "x3", $"+{dummy.RevivalDamage} DMG", "SUND 1" }, Plate(dummy));
+
+        // A dummy whose revivals have added no damage prints none: the HP half is its maximum.
+        Assert.Equal(new[] { "58/58", "x1" }, Plate(new EnemyState { DefeatCount = 1, RevivalMaxHp = 8 }));
+    }
+
+    [Fact]
+    public void TheCountReddensAsItClimbs_WithNoDenominator()
+    {
+        // PHASE4-139: the count is unbounded, so it never renders as n/5 or any
+        // fraction; "further is worse" is made legible by colour instead. The count
+        // is a bare xN at every depth, and its colour only ever reddens — never
+        // less red one cycle deeper — until the farm's unique midpoint, where it is
+        // as red as it gets and stays there.
+        var previous = DungeonHud.ThreatColor(1);
+        for (int n = 1; n <= 60; n++)
+        {
+            var count = DungeonHud.NameplateRuns(new EnemyState { DefeatCount = n })[1];
+            Assert.Equal($"x{n}", count.Text);
+            Assert.DoesNotContain("/", count.Text);
+            Assert.Equal(DungeonHud.ThreatColor(n), count.Color);
+
+            var color = DungeonHud.ThreatColor(n);
+            Assert.True(color.Y <= previous.Y && color.X >= previous.X, $"x{n} is less red than x{n - 1}");
+            previous = color;
+        }
+
+        int hot = GameContent.Current.Tuning.UniqueChanceMidpoint;
+        Assert.True(DungeonHud.ThreatColor(hot).Y < DungeonHud.ThreatColor(1).Y);
+        Assert.True(DungeonHud.ThreatColor(hot / 2).Y < DungeonHud.ThreatColor(1).Y);
+        Assert.True(DungeonHud.ThreatColor(hot).Y < DungeonHud.ThreatColor(hot / 2).Y);
+        Assert.Equal(DungeonHud.ThreatColor(hot), DungeonHud.ThreatColor(hot + 40));
+
+        // Nothing on a plate reads as a fraction but the pool's own HP.
+        var farmed = new EnemyState { DefeatCount = 12, RevivalDamage = 9, RevivalMaxHp = 24 };
+        Assert.Single(Plate(farmed), run => run.Contains('/'));
+    }
+
+    [Fact]
+    public void ARevivalSaysWhatItGained()
+    {
+        // PHASE4-138: a beat when a revival rolls its bonus, so the player
+        // connects the count going up with the dummy getting stronger.
+        Assert.Equal("STRONGER +3 DMG +8 HP", DungeonHud.RevivalBeat(3, 8));
+        Assert.Equal("STRONGER +3 DMG", DungeonHud.RevivalBeat(3, 0));
+        Assert.Equal("STRONGER +8 HP", DungeonHud.RevivalBeat(0, 8));
+        Assert.Null(DungeonHud.RevivalBeat(0, 0));
+
+        // Through a real revival: what the row gained between going down and
+        // getting up — a clean kill's two cycles, on a seed whose first two roll
+        // Damage then Both — is what the beat says.
+        var member = TestPools.Holding("A", TestWeapons.Make("Maul", range: 60, damage: 50, cost: 30),
+            x: 5 * GameConstants.Tile + 16, y: 5 * GameConstants.Tile + 16);
+        var dummy = new EnemyState
+        {
+            X = 5 * GameConstants.Tile + 16 + 40f,
+            Y = 5 * GameConstants.Tile + 16,
+            Weapon = TestWeapons.Get("hatchet"),
+        };
+        var turns = new TurnSystem(new int[20, 20], new[] { member }, new[] { dummy }, () => 10, mapSeed: 1);
+        string? beat = null;
+        var before = (dummy.RevivalDamage, dummy.RevivalMaxHp);
+        turns.EnemyResurrected += e => beat = DungeonHud.RevivalBeat(e.RevivalDamage - before.RevivalDamage, e.RevivalMaxHp - before.RevivalMaxHp);
+        Assert.True(turns.TryAttack(member, dummy));
+        Assert.Equal((false, 2), (dummy.Alive, dummy.DefeatCount));
+        while (!dummy.Alive)
+        {
+            turns.EndTurn();
+            for (float t = 0f; t < 3f; t += 1f / 30f)
+                turns.Update(1f / 30f);
+        }
+
+        Assert.True(dummy.RevivalDamage > 0 && dummy.RevivalMaxHp > 0);
+        Assert.Equal($"STRONGER +{dummy.RevivalDamage} DMG +{dummy.RevivalMaxHp} HP", beat);
+    }
+
+    [Fact]
+    public void TheBossFloorBannerStatesTheTradeBeforeTheFight()
+    {
+        // Settled's backlog: surface the boss floor's trade in the encounter
+        // before a player commits (§4.3). Arriving on the boss floor with the boss
+        // standing, the banner says who waits there and what beating it costs —
+        // the tutorial closes for good; anywhere else the dungeon locks for as many
+        // runs as its floor, and leaving without the fight re-rolls the depth.
+        // Above the bottom it says nothing, which would disclose the depth; and
+        // once the boss is down there is no trade left to state.
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Empty(DungeonHud.BossFloorBanner(tutorial));
+        GoDown(tutorial, party);
+        Assert.Equal(new[] { "THE STONE GOLEM WAITS ON THIS FLOOR", "BEATING IT CLOSES THE TUTORIAL FOR GOOD" },
+            DungeonHud.BossFloorBanner(tutorial));
+        tutorial.RecordBossDefeated();
+        Assert.Empty(DungeonHud.BossFloorBanner(tutorial));
+
+        // The Spear Hall on a seed it rolls seven floors on: nothing on the way
+        // down, then the lock — seven runs, the floor times the tuning's runs a
+        // floor, as the visit itself states it — and the re-roll.
+        var spearHall = GameContent.Current.Dungeons["spear_hall"];
+        var hall = DungeonState.Enter(spearHall, 7, party);
+        Assert.Equal(7, hall.BossFloor);
+        hall.OpenTurns(party, () => 10);
+        while (hall.Current.DownStairs is not null)
+        {
+            Assert.Empty(DungeonHud.BossFloorBanner(hall));
+            GoDown(hall, party);
+        }
+        Assert.Equal(7, hall.LockRuns);
+        Assert.Equal(new[]
+        {
+            "THE SPEAR WARDEN WAITS ON THIS FLOOR",
+            "BEATING IT LOCKS THE SPEAR HALL FOR 7 RUNS",
+            "LEAVE WITHOUT IT AND THE DEPTH RE-ROLLS",
+        }, DungeonHud.BossFloorBanner(hall));
+    }
+
+    [Fact]
+    public void WhenTheBossFallsNothingRevives_AndTheFloorLineSaysSo()
+    {
+        // The boss's fall says who fell and what it means, and from then on the
+        // floor line says what the dungeon has become — on every floor, up to the
+        // way out — and still never how deep it goes.
+        var tutorial = GameContent.Current.Dungeons.Tutorial;
+        var golem = DungeonState.BossRow(tutorial, TestWeapons.Get("hatchet"));
+        Assert.Equal(("THE STONE GOLEM FALLS", "NOTHING REVIVES - FIGHT YOUR WAY OUT"), DungeonHud.BossFalls(golem));
+
+        var party = Party();
+        var visit = DungeonState.Enter(tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        GoDown(visit, party);
+        Assert.Equal("THE TUTORIAL - FLOOR 2", DungeonHud.FloorLine(visit));
+
+        visit.RecordBossDefeated();
+        Assert.Equal("THE TUTORIAL - FLOOR 2 - NOTHING REVIVES", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 2", DungeonHud.ArrivalBanner(visit));
+
+        Gather(visit, party, visit.Current.UpStairs, party.Length);
+        visit.Ascend(party);
+        visit.OpenTurns(party, () => 10);
+        string line = DungeonHud.FloorLine(visit);
+        Assert.Equal("THE TUTORIAL - FLOOR 1 - NOTHING REVIVES", line);
+        Assert.DoesNotContain("/", line);
+        Assert.DoesNotContain("OF", line.Split(' '));
+    }
+
+    [Fact]
+    public void AUniqueDropIsCalledOut_AndTheBossesDropNamesItsTheme()
+    {
+        // 4.3's presentation: a unique's name lands with a beat - whether the
+        // farm's lottery paid out or the boss's graft took its theme's Purity
+        // variant to x3 - and the boss's fall says what it left, forged with its
+        // dungeon's theme, of whatever class it came as.
+        var bulwark = new Drop(TestWeapons.Get("the_bulwark"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal("UNIQUE: THE BULWARK!", DungeonHud.UniqueBeat(bulwark));
+        Assert.Equal("UNIQUE: WIDOWMAKER!", DungeonHud.UniqueBeat(new Drop(TestWeapons.Get("widowmaker"), 40, WasUniqueRoll: true)));
+        Assert.Null(DungeonHud.UniqueBeat(new Drop(TestWeapons.Get("tower_guard"), 7, WasUniqueRoll: false)));
+
+        var bow = new Drop(GameContent.Current.Weapons.Instantiate("hunting_bow", forgedGraft: Block), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.Equal("DROPPED: HUNTING BOW - FORGED WITH BLOCK", DungeonHud.BossDropLine(bow, Block));
+        Assert.Equal("DROPPED: THE BULWARK - UNIQUE", DungeonHud.BossDropLine(bulwark, Block));
+        var knife = new Drop(GameContent.Current.Weapons.Instantiate("flensing_knife", forgedGraft: CritWindow), 0, false);
+        Assert.Equal("DROPPED: FLENSING KNIFE - FORGED WITH CRIT WINDOW", DungeonHud.BossDropLine(knife, CritWindow));
+        Assert.Equal("DROPPED: FLENSING KNIFE", DungeonHud.BossDropLine(knife, null));
+
+        // Every name the HUD gives a theme is the modifier's own words, in capitals.
+        Assert.Equal(new[] { "BLOCK", "BRACE", "LONGSHOT", "CRIT WINDOW", "CHARGES" },
+            new[] { Block, Brace, Longshot, CritWindow, Charges }.Select(DungeonHud.ModifierName));
+
+        // On the floor, the boss's drop is a weapon like any other: its name - a
+        // unique's in gold - and no count, since nobody farmed it.
+        Assert.Equal(new[] { "Hunting Bow" }, Item(bow));
+        Assert.Equal(new[] { "The Bulwark" }, Item(bulwark));
     }
 
     [Fact]
@@ -218,6 +500,40 @@ public class HudTextTests
         var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
         Assert.Equal(new[] { "Widowmaker", "x22" }, Item(won));
         Assert.NotEqual(DungeonHud.GroundItemRuns(farmed)[0].Color, DungeonHud.GroundItemRuns(won)[0].Color);
+    }
+
+    [Fact]
+    public void ALooseItemIsLabelledAsItself()
+    {
+        // A weapon the party put down (4.4) is labelled by what it is, and by
+        // nothing a corpse's drop carries. It has no xN, because the farm's depth
+        // was the dummy's and not the weapon's. It has no corpse behind it: a
+        // loose item is a weapon and a tile. The label is its name alone, a
+        // unique's in the same gold as everywhere else.
+        static string[] Loose(LooseItem item) => DungeonHud.LooseItemRuns(item).Select(r => r.Text).ToArray();
+
+        var farmed = new Drop(TestWeapons.Get("tower_guard"), DefeatCount: 7, WasUniqueRoll: false);
+        Assert.Equal(new[] { "Tower Guard", "x7" }, Item(farmed));                          // on its corpse it wore the farm's depth
+        Assert.Equal(new[] { "Tower Guard" }, Loose(new LooseItem(farmed.Weapon, (5, 5))));   // put down, it is the weapon alone
+
+        var won = new Drop(TestWeapons.Get("widowmaker"), DefeatCount: 22, WasUniqueRoll: true);
+        var unique = DungeonHud.LooseItemRuns(new LooseItem(won.Weapon, (5, 5)));
+        Assert.Equal(new[] { "Widowmaker" }, unique.Select(r => r.Text));
+        Assert.Equal(DungeonHud.GroundItemRuns(won)[0].Color, unique[0].Color);
+        Assert.NotEqual(DungeonHud.LooseItemRuns(new LooseItem(farmed.Weapon, (5, 5)))[0].Color, unique[0].Color);
+
+        // The record is the weapon and its tile. It has no corpse, no drop and no count to read a label from.
+        Assert.Equal(new[] { nameof(LooseItem.Tile), nameof(LooseItem.Weapon) },
+            typeof(LooseItem).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
+
+        // On a real floor: a member puts its bag weapon down, and the label is its name alone.
+        var party = Party();
+        party[0].Inventory[1] = TestWeapons.Get("tower_guard");
+        var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        var left = visit.Current.Leave(party[0], 1);
+        Assert.Equal(new[] { "Tower Guard" }, Loose(left));
+        Assert.DoesNotContain(Loose(left), text => text.StartsWith('x'));
     }
 
     [Fact]
@@ -387,5 +703,409 @@ public class HudTextTests
                 Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
                 Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
             }
+    }
+
+    [Fact]
+    public void InventoryLayout_SixSlotsFitA720Window()
+    {
+        // 4.4's six slots a member (PHASE4-141) in the shipped 1280 x 720 window:
+        // the panel slides up to make room for the three extra slots, and still
+        // prints every progression row the layout keeps, with the swap line and
+        // the key hint clear of the help line at h - 24.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal(6, slots);
+        Assert.Equal(slots, TestPools.Char("A").Inventory.Length);
+        const int most = 2 + 8;   // the two pools and every weapon class at once
+
+        for (int rows = 0; rows <= most; rows++)
+        {
+            var layout = DungeonHud.LayoutInventory(720f, slots, rows);
+            Assert.Equal(rows, layout.Rows);                          // every row printed
+            Assert.True(layout.Top >= 56f, $"rows={rows}: over the top readouts");
+            Assert.True(layout.Bottom <= 720f - 24f, $"rows={rows}: past the help line");
+        }
+
+        var full = DungeonHud.LayoutInventory(720f, slots, most);
+        Assert.True(full.Top < 720f / 2f - 150f);   // slid up from where the three-slot panel opened
+
+        // And past 720 the invariant the three-slot panel keeps holds for six too:
+        // what is drawn clears the help line, or every row it could drop has gone.
+        for (int h = 240; h <= 1600; h += 2)
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(h, slots, rows);
+                Assert.InRange(layout.Rows, 0, rows);
+                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
+                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
+            }
+    }
+
+    [Fact]
+    public void TheEquipHintNamesEveryBagSlot()
+    {
+        // The panel numbers slots from 1 -- the hand is 1 -- and a number key equips
+        // the bag slot printed with it, so six slots are equipped with 2-6 (PHASE4-143).
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(PartyMemberState.InventorySlots));
+        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(TestPools.Char("A").Inventory.Length));
+
+        // It is read off the slots, so a carry tuned differently reads differently:
+        // Phase 3's three, a bag of one, and no bag at all.
+        Assert.Equal("PRESS 2-3 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(3));
+        Assert.Equal("PRESS 2 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(2));
+        Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1));
+
+        // It never names a key the scene does not bind: past the last number key,
+        // it names the keys there are.
+        Assert.Equal(9, DungeonScene.HighestSlotKey);
+        Assert.Equal("PRESS 2-8 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(8));
+        Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(12));
+    }
+
+    [Fact]
+    public void TheLeaveHintNamesItsKeys()
+    {
+        // In the bag, X arms "leave" (4.4), and while it is armed the key hint
+        // asks which weapon to put down: by the bag's own numbers, the same keys
+        // that equip, read off the same slots, with X again to back out. Never 1:
+        // the weapon in hand is not put down this way.
+        int slots = PartyMemberState.InventorySlots;
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots));
+        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(TestPools.Char("A").Inventory.Length));
+
+        var words = DungeonHud.LeaveHint(slots).Split([' ', '?'], StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("X", words);
+        Assert.Contains("CANCELS", words);
+        Assert.DoesNotContain("1", DungeonHud.LeaveHint(slots));
+
+        // The same keys the equip hint names, whatever depth the carry is tuned to:
+        // Phase 3's three, a bag of one, the deepest the number row reaches, and
+        // no key past it. A hand and no bag has nothing to put down.
+        foreach (int n in new[] { 2, 3, 6, 8, 12 })
+        {
+            string keys = DungeonHud.EquipHint(n).Split(' ')[1];   // PRESS 2-6 TO EQUIP: the keys
+            Assert.Equal($"LEAVE WHICH? {keys} - X CANCELS", DungeonHud.LeaveHint(n));
+        }
+        Assert.Equal("LEAVE WHICH? 2 - X CANCELS", DungeonHud.LeaveHint(2));
+        Assert.Equal("LEAVE WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12));
+        Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1));
+
+        // Unarmed, the panel names the key, so X can be found at all. An armed
+        // number on an empty slot says so by the number pressed, and a weapon put
+        // down says what was left, answered by TOOK when it is taken back.
+        Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
+        Assert.Equal("SLOT 3 IS EMPTY", DungeonHud.EmptySlotCue(2));
+        Assert.Equal("SLOT 6 IS EMPTY", DungeonHud.EmptySlotCue(5));
+        Assert.Equal("LEFT HATCHET HERE", DungeonHud.LeftBeat(TestWeapons.Get("hatchet")));
+
+        // And a full bag's refusal is still a carry limit, not a fault, and now
+        // says how to make room: open the bag, and X.
+        string full = DungeonHud.BagFullCue(slots);
+        Assert.Equal("BAG FULL - 6 CARRIED - I THEN X LEAVES ONE", full);
+        Assert.Contains("X", full.Split(' '));
+        Assert.Contains("I", full.Split(' '));
+    }
+
+    [Fact]
+    public void TheFloorLineNamesTheFloorAndNeverTheDepth()
+    {
+        // PHASE4-024: the boss floor is rolled at entry and not disclosed - the
+        // player learns the depth only by reaching the bottom, which is what keeps
+        // the depth-scaled payout from being scummed. So the floor line and the
+        // arrival banner name the dungeon and the floor number, and nothing that
+        // would tell a deep roll from a shallow one: no "of N", no "3/7".
+        var spearHall = GameContent.Current.Dungeons["spear_hall"];
+        const long SevenDeep = 7;   // a seed the Spear Hall rolls seven floors on
+        var party = Party();
+        var visit = DungeonState.Enter(spearHall, SevenDeep, party);
+        Assert.Equal(7, visit.BossFloor);
+        visit.OpenTurns(party, () => 10);
+
+        Assert.Equal("THE SPEAR HALL - FLOOR 1", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 1", DungeonHud.ArrivalBanner(visit));
+
+        GoDown(visit, party);
+        GoDown(visit, party);
+        Assert.Equal(2, visit.FloorIndex);
+        Assert.Equal("THE SPEAR HALL - FLOOR 3", DungeonHud.FloorLine(visit));
+        Assert.Equal("FLOOR 3", DungeonHud.ArrivalBanner(visit));
+
+        // Every floor above the bottom, the third among them: the number of the
+        // floor stood on, and never the seven, a slash, or an "of".
+        while (visit.Current.DownStairs is not null)
+        {
+            foreach (string shown in new[] { DungeonHud.FloorLine(visit), DungeonHud.ArrivalBanner(visit) })
+            {
+                Assert.Contains($"FLOOR {visit.FloorIndex + 1}", shown);
+                Assert.DoesNotContain("7", shown);
+                Assert.DoesNotContain("/", shown);
+                Assert.DoesNotContain("OF", shown.Split(' '));
+            }
+            GoDown(visit, party);
+        }
+
+        // Reached, the bottom is simply the floor the party stands on: it is its
+        // number now because the party is there, not because the line knew.
+        Assert.Equal(visit.BossFloor, visit.FloorIndex + 1);
+        Assert.Equal("THE SPEAR HALL - FLOOR 7", DungeonHud.FloorLine(visit));
+
+        // And the line is the same on the same floor of any depth: a five-floor
+        // visit's first floor reads exactly as a ten-floor one's.
+        var shallow = DungeonState.Enter(spearHall, 4, party);
+        var deep = DungeonState.Enter(spearHall, 6, party);
+        Assert.Equal((5, 10), (shallow.BossFloor, deep.BossFloor));
+        Assert.Equal(DungeonHud.FloorLine(shallow), DungeonHud.FloorLine(deep));
+        Assert.Equal(DungeonHud.ArrivalBanner(shallow), DungeonHud.ArrivalBanner(deep));
+    }
+
+    [Fact]
+    public void EveryStairSaysWhatItDoes_OrWhyNot()
+    {
+        // Each stair is labelled by what it does (4.2) - the first floor's
+        // up-stairs are the way out, every other floor's the way up, and the
+        // bottom has no way down - and standing on one, the cue says what E does
+        // there, or why the party cannot take it yet.
+        Assert.Equal("STAIRS DOWN", DungeonHud.StairLabel(Stair.Down));
+        Assert.Equal("STAIRS UP", DungeonHud.StairLabel(Stair.Up));
+        Assert.Equal("WAY OUT", DungeonHud.StairLabel(Stair.Exit));
+
+        var tile = (R: 5, C: 5);
+        Assert.Equal("E: DESCEND", DungeonHud.StairCue(new StairUse(Stair.Down, tile), null, 4, 4));
+        Assert.Equal("E: CLIMB", DungeonHud.StairCue(new StairUse(Stair.Up, tile), null, 4, 4));
+        Assert.Equal("E: LEAVE THE DUNGEON", DungeonHud.StairCue(new StairUse(Stair.Exit, tile), null, 4, 4));
+        Assert.Equal("GATHER THE PARTY - 2 OF 4 HERE",
+            DungeonHud.StairCue(new StairUse(Stair.Down, tile), StairRefusal.PartyNotGathered, 2, 4));
+
+        // Outside the party's turn the cue is not drawn and E says nothing, so
+        // there is nothing for it to say.
+        Assert.Null(DungeonHud.StairCue(new StairUse(Stair.Down, tile), StairRefusal.NotThePlayersTurn, 4, 4));
+
+        // On a real visit the kinds are the visit's, and so are the numbers. The
+        // tutorial's first floor holds the way out and a way down...
+        var party = Party();
+        var visit = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        visit.OpenTurns(party, () => 10);
+        var first = visit.Current;
+        Assert.Equal(new[] { "WAY OUT", "STAIRS DOWN" },
+            DungeonState.StairsOf(first).Select(s => DungeonHud.StairLabel(s.Kind)));
+
+        // ...and two of the four gathered at the down-stairs are two short, the
+        // count the cue prints being the visit's own: the living within reach, of
+        // the living. The fallen are carried, so they are counted in neither.
+        var down = DungeonState.StairsOf(first).Single(s => s.Kind == Stair.Down);
+        Gather(visit, party, down.Tile, 2);
+        var refusal = visit.CanUse(down, party);
+        Assert.Equal(StairRefusal.PartyNotGathered, refusal);
+        Assert.Equal("GATHER THE PARTY - 2 OF 4 HERE",
+            DungeonHud.StairCue(down, refusal, visit.Gathered(party, down.Tile), party.Count(m => m.Alive)));
+        party[3].Alive = false;
+        Assert.Equal("GATHER THE PARTY - 2 OF 3 HERE",
+            DungeonHud.StairCue(down, visit.CanUse(down, party), visit.Gathered(party, down.Tile), party.Count(m => m.Alive)));
+        party[3].Alive = true;
+
+        // All four there, the cue is the verb; and below, on the tutorial's
+        // bottom floor, the only stair leads back up.
+        Gather(visit, party, down.Tile, party.Length);
+        Assert.Equal("E: DESCEND",
+            DungeonHud.StairCue(down, visit.CanUse(down, party), visit.Gathered(party, down.Tile), party.Length));
+        visit.Descend(party);
+        visit.OpenTurns(party, () => 10);
+        Assert.Null(visit.Current.DownStairs);
+        Assert.Equal(new[] { "STAIRS UP" }, DungeonState.StairsOf(visit.Current).Select(s => DungeonHud.StairLabel(s.Kind)));
+    }
+
+    [Fact]
+    public void HelpLine_NamesTheStairsKey()
+    {
+        // E takes the stairs whatever the member is holding, so the keys every
+        // turn shares name it - for a swing, a cast, a wand's aim, a held shot,
+        // and an empty hand alike.
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("tower_guard")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("staff_of_renewal")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("wand_of_the_nova", DamageType.Acidic)));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(Holding("crossbow")));
+        Assert.Contains("E STAIRS", DungeonHud.HelpLine(TestPools.Holding("A", null)));
+    }
+
+    [Fact]
+    public void TheLeavePromptNamesItsKeys()
+    {
+        // Leaving discards the whole visit (4.1), so the way out asks first, and
+        // the question names the keys that answer it: E or ENTER for yes, ESC for
+        // no. Never a number: 2 on the pause menu is the exit from the game.
+        string prompt = DungeonHud.LeavePrompt();
+        Assert.Equal("LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO", prompt);
+
+        var words = prompt.Split([' ', ':', '-', '?'], StringSplitOptions.RemoveEmptyEntries);
+        Assert.Contains("E", words);
+        Assert.Contains("ENTER", words);
+        Assert.Contains("ESC", words);
+        Assert.DoesNotContain("2", prompt);
+        Assert.DoesNotContain(prompt, char.IsDigit);
+    }
+
+    [Fact]
+    public void TheLeavePromptSaysWhatLeavingCosts()
+    {
+        // The way out's question previews the answer (4.4), since the answer ends
+        // the run: with the boss down, a clear - what you carry goes home, and the
+        // dungeon closes for good or locks for its floor in runs; with it standing,
+        // a retreat - the XP kept, the depth re-rolled where it can be, and whether
+        // the party got deep enough for the run to count (6.3's mercy) - a rule,
+        // never the depth. And either way the whole visit goes. The tutorial is two
+        // floors deep on every visit (PHASE4-077), so its retreat re-rolls nothing
+        // and says nothing of a new depth.
+        const string reset = "EVERY FLOOR RESETS - THE NEXT VISIT IS A NEW DUNGEON";
+        var party = Party();
+        var tutorial = DungeonState.Enter(GameContent.Current.Dungeons.Tutorial, 2762136374, party);
+        tutorial.OpenTurns(party, () => 10);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT", "TOO SHALLOW TO COUNT AS A RUN", reset },
+            DungeonHud.LeavePreview(tutorial));
+        GoDown(tutorial, party);
+        Assert.Equal("TOO SHALLOW TO COUNT AS A RUN", DungeonHud.LeavePreview(tutorial)[1]);   // its two floors never reach the bar
+        tutorial.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE TUTORIAL CLOSES FOR GOOD", reset },
+            DungeonHud.LeavePreview(tutorial));
+
+        // The Spear Hall, seven floors deep: three floors down is deep enough to
+        // count, and nothing says how deep it goes until its boss is down, when the
+        // lock it writes is the floor's.
+        var hall = DungeonState.Enter(GameContent.Current.Dungeons["spear_hall"], 7, party);
+        Assert.Equal(7, hall.BossFloor);
+        hall.OpenTurns(party, () => 10);
+        GoDown(hall, party);
+        GoDown(hall, party);
+        var retreat = DungeonHud.LeavePreview(hall);
+        Assert.Equal(new[] { "NO BOSS - A RETREAT: XP KEPT, THE DEPTH RE-ROLLS", "DEEP ENOUGH TO COUNT AS A RUN", reset }, retreat);
+        Assert.DoesNotContain(retreat, line => line.Contains('7'));
+        hall.RecordBossDefeated();
+        Assert.Equal(new[] { "THE BOSS IS DOWN - YOU KEEP WHAT YOU CARRY", "THE SPEAR HALL LOCKS FOR 7 RUNS", reset },
+            DungeonHud.LeavePreview(hall));
+    }
+
+    [Fact]
+    public void TheRunSummaryNamesTheOutcome()
+    {
+        // 4.4's three outcomes, as the run's end shows them: what the run was, where
+        // and how deep, the boss - its floor only where the party reached it - the
+        // spoils kept or lost by name, the XP kept or clawed back member by member,
+        // whether the run counted, the lock or the closing, and ENTER TO CONTINUE:
+        // the one key the summary answers. Never ESC.
+        static string[] Lines(RunResult result, string? next = null) => DungeonHud.RunSummaryLines(result, next).Select(r => r.Text).ToArray();
+        var bulwark = TestWeapons.Get("the_bulwark");
+        var tower = TestWeapons.Get("tower_guard");
+
+        var cleared = new RunResult("tutorial", RunOutcome.BossKill, BossDefeated: true, DeepestFloor: 2, BossFloorRevealed: 2,
+            ServiceTick: true, MercyTick: false, RunCounter: 1, LockedUntilRun: null, Retired: true,
+            SpoilsKept: [bulwark, tower], SpoilsLost: [], Clawbacks: []);
+        Assert.Equal(new[]
+        {
+            "CLEARED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM FELL ON FLOOR 2",
+            "SPOILS KEPT: THE BULWARK, TOWER GUARD",
+            "XP KEPT",
+            "RUN COUNTED - 1 RUN SO FAR",
+            "THE TUTORIAL IS CLOSED FOR GOOD",
+            "ENTER TO CONTINUE - NEXT: THE SPEAR HALL",
+        }, Lines(cleared, "The Spear Hall"));
+
+        // A fighting retreat from floor 3 of a dungeon seven deep: counted as a
+        // mercy, nothing to keep, and the depth never named.
+        var retreat = new RunResult("spear_hall", RunOutcome.Retreat, false, 3, null, true, true, 4, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE SPEAR HALL - DEEPEST FLOOR 3",
+            "THE SPEAR WARDEN STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN COUNTED - A MERCY FOR FAILING DEEP - 4 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(retreat));
+        Assert.DoesNotContain(Lines(retreat), line => line.Contains('7'));
+
+        // Killed the boss and died on the way out: the clear stands, the spoils
+        // and a share of the XP do not.
+        var died = new RunResult("spear_hall", RunOutcome.Death, true, 5, 5, true, false, 3, 8, false, [], [tower],
+            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)]);
+        Assert.Equal(new[]
+        {
+            DungeonHud.DefeatHeadline,
+            "THE SPEAR HALL - DEEPEST FLOOR 5",
+            "THE SPEAR WARDEN FELL ON FLOOR 5",
+            "SPOILS LOST: TOWER GUARD",
+            "XP CLAWED BACK:",
+            "A: DAGGER -22, HP -6",
+            "C: AXE -15",
+            "RUN COUNTED - 3 RUNS SO FAR",
+            "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
+            "ENTER TO CONTINUE",
+        }, Lines(died));
+        Assert.Equal("DEFEATED", DungeonHud.DefeatHeadline);
+
+        // Dead in the tutorial, the golem standing: nothing counted, and nothing
+        // clawed back, the run having gained nothing (or the share being 0). Its two
+        // floors never reach the mercy floor and never change, so the summary points
+        // at no floor 3 it does not have and promises no new depth.
+        var shallow = new RunResult("tutorial", RunOutcome.Death, false, 2, null, false, false, 0, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "DEFEATED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM STILL STANDS",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT - NOTHING CLAWED BACK",
+            "RUN NOT COUNTED - 0 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(shallow));
+
+        // Walked out past the golem it found: its floor named, and still no re-roll.
+        var waited = new RunResult("tutorial", RunOutcome.Retreat, false, 2, 2, false, false, 0, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE TUTORIAL - DEEPEST FLOOR 2",
+            "THE STONE GOLEM WAITED ON FLOOR 2",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN NOT COUNTED - 0 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(waited));
+
+        // A dungeon that rolls its depth says both: the re-roll, and the rule a
+        // shallow failure missed - or, from its boss floor, the floor it found.
+        var turnedBack = new RunResult("spear_hall", RunOutcome.Retreat, false, 2, null, false, false, 4, null, false, [], [], []);
+        Assert.Equal(new[]
+        {
+            "RETREATED",
+            "THE SPEAR HALL - DEEPEST FLOOR 2",
+            "THE SPEAR WARDEN STILL STANDS - THE DEPTH RE-ROLLS NEXT TIME",
+            "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
+            "XP KEPT",
+            "RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR 3 - 4 RUNS SO FAR",
+            "ENTER TO CONTINUE",
+        }, Lines(turnedBack));
+        var faced = new RunResult("spear_hall", RunOutcome.Retreat, false, 7, 7, true, true, 5, null, false, [], [], []);
+        Assert.Equal("THE SPEAR WARDEN WAITED ON FLOOR 7 - THE DEPTH RE-ROLLS NEXT TIME", Lines(faced)[2]);
+
+        // A long haul wraps rather than running off the panel, every name once.
+        var haul = Enumerable.Range(0, 12).Select(_ => TestWeapons.Get("weakspot_stiletto")).Append(bulwark).ToArray();
+        var hauled = Lines(cleared with { SpoilsKept = haul });
+        var spoils = hauled.SkipWhile(l => !l.StartsWith("SPOILS KEPT:", StringComparison.Ordinal)).TakeWhile(l => l != "XP KEPT").ToArray();
+        Assert.True(spoils.Length > 1);
+        Assert.All(hauled, line => Assert.True(line.Length <= 70, $"'{line}' runs off the panel"));
+        Assert.Equal(12, spoils.Sum(l => l.Split("WEAKSPOT STILETTO").Length - 1));
+        Assert.Single(spoils, l => l.Contains("THE BULWARK"));
+
+        // ENTER is the one way on, on every ending: never ESC, never a quit.
+        foreach (var result in new[] { cleared, retreat, died, shallow, waited, turnedBack, faced })
+        {
+            var lines = Lines(result);
+            Assert.StartsWith(DungeonHud.ContinueHint, lines[^1], StringComparison.Ordinal);
+            var words = lines.SelectMany(l => l.Split([' ', ':', '-', ','], StringSplitOptions.RemoveEmptyEntries));
+            Assert.DoesNotContain("ESC", words);
+            Assert.DoesNotContain("QUIT", words);
+        }
+        Assert.Equal("ENTER TO CONTINUE", DungeonHud.ContinueHint);
     }
 }

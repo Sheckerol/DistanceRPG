@@ -191,10 +191,38 @@ public sealed class PartyMemberState : ActorState
             throw new ArgumentException($"{credit.Pool} is the member's own pool and levels no class; it named {credit.Class}.", nameof(credit));
     }
 
-    /// <summary>Weapon slots a member carries. A roster entry's starting weapon and bag are checked against it at load, so a bag too deep to spawn aborts startup.</summary>
-    public const int InventorySlots = 3;
+    /// <summary>
+    /// Weapon slots a member carries: the party's carry
+    /// (<see cref="Tuning.PartyCarrySlots"/>, §4.4's 24) shared evenly among its
+    /// <see cref="GameConstants.PartySize"/> members — six each, replacing the
+    /// three that were a testing remnant. Slot 0 is the weapon in hand; the rest
+    /// are the bag, and loot and weapons share them — there is no haul bag, so
+    /// every drop carried out is a weapon that could have been swung.
+    /// <para>
+    /// Read from the current content when a member is built, so a member keeps
+    /// the count it was built with. A roster entry's starting weapon and bag are
+    /// checked against the same number at load, so a bag too deep to spawn
+    /// aborts startup.
+    /// </para>
+    /// </summary>
+    public static int InventorySlots => SlotsFor(GameContent.Current.Tuning);
 
-    /// <summary>Three slots; slot 0 is the equipped weapon.</summary>
+    /// <summary>
+    /// The slots a member carries under <paramref name="tuning"/>: its carry over
+    /// the party's size. <see cref="ContentValidator.ValidateTuning"/> refuses a
+    /// carry that does not divide evenly, a slot or more each, so nothing is lost
+    /// to the division, and one that shares out past
+    /// <see cref="GameConstants.MaxInventorySlots"/>, so every slot has a key.
+    /// Content being loaded passes its own tuning, since the content
+    /// <see cref="InventorySlots"/> reads is not current yet.
+    /// </summary>
+    internal static int SlotsFor(Tuning tuning)
+    {
+        ArgumentNullException.ThrowIfNull(tuning);
+        return tuning.PartyCarrySlots / GameConstants.PartySize;
+    }
+
+    /// <summary>The member's <see cref="InventorySlots"/> slots, six under the shipped tuning; slot 0 is the equipped weapon.</summary>
     public Weapon?[] Inventory { get; } = new Weapon?[InventorySlots];
 
     public override Weapon? EquippedWeapon => Inventory[0];
@@ -221,6 +249,50 @@ public sealed class PartyMemberState : ActorState
         SavedMovement = 0;
         EffectiveMax = StatusBehaviours.MiredBudget(this, GameConstants.MaxDistance + bonus);
         DistLeft = EffectiveMax;
+    }
+
+    /// <summary>
+    /// The rest before a dungeon (§4.1): the member walks in whole — alive, HP
+    /// full, mana full to the spendable ceiling (<see cref="ActorState.UsableMaxMana"/>,
+    /// the pool a spend reads, §3.3), every status shed, and the turn's budget
+    /// as a turn with nothing banked starts it: the base movement, no saved
+    /// bonus, no shot held. The permanent half is untouched — the weapons
+    /// carried, the XP earned, the innate spread — because a rest is between
+    /// runs and never a reset of the campaign.
+    /// <para>
+    /// <strong>And armed, if there is anything to arm it with.</strong> A wipe
+    /// takes the run's spoils out of the bags (§4.4), and a spoil the member had
+    /// taken up in hand leaves the hand empty; so an empty hand takes the first
+    /// weapon carried in the bag, moved rather than copied, before the member
+    /// walks into the next dungeon. A hand already holding something is left as
+    /// it is, and a member carrying nothing stays unarmed.
+    /// </para>
+    /// <para>
+    /// Taken at the next entry, not when a run ends, so the run's end still
+    /// shows the fallen as fallen.
+    /// </para>
+    /// </summary>
+    public void Rest()
+    {
+        if (Inventory[0] is null)
+        {
+            for (int slot = 1; slot < Inventory.Length; slot++)
+            {
+                if (Inventory[slot] is not { } carried) continue;
+                Inventory[0] = carried;
+                Inventory[slot] = null;
+                break;
+            }
+        }
+
+        Alive = true;
+        StatusEffects.Clear();
+        Hp = MaxHp;
+        Mana = UsableMaxMana;
+        HeldShots = 0;
+        SavedMovement = 0;
+        EffectiveMax = GameConstants.MaxDistance;
+        DistLeft = GameConstants.MaxDistance;
     }
 
     /// <summary>
