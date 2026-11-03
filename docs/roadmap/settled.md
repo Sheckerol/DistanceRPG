@@ -4487,3 +4487,26 @@ see [phase-7-death](phase-7-death.md).
 - **Gear never punishes you; death is the one thing that takes back, and it
   takes run XP.** §6.1's "no punishment mechanics" is narrowed to equipment
   accordingly.
+- **PHASE 7 DECISION 1 — leaving with a fallen member (§7.5), ruled
+  2026-11-03.** Leaving ends the encounter: a member carried out the way out
+  revives and pays the death cut before the run ends, so the next baseline is
+  taken after it and a body cannot be carried home to dodge it. The stairs work
+  the same way from the other side: the arrival check on the new floor revives
+  the fallen if no live enemy is in view there.
+- **PHASE 7 DECISION 2 — the stored outcome is `PartyWipe` (§7.4, §7.7), ruled
+  2026-11-03.** `RunOutcome.Death` is renamed `PartyWipe` in code, on screen
+  (`PARTY WIPE`) and in the save, taken with save version 4 and a migration step
+  that rewrites a stored `"Death"`. Changing the save format is cheap at this
+  point, and "party wipe" says exactly what ended the run.
+- **PHASE 7 DECISION 3 — a save taken while a member is down (§7.2, §5.1), ruled
+  2026-11-03.** Accepted with no new field: `ActorDto.Alive` already records it,
+  and the member revives at the first turn-start check after the load that finds
+  no live enemy in view. A Phase 6b save loaded under Phase 7 follows Phase 7's
+  rules — the rule changed, not the save.
+- **PHASE 7 DECISION 4 — a revived member's mana (§7.1), ruled 2026-11-03.**
+  As it was when they fell, capped at their new `UsableMaxMana`. Only HP is
+  refilled: dying never tops up a caster better than the members who survived.
+- **PHASE 7 DECISION 5 — when a revive happens (§7.2), ruled 2026-11-03.** At
+  the start of the player turn that finds no live enemy in view — the moment the
+  game already drops into movement mode — never mid-turn when the last enemy in
+  view falls.

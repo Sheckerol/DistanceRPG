@@ -1368,36 +1368,3 @@ hub — `... - AND ITS BLOCK DROPS WITH IT`; (d) the count in other words: `1 RE
 CLEAR` (§6.6's "the first real clear"), `1 WORKER` (the docs' own), or a page line
 that drops `A COUNTED RUN` for the room to say `1 DUNGEON PAST THE TUTORIAL`.
 settled.md's Phase 6b implementation pass records the ruling.
-
-## Leaving with a fallen member (§7.1, §7.5) — PHASE 7 DECISION 1
-
-Today a fallen member is "carried, not gathered": the stairs and the way out
-count only the living (`DungeonState.Gathered`), and the body goes along. Under
-Phase 7 a member is down only until the encounter ends, so the question is what
-leaving does to them first.
-
-- **Taking the stairs down or up:** the arrival check runs `CombatEnded` on the
-  new floor, so they revive there if nothing is in view. Recommended; no ruling
-  needed unless you disagree.
-- **Taking the way out:** if leaving does *not* count as the encounter ending,
-  carrying a body out dodges the death cut — the member stands again free at the
-  next entry's rest, and the baseline is set with their full run gain. The
-  recommendation is that **leaving ends the encounter**: they revive and pay the
-  cut before the run ends, so the baseline is taken after it. The alternative
-  is to accept the dodge as the reward for getting a body home.
-
-## What the stored run outcome is called (§7.4, §5.4) — PHASE 7 DECISION 2
-
-`RunOutcome.Death` is written into the save by name (`LastResult.outcome`).
-Showing it as `WIPE` needs only the HUD; renaming the enum means a save version
-step that rewrites `"Death"` to `"Wipe"`. Recommended: **keep the stored name**
-and change only the words on screen — no version bump for a rename.
-
-## A save taken while a member is down (§7.2, §5.1) — PHASE 7 DECISION 3
-
-`ActorDto.Alive` already records a fallen member, so a mid-encounter save holds
-them down. On load, the turn resumes where it was; the member revives at the next
-turn-start check that finds nothing in view. Recommended: **accept that**, with
-no new save field. And a save from a Phase 6b build that holds a member carried
-down the stairs: the first check after the load revives them, paying the cut,
-under Phase 7's rules — the rule changed, not the save.
