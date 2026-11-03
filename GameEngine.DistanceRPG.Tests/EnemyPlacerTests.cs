@@ -83,17 +83,55 @@ public class EnemyPlacerTests
     }
 
     [Fact]
-    public void PlaceEnemies_AssignsValidWeaponIndices()
+    public void PlaceEnemies_AssignsResolvableWeaponIds()
     {
         var spawns = EnemyPlacer.PlaceEnemies(Map(), Seed);
+        var catalogue = GameContent.Current.Weapons;
 
-        Assert.All(spawns, s => Assert.InRange(s.WeaponIdx, 0, GameConstants.Weapons.Count - 1));
+        // Every id resolves, to one of the placed close-range classes or the healer's staff.
+        Assert.All(spawns, s =>
+        {
+            var def = catalogue[s.WeaponId];
+            Assert.True(EnemyPlacer.PlacedClasses.Contains(def.Class) || s.WeaponId == EnemyPlacer.HealerWeaponId,
+                $"{s.WeaponId} is a {def.Class}, which rank and file never roll");
+        });
 
         // Over a whole map the loadout should be mixed, not one weapon
         // (uniform draw across ~dozens of spawns — a single value would mean
         // the weapon roll is broken, not unlucky).
         if (spawns.Count >= 10)
-            Assert.True(spawns.Select(s => s.WeaponIdx).Distinct().Count() > 1);
+            Assert.True(spawns.Select(s => s.WeaponId).Distinct().Count() > 1);
+    }
+
+    [Fact]
+    public void PlaceEnemies_RollsFiveCloseRangeClasses_FourVariantsEach()
+    {
+        Assert.Equal(
+            new[] { WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe, WeaponClass.Throwing },
+            EnemyPlacer.PlacedClasses);
+
+        var catalogue = GameContent.Current.Weapons;
+        var placeable = EnemyPlacer.PlacedClasses
+            .SelectMany(cls => Enum.GetValues<VariantRole>().Select(role => catalogue.Variant(cls, role).Id))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(20, placeable.Count);
+
+        var rolled = new HashSet<string>(StringComparer.Ordinal);
+        for (long seed = 1; seed <= 40; seed++)
+        {
+            var map = MapGenerator.Generate(new Mulberry32(seed));
+            foreach (var (_, _, id) in EnemyPlacer.PlaceEnemies(map, seed))
+            {
+                if (id == EnemyPlacer.HealerWeaponId) continue;
+                Assert.Contains(id, placeable);
+                rolled.Add(id);
+            }
+        }
+
+        // Over enough maps every one of the twenty comes up, and nothing else
+        // ever does: no bow, no wand, no debuff staff until their AI exists.
+        Assert.True(placeable.SetEquals(rolled),
+            $"never rolled: {string.Join(", ", placeable.Except(rolled))}");
     }
 
     [Fact]
@@ -110,12 +148,13 @@ public class EnemyPlacerTests
                 return c >= room.X && c < room.X + room.W && r >= room.Y && r < room.Y + room.H;
             }).ToList();
 
-            int staves = inRoom.Count(s => s.WeaponIdx == GameConstants.StaffWeaponIdx);
+            int staves = inRoom.Count(s => s.WeaponId == EnemyPlacer.HealerWeaponId);
             Assert.InRange(staves, 0, 1); // never more than one healer per room
             if (staves == 1)
                 Assert.True(inRoom.Count >= GameConstants.MinEnemiesForStaffHealer,
                     "a healer should only appear in a room of 3+ enemies");
         }
+        Assert.Equal("staff_of_renewal", EnemyPlacer.HealerWeaponId);
     }
 
     [Fact]
@@ -124,7 +163,7 @@ public class EnemyPlacerTests
         var first = EnemyPlacer.PlaceEnemies(Map(), Seed);
         var second = EnemyPlacer.PlaceEnemies(Map(), Seed);
         Assert.Equal(
-            first.Select(s => s.WeaponIdx),
-            second.Select(s => s.WeaponIdx));
+            first.Select(s => s.WeaponId),
+            second.Select(s => s.WeaponId));
     }
 }

@@ -13,27 +13,37 @@ public static class EnemyPlacer
 {
     public const int MaxEnemiesPerRoom = 4;
 
+    /// <summary>The weapon a crowded room's healer is converted to.</summary>
+    public const string HealerWeaponId = "staff_of_renewal";
+
     /// <summary>Stream splitter so enemy placement never aliases the map stream.</summary>
     private const long SeedSalt = 0x9E3779B9;
 
     /// <summary>
+    /// The classes rank and file roll from: the five close-range martial
+    /// classes, until kiting AI and the wand placement scorer exist (settled).
+    /// The draw decodes to a class and a variant role, so the stream depends on
+    /// a count fixed here rather than on the catalogue's length: adding a
+    /// weapon re-rolls nobody.
+    /// </summary>
+    public static readonly IReadOnlyList<WeaponClass> PlacedClasses =
+        [WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe, WeaponClass.Throwing];
+
+    private static readonly int VariantsPerClass = Enum.GetValues<VariantRole>().Length;
+
+    /// <summary>
     /// Deterministic spawns for a map seed: logic-space centre positions plus a
-    /// weapon (index into <see cref="GameConstants.Weapons"/>) per dummy. Rank
-    /// and file roll only attack weapons; a crowded room
+    /// weapon id per dummy. Rank and file roll one of the placed classes' four
+    /// variants — a single draw per spawn, as before; a crowded room
     /// (<see cref="GameConstants.MinEnemiesForStaffHealer"/>+ enemies) may then
     /// convert one of its members into a staff healer.
     /// </summary>
-    public static List<(float X, float Y, int WeaponIdx)> PlaceEnemies(MapData map, long mapSeed)
+    public static List<(float X, float Y, string WeaponId)> PlaceEnemies(MapData map, long mapSeed)
     {
         var rng = new Mulberry32(mapSeed ^ SeedSalt);
-        var spawns = new List<(float X, float Y, int WeaponIdx)>();
-
-        // Ordinary enemies never roll a staff — it heals, it can't fight — so
-        // the loadout draw is restricted to the non-caster weapons.
-        var attackWeapons = new List<int>();
-        for (int i = 0; i < GameConstants.Weapons.Count; i++)
-            if (!GameConstants.Weapons[i].IsCaster)
-                attackWeapons.Add(i);
+        var spawns = new List<(float X, float Y, string WeaponId)>();
+        var catalogue = GameContent.Current.Weapons;
+        int loadouts = PlacedClasses.Count * VariantsPerClass;
 
         // DebugRooms is the pristine room list — FogBoxBuilder appends
         // synthetic union rooms to Rooms, which must not spawn anything.
@@ -53,10 +63,15 @@ public static class EnemyPlacer
                     int r = rng.NextInt(room.Y, room.Y + room.H - 1);
                     if (!taken.Add((r, c))) continue;
 
+                    // One draw, decoded as class then variant role — never a staff
+                    // or wand: a caster heals or shapes, it does not stand and fight.
+                    int k = rng.NextInt(0, loadouts - 1);
+                    var weapon = catalogue.Variant(PlacedClasses[k / VariantsPerClass], (VariantRole)(k % VariantsPerClass));
+
                     spawns.Add((
                         c * GameConstants.Tile + GameConstants.Tile / 2f,
                         r * GameConstants.Tile + GameConstants.Tile / 2f,
-                        attackWeapons[rng.NextInt(0, attackWeapons.Count - 1)]));
+                        weapon.Id));
                     break;
                 }
             }
@@ -70,7 +85,7 @@ public static class EnemyPlacer
             {
                 int pick = roomStart + rng.NextInt(0, placed - 1);
                 var (x, y, _) = spawns[pick];
-                spawns[pick] = (x, y, GameConstants.StaffWeaponIdx);
+                spawns[pick] = (x, y, HealerWeaponId);
             }
         }
 
